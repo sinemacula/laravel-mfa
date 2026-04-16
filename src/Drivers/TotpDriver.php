@@ -92,4 +92,27 @@ final class TotpDriver implements FactorDriver
         /** @var string */
         return $this->google2fa->generateSecretKey();
     }
+
+    /**
+     * Build the canonical `otpauth://totp/...` provisioning URI for an
+     * authenticator-app QR code.
+     *
+     * Wraps `Google2FA::getQRCodeUrl()`, which URL-encodes the issuer and
+     * account name internally — callers should pass raw values rather
+     * than pre-encoding them.
+     *
+     * @param  string  $issuer
+     * @param  string  $accountName
+     * @param  string  $secret
+     * @return string
+     */
+    public function provisioningUri(
+        string $issuer,
+        string $accountName,
+        #[\SensitiveParameter]
+        string $secret,
+    ): string {
+        /** @var string */
+        return $this->google2fa->getQRCodeUrl($issuer, $accountName, $secret);
+    }
 }

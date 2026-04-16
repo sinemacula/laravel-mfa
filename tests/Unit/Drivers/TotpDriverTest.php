@@ -30,6 +30,9 @@ use Tests\TestCase;
  */
 final class TotpDriverTest extends TestCase
 {
+    /** @var string Account-name fixture used across the provisioning-URI tests. */
+    private const string ACCOUNT_NAME = 'user@example.com';
+
     public function testIssueChallengeIsNoOp(): void
     {
         $driver = new TotpDriver;
@@ -92,6 +95,81 @@ final class TotpDriverTest extends TestCase
         self::assertIsString($secret);
         self::assertNotSame('', $secret);
         self::assertMatchesRegularExpression('/^[A-Z2-7]+$/', $secret);
+    }
+
+    public function testProvisioningUriReturnsOtpauthScheme(): void
+    {
+        $driver = new TotpDriver;
+        $secret = $driver->generateSecret();
+
+        $uri = $driver->provisioningUri(
+            issuer: 'Acme',
+            accountName: self::ACCOUNT_NAME,
+            secret: $secret,
+        );
+
+        self::assertStringStartsWith('otpauth://totp/', $uri);
+    }
+
+    public function testProvisioningUriIncludesIssuerAndAccountAndSecret(): void
+    {
+        $driver = new TotpDriver;
+        $secret = $driver->generateSecret();
+
+        $uri = $driver->provisioningUri(
+            issuer: 'Acme',
+            accountName: self::ACCOUNT_NAME,
+            secret: $secret,
+        );
+
+        // The label segment is `Issuer:AccountName`, URL-encoded by the
+        // Google2FA library.
+        self::assertStringContainsString('Acme', $uri);
+        self::assertStringContainsString('user%40example.com', $uri);
+
+        // Both the `secret` and `issuer` query parameters must be present
+        // (the latter is the standard auth-app behaviour for grouping).
+        $query = parse_url($uri, PHP_URL_QUERY);
+        self::assertIsString($query);
+
+        parse_str($query, $params);
+
+        self::assertArrayHasKey('secret', $params);
+        self::assertSame($secret, $params['secret']);
+        self::assertArrayHasKey('issuer', $params);
+        self::assertSame('Acme', $params['issuer']);
+    }
+
+    public function testProvisioningUriDoesNotDoubleEncodeIssuer(): void
+    {
+        $driver = new TotpDriver;
+        $secret = $driver->generateSecret();
+
+        $uri = $driver->provisioningUri(
+            issuer: 'Acme Co',
+            accountName: self::ACCOUNT_NAME,
+            secret: $secret,
+        );
+
+        // `Acme Co` should be encoded exactly once. A double-encoded value
+        // would surface as `Acme%2520Co`; the wrapper must trust the
+        // library's single pass.
+        self::assertStringNotContainsString('Acme%2520Co', $uri);
+        self::assertStringContainsString('Acme%20Co', $uri);
+    }
+
+    public function testProvisioningUriSecretParameterCarriesSensitiveAttribute(): void
+    {
+        $reflection  = new \ReflectionMethod(TotpDriver::class, 'provisioningUri');
+        $secretParam = $reflection->getParameters()[2] ?? null;
+
+        self::assertNotNull($secretParam);
+        self::assertSame('secret', $secretParam->getName());
+        self::assertNotEmpty(
+            $secretParam->getAttributes(\SensitiveParameter::class),
+            'The $secret parameter must carry the #[\SensitiveParameter] '
+            . 'attribute so it does not leak into stack traces.',
+        );
     }
 
     /**

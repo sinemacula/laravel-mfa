@@ -136,6 +136,35 @@ $driver = Mfa::driver('totp');
 $valid  = $driver->verify($code, $factor);
 ```
 
+### TOTP enrolment
+
+Generate a shared secret and a provisioning URI, render the URI as a QR code with the QR-rendering library
+of your choice, then persist the secret on a `Factor` row:
+
+```php
+use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Models\Factor;
+
+$driver = Mfa::driver('totp');
+$secret = $driver->generateSecret();
+$uri    = $driver->provisioningUri(
+    issuer: config('app.name'),
+    accountName: $user->email,
+    secret: $secret,
+);
+
+// Render $uri as a QR code with your library of choice. With endroid/qr-code:
+//   $qr = Builder::create()->writer(new PngWriter)->data($uri)->build();
+
+Factor::create([
+    'authenticatable_type' => $user::class,
+    'authenticatable_id'   => $user->getKey(),
+    'driver'               => 'totp',
+    'label'                => 'Authenticator app',
+    'secret'               => $secret,
+]);
+```
+
 ### Custom factor drivers
 
 Register a custom driver via the `extend()` API:
