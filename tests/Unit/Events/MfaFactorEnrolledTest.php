@@ -19,6 +19,11 @@ use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
  */
 final class MfaFactorEnrolledTest extends TestCase
 {
+    /**
+     * Test is final readonly class.
+     *
+     * @return void
+     */
     public function testIsFinalReadonlyClass(): void
     {
         $reflection = new \ReflectionClass(MfaFactorEnrolled::class);
@@ -27,6 +32,11 @@ final class MfaFactorEnrolledTest extends TestCase
         self::assertTrue($reflection->isReadOnly());
     }
 
+    /**
+     * Test constructor preserves arguments.
+     *
+     * @return void
+     */
     public function testConstructorPreservesArguments(): void
     {
         $identity = self::createStub(Authenticatable::class);

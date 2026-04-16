@@ -23,6 +23,11 @@ use SineMacula\Laravel\Mfa\Stores\SessionMfaVerificationStore;
  */
 final class SessionMfaVerificationStoreTest extends TestCase
 {
+    /**
+     * Set up the test fixtures.
+     *
+     * @return void
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -30,6 +35,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         Carbon::setTestNow('2026-04-15T10:00:00+00:00');
     }
 
+    /**
+     * Tear down the test fixtures.
+     *
+     * @return void
+     */
     protected function tearDown(): void
     {
         Carbon::setTestNow();
@@ -37,6 +47,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         parent::tearDown();
     }
 
+    /**
+     * Test implements mfa verification store contract.
+     *
+     * @return void
+     */
     public function testImplementsMfaVerificationStoreContract(): void
     {
         self::assertInstanceOf(
@@ -45,6 +60,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         );
     }
 
+    /**
+     * Test mark verified without timestamp stamps now.
+     *
+     * @return void
+     */
     public function testMarkVerifiedWithoutTimestampStampsNow(): void
     {
         $session = $this->buildSession();
@@ -56,6 +76,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         self::assertSame($expected, $session->get('mfa.verified_at.user-1'));
     }
 
+    /**
+     * Test mark verified with explicit timestamp stamps given timestamp.
+     *
+     * @return void
+     */
     public function testMarkVerifiedWithExplicitTimestampStampsGivenTimestamp(): void
     {
         $session = $this->buildSession();
@@ -67,6 +92,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         self::assertSame($at->getTimestamp(), $session->get('mfa.verified_at.42'));
     }
 
+    /**
+     * Test mark verified throws when identifier is not scalar.
+     *
+     * @return void
+     */
     public function testMarkVerifiedThrowsWhenIdentifierIsNotScalar(): void
     {
         $store = new SessionMfaVerificationStore($this->buildSession());
@@ -77,6 +107,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         $store->markVerified($this->buildIdentity(new \stdClass));
     }
 
+    /**
+     * Test last verified at returns null when no prior verification.
+     *
+     * @return void
+     */
     public function testLastVerifiedAtReturnsNullWhenNoPriorVerification(): void
     {
         $store = new SessionMfaVerificationStore($this->buildSession());
@@ -84,6 +119,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         self::assertNull($store->lastVerifiedAt($this->buildIdentity('user-1')));
     }
 
+    /**
+     * Test last verified at returns carbon after mark verified.
+     *
+     * @return void
+     */
     public function testLastVerifiedAtReturnsCarbonAfterMarkVerified(): void
     {
         $session = $this->buildSession();
@@ -97,6 +137,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         self::assertSame(Carbon::now()->getTimestamp(), $result->getTimestamp());
     }
 
+    /**
+     * Test last verified at returns null when stored value is not int.
+     *
+     * @return void
+     */
     public function testLastVerifiedAtReturnsNullWhenStoredValueIsNotInt(): void
     {
         $session = $this->buildSession();
@@ -107,6 +152,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         self::assertNull($store->lastVerifiedAt($this->buildIdentity('user-1')));
     }
 
+    /**
+     * Test forget clears stored key.
+     *
+     * @return void
+     */
     public function testForgetClearsStoredKey(): void
     {
         $session = $this->buildSession();
@@ -119,6 +169,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         self::assertNull($store->lastVerifiedAt($this->buildIdentity('user-1')));
     }
 
+    /**
+     * Test keys are scoped per identity.
+     *
+     * @return void
+     */
     public function testKeysAreScopedPerIdentity(): void
     {
         $session = $this->buildSession();
@@ -146,6 +201,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         self::assertNotNull($store->lastVerifiedAt($bob));
     }
 
+    /**
+     * Test last verified at throws when identifier is not scalar.
+     *
+     * @return void
+     */
     public function testLastVerifiedAtThrowsWhenIdentifierIsNotScalar(): void
     {
         $store = new SessionMfaVerificationStore($this->buildSession());
@@ -155,6 +215,11 @@ final class SessionMfaVerificationStoreTest extends TestCase
         $store->lastVerifiedAt($this->buildIdentity(new \stdClass));
     }
 
+    /**
+     * Test forget throws when identifier is not scalar.
+     *
+     * @return void
+     */
     public function testForgetThrowsWhenIdentifierIsNotScalar(): void
     {
         $store = new SessionMfaVerificationStore($this->buildSession());

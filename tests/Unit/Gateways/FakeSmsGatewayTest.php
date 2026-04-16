@@ -24,11 +24,21 @@ final class FakeSmsGatewayTest extends TestCase
     /** @var string */
     private const string UK_NUMBER = '+447700900000';
 
+    /**
+     * Test implements sms gateway contract.
+     *
+     * @return void
+     */
     public function testImplementsSmsGatewayContract(): void
     {
         self::assertInstanceOf(SmsGateway::class, new FakeSmsGateway);
     }
 
+    /**
+     * Test sent is initially empty.
+     *
+     * @return void
+     */
     public function testSentIsInitiallyEmpty(): void
     {
         $gateway = new FakeSmsGateway;
@@ -36,6 +46,11 @@ final class FakeSmsGatewayTest extends TestCase
         self::assertSame([], $gateway->sent());
     }
 
+    /**
+     * Test send records outbound messages.
+     *
+     * @return void
+     */
     public function testSendRecordsOutboundMessages(): void
     {
         $gateway = new FakeSmsGateway;
@@ -49,6 +64,11 @@ final class FakeSmsGatewayTest extends TestCase
         ], $gateway->sent());
     }
 
+    /**
+     * Test sent to filters by recipient.
+     *
+     * @return void
+     */
     public function testSentToFiltersByRecipient(): void
     {
         $gateway = new FakeSmsGateway;
@@ -63,6 +83,11 @@ final class FakeSmsGatewayTest extends TestCase
         ], $gateway->sentTo(self::US_NUMBER));
     }
 
+    /**
+     * Test sent to returns empty when no match.
+     *
+     * @return void
+     */
     public function testSentToReturnsEmptyWhenNoMatch(): void
     {
         $gateway = new FakeSmsGateway;
@@ -72,6 +97,11 @@ final class FakeSmsGatewayTest extends TestCase
         self::assertSame([], $gateway->sentTo(self::UK_NUMBER));
     }
 
+    /**
+     * Test reset clears recorded messages.
+     *
+     * @return void
+     */
     public function testResetClearsRecordedMessages(): void
     {
         $gateway = new FakeSmsGateway;

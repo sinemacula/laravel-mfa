@@ -19,6 +19,11 @@ use SineMacula\Laravel\Mfa\Policies\NullMfaPolicy;
  */
 final class NullMfaPolicyTest extends TestCase
 {
+    /**
+     * Test should enforce always returns false.
+     *
+     * @return void
+     */
     public function testShouldEnforceAlwaysReturnsFalse(): void
     {
         $policy   = new NullMfaPolicy;
@@ -27,6 +32,11 @@ final class NullMfaPolicyTest extends TestCase
         self::assertFalse($policy->shouldEnforce($identity));
     }
 
+    /**
+     * Test implements mfa policy contract.
+     *
+     * @return void
+     */
     public function testImplementsMfaPolicyContract(): void
     {
         self::assertInstanceOf(MfaPolicy::class, new NullMfaPolicy);

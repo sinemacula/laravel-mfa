@@ -17,6 +17,11 @@ use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
  */
 final class MfaVerificationFailureReasonTest extends TestCase
 {
+    /**
+     * Test is backed by string.
+     *
+     * @return void
+     */
     public function testIsBackedByString(): void
     {
         $reflection = new \ReflectionEnum(MfaVerificationFailureReason::class);
@@ -25,41 +30,81 @@ final class MfaVerificationFailureReasonTest extends TestCase
         self::assertSame('string', (string) $reflection->getBackingType());
     }
 
+    /**
+     * Test factor locked case value.
+     *
+     * @return void
+     */
     public function testFactorLockedCaseValue(): void
     {
         self::assertSame('factor_locked', MfaVerificationFailureReason::FactorLocked->value);
     }
 
+    /**
+     * Test code invalid case value.
+     *
+     * @return void
+     */
     public function testCodeInvalidCaseValue(): void
     {
         self::assertSame('code_invalid', MfaVerificationFailureReason::CodeInvalid->value);
     }
 
+    /**
+     * Test code expired case value.
+     *
+     * @return void
+     */
     public function testCodeExpiredCaseValue(): void
     {
         self::assertSame('code_expired', MfaVerificationFailureReason::CodeExpired->value);
     }
 
+    /**
+     * Test code missing case value.
+     *
+     * @return void
+     */
     public function testCodeMissingCaseValue(): void
     {
         self::assertSame('code_missing', MfaVerificationFailureReason::CodeMissing->value);
     }
 
+    /**
+     * Test secret missing case value.
+     *
+     * @return void
+     */
     public function testSecretMissingCaseValue(): void
     {
         self::assertSame('secret_missing', MfaVerificationFailureReason::SecretMissing->value);
     }
 
+    /**
+     * Test driver unknown case value.
+     *
+     * @return void
+     */
     public function testDriverUnknownCaseValue(): void
     {
         self::assertSame('driver_unknown', MfaVerificationFailureReason::DriverUnknown->value);
     }
 
+    /**
+     * Test identity unsupported case value.
+     *
+     * @return void
+     */
     public function testIdentityUnsupportedCaseValue(): void
     {
         self::assertSame('identity_unsupported', MfaVerificationFailureReason::IdentityUnsupported->value);
     }
 
+    /**
+     * Test exposes all seven cases.
+     *
+     * @return void
+     */
     public function testExposesAllSevenCases(): void
     {
         self::assertCount(7, MfaVerificationFailureReason::cases());

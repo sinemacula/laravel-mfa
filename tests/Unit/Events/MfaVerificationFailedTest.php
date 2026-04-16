@@ -20,6 +20,11 @@ use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
  */
 final class MfaVerificationFailedTest extends TestCase
 {
+    /**
+     * Test is final readonly class.
+     *
+     * @return void
+     */
     public function testIsFinalReadonlyClass(): void
     {
         $reflection = new \ReflectionClass(MfaVerificationFailed::class);
@@ -28,6 +33,11 @@ final class MfaVerificationFailedTest extends TestCase
         self::assertTrue($reflection->isReadOnly());
     }
 
+    /**
+     * Test constructor preserves arguments.
+     *
+     * @return void
+     */
     public function testConstructorPreservesArguments(): void
     {
         $identity = self::createStub(Authenticatable::class);
@@ -46,6 +56,11 @@ final class MfaVerificationFailedTest extends TestCase
         self::assertSame(MfaVerificationFailureReason::CodeInvalid, $event->reason);
     }
 
+    /**
+     * Test factor may be null.
+     *
+     * @return void
+     */
     public function testFactorMayBeNull(): void
     {
         $identity = self::createStub(Authenticatable::class);

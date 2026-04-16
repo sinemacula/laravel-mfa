@@ -19,6 +19,11 @@ use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
  */
 final class MfaCodeMessageTest extends TestCase
 {
+    /**
+     * Test envelope has default subject.
+     *
+     * @return void
+     */
     public function testEnvelopeHasDefaultSubject(): void
     {
         $message = new MfaCodeMessage('123456', 10);
@@ -29,6 +34,11 @@ final class MfaCodeMessageTest extends TestCase
         self::assertSame('Your verification code', $envelope->subject);
     }
 
+    /**
+     * Test content returns content instance.
+     *
+     * @return void
+     */
     public function testContentReturnsContentInstance(): void
     {
         $message = new MfaCodeMessage('987654', 5);
@@ -36,6 +46,11 @@ final class MfaCodeMessageTest extends TestCase
         self::assertInstanceOf(Content::class, $message->content());
     }
 
+    /**
+     * Test html body mentions code and expiry.
+     *
+     * @return void
+     */
     public function testHtmlBodyMentionsCodeAndExpiry(): void
     {
         $message = new MfaCodeMessage('CODEX', 15);
@@ -47,6 +62,11 @@ final class MfaCodeMessageTest extends TestCase
         self::assertStringContainsString('15 minute', $html);
     }
 
+    /**
+     * Test html body escapes code.
+     *
+     * @return void
+     */
     public function testHtmlBodyEscapesCode(): void
     {
         $message = new MfaCodeMessage('<script>', 5);
@@ -58,6 +78,11 @@ final class MfaCodeMessageTest extends TestCase
         self::assertStringContainsString('&lt;script&gt;', $html);
     }
 
+    /**
+     * Test html body mentions ignore wording.
+     *
+     * @return void
+     */
     public function testHtmlBodyMentionsIgnoreWording(): void
     {
         $message = new MfaCodeMessage('SECRET', 7);
@@ -69,6 +94,11 @@ final class MfaCodeMessageTest extends TestCase
         self::assertStringContainsString('ignore this message', $html);
     }
 
+    /**
+     * Test html body renderer produces expected output.
+     *
+     * @return void
+     */
     public function testHtmlBodyRendererProducesExpectedOutput(): void
     {
         $message    = new MfaCodeMessage('ABC123', 3);
@@ -82,6 +112,11 @@ final class MfaCodeMessageTest extends TestCase
         self::assertStringContainsString('<p>', $html);
     }
 
+    /**
+     * Test code parameter is marked sensitive.
+     *
+     * @return void
+     */
     public function testCodeParameterIsMarkedSensitive(): void
     {
         $reflection = new \ReflectionMethod(MfaCodeMessage::class, '__construct');
@@ -99,6 +134,11 @@ final class MfaCodeMessageTest extends TestCase
         self::assertNotEmpty($codeParam->getAttributes(\SensitiveParameter::class));
     }
 
+    /**
+     * Test exposes code and expiry as public readonly properties.
+     *
+     * @return void
+     */
     public function testExposesCodeAndExpiryAsPublicReadonlyProperties(): void
     {
         $message = new MfaCodeMessage('ABC123', 12);

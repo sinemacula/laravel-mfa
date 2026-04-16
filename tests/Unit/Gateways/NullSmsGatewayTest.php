@@ -19,6 +19,11 @@ use SineMacula\Laravel\Mfa\Gateways\NullSmsGateway;
  */
 final class NullSmsGatewayTest extends TestCase
 {
+    /**
+     * Test send always throws sms gateway not configured exception.
+     *
+     * @return void
+     */
     public function testSendAlwaysThrowsSmsGatewayNotConfiguredException(): void
     {
         $gateway = new NullSmsGateway;
@@ -29,6 +34,11 @@ final class NullSmsGatewayTest extends TestCase
         $gateway->send('+15551234567', 'hello');
     }
 
+    /**
+     * Test implements sms gateway contract.
+     *
+     * @return void
+     */
     public function testImplementsSmsGatewayContract(): void
     {
         self::assertInstanceOf(SmsGateway::class, new NullSmsGateway);

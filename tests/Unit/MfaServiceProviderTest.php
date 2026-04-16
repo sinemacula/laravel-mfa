@@ -26,6 +26,11 @@ use Tests\TestCase;
  */
 final class MfaServiceProviderTest extends TestCase
 {
+    /**
+     * Test binds mfa manager as singleton under mfa alias.
+     *
+     * @return void
+     */
     public function testBindsMfaManagerAsSingletonUnderMfaAlias(): void
     {
         $first  = $this->app->make('mfa');
@@ -35,11 +40,21 @@ final class MfaServiceProviderTest extends TestCase
         self::assertSame($first, $second);
     }
 
+    /**
+     * Test binds mfa policy to null mfa policy.
+     *
+     * @return void
+     */
     public function testBindsMfaPolicyToNullMfaPolicy(): void
     {
         self::assertInstanceOf(NullMfaPolicy::class, $this->app->make(MfaPolicy::class));
     }
 
+    /**
+     * Test binds mfa verification store to session store.
+     *
+     * @return void
+     */
     public function testBindsMfaVerificationStoreToSessionStore(): void
     {
         self::assertInstanceOf(
@@ -48,11 +63,21 @@ final class MfaServiceProviderTest extends TestCase
         );
     }
 
+    /**
+     * Test binds sms gateway to null sms gateway.
+     *
+     * @return void
+     */
     public function testBindsSmsGatewayToNullSmsGateway(): void
     {
         self::assertInstanceOf(NullSmsGateway::class, $this->app->make(SmsGateway::class));
     }
 
+    /**
+     * Test registers middleware aliases.
+     *
+     * @return void
+     */
     public function testRegistersMiddlewareAliases(): void
     {
         /** @var \Illuminate\Routing\Router $router */
@@ -66,6 +91,11 @@ final class MfaServiceProviderTest extends TestCase
         self::assertSame(SkipMfa::class, $middleware['mfa.skip']);
     }
 
+    /**
+     * Test merges default mfa config.
+     *
+     * @return void
+     */
     public function testMergesDefaultMfaConfig(): void
     {
         $config = $this->app->make('config');
@@ -76,6 +106,11 @@ final class MfaServiceProviderTest extends TestCase
         self::assertSame('mfa_factors', $config->get('mfa.factor.table'));
     }
 
+    /**
+     * Test registers config publishing tag.
+     *
+     * @return void
+     */
     public function testRegistersConfigPublishingTag(): void
     {
         $paths = \Illuminate\Support\ServiceProvider::pathsToPublish(
@@ -87,6 +122,11 @@ final class MfaServiceProviderTest extends TestCase
         self::assertContains(config_path('mfa.php'), $paths);
     }
 
+    /**
+     * Test registers migration publishing tag.
+     *
+     * @return void
+     */
     public function testRegistersMigrationPublishingTag(): void
     {
         $paths = \Illuminate\Support\ServiceProvider::pathsToPublish(
@@ -97,14 +137,29 @@ final class MfaServiceProviderTest extends TestCase
         self::assertNotEmpty($paths);
     }
 
+    /**
+     * Test offer publishing is skipped when not running in console.
+     *
+     * @return void
+     */
     public function testOfferPublishingIsSkippedWhenNotRunningInConsole(): void
     {
         // Build a throwaway testbench kernel whose `runningInConsole()`
         // returns false so we exercise the early-return in
         // `offerPublishing()`.
         $app = new class extends \Illuminate\Foundation\Application {
+            /**
+             * Construct.
+             *
+             * @return void
+             */
             public function __construct() {}
 
+            /**
+             * Running in console.
+             *
+             * @return bool
+             */
             public function runningInConsole(): bool
             {
                 return false;

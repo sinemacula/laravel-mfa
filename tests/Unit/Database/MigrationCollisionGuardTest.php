@@ -20,6 +20,11 @@ use SineMacula\Laravel\Mfa\Exceptions\FactorTableAlreadyExistsException;
  */
 final class MigrationCollisionGuardTest extends TestCase
 {
+    /**
+     * Test ensure not exists no ops when table does not exist.
+     *
+     * @return void
+     */
     public function testEnsureNotExistsNoOpsWhenTableDoesNotExist(): void
     {
         $schema = $this->createMock(Builder::class);
@@ -36,6 +41,11 @@ final class MigrationCollisionGuardTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    /**
+     * Test ensure not exists throws when table exists.
+     *
+     * @return void
+     */
     public function testEnsureNotExistsThrowsWhenTableExists(): void
     {
         $connection = self::createStub(Connection::class);
@@ -57,6 +67,11 @@ final class MigrationCollisionGuardTest extends TestCase
         }
     }
 
+    /**
+     * Test exception message falls back to default connection name.
+     *
+     * @return void
+     */
     public function testExceptionMessageFallsBackToDefaultConnectionName(): void
     {
         $connection = self::createStub(Connection::class);

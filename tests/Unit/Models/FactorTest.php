@@ -24,11 +24,24 @@ final class FactorTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** @var string */
+    private const string TEST_USER_EMAIL = 'alice@example.com';
+
+    /**
+     * Test implements eloquent factor contract.
+     *
+     * @return void
+     */
     public function testImplementsEloquentFactorContract(): void
     {
         self::assertInstanceOf(EloquentFactor::class, new Factor);
     }
 
+    /**
+     * Test default table name is mfa factors.
+     *
+     * @return void
+     */
     public function testDefaultTableNameIsMfaFactors(): void
     {
         $factor = new Factor;
@@ -36,6 +49,11 @@ final class FactorTest extends TestCase
         self::assertSame('mfa_factors', $factor->getTable());
     }
 
+    /**
+     * Test table name falls back to default when config facade is not bootstrapped.
+     *
+     * @return void
+     */
     public function testTableNameFallsBackToDefaultWhenConfigFacadeIsNotBootstrapped(): void
     {
         // Swap out the bound Facade application so `Config::string(...)`
@@ -54,6 +72,11 @@ final class FactorTest extends TestCase
         }
     }
 
+    /**
+     * Test table name resolves from config.
+     *
+     * @return void
+     */
     public function testTableNameResolvesFromConfig(): void
     {
         Config::set('mfa.factor.table', 'custom_factors');
@@ -63,6 +86,11 @@ final class FactorTest extends TestCase
         self::assertSame('custom_factors', $factor->getTable());
     }
 
+    /**
+     * Test table name falls back to default when config is empty.
+     *
+     * @return void
+     */
     public function testTableNameFallsBackToDefaultWhenConfigIsEmpty(): void
     {
         Config::set('mfa.factor.table', '');
@@ -72,18 +100,28 @@ final class FactorTest extends TestCase
         self::assertSame('mfa_factors', $factor->getTable());
     }
 
+    /**
+     * Test unique ids returns id column.
+     *
+     * @return void
+     */
     public function testUniqueIdsReturnsIdColumn(): void
     {
         self::assertSame(['id'], (new Factor)->uniqueIds());
     }
 
+    /**
+     * Test generates ulid primary key on save.
+     *
+     * @return void
+     */
     public function testGeneratesUlidPrimaryKeyOnSave(): void
     {
-        $user = TestUser::create(['email' => 'alice@example.com', 'mfa_enabled' => true]);
+        $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
 
         $factor = new Factor([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => $this->authenticatableId($user),
             'driver'               => 'email',
         ]);
         $factor->save();
@@ -93,13 +131,18 @@ final class FactorTest extends TestCase
         self::assertSame(26, strlen($factor->id));
     }
 
+    /**
+     * Test authenticatable morph to relation.
+     *
+     * @return void
+     */
     public function testAuthenticatableMorphToRelation(): void
     {
-        $user = TestUser::create(['email' => 'alice@example.com', 'mfa_enabled' => true]);
+        $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
 
         $factor = new Factor([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => $this->authenticatableId($user),
             'driver'               => 'totp',
         ]);
         $factor->save();
@@ -115,13 +158,18 @@ final class FactorTest extends TestCase
         self::assertSame($user->getKey(), $loaded->getKey());
     }
 
+    /**
+     * Test secret is encrypted at rest and decrypts on read.
+     *
+     * @return void
+     */
     public function testSecretIsEncryptedAtRestAndDecryptsOnRead(): void
     {
-        $user = TestUser::create(['email' => 'alice@example.com', 'mfa_enabled' => true]);
+        $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
 
         $factor = new Factor([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => $this->authenticatableId($user),
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
@@ -136,22 +184,29 @@ final class FactorTest extends TestCase
         // plaintext.
         $connection = $factor->getConnection();
 
-        /** @var object{secret: ?string} $raw */
         $raw = $connection->table($factor->getTable())
             ->where('id', $factor->id)
             ->first(['secret']);
 
-        self::assertNotNull($raw->secret);
-        self::assertNotSame('JBSWY3DPEHPK3PXP', $raw->secret);
+        self::assertNotNull($raw);
+        /** @var mixed $rawSecret */
+        $rawSecret = $raw->secret;
+        self::assertIsString($rawSecret);
+        self::assertNotSame('JBSWY3DPEHPK3PXP', $rawSecret);
     }
 
+    /**
+     * Test secret and code are hidden from serialisation.
+     *
+     * @return void
+     */
     public function testSecretAndCodeAreHiddenFromSerialisation(): void
     {
-        $user = TestUser::create(['email' => 'alice@example.com', 'mfa_enabled' => true]);
+        $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
 
         $factor = new Factor([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => $this->authenticatableId($user),
             'driver'               => 'email',
             'secret'               => 'super-secret',
             'code'                 => '654321',
@@ -163,5 +218,19 @@ final class FactorTest extends TestCase
         self::assertArrayNotHasKey('secret', $array);
         self::assertArrayNotHasKey('code', $array);
         self::assertArrayHasKey('driver', $array);
+    }
+
+    /**
+     * Return the test user's key as a string for morph-to wiring.
+     *
+     * @param  \Tests\Fixtures\TestUser  $user
+     * @return string
+     */
+    private function authenticatableId(TestUser $user): string
+    {
+        /** @var int $key */
+        $key = $user->getKey();
+
+        return (string) $key;
     }
 }

@@ -19,6 +19,11 @@ use SineMacula\Laravel\Mfa\Middleware\SkipMfa;
  */
 final class SkipMfaTest extends TestCase
 {
+    /**
+     * Test handle sets skip mfa attribute and passes through.
+     *
+     * @return void
+     */
     public function testHandleSetsSkipMfaAttributeAndPassesThrough(): void
     {
         $middleware = new SkipMfa;
@@ -33,6 +38,7 @@ final class SkipMfaTest extends TestCase
         });
 
         self::assertTrue($request->attributes->get('skip_mfa'));
+        // @SuppressWarnings("php:S3415")
         self::assertSame($request, $seen);
         self::assertSame($response, $result);
     }

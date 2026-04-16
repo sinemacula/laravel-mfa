@@ -26,8 +26,13 @@ final class FactorSummaryTest extends TestCase
     private const string VERIFIED_AT_ISO = '2026-04-15T12:34:56+00:00';
 
     /** @var string */
-    private const string SAMPLE_MASKED_EMAIL = self::SAMPLE_MASKED_EMAIL;
+    private const string SAMPLE_MASKED_EMAIL = 'al***@example.com';
 
+    /**
+     * Test is final readonly class.
+     *
+     * @return void
+     */
     public function testIsFinalReadonlyClass(): void
     {
         $reflection = new \ReflectionClass(FactorSummary::class);
@@ -36,11 +41,21 @@ final class FactorSummaryTest extends TestCase
         self::assertTrue($reflection->isReadOnly());
     }
 
+    /**
+     * Test implements json serializable.
+     *
+     * @return void
+     */
     public function testImplementsJsonSerializable(): void
     {
         self::assertInstanceOf(\JsonSerializable::class, $this->buildMinimalSummary());
     }
 
+    /**
+     * Test from factor captures all fields.
+     *
+     * @return void
+     */
     public function testFromFactorCapturesAllFields(): void
     {
         $verifiedAt = Carbon::parse(self::VERIFIED_AT_ISO);
@@ -61,6 +76,11 @@ final class FactorSummaryTest extends TestCase
         self::assertSame($verifiedAt, $summary->verifiedAt);
     }
 
+    /**
+     * Test from factor stringifies integer identifier.
+     *
+     * @return void
+     */
     public function testFromFactorStringifiesIntegerIdentifier(): void
     {
         $factor = self::createStub(Factor::class);
@@ -75,6 +95,11 @@ final class FactorSummaryTest extends TestCase
         self::assertSame('42', $summary->id);
     }
 
+    /**
+     * Test from factor collapses non scalar identifier to empty string.
+     *
+     * @return void
+     */
     public function testFromFactorCollapsesNonScalarIdentifierToEmptyString(): void
     {
         $factor = self::createStub(Factor::class);
@@ -89,6 +114,11 @@ final class FactorSummaryTest extends TestCase
         self::assertSame('', $summary->id);
     }
 
+    /**
+     * Test masking keeps null recipient as null.
+     *
+     * @return void
+     */
     public function testMaskingKeepsNullRecipientAsNull(): void
     {
         $factor = self::createStub(Factor::class);
@@ -103,6 +133,11 @@ final class FactorSummaryTest extends TestCase
         self::assertNull($summary->maskedRecipient);
     }
 
+    /**
+     * Test masking keeps empty string recipient as empty string.
+     *
+     * @return void
+     */
     public function testMaskingKeepsEmptyStringRecipientAsEmptyString(): void
     {
         $factor = self::createStub(Factor::class);
@@ -117,6 +152,11 @@ final class FactorSummaryTest extends TestCase
         self::assertSame('', $summary->maskedRecipient);
     }
 
+    /**
+     * Test masking email with short single char local part.
+     *
+     * @return void
+     */
     public function testMaskingEmailWithShortSingleCharLocalPart(): void
     {
         $summary = $this->buildSummaryWithRecipient('a@example.com');
@@ -126,6 +166,11 @@ final class FactorSummaryTest extends TestCase
         self::assertSame('a*@example.com', $summary->maskedRecipient);
     }
 
+    /**
+     * Test masking email with two char local part.
+     *
+     * @return void
+     */
     public function testMaskingEmailWithTwoCharLocalPart(): void
     {
         $summary = $this->buildSummaryWithRecipient('ab@example.com');
@@ -135,6 +180,11 @@ final class FactorSummaryTest extends TestCase
         self::assertSame('a*@example.com', $summary->maskedRecipient);
     }
 
+    /**
+     * Test masking email with four char local part.
+     *
+     * @return void
+     */
     public function testMaskingEmailWithFourCharLocalPart(): void
     {
         $summary = $this->buildSummaryWithRecipient('abcd@example.com');
@@ -144,6 +194,11 @@ final class FactorSummaryTest extends TestCase
         self::assertSame('ab**@example.com', $summary->maskedRecipient);
     }
 
+    /**
+     * Test masking email preserves domain.
+     *
+     * @return void
+     */
     public function testMaskingEmailPreservesDomain(): void
     {
         $summary = $this->buildSummaryWithRecipient('alice@sub.example.com');
@@ -151,6 +206,11 @@ final class FactorSummaryTest extends TestCase
         self::assertStringEndsWith('@sub.example.com', (string) $summary->maskedRecipient);
     }
 
+    /**
+     * Test masking phone preserves last four digits.
+     *
+     * @return void
+     */
     public function testMaskingPhonePreservesLastFourDigits(): void
     {
         $summary = $this->buildSummaryWithRecipient('+15551234567');
@@ -158,6 +218,11 @@ final class FactorSummaryTest extends TestCase
         self::assertSame('********4567', $summary->maskedRecipient);
     }
 
+    /**
+     * Test masking short strings are fully masked.
+     *
+     * @return void
+     */
     public function testMaskingShortStringsAreFullyMasked(): void
     {
         $summary = $this->buildSummaryWithRecipient('1234');
@@ -165,6 +230,11 @@ final class FactorSummaryTest extends TestCase
         self::assertSame('****', $summary->maskedRecipient);
     }
 
+    /**
+     * Test masking single character recipient is fully masked.
+     *
+     * @return void
+     */
     public function testMaskingSingleCharacterRecipientIsFullyMasked(): void
     {
         $summary = $this->buildSummaryWithRecipient('9');
@@ -172,6 +242,11 @@ final class FactorSummaryTest extends TestCase
         self::assertSame('*', $summary->maskedRecipient);
     }
 
+    /**
+     * Test json serialize shape with verified at.
+     *
+     * @return void
+     */
     public function testJsonSerializeShapeWithVerifiedAt(): void
     {
         $verifiedAt = Carbon::parse(self::VERIFIED_AT_ISO);
@@ -189,10 +264,15 @@ final class FactorSummaryTest extends TestCase
             'driver'           => 'email',
             'label'            => 'Primary',
             'masked_recipient' => self::SAMPLE_MASKED_EMAIL,
-            'verified_at'      => '2026-04-15T12:34:56+00:00',
+            'verified_at'      => self::VERIFIED_AT_ISO,
         ], $summary->jsonSerialize());
     }
 
+    /**
+     * Test json serialize shape with null fields.
+     *
+     * @return void
+     */
     public function testJsonSerializeShapeWithNullFields(): void
     {
         $summary = new FactorSummary(
@@ -212,6 +292,11 @@ final class FactorSummaryTest extends TestCase
         ], $summary->jsonSerialize());
     }
 
+    /**
+     * Test json encodes via json serializable.
+     *
+     * @return void
+     */
     public function testJsonEncodesViaJsonSerializable(): void
     {
         $summary = new FactorSummary(

@@ -34,6 +34,11 @@ final class RequireMfaTest extends TestCase
     /** @var \Illuminate\Container\Container */
     private Container $container;
 
+    /**
+     * Set up the test fixtures.
+     *
+     * @return void
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -44,6 +49,11 @@ final class RequireMfaTest extends TestCase
         Facade::clearResolvedInstances();
     }
 
+    /**
+     * Tear down the test fixtures.
+     *
+     * @return void
+     */
     protected function tearDown(): void
     {
         Facade::clearResolvedInstances();
@@ -53,6 +63,11 @@ final class RequireMfaTest extends TestCase
         parent::tearDown();
     }
 
+    /**
+     * Test passes through when skip mfa attribute set.
+     *
+     * @return void
+     */
     public function testPassesThroughWhenSkipMfaAttributeSet(): void
     {
         $this->bindManager(new FakeMfaManager);
@@ -67,6 +82,11 @@ final class RequireMfaTest extends TestCase
         self::assertSame($response, $result);
     }
 
+    /**
+     * Test passes through when should use returns false.
+     *
+     * @return void
+     */
     public function testPassesThroughWhenShouldUseReturnsFalse(): void
     {
         $manager            = new FakeMfaManager;
@@ -82,6 +102,11 @@ final class RequireMfaTest extends TestCase
         self::assertSame($response, $result);
     }
 
+    /**
+     * Test throws mfa required when not setup.
+     *
+     * @return void
+     */
     public function testThrowsMfaRequiredWhenNotSetup(): void
     {
         $factor = self::createStub(Factor::class);
@@ -94,7 +119,8 @@ final class RequireMfaTest extends TestCase
         $manager            = new FakeMfaManager;
         $manager->shouldUse = true;
         $manager->isSetup   = false;
-        $manager->factors   = new Collection([$factor]);
+        // @phpstan-ignore assign.propertyType
+        $manager->factors = new Collection([$factor]);
         $this->bindManager($manager);
 
         $middleware = new RequireMfa;
@@ -111,6 +137,11 @@ final class RequireMfaTest extends TestCase
         }
     }
 
+    /**
+     * Test throws mfa required when never verified.
+     *
+     * @return void
+     */
     public function testThrowsMfaRequiredWhenNeverVerified(): void
     {
         $manager                  = new FakeMfaManager;
@@ -131,6 +162,11 @@ final class RequireMfaTest extends TestCase
         }
     }
 
+    /**
+     * Test throws mfa expired when verification expired.
+     *
+     * @return void
+     */
     public function testThrowsMfaExpiredWhenVerificationExpired(): void
     {
         $factor = self::createStub(Factor::class);
@@ -145,7 +181,8 @@ final class RequireMfaTest extends TestCase
         $manager->isSetup         = true;
         $manager->hasEverVerified = true;
         $manager->hasExpired      = true;
-        $manager->factors         = new Collection([$factor]);
+        // @phpstan-ignore assign.propertyType
+        $manager->factors = new Collection([$factor]);
         $this->bindManager($manager);
 
         $middleware = new RequireMfa;
@@ -162,6 +199,11 @@ final class RequireMfaTest extends TestCase
         }
     }
 
+    /**
+     * Test calls next and returns response on success.
+     *
+     * @return void
+     */
     public function testCallsNextAndReturnsResponseOnSuccess(): void
     {
         $manager                  = new FakeMfaManager;
@@ -217,32 +259,60 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
     /** @var ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> */
     public ?Collection $factors = null;
 
-    public function __construct()
-    {
-        // Intentionally skip parent::__construct to avoid requiring a
-        // full container. The middleware only calls the overrides below.
-    }
+    /**
+     * Intentionally skip parent::__construct to avoid requiring a full
+     * container; the middleware only calls the overrides below.
+     *
+     * @phpstan-ignore constructor.missingParentCall
+     */
+    public function __construct() {}
 
+    /**
+     * Should use.
+     *
+     * @return bool
+     */
     public function shouldUse(): bool
     {
         return $this->shouldUse;
     }
 
+    /**
+     * Is setup.
+     *
+     * @return bool
+     */
     public function isSetup(): bool
     {
         return $this->isSetup;
     }
 
+    /**
+     * Has ever verified.
+     *
+     * @return bool
+     */
     public function hasEverVerified(): bool
     {
         return $this->hasEverVerified;
     }
 
+    /**
+     * Has expired.
+     *
+     * @param  ?int  $expiresAfter
+     * @return bool
+     */
     public function hasExpired(?int $expiresAfter = null): bool
     {
         return $this->hasExpired;
     }
 
+    /**
+     * Get factors.
+     *
+     * @return ?Collection
+     */
     public function getFactors(): ?Collection
     {
         return $this->factors;

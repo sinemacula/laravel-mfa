@@ -19,6 +19,11 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  */
 final class MfaRequiredExceptionTest extends TestCase
 {
+    /**
+     * Test is final.
+     *
+     * @return void
+     */
     public function testIsFinal(): void
     {
         $reflection = new \ReflectionClass(MfaRequiredException::class);
@@ -26,11 +31,21 @@ final class MfaRequiredExceptionTest extends TestCase
         self::assertTrue($reflection->isFinal());
     }
 
+    /**
+     * Test extends http exception.
+     *
+     * @return void
+     */
     public function testExtendsHttpException(): void
     {
         self::assertInstanceOf(HttpException::class, new MfaRequiredException);
     }
 
+    /**
+     * Test default status and message.
+     *
+     * @return void
+     */
     public function testDefaultStatusAndMessage(): void
     {
         $exception = new MfaRequiredException;
@@ -40,6 +55,11 @@ final class MfaRequiredExceptionTest extends TestCase
         self::assertSame([], $exception->getFactors());
     }
 
+    /**
+     * Test custom message is respected.
+     *
+     * @return void
+     */
     public function testCustomMessageIsRespected(): void
     {
         $exception = new MfaRequiredException([], 'Please verify.');
@@ -47,6 +67,11 @@ final class MfaRequiredExceptionTest extends TestCase
         self::assertSame('Please verify.', $exception->getMessage());
     }
 
+    /**
+     * Test factors are preserved.
+     *
+     * @return void
+     */
     public function testFactorsArePreserved(): void
     {
         $summary = new FactorSummary(

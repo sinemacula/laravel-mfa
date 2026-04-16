@@ -17,6 +17,11 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
  */
 final class UnsupportedIdentifierExceptionTest extends TestCase
 {
+    /**
+     * Test is final.
+     *
+     * @return void
+     */
     public function testIsFinal(): void
     {
         $reflection = new \ReflectionClass(UnsupportedIdentifierException::class);
@@ -24,6 +29,11 @@ final class UnsupportedIdentifierExceptionTest extends TestCase
         self::assertTrue($reflection->isFinal());
     }
 
+    /**
+     * Test extends runtime exception.
+     *
+     * @return void
+     */
     public function testExtendsRuntimeException(): void
     {
         self::assertInstanceOf(
@@ -32,6 +42,11 @@ final class UnsupportedIdentifierExceptionTest extends TestCase
         );
     }
 
+    /**
+     * Test preserves message.
+     *
+     * @return void
+     */
     public function testPreservesMessage(): void
     {
         $exception = new UnsupportedIdentifierException('Scalar identifier required.');
