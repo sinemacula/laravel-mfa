@@ -100,6 +100,23 @@ final class BackupCodeDriverTest extends TestCase
         self::assertFalse($driver->verify($fresh, $plain));
     }
 
+    public function testVerifyReturnsFalseWhenConcurrentConsumerDeletedTheRow(): void
+    {
+        $driver = new BackupCodeDriver;
+        $plain  = 'RACEDELETE';
+        $hash   = $driver->hash($plain);
+        $factor = $this->makeEloquentFactor($hash);
+
+        // Simulate a concurrent request having already consumed AND
+        // purged the row between the outer verify() loading the in-
+        // memory factor and the atomic lockForUpdate() query running.
+        DB::table($factor->getTable())
+            ->where($factor->getKeyName(), $factor->getKey())
+            ->delete();
+
+        self::assertFalse($driver->verify($factor, $plain));
+    }
+
     public function testVerifyReturnsTrueForEloquentFactorThatIsNotAnEloquentModel(): void
     {
         $driver = new BackupCodeDriver;
@@ -463,25 +480,4 @@ final class BackupCodeDriverTest extends TestCase
             }
         };
     }
-}
-
-/**
- * Factor subclass that drops the `encrypted` cast on `secret` so the
- * backup-code driver's plaintext `WHERE secret = ?` atomic-consume
- * query can match the stored column. The shipped model's default
- * non-deterministic encryption cast prevents such plaintext
- * comparisons from matching.
- *
- * @internal
- */
-final class PlainSecretFactor extends FactorModel
-{
-    /** @var array<string, string> */
-    protected $casts = [
-        'expires_at'        => 'datetime',
-        'verified_at'       => 'datetime',
-        'locked_until'      => 'datetime',
-        'last_attempted_at' => 'datetime',
-        'attempts'          => 'integer',
-    ];
 }

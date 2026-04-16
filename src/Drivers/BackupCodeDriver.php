@@ -203,12 +203,12 @@ class BackupCodeDriver implements FactorDriver
         /** @var bool $result */
         $result = DB::connection($factor->getConnectionName())->transaction(
             static function () use ($factor, $secretColumn, $expectedSecret): bool {
-                /** @var ?EloquentFactor $locked */
+                /** @var ?Model $locked */
                 $locked = $factor->newQuery()
                     ->lockForUpdate()
                     ->find($factor->getKey());
 
-                if ($locked === null) {
+                if (!$locked instanceof EloquentFactor) {
                     return false;
                 }
 
@@ -217,10 +217,6 @@ class BackupCodeDriver implements FactorDriver
                 if ($currentSecret === null
                     || !hash_equals($currentSecret, $expectedSecret)
                 ) {
-                    return false;
-                }
-
-                if (!$locked instanceof Model) {
                     return false;
                 }
 

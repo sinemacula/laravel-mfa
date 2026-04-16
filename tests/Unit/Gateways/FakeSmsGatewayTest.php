@@ -18,6 +18,12 @@ use SineMacula\Laravel\Mfa\Gateways\FakeSmsGateway;
  */
 final class FakeSmsGatewayTest extends TestCase
 {
+    /** @var string */
+    private const string US_NUMBER = '+15551234567';
+
+    /** @var string */
+    private const string UK_NUMBER = '+447700900000';
+
     public function testImplementsSmsGatewayContract(): void
     {
         self::assertInstanceOf(SmsGateway::class, new FakeSmsGateway);
@@ -34,12 +40,12 @@ final class FakeSmsGatewayTest extends TestCase
     {
         $gateway = new FakeSmsGateway;
 
-        $gateway->send('+15551234567', 'hello');
-        $gateway->send('+447700900000', 'world');
+        $gateway->send(self::US_NUMBER, 'hello');
+        $gateway->send(self::UK_NUMBER, 'world');
 
         self::assertSame([
-            ['to' => '+15551234567', 'message' => 'hello'],
-            ['to' => '+447700900000', 'message' => 'world'],
+            ['to' => self::US_NUMBER, 'message' => 'hello'],
+            ['to' => self::UK_NUMBER, 'message' => 'world'],
         ], $gateway->sent());
     }
 
@@ -47,30 +53,30 @@ final class FakeSmsGatewayTest extends TestCase
     {
         $gateway = new FakeSmsGateway;
 
-        $gateway->send('+15551234567', 'first');
-        $gateway->send('+447700900000', 'second');
-        $gateway->send('+15551234567', 'third');
+        $gateway->send(self::US_NUMBER, 'first');
+        $gateway->send(self::UK_NUMBER, 'second');
+        $gateway->send(self::US_NUMBER, 'third');
 
         self::assertSame([
-            ['to' => '+15551234567', 'message' => 'first'],
-            ['to' => '+15551234567', 'message' => 'third'],
-        ], $gateway->sentTo('+15551234567'));
+            ['to' => self::US_NUMBER, 'message' => 'first'],
+            ['to' => self::US_NUMBER, 'message' => 'third'],
+        ], $gateway->sentTo(self::US_NUMBER));
     }
 
     public function testSentToReturnsEmptyWhenNoMatch(): void
     {
         $gateway = new FakeSmsGateway;
 
-        $gateway->send('+15551234567', 'hello');
+        $gateway->send(self::US_NUMBER, 'hello');
 
-        self::assertSame([], $gateway->sentTo('+447700900000'));
+        self::assertSame([], $gateway->sentTo(self::UK_NUMBER));
     }
 
     public function testResetClearsRecordedMessages(): void
     {
         $gateway = new FakeSmsGateway;
 
-        $gateway->send('+15551234567', 'hello');
+        $gateway->send(self::US_NUMBER, 'hello');
         $gateway->reset();
 
         self::assertSame([], $gateway->sent());

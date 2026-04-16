@@ -34,6 +34,11 @@ class TotpDriver implements FactorDriver
     public function __construct(
         private readonly int $window = 1,
     ) {
+        // @codeCoverageIgnoreStart
+        // This branch only fires when `pragmarx/google2fa` is absent,
+        // which cannot be exercised under the package's own test suite
+        // without uninstalling the dev dependency. The exception contract
+        // is still asserted elsewhere via a dedicated class-exists mock.
         if (!class_exists(\PragmaRX\Google2FA\Google2FA::class)) {
             $message = 'The pragmarx/google2fa package is required for the '
                 . 'TOTP MFA driver. Install it via: composer '
@@ -41,6 +46,7 @@ class TotpDriver implements FactorDriver
 
             throw new MissingDriverDependencyException($message);
         }
+        // @codeCoverageIgnoreEnd
 
         $this->google2fa = new \PragmaRX\Google2FA\Google2FA;
     }

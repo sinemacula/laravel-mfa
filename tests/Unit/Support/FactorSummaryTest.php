@@ -22,6 +22,12 @@ use SineMacula\Laravel\Mfa\Support\FactorSummary;
  */
 final class FactorSummaryTest extends TestCase
 {
+    /** @var string */
+    private const string VERIFIED_AT_ISO = '2026-04-15T12:34:56+00:00';
+
+    /** @var string */
+    private const string SAMPLE_MASKED_EMAIL = self::SAMPLE_MASKED_EMAIL;
+
     public function testIsFinalReadonlyClass(): void
     {
         $reflection = new \ReflectionClass(FactorSummary::class);
@@ -37,7 +43,7 @@ final class FactorSummaryTest extends TestCase
 
     public function testFromFactorCapturesAllFields(): void
     {
-        $verifiedAt = Carbon::parse('2026-04-15T12:34:56+00:00');
+        $verifiedAt = Carbon::parse(self::VERIFIED_AT_ISO);
 
         $factor = self::createStub(Factor::class);
         $factor->method('getFactorIdentifier')->willReturn('01HXYZABCDEF');
@@ -51,7 +57,7 @@ final class FactorSummaryTest extends TestCase
         self::assertSame('01HXYZABCDEF', $summary->id);
         self::assertSame('email', $summary->driver);
         self::assertSame('Work email', $summary->label);
-        self::assertSame('al***@example.com', $summary->maskedRecipient);
+        self::assertSame(self::SAMPLE_MASKED_EMAIL, $summary->maskedRecipient);
         self::assertSame($verifiedAt, $summary->verifiedAt);
     }
 
@@ -168,13 +174,13 @@ final class FactorSummaryTest extends TestCase
 
     public function testJsonSerializeShapeWithVerifiedAt(): void
     {
-        $verifiedAt = Carbon::parse('2026-04-15T12:34:56+00:00');
+        $verifiedAt = Carbon::parse(self::VERIFIED_AT_ISO);
 
         $summary = new FactorSummary(
             id: '01H',
             driver: 'email',
             label: 'Primary',
-            maskedRecipient: 'al***@example.com',
+            maskedRecipient: self::SAMPLE_MASKED_EMAIL,
             verifiedAt: $verifiedAt,
         );
 
@@ -182,7 +188,7 @@ final class FactorSummaryTest extends TestCase
             'id'               => '01H',
             'driver'           => 'email',
             'label'            => 'Primary',
-            'masked_recipient' => 'al***@example.com',
+            'masked_recipient' => self::SAMPLE_MASKED_EMAIL,
             'verified_at'      => '2026-04-15T12:34:56+00:00',
         ], $summary->jsonSerialize());
     }
