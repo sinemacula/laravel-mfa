@@ -31,15 +31,30 @@ abstract class AbstractOtpDriver implements FactorDriver
     /**
      * Constructor.
      *
+     * `$alphabet` controls the per-character set used by `generateCode()`:
+     * `null` (default) preserves the historical numeric behaviour;
+     * a non-null string switches to picking characters uniformly from
+     * the supplied alphabet. Empty and single-character alphabets are
+     * rejected at construction so misconfigurations fail fast rather
+     * than at first code issuance.
+     *
      * @param  int  $codeLength
      * @param  int  $expiry
      * @param  int  $maxAttempts
+     * @param  ?string  $alphabet
+     *
+     * @throws \InvalidArgumentException
      */
     public function __construct(
         protected readonly int $codeLength = 6,
         protected readonly int $expiry = 10,
         protected readonly int $maxAttempts = 3,
-    ) {}
+        protected readonly ?string $alphabet = null,
+    ) {
+        if ($alphabet !== null && strlen($alphabet) < 2) {
+            throw new \InvalidArgumentException('OTP alphabet must contain at least two characters; received ' . ($alphabet === '' ? 'an empty string' : 'a single character') . '.');
+        }
+    }
 
     /**
      * Issue a fresh one-time code against the factor and dispatch it
@@ -137,6 +152,17 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
+     * Get the configured code alphabet, or null when codes are drawn
+     * from the default numeric set.
+     *
+     * @return ?string
+     */
+    public function getAlphabet(): ?string
+    {
+        return $this->alphabet;
+    }
+
+    /**
      * Deliver the issued code to the factor's recipient via the
      * subclass's chosen transport.
      *
@@ -151,21 +177,33 @@ abstract class AbstractOtpDriver implements FactorDriver
     ): void;
 
     /**
-     * Generate a numeric one-time code of the configured length. Uses
-     * `random_int` for cryptographic suitability (vs `mt_rand` / `rand`).
+     * Generate a one-time code of the configured length. Uses `random_int`
+     * for cryptographic suitability (vs `mt_rand` / `rand`).
+     *
+     * Defaults to a numeric, zero-padded code so the historical contract
+     * holds when no alphabet is configured. When an alphabet is supplied,
+     * each character is drawn uniformly from it via `random_int`.
      *
      * @return string
      */
     protected function generateCode(): string
     {
-        $min = 0;
-        $max = (10 ** $this->codeLength) - 1;
+        if ($this->alphabet === null) {
+            return str_pad(
+                (string) random_int(0, (10 ** $this->codeLength) - 1),
+                $this->codeLength,
+                '0',
+                STR_PAD_LEFT,
+            );
+        }
 
-        return str_pad(
-            (string) random_int($min, $max),
-            $this->codeLength,
-            '0',
-            STR_PAD_LEFT,
-        );
+        $alphabetLength = strlen($this->alphabet);
+        $code           = '';
+
+        for ($i = 0; $i < $this->codeLength; $i++) {
+            $code .= $this->alphabet[random_int(0, $alphabetLength - 1)];
+        }
+
+        return $code;
     }
 }

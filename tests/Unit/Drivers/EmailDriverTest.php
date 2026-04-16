@@ -118,6 +118,29 @@ final class EmailDriverTest extends TestCase
         self::assertTrue($expires->isFuture());
     }
 
+    public function testDispatchUsesConfiguredAlphabet(): void
+    {
+        Mail::fake();
+
+        /** @var Mailer $mailer */
+        $mailer = $this->app->make(Mailer::class);
+
+        $driver = new EmailDriver(
+            mailer: $mailer,
+            codeLength: 8,
+            alphabet: '0123456789ABCDEF',
+        );
+        $factor = $this->makeFactor(recipient: 'alphabet@example.com');
+
+        $driver->issueChallenge($factor);
+
+        Mail::assertSent(
+            MfaCodeMessage::class,
+            static fn (MfaCodeMessage $mail): bool => $mail->hasTo('alphabet@example.com')
+                    && preg_match('/^[0-9A-F]{8}$/', $mail->code) === 1,
+        );
+    }
+
     /**
      * Build an `EmailDriver` with the container's mailer and an
      * optional Mailable override.

@@ -57,6 +57,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertSame(6, $driver->getCodeLength());
         self::assertSame(10, $driver->getExpiry());
         self::assertSame(3, $driver->getMaxAttempts());
+        self::assertNull($driver->getAlphabet());
     }
 
     public function testEmailDriverBuildsWithConfiguredOverrides(): void
@@ -67,6 +68,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
             'code_length'  => 8,
             'expiry'       => 20,
             'max_attempts' => 7,
+            'alphabet'     => '0123456789ABCDEF',
             'mailable'     => \SineMacula\Laravel\Mfa\Mail\MfaCodeMessage::class,
         ]);
 
@@ -76,6 +78,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertSame(8, $driver->getCodeLength());
         self::assertSame(20, $driver->getExpiry());
         self::assertSame(7, $driver->getMaxAttempts());
+        self::assertSame('0123456789ABCDEF', $driver->getAlphabet());
     }
 
     public function testSmsDriverBuildsWithDefaults(): void
@@ -92,6 +95,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertSame(6, $driver->getCodeLength());
         self::assertSame(10, $driver->getExpiry());
         self::assertSame(3, $driver->getMaxAttempts());
+        self::assertNull($driver->getAlphabet());
     }
 
     public function testSmsDriverBuildsWithConfiguredOverrides(): void
@@ -102,6 +106,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
             'code_length'      => 4,
             'expiry'           => 5,
             'max_attempts'     => 2,
+            'alphabet'         => 'ABCDEF',
             'message_template' => 'Code: :code',
         ]);
 
@@ -112,6 +117,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertSame(4, $driver->getCodeLength());
         self::assertSame(5, $driver->getExpiry());
         self::assertSame(2, $driver->getMaxAttempts());
+        self::assertSame('ABCDEF', $driver->getAlphabet());
     }
 
     public function testBackupCodeDriverBuildsWithDefaults(): void

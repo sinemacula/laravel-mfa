@@ -32,6 +32,7 @@ final class EmailDriver extends AbstractOtpDriver
      * @param  int  $codeLength
      * @param  int  $expiry
      * @param  int  $maxAttempts
+     * @param  ?string  $alphabet
      */
     public function __construct(
         private readonly Mailer $mailer,
@@ -39,8 +40,9 @@ final class EmailDriver extends AbstractOtpDriver
         int $codeLength = 6,
         int $expiry = 10,
         int $maxAttempts = 3,
+        ?string $alphabet = null,
     ) {
-        parent::__construct($codeLength, $expiry, $maxAttempts);
+        parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet);
     }
 
     /**

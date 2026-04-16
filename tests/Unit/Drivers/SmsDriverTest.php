@@ -131,6 +131,27 @@ final class SmsDriverTest extends TestCase
         self::assertNotNull($factor->getExpiresAt());
     }
 
+    public function testDispatchUsesConfiguredAlphabet(): void
+    {
+        $gateway = new FakeSmsGateway;
+        $driver  = new SmsDriver(
+            gateway: $gateway,
+            codeLength: 8,
+            alphabet: '0123456789ABCDEF',
+        );
+        $factor = $this->makeFactor(recipient: '+442222222222');
+
+        $driver->issueChallenge($factor);
+
+        $sent    = $gateway->sentTo('+442222222222');
+        $message = $sent[0]['message'];
+
+        self::assertMatchesRegularExpression(
+            '/^Your verification code is: [0-9A-F]{8}$/',
+            $message,
+        );
+    }
+
     /**
      * Build an `SmsDriver` with a fresh `FakeSmsGateway`.
      */

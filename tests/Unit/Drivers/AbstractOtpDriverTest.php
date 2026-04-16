@@ -147,6 +147,7 @@ final class AbstractOtpDriverTest extends TestCase
         self::assertSame(8, $driver->getCodeLength());
         self::assertSame(15, $driver->getExpiry());
         self::assertSame(5, $driver->getMaxAttempts());
+        self::assertNull($driver->getAlphabet());
     }
 
     public function testGeneratedCodeIsZeroPaddedNumericOfConfiguredLength(): void
@@ -163,6 +164,56 @@ final class AbstractOtpDriverTest extends TestCase
         self::assertMatchesRegularExpression('/^\d{8}$/', $code);
     }
 
+    public function testConstructorRejectsEmptyAlphabet(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('OTP alphabet must contain at least two characters');
+
+        $this->makeDriver(alphabet: '');
+    }
+
+    public function testConstructorRejectsSingleCharacterAlphabet(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('OTP alphabet must contain at least two characters');
+
+        $this->makeDriver(alphabet: 'A');
+    }
+
+    public function testGetAlphabetReturnsConfiguredValue(): void
+    {
+        $driver = $this->makeDriver(alphabet: 'ABCDEF');
+
+        self::assertSame('ABCDEF', $driver->getAlphabet());
+    }
+
+    public function testGeneratedCodeDrawsFromTwoCharacterAlphabet(): void
+    {
+        $driver = $this->makeDriver(codeLength: 20, alphabet: 'AB');
+        $factor = $this->createEloquentFactor();
+
+        $driver->issueChallenge($factor);
+
+        $code = $driver->dispatched[0]['code'];
+
+        self::assertIsString($code);
+        self::assertSame(20, strlen($code));
+        self::assertMatchesRegularExpression('/^[AB]{20}$/', $code);
+    }
+
+    public function testGeneratedCodeDrawsFromHexAlphabet(): void
+    {
+        $driver = $this->makeDriver(codeLength: 10, alphabet: '0123456789ABCDEF');
+        $factor = $this->createEloquentFactor();
+
+        $driver->issueChallenge($factor);
+
+        $code = $driver->dispatched[0]['code'];
+
+        self::assertIsString($code);
+        self::assertMatchesRegularExpression('/^[0-9A-F]{10}$/', $code);
+    }
+
     /**
      * Build a concrete subclass of the abstract driver that records
      * every `dispatch()` invocation, optionally throws, and captures
@@ -173,6 +224,7 @@ final class AbstractOtpDriverTest extends TestCase
      * @param  int  $expiry
      * @param  int  $maxAttempts
      * @param  bool  $throwOnDispatch
+     * @param  ?string  $alphabet
      * @param  list<string>  $orderTracker
      */
     private function makeDriver(
@@ -180,9 +232,10 @@ final class AbstractOtpDriverTest extends TestCase
         int $expiry = 10,
         int $maxAttempts = 3,
         bool $throwOnDispatch = false,
+        ?string $alphabet = null,
         array &$orderTracker = [],
     ): AbstractOtpDriver {
-        $driver = new class ($codeLength, $expiry, $maxAttempts, $throwOnDispatch) extends AbstractOtpDriver {
+        $driver = new class ($codeLength, $expiry, $maxAttempts, $alphabet, $throwOnDispatch) extends AbstractOtpDriver {
             /** @var list<array{factor: EloquentFactor, code: string}> */
             public array $dispatched = [];
 
@@ -193,9 +246,10 @@ final class AbstractOtpDriverTest extends TestCase
                 int $codeLength,
                 int $expiry,
                 int $maxAttempts,
+                ?string $alphabet,
                 private readonly bool $throwOnDispatch,
             ) {
-                parent::__construct($codeLength, $expiry, $maxAttempts);
+                parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet);
             }
 
             public function bindOrderRef(array &$tracker): void

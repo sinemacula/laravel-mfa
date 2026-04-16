@@ -407,6 +407,7 @@ class MfaManager extends Manager
          *     code_length?: int,
          *     expiry?: int,
          *     max_attempts?: int,
+         *     alphabet?: ?string,
          *     mailable?: class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>
          * } $config
          */
@@ -418,6 +419,7 @@ class MfaManager extends Manager
             codeLength: $config['code_length']   ?? 6,
             expiry: $config['expiry']            ?? 10,
             maxAttempts: $config['max_attempts'] ?? 3,
+            alphabet: $config['alphabet']        ?? null,
         );
     }
 
@@ -433,6 +435,7 @@ class MfaManager extends Manager
          *     code_length?: int,
          *     expiry?: int,
          *     max_attempts?: int,
+         *     alphabet?: ?string,
          *     message_template?: string
          * } $config
          */
@@ -445,6 +448,7 @@ class MfaManager extends Manager
             codeLength: $config['code_length']   ?? 6,
             expiry: $config['expiry']            ?? 10,
             maxAttempts: $config['max_attempts'] ?? 3,
+            alphabet: $config['alphabet']        ?? null,
         );
     }
 

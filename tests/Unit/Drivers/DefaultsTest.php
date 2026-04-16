@@ -44,6 +44,7 @@ final class DefaultsTest extends TestCase
         self::assertSame(6, $driver->getCodeLength());
         self::assertSame(10, $driver->getExpiry());
         self::assertSame(3, $driver->getMaxAttempts());
+        self::assertNull($driver->getAlphabet());
     }
 
     public function testEmailDriverDefaults(): void
@@ -57,6 +58,7 @@ final class DefaultsTest extends TestCase
         self::assertSame(10, $driver->getExpiry());
         self::assertSame(3, $driver->getMaxAttempts());
         self::assertSame(MfaCodeMessage::class, $driver->getMailable());
+        self::assertNull($driver->getAlphabet());
     }
 
     public function testSmsDriverDefaults(): void
@@ -70,6 +72,7 @@ final class DefaultsTest extends TestCase
             'Your verification code is: :code',
             $driver->getMessageTemplate(),
         );
+        self::assertNull($driver->getAlphabet());
     }
 
     public function testBackupCodeDriverDefaults(): void
