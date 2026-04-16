@@ -28,6 +28,7 @@ use SineMacula\Laravel\Mfa\Traits\ActsAsFactor;
  * @property string $authenticatable_id
  * @property string $driver
  * @property ?string $label
+ * @property ?string $recipient
  * @property ?string $secret
  * @property ?string $code
  * @property ?\Carbon\CarbonInterface $expires_at
@@ -46,6 +47,7 @@ class Factor extends Model implements EloquentFactor
         'authenticatable_id',
         'driver',
         'label',
+        'recipient',
         'secret',
         'code',
         'expires_at',

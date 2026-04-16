@@ -75,6 +75,19 @@ trait ActsAsFactor
     }
 
     /**
+     * Return the factor's delivery destination (phone number / email).
+     *
+     * @return ?string
+     */
+    public function getRecipient(): ?string
+    {
+        /** @var mixed $value */
+        $value = $this->getAttribute($this->getRecipientName());
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
      * Return the authenticatable the factor belongs to. Returns `null` when
      * the `authenticatable` relation has not been loaded — this accessor
      * MUST NOT trigger a lazy query. Callers that need the related record
@@ -226,6 +239,16 @@ trait ActsAsFactor
     public function getLabelName(): string
     {
         return 'label';
+    }
+
+    /**
+     * Column name holding the delivery destination.
+     *
+     * @return string
+     */
+    public function getRecipientName(): string
+    {
+        return 'recipient';
     }
 
     /**

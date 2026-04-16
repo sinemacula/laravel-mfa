@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa;
 use Carbon\Carbon;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Manager;
@@ -16,6 +17,8 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
@@ -23,6 +26,7 @@ use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
+use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
 
 /**
  * MFA manager.
@@ -162,7 +166,22 @@ class MfaManager extends Manager
             $expiresAfter = $this->resolveDefaultExpiry();
         }
 
-        return Carbon::now()->diffInMinutes($verifiedAt) > $expiresAfter;
+        // `expiresAfter === 0` is the documented "require verification on
+        // every request" setting; treat any prior verification as expired.
+        if ($expiresAfter <= 0) {
+            return true;
+        }
+
+        $elapsed = $verifiedAt->diffInMinutes(Carbon::now(), false);
+
+        // Negative elapsed means `verifiedAt` is in the future (clock skew
+        // or malicious store write). Treat as expired rather than trusting
+        // a future-dated verification.
+        if ($elapsed < 0) {
+            return true;
+        }
+
+        return $elapsed > $expiresAfter;
     }
 
     /**
@@ -372,10 +391,22 @@ class MfaManager extends Manager
      */
     protected function createEmailDriver(): FactorDriver
     {
-        /** @var array{code_length?: int, expiry?: int, max_attempts?: int} $config */
+        /**
+         * @var array{
+         *     code_length?: int,
+         *     expiry?: int,
+         *     max_attempts?: int,
+         *     mailable?: class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>
+         * } $config
+         */
         $config = $this->getDriverConfig('email');
 
+        /** @var \Illuminate\Contracts\Mail\Mailer $mailer */
+        $mailer = $this->container->make(Mailer::class);
+
         return new EmailDriver(
+            mailer: $mailer,
+            mailable: $config['mailable']        ?? MfaCodeMessage::class,
             codeLength: $config['code_length']   ?? 6,
             expiry: $config['expiry']            ?? 10,
             maxAttempts: $config['max_attempts'] ?? 3,
@@ -389,13 +420,50 @@ class MfaManager extends Manager
      */
     protected function createSmsDriver(): FactorDriver
     {
-        /** @var array{code_length?: int, expiry?: int, max_attempts?: int} $config */
+        /**
+         * @var array{
+         *     code_length?: int,
+         *     expiry?: int,
+         *     max_attempts?: int,
+         *     message_template?: string
+         * } $config
+         */
         $config = $this->getDriverConfig('sms');
 
+        /** @var \SineMacula\Laravel\Mfa\Contracts\SmsGateway $gateway */
+        $gateway = $this->container->make(SmsGateway::class);
+
         return new SmsDriver(
+            gateway: $gateway,
+            messageTemplate: $config['message_template']
+                                                 ?? 'Your verification code is: :code',
             codeLength: $config['code_length']   ?? 6,
             expiry: $config['expiry']            ?? 10,
             maxAttempts: $config['max_attempts'] ?? 3,
+        );
+    }
+
+    /**
+     * Create the backup-code driver.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
+     */
+    protected function createBackupCodeDriver(): FactorDriver
+    {
+        /**
+         * @var array{
+         *     code_length?: int,
+         *     alphabet?: string,
+         *     code_count?: int
+         * } $config
+         */
+        $config = $this->getDriverConfig('backup_code');
+
+        return new BackupCodeDriver(
+            codeLength: $config['code_length'] ?? 10,
+            alphabet: $config['alphabet']
+                                             ?? '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
+            codeCount: $config['code_count'] ?? 10,
         );
     }
 
@@ -482,18 +550,36 @@ class MfaManager extends Manager
     /**
      * Classify the failure reason for a non-successful verification.
      *
+     * TOTP-shaped drivers fail with `SecretMissing` when the factor has no
+     * persistent secret (expected TOTP enrolment never completed). OTP-
+     * delivery drivers fail with `CodeMissing` when no challenge has been
+     * issued, `CodeExpired` when the pending code has aged out, and
+     * `CodeInvalid` for all other comparison mismatches.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return \SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason
      */
     private function classifyFailure(Factor $factor): MfaVerificationFailureReason
     {
         $expiresAt = $factor->getExpiresAt();
+        $code      = $factor->getCode();
+        $secret    = $factor->getSecret();
+
+        if ($code === null && $secret === null) {
+            return MfaVerificationFailureReason::SecretMissing;
+        }
 
         if ($expiresAt !== null && $expiresAt->isPast()) {
             return MfaVerificationFailureReason::CodeExpired;
         }
 
-        if ($factor->getCode() === null && $factor->getSecret() === null) {
+        if ($code === null && $secret !== null) {
+            // Has a secret (TOTP-shaped) but the submitted code didn't match.
+            return MfaVerificationFailureReason::CodeInvalid;
+        }
+
+        if ($code !== null && $expiresAt === null) {
+            // Pending code exists but has no expiry — treat as missing.
             return MfaVerificationFailureReason::CodeMissing;
         }
 

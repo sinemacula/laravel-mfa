@@ -52,6 +52,16 @@ interface Factor
     public function getLabel(): ?string;
 
     /**
+     * Return the delivery destination for OTP-delivery drivers — the
+     * phone number for SMS factors, the email address for email factors,
+     * `null` for factors that do not deliver to the identity over the
+     * network (TOTP, backup codes).
+     *
+     * @return ?string
+     */
+    public function getRecipient(): ?string;
+
+    /**
      * Return the authenticatable the factor belongs to, or `null` when the
      * relation is not loaded or the owner has been detached. Implementations
      * MUST NOT trigger a lazy load from this method — callers that need the

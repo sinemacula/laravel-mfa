@@ -4,115 +4,76 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
-use SineMacula\Laravel\Mfa\Contracts\Factor;
-use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use Illuminate\Contracts\Mail\Mailer;
+use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
+use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
+use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
 
 /**
  * Email factor driver.
  *
- * Verifies one-time codes delivered via email. The driver checks
- * the submitted code against the stored code on the factor,
- * enforcing expiry. Attempt counting and lockout orchestration are
- * handled by the MFA manager.
- *
- * Challenge issuance (code generation + mail dispatch) is wired up
- * in a later phase; for now `issueChallenge()` is a stub.
+ * Issues one-time codes via Laravel's mail subsystem and verifies them
+ * in constant time. The shipped `MfaCodeMessage` Mailable carries a
+ * plain-text view under the `mfa::` namespace; consumers who want a
+ * branded email subclass the Mailable or rebind it against this driver.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class EmailDriver implements FactorDriver
+class EmailDriver extends AbstractOtpDriver
 {
     /**
-     * Create a new email driver instance.
+     * Constructor.
      *
+     * @param  \Illuminate\Contracts\Mail\Mailer  $mailer
+     * @param  class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>  $mailable
      * @param  int  $codeLength
      * @param  int  $expiry
      * @param  int  $maxAttempts
      */
     public function __construct(
-        private readonly int $codeLength = 6,
-        private readonly int $expiry = 10,
-        private readonly int $maxAttempts = 3,
-    ) {}
-
-    /**
-     * Issue a fresh one-time code against the factor and dispatch
-     * it via Laravel's mail subsystem.
-     *
-     * Wired up in Phase 3 (B-09). Currently a no-op so the contract
-     * can be satisfied while the manager orchestration lands.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
-     */
-    public function issueChallenge(Factor $factor): void
-    {
-        // Stub — code generation and Mailable dispatch land with the manager
-        // challenge orchestration.
+        private readonly Mailer $mailer,
+        private readonly string $mailable = MfaCodeMessage::class,
+        int $codeLength = 6,
+        int $expiry = 10,
+        int $maxAttempts = 3,
+    ) {
+        parent::__construct($codeLength, $expiry, $maxAttempts);
     }
 
     /**
-     * Verify the submitted code against the factor's pending code.
+     * Get the configured Mailable class.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @return class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>
+     */
+    public function getMailable(): string
+    {
+        return $this->mailable;
+    }
+
+    /**
+     * Dispatch the Mailable to the factor's recipient email.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $code
-     * @return bool
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException
      */
-    public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
-    {
-        $stored  = $factor->getCode();
-        $expires = $factor->getExpiresAt();
+    protected function dispatch(
+        EloquentFactor $factor,
+        #[\SensitiveParameter]
+        string $code,
+    ): void {
+        $recipient = $factor->getRecipient();
 
-        if ($stored === null || $expires === null) {
-            return false;
+        if ($recipient === null || $recipient === '') {
+            throw new MissingRecipientException('Email factor has no recipient configured; cannot deliver code.');
         }
 
-        if ($expires->isPast()) {
-            return false;
-        }
+        /** @var \SineMacula\Laravel\Mfa\Mail\MfaCodeMessage $message */
+        $message = new ($this->mailable)($code, $this->getExpiry());
 
-        return hash_equals($stored, $code);
-    }
-
-    /**
-     * Email codes are generated on demand; no persistent secret is
-     * required.
-     *
-     * @return null
-     */
-    public function generateSecret(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * Get the configured code length.
-     *
-     * @return int
-     */
-    public function getCodeLength(): int
-    {
-        return $this->codeLength;
-    }
-
-    /**
-     * Get the configured expiry in minutes.
-     *
-     * @return int
-     */
-    public function getExpiry(): int
-    {
-        return $this->expiry;
-    }
-
-    /**
-     * Get the configured maximum attempts.
-     *
-     * @return int
-     */
-    public function getMaxAttempts(): int
-    {
-        return $this->maxAttempts;
+        $this->mailer->to($recipient)->send($message);
     }
 }

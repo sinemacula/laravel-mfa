@@ -73,9 +73,22 @@ return [
         ],
 
         'sms' => [
-            'code_length'  => (int) env('MFA_SMS_CODE_LENGTH', 6),
-            'expiry'       => (int) env('MFA_SMS_EXPIRY_MINUTES', 10),
-            'max_attempts' => (int) env('MFA_SMS_MAX_ATTEMPTS', 3),
+            'code_length'      => (int) env('MFA_SMS_CODE_LENGTH', 6),
+            'expiry'           => (int) env('MFA_SMS_EXPIRY_MINUTES', 10),
+            'max_attempts'     => (int) env('MFA_SMS_MAX_ATTEMPTS', 3),
+            'message_template' => env(
+                'MFA_SMS_MESSAGE_TEMPLATE',
+                'Your verification code is: :code',
+            ),
+        ],
+
+        'backup_code' => [
+            'code_length' => (int) env('MFA_BACKUP_CODE_LENGTH', 10),
+            'alphabet'    => env(
+                'MFA_BACKUP_CODE_ALPHABET',
+                '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
+            ),
+            'code_count' => (int) env('MFA_BACKUP_CODE_COUNT', 10),
         ],
 
     ],

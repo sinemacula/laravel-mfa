@@ -50,6 +50,14 @@ interface EloquentFactor extends Factor
     public function getLabelName(): string;
 
     /**
+     * Column name holding the delivery destination (phone number / email)
+     * for drivers that deliver codes to the identity.
+     *
+     * @return string
+     */
+    public function getRecipientName(): string;
+
+    /**
      * Column name holding the persistent secret (encrypted at rest on the
      * shipped model via the `encrypted` cast).
      *

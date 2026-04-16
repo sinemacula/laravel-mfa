@@ -4,116 +4,75 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
-use SineMacula\Laravel\Mfa\Contracts\Factor;
-use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
+use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
 
 /**
  * SMS factor driver.
  *
- * Verifies one-time codes delivered via SMS through a consumer-
- * provided gateway. The driver checks the submitted code against
- * the stored code on the factor, enforcing expiry. Attempt counting
- * and lockout orchestration are handled by the MFA manager.
- *
- * Challenge issuance (code generation + gateway dispatch) is wired
- * up in a later phase; for now `issueChallenge()` is a stub.
+ * Issues one-time codes through a consumer-provided `SmsGateway` and
+ * verifies them in constant time. The default gateway binding is
+ * `NullSmsGateway`, which throws to surface the missing provider wiring
+ * to the developer rather than silently dropping codes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class SmsDriver implements FactorDriver
+class SmsDriver extends AbstractOtpDriver
 {
     /**
-     * Create a new SMS driver instance.
+     * Constructor.
      *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\SmsGateway  $gateway
+     * @param  string  $messageTemplate
      * @param  int  $codeLength
      * @param  int  $expiry
      * @param  int  $maxAttempts
      */
     public function __construct(
-        private readonly int $codeLength = 6,
-        private readonly int $expiry = 10,
-        private readonly int $maxAttempts = 3,
-    ) {}
-
-    /**
-     * Issue a fresh one-time code against the factor and dispatch
-     * it through the bound SMS gateway.
-     *
-     * Wired up in Phase 3 (B-07 / SMS rewrite). Currently a no-op
-     * so the contract can be satisfied while the manager
-     * orchestration lands.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
-     */
-    public function issueChallenge(Factor $factor): void
-    {
-        // Stub — code generation and gateway dispatch land with the SMS gateway
-        // contract and manager challenge orchestration.
+        private readonly SmsGateway $gateway,
+        private readonly string $messageTemplate = 'Your verification code is: :code',
+        int $codeLength = 6,
+        int $expiry = 10,
+        int $maxAttempts = 3,
+    ) {
+        parent::__construct($codeLength, $expiry, $maxAttempts);
     }
 
     /**
-     * Verify the submitted code against the factor's pending code.
+     * Get the configured message template.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @return string
+     */
+    public function getMessageTemplate(): string
+    {
+        return $this->messageTemplate;
+    }
+
+    /**
+     * Dispatch the code to the factor's recipient phone number via the
+     * bound SMS gateway.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $code
-     * @return bool
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException
      */
-    public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
-    {
-        $stored  = $factor->getCode();
-        $expires = $factor->getExpiresAt();
+    protected function dispatch(
+        EloquentFactor $factor,
+        #[\SensitiveParameter]
+        string $code,
+    ): void {
+        $recipient = $factor->getRecipient();
 
-        if ($stored === null || $expires === null) {
-            return false;
+        if ($recipient === null || $recipient === '') {
+            throw new MissingRecipientException('SMS factor has no recipient configured; cannot deliver code.');
         }
 
-        if ($expires->isPast()) {
-            return false;
-        }
+        $message = str_replace(':code', $code, $this->messageTemplate);
 
-        return hash_equals($stored, $code);
-    }
-
-    /**
-     * SMS codes are generated on demand; no persistent secret is
-     * required.
-     *
-     * @return null
-     */
-    public function generateSecret(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * Get the configured code length.
-     *
-     * @return int
-     */
-    public function getCodeLength(): int
-    {
-        return $this->codeLength;
-    }
-
-    /**
-     * Get the configured expiry in minutes.
-     *
-     * @return int
-     */
-    public function getExpiry(): int
-    {
-        return $this->expiry;
-    }
-
-    /**
-     * Get the configured maximum attempts.
-     *
-     * @return int
-     */
-    public function getMaxAttempts(): int
-    {
-        return $this->maxAttempts;
+        $this->gateway->send($recipient, $message);
     }
 }

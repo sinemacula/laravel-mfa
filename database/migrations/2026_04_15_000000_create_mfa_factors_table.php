@@ -52,6 +52,14 @@ return new class extends Migration {
             // disambiguate between multiple factors of the same driver.
             $blueprint->string('label')->nullable();
 
+            // Delivery destination for OTP-delivery drivers. Stores the phone
+            // number for SMS factors (E.164-formatted), email address for
+            // email factors, and is null for factors that don't deliver to
+            // the identity over the network (TOTP, backup codes). Captured
+            // at enrolment time — intentionally not resolved live from the
+            // identity so a silent address change cannot redirect codes.
+            $blueprint->string('recipient')->nullable();
+
             // Persistent secret for drivers that use one (TOTP). Encrypted
             // at rest via the model's `encrypted` cast.
             $blueprint->text('secret')->nullable();
