@@ -243,6 +243,36 @@ final class RequireMfaMiddlewareTest extends TestCase
     }
 
     /**
+     * Tighter parser checks: scientific notation, leading sign,
+     * surrounding whitespace, and empty string must all be rejected.
+     * `is_numeric` would silently coerce these to ints, which is the
+     * opposite of what a route definition needs.
+     *
+     * @return void
+     */
+    public function testStepUpRejectsLooselyNumericParameters(): void
+    {
+        $user = TestUser::create([
+            'email'       => 'loose@example.test',
+            'mfa_enabled' => true,
+        ]);
+        $this->actingAs($user);
+
+        $candidates = ['1e2', '+5', ' 5', '5 ', ''];
+        $rejected   = [];
+
+        foreach ($candidates as $candidate) {
+            try {
+                $this->runMiddleware(maxAgeMinutes: $candidate);
+            } catch (\InvalidArgumentException) {
+                $rejected[] = $candidate;
+            }
+        }
+
+        self::assertSame($candidates, $rejected);
+    }
+
+    /**
      * Drive the middleware with the given route-middleware param and
      * report whether the inner handler was reached.
      *

@@ -97,6 +97,13 @@ final class RequireMfa
      * Parse the route-middleware `max-age` parameter into an integer
      * minutes value (or null when absent).
      *
+     * Accepts decimal-digit strings only — `is_numeric` would also pass
+     * scientific notation (`1e2`), leading-sign forms (`+5`, `-1`),
+     * whitespace, and decimals, none of which are valid as a route
+     * parameter. A strict regex keeps the contract tight so a typo in
+     * a route definition surfaces loudly rather than being silently
+     * coerced.
+     *
      * @param  ?string  $maxAgeMinutes
      * @return ?int
      *
@@ -108,17 +115,11 @@ final class RequireMfa
             return null;
         }
 
-        if (!is_numeric($maxAgeMinutes) || str_contains($maxAgeMinutes, '.')) {
+        if (preg_match('/^\d+$/', $maxAgeMinutes) !== 1) {
             throw new \InvalidArgumentException(sprintf('RequireMfa middleware max-age parameter must be a non-negative integer; received "%s".', $maxAgeMinutes));
         }
 
-        $value = (int) $maxAgeMinutes;
-
-        if ($value < 0) {
-            throw new \InvalidArgumentException(sprintf('RequireMfa middleware max-age parameter must be a non-negative integer; received "%s".', $maxAgeMinutes));
-        }
-
-        return $value;
+        return (int) $maxAgeMinutes;
     }
 
     /**
