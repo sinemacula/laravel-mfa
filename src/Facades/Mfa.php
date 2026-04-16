@@ -9,17 +9,24 @@ use Illuminate\Support\Facades\Facade;
 /**
  * MFA facade.
  *
- * Provides a static interface to the MFA manager for convenient
- * access throughout the application.
+ * Static interface to the `MfaManager` singleton. Re-exposes the manager's
+ * verification-state, driver, and orchestration surface so consuming
+ * applications do not need to resolve the manager out of the container on
+ * every call site.
  *
- * @method static \SineMacula\Laravel\Mfa\Contracts\FactorDriver driver(string|null $driver = null)
- * @method static bool shouldUse()
- * @method static bool isSetup()
- * @method static bool hasExpired(int|null $expiresAfter = null)
- * @method static void clearCache(\Illuminate\Contracts\Auth\Authenticatable|null $identity = null)
- * @method static \Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>|null getFactors()
+ * @method static \SineMacula\Laravel\Mfa\Contracts\FactorDriver driver(?string $driver = null)
  * @method static string getDefaultDriver()
  * @method static static extend(string $driver, \Closure(\Illuminate\Contracts\Foundation\Application): \SineMacula\Laravel\Mfa\Contracts\FactorDriver $callback)
+ * @method static bool shouldUse()
+ * @method static bool isSetup()
+ * @method static bool hasEverVerified()
+ * @method static bool hasExpired(?int $expiresAfter = null)
+ * @method static void markVerified()
+ * @method static void forgetVerification()
+ * @method static void clearCache(?\Illuminate\Contracts\Auth\Authenticatable $identity = null)
+ * @method static ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> getFactors()
+ * @method static void challenge(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor)
+ * @method static bool verify(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor, string $code)
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

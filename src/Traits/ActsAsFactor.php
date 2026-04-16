@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Traits;
 
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -295,5 +296,98 @@ trait ActsAsFactor
     public function getVerifiedAtName(): string
     {
         return 'verified_at';
+    }
+
+    /**
+     * Increment the attempt counter and stamp the last-attempted timestamp.
+     *
+     * @param  ?\Carbon\CarbonInterface  $at
+     * @return void
+     */
+    public function recordAttempt(?CarbonInterface $at = null): void
+    {
+        $this->setAttribute(
+            $this->getAttemptsName(),
+            $this->getAttempts() + 1,
+        );
+        $this->setAttribute(
+            $this->getLastAttemptedAtName(),
+            $at ?? Carbon::now(),
+        );
+    }
+
+    /**
+     * Reset the attempt counter and clear any active lockout.
+     *
+     * @return void
+     */
+    public function resetAttempts(): void
+    {
+        $this->setAttribute($this->getAttemptsName(), 0);
+        $this->setAttribute($this->getLockedUntilName(), null);
+    }
+
+    /**
+     * Apply a lockout window deferring further verification attempts.
+     *
+     * @param  \Carbon\CarbonInterface  $until
+     * @return void
+     */
+    public function applyLockout(CarbonInterface $until): void
+    {
+        $this->setAttribute($this->getLockedUntilName(), $until);
+    }
+
+    /**
+     * Stamp a successful verification and reset the attempt state.
+     *
+     * @param  ?\Carbon\CarbonInterface  $at
+     * @return void
+     */
+    public function recordVerification(?CarbonInterface $at = null): void
+    {
+        $this->setAttribute(
+            $this->getVerifiedAtName(),
+            $at ?? Carbon::now(),
+        );
+        $this->resetAttempts();
+        $this->consumeCode();
+    }
+
+    /**
+     * Persist a newly issued one-time code and its expiry.
+     *
+     * @param  string  $code
+     * @param  \Carbon\CarbonInterface  $expiresAt
+     * @return void
+     */
+    public function issueCode(
+        #[\SensitiveParameter]
+        string $code,
+        CarbonInterface $expiresAt,
+    ): void {
+        $this->setAttribute($this->getCodeName(), $code);
+        $this->setAttribute($this->getExpiresAtName(), $expiresAt);
+    }
+
+    /**
+     * Clear any pending one-time code and its expiry.
+     *
+     * @return void
+     */
+    public function consumeCode(): void
+    {
+        $this->setAttribute($this->getCodeName(), null);
+        $this->setAttribute($this->getExpiresAtName(), null);
+    }
+
+    /**
+     * Persist pending mutations to the underlying storage.
+     *
+     * @return void
+     */
+    public function persist(): void
+    {
+        $this->save();
     }
 }

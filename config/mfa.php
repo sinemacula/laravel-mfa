@@ -79,4 +79,18 @@ return [
         ],
 
     ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Lockout
+    |---------------------------------------------------------------------------
+    |
+    | How long, in minutes, a factor is locked from further verification
+    | attempts after reaching its per-driver `max_attempts` threshold. The
+    | lockout clears automatically once the window passes; administrative
+    | unlocks are a consumer-side concern.
+    |
+    */
+
+    'lockout_minutes' => (int) env('MFA_LOCKOUT_MINUTES', 15),
 ];
