@@ -8,3 +8,9 @@
 .DS_Store
 clover.xml
 composer.lock
+
+# qlty writes these symlinks to the root so PHP-CS-Fixer / PHPCS / PHPStan
+# can auto-discover their configs out of `.qlty/configs/`.
+/.php-cs-fixer.dist.php
+/phpcs.xml
+/phpstan.neon

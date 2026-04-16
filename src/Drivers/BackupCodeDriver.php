@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Drivers;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
@@ -176,11 +177,13 @@ class BackupCodeDriver implements FactorDriver
     /**
      * Atomically consume the factor's stored secret.
      *
-     * Issues a conditional UPDATE that matches only while the secret
-     * column still holds the expected hash. Returns `true` when the row
-     * was the one we consumed, `false` when another request beat us to
-     * it. The in-memory factor is synchronised on success so the
-     * manager's subsequent `persist()` does not overwrite the null.
+     * Uses a pessimistic row lock inside a short transaction to close
+     * the TOCTOU race where two concurrent requests would both match
+     * the same hash. The secret column is cast to `encrypted` on the
+     * shipped model, so we cannot compare encrypted-at-rest values
+     * directly in a WHERE clause — hence the `lockForUpdate()` pattern
+     * rather than a conditional UPDATE. Returns `true` when this
+     * request consumed the code, `false` when another beat us to it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $expectedSecret
@@ -197,18 +200,42 @@ class BackupCodeDriver implements FactorDriver
 
         $secretColumn = $factor->getSecretName();
 
-        $affected = $factor->newQuery()
-            ->whereKey($factor->getKey())
-            ->where($secretColumn, $expectedSecret)
-            ->update([$secretColumn => null]);
+        /** @var bool $result */
+        $result = DB::connection($factor->getConnectionName())->transaction(
+            static function () use ($factor, $secretColumn, $expectedSecret): bool {
+                /** @var ?EloquentFactor $locked */
+                $locked = $factor->newQuery()
+                    ->lockForUpdate()
+                    ->find($factor->getKey());
 
-        if ($affected === 0) {
-            return false;
+                if ($locked === null) {
+                    return false;
+                }
+
+                $currentSecret = $locked->getSecret();
+
+                if ($currentSecret === null
+                    || !hash_equals($currentSecret, $expectedSecret)
+                ) {
+                    return false;
+                }
+
+                if (!$locked instanceof Model) {
+                    return false;
+                }
+
+                $locked->setAttribute($secretColumn, null);
+                $locked->save();
+
+                return true;
+            },
+        );
+
+        if ($result) {
+            $factor->setAttribute($secretColumn, null);
         }
 
-        $factor->setAttribute($secretColumn, null);
-
-        return true;
+        return $result;
     }
 
     /**

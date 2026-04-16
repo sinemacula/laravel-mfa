@@ -13,11 +13,11 @@ use Illuminate\Queue\SerializesModels;
 /**
  * Default Mailable for MFA email-code delivery.
  *
- * Ships an inline plain-text body so the package works out of the box
- * with no published views. Consumers who want a branded email / HTML
- * layout subclass this Mailable (or configure the email driver to use
- * their own Mailable class) and override `content()` to point at their
- * own view.
+ * Ships an inline HTML body so the package works out of the box with
+ * no published views. Consumers who want a branded email / a text
+ * alternative subclass this Mailable (or configure the email driver
+ * to use their own Mailable class) and override `content()` or
+ * `renderHtml()` to point at their own view.
  *
  * The code and expiry are exposed as public readonly properties so
  * custom views can render them as `{{ $code }}` / `{{ $expiresInMinutes }}`.
@@ -59,40 +59,16 @@ class MfaCodeMessage extends Mailable
     }
 
     /**
-     * Build the content.
+     * Build the content. Uses the `htmlString` parameter on `Content`
+     * so consumers do not need to publish a view for the shipped
+     * default to render.
      *
      * @return \Illuminate\Mail\Mailables\Content
      */
     public function content(): Content
     {
-        // Raw-string bodies go through positional args — view / html / text
-        // / markdown / with / htmlString / textString — because larastan's
-        // Content stub is currently missing the two trailing parameters.
-        // @phpstan-ignore arguments.count
         return new Content(
-            null,
-            null,
-            null,
-            null,
-            [],
-            $this->renderHtml(),
-            $this->renderText(),
-        );
-    }
-
-    /**
-     * Render the plain-text body.
-     *
-     * @return string
-     */
-    protected function renderText(): string
-    {
-        return sprintf(
-            "Your verification code is: %s\n\n"
-            . "This code expires in %d minute(s).\n\n"
-            . 'If you did not request this code, you can safely ignore this message.',
-            $this->code,
-            $this->expiresInMinutes,
+            htmlString: $this->renderHtml(),
         );
     }
 

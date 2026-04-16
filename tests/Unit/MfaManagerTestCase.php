@@ -2,25 +2,28 @@
 
 declare(strict_types = 1);
 
-namespace Tests;
+namespace Tests\Unit;
 
 use Illuminate\Contracts\Config\Repository;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
+use Tests\Fixtures;
 
 /**
- * Base TestCase for the `sinemacula/laravel-mfa` test suites.
+ * Dedicated MfaManager test base class.
  *
- * Boots an Orchestra TestBench application with the MFA service
- * provider registered, an in-memory SQLite connection, and the
- * shipped migration applied. Concrete tests subclass this directly
- * (via `use RefreshDatabase` when persistence is required) or the
- * thinner `Tests\UnitTestCase` for pure unit scenarios.
+ * Mirrors the `Tests\TestCase` bootstrap but declares its provider /
+ * environment hooks with parameter signatures compatible with the
+ * Orchestra TestBench base class under strict PHP 8.3 LSP checks, so
+ * test files that depend on this base can load regardless of any
+ * upstream signature drift on the shared Tests\TestCase.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
+ *
+ * @internal
  */
-abstract class TestCase extends BaseTestCase
+abstract class MfaManagerTestCase extends BaseTestCase
 {
     /**
      * Register the package's service provider with the test
@@ -75,7 +78,7 @@ abstract class TestCase extends BaseTestCase
      */
     protected function defineDatabaseMigrations(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
-        $this->loadMigrationsFrom(__DIR__ . '/Fixtures/migrations');
+        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
+        $this->loadMigrationsFrom(__DIR__ . '/../Fixtures/migrations');
     }
 }
