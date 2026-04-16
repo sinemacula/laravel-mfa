@@ -24,7 +24,7 @@ use SineMacula\Laravel\Mfa\Gateways\FakeSmsGateway;
 final class OtpVerifyBench
 {
     /** @var string Stable code seeded into both factor doubles each iteration. */
-    private const string CODE = self::CODE;
+    private const string CODE = '123456';
 
     /** @var \SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver */
     private AbstractOtpDriver $driver;
