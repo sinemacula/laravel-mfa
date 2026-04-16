@@ -343,6 +343,15 @@ final class BackupCodeDriverTest extends TestCase
      */
     private function makeNonModelEloquentFactor(string $secret): EloquentFactor
     {
+        /**
+         * Anonymous class implements the full EloquentFactor contract
+         * surface (33 methods). The method count is dictated by the
+         * contract, not by accidental complexity — splitting would
+         * require fragmenting EloquentFactor itself, which is out of
+         * scope for a single-purpose test fixture.
+         *
+         * @SuppressWarnings("php:S1448")
+         */
         return new class ($secret) implements EloquentFactor {
             /**
              * Capture the seeded secret value.

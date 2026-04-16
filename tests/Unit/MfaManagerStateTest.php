@@ -4,25 +4,24 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
-use Carbon\Carbon;
-use Illuminate\Config\Repository;
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Auth;
-use Mockery;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
-use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\NonScalarIdentifierUser;
 use Tests\Fixtures\PlainUser;
 use Tests\Fixtures\TestUser;
+use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 
 /**
- * Unit tests for `MfaManager` state-query and cache methods.
+ * Unit tests for `MfaManager` lookup-style state queries.
  *
  * Covers `getDefaultDriver()`, `shouldUse()`, `isSetup()`,
- * `hasEverVerified()`, `hasExpired()`, `markVerified()`,
- * `forgetVerification()`, `clearCache()`, and `getFactors()`.
+ * `hasEverVerified()`, and `getFactors()`. The expiry-window and
+ * lifecycle-mutation surfaces live in dedicated sibling files
+ * (`MfaManagerExpiryTest`, `MfaManagerLifecycleTest`) so each subject
+ * stays under the project's max-methods-per-class threshold without
+ * losing its cohesive grouping.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -31,19 +30,7 @@ use Tests\Fixtures\TestUser;
  */
 final class MfaManagerStateTest extends MfaManagerTestCase
 {
-    /**
-     * Tear down Mockery expectations between test cases.
-     *
-     * @return void
-     */
-    protected function tearDown(): void
-    {
-        if (class_exists(\Mockery::class)) {
-            \Mockery::close();
-        }
-
-        parent::tearDown();
-    }
+    use InteractsWithMfaManagerState;
 
     /**
      * The shipped default driver should be `'totp'`.
@@ -58,28 +45,26 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Without a resolved identity `shouldUse()` must always return
-     * false.
+     * Without an identity in the guard, `shouldUse()` must return false
+     * regardless of the bound policy.
      *
      * @return void
      */
     public function testShouldUseReturnsFalseWhenNoIdentityResolved(): void
     {
-        $manager = $this->manager();
-
-        self::assertFalse($manager->shouldUse());
+        self::assertFalse($this->manager()->shouldUse());
     }
 
     /**
      * An identity that does not implement
-     * `MultiFactorAuthenticatable` must never opt into MFA
-     * enforcement, regardless of policy state.
+     * `MultiFactorAuthenticatable` must short-circuit `shouldUse()`
+     * to false.
      *
      * @return void
      */
     public function testShouldUseReturnsFalseWhenIdentityIsNotMfaAuthenticatable(): void
     {
-        $plain = PlainUser::query()->create(['email' => 'plain@example.com']);
+        $plain = new PlainUser;
 
         $this->actingAs($plain);
 
@@ -87,8 +72,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity reporting `shouldUseMultiFactor() === true` should
-     * activate enforcement.
+     * An identity opting in via `shouldUseMultiFactor()` should make
+     * `shouldUse()` return true without consulting the policy.
      *
      * @return void
      */
@@ -105,8 +90,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * The bound `MfaPolicy` should be able to force enforcement even
-     * when the identity itself does not opt in.
+     * When the identity does not opt in but the bound `MfaPolicy`
+     * enforces MFA externally, `shouldUse()` should still return true.
      *
      * @return void
      */
@@ -117,22 +102,22 @@ final class MfaManagerStateTest extends MfaManagerTestCase
             'mfa_enabled' => false,
         ]);
 
+        $this->actingAs($user);
+
+        /** @var \Mockery\MockInterface&\SineMacula\Laravel\Mfa\Contracts\MfaPolicy $policy */
         $policy = \Mockery::mock(MfaPolicy::class);
         $policy->shouldReceive('shouldEnforce')
             ->once()
-            ->with(\Mockery::type(Authenticatable::class))
             ->andReturnTrue();
 
         $this->container()->instance(MfaPolicy::class, $policy);
-
-        $this->actingAs($user);
 
         self::assertTrue($this->manager()->shouldUse());
     }
 
     /**
-     * When neither the identity nor the policy demand MFA the manager
-     * must report `shouldUse() === false`.
+     * If neither the identity nor the policy enforces MFA, the
+     * manager must report `shouldUse()` as false.
      *
      * @return void
      */
@@ -149,7 +134,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Without a resolved identity `isSetup()` must return false.
+     * Without an identity `isSetup()` must report false rather than
+     * throwing.
      *
      * @return void
      */
@@ -159,8 +145,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity with no persisted factors should report as not
-     * having MFA set up.
+     * An identity with no factor rows in the database must report
+     * `isSetup()` as false.
      *
      * @return void
      */
@@ -177,8 +163,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity with at least one persisted factor should report as
-     * having MFA set up.
+     * An identity with at least one persisted factor must report
+     * `isSetup()` as true.
      *
      * @return void
      */
@@ -192,8 +178,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * `isSetup()` should cache its result for the duration of the
-     * request, so subsequent calls do not re-query the database.
+     * Repeated `isSetup()` calls within a single request must hit the
+     * runtime cache rather than re-querying the database.
      *
      * @return void
      */
@@ -207,16 +193,14 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         self::assertTrue($manager->isSetup());
 
-        // Delete the factor after the first lookup. The cached result
-        // should remain truthy because the manager does not re-query
-        // the database on subsequent calls within the same request.
+        // Wipe the underlying data — the cached entry must survive.
         Factor::query()->where('authenticatable_id', $user->getKey())->delete();
 
         self::assertTrue($manager->isSetup());
     }
 
     /**
-     * Without a resolved identity `hasEverVerified()` must return
+     * Without an identity `hasEverVerified()` must short-circuit to
      * false.
      *
      * @return void
@@ -227,8 +211,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * `hasEverVerified()` should report false when the verification
-     * store has no record for the identity.
+     * When the bound store reports no prior verification timestamp,
+     * `hasEverVerified()` must return false.
      *
      * @return void
      */
@@ -238,19 +222,17 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('lastVerifiedAt')
-            ->once()
-            ->andReturnNull();
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
+        $this->container()->instance(
+            MfaVerificationStore::class,
+            $this->nullStore(),
+        );
 
         self::assertFalse($this->manager()->hasEverVerified());
     }
 
     /**
-     * `hasEverVerified()` should report true once the store can prove
-     * the identity has been verified at any prior point.
+     * When the bound store reports a non-null verification timestamp,
+     * `hasEverVerified()` must return true.
      *
      * @return void
      */
@@ -260,359 +242,12 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('lastVerifiedAt')
-            ->once()
-            ->andReturn(Carbon::now());
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
+        $this->container()->instance(
+            MfaVerificationStore::class,
+            $this->fixedStore(\Carbon\Carbon::now()->subMinute()),
+        );
 
         self::assertTrue($this->manager()->hasEverVerified());
-    }
-
-    /**
-     * Without an identity verification is always treated as expired.
-     *
-     * @return void
-     */
-    public function testHasExpiredReturnsTrueWhenNoIdentity(): void
-    {
-        self::assertTrue($this->manager()->hasExpired());
-    }
-
-    /**
-     * An identity with no prior verification record should be treated
-     * as expired so the consumer is forced to verify.
-     *
-     * @return void
-     */
-    public function testHasExpiredReturnsTrueWhenNoPriorVerification(): void
-    {
-        $user = TestUser::query()->create(['email' => 'g@example.com']);
-
-        $this->actingAs($user);
-
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->nullStore(),
-        );
-
-        self::assertTrue($this->manager()->hasExpired());
-    }
-
-    /**
-     * Omitting the explicit expiry argument should fall back to the
-     * configured `mfa.default_expiry` value.
-     *
-     * @return void
-     */
-    public function testHasExpiredUsesConfiguredDefaultExpiryWhenParameterOmitted(): void
-    {
-        $user = TestUser::query()->create(['email' => 'h@example.com']);
-
-        $this->actingAs($user);
-
-        $config = app(Repository::class);
-        $config->set('mfa.default_expiry', 60);
-
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->fixedStore(Carbon::now()->subMinutes(30)),
-        );
-
-        self::assertFalse($this->manager()->hasExpired());
-    }
-
-    /**
-     * A recent verification with an explicit expiry should be treated
-     * as still valid.
-     *
-     * @return void
-     */
-    public function testHasExpiredReturnsFalseForRecentVerificationWithExplicitExpiry(): void
-    {
-        $user = TestUser::query()->create(['email' => 'i@example.com']);
-
-        $this->actingAs($user);
-
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->fixedStore(Carbon::now()->subMinutes(5)),
-        );
-
-        self::assertFalse($this->manager()->hasExpired(60));
-    }
-
-    /**
-     * An explicit expiry of zero minutes should immediately expire any
-     * prior verification.
-     *
-     * @return void
-     */
-    public function testHasExpiredReturnsTrueWhenExplicitExpiryIsZero(): void
-    {
-        $user = TestUser::query()->create(['email' => 'j@example.com']);
-
-        $this->actingAs($user);
-
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->fixedStore(Carbon::now()->subMinutes(1)),
-        );
-
-        self::assertTrue($this->manager()->hasExpired(0));
-    }
-
-    /**
-     * A negative explicit expiry must be treated identically to zero.
-     *
-     * @return void
-     */
-    public function testHasExpiredReturnsTrueWhenExplicitExpiryIsNegative(): void
-    {
-        $user = TestUser::query()->create(['email' => 'k@example.com']);
-
-        $this->actingAs($user);
-
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->fixedStore(Carbon::now()->subMinutes(1)),
-        );
-
-        self::assertTrue($this->manager()->hasExpired(-5));
-    }
-
-    /**
-     * A future-dated verification timestamp must be rejected as a
-     * clock-skew defence and treated as expired.
-     *
-     * @return void
-     */
-    public function testHasExpiredReturnsTrueForFutureDatedVerification(): void
-    {
-        $user = TestUser::query()->create(['email' => 'l@example.com']);
-
-        $this->actingAs($user);
-
-        // Clock-skew defence: a store that reports a verification in
-        // the future should not be trusted as "still valid".
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->fixedStore(Carbon::now()->addMinutes(30)),
-        );
-
-        self::assertTrue($this->manager()->hasExpired(60));
-    }
-
-    /**
-     * Once the elapsed minutes exceed the expiry budget the
-     * verification should expire.
-     *
-     * @return void
-     */
-    public function testHasExpiredReturnsTrueWhenElapsedExceedsExpiry(): void
-    {
-        $user = TestUser::query()->create(['email' => 'm@example.com']);
-
-        $this->actingAs($user);
-
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->fixedStore(Carbon::now()->subMinutes(120)),
-        );
-
-        self::assertTrue($this->manager()->hasExpired(60));
-    }
-
-    /**
-     * A non-numeric `mfa.default_expiry` config value should be
-     * coerced to zero, expiring any prior verification.
-     *
-     * @return void
-     */
-    public function testHasExpiredDefaultsToFallbackExpiryWhenConfigIsNonNumeric(): void
-    {
-        $user = TestUser::query()->create(['email' => 'n@example.com']);
-
-        $this->actingAs($user);
-
-        $config = app(Repository::class);
-        $config->set('mfa.default_expiry', 'not-a-number');
-
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->fixedStore(Carbon::now()->subMinute()),
-        );
-
-        // A non-numeric config falls back to 0 via the manager's
-        // `resolveDefaultExpiry()` defence, meaning any prior
-        // verification is treated as expired.
-        self::assertTrue($this->manager()->hasExpired());
-    }
-
-    /**
-     * A numeric-string `mfa.default_expiry` config value should be
-     * coerced to an int and respected.
-     *
-     * @return void
-     */
-    public function testHasExpiredCoercesNumericStringConfigToInt(): void
-    {
-        $user = TestUser::query()->create(['email' => 'o@example.com']);
-
-        $this->actingAs($user);
-
-        $config = app(Repository::class);
-        $config->set('mfa.default_expiry', '60');
-
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->fixedStore(Carbon::now()->subMinutes(10)),
-        );
-
-        self::assertFalse($this->manager()->hasExpired());
-    }
-
-    /**
-     * Without an identity `markVerified()` must not touch the
-     * verification store.
-     *
-     * @return void
-     */
-    public function testMarkVerifiedIsNoopWhenNoIdentity(): void
-    {
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldNotReceive('markVerified');
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
-
-        $this->manager()->markVerified();
-
-        $this->addToAssertionCount(1);
-    }
-
-    /**
-     * With an identity `markVerified()` should delegate to the bound
-     * store's `markVerified()` method.
-     *
-     * @return void
-     */
-    public function testMarkVerifiedDelegatesToStore(): void
-    {
-        $user = TestUser::query()->create(['email' => 'p@example.com']);
-
-        $this->actingAs($user);
-
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('markVerified')
-            ->once()
-            ->with(\Mockery::type(Authenticatable::class));
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
-
-        $this->manager()->markVerified();
-
-        $this->addToAssertionCount(1);
-    }
-
-    /**
-     * Without an identity `forgetVerification()` must not touch the
-     * verification store.
-     *
-     * @return void
-     */
-    public function testForgetVerificationIsNoopWhenNoIdentity(): void
-    {
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldNotReceive('forget');
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
-
-        $this->manager()->forgetVerification();
-
-        $this->addToAssertionCount(1);
-    }
-
-    /**
-     * With an identity `forgetVerification()` should delegate to the
-     * bound store's `forget()` method.
-     *
-     * @return void
-     */
-    public function testForgetVerificationDelegatesToStore(): void
-    {
-        $user = TestUser::query()->create(['email' => 'q@example.com']);
-
-        $this->actingAs($user);
-
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('forget')
-            ->once()
-            ->with(\Mockery::type(Authenticatable::class));
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
-
-        $this->manager()->forgetVerification();
-
-        $this->addToAssertionCount(1);
-    }
-
-    /**
-     * Calling `clearCache()` without an identity argument should
-     * flush every cached entry across the manager.
-     *
-     * @return void
-     */
-    public function testClearCacheWithoutIdentityFlushesEverything(): void
-    {
-        $user = $this->makeUserWithFactor();
-
-        $this->actingAs($user);
-
-        $manager = $this->manager();
-
-        self::assertTrue($manager->isSetup());
-
-        Factor::query()->where('authenticatable_id', $user->getKey())->delete();
-
-        // Still cached before flush.
-        self::assertTrue($manager->isSetup());
-
-        $manager->clearCache();
-
-        self::assertFalse($manager->isSetup());
-    }
-
-    /**
-     * Scoping `clearCache()` to a single identity must leave other
-     * identities' cache entries intact.
-     *
-     * @return void
-     */
-    public function testClearCacheScopedToIdentityLeavesOthersAlone(): void
-    {
-        $userA = $this->makeUserWithFactor('user-a@example.com');
-        $userB = $this->makeUserWithFactor('user-b@example.com');
-
-        $manager = $this->manager();
-
-        $this->actingAs($userA);
-        self::assertTrue($manager->isSetup());
-
-        $this->actingAs($userB);
-        self::assertTrue($manager->isSetup());
-
-        // Wipe the underlying data for both users, then scope-clear A.
-        Factor::query()->delete();
-
-        $manager->clearCache($userA);
-
-        $this->actingAs($userA);
-        self::assertFalse($manager->isSetup());
-
-        // B's cache entry survives the scoped clear.
-        $this->actingAs($userB);
-        self::assertTrue($manager->isSetup());
     }
 
     /**
@@ -646,26 +281,6 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * The cache-prefix builder should accept an identity whose auth
-     * identifier is neither a string nor an int by falling back to an
-     * empty suffix rather than throwing.
-     *
-     * @return void
-     */
-    public function testIsSetupHandlesNonScalarAuthIdentifierViaEmptySuffix(): void
-    {
-        $identity = new NonScalarIdentifierUser;
-
-        Auth::shouldReceive('user')->andReturn($identity);
-
-        // `isSetup()` forces the manager through `getCachePrefix()`,
-        // which must accept an identity whose auth identifier is
-        // neither a string nor an int by falling back to an empty
-        // suffix rather than throwing.
-        self::assertFalse($this->manager()->isSetup());
-    }
-
-    /**
      * `getFactors()` should cache its returned collection so repeated
      * calls within the same request do not re-query the database.
      *
@@ -690,71 +305,22 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolve the package's MFA manager instance from the container.
+     * The cache-prefix builder should accept an identity whose auth
+     * identifier is neither a string nor an int by falling back to an
+     * empty suffix rather than throwing.
      *
-     * @return \SineMacula\Laravel\Mfa\MfaManager
+     * @return void
      */
-    private function manager(): MfaManager
+    public function testIsSetupHandlesNonScalarAuthIdentifierViaEmptySuffix(): void
     {
-        $manager = $this->container()->make('mfa');
-        \PHPUnit\Framework\Assert::assertInstanceOf(MfaManager::class, $manager);
+        $identity = new NonScalarIdentifierUser;
 
-        return $manager;
-    }
+        Auth::shouldReceive('user')->andReturn($identity);
 
-    /**
-     * Create a test user with a single backing TOTP factor.
-     *
-     * @param  string  $email
-     * @return \Tests\Fixtures\TestUser
-     */
-    private function makeUserWithFactor(string $email = 'user@example.com'): TestUser
-    {
-        /** @var \Tests\Fixtures\TestUser $user */
-        $user = TestUser::query()->create([
-            'email'       => $email,
-            'mfa_enabled' => true,
-        ]);
-
-        Factor::query()->create([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
-            'secret'               => 'JBSWY3DPEHPK3PXP',
-        ]);
-
-        return $user;
-    }
-
-    /**
-     * Build a store mock whose `lastVerifiedAt()` always returns the
-     * supplied timestamp.
-     *
-     * @param  \Carbon\Carbon  $at
-     * @return \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore
-     */
-    private function fixedStore(Carbon $at): MfaVerificationStore
-    {
-        /** @var \Mockery\MockInterface&\SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('lastVerifiedAt')
-            ->andReturn($at);
-
-        return $store;
-    }
-
-    /**
-     * Build a store mock whose `lastVerifiedAt()` always returns null.
-     *
-     * @return \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore
-     */
-    private function nullStore(): MfaVerificationStore
-    {
-        /** @var \Mockery\MockInterface&\SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('lastVerifiedAt')
-            ->andReturnNull();
-
-        return $store;
+        // `isSetup()` forces the manager through `getCachePrefix()`,
+        // which must accept an identity whose auth identifier is
+        // neither a string nor an int by falling back to an empty
+        // suffix rather than throwing.
+        self::assertFalse($this->manager()->isSetup());
     }
 }

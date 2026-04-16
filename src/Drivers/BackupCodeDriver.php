@@ -76,26 +76,19 @@ final class BackupCodeDriver implements FactorDriver
     ): bool {
         $stored = $factor->getSecret();
 
-        if ($stored === null || $stored === '') {
-            return false;
-        }
-
-        $submitted = $this->hash($code);
-
-        if (!hash_equals($stored, $submitted)) {
+        if ($stored === null || $stored === '' || !hash_equals($stored, $this->hash($code))) {
             return false;
         }
 
         // Single-use consumption: an atomic conditional UPDATE closes the
-        // TOCTOU race where two concurrent requests could both match the
+        // TOCTOU race where two concurrent requests would both match the
         // same code. Only the request whose UPDATE finds the still-
         // unconsumed secret wins; the loser sees zero affected rows and
-        // returns false.
-        if ($factor instanceof EloquentFactor) {
-            return $this->consumeAtomic($factor, $stored);
-        }
-
-        return true;
+        // returns false. Non-Eloquent factors have no row to consume, so
+        // the comparison alone constitutes the verification result.
+        return $factor instanceof EloquentFactor
+            ? $this->consumeAtomic($factor, $stored)
+            : true;
     }
 
     /**

@@ -111,23 +111,45 @@ final readonly class FactorSummary implements \JsonSerializable
             return $recipient;
         }
 
-        if (str_contains($recipient, '@')) {
-            [$local, $domain] = explode('@', $recipient, 2);
+        return str_contains($recipient, '@')
+            ? self::maskEmail($recipient)
+            : self::maskOpaque($recipient);
+    }
 
-            $keep   = min(2, (int) max(1, floor(strlen($local) / 2)));
-            $prefix = substr($local, 0, $keep);
-            $masked = $prefix . str_repeat('*', max(1, strlen($local) - $keep));
+    /**
+     * Mask an email address: keep the domain intact, mask the local-part
+     * except for the leading two characters (or one if the local-part is
+     * a single character).
+     *
+     * @param  string  $recipient
+     * @return string
+     */
+    private static function maskEmail(string $recipient): string
+    {
+        [$local, $domain] = explode('@', $recipient, 2);
 
-            return $masked . '@' . $domain;
-        }
+        $keep   = min(2, (int) max(1, floor(strlen($local) / 2)));
+        $prefix = substr($local, 0, $keep);
+        $masked = $prefix . str_repeat('*', max(1, strlen($local) - $keep));
 
+        return $masked . '@' . $domain;
+    }
+
+    /**
+     * Mask a phone number / opaque recipient: keep the last four
+     * characters, mask everything before them. If the input is four or
+     * fewer characters, mask all of it.
+     *
+     * @param  string  $recipient
+     * @return string
+     */
+    private static function maskOpaque(string $recipient): string
+    {
         $keep   = 4;
         $length = strlen($recipient);
 
-        if ($length <= $keep) {
-            return str_repeat('*', $length);
-        }
-
-        return str_repeat('*', $length - $keep) . substr($recipient, -$keep);
+        return $length <= $keep
+            ? str_repeat('*', $length)
+            : str_repeat('*', $length - $keep) . substr($recipient, -$keep);
     }
 }

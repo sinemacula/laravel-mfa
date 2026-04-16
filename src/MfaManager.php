@@ -7,7 +7,6 @@ namespace SineMacula\Laravel\Mfa;
 use Carbon\Carbon;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Manager;
@@ -17,16 +16,10 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
-use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
-use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
-use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
-use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
-use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
 
 /**
  * MFA manager.
@@ -46,7 +39,10 @@ use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
  * The manager wires them together, dispatches the lifecycle events, and
  * caches per-request read results so middleware stacks that call
  * `shouldUse()` / `isSetup()` / `hasExpired()` in sequence do not incur
- * redundant work.
+ * redundant work. Built-in driver factories live in `MfaServiceProvider`
+ * and are registered against the manager through the standard `extend()`
+ * API at construction time, keeping this class free of per-driver
+ * construction logic.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -97,7 +93,10 @@ class MfaManager extends Manager
             return true;
         }
 
-        return $this->resolvePolicy()->shouldEnforce($identity);
+        /** @var \SineMacula\Laravel\Mfa\Contracts\MfaPolicy $policy */
+        $policy = $this->container->make(MfaPolicy::class);
+
+        return $policy->shouldEnforce($identity);
     }
 
     /**
@@ -137,7 +136,10 @@ class MfaManager extends Manager
             return false;
         }
 
-        return $this->resolveStore()->lastVerifiedAt($identity) !== null;
+        /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
+        $store = $this->container->make(MfaVerificationStore::class);
+
+        return $store->lastVerifiedAt($identity) !== null;
     }
 
     /**
@@ -156,32 +158,29 @@ class MfaManager extends Manager
             return true;
         }
 
-        $verifiedAt = $this->resolveStore()->lastVerifiedAt($identity);
+        /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
+        $store = $this->container->make(MfaVerificationStore::class);
 
-        if ($verifiedAt === null) {
-            return true;
-        }
+        $verifiedAt = $store->lastVerifiedAt($identity);
+        $window     = $expiresAfter ?? $this->resolveIntConfig(
+            'mfa.default_expiry',
+            default: 20160,
+            malformedFallback: 0,
+        );
 
-        if ($expiresAfter === null) {
-            $expiresAfter = $this->resolveDefaultExpiry();
-        }
+        // `verifiedAt === null` means no prior verification exists.
+        // `window <= 0` is the documented "require verification on every
+        // request" setting and treats any prior verification as expired.
+        // A negative `elapsed` means `verifiedAt` is in the future (clock
+        // skew or a malicious store write) — treat as expired rather than
+        // trusting a future-dated verification.
+        $elapsed = $verifiedAt?->diffInMinutes(Carbon::now(), false);
 
-        // `expiresAfter === 0` is the documented "require verification on
-        // every request" setting; treat any prior verification as expired.
-        if ($expiresAfter <= 0) {
-            return true;
-        }
-
-        $elapsed = $verifiedAt->diffInMinutes(Carbon::now(), false);
-
-        // Negative elapsed means `verifiedAt` is in the future (clock skew
-        // or malicious store write). Treat as expired rather than trusting
-        // a future-dated verification.
-        if ($elapsed < 0) {
-            return true;
-        }
-
-        return $elapsed > $expiresAfter;
+        return $verifiedAt === null
+            || $window <= 0
+            || $elapsed === null
+            || $elapsed < 0
+            || $elapsed > $window;
     }
 
     /**
@@ -198,7 +197,10 @@ class MfaManager extends Manager
             return;
         }
 
-        $this->resolveStore()->markVerified($identity);
+        /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
+        $store = $this->container->make(MfaVerificationStore::class);
+
+        $store->markVerified($identity);
     }
 
     /**
@@ -214,7 +216,10 @@ class MfaManager extends Manager
             return;
         }
 
-        $this->resolveStore()->forget($identity);
+        /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
+        $store = $this->container->make(MfaVerificationStore::class);
+
+        $store->forget($identity);
     }
 
     /**
@@ -304,9 +309,9 @@ class MfaManager extends Manager
             return;
         }
 
-        $this->resolveEvents()->dispatch(
-            new MfaChallengeIssued($identity, $factor, $driver),
-        );
+        $events = $this->container->make(Dispatcher::class);
+
+        $events->dispatch(new MfaChallengeIssued($identity, $factor, $driver));
     }
 
     /**
@@ -342,13 +347,15 @@ class MfaManager extends Manager
             return false;
         }
 
+        $events = $this->container->make(Dispatcher::class);
+
         if ($factor->isLocked()) {
-            $this->dispatchFailure(
+            $events->dispatch(new MfaVerificationFailed(
                 $identity,
                 $factor,
                 $driver,
                 MfaVerificationFailureReason::FactorLocked,
-            );
+            ));
 
             return false;
         }
@@ -359,153 +366,9 @@ class MfaManager extends Manager
             $this->applyVerificationOutcome($factor, $driver, $valid);
         }
 
-        if ($valid) {
-            $this->resolveStore()->markVerified($identity);
-            $this->clearCache($identity);
+        $this->finaliseVerification($identity, $factor, $driver, $valid, $events);
 
-            $this->resolveEvents()->dispatch(
-                new MfaVerified($identity, $factor, $driver),
-            );
-
-            return true;
-        }
-
-        $this->dispatchFailure(
-            $identity,
-            $factor,
-            $driver,
-            $this->classifyFailure($factor),
-        );
-
-        return false;
-    }
-
-    /**
-     * Create the TOTP driver.
-     *
-     * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
-     */
-    protected function createTotpDriver(): FactorDriver
-    {
-        /** @var array{window?: int} $config */
-        $config = $this->getDriverConfig('totp');
-
-        return new TotpDriver(
-            window: $config['window'] ?? 1,
-        );
-    }
-
-    /**
-     * Create the email driver.
-     *
-     * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
-     */
-    protected function createEmailDriver(): FactorDriver
-    {
-        /**
-         * @var array{
-         *     code_length?: int,
-         *     expiry?: int,
-         *     max_attempts?: int,
-         *     alphabet?: ?string,
-         *     mailable?: class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>
-         * } $config
-         */
-        $config = $this->getDriverConfig('email');
-
-        return new EmailDriver(
-            mailer: $this->container->make(Mailer::class),
-            mailable: $config['mailable']        ?? MfaCodeMessage::class,
-            codeLength: $config['code_length']   ?? 6,
-            expiry: $config['expiry']            ?? 10,
-            maxAttempts: $config['max_attempts'] ?? 3,
-            alphabet: $config['alphabet']        ?? null,
-        );
-    }
-
-    /**
-     * Create the SMS driver.
-     *
-     * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
-     */
-    protected function createSmsDriver(): FactorDriver
-    {
-        /**
-         * @var array{
-         *     code_length?: int,
-         *     expiry?: int,
-         *     max_attempts?: int,
-         *     alphabet?: ?string,
-         *     message_template?: string
-         * } $config
-         */
-        $config = $this->getDriverConfig('sms');
-
-        return new SmsDriver(
-            gateway: $this->container->make(SmsGateway::class),
-            messageTemplate: $config['message_template']
-                                                 ?? 'Your verification code is: :code',
-            codeLength: $config['code_length']   ?? 6,
-            expiry: $config['expiry']            ?? 10,
-            maxAttempts: $config['max_attempts'] ?? 3,
-            alphabet: $config['alphabet']        ?? null,
-        );
-    }
-
-    /**
-     * Create the backup-code driver.
-     *
-     * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
-     */
-    protected function createBackupCodeDriver(): FactorDriver
-    {
-        /**
-         * @var array{
-         *     code_length?: int,
-         *     alphabet?: string,
-         *     code_count?: int
-         * } $config
-         */
-        $config = $this->getDriverConfig('backup_code');
-
-        return new BackupCodeDriver(
-            codeLength: $config['code_length'] ?? 10,
-            alphabet: $config['alphabet']
-                                             ?? '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
-            codeCount: $config['code_count'] ?? 10,
-        );
-    }
-
-    /**
-     * Resolve the bound MFA policy.
-     *
-     * @return \SineMacula\Laravel\Mfa\Contracts\MfaPolicy
-     */
-    protected function resolvePolicy(): MfaPolicy
-    {
-        /** @var \SineMacula\Laravel\Mfa\Contracts\MfaPolicy */
-        return $this->container->make(MfaPolicy::class);
-    }
-
-    /**
-     * Resolve the bound MFA verification store.
-     *
-     * @return \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore
-     */
-    protected function resolveStore(): MfaVerificationStore
-    {
-        /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore */
-        return $this->container->make(MfaVerificationStore::class);
-    }
-
-    /**
-     * Resolve the event dispatcher.
-     *
-     * @return \Illuminate\Contracts\Events\Dispatcher
-     */
-    protected function resolveEvents(): Dispatcher
-    {
-        return $this->container->make(Dispatcher::class);
+        return $valid;
     }
 
     /**
@@ -528,6 +391,44 @@ class MfaManager extends Manager
         }
 
         return $instance;
+    }
+
+    /**
+     * Apply the post-driver outcome side-effects: mark verified and
+     * clear cache + dispatch MfaVerified on success, or dispatch
+     * MfaVerificationFailed with a machine-readable reason on failure.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $driver
+     * @param  bool  $valid
+     * @param  \Illuminate\Contracts\Events\Dispatcher  $events
+     * @return void
+     */
+    private function finaliseVerification(
+        MultiFactorAuthenticatable $identity,
+        Factor $factor,
+        string $driver,
+        bool $valid,
+        Dispatcher $events,
+    ): void {
+        if (!$valid) {
+            $events->dispatch(new MfaVerificationFailed(
+                $identity,
+                $factor,
+                $driver,
+                $this->classifyFailure($factor),
+            ));
+
+            return;
+        }
+
+        /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
+        $store = $this->container->make(MfaVerificationStore::class);
+        $store->markVerified($identity);
+        $this->clearCache($identity);
+
+        $events->dispatch(new MfaVerified($identity, $factor, $driver));
     }
 
     /**
@@ -566,11 +467,11 @@ class MfaManager extends Manager
 
         $factor->recordAttempt();
 
-        $maxAttempts = $this->resolveMaxAttempts($driver);
+        $maxAttempts = $this->resolveIntConfig("mfa.drivers.{$driver}.max_attempts", 0);
 
         if ($maxAttempts > 0 && $factor->getAttempts() >= $maxAttempts) {
             $factor->applyLockout(
-                Carbon::now()->addMinutes($this->resolveLockoutMinutes()),
+                Carbon::now()->addMinutes($this->resolveIntConfig('mfa.lockout_minutes', 15)),
             );
         }
 
@@ -595,112 +496,53 @@ class MfaManager extends Manager
         $code      = $factor->getCode();
         $secret    = $factor->getSecret();
 
-        if ($code === null && $secret === null) {
-            return MfaVerificationFailureReason::SecretMissing;
-        }
-
-        if ($expiresAt !== null && $expiresAt->isPast()) {
-            return MfaVerificationFailureReason::CodeExpired;
-        }
-
-        if ($code === null) {
-            // Must be a TOTP-shaped factor (secret non-null per the early
-            // return above). The submitted code didn't match the derived
-            // TOTP window.
-            return MfaVerificationFailureReason::CodeInvalid;
-        }
-
-        if ($expiresAt === null) {
-            // Pending code exists but has no expiry — treat as missing.
-            return MfaVerificationFailureReason::CodeMissing;
-        }
-
-        return MfaVerificationFailureReason::CodeInvalid;
+        // Branches in priority order:
+        // - SecretMissing: TOTP enrolment never completed (no code AND no secret).
+        // - CodeExpired:   pending OTP aged past its window.
+        // - CodeMissing:   pending code exists but has no expiry — treat as missing.
+        // - CodeInvalid:   default — TOTP window mismatch or OTP comparison mismatch.
+        return match (true) {
+            $code === null      && $secret === null     => MfaVerificationFailureReason::SecretMissing,
+            $expiresAt !== null && $expiresAt->isPast() => MfaVerificationFailureReason::CodeExpired,
+            $code      !== null && $expiresAt === null  => MfaVerificationFailureReason::CodeMissing,
+            default                                     => MfaVerificationFailureReason::CodeInvalid,
+        };
     }
 
     /**
-     * Dispatch a `MfaVerificationFailed` event.
+     * Resolve an integer setting from the application config.
      *
-     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
-     * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $driver
-     * @param  \SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason  $reason
-     * @return void
-     */
-    private function dispatchFailure(
-        Authenticatable $identity,
-        ?Factor $factor,
-        string $driver,
-        MfaVerificationFailureReason $reason,
-    ): void {
-        $this->resolveEvents()->dispatch(
-            new MfaVerificationFailed($identity, $factor, $driver, $reason),
-        );
-    }
-
-    /**
-     * Resolve the max-attempts threshold for a driver.
+     * Two fallback values are accepted so callers can distinguish
+     * "absent" (key missing → use a sensible default) from "malformed"
+     * (key present but not coercible to int → fail safe by using
+     * `$malformedFallback`, typically 0). The asymmetry is deliberate:
+     * a misconfigured expiry value should not silently grant a long
+     * valid window.
      *
-     * @param  string  $driver
+     * @param  string  $key
+     * @param  int  $default
+     * @param  ?int  $malformedFallback
      * @return int
      */
-    private function resolveMaxAttempts(string $driver): int
-    {
-        /** @var mixed $value */
-        $value = $this->getDriverConfig($driver)['max_attempts'] ?? 0;
-
-        return is_int($value) ? $value : 0;
-    }
-
-    /**
-     * Resolve the lockout duration in minutes.
-     *
-     * @return int
-     */
-    private function resolveLockoutMinutes(): int
-    {
-        /** @var \Illuminate\Config\Repository $config */
+    private function resolveIntConfig(
+        string $key,
+        int $default,
+        ?int $malformedFallback = null,
+    ): int {
         $config = $this->container->make('config');
 
-        /** @var mixed $value */
-        $value = $config->get('mfa.lockout_minutes', 15);
-
-        return is_int($value) ? $value : 15;
-    }
-
-    /**
-     * Resolve the default expiry window in minutes.
-     *
-     * @return int
-     */
-    private function resolveDefaultExpiry(): int
-    {
-        /** @var \Illuminate\Config\Repository $config */
-        $config = $this->container->make('config');
-
-        /** @var mixed $value */
-        $value = $config->get('mfa.default_expiry', 20160);
-
-        if (is_int($value)) {
-            return $value;
+        if (!$config->has($key)) {
+            return $default;
         }
 
-        return is_numeric($value) ? (int) $value : 0;
-    }
+        /** @var mixed $value */
+        $value = $config->get($key);
 
-    /**
-     * Get the configuration for a specific driver.
-     *
-     * @param  string  $driver
-     * @return array<string, mixed>
-     */
-    private function getDriverConfig(string $driver): array
-    {
-        /** @var \Illuminate\Config\Repository $config */
-        $config = $this->container->make('config');
-
-        /** @var array<string, mixed> */
-        return $config->get("mfa.drivers.{$driver}", []);
+        return match (true) {
+            is_int($value)     => $value,
+            is_numeric($value) => (int) $value,
+            default            => $malformedFallback ?? $default,
+        };
     }
 
     /**
@@ -735,7 +577,6 @@ class MfaManager extends Manager
      */
     private function getCachePrefix(Authenticatable $identity): string
     {
-        /** @var \Illuminate\Config\Repository $config */
         $config = $this->container->make('config');
 
         /** @var string $prefix */
