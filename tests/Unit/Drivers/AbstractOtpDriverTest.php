@@ -167,7 +167,10 @@ final class AbstractOtpDriverTest extends TestCase
     public function testConstructorRejectsEmptyAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('OTP alphabet must contain at least two characters');
+        // Asserting the distinguishing suffix (not just the shared
+        // prefix) so a future refactor that swaps the two branch
+        // strings cannot silently flip the diagnostic.
+        $this->expectExceptionMessage('received an empty string.');
 
         $this->makeDriver(alphabet: '');
     }
@@ -175,7 +178,7 @@ final class AbstractOtpDriverTest extends TestCase
     public function testConstructorRejectsSingleCharacterAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('OTP alphabet must contain at least two characters');
+        $this->expectExceptionMessage('received a single character.');
 
         $this->makeDriver(alphabet: 'A');
     }
