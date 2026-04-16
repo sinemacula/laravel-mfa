@@ -18,17 +18,29 @@ use Tests\TestCase;
  */
 final class SanityTest extends TestCase
 {
+    /**
+     * The MFA manager should resolve from the container under the
+     * `'mfa'` alias registered by the service provider.
+     *
+     * @return void
+     */
     public function testManagerResolvesFromContainer(): void
     {
-        $manager = $this->app->make('mfa');
+        $manager = $this->container()->make('mfa');
 
         self::assertInstanceOf(MfaManager::class, $manager);
     }
 
+    /**
+     * The shipped default driver should be `'totp'` when no consumer
+     * override is configured.
+     *
+     * @return void
+     */
     public function testDefaultDriverIsTotp(): void
     {
-        /** @var MfaManager $manager */
-        $manager = $this->app->make('mfa');
+        /** @var \SineMacula\Laravel\Mfa\MfaManager $manager */
+        $manager = $this->container()->make('mfa');
 
         self::assertSame('totp', $manager->getDefaultDriver());
     }

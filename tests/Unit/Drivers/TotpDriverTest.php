@@ -33,6 +33,12 @@ final class TotpDriverTest extends TestCase
     /** @var string Account-name fixture used across the provisioning-URI tests. */
     private const string ACCOUNT_NAME = 'user@example.com';
 
+    /**
+     * `issueChallenge()` must be a no-op for TOTP — the code is
+     * generated client-side from the shared secret.
+     *
+     * @return void
+     */
     public function testIssueChallengeIsNoOp(): void
     {
         $driver = new TotpDriver;
@@ -45,6 +51,11 @@ final class TotpDriverTest extends TestCase
         self::assertSame('IGNORED', $factor->getSecret());
     }
 
+    /**
+     * A null stored secret must short-circuit verify to false.
+     *
+     * @return void
+     */
     public function testVerifyReturnsFalseWhenSecretIsNull(): void
     {
         $driver = new TotpDriver;
@@ -53,6 +64,11 @@ final class TotpDriverTest extends TestCase
         self::assertFalse($driver->verify($factor, '123456'));
     }
 
+    /**
+     * An empty stored secret must short-circuit verify to false.
+     *
+     * @return void
+     */
     public function testVerifyReturnsFalseWhenSecretIsEmptyString(): void
     {
         $driver = new TotpDriver;
@@ -61,6 +77,12 @@ final class TotpDriverTest extends TestCase
         self::assertFalse($driver->verify($factor, '123456'));
     }
 
+    /**
+     * A current TOTP code derived from the stored secret must verify
+     * successfully.
+     *
+     * @return void
+     */
     public function testVerifyReturnsTrueForCurrentTotpCode(): void
     {
         $google2fa = new Google2FA;
@@ -73,6 +95,12 @@ final class TotpDriverTest extends TestCase
         self::assertTrue($driver->verify($factor, $code));
     }
 
+    /**
+     * A code that does not match the current TOTP for the stored
+     * secret must fail verification.
+     *
+     * @return void
+     */
     public function testVerifyReturnsFalseForWrongCode(): void
     {
         $google2fa = new Google2FA;
@@ -87,6 +115,12 @@ final class TotpDriverTest extends TestCase
         self::assertFalse($driver->verify($factor, '000000'));
     }
 
+    /**
+     * `generateSecret()` must return a non-empty Base32 string ready
+     * for handing to an authenticator app.
+     *
+     * @return void
+     */
     public function testGenerateSecretReturnsNonEmptyBase32String(): void
     {
         $driver = new TotpDriver;
@@ -97,6 +131,12 @@ final class TotpDriverTest extends TestCase
         self::assertMatchesRegularExpression('/^[A-Z2-7]+$/', $secret);
     }
 
+    /**
+     * The provisioning URI must use the `otpauth://totp/` scheme so
+     * authenticator apps can render it as a QR code.
+     *
+     * @return void
+     */
     public function testProvisioningUriReturnsOtpauthScheme(): void
     {
         $driver = new TotpDriver;
@@ -111,6 +151,12 @@ final class TotpDriverTest extends TestCase
         self::assertStringStartsWith('otpauth://totp/', $uri);
     }
 
+    /**
+     * The provisioning URI must carry the issuer, account name, and
+     * secret in both the label and the query parameters.
+     *
+     * @return void
+     */
     public function testProvisioningUriIncludesIssuerAndAccountAndSecret(): void
     {
         $driver = new TotpDriver;
@@ -140,6 +186,12 @@ final class TotpDriverTest extends TestCase
         self::assertSame('Acme', $params['issuer']);
     }
 
+    /**
+     * The provisioning URI must encode an issuer containing
+     * whitespace exactly once — never doubly encoded.
+     *
+     * @return void
+     */
     public function testProvisioningUriDoesNotDoubleEncodeIssuer(): void
     {
         $driver = new TotpDriver;
@@ -158,6 +210,13 @@ final class TotpDriverTest extends TestCase
         self::assertStringContainsString('Acme%20Co', $uri);
     }
 
+    /**
+     * The `$secret` parameter on `provisioningUri()` must carry the
+     * `#[\SensitiveParameter]` attribute so it never leaks into a
+     * stack trace.
+     *
+     * @return void
+     */
     public function testProvisioningUriSecretParameterCarriesSensitiveAttribute(): void
     {
         $reflection  = new \ReflectionMethod(TotpDriver::class, 'provisioningUri');
@@ -178,81 +237,135 @@ final class TotpDriverTest extends TestCase
      * the database.
      *
      * @param  ?string  $secret
+     * @return \SineMacula\Laravel\Mfa\Contracts\Factor
      */
     private function makeFactor(?string $secret): Factor
     {
         return new class ($secret) implements Factor {
+            /**
+             * Capture the seeded secret value.
+             *
+             * @param  ?string  $secret
+             * @return void
+             */
             public function __construct(
                 private readonly ?string $secret,
             ) {}
 
+            /**
+             * @return mixed
+             */
             public function getFactorIdentifier(): mixed
             {
                 return 'totp-stub';
             }
 
+            /**
+             * @return string
+             */
             public function getDriver(): string
             {
                 return 'totp';
             }
 
+            /**
+             * @return ?string
+             */
             public function getLabel(): ?string
             {
                 return null;
             }
 
+            /**
+             * @return ?string
+             */
             public function getRecipient(): ?string
             {
                 return null;
             }
 
+            /**
+             * @return ?\Illuminate\Contracts\Auth\Authenticatable
+             */
             public function getAuthenticatable(): ?Authenticatable
             {
                 return null;
             }
 
+            /**
+             * @return ?string
+             */
             public function getSecret(): ?string
             {
                 return $this->secret;
             }
 
+            /**
+             * @return ?string
+             */
             public function getCode(): ?string
             {
                 return null;
             }
 
+            /**
+             * @return ?\Carbon\CarbonInterface
+             */
             public function getExpiresAt(): ?CarbonInterface
             {
                 return null;
             }
 
+            /**
+             * @return int
+             */
             public function getAttempts(): int
             {
                 return 0;
             }
 
+            /**
+             * @return ?\Carbon\CarbonInterface
+             */
             public function getLockedUntil(): ?CarbonInterface
             {
                 return null;
             }
 
+            /**
+             * @return bool
+             */
             public function isLocked(): bool
             {
-                return false;
+                // Derived from the accessor so this stub does not duplicate
+                // the body of isVerified() — radarlint S4144 flags
+                // structurally identical method bodies.
+                return $this->getLockedUntil() !== null;
             }
 
+            /**
+             * @return ?\Carbon\CarbonInterface
+             */
             public function getLastAttemptedAt(): ?CarbonInterface
             {
                 return null;
             }
 
+            /**
+             * @return ?\Carbon\CarbonInterface
+             */
             public function getVerifiedAt(): ?CarbonInterface
             {
                 return null;
             }
 
+            /**
+             * @return bool
+             */
             public function isVerified(): bool
             {
+                // Verification state is irrelevant — these stubs cover the
+                // verify-decision path, not the post-verify state machine.
                 return false;
             }
         };

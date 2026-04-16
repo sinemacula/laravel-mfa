@@ -30,6 +30,15 @@ final class RequireMfaMiddlewareTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** @var string Sentinel returned by the inner handler so a missed-throw shows up as a string assertion failure. */
+    private const string NOT_REACHED = 'not reached';
+
+    /**
+     * An identity that does not opt into MFA must not trigger the
+     * middleware enforcement chain.
+     *
+     * @return void
+     */
     public function testPassesWhenMfaDisabled(): void
     {
         $user = TestUser::create([
@@ -41,6 +50,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         self::assertFalse(Mfa::shouldUse());
     }
 
+    /**
+     * An MFA-enrolled identity with no registered factors must
+     * trigger an `MfaRequiredException` from the middleware.
+     *
+     * @return void
+     */
     public function testRaisesRequiredExceptionWhenNoFactors(): void
     {
         $user = TestUser::create([
@@ -53,12 +68,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         self::assertFalse(Mfa::isSetup());
 
         try {
-            $middleware = $this->app->make(
+            $middleware = $this->container()->make(
                 \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
             );
             $middleware->handle(
-                $this->app->make(\Illuminate\Http\Request::class),
-                static fn (): mixed => 'not reached',
+                $this->container()->make(\Illuminate\Http\Request::class),
+                static fn (): mixed => self::NOT_REACHED,
             );
 
             self::fail('Expected MfaRequiredException');
@@ -68,17 +83,24 @@ final class RequireMfaMiddlewareTest extends TestCase
         }
     }
 
+    /**
+     * An identity with at least one factor but no successful
+     * verification must trigger an `MfaRequiredException` carrying
+     * the factor summaries in the payload.
+     *
+     * @return void
+     */
     public function testRaisesRequiredExceptionWhenNeverVerified(): void
     {
         [, $factor] = $this->enrolTotp();
 
         try {
-            $middleware = $this->app->make(
+            $middleware = $this->container()->make(
                 \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
             );
             $middleware->handle(
-                $this->app->make(\Illuminate\Http\Request::class),
-                static fn (): mixed => 'not reached',
+                $this->container()->make(\Illuminate\Http\Request::class),
+                static fn (): mixed => self::NOT_REACHED,
             );
 
             self::fail('Expected MfaRequiredException');
@@ -94,6 +116,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         unset($factor);
     }
 
+    /**
+     * Once the active verification ages past the configured expiry
+     * the middleware must throw `MfaExpiredException`.
+     *
+     * @return void
+     */
     public function testRaisesExpiredExceptionWhenVerificationAgedOut(): void
     {
         [$user, $factor, $code] = $this->enrolTotp();
@@ -105,12 +133,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         $this->travel(15 * 24 * 60 + 1)->minutes();
 
         try {
-            $middleware = $this->app->make(
+            $middleware = $this->container()->make(
                 \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
             );
             $middleware->handle(
-                $this->app->make(\Illuminate\Http\Request::class),
-                static fn (): mixed => 'not reached',
+                $this->container()->make(\Illuminate\Http\Request::class),
+                static fn (): mixed => self::NOT_REACHED,
             );
 
             self::fail('Expected MfaExpiredException');
@@ -121,6 +149,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         unset($user, $factor);
     }
 
+    /**
+     * Setting the `skip_mfa` request attribute must short-circuit
+     * the middleware to the next handler regardless of MFA state.
+     *
+     * @return void
+     */
     public function testSkipAttributeBypassesEnforcement(): void
     {
         $user = TestUser::create([
@@ -129,10 +163,10 @@ final class RequireMfaMiddlewareTest extends TestCase
         ]);
         $this->actingAs($user);
 
-        $request = $this->app->make(\Illuminate\Http\Request::class);
+        $request = $this->container()->make(\Illuminate\Http\Request::class);
         $request->attributes->set('skip_mfa', true);
 
-        $middleware = $this->app->make(
+        $middleware = $this->container()->make(
             \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
         );
 
@@ -146,6 +180,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         self::assertTrue($reached);
     }
 
+    /**
+     * Step-up middleware: a verification within the configured
+     * max-age must pass through.
+     *
+     * @return void
+     */
     public function testStepUpPassesWhenVerificationIsWithinMaxAge(): void
     {
         [, $factor, $code] = $this->enrolTotp();
@@ -159,6 +199,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         self::assertTrue($reached);
     }
 
+    /**
+     * Step-up middleware: a verification older than the configured
+     * max-age must throw `MfaExpiredException`.
+     *
+     * @return void
+     */
     public function testStepUpThrowsExpiredWhenVerificationOlderThanMaxAge(): void
     {
         [, $factor, $code] = $this->enrolTotp();
@@ -172,6 +218,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         $this->runMiddleware(maxAgeMinutes: '5');
     }
 
+    /**
+     * Step-up middleware: a max-age of zero must always throw,
+     * regardless of how recent the verification was.
+     *
+     * @return void
+     */
     public function testStepUpZeroAlwaysThrowsEvenForFreshVerification(): void
     {
         [, $factor, $code] = $this->enrolTotp();
@@ -183,6 +235,13 @@ final class RequireMfaMiddlewareTest extends TestCase
         $this->runMiddleware(maxAgeMinutes: '0');
     }
 
+    /**
+     * Step-up middleware: an explicit `mfa:N` parameter must
+     * override a shorter `default_expiry` config so the per-route
+     * window wins.
+     *
+     * @return void
+     */
     public function testStepUpOverridesShorterDefaultExpiry(): void
     {
         // The default config expiry is 14 days; force it to 1 minute so
@@ -201,6 +260,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         self::assertTrue($reached);
     }
 
+    /**
+     * Step-up middleware: a non-numeric `mfa:N` parameter must
+     * surface a clear `InvalidArgumentException`.
+     *
+     * @return void
+     */
     public function testStepUpRejectsNonNumericParameter(): void
     {
         $user = TestUser::create([
@@ -215,6 +280,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         $this->runMiddleware(maxAgeMinutes: 'abc');
     }
 
+    /**
+     * Step-up middleware: a negative `mfa:N` parameter must surface
+     * a clear `InvalidArgumentException`.
+     *
+     * @return void
+     */
     public function testStepUpRejectsNegativeParameter(): void
     {
         $user = TestUser::create([
@@ -229,6 +300,12 @@ final class RequireMfaMiddlewareTest extends TestCase
         $this->runMiddleware(maxAgeMinutes: '-1');
     }
 
+    /**
+     * Step-up middleware: a fractional `mfa:N` parameter must
+     * surface a clear `InvalidArgumentException`.
+     *
+     * @return void
+     */
     public function testStepUpRejectsFractionalParameter(): void
     {
         $user = TestUser::create([
@@ -281,13 +358,13 @@ final class RequireMfaMiddlewareTest extends TestCase
      */
     private function runMiddleware(?string $maxAgeMinutes): bool
     {
-        $middleware = $this->app->make(
+        $middleware = $this->container()->make(
             \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
         );
 
         $reached = false;
         $middleware->handle(
-            $this->app->make(\Illuminate\Http\Request::class),
+            $this->container()->make(\Illuminate\Http\Request::class),
             static function () use (&$reached): \Symfony\Component\HttpFoundation\Response {
                 $reached = true;
 
@@ -300,7 +377,7 @@ final class RequireMfaMiddlewareTest extends TestCase
     }
 
     /**
-     * @return array{0: TestUser, 1: Factor, 2: string}
+     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
      */
     private function enrolTotp(): array
     {
@@ -313,10 +390,10 @@ final class RequireMfaMiddlewareTest extends TestCase
         $google = new Google2FA;
         $secret = $google->generateSecretKey();
 
-        /** @var Factor $factor */
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'totp',
             'secret'               => $secret,
         ]);

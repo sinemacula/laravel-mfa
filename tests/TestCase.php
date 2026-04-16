@@ -4,8 +4,9 @@ declare(strict_types = 1);
 
 namespace Tests;
 
-use Illuminate\Contracts\Config\Repository;
+use Illuminate\Config\Repository;
 use Orchestra\Testbench\TestCase as BaseTestCase;
+use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 
 /**
@@ -26,7 +27,7 @@ abstract class TestCase extends BaseTestCase
      * Register the package's service provider with the test
      * application.
      *
-     * @param  mixed  $app
+     * @param  \Illuminate\Foundation\Application  $app
      * @return list<class-string<\Illuminate\Support\ServiceProvider>>
      */
     protected function getPackageProviders(mixed $app): array
@@ -39,12 +40,12 @@ abstract class TestCase extends BaseTestCase
     /**
      * Configure the application environment for the test suite.
      *
-     * @param  mixed  $app
+     * @param  \Illuminate\Foundation\Application  $app
      * @return void
      */
     protected function defineEnvironment(mixed $app): void
     {
-        /** @var \Illuminate\Contracts\Config\Repository $config */
+        /** @var \Illuminate\Config\Repository $config */
         $config = $app->make(Repository::class);
 
         $config->set('app.key', 'base64:' . base64_encode(random_bytes(32)));
@@ -77,5 +78,19 @@ abstract class TestCase extends BaseTestCase
     {
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         $this->loadMigrationsFrom(__DIR__ . '/Fixtures/migrations');
+    }
+
+    /**
+     * Return the bootstrapped application container as a non-null
+     * value, narrowing the parent's nullable property for static
+     * analysis.
+     *
+     * @return \Illuminate\Foundation\Application
+     */
+    protected function container(): \Illuminate\Foundation\Application
+    {
+        Assert::assertNotNull($this->app);
+
+        return $this->app;
     }
 }

@@ -203,7 +203,7 @@ final class BackupCodeDriver implements FactorDriver
         /** @var bool $result */
         $result = DB::connection($factor->getConnectionName())->transaction(
             static function () use ($factor, $secretColumn, $expectedSecret): bool {
-                /** @var ?Model $locked */
+                /** @var ?\Illuminate\Database\Eloquent\Model $locked */
                 // @phpstan-ignore staticMethod.dynamicCall
                 $locked = $factor->newQuery()
                     ->lockForUpdate()
@@ -215,7 +215,8 @@ final class BackupCodeDriver implements FactorDriver
 
                 $currentSecret = $locked->getSecret();
 
-                if ($currentSecret === null
+                if (
+                    $currentSecret === null
                     || !hash_equals($currentSecret, $expectedSecret)
                 ) {
                     return false;

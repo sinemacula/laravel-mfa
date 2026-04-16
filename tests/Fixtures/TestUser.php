@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
  * Test user model used across the MFA test suites.
@@ -28,7 +29,7 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
 {
     use AuthenticatableTrait;
 
-    /** @var string */
+    /** @var string|null */
     protected $table = 'test_users';
 
     /** @var list<string> */
@@ -59,7 +60,7 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
      */
     public function isMfaEnabled(): bool
     {
-        return $this->authFactors()->exists();
+        return self::countFactors($this->authFactors()) > 0;
     }
 
     /**
@@ -73,7 +74,9 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
      */
     public function authFactors(): Builder
     {
-        return $this->factors()->getQuery();
+        $builder = $this->factors()->getQuery();
+
+        return self::coerceFactorBuilder($builder);
     }
 
     /**
@@ -84,5 +87,45 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
     public function factors(): MorphMany
     {
         return $this->morphMany(Factor::class, 'authenticatable');
+    }
+
+    /**
+     * Re-present the morph-relation builder under the intersection type
+     * required by the `MultiFactorAuthenticatable` contract. The shipped
+     * Factor model IS both an Eloquent Model and the Factor contract, so
+     * the cast is sound; this helper hides the generic-invariance gap
+     * from PHPStan.
+     *
+     * @formatter:off
+     *
+     * @param  mixed  $builder
+     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     *
+     * @formatter:on
+     */
+    private static function coerceFactorBuilder(mixed $builder): Builder
+    {
+        if (!$builder instanceof Builder) {
+            throw new UnexpectedBuilderTypeException('Expected an Eloquent Builder instance.');
+        }
+
+        /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> $builder */
+        return $builder;
+    }
+
+    /**
+     * Wrap the dynamic count() call so PHPStan does not flag it as a
+     * dynamic call to a static method.
+     *
+     * @formatter:off
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>  $builder
+     * @return int
+     *
+     * @formatter:on
+     */
+    private static function countFactors(Builder $builder): int
+    {
+        return $builder->toBase()->count();
     }
 }

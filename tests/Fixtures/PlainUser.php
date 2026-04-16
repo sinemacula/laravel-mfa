@@ -22,7 +22,7 @@ final class PlainUser extends Model implements Authenticatable
 {
     use AuthenticatableTrait;
 
-    /** @var string */
+    /** @var string|null */
     protected $table = 'test_users';
 
     /** @var list<string> */

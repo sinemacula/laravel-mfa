@@ -32,6 +32,17 @@ final class TotpLifecycleTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** @var string A code that is astronomically unlikely to match the current TOTP for any freshly generated secret. */
+    private const string WRONG_CODE = '000000';
+
+    /**
+     * A successful TOTP verification must update both the
+     * verification store and the factor row, and dispatch the
+     * `MfaVerified` event with the matching identity / driver /
+     * factor.
+     *
+     * @return void
+     */
     public function testSuccessfulVerificationMarksStoreAndFactor(): void
     {
         Event::fake([MfaVerified::class]);
@@ -48,18 +59,29 @@ final class TotpLifecycleTest extends TestCase
         self::assertNotNull($factor->getVerifiedAt());
         self::assertSame(0, $factor->getAttempts());
 
-        Event::assertDispatched(MfaVerified::class, static fn (MfaVerified $event): bool => $event->identity->is($user)
+        Event::assertDispatched(MfaVerified::class, static function (MfaVerified $event) use ($user, $factor): bool {
+            $identity = $event->identity;
+
+            return $identity instanceof TestUser
+                && $identity->getKey()                   === $user->getKey()
                 && $event->factor->getFactorIdentifier() === $factor->getFactorIdentifier()
-                && $event->driver                        === 'totp');
+                && $event->driver                        === 'totp';
+        });
     }
 
+    /**
+     * A failed TOTP verification must increment the attempt counter
+     * and dispatch a `CodeInvalid` failure event.
+     *
+     * @return void
+     */
     public function testFailedVerificationIncrementsAttemptsAndFiresFailureEvent(): void
     {
         Event::fake([MfaVerificationFailed::class]);
 
         [, $factor] = $this->enrolTotp();
 
-        $result = Mfa::verify('totp', $factor, '000000');
+        $result = Mfa::verify('totp', $factor, self::WRONG_CODE);
 
         self::assertFalse($result);
 
@@ -73,6 +95,13 @@ final class TotpLifecycleTest extends TestCase
         );
     }
 
+    /**
+     * Crossing the configured `max_attempts` threshold must lock the
+     * factor; subsequent verifies must short-circuit with a
+     * `FactorLocked` failure event.
+     *
+     * @return void
+     */
     public function testThresholdCrossingAppliesLockout(): void
     {
         [, $factor] = $this->enrolTotp();
@@ -80,11 +109,11 @@ final class TotpLifecycleTest extends TestCase
         // TOTP max_attempts is not configured by default; mimic an OTP
         // driver's config by inlining the expectation. The shipped
         // email / sms defaults are 3.
-        $this->app['config']->set('mfa.drivers.totp.max_attempts', 3);
+        config()->set('mfa.drivers.totp.max_attempts', 3);
 
-        Mfa::verify('totp', $factor, '000000');
-        Mfa::verify('totp', $factor->refresh(), '000000');
-        Mfa::verify('totp', $factor->refresh(), '000000');
+        Mfa::verify('totp', $factor, self::WRONG_CODE);
+        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
+        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
 
         $factor->refresh();
 
@@ -94,7 +123,7 @@ final class TotpLifecycleTest extends TestCase
 
         Event::fake([MfaVerificationFailed::class]);
 
-        $result = Mfa::verify('totp', $factor, '000000');
+        $result = Mfa::verify('totp', $factor, self::WRONG_CODE);
 
         self::assertFalse($result);
 
@@ -108,7 +137,7 @@ final class TotpLifecycleTest extends TestCase
      * Enrol a TOTP factor for a freshly created test user and return
      * the [user, factor, current-code] triple.
      *
-     * @return array{0: TestUser, 1: Factor, 2: string}
+     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
      */
     private function enrolTotp(): array
     {
@@ -122,10 +151,10 @@ final class TotpLifecycleTest extends TestCase
         $google = new Google2FA;
         $secret = $google->generateSecretKey();
 
-        /** @var Factor $factor */
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'totp',
             'secret'               => $secret,
         ]);

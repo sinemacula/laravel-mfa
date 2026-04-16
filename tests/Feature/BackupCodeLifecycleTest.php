@@ -26,6 +26,13 @@ final class BackupCodeLifecycleTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * A backup code must verify successfully exactly once; the
+     * second attempt against the same code must fail because the
+     * secret is consumed.
+     *
+     * @return void
+     */
     public function testBackupCodeVerifiesOnceThenFails(): void
     {
         $user   = $this->loginUser();
@@ -34,10 +41,10 @@ final class BackupCodeLifecycleTest extends TestCase
         $plaintexts = $driver->generateSet();
         $code       = $plaintexts[0];
 
-        /** @var Factor $factor */
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'backup_code',
             'secret'               => $driver->hash($code),
         ]);
@@ -52,6 +59,13 @@ final class BackupCodeLifecycleTest extends TestCase
         self::assertFalse($second);
     }
 
+    /**
+     * Two concurrent consumers of the same backup code must produce
+     * exactly one success — the second consumer sees the nulled
+     * secret and fails.
+     *
+     * @return void
+     */
     public function testConcurrentConsumptionHasASingleWinner(): void
     {
         $user   = $this->loginUser();
@@ -59,10 +73,10 @@ final class BackupCodeLifecycleTest extends TestCase
 
         $code = 'SHARED0001';
 
-        /** @var Factor $factor */
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'backup_code',
             'secret'               => $driver->hash($code),
         ]);
@@ -84,6 +98,12 @@ final class BackupCodeLifecycleTest extends TestCase
         self::assertFalse($secondResult);
     }
 
+    /**
+     * Create a fresh MFA-enrolled test user and authenticate as them
+     * for the rest of the scenario.
+     *
+     * @return \Tests\Fixtures\TestUser
+     */
     private function loginUser(): TestUser
     {
         $user = TestUser::create([

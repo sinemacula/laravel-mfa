@@ -23,10 +23,24 @@ use SineMacula\Laravel\Mfa\Gateways\FakeSmsGateway;
 #[Bench\BeforeMethods('setUp')]
 final class OtpVerifyBench
 {
+    /** @var string Stable code seeded into both factor doubles each iteration. */
+    private const string CODE = self::CODE;
+
+    /** @var \SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver */
     private AbstractOtpDriver $driver;
+
+    /** @var \Benchmarks\InMemoryFactor */
     private InMemoryFactor $factorHit;
+
+    /** @var \Benchmarks\InMemoryFactor */
     private InMemoryFactor $factorExpired;
 
+    /**
+     * Build a single SMS driver instance and the two factor doubles
+     * the verify benches reuse across iterations.
+     *
+     * @return void
+     */
     public function __construct()
     {
         $this->driver = new SmsDriver(gateway: new FakeSmsGateway);
@@ -35,22 +49,38 @@ final class OtpVerifyBench
         $this->factorExpired = new InMemoryFactor(driver: 'sms');
     }
 
+    /**
+     * Reset the factor codes / expiries before each iteration so a
+     * verify call cannot leak mutated state across runs.
+     *
+     * @return void
+     */
     public function setUp(): void
     {
-        $this->factorHit->code      = '123456';
+        $this->factorHit->code      = self::CODE;
         $this->factorHit->expiresAt = Carbon::now()->addMinutes(10);
 
-        $this->factorExpired->code      = '123456';
+        $this->factorExpired->code      = self::CODE;
         $this->factorExpired->expiresAt = Carbon::now()->subMinute();
     }
 
+    /**
+     * Measure the cost of a successful OTP verify.
+     *
+     * @return void
+     */
     #[Bench\Iterations(3)]
     #[Bench\Revs(1000)]
     public function benchVerifyHit(): void
     {
-        $this->driver->verify($this->factorHit, '123456');
+        $this->driver->verify($this->factorHit, self::CODE);
     }
 
+    /**
+     * Measure the cost of a mismatched OTP verify.
+     *
+     * @return void
+     */
     #[Bench\Iterations(3)]
     #[Bench\Revs(1000)]
     public function benchVerifyMiss(): void
@@ -58,10 +88,16 @@ final class OtpVerifyBench
         $this->driver->verify($this->factorHit, '000000');
     }
 
+    /**
+     * Measure the cost of an expired-code verify (the early-return
+     * branch).
+     *
+     * @return void
+     */
     #[Bench\Iterations(3)]
     #[Bench\Revs(1000)]
     public function benchVerifyExpired(): void
     {
-        $this->driver->verify($this->factorExpired, '123456');
+        $this->driver->verify($this->factorExpired, self::CODE);
     }
 }

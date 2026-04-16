@@ -13,9 +13,9 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
-use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Support\FactorSummary;
+use Tests\Fixtures\FakeMfaManager;
 
 /**
  * Unit tests for the `RequireMfa` middleware.
@@ -231,90 +231,11 @@ final class RequireMfaTest extends TestCase
     /**
      * Bind the supplied fake manager against the container's `'mfa'` key.
      *
-     * @param  \Tests\Unit\Middleware\FakeMfaManager  $manager
+     * @param  \Tests\Fixtures\FakeMfaManager  $manager
      * @return void
      */
     private function bindManager(FakeMfaManager $manager): void
     {
         $this->container->instance('mfa', $manager);
-    }
-}
-
-/**
- * Test double for `MfaManager` used by the `RequireMfa` middleware tests.
- *
- * Extends the real manager so the facade's `@method` assertions line up,
- * but bypasses the container-backed Manager constructor — we only poke
- * the handful of methods the middleware actually invokes.
- *
- * @internal
- */
-final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
-{
-    public bool $shouldUse       = true;
-    public bool $isSetup         = true;
-    public bool $hasEverVerified = true;
-    public bool $hasExpired      = false;
-
-    /** @var ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> */
-    public ?Collection $factors = null;
-
-    /**
-     * Intentionally skip parent::__construct to avoid requiring a full
-     * container; the middleware only calls the overrides below.
-     *
-     * @phpstan-ignore constructor.missingParentCall
-     */
-    public function __construct() {}
-
-    /**
-     * Should use.
-     *
-     * @return bool
-     */
-    public function shouldUse(): bool
-    {
-        return $this->shouldUse;
-    }
-
-    /**
-     * Is setup.
-     *
-     * @return bool
-     */
-    public function isSetup(): bool
-    {
-        return $this->isSetup;
-    }
-
-    /**
-     * Has ever verified.
-     *
-     * @return bool
-     */
-    public function hasEverVerified(): bool
-    {
-        return $this->hasEverVerified;
-    }
-
-    /**
-     * Has expired.
-     *
-     * @param  ?int  $expiresAfter
-     * @return bool
-     */
-    public function hasExpired(?int $expiresAfter = null): bool
-    {
-        return $this->hasExpired;
-    }
-
-    /**
-     * Get factors.
-     *
-     * @return ?Collection
-     */
-    public function getFactors(): ?Collection
-    {
-        return $this->factors;
     }
 }

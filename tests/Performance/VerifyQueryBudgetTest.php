@@ -28,6 +28,13 @@ final class VerifyQueryBudgetTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * A successful TOTP verify must stay within the documented
+     * two-query budget: the factor-row update plus the verification
+     * store write.
+     *
+     * @return void
+     */
     public function testTotpVerifyHitBudget(): void
     {
         $user   = $this->loginUser();
@@ -35,7 +42,7 @@ final class VerifyQueryBudgetTest extends TestCase
 
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'totp',
             'secret'               => $secret,
         ]);
@@ -57,13 +64,20 @@ final class VerifyQueryBudgetTest extends TestCase
         ));
     }
 
+    /**
+     * Rejecting a verify against a locked factor must not issue any
+     * database queries — the manager's lock check happens entirely
+     * in memory.
+     *
+     * @return void
+     */
     public function testTotpVerifyLockedBudget(): void
     {
         $user = $this->loginUser();
 
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
             'locked_until'         => now()->addHour(),
@@ -80,13 +94,20 @@ final class VerifyQueryBudgetTest extends TestCase
         ));
     }
 
+    /**
+     * A failed TOTP verify must stay within a single query — the
+     * attempt-count update on the factor row, with no verification
+     * store write.
+     *
+     * @return void
+     */
     public function testTotpVerifyMissBudget(): void
     {
         $user = $this->loginUser();
 
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
@@ -103,6 +124,12 @@ final class VerifyQueryBudgetTest extends TestCase
         ));
     }
 
+    /**
+     * Create a fresh MFA-enrolled test user and authenticate as them
+     * for the rest of the scenario.
+     *
+     * @return \Tests\Fixtures\TestUser
+     */
     private function loginUser(): TestUser
     {
         $user = TestUser::create([

@@ -39,6 +39,12 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
         parent::tearDown();
     }
 
+    /**
+     * Issuing a challenge against an Eloquent-backed factor should
+     * zero the attempt counter and dispatch the challenge event.
+     *
+     * @return void
+     */
     public function testChallengeResetsAttemptsAndPersistsEloquentFactor(): void
     {
         $user = TestUser::query()->create(['email' => 'c1@example.com']);
@@ -47,7 +53,7 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
 
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'email',
             'recipient'            => 'c1@example.com',
             'attempts'             => 4,
@@ -75,6 +81,13 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
         );
     }
 
+    /**
+     * For non-Eloquent factors the manager should still dispatch the
+     * driver's `issueChallenge()` without attempting to persist any
+     * state.
+     *
+     * @return void
+     */
     public function testChallengeDispatchesThroughInMemoryFactorWithoutMutation(): void
     {
         $user = TestUser::query()->create(['email' => 'c2@example.com']);
@@ -97,6 +110,12 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
         Event::assertDispatched(MfaChallengeIssued::class);
     }
 
+    /**
+     * Without a resolved identity the manager should still call the
+     * driver but skip dispatching any event on the bus.
+     *
+     * @return void
+     */
     public function testChallengeIsNoopDispatchWhenNoIdentity(): void
     {
         $factor = new InMemoryFactor(driver: 'totp');
@@ -110,7 +129,7 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
         $dispatcher = \Mockery::mock(Dispatcher::class);
         $dispatcher->shouldNotReceive('dispatch');
 
-        $this->app->instance(Dispatcher::class, $dispatcher);
+        $this->container()->instance(Dispatcher::class, $dispatcher);
 
         $this->manager()->challenge('totp', $factor);
 
@@ -126,7 +145,7 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
      */
     private function stubDriver(string $name, FactorDriver $driver): void
     {
-        $this->manager()->extend($name, static fn (): FactorDriver => $driver);
+        $this->manager()->extend($name, fn (): FactorDriver => $driver);
     }
 
     /**
@@ -136,7 +155,9 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
      */
     private function manager(): MfaManager
     {
-        /** @var \SineMacula\Laravel\Mfa\MfaManager $manager */
-        return $this->app->make('mfa');
+        $manager = $this->container()->make('mfa');
+        \PHPUnit\Framework\Assert::assertInstanceOf(MfaManager::class, $manager);
+
+        return $manager;
     }
 }

@@ -52,7 +52,9 @@ abstract class AbstractOtpDriver implements FactorDriver
         protected readonly ?string $alphabet = null,
     ) {
         if ($alphabet !== null && strlen($alphabet) < 2) {
-            throw new \InvalidArgumentException('OTP alphabet must contain at least two characters; received ' . ($alphabet === '' ? 'an empty string' : 'a single character') . '.');
+            $detail = $alphabet === '' ? 'an empty string' : 'a single character';
+
+            throw new \InvalidArgumentException('OTP alphabet must contain at least two characters; received ' . $detail . '.');
         }
     }
 

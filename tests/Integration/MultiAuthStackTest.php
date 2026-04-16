@@ -39,6 +39,12 @@ final class MultiAuthStackTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * Under the default session guard the manager must read the
+     * acting user identity and surface its persisted factors.
+     *
+     * @return void
+     */
     public function testSessionGuardSeesIdentityAndFactors(): void
     {
         $user = $this->enrolUser('session@example.test');
@@ -50,9 +56,16 @@ final class MultiAuthStackTest extends TestCase
         self::assertCount(1, Mfa::getFactors() ?? collect());
     }
 
+    /**
+     * Under a token-style guard whose resolver hands back an
+     * Eloquent identity the manager must surface the same setup
+     * state and factor collection.
+     *
+     * @return void
+     */
     public function testTokenStyleGuardSeesIdentityAndFactors(): void
     {
-        $this->app['config']->set('auth.guards.token', [
+        config()->set('auth.guards.token', [
             'driver'   => 'token',
             'provider' => 'users',
         ]);
@@ -64,39 +77,76 @@ final class MultiAuthStackTest extends TestCase
         // reads through the default guard, so swap it out for the
         // duration of the assertions.
         Auth::extend('token', static function ($app, string $name, array $config) use ($user): Guard {
+            // The closure signature is fixed by Laravel's `Auth::extend`
+            // contract; this fake guard ignores the wiring args and
+            // returns the user captured from the outer closure.
+            unset($app, $name, $config);
+
             return new class ($user) implements Guard {
+                /**
+                 * Capture the resolved identity once at construction.
+                 *
+                 * @param  \Tests\Fixtures\TestUser  $resolved
+                 * @return void
+                 */
                 public function __construct(private readonly TestUser $resolved) {}
 
+                /**
+                 * @return bool
+                 */
                 public function check(): bool
                 {
                     return true;
                 }
 
+                /**
+                 * @return bool
+                 */
                 public function guest(): bool
                 {
                     return false;
                 }
 
+                /**
+                 * @return \Tests\Fixtures\TestUser
+                 */
                 public function user(): TestUser
                 {
                     return $this->resolved;
                 }
 
+                /**
+                 * @return int
+                 */
                 public function id(): int
                 {
-                    return $this->resolved->getKey();
+                    return $this->resolved->id;
                 }
 
+                /**
+                 * @param  array<array-key, mixed>  $credentials
+                 * @return bool
+                 */
                 public function validate(array $credentials = []): bool
                 {
                     return true;
                 }
 
+                /**
+                 * @return bool
+                 */
                 public function hasUser(): bool
                 {
                     return true;
                 }
 
+                /**
+                 * No-op — the fixture binds its identity at
+                 * construction time.
+                 *
+                 * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
+                 * @return self
+                 */
                 public function setUser(Authenticatable $user): self
                 {
                     return $this;
@@ -104,8 +154,8 @@ final class MultiAuthStackTest extends TestCase
             };
         });
 
-        $this->app['config']->set('auth.defaults.guard', 'token');
-        $this->app->forgetInstance('mfa');
+        config()->set('auth.defaults.guard', 'token');
+        $this->container()->forgetInstance('mfa');
         Mfa::clearCache();
 
         self::assertTrue(Mfa::shouldUse());
@@ -113,6 +163,14 @@ final class MultiAuthStackTest extends TestCase
         self::assertCount(1, Mfa::getFactors() ?? collect());
     }
 
+    /**
+     * Under a custom guard whose resolver hands back a non-Eloquent
+     * `Authenticatable` the manager must short-circuit cleanly
+     * rather than throw — proving the orchestration layer does not
+     * assume Eloquent throughout.
+     *
+     * @return void
+     */
     public function testCustomAuthenticatableGuardWithoutEloquentBindsCorrectly(): void
     {
         // Custom guard that hands back a non-Eloquent Authenticatable.
@@ -121,43 +179,75 @@ final class MultiAuthStackTest extends TestCase
         // assume Eloquent throughout the orchestration surface.
         Auth::extend('custom', static function (): Guard {
             return new class implements Guard {
+                /** @var \Illuminate\Auth\GenericUser */
                 private readonly GenericUser $resolved;
 
+                /**
+                 * Build the fixture identity once at construction.
+                 *
+                 * @return void
+                 */
                 public function __construct()
                 {
                     $this->resolved = new GenericUser(['id' => 99, 'name' => 'Generic']);
                 }
 
+                /**
+                 * @return bool
+                 */
                 public function check(): bool
                 {
                     return true;
                 }
 
+                /**
+                 * @return bool
+                 */
                 public function guest(): bool
                 {
                     return false;
                 }
 
+                /**
+                 * @return \Illuminate\Auth\GenericUser
+                 */
                 public function user(): GenericUser
                 {
                     return $this->resolved;
                 }
 
+                /**
+                 * @return int
+                 */
                 public function id(): int
                 {
                     return 99;
                 }
 
+                /**
+                 * @param  array<array-key, mixed>  $credentials
+                 * @return bool
+                 */
                 public function validate(array $credentials = []): bool
                 {
                     return true;
                 }
 
+                /**
+                 * @return bool
+                 */
                 public function hasUser(): bool
                 {
                     return true;
                 }
 
+                /**
+                 * No-op — the fixture binds its identity at
+                 * construction time.
+                 *
+                 * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
+                 * @return self
+                 */
                 public function setUser(Authenticatable $user): self
                 {
                     return $this;
@@ -165,12 +255,12 @@ final class MultiAuthStackTest extends TestCase
             };
         });
 
-        $this->app['config']->set('auth.guards.custom', [
+        config()->set('auth.guards.custom', [
             'driver'   => 'custom',
             'provider' => 'users',
         ]);
-        $this->app['config']->set('auth.defaults.guard', 'custom');
-        $this->app->forgetInstance('mfa');
+        config()->set('auth.defaults.guard', 'custom');
+        $this->container()->forgetInstance('mfa');
         Mfa::clearCache();
 
         // GenericUser does not implement MultiFactorAuthenticatable, so
@@ -180,6 +270,12 @@ final class MultiAuthStackTest extends TestCase
         self::assertNull(Mfa::getFactors());
     }
 
+    /**
+     * Persist a fresh MFA-enrolled user with one TOTP factor.
+     *
+     * @param  string  $email
+     * @return \Tests\Fixtures\TestUser
+     */
     private function enrolUser(string $email): TestUser
     {
         $user = TestUser::create([
@@ -189,7 +285,7 @@ final class MultiAuthStackTest extends TestCase
 
         Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);

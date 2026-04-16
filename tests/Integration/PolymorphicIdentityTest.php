@@ -27,6 +27,13 @@ final class PolymorphicIdentityTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * Factors persisted against one identity class must not leak
+     * into a sibling identity class — the polymorphic relation
+     * scopes by `authenticatable_type` correctly.
+     *
+     * @return void
+     */
     public function testFactorsAreScopedToTheirOwningIdentityType(): void
     {
         $primary = TestUser::create([
@@ -41,14 +48,14 @@ final class PolymorphicIdentityTest extends TestCase
 
         Factor::create([
             'authenticatable_type' => $primary::class,
-            'authenticatable_id'   => (string) $primary->getKey(),
+            'authenticatable_id'   => (string) $primary->id,
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 
         Factor::create([
             'authenticatable_type' => $secondary::class,
-            'authenticatable_id'   => (string) $secondary->getKey(),
+            'authenticatable_id'   => (string) $secondary->id,
             'driver'               => 'email',
             'recipient'            => $secondary->email,
         ]);
@@ -56,18 +63,34 @@ final class PolymorphicIdentityTest extends TestCase
         $this->actingAs($primary);
         self::assertTrue(Mfa::shouldUse());
         self::assertTrue(Mfa::isSetup());
-        self::assertCount(1, Mfa::getFactors() ?? collect());
-        self::assertSame('totp', (Mfa::getFactors()?->first())->getDriver());
+
+        $primaryFactors = Mfa::getFactors();
+        self::assertNotNull($primaryFactors);
+        self::assertCount(1, $primaryFactors);
+        $primaryFactor = $primaryFactors->first();
+        self::assertNotNull($primaryFactor);
+        self::assertSame('totp', $primaryFactor->getDriver());
 
         Mfa::clearCache();
 
         $this->actingAs($secondary);
         self::assertTrue(Mfa::shouldUse());
         self::assertTrue(Mfa::isSetup());
-        self::assertCount(1, Mfa::getFactors() ?? collect());
-        self::assertSame('email', (Mfa::getFactors()?->first())->getDriver());
+
+        $secondaryFactors = Mfa::getFactors();
+        self::assertNotNull($secondaryFactors);
+        self::assertCount(1, $secondaryFactors);
+        $secondaryFactor = $secondaryFactors->first();
+        self::assertNotNull($secondaryFactor);
+        self::assertSame('email', $secondaryFactor->getDriver());
     }
 
+    /**
+     * The `shouldUse()` enforcement check must respond identically
+     * across both identity classes when neither opts in.
+     *
+     * @return void
+     */
     public function testEnforcementWorksAcrossBothIdentityClasses(): void
     {
         $primary = TestUser::create([

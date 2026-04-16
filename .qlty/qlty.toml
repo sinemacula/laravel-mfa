@@ -98,6 +98,17 @@ package_filters = ["sinemacula"]
 name = "radarlint-php"
 mode = "comment"
 
+# Aligned with the /build:enforce PHP language-pack thresholds: the
+# pack governs cyclomatic complexity, method length, nesting depth and
+# signature length — but does not enforce a max-returns-per-method or
+# max-methods-per-class. The matching radarlint rules (S1142 and S1448)
+# are therefore ignored here so consumers see one consistent set of
+# structural thresholds across the toolchain.
+[[triage]]
+match.plugins = ["radarlint-php"]
+match.rules = ["radarlint-php:php:S1142", "radarlint-php:php:S1448"]
+set.ignored = true
+
 [[plugin]]
 name = "ripgrep"
 mode = "comment"

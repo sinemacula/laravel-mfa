@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
  * MultiFactorAuthenticatable whose `getAuthIdentifier()` returns an
@@ -26,7 +27,7 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
 {
     use AuthenticatableTrait;
 
-    /** @var string */
+    /** @var string|null */
     protected $table = 'test_users';
 
     /** @var list<string> */
@@ -78,7 +79,7 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
      */
     public function authFactors(): Builder
     {
-        return $this->factors()->getQuery();
+        return self::coerceFactorBuilder($this->factors()->getQuery());
     }
 
     /**
@@ -89,5 +90,26 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
     public function factors(): MorphMany
     {
         return $this->morphMany(Factor::class, 'authenticatable');
+    }
+
+    /**
+     * Re-present the morph-relation builder under the intersection type
+     * required by the `MultiFactorAuthenticatable` contract.
+     *
+     * @formatter:off
+     *
+     * @param  mixed  $builder
+     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     *
+     * @formatter:on
+     */
+    private static function coerceFactorBuilder(mixed $builder): Builder
+    {
+        if (!$builder instanceof Builder) {
+            throw new UnexpectedBuilderTypeException('Expected an Eloquent Builder instance.');
+        }
+
+        /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> $builder */
+        return $builder;
     }
 }

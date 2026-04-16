@@ -4,7 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
-use Illuminate\Contracts\Config\Repository;
+use Illuminate\Config\Repository;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
@@ -22,10 +22,15 @@ use SineMacula\Laravel\Mfa\MfaManager;
  */
 final class MfaManagerDriversTest extends MfaManagerTestCase
 {
+    /**
+     * Resolving the TOTP driver should honour the configured
+     * verification window from `config('mfa.drivers.totp.window')`.
+     *
+     * @return void
+     */
     public function testTotpDriverBuildsWithConfiguredWindow(): void
     {
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.totp.window', 3);
 
         $driver = $this->manager()->driver('totp');
@@ -33,10 +38,15 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertInstanceOf(TotpDriver::class, $driver);
     }
 
+    /**
+     * Resolving the TOTP driver with no `window` configured should
+     * fall back to the shipped default of 1 step.
+     *
+     * @return void
+     */
     public function testTotpDriverDefaultsWindowToOneWhenUnset(): void
     {
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.totp', []);
 
         $driver = $this->manager()->driver('totp');
@@ -44,13 +54,18 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertInstanceOf(TotpDriver::class, $driver);
     }
 
+    /**
+     * Resolving the email driver with an empty config slice should
+     * surface the shipped defaults verbatim.
+     *
+     * @return void
+     */
     public function testEmailDriverBuildsWithDefaults(): void
     {
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.email', []);
 
-        /** @var EmailDriver $driver */
+        /** @var \SineMacula\Laravel\Mfa\Drivers\EmailDriver $driver */
         $driver = $this->manager()->driver('email');
 
         self::assertInstanceOf(EmailDriver::class, $driver);
@@ -60,10 +75,16 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertNull($driver->getAlphabet());
     }
 
+    /**
+     * Resolving the email driver should apply every override in the
+     * config slice — code length, expiry, attempts, alphabet, and
+     * mailable.
+     *
+     * @return void
+     */
     public function testEmailDriverBuildsWithConfiguredOverrides(): void
     {
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.email', [
             'code_length'  => 8,
             'expiry'       => 20,
@@ -72,7 +93,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
             'mailable'     => \SineMacula\Laravel\Mfa\Mail\MfaCodeMessage::class,
         ]);
 
-        /** @var EmailDriver $driver */
+        /** @var \SineMacula\Laravel\Mfa\Drivers\EmailDriver $driver */
         $driver = $this->manager()->driver('email');
 
         self::assertSame(8, $driver->getCodeLength());
@@ -81,13 +102,18 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertSame('0123456789ABCDEF', $driver->getAlphabet());
     }
 
+    /**
+     * Resolving the SMS driver with an empty config slice should
+     * surface the shipped defaults verbatim.
+     *
+     * @return void
+     */
     public function testSmsDriverBuildsWithDefaults(): void
     {
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.sms', []);
 
-        /** @var SmsDriver $driver */
+        /** @var \SineMacula\Laravel\Mfa\Drivers\SmsDriver $driver */
         $driver = $this->manager()->driver('sms');
 
         self::assertInstanceOf(SmsDriver::class, $driver);
@@ -98,10 +124,16 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertNull($driver->getAlphabet());
     }
 
+    /**
+     * Resolving the SMS driver should apply every override in the
+     * config slice — code length, expiry, attempts, alphabet, and
+     * message template.
+     *
+     * @return void
+     */
     public function testSmsDriverBuildsWithConfiguredOverrides(): void
     {
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.sms', [
             'code_length'      => 4,
             'expiry'           => 5,
@@ -110,7 +142,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
             'message_template' => 'Code: :code',
         ]);
 
-        /** @var SmsDriver $driver */
+        /** @var \SineMacula\Laravel\Mfa\Drivers\SmsDriver $driver */
         $driver = $this->manager()->driver('sms');
 
         self::assertSame('Code: :code', $driver->getMessageTemplate());
@@ -120,13 +152,18 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertSame('ABCDEF', $driver->getAlphabet());
     }
 
+    /**
+     * Resolving the backup-code driver with an empty config slice
+     * should surface the shipped defaults verbatim.
+     *
+     * @return void
+     */
     public function testBackupCodeDriverBuildsWithDefaults(): void
     {
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.backup_code', []);
 
-        /** @var BackupCodeDriver $driver */
+        /** @var \SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver $driver */
         $driver = $this->manager()->driver('backup_code');
 
         self::assertInstanceOf(BackupCodeDriver::class, $driver);
@@ -135,17 +172,22 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertSame(10, $driver->getCodeCount());
     }
 
+    /**
+     * Resolving the backup-code driver should apply every override
+     * in the config slice — code length, alphabet, and code count.
+     *
+     * @return void
+     */
     public function testBackupCodeDriverBuildsWithConfiguredOverrides(): void
     {
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.backup_code', [
             'code_length' => 12,
             'alphabet'    => 'ABCDEF',
             'code_count'  => 5,
         ]);
 
-        /** @var BackupCodeDriver $driver */
+        /** @var \SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver $driver */
         $driver = $this->manager()->driver('backup_code');
 
         self::assertSame(12, $driver->getCodeLength());
@@ -153,6 +195,14 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertSame(5, $driver->getCodeCount());
     }
 
+    /**
+     * Verifying through an extension whose factory returns a
+     * non-`FactorDriver` instance should surface a clear
+     * `LogicException` instead of a fatal type error inside the
+     * verification pipeline.
+     *
+     * @return void
+     */
     public function testVerifyThrowsWhenExtendedDriverIsNotAFactorDriver(): void
     {
         // The base Manager's extend() accepts any callable returning
@@ -160,7 +210,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         // boundary so a misconfigured extension surfaces a LogicException
         // rather than a fatal type error deep inside verify().
         $manager = $this->manager();
-        $manager->extend('not-a-driver', static fn (): \stdClass => new \stdClass);
+        $manager->extend('not-a-driver', fn (): \stdClass => new \stdClass);
 
         $factor = new \SineMacula\Laravel\Mfa\Models\Factor;
 
@@ -183,7 +233,9 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      */
     private function manager(): MfaManager
     {
-        /** @var \SineMacula\Laravel\Mfa\MfaManager $manager */
-        return $this->app->make('mfa');
+        $manager = $this->container()->make('mfa');
+        \PHPUnit\Framework\Assert::assertInstanceOf(MfaManager::class, $manager);
+
+        return $manager;
     }
 }

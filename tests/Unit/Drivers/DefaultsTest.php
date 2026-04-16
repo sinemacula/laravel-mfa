@@ -31,14 +31,31 @@ final class DefaultsTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
 
+    /**
+     * `AbstractOtpDriver`'s constructor defaults — code length 6,
+     * 10-minute expiry, 3 attempts, no custom alphabet — must be
+     * preserved.
+     *
+     * @return void
+     */
     public function testAbstractOtpDriverDefaults(): void
     {
         $driver = new class extends AbstractOtpDriver {
+            /**
+             * No-op dispatch — the test only asserts the
+             * constructor defaults exposed via the getters.
+             *
+             * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+             * @param  string  $code
+             * @return void
+             */
             protected function dispatch(
                 \SineMacula\Laravel\Mfa\Contracts\EloquentFactor $factor,
                 #[\SensitiveParameter]
                 string $code,
-            ): void {}
+            ): void {
+                // Intentionally empty — see method docblock.
+            }
         };
 
         self::assertSame(6, $driver->getCodeLength());
@@ -47,9 +64,16 @@ final class DefaultsTest extends TestCase
         self::assertNull($driver->getAlphabet());
     }
 
+    /**
+     * `EmailDriver`'s constructor defaults — code length 6,
+     * 10-minute expiry, 3 attempts, default `MfaCodeMessage`
+     * Mailable, no custom alphabet — must be preserved.
+     *
+     * @return void
+     */
     public function testEmailDriverDefaults(): void
     {
-        /** @var \Illuminate\Contracts\Mail\Mailer $mailer */
+        /** @var \Illuminate\Contracts\Mail\Mailer&\Mockery\MockInterface $mailer */
         $mailer = \Mockery::mock(\Illuminate\Contracts\Mail\Mailer::class);
 
         $driver = new EmailDriver(mailer: $mailer);
@@ -61,6 +85,13 @@ final class DefaultsTest extends TestCase
         self::assertNull($driver->getAlphabet());
     }
 
+    /**
+     * `SmsDriver`'s constructor defaults — code length 6, 10-minute
+     * expiry, 3 attempts, the shipped message template, no custom
+     * alphabet — must be preserved.
+     *
+     * @return void
+     */
     public function testSmsDriverDefaults(): void
     {
         $driver = new SmsDriver(gateway: new FakeSmsGateway);
@@ -75,6 +106,13 @@ final class DefaultsTest extends TestCase
         self::assertNull($driver->getAlphabet());
     }
 
+    /**
+     * `BackupCodeDriver`'s constructor defaults — 10-character
+     * codes, the shipped Crockford-style alphabet, and a set size of
+     * 10 — must be preserved.
+     *
+     * @return void
+     */
     public function testBackupCodeDriverDefaults(): void
     {
         $driver = new BackupCodeDriver;
@@ -84,6 +122,12 @@ final class DefaultsTest extends TestCase
         self::assertSame(10, $driver->getCodeCount());
     }
 
+    /**
+     * The TOTP driver should accept a constructor-supplied window
+     * override; default and explicit instances must be distinct.
+     *
+     * @return void
+     */
     public function testTotpDriverUsesWindowOne(): void
     {
         // The Google2FA::verifyKey window is exercised by its own tests;

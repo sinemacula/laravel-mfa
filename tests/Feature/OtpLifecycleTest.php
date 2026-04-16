@@ -35,6 +35,13 @@ final class OtpLifecycleTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * Issuing an email challenge should send the Mailable, persist
+     * the code, dispatch the challenge event, and then verify
+     * successfully against the persisted code.
+     *
+     * @return void
+     */
     public function testEmailChallengeIssuedAndVerified(): void
     {
         Mail::fake();
@@ -64,10 +71,17 @@ final class OtpLifecycleTest extends TestCase
         self::assertNull($factor->getExpiresAt());
     }
 
+    /**
+     * Issuing an SMS challenge through the bound `FakeSmsGateway`
+     * should record the outbound message and verify successfully
+     * against the persisted code.
+     *
+     * @return void
+     */
     public function testSmsChallengeIssuedAndVerifiedViaBoundGateway(): void
     {
         $gateway = new FakeSmsGateway;
-        $this->app->instance(SmsGateway::class, $gateway);
+        $this->container()->instance(SmsGateway::class, $gateway);
 
         Event::fake([MfaChallengeIssued::class, MfaVerified::class]);
 
@@ -89,6 +103,13 @@ final class OtpLifecycleTest extends TestCase
         self::assertTrue($result);
     }
 
+    /**
+     * A submitted email code that does not match the persisted code
+     * should fail verification and dispatch a `CodeInvalid` failure
+     * event.
+     *
+     * @return void
+     */
     public function testEmailVerificationFailsWithWrongCode(): void
     {
         Mail::fake();
@@ -108,6 +129,13 @@ final class OtpLifecycleTest extends TestCase
         );
     }
 
+    /**
+     * A code whose `expires_at` has passed must be rejected with a
+     * `CodeExpired` failure event even when the submitted code
+     * matches the stored value.
+     *
+     * @return void
+     */
     public function testExpiredCodeIsRejected(): void
     {
         Mail::fake();
@@ -132,7 +160,10 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * @return array{0: TestUser, 1: Factor}
+     * Enrol a fresh test user with an email factor and authenticate
+     * as them.
+     *
+     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
     private function enrolEmail(): array
     {
@@ -143,10 +174,10 @@ final class OtpLifecycleTest extends TestCase
 
         $this->actingAs($user);
 
-        /** @var Factor $factor */
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'email',
             'recipient'            => $user->email,
         ]);
@@ -156,7 +187,7 @@ final class OtpLifecycleTest extends TestCase
 
     /**
      * @param  string  $phone
-     * @return array{0: TestUser, 1: Factor}
+     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
     private function enrolSms(string $phone): array
     {
@@ -167,10 +198,10 @@ final class OtpLifecycleTest extends TestCase
 
         $this->actingAs($user);
 
-        /** @var Factor $factor */
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'sms',
             'recipient'            => $phone,
         ]);

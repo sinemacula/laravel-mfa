@@ -10,6 +10,7 @@ use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
 use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
+use Tests\Fixtures\CustomMfaCodeMessage;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
 
@@ -28,6 +29,13 @@ use Tests\TestCase;
  */
 final class EmailDriverTest extends TestCase
 {
+    /**
+     * `dispatch()` must reject a null recipient with a clear
+     * `MissingRecipientException` rather than silently dropping the
+     * outbound mail.
+     *
+     * @return void
+     */
     public function testDispatchThrowsWhenRecipientIsNull(): void
     {
         Mail::fake();
@@ -41,6 +49,12 @@ final class EmailDriverTest extends TestCase
         $driver->issueChallenge($factor);
     }
 
+    /**
+     * `dispatch()` must reject an empty-string recipient identically
+     * to a null one.
+     *
+     * @return void
+     */
     public function testDispatchThrowsWhenRecipientIsEmptyString(): void
     {
         Mail::fake();
@@ -53,6 +67,13 @@ final class EmailDriverTest extends TestCase
         $driver->issueChallenge($factor);
     }
 
+    /**
+     * Issuing a challenge with a configured recipient should send the
+     * default `MfaCodeMessage` Mailable to that address with a fresh
+     * 6-digit numeric code and the configured 10-minute expiry.
+     *
+     * @return void
+     */
     public function testDispatchSendsDefaultMailableToRecipient(): void
     {
         Mail::fake();
@@ -70,6 +91,12 @@ final class EmailDriverTest extends TestCase
         );
     }
 
+    /**
+     * The driver must honour a constructor-supplied custom Mailable
+     * class so consumers can ship branded message templates.
+     *
+     * @return void
+     */
     public function testDispatchUsesCustomMailableClass(): void
     {
         Mail::fake();
@@ -85,6 +112,12 @@ final class EmailDriverTest extends TestCase
         );
     }
 
+    /**
+     * `getMailable()` must return the constructor-supplied class
+     * verbatim.
+     *
+     * @return void
+     */
     public function testGetMailableReturnsConstructorValue(): void
     {
         $driver = $this->makeDriver(mailable: CustomMfaCodeMessage::class);
@@ -92,6 +125,12 @@ final class EmailDriverTest extends TestCase
         self::assertSame(CustomMfaCodeMessage::class, $driver->getMailable());
     }
 
+    /**
+     * Without an explicit constructor argument `getMailable()` must
+     * fall back to the shipped `MfaCodeMessage` default.
+     *
+     * @return void
+     */
     public function testGetMailableDefaultsToMfaCodeMessage(): void
     {
         $driver = $this->makeDriver();
@@ -99,6 +138,12 @@ final class EmailDriverTest extends TestCase
         self::assertSame(MfaCodeMessage::class, $driver->getMailable());
     }
 
+    /**
+     * After issuing a challenge the underlying factor row must carry
+     * a freshly issued numeric code with a future expiry.
+     *
+     * @return void
+     */
     public function testIssueChallengePersistsCodeAndExpiry(): void
     {
         Mail::fake();
@@ -118,12 +163,17 @@ final class EmailDriverTest extends TestCase
         self::assertTrue($expires->isFuture());
     }
 
+    /**
+     * A configured alphabet (e.g. hex) must be honoured by the issued
+     * code so consumers can override the default zero-padded numeric.
+     *
+     * @return void
+     */
     public function testDispatchUsesConfiguredAlphabet(): void
     {
         Mail::fake();
 
-        /** @var Mailer $mailer */
-        $mailer = $this->app->make(Mailer::class);
+        $mailer = app(Mailer::class);
 
         $driver = new EmailDriver(
             mailer: $mailer,
@@ -145,12 +195,12 @@ final class EmailDriverTest extends TestCase
      * Build an `EmailDriver` with the container's mailer and an
      * optional Mailable override.
      *
-     * @param  class-string<MfaCodeMessage>  $mailable
+     * @param  class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>  $mailable
+     * @return \SineMacula\Laravel\Mfa\Drivers\EmailDriver
      */
     private function makeDriver(string $mailable = MfaCodeMessage::class): EmailDriver
     {
-        /** @var Mailer $mailer */
-        $mailer = $this->app->make(Mailer::class);
+        $mailer = app(Mailer::class);
 
         return new EmailDriver(
             mailer: $mailer,
@@ -163,6 +213,7 @@ final class EmailDriverTest extends TestCase
      * inserted test user.
      *
      * @param  ?string  $recipient
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
     private function makeFactor(?string $recipient): FactorModel
     {
@@ -175,17 +226,9 @@ final class EmailDriverTest extends TestCase
         $factor->driver               = 'email';
         $factor->recipient            = $recipient;
         $factor->authenticatable_type = $user->getMorphClass();
-        $factor->authenticatable_id   = (string) $user->getKey();
+        $factor->authenticatable_id   = (string) $user->id;
         $factor->save();
 
         return $factor;
     }
 }
-
-/**
- * Custom Mailable subclass used to verify the constructor-configurable
- * `$mailable` class argument is honoured by the driver.
- *
- * @internal
- */
-final class CustomMfaCodeMessage extends MfaCodeMessage {}

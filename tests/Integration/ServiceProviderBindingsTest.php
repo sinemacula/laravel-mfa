@@ -30,39 +30,70 @@ use Tests\TestCase;
  */
 final class ServiceProviderBindingsTest extends TestCase
 {
+    /**
+     * The `'mfa'` alias must resolve to the same `MfaManager`
+     * instance every time — the manager is registered as a
+     * singleton.
+     *
+     * @return void
+     */
     public function testMfaManagerIsSingleton(): void
     {
-        $a = $this->app->make('mfa');
-        $b = $this->app->make('mfa');
+        $a = $this->container()->make('mfa');
+        $b = $this->container()->make('mfa');
 
         self::assertInstanceOf(MfaManager::class, $a);
         self::assertSame($a, $b);
     }
 
+    /**
+     * Without a consumer override the `MfaPolicy` contract must
+     * resolve to the shipped `NullMfaPolicy`.
+     *
+     * @return void
+     */
     public function testDefaultMfaPolicyIsNull(): void
     {
-        $policy = $this->app->make(MfaPolicy::class);
+        $policy = $this->container()->make(MfaPolicy::class);
 
         self::assertInstanceOf(NullMfaPolicy::class, $policy);
     }
 
+    /**
+     * Without a consumer override the `MfaVerificationStore`
+     * contract must resolve to the session-backed default.
+     *
+     * @return void
+     */
     public function testDefaultVerificationStoreIsSessionBacked(): void
     {
-        $store = $this->app->make(MfaVerificationStore::class);
+        $store = $this->container()->make(MfaVerificationStore::class);
 
         self::assertInstanceOf(SessionMfaVerificationStore::class, $store);
     }
 
+    /**
+     * Without a consumer override the `SmsGateway` contract must
+     * resolve to the loud-failing `NullSmsGateway` default.
+     *
+     * @return void
+     */
     public function testDefaultSmsGatewayIsNull(): void
     {
-        $gateway = $this->app->make(SmsGateway::class);
+        $gateway = $this->container()->make(SmsGateway::class);
 
         self::assertInstanceOf(NullSmsGateway::class, $gateway);
     }
 
+    /**
+     * The provider must register the `'mfa'` and `'mfa.skip'`
+     * middleware aliases against the router.
+     *
+     * @return void
+     */
     public function testMiddlewareAliasesAreRegistered(): void
     {
-        $router  = $this->app->make(Router::class);
+        $router  = $this->container()->make(Router::class);
         $aliases = $router->getMiddleware();
 
         self::assertArrayHasKey('mfa', $aliases);

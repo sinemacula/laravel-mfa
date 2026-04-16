@@ -26,6 +26,13 @@ final class BackupCodeDriverRaceTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * If the underlying factor row disappears between the in-memory
+     * hash compare and the lock-for-update query the verify must
+     * report failure rather than succeed.
+     *
+     * @return void
+     */
     public function testConsumeReturnsFalseWhenRowVanishes(): void
     {
         $user = TestUser::create([
@@ -36,10 +43,10 @@ final class BackupCodeDriverRaceTest extends TestCase
         $driver = new BackupCodeDriver;
         $code   = 'RACEA0001X';
 
-        /** @var Factor $factor */
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'backup_code',
             'secret'               => $driver->hash($code),
         ]);

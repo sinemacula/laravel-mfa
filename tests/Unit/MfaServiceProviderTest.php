@@ -33,8 +33,8 @@ final class MfaServiceProviderTest extends TestCase
      */
     public function testBindsMfaManagerAsSingletonUnderMfaAlias(): void
     {
-        $first  = $this->app->make('mfa');
-        $second = $this->app->make('mfa');
+        $first  = $this->container()->make('mfa');
+        $second = $this->container()->make('mfa');
 
         self::assertInstanceOf(MfaManager::class, $first);
         self::assertSame($first, $second);
@@ -47,7 +47,7 @@ final class MfaServiceProviderTest extends TestCase
      */
     public function testBindsMfaPolicyToNullMfaPolicy(): void
     {
-        self::assertInstanceOf(NullMfaPolicy::class, $this->app->make(MfaPolicy::class));
+        self::assertInstanceOf(NullMfaPolicy::class, $this->container()->make(MfaPolicy::class));
     }
 
     /**
@@ -59,7 +59,7 @@ final class MfaServiceProviderTest extends TestCase
     {
         self::assertInstanceOf(
             SessionMfaVerificationStore::class,
-            $this->app->make(MfaVerificationStore::class),
+            $this->container()->make(MfaVerificationStore::class),
         );
     }
 
@@ -70,7 +70,7 @@ final class MfaServiceProviderTest extends TestCase
      */
     public function testBindsSmsGatewayToNullSmsGateway(): void
     {
-        self::assertInstanceOf(NullSmsGateway::class, $this->app->make(SmsGateway::class));
+        self::assertInstanceOf(NullSmsGateway::class, $this->container()->make(SmsGateway::class));
     }
 
     /**
@@ -81,7 +81,7 @@ final class MfaServiceProviderTest extends TestCase
     public function testRegistersMiddlewareAliases(): void
     {
         /** @var \Illuminate\Routing\Router $router */
-        $router = $this->app->make(Router::class);
+        $router = $this->container()->make(Router::class);
 
         $middleware = $router->getMiddleware();
 
@@ -98,7 +98,7 @@ final class MfaServiceProviderTest extends TestCase
      */
     public function testMergesDefaultMfaConfig(): void
     {
-        $config = $this->app->make('config');
+        $config = $this->container()->make('config');
 
         // Sanity check: the config file shipped with the package has been
         // merged into the runtime configuration.
@@ -149,13 +149,6 @@ final class MfaServiceProviderTest extends TestCase
         // `offerPublishing()`.
         $app = new class extends \Illuminate\Foundation\Application {
             /**
-             * Construct.
-             *
-             * @return void
-             */
-            public function __construct() {}
-
-            /**
              * Running in console.
              *
              * @return bool
@@ -166,9 +159,13 @@ final class MfaServiceProviderTest extends TestCase
             }
         };
 
-        $app->bind('config', static fn () => new \Illuminate\Config\Repository([
-            'mfa' => require __DIR__ . '/../../config/mfa.php',
-        ]));
+        // The booted provider only consults the config to decide what
+        // to publish, and `runningInConsole()` short-circuits that path
+        // for this test — so an empty repository is sufficient and
+        // avoids loading the real config file via `require` / `include`
+        // (both forbidden by the project's lint rules outside namespace
+        // imports).
+        $app->bind('config', static fn () => new \Illuminate\Config\Repository(['mfa' => []]));
         $app->bind(\Illuminate\Routing\Router::class, static fn ($app) => new \Illuminate\Routing\Router(
             new \Illuminate\Events\Dispatcher($app),
         ));

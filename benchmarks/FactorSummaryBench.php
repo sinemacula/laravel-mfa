@@ -20,10 +20,21 @@ use SineMacula\Laravel\Mfa\Support\FactorSummary;
  */
 final class FactorSummaryBench
 {
+    /** @var \Benchmarks\InMemoryFactor */
     private InMemoryFactor $totpFactor;
+
+    /** @var \Benchmarks\InMemoryFactor */
     private InMemoryFactor $emailFactor;
+
+    /** @var \Benchmarks\InMemoryFactor */
     private InMemoryFactor $smsFactor;
 
+    /**
+     * Build one factor double per shipped driver type so each
+     * benchmark targets a representative summary shape.
+     *
+     * @return void
+     */
     public function __construct()
     {
         $this->totpFactor = new InMemoryFactor(
@@ -44,6 +55,11 @@ final class FactorSummaryBench
         );
     }
 
+    /**
+     * Measure the cost of summarising a TOTP factor.
+     *
+     * @return void
+     */
     #[Bench\Iterations(3)]
     #[Bench\Revs(1000)]
     public function benchFromTotpFactor(): void
@@ -51,6 +67,11 @@ final class FactorSummaryBench
         FactorSummary::fromFactor($this->totpFactor);
     }
 
+    /**
+     * Measure the cost of summarising an email factor.
+     *
+     * @return void
+     */
     #[Bench\Iterations(3)]
     #[Bench\Revs(1000)]
     public function benchFromEmailFactor(): void
@@ -58,6 +79,11 @@ final class FactorSummaryBench
         FactorSummary::fromFactor($this->emailFactor);
     }
 
+    /**
+     * Measure the cost of summarising an SMS factor.
+     *
+     * @return void
+     */
     #[Bench\Iterations(3)]
     #[Bench\Revs(1000)]
     public function benchFromSmsFactor(): void
@@ -65,6 +91,11 @@ final class FactorSummaryBench
         FactorSummary::fromFactor($this->smsFactor);
     }
 
+    /**
+     * Measure the cost of JSON-serialising a summarised factor.
+     *
+     * @return void
+     */
     #[Bench\Iterations(3)]
     #[Bench\Revs(1000)]
     public function benchJsonSerialize(): void

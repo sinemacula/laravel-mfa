@@ -5,7 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Carbon\Carbon;
-use Illuminate\Contracts\Config\Repository;
+use Illuminate\Config\Repository;
 use Illuminate\Support\Facades\Event;
 use Mockery;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
@@ -30,6 +30,12 @@ use Tests\Fixtures\TestUser;
  */
 final class MfaManagerVerifyTest extends MfaManagerTestCase
 {
+    /** @var string Canonical right-shape OTP fixture used for the success-path assertions. */
+    private const string VALID_CODE = '123456';
+
+    /** @var string Sentinel mismatch code used to drive the failure-path assertions. */
+    private const string WRONG_CODE = '000000';
+
     /**
      * Tear down Mockery expectations between test cases.
      *
@@ -44,15 +50,27 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         parent::tearDown();
     }
 
+    /**
+     * Without a resolved identity `verify()` should short-circuit to
+     * false and never invoke the driver.
+     *
+     * @return void
+     */
     public function testVerifyReturnsFalseWhenNoIdentity(): void
     {
         $factor = new InMemoryFactor;
 
         $this->stubDriver('totp', $this->noopDriver());
 
-        self::assertFalse($this->manager()->verify('totp', $factor, '123456'));
+        self::assertFalse($this->manager()->verify('totp', $factor, self::VALID_CODE));
     }
 
+    /**
+     * A locked factor must short-circuit to false and dispatch a
+     * `MfaVerificationFailed` event with the `FactorLocked` reason.
+     *
+     * @return void
+     */
     public function testVerifyReturnsFalseAndDispatchesWhenFactorLocked(): void
     {
         $user = TestUser::query()->create(['email' => 'v1@example.com']);
@@ -72,7 +90,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::fake();
 
-        self::assertFalse($this->manager()->verify('totp', $factor, '000000'));
+        self::assertFalse($this->manager()->verify('totp', $factor, self::WRONG_CODE));
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
@@ -81,6 +99,12 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         );
     }
 
+    /**
+     * A successful verify against an Eloquent-backed factor should
+     * persist the success state and dispatch the `MfaVerified` event.
+     *
+     * @return void
+     */
     public function testVerifySuccessPersistsAndDispatchesVerifiedEvent(): void
     {
         $user = TestUser::query()->create(['email' => 'v2@example.com']);
@@ -89,10 +113,10 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'email',
             'recipient'            => 'v2@example.com',
-            'code'                 => '123456',
+            'code'                 => self::VALID_CODE,
             'expires_at'           => Carbon::now()->addMinutes(10),
             'attempts'             => 1,
         ]);
@@ -100,7 +124,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldReceive('verify')
             ->once()
-            ->with(\Mockery::type(FactorContract::class), '123456')
+            ->with(\Mockery::type(FactorContract::class), self::VALID_CODE)
             ->andReturnTrue();
 
         $this->stubDriver('email', $driver);
@@ -110,11 +134,11 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
             ->once()
             ->andReturn();
 
-        $this->app->instance(MfaVerificationStore::class, $store);
+        $this->container()->instance(MfaVerificationStore::class, $store);
 
         Event::fake();
 
-        self::assertTrue($this->manager()->verify('email', $factor, '123456'));
+        self::assertTrue($this->manager()->verify('email', $factor, self::VALID_CODE));
 
         $factor->refresh();
 
@@ -126,6 +150,12 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         Event::assertNotDispatched(MfaVerificationFailed::class);
     }
 
+    /**
+     * A successful verify must clear the manager's per-identity cache
+     * so subsequent state queries observe the updated factor row.
+     *
+     * @return void
+     */
     public function testVerifySuccessClearsManagerCache(): void
     {
         $user = TestUser::query()->create([
@@ -137,7 +167,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
@@ -159,12 +189,18 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         self::assertTrue($manager->isSetup(), 'cache still warm before verify');
 
-        self::assertTrue($manager->verify('totp', $factor, '000000'));
+        self::assertTrue($manager->verify('totp', $factor, self::WRONG_CODE));
 
         // Post-verify the identity cache is scoped-cleared.
         self::assertFalse($manager->isSetup());
     }
 
+    /**
+     * A failed verify against an Eloquent factor should increment the
+     * attempt counter and dispatch the failure event.
+     *
+     * @return void
+     */
     public function testVerifyFailurePersistsAttemptAndDispatchesFailure(): void
     {
         $user = TestUser::query()->create(['email' => 'v4@example.com']);
@@ -173,7 +209,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
             'attempts'             => 0,
@@ -186,7 +222,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::fake();
 
-        self::assertFalse($this->manager()->verify('totp', $factor, '000000'));
+        self::assertFalse($this->manager()->verify('totp', $factor, self::WRONG_CODE));
 
         $factor->refresh();
         self::assertSame(1, $factor->getAttempts());
@@ -198,20 +234,25 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         );
     }
 
+    /**
+     * Crossing the configured `max_attempts` threshold must record a
+     * lockout expiry on the factor.
+     *
+     * @return void
+     */
     public function testVerifyFailureAppliesLockoutAtMaxAttemptsThreshold(): void
     {
         $user = TestUser::query()->create(['email' => 'v5@example.com']);
 
         $this->actingAs($user);
 
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.email.max_attempts', 3);
         $config->set('mfa.lockout_minutes', 7);
 
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'email',
             'recipient'            => 'v5@example.com',
             'code'                 => '999999',
@@ -224,7 +265,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $this->stubDriver('email', $driver);
 
-        self::assertFalse($this->manager()->verify('email', $factor, '000000'));
+        self::assertFalse($this->manager()->verify('email', $factor, self::WRONG_CODE));
 
         $factor->refresh();
         self::assertSame(3, $factor->getAttempts());
@@ -235,19 +276,24 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         self::assertTrue($lockedUntil->isFuture());
     }
 
+    /**
+     * Configuring `max_attempts` to zero should disable lockout
+     * entirely, no matter how many failed attempts have accrued.
+     *
+     * @return void
+     */
     public function testVerifyFailureSkipsLockoutWhenMaxAttemptsIsZero(): void
     {
         $user = TestUser::query()->create(['email' => 'v6@example.com']);
 
         $this->actingAs($user);
 
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.totp.max_attempts', 0);
 
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
             'attempts'             => 99,
@@ -258,26 +304,31 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $this->stubDriver('totp', $driver);
 
-        self::assertFalse($this->manager()->verify('totp', $factor, '000000'));
+        self::assertFalse($this->manager()->verify('totp', $factor, self::WRONG_CODE));
 
         $factor->refresh();
         self::assertNull($factor->getLockedUntil());
     }
 
+    /**
+     * A non-int `mfa.lockout_minutes` config value should fall back
+     * to the manager's safe default rather than break lockout.
+     *
+     * @return void
+     */
     public function testVerifyFailureUsesFallbackLockoutMinutesWhenConfigIsNonInt(): void
     {
         $user = TestUser::query()->create(['email' => 'v7@example.com']);
 
         $this->actingAs($user);
 
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.email.max_attempts', 2);
         $config->set('mfa.lockout_minutes', 'not-an-int');
 
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'email',
             'recipient'            => 'v7@example.com',
             'code'                 => '999999',
@@ -290,25 +341,30 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $this->stubDriver('email', $driver);
 
-        self::assertFalse($this->manager()->verify('email', $factor, '000000'));
+        self::assertFalse($this->manager()->verify('email', $factor, self::WRONG_CODE));
 
         $factor->refresh();
         self::assertNotNull($factor->getLockedUntil());
     }
 
+    /**
+     * A non-int `max_attempts` config value should be coerced to zero
+     * — i.e. lockout disabled.
+     *
+     * @return void
+     */
     public function testVerifyFailureTreatsNonIntMaxAttemptsAsZero(): void
     {
         $user = TestUser::query()->create(['email' => 'v8@example.com']);
 
         $this->actingAs($user);
 
-        /** @var Repository $config */
-        $config = $this->app->make(Repository::class);
+        $config = app(Repository::class);
         $config->set('mfa.drivers.totp.max_attempts', 'not-an-int');
 
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->getKey(),
+            'authenticatable_id'   => (string) $user->id,
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
             'attempts'             => 5,
@@ -319,12 +375,19 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $this->stubDriver('totp', $driver);
 
-        self::assertFalse($this->manager()->verify('totp', $factor, '000000'));
+        self::assertFalse($this->manager()->verify('totp', $factor, self::WRONG_CODE));
 
         $factor->refresh();
         self::assertNull($factor->getLockedUntil());
     }
 
+    /**
+     * Failure handling on a non-Eloquent factor must skip every
+     * persistence side-effect while still dispatching the failure
+     * event.
+     *
+     * @return void
+     */
     public function testVerifyFailureOnNonEloquentFactorSkipsStateMutation(): void
     {
         $user = TestUser::query()->create(['email' => 'v9@example.com']);
@@ -344,7 +407,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::fake();
 
-        self::assertFalse($this->manager()->verify('totp', $factor, '000000'));
+        self::assertFalse($this->manager()->verify('totp', $factor, self::WRONG_CODE));
 
         // In-memory factor is untouched because it does not implement
         // `EloquentFactor`.
@@ -353,6 +416,12 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         Event::assertDispatched(MfaVerificationFailed::class);
     }
 
+    /**
+     * `classifyFailure()` must report `SecretMissing` for a TOTP-shape
+     * factor with no stored secret.
+     *
+     * @return void
+     */
     public function testClassifyFailureReturnsSecretMissingForTotpShapedFactorWithoutSecret(): void
     {
         $user = TestUser::query()->create(['email' => 'cf1@example.com']);
@@ -368,7 +437,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::fake();
 
-        $this->manager()->verify('totp', $factor, '000000');
+        $this->manager()->verify('totp', $factor, self::WRONG_CODE);
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
@@ -376,6 +445,12 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         );
     }
 
+    /**
+     * `classifyFailure()` must report `CodeExpired` when the factor
+     * carries a pending code whose expiry has passed.
+     *
+     * @return void
+     */
     public function testClassifyFailureReturnsCodeExpiredWhenPendingCodeHasExpired(): void
     {
         $user = TestUser::query()->create(['email' => 'cf2@example.com']);
@@ -384,7 +459,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $factor = new InMemoryFactor(
             driver: 'email',
-            code: '123456',
+            code: self::VALID_CODE,
             expiresAt: Carbon::now()->subMinute(),
         );
 
@@ -395,7 +470,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::fake();
 
-        $this->manager()->verify('email', $factor, '000000');
+        $this->manager()->verify('email', $factor, self::WRONG_CODE);
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
@@ -403,6 +478,12 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         );
     }
 
+    /**
+     * `classifyFailure()` must report `CodeInvalid` when a TOTP factor
+     * has a stored secret but verification still fails.
+     *
+     * @return void
+     */
     public function testClassifyFailureReturnsCodeInvalidForTotpSecretMismatch(): void
     {
         $user = TestUser::query()->create(['email' => 'cf3@example.com']);
@@ -421,7 +502,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::fake();
 
-        $this->manager()->verify('totp', $factor, '000000');
+        $this->manager()->verify('totp', $factor, self::WRONG_CODE);
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
@@ -429,6 +510,12 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         );
     }
 
+    /**
+     * `classifyFailure()` must report `CodeMissing` when the factor
+     * carries a pending code but no expiry timestamp.
+     *
+     * @return void
+     */
     public function testClassifyFailureReturnsCodeMissingWhenPendingCodeHasNoExpiry(): void
     {
         $user = TestUser::query()->create(['email' => 'cf4@example.com']);
@@ -437,7 +524,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $factor = new InMemoryFactor(
             driver: 'email',
-            code: '123456',
+            code: self::VALID_CODE,
         );
 
         $driver = \Mockery::mock(FactorDriver::class);
@@ -447,7 +534,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::fake();
 
-        $this->manager()->verify('email', $factor, '000000');
+        $this->manager()->verify('email', $factor, self::WRONG_CODE);
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
@@ -455,6 +542,13 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         );
     }
 
+    /**
+     * `classifyFailure()` must report `CodeInvalid` when the factor
+     * carries a valid pending code with a future expiry but the
+     * driver still rejects verification.
+     *
+     * @return void
+     */
     public function testClassifyFailureReturnsCodeInvalidForValidPendingCodeWithFutureExpiry(): void
     {
         $user = TestUser::query()->create(['email' => 'cf5@example.com']);
@@ -463,7 +557,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $factor = new InMemoryFactor(
             driver: 'email',
-            code: '123456',
+            code: self::VALID_CODE,
             expiresAt: Carbon::now()->addMinutes(5),
         );
 
@@ -474,7 +568,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::fake();
 
-        $this->manager()->verify('email', $factor, '000000');
+        $this->manager()->verify('email', $factor, self::WRONG_CODE);
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
@@ -491,7 +585,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      */
     private function stubDriver(string $name, FactorDriver $driver): void
     {
-        $this->manager()->extend($name, static fn (): FactorDriver => $driver);
+        $this->manager()->extend($name, fn (): FactorDriver => $driver);
     }
 
     /**
@@ -502,10 +596,10 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      */
     private function noopDriver(): FactorDriver
     {
+        /** @var \Mockery\MockInterface&\SineMacula\Laravel\Mfa\Contracts\FactorDriver $driver */
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldNotReceive('verify');
 
-        /** @var FactorDriver $driver */
         return $driver;
     }
 
@@ -516,7 +610,9 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      */
     private function manager(): MfaManager
     {
-        /** @var \SineMacula\Laravel\Mfa\MfaManager $manager */
-        return $this->app->make('mfa');
+        $manager = $this->container()->make('mfa');
+        \PHPUnit\Framework\Assert::assertInstanceOf(MfaManager::class, $manager);
+
+        return $manager;
     }
 }
