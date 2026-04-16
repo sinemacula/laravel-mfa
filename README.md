@@ -228,6 +228,52 @@ class AppUser extends User implements MultiFactorAuthenticatable
 }
 ```
 
+## Security model
+
+### Rate limiting
+
+The package's per-factor lockout (`max_attempts` + `lockout_minutes`) protects an individual factor row from
+runaway attempts on the same code, but it does not by itself defend against:
+
+- Distributed brute-force across many factors (e.g. an attacker with a leaked email list trying common codes).
+- DoS against the lockout window: flooding the verify endpoint with bad codes to push every legitimate user into
+  the cooldown.
+
+Layer Laravel's built-in `RateLimiter` on top of the verify endpoint to close those gaps. Define the limiter in a
+service provider:
+
+```php
+// app/Providers/AppServiceProvider.php (boot method)
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+
+RateLimiter::for('mfa-verify', static function (Request $request): array {
+    $identifier = optional($request->user())->getAuthIdentifier()
+        ?? $request->ip();
+
+    return [
+        // Per-IP cap for unauthenticated / spray attacks
+        Limit::perMinute(10)->by($request->ip() ?? 'unknown'),
+
+        // Per-identity cap so one compromised IP can't brute many users
+        Limit::perMinute(5)->by((string) $identifier),
+    ];
+});
+```
+
+Then attach the throttle alongside `SkipMfa` on the verification endpoint:
+
+```php
+// routes/web.php
+Route::post('/mfa/verify', VerifyController::class)
+    ->middleware(['mfa.skip', 'throttle:mfa-verify']);
+```
+
+Apply the throttle **only** to the verify endpoint itself — do not gate routes that merely read MFA state
+(`Mfa::shouldUse()`, `Mfa::isSetup()`, etc.) behind it, since those are called on every request and would
+exhaust the bucket without representing an attack signal.
+
 ## Extensibility
 
 All concrete classes in this package are `final` unless explicitly designed for extension. Extension is through
