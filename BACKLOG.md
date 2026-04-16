@@ -10,22 +10,26 @@ that remains.
 
 ## Status
 
-- **100% line / method / class coverage** on `src/` (498/498 lines, 134/134 methods, 26/26 classes)
-- **303 tests passing** across Unit / Feature / Integration / Performance suites
+- **100% line / method / class coverage** on `src/` (515/515 statements, 138/138 methods, 26/26 classes)
+- **323 tests passing** across Unit / Feature / Integration / Performance suites
 - **Mutation testing gate green** — 92% Covered MSI on scoped paths (gate: 90%)
 - **PHPBench benchmarks** covering every hot-path (TOTP, OTP, backup codes, FactorSummary)
 - **`composer check` clean** on `src/` and `benchmarks/` (only pre-existing markdown lint on the PRD and
   informational radarlint code-smell warnings remain)
 
-**Release-blocking work that still needs to land before 1.0:**
+**Release-blocking work has all shipped — package is ready to tag 1.0.** Detailed history in the git log:
 
-- **B-18** — TOTP provisioning URI helper (enrolment DX for the most-used driver)
-- **B-19** — Configurable code alphabet (PRD P1)
-- **B-20** — Step-up middleware variant (PRD primary persona)
-- **B-22** — Rate-limit recipe in README (defence-in-depth documentation)
+- **B-18** ✅ TOTP provisioning URI helper — `7be3199`
+- **B-19** ✅ Configurable code alphabet — `c9f6545`
+- **B-20** ✅ Step-up middleware via parameterised `mfa:N` — `83b463f`, hardened in `ec83773`
+- **B-22** ✅ Rate-limit recipe in README — `8ffcda1`
+- **PRD P1** ✅ Documented Twilio `SmsGateway` binding example — `a2b48ef`
 
-Detailed implementation specs for each are under "Phase 6 — Release blockers" and "Phase 7 — Release docs"
-below. Every item must land before tagging 1.0.
+The only remaining tracked item is **B-23** (`DeviceMfaVerificationStore`), which is delivered out of repo by
+`sinemacula/laravel-iam` and is documented under "Phase 8 — Out of scope" below for the IAM glue's authors.
+
+The Phase 6 / Phase 7 implementation specs that follow are kept as historical reference — they were the source
+documents the four shipped commits worked against.
 
 ---
 
