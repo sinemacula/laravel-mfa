@@ -187,6 +187,76 @@ Factor::create([
 ]);
 ```
 
+### SMS gateway binding
+
+The SMS driver delegates outbound delivery to a `SmsGateway` implementation. The package ships a
+`NullSmsGateway` default that throws `SmsGatewayNotConfiguredException` to surface missing wiring loudly —
+consumers who enable the SMS driver bind their own implementation against the contract.
+
+Worked example with Twilio (`composer require twilio/sdk`):
+
+```php
+// app/Mfa/TwilioSmsGateway.php
+namespace App\Mfa;
+
+use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use Twilio\Exceptions\RestException;
+use Twilio\Rest\Client;
+
+final readonly class TwilioSmsGateway implements SmsGateway
+{
+    public function __construct(
+        private Client $twilio,
+        private string $fromNumber,
+    ) {}
+
+    public function send(string $to, #[\SensitiveParameter] string $message): void
+    {
+        try {
+            $this->twilio->messages->create($to, [
+                'from' => $this->fromNumber,
+                'body' => $message,
+            ]);
+        } catch (RestException $e) {
+            // Translate the SDK-specific failure into something the
+            // verification UI can render — a non-throwing return implies
+            // the message reached Twilio for downstream delivery.
+            throw new \RuntimeException(
+                'Failed to dispatch MFA SMS via Twilio: ' . $e->getMessage(),
+                previous: $e,
+            );
+        }
+    }
+}
+```
+
+Bind it in a service provider:
+
+```php
+// app/Providers/AppServiceProvider.php
+use App\Mfa\TwilioSmsGateway;
+use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use Twilio\Rest\Client;
+
+public function register(): void
+{
+    $this->app->singleton(SmsGateway::class, static function ($app): TwilioSmsGateway {
+        return new TwilioSmsGateway(
+            twilio: new Client(
+                config('services.twilio.sid'),
+                config('services.twilio.token'),
+            ),
+            fromNumber: config('services.twilio.from'),
+        );
+    });
+}
+```
+
+Vonage, AWS SNS, MessageBird, or any in-house gateway follows the same shape — implement
+`SmsGateway::send(string $to, string $message): void`, bind it in a service provider, you're done. The
+contract intentionally exposes only the recipient and the rendered message (the package owns code
+generation, template substitution, lockouts, and verification state) so the gateway adapter stays thin.
+
 ### Custom factor drivers
 
 Register a custom driver via the `extend()` API:
