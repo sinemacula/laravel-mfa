@@ -153,6 +153,29 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertSame(5, $driver->getCodeCount());
     }
 
+    public function testVerifyThrowsWhenExtendedDriverIsNotAFactorDriver(): void
+    {
+        // The base Manager's extend() accepts any callable returning
+        // mixed; resolveDriver guards the FactorDriver contract at the
+        // boundary so a misconfigured extension surfaces a LogicException
+        // rather than a fatal type error deep inside verify().
+        $manager = $this->manager();
+        $manager->extend('not-a-driver', static fn (): \stdClass => new \stdClass);
+
+        $factor = new \SineMacula\Laravel\Mfa\Models\Factor;
+
+        $user = \Tests\Fixtures\TestUser::query()->create([
+            'email'       => 'extend@example.test',
+            'mfa_enabled' => true,
+        ]);
+        $this->actingAs($user);
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Driver [not-a-driver] must implement');
+
+        $manager->verify('not-a-driver', $factor, '000000');
+    }
+
     /**
      * Resolve the package's MFA manager from the container.
      *
