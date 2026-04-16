@@ -4,15 +4,18 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Exceptions;
 
+use SineMacula\Laravel\Mfa\Support\FactorSummary;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * MFA required exception.
+ * Thrown when a request requires multi-factor authentication but the
+ * current identity has not completed MFA verification (either has no
+ * factors set up, or has factors but has never verified against them).
  *
- * Thrown when a request requires multi-factor authentication but
- * the identity has not yet completed MFA verification. The
- * exception carries the available factors so the consuming
- * application can present them to the user.
+ * Carries a list of `FactorSummary` records describing the factors the
+ * identity has available — the consuming application uses this payload
+ * to render a verification UI without needing to know anything about
+ * the package's internal factor representation.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -20,22 +23,26 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 class MfaRequiredException extends HttpException
 {
     /**
-     * Create a new MFA required exception.
+     * Constructor.
      *
-     * @param  array<string, mixed>  $factors
+     * @param  list<\SineMacula\Laravel\Mfa\Support\FactorSummary>  $factors
      * @param  string  $message
      */
     public function __construct(
+
+        /** Factor summaries available to the current identity. */
         private readonly array $factors = [],
+
         string $message = 'Multi-factor authentication is required.',
+
     ) {
         parent::__construct(401, $message);
     }
 
     /**
-     * Get the available factors data.
+     * Return the factor summaries available to the current identity.
      *
-     * @return array<string, mixed>
+     * @return list<\SineMacula\Laravel\Mfa\Support\FactorSummary>
      */
     public function getFactors(): array
     {

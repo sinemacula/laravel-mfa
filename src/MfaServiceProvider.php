@@ -6,11 +6,14 @@ namespace SineMacula\Laravel\Mfa;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Gateways\NullSmsGateway;
+use SineMacula\Laravel\Mfa\Middleware\RequireMfa;
+use SineMacula\Laravel\Mfa\Middleware\SkipMfa;
 use SineMacula\Laravel\Mfa\Policies\NullMfaPolicy;
 use SineMacula\Laravel\Mfa\Stores\SessionMfaVerificationStore;
 
@@ -54,6 +57,7 @@ class MfaServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->offerPublishing();
+        $this->registerMiddlewareAliases();
     }
 
     /**
@@ -113,6 +117,22 @@ class MfaServiceProvider extends ServiceProvider
     protected function registerSmsGateway(): void
     {
         $this->app->singleton(SmsGateway::class, NullSmsGateway::class);
+    }
+
+    /**
+     * Register the package's middleware under short aliases so
+     * consumers can reference them as `'mfa'` / `'mfa.skip'` in their
+     * route files without importing FQCNs.
+     *
+     * @return void
+     */
+    protected function registerMiddlewareAliases(): void
+    {
+        /** @var \Illuminate\Routing\Router $router */
+        $router = $this->app->make(Router::class);
+
+        $router->aliasMiddleware('mfa', RequireMfa::class);
+        $router->aliasMiddleware('mfa.skip', SkipMfa::class);
     }
 
     /**

@@ -8,18 +8,28 @@ use Illuminate\Http\Request;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Support\FactorSummary;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Require MFA middleware.
  *
- * Checks whether the current identity must complete multi-factor
- * authentication. Throws an exception if MFA is required but has
- * not been verified, or if a previous verification has expired.
+ * Gates incoming requests behind a valid MFA verification. Throws one
+ * of two structured exceptions depending on the identity's state, so
+ * the consuming application can render different UIs for each case:
  *
- * This middleware does not render responses; it throws exceptions
- * for the consuming application to handle via its exception
- * handler.
+ * - No factors set up OR factors exist but the identity has never
+ *   verified → `MfaRequiredException`
+ * - Prior verification exists but has aged past the configured expiry
+ *   window → `MfaExpiredException`
+ *
+ * Both exceptions carry a list of `FactorSummary` records with masked
+ * delivery destinations so they are safe to ship through JSON response
+ * bodies and log sinks.
+ *
+ * Requests flagged with the `skip_mfa` request attribute (set by
+ * `SkipMfa`) bypass enforcement entirely — used on the verification
+ * endpoints themselves to avoid circular enforcement.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -38,7 +48,7 @@ class RequireMfa
      */
     public function handle(Request $request, \Closure $next): Response
     {
-        if ($request->attributes->get('skip_mfa', false)) {
+        if ($request->attributes->get('skip_mfa', false) === true) {
             return $next($request);
         }
 
@@ -46,25 +56,29 @@ class RequireMfa
             return $next($request);
         }
 
-        $factors = $this->resolveFactorsData();
+        $summaries = $this->resolveFactorSummaries();
 
         if (!Mfa::isSetup()) {
-            throw new MfaRequiredException($factors);
+            throw new MfaRequiredException($summaries);
+        }
+
+        if (!Mfa::hasEverVerified()) {
+            throw new MfaRequiredException($summaries);
         }
 
         if (Mfa::hasExpired()) {
-            throw new MfaExpiredException($factors);
+            throw new MfaExpiredException($summaries);
         }
 
         return $next($request);
     }
 
     /**
-     * Resolve the factors data for the exception payload.
+     * Build the factor-summary payload for exception dispatch.
      *
-     * @return array<string, mixed>
+     * @return list<\SineMacula\Laravel\Mfa\Support\FactorSummary>
      */
-    private function resolveFactorsData(): array
+    private function resolveFactorSummaries(): array
     {
         $factors = Mfa::getFactors();
 
@@ -72,6 +86,10 @@ class RequireMfa
             return [];
         }
 
-        return $factors->toArray();
+        /** @var list<\SineMacula\Laravel\Mfa\Support\FactorSummary> */
+        return $factors
+            ->map(static fn ($factor): FactorSummary => FactorSummary::fromFactor($factor))
+            ->values()
+            ->all();
     }
 }
