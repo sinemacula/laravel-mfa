@@ -19,7 +19,7 @@ use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class SmsDriver extends AbstractOtpDriver
+final class SmsDriver extends AbstractOtpDriver
 {
     /**
      * Constructor.

@@ -48,7 +48,7 @@
         "squizlabs/php_codesniffer": "^4.0"
     },
     "suggest": {
-        "pragmarx/google2fa": "Required for the TOTP factor driver (^8.0)."
+        "pragmarx/google2fa": "Required for the TOTP factor driver (^9.0)."
     },
     "autoload": {
         "psr-4": {

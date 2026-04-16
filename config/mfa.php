@@ -31,7 +31,11 @@ return [
     |
     | The number of minutes an MFA verification remains valid before the user
     | must re-verify. Individual drivers may override this value via their own
-    | `expiry` setting. Set to `0` to require verification on every request.
+    | `expiry` setting. Setting this to `0` makes every prior verification
+    | "expired" — the route-level `RequireMfa` middleware will reject every
+    | request, so use the step-up middleware variant when you need to require
+    | re-verification for a specific action without locking the user out
+    | globally.
     |
     */
 

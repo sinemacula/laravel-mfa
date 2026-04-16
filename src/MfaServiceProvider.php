@@ -22,7 +22,7 @@ use SineMacula\Laravel\Mfa\Stores\SessionMfaVerificationStore;
  *
  * Bootstraps the multi-factor authentication services: the MFA manager
  * singleton, the default policy / verification store / SMS gateway
- * bindings, mail view loading, and config / migration / view publishing.
+ * bindings, the middleware aliases, and config + migration publishing.
  *
  * Consumers with their own enforcement policy, stateless verification
  * store, or real SMS gateway rebind the matching contracts in their

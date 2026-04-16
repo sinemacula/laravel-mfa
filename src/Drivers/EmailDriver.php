@@ -13,14 +13,16 @@ use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
  * Email factor driver.
  *
  * Issues one-time codes via Laravel's mail subsystem and verifies them
- * in constant time. The shipped `MfaCodeMessage` Mailable carries a
- * plain-text view under the `mfa::` namespace; consumers who want a
- * branded email subclass the Mailable or rebind it against this driver.
+ * in constant time. The shipped `MfaCodeMessage` Mailable carries an
+ * inline HTML body so the package works with no published views;
+ * consumers who want a branded email subclass the Mailable (or pass
+ * their own Mailable class via the driver constructor) and override
+ * its `content()` to point at their own view.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class EmailDriver extends AbstractOtpDriver
+final class EmailDriver extends AbstractOtpDriver
 {
     /**
      * Constructor.

@@ -1,7 +1,18 @@
 # Backlog
 
-Running log of issues, gaps, and architectural questions to resolve as `sinemacula/laravel-mfa` is built out.
-Scoped to `src/` only — testing and coverage gaps will be tracked separately after the implementation stabilises.
+Running log of issues, gaps, and architectural questions resolved while building `sinemacula/laravel-mfa`.
+
+---
+
+## Status — ✅ Phases 1–5 and Phase 9 (tests) complete
+
+- **100% line / method / class coverage** on `src/` (498/498 lines, 134/134 methods, 26/26 classes)
+- **298 tests passing** across Unit / Feature / Integration / Performance suites
+- **Mutation testing gate green** — 92% Covered MSI on scoped paths (gate: 90%)
+- **PHPBench benchmarks** covering every hot-path (TOTP, OTP, backup codes, FactorSummary)
+- **`composer check` clean** on `src/` and `benchmarks/` (only pre-existing markdown lint + informational radarlint code-smell warnings remain)
+
+Remaining optional work is tracked in the Phase 6 / 7 sections below — enrolment helpers, code-alphabet config, step-up middleware, replay protection, and rate-limit docs.
 
 ---
 

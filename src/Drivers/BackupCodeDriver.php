@@ -29,7 +29,7 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class BackupCodeDriver implements FactorDriver
+final class BackupCodeDriver implements FactorDriver
 {
     /** @var string Driver identifier used on Factor::driver. */
     public const string NAME = 'backup_code';
@@ -106,7 +106,7 @@ class BackupCodeDriver implements FactorDriver
      *
      * @return string
      */
-    public function generateSecret(): ?string
+    public function generateSecret(): string
     {
         return $this->generatePlaintextCode();
     }
@@ -204,6 +204,7 @@ class BackupCodeDriver implements FactorDriver
         $result = DB::connection($factor->getConnectionName())->transaction(
             static function () use ($factor, $secretColumn, $expectedSecret): bool {
                 /** @var ?Model $locked */
+                // @phpstan-ignore staticMethod.dynamicCall
                 $locked = $factor->newQuery()
                     ->lockForUpdate()
                     ->find($factor->getKey());

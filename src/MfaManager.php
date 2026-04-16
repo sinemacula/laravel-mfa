@@ -292,7 +292,7 @@ class MfaManager extends Manager
             $factor->resetAttempts();
         }
 
-        $this->driver($driver)->issueChallenge($factor);
+        $this->resolveDriver($driver)->issueChallenge($factor);
 
         if ($factor instanceof EloquentFactor) {
             $factor->persist();
@@ -353,7 +353,7 @@ class MfaManager extends Manager
             return false;
         }
 
-        $valid = $this->driver($driver)->verify($factor, $code);
+        $valid = $this->resolveDriver($driver)->verify($factor, $code);
 
         if ($factor instanceof EloquentFactor) {
             $this->applyVerificationOutcome($factor, $driver, $valid);
@@ -412,11 +412,8 @@ class MfaManager extends Manager
          */
         $config = $this->getDriverConfig('email');
 
-        /** @var \Illuminate\Contracts\Mail\Mailer $mailer */
-        $mailer = $this->container->make(Mailer::class);
-
         return new EmailDriver(
-            mailer: $mailer,
+            mailer: $this->container->make(Mailer::class),
             mailable: $config['mailable']        ?? MfaCodeMessage::class,
             codeLength: $config['code_length']   ?? 6,
             expiry: $config['expiry']            ?? 10,
@@ -441,11 +438,8 @@ class MfaManager extends Manager
          */
         $config = $this->getDriverConfig('sms');
 
-        /** @var \SineMacula\Laravel\Mfa\Contracts\SmsGateway $gateway */
-        $gateway = $this->container->make(SmsGateway::class);
-
         return new SmsDriver(
-            gateway: $gateway,
+            gateway: $this->container->make(SmsGateway::class),
             messageTemplate: $config['message_template']
                                                  ?? 'Your verification code is: :code',
             codeLength: $config['code_length']   ?? 6,
@@ -507,8 +501,29 @@ class MfaManager extends Manager
      */
     protected function resolveEvents(): Dispatcher
     {
-        /** @var \Illuminate\Contracts\Events\Dispatcher */
         return $this->container->make(Dispatcher::class);
+    }
+
+    /**
+     * Resolve the named factor driver, narrowed to the
+     * `FactorDriver` contract for downstream callers.
+     *
+     * The base manager's `driver()` returns `mixed`; this helper
+     * locks the return type so callers do not need to hint or
+     * assert at every site.
+     *
+     * @param  string  $driver
+     * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
+     */
+    protected function resolveDriver(string $driver): FactorDriver
+    {
+        $instance = $this->driver($driver);
+
+        if (!$instance instanceof FactorDriver) {
+            throw new \LogicException(sprintf('Driver [%s] must implement %s.', $driver, FactorDriver::class));
+        }
+
+        return $instance;
     }
 
     /**

@@ -97,7 +97,7 @@ For sensitive operations or step-up flows, the developer applies the middleware 
 
 ### Must Have (P0)
 
-- **Standalone integration:** Developer can install the package into any Laravel 13+ application using any auth stack (SessionGuard, Sanctum, Passport, custom guard, or `sinemacula/laravel-authentication`) without modifying the auth stack.
+- **Standalone integration:** Developer can install the package into any Laravel 12 or 13 application using any auth stack (SessionGuard, Sanctum, Passport, custom guard, or `sinemacula/laravel-authentication`) without modifying the auth stack.
   - **Acceptance criteria:** Integration tests demonstrate successful MFA enforcement against at least three distinct authentication setups (SessionGuard, Sanctum, and a custom guard implementing only `Illuminate\Contracts\Auth\Authenticatable`) with no package code paths conditional on the guard in use.
 
 - **TOTP factor driver:** Developer can require users to set up and verify MFA using a time-based one-time password (TOTP) compatible with standard authenticator apps.
@@ -179,7 +179,7 @@ For sensitive operations or step-up flows, the developer applies the middleware 
 ## Dependencies
 
 - PHP 8.3+
-- Laravel 13+
+- Laravel 12.40+ or 13.3+
 - `Illuminate\Contracts\Auth\Authenticatable` (Laravel standard contract)
 - Optional (suggested) runtime dependency: a TOTP library satisfying RFC 6238, used by the TOTP driver only and detected at runtime with a clear error if missing
 - Optional consumer-provided dependency: an SMS gateway implementation conforming to the package's gateway contract, required only if the SMS driver is used

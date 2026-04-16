@@ -19,7 +19,7 @@ use SineMacula\Laravel\Mfa\Exceptions\MissingDriverDependencyException;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class TotpDriver implements FactorDriver
+final class TotpDriver implements FactorDriver
 {
     /** @var object The Google2FA instance */
     private readonly object $google2fa;
