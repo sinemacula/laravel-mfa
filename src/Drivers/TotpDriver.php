@@ -35,7 +35,11 @@ class TotpDriver implements FactorDriver
         private readonly int $window = 1,
     ) {
         if (!class_exists(\PragmaRX\Google2FA\Google2FA::class)) {
-            throw new MissingDriverDependencyException('The pragmarx/google2fa package is required for the TOTP MFA driver. Install it via: composer require pragmarx/google2fa');
+            $message = 'The pragmarx/google2fa package is required for the '
+                . 'TOTP MFA driver. Install it via: composer '
+                . 'require pragmarx/google2fa';
+
+            throw new MissingDriverDependencyException($message);
         }
 
         $this->google2fa = new \PragmaRX\Google2FA\Google2FA;

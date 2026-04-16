@@ -9,6 +9,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Session\Session;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 
 /**
  * Session-backed MFA verification store.
@@ -45,24 +46,31 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
     ) {}
 
     /**
-     * Record that the given identity has just completed a
-     * successful MFA verification.
+     * Record that the given identity has just completed a successful MFA
+     * verification. Stamps the session at the given time, defaulting to
+     * "now" when no explicit timestamp is supplied.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
+     * @param  ?\Carbon\CarbonInterface  $at
      * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function markVerified(Authenticatable $identity): void
+    public function markVerified(Authenticatable $identity, ?CarbonInterface $at = null): void
     {
-        $this->session->put($this->key($identity), Carbon::now()->getTimestamp());
+        $timestamp = ($at ?? Carbon::now())->getTimestamp();
+
+        $this->session->put($this->key($identity), $timestamp);
     }
 
     /**
-     * Return the timestamp of the given identity's most recent
-     * successful MFA verification, or `null` when the identity has
-     * never been verified.
+     * Return the timestamp of the given identity's most recent successful
+     * MFA verification, or `null` when the identity has never been verified.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return ?\Carbon\CarbonInterface
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     public function lastVerifiedAt(Authenticatable $identity): ?CarbonInterface
     {
@@ -77,11 +85,12 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
     }
 
     /**
-     * Clear any stored verification timestamp for the given
-     * identity.
+     * Clear any stored verification timestamp for the given identity.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     public function forget(Authenticatable $identity): void
     {
@@ -91,20 +100,28 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
     /**
      * Build the session key for the given identity.
      *
-     * Keys by auth identifier so a session that changes owner
-     * (e.g. impersonation, legacy flows that bypass session
-     * regeneration) cannot inherit a prior identity's verification
-     * state.
+     * Keys by auth identifier so a session that changes owner (e.g.
+     * impersonation, legacy flows that bypass session regeneration) cannot
+     * inherit a prior identity's verification state. Fails loud when the
+     * auth identifier is non-scalar rather than silently collapsing
+     * distinct identities to a shared key.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return string
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     private function key(Authenticatable $identity): string
     {
         $identifier = $identity->getAuthIdentifier();
 
-        $suffix = is_string($identifier) || is_int($identifier) ? (string) $identifier : '_';
+        if (!is_string($identifier) && !is_int($identifier)) {
+            $message = 'SessionMfaVerificationStore requires a string or int '
+                . 'auth identifier; got ' . get_debug_type($identifier) . '.';
 
-        return self::KEY_PREFIX . $suffix;
+            throw new UnsupportedIdentifierException($message);
+        }
+
+        return self::KEY_PREFIX . $identifier;
     }
 }

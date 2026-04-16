@@ -39,12 +39,17 @@ interface FactorDriver
     /**
      * Verify the given code against the factor.
      *
-     * Drivers are responsible for the per-factor-type comparison
-     * logic (TOTP uses Google2FA, email / SMS use constant-time
-     * comparison of the pending code, backup codes consume a
-     * single-use code). Drivers MUST NOT mutate attempt counters
-     * or verification timestamps — those side effects belong to
-     * the MFA manager's orchestration layer.
+     * Drivers are responsible for the per-factor-type comparison logic
+     * (TOTP uses Google2FA, email / SMS use constant-time comparison of the
+     * pending code, backup codes consume a single-use code and mark it
+     * consumed on success).
+     *
+     * Drivers MUST NOT mutate attempt counters, lockout state, or
+     * verification timestamps — those side effects belong to the MFA
+     * manager's orchestration layer. Drivers MAY mutate single-use factor
+     * material on successful verification (e.g. backup codes marking the
+     * consumed code spent) when single-use semantics are intrinsic to the
+     * driver contract.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code

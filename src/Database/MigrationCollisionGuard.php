@@ -50,10 +50,15 @@ final readonly class MigrationCollisionGuard
         $connection = $this->schema->getConnection()->getName() ?? 'default';
 
         $message = sprintf(
-            'Cannot install the laravel-mfa factors migration: a table named \'%s\' already exists on connection \'%s\'.'
-            . ' Set `factor.table` in config/mfa.php to a different name and re-run the migration.',
-            $table,
-            $connection,
+            '%s %s %s',
+            sprintf(
+                'Cannot install the laravel-mfa factors migration: a table '
+                . 'named \'%s\' already exists on connection \'%s\'.',
+                $table,
+                $connection,
+            ),
+            'Set `factor.table` in config/mfa.php to a different name',
+            'and re-run the migration.',
         );
 
         throw new FactorTableAlreadyExistsException($message);

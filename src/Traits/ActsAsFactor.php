@@ -74,14 +74,21 @@ trait ActsAsFactor
     }
 
     /**
-     * Return the authenticatable the factor belongs to.
+     * Return the authenticatable the factor belongs to. Returns `null` when
+     * the `authenticatable` relation has not been loaded — this accessor
+     * MUST NOT trigger a lazy query. Callers that need the related record
+     * should eager-load the relation on the query first.
      *
      * @return ?\Illuminate\Contracts\Auth\Authenticatable
      */
     public function getAuthenticatable(): ?Authenticatable
     {
+        if (!$this->relationLoaded('authenticatable')) {
+            return null;
+        }
+
         /** @var mixed $related */
-        $related = $this->getRelationValue('authenticatable');
+        $related = $this->getRelation('authenticatable');
 
         return $related instanceof Authenticatable ? $related : null;
     }

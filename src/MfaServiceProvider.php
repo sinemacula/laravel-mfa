@@ -85,7 +85,12 @@ class MfaServiceProvider extends ServiceProvider
      */
     protected function registerMfaVerificationStore(): void
     {
-        $this->app->singleton(MfaVerificationStore::class, static fn (Application $app): MfaVerificationStore => new SessionMfaVerificationStore($app->make(Session::class)));
+        $this->app->singleton(
+            MfaVerificationStore::class,
+            static fn (Application $app): MfaVerificationStore => new SessionMfaVerificationStore(
+                $app->make(Session::class),
+            ),
+        );
     }
 
     /**

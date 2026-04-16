@@ -33,13 +33,17 @@ use Illuminate\Contracts\Auth\Authenticatable;
 interface MfaVerificationStore
 {
     /**
-     * Record that the given identity has just completed a
-     * successful MFA verification.
+     * Record that the given identity has just completed a successful MFA
+     * verification. Stores implementations use the supplied timestamp when
+     * provided, falling back to "now" otherwise. Passing an explicit `$at`
+     * lets paired-mode stores (e.g. a device-backed implementation) stamp
+     * the persistence layer atomically with the verification event.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
+     * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
-    public function markVerified(Authenticatable $identity): void;
+    public function markVerified(Authenticatable $identity, ?CarbonInterface $at = null): void;
 
     /**
      * Return the timestamp of the given identity's most recent

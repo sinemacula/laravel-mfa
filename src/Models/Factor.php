@@ -7,7 +7,7 @@ namespace SineMacula\Laravel\Mfa\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
-use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
+use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Traits\ActsAsFactor;
 
 /**
@@ -36,7 +36,7 @@ use SineMacula\Laravel\Mfa\Traits\ActsAsFactor;
  * @property ?\Carbon\CarbonInterface $locked_until
  * @property ?\Carbon\CarbonInterface $last_attempted_at
  */
-class Factor extends Model implements FactorContract
+class Factor extends Model implements EloquentFactor
 {
     use ActsAsFactor, HasUlids;
 

@@ -170,7 +170,11 @@ class MfaManager extends Manager
             return null;
         }
 
-        return $this->cached(self::CACHE_KEY_FACTORS, $identity, static fn (): Collection => $identity->authFactors()->get()->toBase());
+        return $this->cached(
+            self::CACHE_KEY_FACTORS,
+            $identity,
+            static fn (): Collection => $identity->authFactors()->get()->toBase(),
+        );
     }
 
     /**
@@ -285,7 +289,11 @@ class MfaManager extends Manager
 
         $identifier = $identity->getAuthIdentifier();
 
-        return $prefix . (is_string($identifier) || is_int($identifier) ? (string) $identifier : '') . ':';
+        $suffix = is_string($identifier) || is_int($identifier)
+            ? (string) $identifier
+            : '';
+
+        return $prefix . $suffix . ':';
     }
 
     /**
