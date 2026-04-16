@@ -123,9 +123,9 @@ final class TotpDriverTest extends TestCase
         );
 
         // The label segment is `Issuer:AccountName`, URL-encoded by the
-        // Google2FA library.
-        self::assertStringContainsString('Acme', $uri);
-        self::assertStringContainsString('user%40example.com', $uri);
+        // Google2FA library — assert the joined form so the test is not
+        // satisfied by the `issuer=Acme` query parameter alone.
+        self::assertStringContainsString('Acme:user%40example.com', $uri);
 
         // Both the `secret` and `issuer` query parameters must be present
         // (the latter is the standard auth-app behaviour for grouping).
