@@ -146,6 +146,129 @@ final class RequireMfaMiddlewareTest extends TestCase
         self::assertTrue($reached);
     }
 
+    public function testStepUpPassesWhenVerificationIsWithinMaxAge(): void
+    {
+        [, $factor, $code] = $this->enrolTotp();
+
+        self::assertTrue(Mfa::verify('totp', $factor, $code));
+
+        $this->travel(4)->minutes();
+
+        $reached = $this->runMiddleware(maxAgeMinutes: '5');
+
+        self::assertTrue($reached);
+    }
+
+    public function testStepUpThrowsExpiredWhenVerificationOlderThanMaxAge(): void
+    {
+        [, $factor, $code] = $this->enrolTotp();
+
+        self::assertTrue(Mfa::verify('totp', $factor, $code));
+
+        $this->travel(6)->minutes();
+
+        $this->expectException(MfaExpiredException::class);
+
+        $this->runMiddleware(maxAgeMinutes: '5');
+    }
+
+    public function testStepUpZeroAlwaysThrowsEvenForFreshVerification(): void
+    {
+        [, $factor, $code] = $this->enrolTotp();
+
+        self::assertTrue(Mfa::verify('totp', $factor, $code));
+
+        $this->expectException(MfaExpiredException::class);
+
+        $this->runMiddleware(maxAgeMinutes: '0');
+    }
+
+    public function testStepUpOverridesShorterDefaultExpiry(): void
+    {
+        // The default config expiry is 14 days; force it to 1 minute so
+        // we can prove that an explicit `mfa:60` parameter wins by
+        // letting a verification 30 minutes old still pass.
+        config()->set('mfa.default_expiry', 1);
+
+        [, $factor, $code] = $this->enrolTotp();
+
+        self::assertTrue(Mfa::verify('totp', $factor, $code));
+
+        $this->travel(30)->minutes();
+
+        $reached = $this->runMiddleware(maxAgeMinutes: '60');
+
+        self::assertTrue($reached);
+    }
+
+    public function testStepUpRejectsNonNumericParameter(): void
+    {
+        $user = TestUser::create([
+            'email'       => 'badparam@example.test',
+            'mfa_enabled' => true,
+        ]);
+        $this->actingAs($user);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('RequireMfa middleware max-age parameter must be a non-negative integer');
+
+        $this->runMiddleware(maxAgeMinutes: 'abc');
+    }
+
+    public function testStepUpRejectsNegativeParameter(): void
+    {
+        $user = TestUser::create([
+            'email'       => 'negparam@example.test',
+            'mfa_enabled' => true,
+        ]);
+        $this->actingAs($user);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('RequireMfa middleware max-age parameter must be a non-negative integer');
+
+        $this->runMiddleware(maxAgeMinutes: '-1');
+    }
+
+    public function testStepUpRejectsFractionalParameter(): void
+    {
+        $user = TestUser::create([
+            'email'       => 'fracparam@example.test',
+            'mfa_enabled' => true,
+        ]);
+        $this->actingAs($user);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->runMiddleware(maxAgeMinutes: '1.5');
+    }
+
+    /**
+     * Drive the middleware with the given route-middleware param and
+     * report whether the inner handler was reached.
+     *
+     * @param  ?string  $maxAgeMinutes
+     * @return bool
+     */
+    private function runMiddleware(?string $maxAgeMinutes): bool
+    {
+        $middleware = $this->app->make(
+            \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
+        );
+
+        $reached = false;
+        $middleware->handle(
+            $this->app->make(\Illuminate\Http\Request::class),
+            static function () use (&$reached): \Symfony\Component\HttpFoundation\Response {
+                $reached = true;
+
+                return new \Symfony\Component\HttpFoundation\Response('ok');
+            },
+            $maxAgeMinutes,
+        );
+
+        return $reached;
+    }
+
     /**
      * @return array{0: TestUser, 1: Factor, 2: string}
      */

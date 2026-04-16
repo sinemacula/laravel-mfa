@@ -97,6 +97,28 @@ Route::middleware([SkipMfa::class])->group(function () {
 });
 ```
 
+### Step-up authentication
+
+The `mfa` middleware accepts an optional `max-age` minutes parameter to override the global `default_expiry`
+on a per-route basis. Use it to gate sensitive actions behind a recent verification without forcing the global
+expiry to be aggressive:
+
+```php
+// Standard MFA gate (uses default_expiry from config)
+Route::middleware('mfa')->group(function () {
+    Route::get('/dashboard', DashboardController::class);
+});
+
+// Step-up gate: require verification within the last 5 minutes
+Route::middleware('mfa:5')->delete('/account', AccountController::class);
+
+// Strict every-request gate for the highest-risk actions
+Route::middleware('mfa:0')->post('/api/admin/delete-everything', NukeController::class);
+```
+
+`mfa:0` rejects every request — it requires the user to step through verification immediately before the
+action — so reserve it for actions that justify the friction.
+
 When MFA is required but not verified, `MfaRequiredException` is thrown. When a previous verification has expired,
 `MfaExpiredException` is thrown. Both carry the user's available factors:
 
