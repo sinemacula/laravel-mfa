@@ -59,10 +59,13 @@ abstract class AbstractOtpDriver implements FactorDriver
         $code      = $this->generateCode();
         $expiresAt = Carbon::now()->addMinutes($this->expiry);
 
+        // Dispatch before persist: if the transport throws, nothing is
+        // stored against the factor, so the user does not end up with a
+        // "valid" code they never received.
+        $this->dispatch($factor, $code);
+
         $factor->issueCode($code, $expiresAt);
         $factor->persist();
-
-        $this->dispatch($factor, $code);
     }
 
     /**

@@ -14,4 +14,4 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class MissingDriverDependencyException extends \RuntimeException {}
+final class MissingDriverDependencyException extends \RuntimeException {}

@@ -20,7 +20,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class MfaExpiredException extends HttpException
+final class MfaExpiredException extends HttpException
 {
     /**
      * Constructor.

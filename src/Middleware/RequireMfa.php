@@ -34,7 +34,7 @@ use Symfony\Component\HttpFoundation\Response;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class RequireMfa
+final class RequireMfa
 {
     /**
      * Handle an incoming request.

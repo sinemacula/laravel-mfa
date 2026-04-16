@@ -285,7 +285,18 @@ class MfaManager extends Manager
      */
     public function challenge(string $driver, Factor $factor): void
     {
+        // A fresh challenge invalidates any prior failed-attempt state so
+        // a user who locked themselves out on a stale code can recover by
+        // requesting a new one.
+        if ($factor instanceof EloquentFactor) {
+            $factor->resetAttempts();
+        }
+
         $this->driver($driver)->issueChallenge($factor);
+
+        if ($factor instanceof EloquentFactor) {
+            $factor->persist();
+        }
 
         $identity = $this->resolveIdentity();
 
@@ -573,12 +584,14 @@ class MfaManager extends Manager
             return MfaVerificationFailureReason::CodeExpired;
         }
 
-        if ($code === null && $secret !== null) {
-            // Has a secret (TOTP-shaped) but the submitted code didn't match.
+        if ($code === null) {
+            // Must be a TOTP-shaped factor (secret non-null per the early
+            // return above). The submitted code didn't match the derived
+            // TOTP window.
             return MfaVerificationFailureReason::CodeInvalid;
         }
 
-        if ($code !== null && $expiresAt === null) {
+        if ($expiresAt === null) {
             // Pending code exists but has no expiry — treat as missing.
             return MfaVerificationFailureReason::CodeMissing;
         }

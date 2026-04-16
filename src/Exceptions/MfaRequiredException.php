@@ -20,7 +20,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class MfaRequiredException extends HttpException
+final class MfaRequiredException extends HttpException
 {
     /**
      * Constructor.

@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
+use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
@@ -84,10 +85,13 @@ class BackupCodeDriver implements FactorDriver
             return false;
         }
 
-        // Single-use: invalidate the stored code on success. The manager's
-        // `EloquentFactor` persistence call will flush this to storage.
+        // Single-use consumption: an atomic conditional UPDATE closes the
+        // TOCTOU race where two concurrent requests could both match the
+        // same code. Only the request whose UPDATE finds the still-
+        // unconsumed secret wins; the loser sees zero affected rows and
+        // returns false.
         if ($factor instanceof EloquentFactor) {
-            $this->consume($factor);
+            return $this->consumeAtomic($factor, $stored);
         }
 
         return true;
@@ -170,26 +174,41 @@ class BackupCodeDriver implements FactorDriver
     }
 
     /**
-     * Mark the factor's stored secret consumed after a successful match.
+     * Atomically consume the factor's stored secret.
+     *
+     * Issues a conditional UPDATE that matches only while the secret
+     * column still holds the expected hash. Returns `true` when the row
+     * was the one we consumed, `false` when another request beat us to
+     * it. The in-memory factor is synchronised on success so the
+     * manager's subsequent `persist()` does not overwrite the null.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
-     * @return void
+     * @param  string  $expectedSecret
+     * @return bool
      */
-    private function consume(EloquentFactor $factor): void
-    {
-        // We reuse `consumeCode()` on the factor which clears code +
-        // expires_at. Backup codes store their material on `secret`,
-        // so we also null the secret here so the row is effectively
-        // spent but still observable in audit trails.
-        $factor->issueCode('', $factor->getExpiresAt() ?? \Carbon\Carbon::now());
-
-        // Clear the secret column via setAttribute on the underlying
-        // Eloquent model. Because EloquentFactor doesn't expose a
-        // setSecret() helper, use the column-name hook.
-        if (method_exists($factor, 'setAttribute')) {
-            $factor->setAttribute($factor->getSecretName(), null);
-            $factor->consumeCode();
+    private function consumeAtomic(
+        EloquentFactor $factor,
+        #[\SensitiveParameter]
+        string $expectedSecret,
+    ): bool {
+        if (!$factor instanceof Model) {
+            return true;
         }
+
+        $secretColumn = $factor->getSecretName();
+
+        $affected = $factor->newQuery()
+            ->whereKey($factor->getKey())
+            ->where($secretColumn, $expectedSecret)
+            ->update([$secretColumn => null]);
+
+        if ($affected === 0) {
+            return false;
+        }
+
+        $factor->setAttribute($secretColumn, null);
+
+        return true;
     }
 
     /**
