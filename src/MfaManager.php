@@ -7,7 +7,6 @@ namespace SineMacula\Laravel\Mfa;
 use Carbon\Carbon;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -559,8 +558,17 @@ class MfaManager extends Manager
 
         $codes = $driver->generateSet($count);
 
-        $this->container->make(ConnectionInterface::class)->transaction(function () use ($identity, $driver, $codes): void {
-            $this->rotateBackupCodeBatch($identity, $driver, $codes);
+        // Transaction runs on the factor model's own connection so the
+        // documented atomic-replace guarantee still holds when a consumer
+        // points `config('mfa.factor.model')` at a model bound to a non-
+        // default database connection. Using the container-default
+        // `ConnectionInterface` would open the transaction on one
+        // connection while the rotation writes land on another.
+        $modelClass = $this->factorModel();
+        $connection = (new $modelClass)->getConnection();
+
+        $connection->transaction(function () use ($identity, $driver, $codes, $modelClass): void {
+            $this->rotateBackupCodeBatch($identity, $driver, $codes, $modelClass);
         });
 
         $this->clearCache($identity);
@@ -678,20 +686,27 @@ class MfaManager extends Manager
      * Atomically replace the identity's existing backup-code factors with the
      * supplied freshly-minted batch. Runs inside a single transaction provided
      * by the caller — no overlap window where both old and new codes would
-     * verify.
+     * verify. The factor-model class is passed in so the rotation uses the
+     * exact same class (and therefore connection) the outer transaction was
+     * opened on.
+     *
+     * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver  $driver
      * @param  list<string>  $codes
+     * @param  class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $modelClass
      * @return void
+     *
+     * @formatter:on
      */
     private function rotateBackupCodeBatch(
         MultiFactorAuthenticatable $identity,
         BackupCodeDriver $driver,
         array $codes,
+        string $modelClass,
     ): void {
-        $modelClass = $this->factorModel();
-        $morphType  = $identity instanceof Model
+        $morphType = $identity instanceof Model
             // @phpstan-ignore staticMethod.dynamicCall (getMorphClass is defined as an instance method upstream)
             ? $identity->getMorphClass()
             : $identity::class;
