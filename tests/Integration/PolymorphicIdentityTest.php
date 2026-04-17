@@ -60,6 +60,10 @@ final class PolymorphicIdentityTest extends TestCase
             'recipient'            => $secondary->email,
         ]);
 
+        // No manual `Mfa::clearCache()` between identity switches —
+        // the manager's per-identity cache scopes by morph class as
+        // well as identifier, so two distinct authenticatable classes
+        // sharing a primary key value get distinct cache slots.
         $this->actingAs($primary);
         self::assertTrue(Mfa::shouldUse());
         self::assertTrue(Mfa::isSetup());
@@ -71,8 +75,6 @@ final class PolymorphicIdentityTest extends TestCase
         self::assertNotNull($primaryFactor);
         self::assertSame('totp', $primaryFactor->getDriver());
 
-        Mfa::clearCache();
-
         $this->actingAs($secondary);
         self::assertTrue(Mfa::shouldUse());
         self::assertTrue(Mfa::isSetup());
@@ -83,6 +85,51 @@ final class PolymorphicIdentityTest extends TestCase
         $secondaryFactor = $secondaryFactors->first();
         self::assertNotNull($secondaryFactor);
         self::assertSame('email', $secondaryFactor->getDriver());
+    }
+
+    /**
+     * Two MFA-capable identity classes that share a primary-key value
+     * (`User #1` and `Admin #1`) MUST get distinct cache entries
+     * within the same request — without that scoping the second
+     * identity inherits the first identity's cached state.
+     *
+     * @return void
+     */
+    public function testCacheKeysScopeByIdentityClassEvenWhenIdentifiersCollide(): void
+    {
+        $primary = TestUser::create([
+            'email'       => 'shared@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        // Force the secondary onto the same primary-key value so the
+        // only thing distinguishing the two identities in the cache is
+        // the morph class. Pre-key-collision the cache prefix would
+        // produce identical keys and one identity's setup state would
+        // win the cache slot.
+        $secondary = SecondaryUser::create([
+            'email'       => 'shared-secondary@example.test',
+            'mfa_enabled' => true,
+        ]);
+        $secondary->forceFill(['id' => $primary->getKey()])->saveQuietly();
+        $secondary->refresh();
+
+        // Only the primary identity owns a factor.
+        Factor::create([
+            'authenticatable_type' => $primary::class,
+            'authenticatable_id'   => (string) $primary->id,
+            'driver'               => 'totp',
+            'secret'               => 'JBSWY3DPEHPK3PXP',
+        ]);
+
+        $this->actingAs($primary);
+        self::assertTrue(Mfa::isSetup());
+
+        $this->actingAs($secondary);
+        // Without per-class cache scoping this would erroneously return
+        // true because the cached "isSetup" entry for the shared id
+        // would still be in memory.
+        self::assertFalse(Mfa::isSetup());
     }
 
     /**
@@ -105,8 +152,6 @@ final class PolymorphicIdentityTest extends TestCase
 
         $this->actingAs($primary);
         self::assertFalse(Mfa::shouldUse());
-
-        Mfa::clearCache();
 
         $this->actingAs($secondary);
         self::assertFalse(Mfa::shouldUse());

@@ -706,6 +706,12 @@ class MfaManager extends Manager
     /**
      * Get the cache key prefix for the given identity.
      *
+     * The prefix includes the identity's morph class (or FQCN for non-
+     * Eloquent identities) so two MFA-capable models with overlapping
+     * primary keys (`User #1` and `Admin #1`) cannot collide on a
+     * single cache slot. Without that scope a multi-guard request
+     * would let cached state from one identity bleed into the other.
+     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return string
      */
@@ -722,6 +728,11 @@ class MfaManager extends Manager
             ? (string) $identifier
             : '';
 
-        return $prefix . $suffix . ':';
+        $class = $identity instanceof Model
+            // @phpstan-ignore staticMethod.dynamicCall (getMorphClass is defined as an instance method upstream)
+            ? $identity->getMorphClass()
+            : $identity::class;
+
+        return $prefix . $class . ':' . $suffix . ':';
     }
 }
