@@ -351,9 +351,16 @@ class AppUser extends User implements MultiFactorAuthenticatable
 
     public function isMfaEnabled(): bool
     {
-        // The shipped `Factor` model uses `verified_at` (datetime) rather
-        // than a boolean column — `whereNotNull` matches the schema.
-        return $this->authFactors()->whereNotNull('verified_at')->exists();
+        // Canonical rule: MFA is "enabled" once the identity has at least
+        // one enrolled factor. Per-request verification freshness is owned
+        // separately by `Mfa::hasExpired()` / the verification store, so
+        // `isMfaEnabled()` deliberately does NOT look at `verified_at`.
+        //
+        // If your product policy is stricter — e.g. "enabled" must mean
+        // the factor has completed its first verification — swap in
+        // `->whereNotNull('verified_at')->exists()` here. Keep it
+        // consistent with whatever `Mfa::isSetup()` should report.
+        return $this->authFactors()->exists();
     }
 
     public function authFactors(): Builder

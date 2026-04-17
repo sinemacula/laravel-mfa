@@ -34,8 +34,18 @@ interface MultiFactorAuthenticatable extends Authenticatable
      * Determine whether multi-factor authentication is currently enabled for
      * this identity.
      *
-     * An identity may support MFA but not yet have it enabled (e.g. the user
-     * hasn't configured any factors).
+     * Canonical rule: MFA is enabled once the identity has at least one
+     * enrolled factor. Per-request verification freshness lives separately on
+     * `Mfa::hasExpired()` / the verification store, so implementations should
+     * NOT fold "has ever verified" into this predicate — that would collapse
+     * two orthogonal concepts and leave newly enrolled factors reading as
+     * "not enabled".
+     *
+     * Consumers whose product policy is stricter (e.g. "enabled" means the
+     * factor has completed its first verification) may implement that
+     * narrower rule here; the package does not enforce a single query shape.
+     * The shipped `Mfa::isSetup()` caches and reports whatever this method
+     * returns.
      *
      * @return bool
      */

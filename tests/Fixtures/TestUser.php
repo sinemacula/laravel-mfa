@@ -58,7 +58,9 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
     }
 
     /**
-     * Determine whether the user has any verified factor.
+     * Determine whether the user has at least one enrolled factor —
+     * matches the canonical rule documented on the
+     * `MultiFactorAuthenticatable::isMfaEnabled()` contract.
      *
      * @return bool
      */
