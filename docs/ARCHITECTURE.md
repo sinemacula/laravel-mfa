@@ -1,28 +1,11 @@
-# Backlog
+# Architecture
 
-Forward-looking work for `sinemacula/laravel-mfa`. Everything shipped in the 1.0 cycle has been
-cleared from this file — the git log carries the per-commit audit trail. Only the durable
-architectural context and the one explicitly-out-of-repo item remain.
-
-The 1.0 candidate sits on `feature/release-1.0-prep`.
+Durable contributor context for `sinemacula/laravel-mfa`. Anything new should be consistent with
+the operating modes and resolved decisions below unless explicitly discussed.
 
 ---
 
-## Status
-
-- **336 tests / 894 assertions** passing across Unit / Feature / Integration / Performance suites.
-- **100% line / method / class coverage** on `src/` (531/531 statements, 132/132 methods, 26/26
-  classes).
-- **Mutation gate green** — 100% Mutation Code Coverage, **92% Covered MSI** on scoped paths
-  (gate: 85%).
-- **PHPBench benchmarks** covering every hot-path (TOTP, OTP, backup codes, FactorSummary).
-- **`composer check -- --all --no-cache`** exits 0 across the whole repo. No `[[triage]]` rule
-  suppressions in `.qlty/qlty.toml`. Zero `@SuppressWarnings` annotations anywhere in the
-  codebase.
-
----
-
-## Architecture reference
+## Operating modes
 
 The package is designed to operate cleanly in three modes. Any new work must keep all three
 working.
@@ -48,9 +31,9 @@ working.
 
 ### Wrapped by `sinemacula/laravel-iam`
 
-- Parent package provides: a `DeviceMfaVerificationStore` binding (B-23, out of repo), an
-  opinionated `OrganisationMfaPolicy` bound against the `MfaPolicy` contract, cross-package event
-  listeners (audit log), and any other opinionated defaults.
+- Parent package provides: a `DeviceMfaVerificationStore` binding (lives in `laravel-iam`, not
+  this repo), an opinionated `OrganisationMfaPolicy` bound against the `MfaPolicy` contract,
+  cross-package event listeners (audit log), and any other opinionated defaults.
 - This repo stays clean of parent-package knowledge. The extension seams (policy, store, gateway)
   must be expressive enough that the parent package does not need to monkey-patch.
 
@@ -58,8 +41,7 @@ working.
 
 ## Resolved decisions
 
-Historical record of the architectural calls. Anything new should be consistent with these
-unless explicitly discussed.
+Historical record of the architectural calls made during the 1.0 cycle.
 
 - **D1 — Generic `MfaPolicy` contract, not org-specific `EnforcesMfa`.** The package ships a
   `MfaPolicy` extension seam with a no-op default (`NullMfaPolicy`). Consumers bind their own
@@ -84,8 +66,8 @@ unless explicitly discussed.
   recent registration. Pinned by
   `tests/Integration/CustomDriverExtensionTest::testConsumerCanOverrideBuiltInTotpDriver`.
 - **D6 — Lifecycle events are dispatched by the manager, not by consumer code.** Factor
-  enrolment goes through `Mfa::enrol(Factor)`; factor removal goes through `Mfa::disable(Factor)`.
-  Both invalidate the identity's setup-state cache and dispatch
+  enrolment goes through `Mfa::enrol(Factor)`; factor removal goes through
+  `Mfa::disable(Factor)`. Both invalidate the identity's setup-state cache and dispatch
   `MfaFactorEnrolled` / `MfaFactorDisabled` so audit subscribers do not have to rely on consumer
   cooperation. Five lifecycle events in total: `MfaChallengeIssued`, `MfaVerified`,
   `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`.
@@ -99,57 +81,3 @@ unless explicitly discussed.
   every `Factor` / `EloquentFactor` method. Anonymous test fixtures extend the relevant abstract
   and override only the methods they need — keeping every fixture well below the
   max-methods-per-class threshold without resorting to `@SuppressWarnings` annotations.
-
----
-
-## Out of scope (delivered by `sinemacula/laravel-iam`)
-
-Not this repo's work, tracked here for visibility so the IAM glue's authors know what to wire.
-
-### B-23 — `DeviceMfaVerificationStore`
-
-A `MfaVerificationStore` implementation that reads / writes the `last_mfa_verified_at` column on
-the `Device` record from `sinemacula/laravel-authentication`. This is what makes paired-mode
-(stateless JWT, Sanctum personal access tokens, Passport) verification persist *per device*
-instead of leaning on the session — without it the default `SessionMfaVerificationStore` cannot
-work for stateless stacks.
-
-Lives in `laravel-iam` because that package is the only one allowed to depend on both
-`laravel-mfa` and `laravel-authentication`. Shape of the integration:
-
-```php
-// In laravel-iam's service provider:
-$this->app->singleton(MfaVerificationStore::class, DeviceMfaVerificationStore::class);
-```
-
-```php
-// laravel-iam/src/Stores/DeviceMfaVerificationStore.php
-final readonly class DeviceMfaVerificationStore implements MfaVerificationStore
-{
-    public function __construct(private AuthManager $auth) {}
-
-    public function markVerified(Authenticatable $identity, ?CarbonInterface $at = null): void
-    {
-        $device = $this->auth->guard()->device(); // contextual accessor on the auth package
-        if ($device instanceof EloquentDevice) {
-            $device->forceFill(['last_mfa_verified_at' => $at ?? now()])->save();
-        }
-    }
-
-    public function lastVerifiedAt(Authenticatable $identity): ?CarbonInterface
-    {
-        return $this->auth->guard()->device()?->getLastMfaVerification();
-    }
-
-    public function forget(Authenticatable $identity): void
-    {
-        $device = $this->auth->guard()->device();
-        if ($device instanceof EloquentDevice) {
-            $device->forceFill(['last_mfa_verified_at' => null])->save();
-        }
-    }
-}
-```
-
-The MFA package's `MfaVerificationStore::markVerified()` accepts an optional `CarbonInterface $at`
-precisely so this implementation can stamp the device row atomically with the verification event.
