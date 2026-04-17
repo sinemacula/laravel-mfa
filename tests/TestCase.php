@@ -51,11 +51,7 @@ abstract class TestCase extends BaseTestCase
         $config->set('app.key', 'base64:' . base64_encode(random_bytes(32)));
 
         $config->set('database.default', 'testing');
-        $config->set('database.connections.testing', [
-            'driver'   => 'sqlite',
-            'database' => ':memory:',
-            'prefix'   => '',
-        ]);
+        $config->set('database.connections.testing', $this->resolveDatabaseConnection());
 
         $config->set('auth.defaults.guard', 'web');
         $config->set('auth.guards.web', [
@@ -66,6 +62,43 @@ abstract class TestCase extends BaseTestCase
             'driver' => 'eloquent',
             'model'  => Fixtures\TestUser::class,
         ]);
+    }
+
+    /**
+     * Resolve the test database connection.
+     *
+     * Default is in-memory SQLite so a fresh `composer test` run
+     * needs no external services. When CI provisions MySQL or
+     * PostgreSQL and exports `DB_CONNECTION` (and the matching
+     * `DB_HOST` / `DB_PORT` / `DB_DATABASE` / `DB_USERNAME` /
+     * `DB_PASSWORD` env vars) the bootstrap honours them so the
+     * "database-tests" matrix actually runs against the engine the
+     * workflow provisioned — not silently against SQLite three times.
+     *
+     * @return array<string, mixed>
+     */
+    protected function resolveDatabaseConnection(): array
+    {
+        $driver = getenv('DB_CONNECTION');
+
+        if ($driver === false || $driver === '' || $driver === 'sqlite') {
+            return [
+                'driver'   => 'sqlite',
+                'database' => ':memory:',
+                'prefix'   => '',
+            ];
+        }
+
+        return [
+            'driver'   => $driver,
+            'host'     => self::envOrDefault('DB_HOST', '127.0.0.1'),
+            'port'     => self::envOrDefault('DB_PORT', $driver === 'pgsql' ? '5432' : '3306'),
+            'database' => self::envOrDefault('DB_DATABASE', 'laravel_mfa_test'),
+            'username' => self::envOrDefault('DB_USERNAME', $driver === 'pgsql' ? 'postgres' : 'root'),
+            'password' => self::envOrDefault('DB_PASSWORD', ''),
+            'prefix'   => '',
+            'charset'  => $driver === 'pgsql' ? 'utf8' : 'utf8mb4',
+        ];
     }
 
     /**
@@ -92,5 +125,22 @@ abstract class TestCase extends BaseTestCase
         Assert::assertNotNull($this->app);
 
         return $this->app;
+    }
+
+    /**
+     * Return the value of the given env var if it is set and non-empty,
+     * otherwise return the supplied default. Centralised so the
+     * connection resolver does not repeat the `getenv` + falsy-check
+     * pattern at every key.
+     *
+     * @param  string  $key
+     * @param  string  $default
+     * @return string
+     */
+    private static function envOrDefault(string $key, string $default): string
+    {
+        $value = getenv($key);
+
+        return $value === false || $value === '' ? $default : $value;
     }
 }

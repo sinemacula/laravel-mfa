@@ -143,5 +143,22 @@ jobs:
             -   name: Install dependencies
                 run: composer install --prefer-dist --no-interaction --no-progress
 
+            -   name: Confirm test bootstrap honours DB_CONNECTION
+                run: |
+                    php -r '
+                        require "vendor/autoload.php";
+                        require "tests/TestCase.php";
+                        $reflection = new ReflectionClass(Tests\TestCase::class);
+                        $method = $reflection->getMethod("resolveDatabaseConnection");
+                        $method->setAccessible(true);
+                        $instance = $reflection->newInstanceWithoutConstructor();
+                        $resolved = $method->invoke($instance);
+                        fwrite(STDOUT, sprintf("Test bootstrap resolved driver: %s\n", $resolved["driver"]));
+                        if ($resolved["driver"] !== getenv("DB_CONNECTION")) {
+                            fwrite(STDERR, sprintf("FAIL: bootstrap returned [%s] but DB_CONNECTION=[%s]\n", $resolved["driver"], getenv("DB_CONNECTION")));
+                            exit(1);
+                        }
+                    '
+
             -   name: PHPUnit (serial)
                 run: vendor/bin/phpunit

@@ -43,6 +43,12 @@ abstract class MfaManagerTestCase extends BaseTestCase
     /**
      * Configure the application environment for the test suite.
      *
+     * Honours `DB_CONNECTION` (and the matching `DB_HOST` / `DB_PORT`
+     * / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` env vars) so the
+     * CI database matrix runs against the engine the workflow
+     * provisioned — not silently against SQLite. Falls back to in-
+     * memory SQLite for local `composer test` runs.
+     *
      * @param  \Illuminate\Foundation\Application  $app
      * @return void
      */
@@ -54,11 +60,7 @@ abstract class MfaManagerTestCase extends BaseTestCase
         $config->set('app.key', 'base64:' . base64_encode(random_bytes(32)));
 
         $config->set('database.default', 'testing');
-        $config->set('database.connections.testing', [
-            'driver'   => 'sqlite',
-            'database' => ':memory:',
-            'prefix'   => '',
-        ]);
+        $config->set('database.connections.testing', $this->resolveDatabaseConnection());
 
         $config->set('auth.defaults.guard', 'web');
         $config->set('auth.guards.web', [
@@ -69,6 +71,38 @@ abstract class MfaManagerTestCase extends BaseTestCase
             'driver' => 'eloquent',
             'model'  => Fixtures\TestUser::class,
         ]);
+    }
+
+    /**
+     * Resolve the test database connection — see `Tests\TestCase` for
+     * the env-driven contract; this shadow on `MfaManagerTestCase`
+     * keeps the manager test family aligned with the same engine
+     * matrix the rest of the suite runs against.
+     *
+     * @return array<string, mixed>
+     */
+    protected function resolveDatabaseConnection(): array
+    {
+        $driver = getenv('DB_CONNECTION');
+
+        if ($driver === false || $driver === '' || $driver === 'sqlite') {
+            return [
+                'driver'   => 'sqlite',
+                'database' => ':memory:',
+                'prefix'   => '',
+            ];
+        }
+
+        return [
+            'driver'   => $driver,
+            'host'     => self::envOrDefault('DB_HOST', '127.0.0.1'),
+            'port'     => self::envOrDefault('DB_PORT', $driver === 'pgsql' ? '5432' : '3306'),
+            'database' => self::envOrDefault('DB_DATABASE', 'laravel_mfa_test'),
+            'username' => self::envOrDefault('DB_USERNAME', $driver === 'pgsql' ? 'postgres' : 'root'),
+            'password' => self::envOrDefault('DB_PASSWORD', ''),
+            'prefix'   => '',
+            'charset'  => $driver === 'pgsql' ? 'utf8' : 'utf8mb4',
+        ];
     }
 
     /**
@@ -95,5 +129,17 @@ abstract class MfaManagerTestCase extends BaseTestCase
         Assert::assertNotNull($this->app);
 
         return $this->app;
+    }
+
+    /**
+     * @param  string  $key
+     * @param  string  $default
+     * @return string
+     */
+    private static function envOrDefault(string $key, string $default): string
+    {
+        $value = getenv($key);
+
+        return $value === false || $value === '' ? $default : $value;
     }
 }
