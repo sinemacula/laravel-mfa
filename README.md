@@ -309,8 +309,11 @@ rather than mid-request.
 Your identity model implements `MultiFactorAuthenticatable`:
 
 ```php
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Facades\Mfa;
 
 class AppUser extends User implements MultiFactorAuthenticatable
 {
@@ -321,12 +324,22 @@ class AppUser extends User implements MultiFactorAuthenticatable
 
     public function isMfaEnabled(): bool
     {
-        return $this->authFactors()->where('verified', true)->exists();
+        // The shipped `Factor` model uses `verified_at` (datetime) rather
+        // than a boolean column — `whereNotNull` matches the schema.
+        return $this->authFactors()->whereNotNull('verified_at')->exists();
     }
 
-    public function authFactors(): \Illuminate\Contracts\Database\Eloquent\Builder
+    public function authFactors(): Builder
     {
-        return $this->morphMany(\SineMacula\Laravel\Mfa\Models\Factor::class, 'authenticatable');
+        return $this->factors()->getQuery();
+    }
+
+    public function factors(): MorphMany
+    {
+        // Resolves through `Mfa::factorModel()` so consumers who swap
+        // the shipped model via `config('mfa.factor.model')` get their
+        // subclass back here without any further wiring.
+        return $this->morphMany(Mfa::factorModel(), 'authenticatable');
     }
 }
 ```
