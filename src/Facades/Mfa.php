@@ -28,6 +28,9 @@ use Illuminate\Support\Facades\Facade;
  * @method static ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> getFactors()
  * @method static void challenge(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor)
  * @method static bool verify(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor, string $code)
+ * @method static void enrol(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
+ * @method static void disable(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
+ * @method static list<string> issueBackupCodes(?int $count = null)
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

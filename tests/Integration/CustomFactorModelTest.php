@@ -141,7 +141,7 @@ final class CustomFactorModelTest extends TestCase
         config()->set('mfa.factor.model', \stdClass::class);
 
         $this->expectException(InvalidFactorModelException::class);
-        $this->expectExceptionMessage('must implement');
+        $this->expectExceptionMessage('must extend');
 
         Mfa::factorModel();
     }

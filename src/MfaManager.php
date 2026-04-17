@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa;
 use Carbon\Carbon;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -17,6 +18,7 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
@@ -91,7 +93,7 @@ class MfaManager extends Manager
      * the package itself uses it in any code path that needs to
      * instantiate a fresh factor (for example backup-code rotation).
      *
-     * @return class-string<\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
+     * @return class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      */
     public function factorModel(): string
     {
@@ -116,11 +118,11 @@ class MfaManager extends Manager
             throw new InvalidFactorModelException(sprintf('mfa.factor.model class [%s] does not exist.', $configured));
         }
 
-        if (!is_subclass_of($configured, EloquentFactor::class)) {
-            throw new InvalidFactorModelException(sprintf('mfa.factor.model class [%s] must implement %s.', $configured, EloquentFactor::class));
+        if (!is_subclass_of($configured, EloquentFactor::class) || !is_subclass_of($configured, Model::class)) {
+            throw new InvalidFactorModelException(sprintf('mfa.factor.model class [%s] must extend %s and implement %s.', $configured, Model::class, EloquentFactor::class));
         }
 
-        /** @var class-string<\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $configured */
+        /** @var class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $configured */
         return $configured;
     }
 
@@ -600,6 +602,84 @@ class MfaManager extends Manager
 
         $events = $this->container->make(Dispatcher::class);
         $events->dispatch(new MfaFactorDisabled($identity, $factor, $factor->getDriver()));
+    }
+
+    /**
+     * Issue a fresh batch of backup codes for the current identity.
+     *
+     * Atomically replaces the identity's existing `backup_code` factors
+     * inside a single database transaction: every prior backup-code row
+     * is deleted, a fresh batch is minted via the configured
+     * `BackupCodeDriver`, and one `Factor` row per code is persisted
+     * with the hashed value on `secret`. Returns the plaintext set
+     * exactly once for the caller to display / download — the codes
+     * are NEVER recoverable after this method returns, by design.
+     *
+     * Each new backup-code factor dispatches `MfaFactorEnrolled` so
+     * audit subscribers see the rotation as a normal lifecycle event.
+     * The identity's setup-state cache is invalidated so a subsequent
+     * `isSetup()` reflects the new batch immediately.
+     *
+     * No-op (returns `[]`) when no MFA-capable identity is resolvable,
+     * matching the established `enrol()` / `disable()` shape so
+     * consumers can call this unconditionally without guarding against
+     * unauthenticated requests.
+     *
+     * @param  ?int  $count
+     * @return list<string>
+     */
+    public function issueBackupCodes(?int $count = null): array
+    {
+        $identity = $this->resolveIdentity();
+
+        if ($identity === null) {
+            return [];
+        }
+
+        $driver = $this->driver(BackupCodeDriver::NAME);
+
+        if (!$driver instanceof BackupCodeDriver) {
+            throw new \LogicException(sprintf('Driver [%s] must be a %s instance to issue backup codes.', BackupCodeDriver::NAME, BackupCodeDriver::class));
+        }
+
+        $modelClass = $this->factorModel();
+        $morphType  = $identity instanceof Model
+            // @phpstan-ignore staticMethod.dynamicCall (getMorphClass is defined as an instance method upstream)
+            ? $identity->getMorphClass()
+            : $identity::class;
+        $morphId    = $identity->getAuthIdentifier();
+        $events     = $this->container->make(Dispatcher::class);
+        $connection = $this->container->make(ConnectionInterface::class);
+
+        $codes = $driver->generateSet($count);
+
+        $connection->transaction(function () use ($modelClass, $morphType, $morphId, $codes, $driver, $identity, $events): void {
+            // Delete any prior batch first so the rotation is atomic
+            // with respect to readers — no overlap window where both
+            // old and new codes would verify.
+            $modelClass::query()
+                ->where('authenticatable_type', $morphType)
+                ->where('authenticatable_id', $morphId)
+                ->where('driver', BackupCodeDriver::NAME)
+                ->delete();
+
+            foreach ($codes as $code) {
+                $factor   = new $modelClass;
+                $relation = $factor->authenticatable();
+
+                $factor->setAttribute($relation->getMorphType(), $morphType);
+                $factor->setAttribute($relation->getForeignKeyName(), $morphId);
+                $factor->setAttribute($factor->getDriverName(), BackupCodeDriver::NAME);
+                $factor->setAttribute($factor->getSecretName(), $driver->hash($code));
+                $factor->save();
+
+                $events->dispatch(new MfaFactorEnrolled($identity, $factor, BackupCodeDriver::NAME));
+            }
+        });
+
+        $this->clearCache($identity);
+
+        return $codes;
     }
 
     /**

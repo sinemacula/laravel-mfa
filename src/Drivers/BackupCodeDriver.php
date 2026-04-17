@@ -124,13 +124,27 @@ final class BackupCodeDriver implements FactorDriver
      * responsible for hashing via `hash()` before persistence and
      * surfacing the plaintext set to the user out-of-band.
      *
+     * The optional `$count` argument overrides the configured default
+     * for this single call — useful when a consumer needs a larger
+     * batch for a specific user (admin / break-glass) without rebinding
+     * the driver. Must be a positive integer.
+     *
+     * @param  ?int  $count
      * @return list<string>
+     *
+     * @throws \InvalidArgumentException
      */
-    public function generateSet(): array
+    public function generateSet(?int $count = null): array
     {
+        $effectiveCount = $count ?? $this->codeCount;
+
+        if ($effectiveCount < 1) {
+            throw new \InvalidArgumentException(sprintf('Backup-code count must be at least 1; got [%d].', $effectiveCount));
+        }
+
         $codes = [];
 
-        for ($i = 0; $i < $this->codeCount; $i++) {
+        for ($i = 0; $i < $effectiveCount; $i++) {
             $codes[] = $this->generatePlaintextCode();
         }
 

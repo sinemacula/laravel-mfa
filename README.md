@@ -205,6 +205,33 @@ $factor->secret = $secret;
 Mfa::enrol($factor);
 ```
 
+#### Backup codes
+
+Backup codes are the package's first-party recovery factor. `Mfa::issueBackupCodes($count = null)` mints a
+fresh batch for the current identity, atomically replaces any prior batch (so there is no overlap window
+where both old and new codes would verify), persists each code as its own `Factor` row with the SHA-256
+hash on `secret`, dispatches one `MfaFactorEnrolled` event per code, and returns the plaintext set
+**exactly once** for downstream display / download:
+
+```php
+use SineMacula\Laravel\Mfa\Facades\Mfa;
+
+// In your settings controller, after the user re-authenticates:
+$plaintextCodes = Mfa::issueBackupCodes();
+
+// Render `$plaintextCodes` to the user — this is the only chance.
+// Subsequent reads return the hashed `secret` column (not recoverable).
+return view('mfa.backup-codes', ['codes' => $plaintextCodes]);
+```
+
+Pass an explicit `$count` argument to override the configured default batch size for that single call:
+
+```php
+$twentyCodes = Mfa::issueBackupCodes(20);
+```
+
+The configured default batch size is set via `MFA_BACKUP_CODE_COUNT` (default `10`).
+
 #### Disabling a factor
 
 ```php
