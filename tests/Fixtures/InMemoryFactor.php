@@ -27,7 +27,10 @@ final class InMemoryFactor implements Factor
 {
     /**
      * Build an in-memory factor double with the provided immutable
-     * state.
+     * state. The optional `$authenticatable` argument lets the fixture
+     * report ownership to the manager's cross-account guard — leaving
+     * it null mirrors the pre-guard "owner unknown" shape and trips the
+     * `FactorOwnershipMismatchException` path.
      *
      * @param  string  $driver
      * @param  ?string  $secret
@@ -39,6 +42,7 @@ final class InMemoryFactor implements Factor
      * @param  ?string  $recipient
      * @param  ?string  $label
      * @param  mixed  $identifier
+     * @param  ?\Illuminate\Contracts\Auth\Authenticatable  $authenticatable
      * @return void
      */
     public function __construct(
@@ -52,6 +56,7 @@ final class InMemoryFactor implements Factor
         private readonly ?string $recipient = null,
         private readonly ?string $label = null,
         private readonly mixed $identifier = 'factor-id',
+        private readonly ?Authenticatable $authenticatable = null,
     ) {}
 
     /**
@@ -95,14 +100,14 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Always returns `null` because this fixture is not bound to a
-     * real authenticatable.
+     * Return the authenticatable bound at construction time, or `null`
+     * when the fixture was built without an owner.
      *
      * @return ?\Illuminate\Contracts\Auth\Authenticatable
      */
     public function getAuthenticatable(): ?Authenticatable
     {
-        return null;
+        return $this->authenticatable;
     }
 
     /**

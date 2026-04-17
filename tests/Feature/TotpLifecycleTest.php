@@ -4,10 +4,12 @@ declare(strict_types = 1);
 
 namespace Tests\Feature;
 
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
+use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -131,6 +133,90 @@ final class TotpLifecycleTest extends TestCase
             MfaVerificationFailed::class,
             static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::FactorLocked,
         );
+    }
+
+    /**
+     * `challenge()` must NOT clear an active TOTP lockout — TOTP has
+     * no per-challenge secret to rotate, so wiping the attempt counter
+     * on every "start MFA" call would let any consumer-side resend
+     * endpoint act as a free unlock against the configured
+     * `max_attempts` defence.
+     *
+     * @return void
+     */
+    public function testChallengePreservesTotpLockoutAcrossInvocations(): void
+    {
+        [, $factor] = $this->enrolTotp();
+
+        config()->set('mfa.drivers.totp.max_attempts', 3);
+
+        // Burn through `max_attempts` to force the lockout.
+        Mfa::verify('totp', $factor, self::WRONG_CODE);
+        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
+        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
+
+        $factor->refresh();
+
+        $lockedUntilBefore = $factor->getLockedUntil();
+        self::assertNotNull($lockedUntilBefore);
+        self::assertTrue($factor->isLocked());
+
+        Event::fake([MfaChallengeIssued::class]);
+
+        Mfa::challenge('totp', $factor);
+
+        $factor->refresh();
+
+        // The challenge must complete (TOTP has nothing to issue) but
+        // the lockout state survives intact.
+        self::assertSame(3, $factor->getAttempts());
+
+        $lockedUntilAfter = $factor->getLockedUntil();
+        self::assertNotNull($lockedUntilAfter);
+        self::assertTrue($factor->isLocked());
+        self::assertSame(
+            $lockedUntilBefore->getTimestamp(),
+            $lockedUntilAfter->getTimestamp(),
+        );
+
+        Event::assertDispatched(MfaChallengeIssued::class);
+    }
+
+    /**
+     * Backup-code factors share the no-rotation property: their secret
+     * is pre-issued at enrolment, so `challenge()` must also preserve
+     * any active lockout. This catches the same bypass shape against
+     * the recovery factor.
+     *
+     * @return void
+     */
+    public function testChallengePreservesBackupCodeLockoutAcrossInvocations(): void
+    {
+        $user = TestUser::create([
+            'email'       => 'backup-lockout@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        $this->actingAs($user);
+
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
+        $factor = Factor::create([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+            'driver'               => 'backup_code',
+            'secret'               => hash('sha256', 'PLAIN12345'),
+            'attempts'             => 5,
+            'locked_until'         => Carbon::now()->addMinutes(15),
+        ]);
+
+        self::assertTrue($factor->isLocked());
+
+        Mfa::challenge('backup_code', $factor);
+
+        $factor->refresh();
+
+        self::assertSame(5, $factor->getAttempts());
+        self::assertTrue($factor->isLocked());
     }
 
     /**

@@ -40,12 +40,15 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
     }
 
     /**
-     * Issuing a challenge against an Eloquent-backed factor should
-     * zero the attempt counter and dispatch the challenge event.
+     * The manager should hand the Eloquent factor through to the driver
+     * unchanged — the per-driver attempt-state policy lives in
+     * `FactorDriver::issueChallenge()` (OTP drivers reset alongside
+     * minting a fresh code; TOTP and backup-code drivers preserve the
+     * lockout because they cannot rotate any secret of their own).
      *
      * @return void
      */
-    public function testChallengeResetsAttemptsAndPersistsEloquentFactor(): void
+    public function testChallengeDispatchesToDriverAndPersistsEloquentFactor(): void
     {
         $user = TestUser::query()->create(['email' => 'c1@example.com']);
 
@@ -72,7 +75,9 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
 
         $factor->refresh();
 
-        self::assertSame(0, $factor->getAttempts());
+        // The mock driver is a no-op; the manager must NOT have wiped
+        // the attempt counter on its own behalf.
+        self::assertSame(4, $factor->getAttempts());
 
         Event::assertDispatched(
             MfaChallengeIssued::class,
@@ -94,7 +99,7 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        $factor = new InMemoryFactor(driver: 'totp');
+        $factor = new InMemoryFactor(driver: 'totp', authenticatable: $user);
 
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldReceive('issueChallenge')
@@ -111,18 +116,19 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
     }
 
     /**
-     * Without a resolved identity the manager should still call the
-     * driver but skip dispatching any event on the bus.
+     * Without a resolved identity the manager must short-circuit
+     * before any driver work — issuing a challenge for "no one" is
+     * meaningless and a stray dispatch would leak side effects to a
+     * factor whose ownership cannot be checked.
      *
      * @return void
      */
-    public function testChallengeIsNoopDispatchWhenNoIdentity(): void
+    public function testChallengeIsNoopWhenNoIdentity(): void
     {
         $factor = new InMemoryFactor(driver: 'totp');
 
         $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldReceive('issueChallenge')
-            ->once();
+        $driver->shouldNotReceive('issueChallenge');
 
         $this->stubDriver('totp', $driver);
 

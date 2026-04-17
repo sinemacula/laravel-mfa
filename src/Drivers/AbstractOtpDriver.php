@@ -82,6 +82,16 @@ abstract class AbstractOtpDriver implements FactorDriver
         $this->dispatch($factor, $code);
 
         $factor->issueCode($code, $expiresAt);
+
+        // Pair the attempt-state reset with a freshly minted code: the
+        // OTP family rotates its secret on every challenge, so clearing
+        // a prior lockout cannot be used as a free unlock — the attacker
+        // has to receive the new code through the configured transport
+        // before they can verify against it. Drivers that do NOT rotate
+        // a secret per challenge (TOTP, backup codes) deliberately
+        // preserve their lockout state across `challenge()` calls.
+        $factor->resetAttempts();
+
         $factor->persist();
     }
 

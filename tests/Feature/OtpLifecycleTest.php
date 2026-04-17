@@ -160,6 +160,42 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
+     * The OTP driver path must reset the attempt counter when it
+     * issues a fresh code — paired with a transport hop the user has
+     * to receive, so an attacker cannot use it as a free unlock the
+     * way an unconditional manager-side reset would have allowed.
+     *
+     * @return void
+     */
+    public function testEmailChallengeResetsAttemptsAlongsideFreshCode(): void
+    {
+        Mail::fake();
+
+        [, $factor] = $this->enrolEmail();
+
+        // Stage a previously-locked-out factor: max attempts burned and
+        // a future lockout still active.
+        $factor->forceFill([
+            'attempts'     => 3,
+            'locked_until' => now()->addMinutes(15),
+        ])->save();
+
+        self::assertTrue($factor->isLocked());
+
+        Mfa::challenge('email', $factor);
+
+        $factor->refresh();
+
+        // OTP rotation closes the bypass risk: a brand-new code lands
+        // in the user's inbox alongside the cleared lockout, so an
+        // attacker without inbox access cannot exploit the reset.
+        self::assertSame(0, $factor->getAttempts());
+        self::assertNull($factor->getLockedUntil());
+        self::assertFalse($factor->isLocked());
+        self::assertNotNull($factor->getCode());
+    }
+
+    /**
      * Enrol a fresh test user with an email factor and authenticate
      * as them.
      *

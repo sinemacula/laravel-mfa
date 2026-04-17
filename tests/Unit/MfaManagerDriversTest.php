@@ -212,13 +212,18 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $manager = $this->manager();
         $manager->extend('not-a-driver', fn (): \stdClass => new \stdClass);
 
-        $factor = new \SineMacula\Laravel\Mfa\Models\Factor;
-
         $user = \Tests\Fixtures\TestUser::query()->create([
             'email'       => 'extend@example.test',
             'mfa_enabled' => true,
         ]);
         $this->actingAs($user);
+
+        // Stamp ownership onto the factor so the bad-driver guard
+        // fires ahead of the ownership guard — the test's subject is
+        // the LogicException, not a cross-account rejection.
+        $factor                       = new \SineMacula\Laravel\Mfa\Models\Factor;
+        $factor->authenticatable_type = $user::class;
+        $factor->authenticatable_id   = (string) $user->id;
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Driver [not-a-driver] must implement');

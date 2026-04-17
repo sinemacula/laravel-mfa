@@ -81,6 +81,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
             driver: 'totp',
             secret: 'JBSWY3DPEHPK3PXP',
             lockedUntil: Carbon::now()->addMinutes(5),
+            authenticatable: $user,
         );
 
         $driver = \Mockery::mock(FactorDriver::class);
@@ -398,6 +399,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
             driver: 'totp',
             secret: 'JBSWY3DPEHPK3PXP',
             attempts: 0,
+            authenticatable: $user,
         );
 
         $driver = \Mockery::mock(FactorDriver::class);
@@ -428,7 +430,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        $factor = new InMemoryFactor(driver: 'totp');
+        $factor = new InMemoryFactor(driver: 'totp', authenticatable: $user);
 
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldReceive('verify')->once()->andReturnFalse();
@@ -461,6 +463,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
             driver: 'email',
             code: self::VALID_CODE,
             expiresAt: Carbon::now()->subMinute(),
+            authenticatable: $user,
         );
 
         $driver = \Mockery::mock(FactorDriver::class);
@@ -493,6 +496,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $factor = new InMemoryFactor(
             driver: 'totp',
             secret: 'JBSWY3DPEHPK3PXP',
+            authenticatable: $user,
         );
 
         $driver = \Mockery::mock(FactorDriver::class);
@@ -525,6 +529,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $factor = new InMemoryFactor(
             driver: 'email',
             code: self::VALID_CODE,
+            authenticatable: $user,
         );
 
         $driver = \Mockery::mock(FactorDriver::class);
@@ -559,6 +564,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
             driver: 'email',
             code: self::VALID_CODE,
             expiresAt: Carbon::now()->addMinutes(5),
+            authenticatable: $user,
         );
 
         $driver = \Mockery::mock(FactorDriver::class);

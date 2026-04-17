@@ -153,21 +153,27 @@ Mfa::getFactors();      // Collection|null - the user's registered factors
 
 ### Verifying a code
 
-Resolve a driver through the manager and verify:
+Resolve a driver through the manager and verify directly (most consumers prefer `Mfa::verify(...)` which adds
+ownership enforcement, lockout handling, attempt counting, and lifecycle events around the same call):
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 
 $driver = Mfa::driver('totp');
-$valid  = $driver->verify($code, $factor);
+$valid  = $driver->verify($factor, $code);
 ```
 
 ### Enrolment and disable
 
-`Mfa::enrol($factor)` persists a freshly-built factor against the current identity, invalidates the manager's
-setup-state cache, and dispatches `MfaFactorEnrolled`. `Mfa::disable($factor)` deletes the underlying row,
-invalidates the cache, and dispatches `MfaFactorDisabled`. Both are no-ops when no MFA-capable identity is
-authenticated, so they are safe to call unconditionally during a sign-up or settings flow.
+`Mfa::enrol($factor)` stamps the current identity onto the factor's polymorphic columns, persists it,
+invalidates the manager's setup-state cache, and dispatches `MfaFactorEnrolled`. `Mfa::disable($factor)`
+checks ownership, deletes the underlying row, invalidates the cache, and dispatches `MfaFactorDisabled`.
+Both are no-ops when no MFA-capable identity is authenticated, so they are safe to call unconditionally
+during a sign-up or settings flow. Ownership is managed by the package — consumers do **not** populate
+`authenticatable_type` / `authenticatable_id` themselves; any caller-supplied values on the new factor are
+overwritten with the current identity. `verify()`, `challenge()`, and `disable()` throw
+`FactorOwnershipMismatchException` when handed a factor owned by a different identity, closing the
+"look up factor by ID from request input" cross-account-bypass shape.
 
 #### TOTP
 
@@ -189,13 +195,13 @@ $uri    = $driver->provisioningUri(
 // Render $uri as a QR code with your library of choice. With endroid/qr-code:
 //   $qr = Builder::create()->writer(new PngWriter)->data($uri)->build();
 
-$factor                       = new Factor;
-$factor->driver               = 'totp';
-$factor->label                = 'Authenticator app';
-$factor->secret               = $secret;
-$factor->authenticatable_type = $user::class;
-$factor->authenticatable_id   = $user->getKey();
+$factor         = new Factor;
+$factor->driver = 'totp';
+$factor->label  = 'Authenticator app';
+$factor->secret = $secret;
 
+// `Mfa::enrol()` stamps the current identity's morph columns itself —
+// callers do not (and should not) populate them.
 Mfa::enrol($factor);
 ```
 

@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa;
 use Carbon\Carbon;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Manager;
@@ -22,6 +23,7 @@ use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
+use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 
 /**
  * MFA manager.
@@ -115,12 +117,14 @@ class MfaManager extends Manager
             return false;
         }
 
+        $cacheKey = $this->getCachePrefix($identity) . self::CACHE_KEY_SETUP;
+
+        if (!array_key_exists($cacheKey, $this->cache)) {
+            $this->cache[$cacheKey] = $identity->isMfaEnabled();
+        }
+
         /** @var bool */
-        return $this->cached(
-            self::CACHE_KEY_SETUP,
-            $identity,
-            static fn (): bool => $identity->isMfaEnabled(),
-        );
+        return $this->cache[$cacheKey];
     }
 
     /**
@@ -271,11 +275,14 @@ class MfaManager extends Manager
             return null;
         }
 
-        return $this->cached(
-            self::CACHE_KEY_FACTORS,
-            $identity,
-            static fn (): Collection => $identity->authFactors()->get()->toBase(),
-        );
+        $cacheKey = $this->getCachePrefix($identity) . self::CACHE_KEY_FACTORS;
+
+        if (!array_key_exists($cacheKey, $this->cache)) {
+            $this->cache[$cacheKey] = $identity->authFactors()->get()->toBase();
+        }
+
+        /** @var \Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> */
+        return $this->cache[$cacheKey];
     }
 
     /**
@@ -286,29 +293,34 @@ class MfaManager extends Manager
      * SMS) the challenge is sent; for implicit drivers (TOTP) this is a
      * signal that a verification window is now active.
      *
+     * Throws `FactorOwnershipMismatchException` when the supplied factor
+     * does not belong to the current identity, closing the cross-account
+     * factor-tampering primitive.
+     *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
      */
     public function challenge(string $driver, Factor $factor): void
     {
-        // A fresh challenge invalidates any prior failed-attempt state so
-        // a user who locked themselves out on a stale code can recover by
-        // requesting a new one.
-        if ($factor instanceof EloquentFactor) {
-            $factor->resetAttempts();
-        }
-
-        $this->resolveDriver($driver)->issueChallenge($factor);
-
-        if ($factor instanceof EloquentFactor) {
-            $factor->persist();
-        }
-
         $identity = $this->resolveIdentity();
 
         if ($identity === null) {
             return;
+        }
+
+        $this->assertFactorOwnership($factor, $identity);
+
+        // OTP-issuing drivers (email, SMS) reset the attempt counter from
+        // inside `issueChallenge()` once the new code has been minted —
+        // the reset is paired with a fresh secret and so cannot be used
+        // to wipe a lockout without rotating credentials. TOTP and backup
+        // codes have no per-challenge secret, so the manager preserves
+        // their lockout state across challenge calls.
+        $this->resolveDriver($driver)->issueChallenge($factor);
+
+        if ($factor instanceof EloquentFactor) {
+            $factor->persist();
         }
 
         $events = $this->container->make(Dispatcher::class);
@@ -332,6 +344,10 @@ class MfaManager extends Manager
      *   configured per-driver threshold is reached, dispatches
      *   `MfaVerificationFailed` with a machine-readable reason.
      *
+     * Throws `FactorOwnershipMismatchException` when the supplied factor
+     * does not belong to the current identity, closing the cross-account
+     * MFA-bypass primitive.
+     *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
@@ -349,6 +365,8 @@ class MfaManager extends Manager
             return false;
         }
 
+        $this->assertFactorOwnership($factor, $identity);
+
         $events = $this->container->make(Dispatcher::class);
 
         if ($factor->isLocked()) {
@@ -364,8 +382,27 @@ class MfaManager extends Manager
 
         $valid = $this->resolveDriver($driver)->verify($factor, $code);
 
-        if ($factor instanceof EloquentFactor) {
-            $this->applyVerificationOutcome($factor, $driver, $valid);
+        // Persist the post-driver outcome on the factor row. Successful
+        // verification stamps verified-at, resets attempts, and clears
+        // any pending OTP code; failure increments the attempt counter
+        // and applies a per-driver lockout once the configured threshold
+        // is crossed. Non-Eloquent factors carry no row to mutate, so
+        // they skip both branches and the manager only emits the event.
+        if ($valid && $factor instanceof EloquentFactor) {
+            $factor->recordVerification();
+            $factor->persist();
+        } elseif ($factor instanceof EloquentFactor) {
+            $factor->recordAttempt();
+
+            $maxAttempts = $this->resolveIntConfig("mfa.drivers.{$driver}.max_attempts", 0);
+
+            if ($maxAttempts > 0 && $factor->getAttempts() >= $maxAttempts) {
+                $factor->applyLockout(
+                    Carbon::now()->addMinutes($this->resolveIntConfig('mfa.lockout_minutes', 15)),
+                );
+            }
+
+            $factor->persist();
         }
 
         $this->finaliseVerification($identity, $factor, $driver, $valid, $events);
@@ -378,11 +415,20 @@ class MfaManager extends Manager
      *
      * The consumer constructs the factor (TOTP secret already generated,
      * email recipient already set, backup-code hash already populated,
-     * etc.); this method persists it (via the `EloquentFactor::persist()`
-     * seam), invalidates the identity's setup-state cache so the next
+     * etc.); this method stamps the factor's ownership onto the current
+     * identity, persists it (via the `EloquentFactor::persist()` seam),
+     * invalidates the identity's setup-state cache so the next
      * `isSetup()` call sees the new factor, and dispatches
      * `MfaFactorEnrolled` for downstream subscribers (audit log, ops
      * notifications, access-policy recalculation).
+     *
+     * Ownership is stamped, never trusted: any caller-supplied morph
+     * columns on an Eloquent factor are overwritten with the current
+     * identity's class and identifier, so a consumer cannot enrol a
+     * factor against a different account by passing pre-populated
+     * relation columns. Non-Eloquent factor implementations must
+     * already report the current identity through `getAuthenticatable()`;
+     * mismatches throw `FactorOwnershipMismatchException`.
      *
      * No-op when no MFA-capable identity is resolvable from the guard —
      * matches the established `markVerified()` / `forgetVerification()`
@@ -400,8 +446,23 @@ class MfaManager extends Manager
             return;
         }
 
-        if ($factor instanceof EloquentFactor) {
+        if ($factor instanceof EloquentFactor && $factor instanceof Model) {
+            // Stamp ownership rather than asserting it: a consumer cannot
+            // enrol a factor against a different account by pre-populating
+            // the morph columns. Reading the column names off the relation
+            // builder so consumer subclasses that customise the relation
+            // name still work.
+            $relation = $factor->authenticatable();
+
+            $factor->setAttribute(
+                $relation->getMorphType(),
+                $identity instanceof Model ? $identity->getMorphClass() : $identity::class,
+            );
+            $factor->setAttribute($relation->getForeignKeyName(), $identity->getAuthIdentifier());
+
             $factor->persist();
+        } else {
+            $this->assertFactorOwnership($factor, $identity);
         }
 
         $this->clearCache($identity);
@@ -420,6 +481,10 @@ class MfaManager extends Manager
      * `Factor` implementations are left to the consumer to discard;
      * the event still fires so observers can react.
      *
+     * Throws `FactorOwnershipMismatchException` when the supplied factor
+     * does not belong to the current identity, preventing a caller from
+     * deleting another account's factor by passing its identifier.
+     *
      * No-op when no MFA-capable identity is resolvable, mirroring
      * `enrol()`'s shape.
      *
@@ -434,7 +499,9 @@ class MfaManager extends Manager
             return;
         }
 
-        if ($factor instanceof \Illuminate\Database\Eloquent\Model) {
+        $this->assertFactorOwnership($factor, $identity);
+
+        if ($factor instanceof Model) {
             $factor->delete();
         }
 
@@ -530,36 +597,67 @@ class MfaManager extends Manager
     }
 
     /**
-     * Apply the verification outcome to a persistable factor and save.
+     * Verify that the given factor belongs to the supplied identity.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
-     * @param  string  $driver
-     * @param  bool  $valid
+     * Eloquent factors are matched by morph columns read directly off
+     * the model attributes (no query triggered). Non-Eloquent factors
+     * are matched by the `getAuthenticatable()` accessor — which the
+     * contract guarantees does not lazy-load — comparing FQCN and
+     * identifier. Either path throws `FactorOwnershipMismatchException`
+     * on mismatch (or on a non-Eloquent factor whose owner is unknown).
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      */
-    private function applyVerificationOutcome(
-        EloquentFactor $factor,
-        string $driver,
-        bool $valid,
+    private function assertFactorOwnership(
+        Factor $factor,
+        MultiFactorAuthenticatable $identity,
     ): void {
-        if ($valid) {
-            $factor->recordVerification();
-            $factor->persist();
+        // Eloquent identities surface their morph class through
+        // `getMorphClass()` so consumers' `morphMap` configuration is
+        // honoured; non-Eloquent identities fall back to the FQCN.
+        $expectedType = $identity instanceof Model
+            ? $identity->getMorphClass()
+            : $identity::class;
 
-            return;
+        $expectedId = $identity->getAuthIdentifier();
+
+        if ($factor instanceof EloquentFactor && $factor instanceof Model) {
+            $relation   = $factor->authenticatable();
+            $factorType = $factor->getAttribute($relation->getMorphType());
+            $factorId   = $factor->getAttribute($relation->getForeignKeyName());
+            $matches    = $factorType === $expectedType && $this->sameIdentifier($factorId, $expectedId);
+        } else {
+            $owner   = $factor->getAuthenticatable();
+            $matches = $owner !== null
+                && $owner::class === $identity::class
+                && $this->sameIdentifier($owner->getAuthIdentifier(), $expectedId);
         }
 
-        $factor->recordAttempt();
+        if (!$matches) {
+            throw FactorOwnershipMismatchException::for($factor, $identity);
+        }
+    }
 
-        $maxAttempts = $this->resolveIntConfig("mfa.drivers.{$driver}.max_attempts", 0);
-
-        if ($maxAttempts > 0 && $factor->getAttempts() >= $maxAttempts) {
-            $factor->applyLockout(
-                Carbon::now()->addMinutes($this->resolveIntConfig('mfa.lockout_minutes', 15)),
-            );
+    /**
+     * Compare two auth identifiers under the package's safe-cast rule:
+     * both sides must be string|int, and their string representation
+     * must match. Anything non-scalar collapses to `false` so the
+     * ownership check fails closed rather than treating an unsupported
+     * identifier shape as equal.
+     *
+     * @param  mixed  $left
+     * @param  mixed  $right
+     * @return bool
+     */
+    private function sameIdentifier(mixed $left, mixed $right): bool
+    {
+        if ((!is_string($left) && !is_int($left)) || (!is_string($right) && !is_int($right))) {
+            return false;
         }
 
-        $factor->persist();
+        return (string) $left === (string) $right;
     }
 
     /**
@@ -597,30 +695,6 @@ class MfaManager extends Manager
         return is_numeric($value)
             ? (int) $value
             : ($malformedFallback ?? $default);
-    }
-
-    /**
-     * Retrieve a cached value or compute and store it.
-     *
-     * @template T
-     *
-     * @param  string  $key
-     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
-     * @param  callable(): T  $callback
-     * @return T
-     */
-    private function cached(
-        string $key,
-        Authenticatable $identity,
-        callable $callback,
-    ): mixed {
-        $cacheKey = $this->getCachePrefix($identity) . $key;
-
-        if (!array_key_exists($cacheKey, $this->cache)) {
-            $this->cache[$cacheKey] = $callback();
-        }
-
-        return $this->cache[$cacheKey];
     }
 
     /**
