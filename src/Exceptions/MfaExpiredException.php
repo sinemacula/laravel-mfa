@@ -33,6 +33,7 @@ final class MfaExpiredException extends HttpException
         /** Factor summaries available to the current identity. */
         private readonly array $factors = [],
 
+        // Human-readable message surfaced to consumer UIs / logs.
         string $message = 'Multi-factor authentication has expired.',
 
     ) {

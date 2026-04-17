@@ -158,11 +158,7 @@ interface EloquentFactor extends Factor
      * @param  \Carbon\CarbonInterface  $expiresAt
      * @return void
      */
-    public function issueCode(
-        #[\SensitiveParameter]
-        string $code,
-        CarbonInterface $expiresAt,
-    ): void;
+    public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void;
 
     /**
      * Clear the pending one-time code and its expiry. Called on successful

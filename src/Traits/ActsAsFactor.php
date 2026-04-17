@@ -388,11 +388,8 @@ trait ActsAsFactor
      * @param  \Carbon\CarbonInterface  $expiresAt
      * @return void
      */
-    public function issueCode(
-        #[\SensitiveParameter]
-        string $code,
-        CarbonInterface $expiresAt,
-    ): void {
+    public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void
+    {
         $this->setAttribute($this->getCodeName(), $code);
         $this->setAttribute($this->getExpiresAtName(), $expiresAt);
     }

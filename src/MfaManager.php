@@ -412,12 +412,8 @@ class MfaManager extends Manager
      * @param  string  $code
      * @return bool
      */
-    public function verify(
-        string $driver,
-        Factor $factor,
-        #[\SensitiveParameter]
-        string $code,
-    ): bool {
+    public function verify(string $driver, Factor $factor, #[\SensitiveParameter] string $code): bool
+    {
         $identity = $this->resolveIdentity();
 
         if ($identity === null) {

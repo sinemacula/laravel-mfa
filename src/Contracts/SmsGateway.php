@@ -30,9 +30,5 @@ interface SmsGateway
      * @param  string  $message
      * @return void
      */
-    public function send(
-        string $to,
-        #[\SensitiveParameter]
-        string $message,
-    ): void;
+    public function send(string $to, #[\SensitiveParameter] string $message): void;
 }

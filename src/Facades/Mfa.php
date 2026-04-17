@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Facade;
  * applications do not need to resolve the manager out of the container on
  * every call site.
  *
+ * @formatter:off
+ *
  * @method static \SineMacula\Laravel\Mfa\Contracts\FactorDriver driver(?string $driver = null)
  * @method static string getDefaultDriver()
  * @method static class-string<\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> factorModel()
@@ -31,6 +33,8 @@ use Illuminate\Support\Facades\Facade;
  * @method static void enrol(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
  * @method static void disable(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
  * @method static list<string> issueBackupCodes(?int $count = null)
+ *
+ * @formatter:on
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
