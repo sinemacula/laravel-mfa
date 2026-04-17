@@ -18,9 +18,8 @@ use Tests\TestCase;
  * Unit tests for `EmailDriver`.
  *
  * Exercises the Laravel mailer dispatch path (via `Mail::fake()`), the
- * missing-recipient guard, the Mailable class override, and the
- * end-to-end challenge-issuance happy path persisting a real
- * `Factor` row.
+ * missing-recipient guard, the Mailable class override, and the end-to-end
+ * challenge-issuance happy path persisting a real `Factor` row.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -31,8 +30,8 @@ final class EmailDriverTest extends TestCase
 {
     /**
      * `dispatch()` must reject a null recipient with a clear
-     * `MissingRecipientException` rather than silently dropping the
-     * outbound mail.
+     * `MissingRecipientException` rather than silently dropping the outbound
+     * mail.
      *
      * @return void
      */
@@ -50,8 +49,8 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * `dispatch()` must reject an empty-string recipient identically
-     * to a null one.
+     * `dispatch()` must reject an empty-string recipient identically to a null
+     * one.
      *
      * @return void
      */
@@ -68,9 +67,9 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * Issuing a challenge with a configured recipient should send the
-     * default `MfaCodeMessage` Mailable to that address with a fresh
-     * 6-digit numeric code and the configured 10-minute expiry.
+     * Issuing a challenge with a configured recipient should send the default
+     * `MfaCodeMessage` Mailable to that address with a fresh 6-digit numeric
+     * code and the configured 10-minute expiry.
      *
      * @return void
      */
@@ -92,8 +91,8 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * The driver must honour a constructor-supplied custom Mailable
-     * class so consumers can ship branded message templates.
+     * The driver must honour a constructor-supplied custom Mailable class so
+     * consumers can ship branded message templates.
      *
      * @return void
      */
@@ -113,8 +112,7 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * `getMailable()` must return the constructor-supplied class
-     * verbatim.
+     * `getMailable()` must return the constructor-supplied class verbatim.
      *
      * @return void
      */
@@ -126,8 +124,8 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * Without an explicit constructor argument `getMailable()` must
-     * fall back to the shipped `MfaCodeMessage` default.
+     * Without an explicit constructor argument `getMailable()` must fall back
+     * to the shipped `MfaCodeMessage` default.
      *
      * @return void
      */
@@ -139,8 +137,8 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * After issuing a challenge the underlying factor row must carry
-     * a freshly issued numeric code with a future expiry.
+     * After issuing a challenge the underlying factor row must carry a freshly
+     * issued numeric code with a future expiry.
      *
      * @return void
      */
@@ -164,8 +162,8 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * A configured alphabet (e.g. hex) must be honoured by the issued
-     * code so consumers can override the default zero-padded numeric.
+     * A configured alphabet (e.g. hex) must be honoured by the issued code so
+     * consumers can override the default zero-padded numeric.
      *
      * @return void
      */
@@ -192,8 +190,8 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * Build an `EmailDriver` with the container's mailer and an
-     * optional Mailable override.
+     * Build an `EmailDriver` with the container's mailer and an optional
+     * Mailable override.
      *
      * @param  class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>  $mailable
      * @return \SineMacula\Laravel\Mfa\Drivers\EmailDriver
@@ -209,8 +207,8 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * Persist and return a fresh email factor owned by a freshly
-     * inserted test user.
+     * Persist and return a fresh email factor owned by a freshly inserted test
+     * user.
      *
      * @param  ?string  $recipient
      * @return \SineMacula\Laravel\Mfa\Models\Factor

@@ -48,8 +48,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
     }
 
     /**
-     * Without a resolved identity `verify()` should short-circuit to
-     * false and never invoke the driver.
+     * Without a resolved identity `verify()` should short-circuit to false and
+     * never invoke the driver.
      *
      * @return void
      */
@@ -92,14 +92,14 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::FactorLocked
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::FACTOR_LOCKED
                 && $event->driver                                            === 'totp',
         );
     }
 
     /**
-     * A failed verify against an Eloquent factor should increment the
-     * attempt counter and dispatch the failure event.
+     * A failed verify against an Eloquent factor should increment the attempt
+     * counter and dispatch the failure event.
      *
      * @return void
      */
@@ -132,13 +132,13 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CodeInvalid,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_INVALID,
         );
     }
 
     /**
-     * Crossing the configured `max_attempts` threshold must record a
-     * lockout expiry on the factor.
+     * Crossing the configured `max_attempts` threshold must record a lockout
+     * expiry on the factor.
      *
      * @return void
      */
@@ -179,8 +179,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
     }
 
     /**
-     * Configuring `max_attempts` to zero should disable lockout
-     * entirely, no matter how many failed attempts have accrued.
+     * Configuring `max_attempts` to zero should disable lockout entirely, no
+     * matter how many failed attempts have accrued.
      *
      * @return void
      */
@@ -213,8 +213,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
     }
 
     /**
-     * A non-int `mfa.lockout_minutes` config value should fall back
-     * to the manager's safe default rather than break lockout.
+     * A non-int `mfa.lockout_minutes` config value should fall back to the
+     * manager's safe default rather than break lockout.
      *
      * @return void
      */
@@ -250,8 +250,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
     }
 
     /**
-     * A non-int `max_attempts` config value should be coerced to zero
-     * — i.e. lockout disabled.
+     * A non-int `max_attempts` config value should be coerced to zero — i.e.
+     * lockout disabled.
      *
      * @return void
      */
@@ -284,9 +284,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
     }
 
     /**
-     * Failure handling on a non-Eloquent factor must skip every
-     * persistence side-effect while still dispatching the failure
-     * event.
+     * Failure handling on a non-Eloquent factor must skip every persistence
+     * side-effect while still dispatching the failure event.
      *
      * @return void
      */
@@ -332,8 +331,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
     }
 
     /**
-     * Build a no-op driver stub whose `verify` method is never expected to
-     * run (used when the pipeline short-circuits before driver dispatch).
+     * Build a no-op driver stub whose `verify` method is never expected to run
+     * (used when the pipeline short-circuits before driver dispatch).
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
      */

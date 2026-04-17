@@ -8,8 +8,8 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use Tests\TestCase;
 
 /**
- * Sanity check that the testbench bootstrap wires the package
- * service provider and exposes the MFA manager on the container.
+ * Sanity check that the testbench bootstrap wires the package service provider
+ * and exposes the MFA manager on the container.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -19,8 +19,8 @@ use Tests\TestCase;
 final class SanityTest extends TestCase
 {
     /**
-     * The MFA manager should resolve from the container under the
-     * `'mfa'` alias registered by the service provider.
+     * The MFA manager should resolve from the container under the `'mfa'` alias
+     * registered by the service provider.
      *
      * @return void
      */
@@ -32,8 +32,8 @@ final class SanityTest extends TestCase
     }
 
     /**
-     * The shipped default driver should be `'totp'` when no consumer
-     * override is configured.
+     * The shipped default driver should be `'totp'` when no consumer override
+     * is configured.
      *
      * @return void
      */

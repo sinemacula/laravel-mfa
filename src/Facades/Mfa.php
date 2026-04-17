@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Facade;
  *
  * Static interface to the `MfaManager` singleton. Re-exposes the manager's
  * verification-state, driver, and orchestration surface so consuming
- * applications do not need to resolve the manager out of the container on
- * every call site.
+ * applications do not need to resolve the manager out of the container on every
+ * call site.
  *
  * @formatter:off
  *

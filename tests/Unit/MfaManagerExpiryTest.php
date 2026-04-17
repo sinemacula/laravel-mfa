@@ -13,12 +13,11 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 /**
  * Unit tests for `MfaManager::hasExpired()`.
  *
- * Split out from the broader state-test family so each subject stays
- * under the project's max-methods-per-class threshold. Covers every
- * branch of the expiry decision: identity presence, prior verification
- * presence, the configured-vs-explicit window, the zero / negative /
- * future-dated edge cases, and the malformed / numeric-string config
- * paths.
+ * Split out from the broader state-test family so each subject stays under the
+ * project's max-methods-per-class threshold. Covers every branch of the expiry
+ * decision: identity presence, prior verification presence, the
+ * configured-vs-explicit window, the zero / negative / future-dated edge cases,
+ * and the malformed / numeric-string config paths.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -40,8 +39,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity with no prior verification record should be treated
-     * as expired so the consumer is forced to verify.
+     * An identity with no prior verification record should be treated as
+     * expired so the consumer is forced to verify.
      *
      * @return void
      */
@@ -60,8 +59,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * Omitting the explicit expiry argument should fall back to the
-     * configured `mfa.default_expiry` value.
+     * Omitting the explicit expiry argument should fall back to the configured
+     * `mfa.default_expiry` value.
      *
      * @return void
      */
@@ -83,8 +82,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * A recent verification with an explicit expiry should be treated
-     * as still valid.
+     * A recent verification with an explicit expiry should be treated as still
+     * valid.
      *
      * @return void
      */
@@ -103,8 +102,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * An explicit expiry of zero minutes should immediately expire any
-     * prior verification.
+     * An explicit expiry of zero minutes should immediately expire any prior
+     * verification.
      *
      * @return void
      */
@@ -142,8 +141,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * A future-dated verification timestamp must be rejected as a
-     * clock-skew defence and treated as expired.
+     * A future-dated verification timestamp must be rejected as a clock-skew
+     * defence and treated as expired.
      *
      * @return void
      */
@@ -164,8 +163,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * Once the elapsed minutes exceed the expiry budget the
-     * verification should expire.
+     * Once the elapsed minutes exceed the expiry budget the verification should
+     * expire.
      *
      * @return void
      */
@@ -184,10 +183,9 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * The expiry comparison is `elapsed > window` (strict greater-than),
-     * so a verification recorded exactly `window` minutes ago is still
-     * valid. Pins the inclusive boundary so a regression to `>=` is
-     * caught.
+     * The expiry comparison is `elapsed > window` (strict greater-than), so a
+     * verification recorded exactly `window` minutes ago is still valid. Pins
+     * the inclusive boundary so a regression to `>=` is caught.
      *
      * @return void
      */
@@ -216,9 +214,9 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * One minute past the window the verification must expire. Pairs
-     * with the boundary test above to pin the strictly-greater-than
-     * semantics from both sides.
+     * One minute past the window the verification must expire. Pairs with the
+     * boundary test above to pin the strictly-greater-than semantics from both
+     * sides.
      *
      * @return void
      */
@@ -244,8 +242,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * A non-numeric `mfa.default_expiry` config value should be
-     * coerced to zero, expiring any prior verification.
+     * A non-numeric `mfa.default_expiry` config value should be coerced to
+     * zero, expiring any prior verification.
      *
      * @return void
      */
@@ -270,8 +268,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * A numeric-string `mfa.default_expiry` config value should be
-     * coerced to an int and respected.
+     * A numeric-string `mfa.default_expiry` config value should be coerced to
+     * an int and respected.
      *
      * @return void
      */

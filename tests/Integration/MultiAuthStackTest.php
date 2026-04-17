@@ -27,8 +27,8 @@ use Tests\TestCase;
  *   3. A custom in-memory guard built on `Illuminate\Contracts\Auth\Guard`
  *      that hands back a fixture identity directly.
  *
- * Each guard authenticates a user, then asks the MFA manager to verify
- * setup state, run a TOTP verification, and report `hasEverVerified()`.
+ * Each guard authenticates a user, then asks the MFA manager to verify setup
+ * state, run a TOTP verification, and report `hasEverVerified()`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -40,8 +40,8 @@ final class MultiAuthStackTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Under the default session guard the manager must read the
-     * acting user identity and surface its persisted factors.
+     * Under the default session guard the manager must read the acting user
+     * identity and surface its persisted factors.
      *
      * @return void
      */
@@ -57,9 +57,8 @@ final class MultiAuthStackTest extends TestCase
     }
 
     /**
-     * Under a token-style guard whose resolver hands back an
-     * Eloquent identity the manager must surface the same setup
-     * state and factor collection.
+     * Under a token-style guard whose resolver hands back an Eloquent identity
+     * the manager must surface the same setup state and factor collection.
      *
      * @return void
      */
@@ -88,9 +87,9 @@ final class MultiAuthStackTest extends TestCase
 
     /**
      * Under a custom guard whose resolver hands back a non-Eloquent
-     * `Authenticatable` the manager must short-circuit cleanly
-     * rather than throw — proving the orchestration layer does not
-     * assume Eloquent throughout.
+     * `Authenticatable` the manager must short-circuit cleanly rather than
+     * throw — proving the orchestration layer does not assume Eloquent
+     * throughout.
      *
      * @return void
      */
@@ -118,13 +117,10 @@ final class MultiAuthStackTest extends TestCase
     }
 
     /**
-     * Sanctum's `auth:sanctum` guard authenticates the request via a
-     * personal access token (Bearer) and falls back to the configured
-     * stateful guard for browser sessions. The MFA package must
-     * resolve the same MultiFactorAuthenticatable identity through
-     * Sanctum's TransientToken guard as it does through SessionGuard
-     * — proving the package depends only on `Auth::user()` returning
-     * a `MultiFactorAuthenticatable`, not on Sanctum-specific wiring.
+     * The MFA package must resolve the same `MultiFactorAuthenticatable`
+     * identity through Sanctum's TransientToken guard as it does through
+     * SessionGuard — proving the package depends only on `Auth::user()`, not
+     * on Sanctum-specific wiring.
      *
      * @return void
      */

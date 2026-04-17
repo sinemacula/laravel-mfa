@@ -13,12 +13,11 @@ use SineMacula\Laravel\Mfa\Traits\ActsAsFactor;
 /**
  * Default shipped Factor Eloquent model.
  *
- * Polymorphic factor record bound to an authenticatable identity
- * via the `authenticatable()` morphTo relation. ULID primary key.
- * Swappable via `config('mfa.factor.model')` / `mfa.factor.table`
- * as the package's default Eloquent adapter. Non-`final` so
- * consumers may subclass; subclasses MUST continue satisfying the
- * `Factor` persistence boundary.
+ * Polymorphic factor record bound to an authenticatable identity via the
+ * `authenticatable()` morphTo relation. ULID primary key. Swappable via
+ * `config('mfa.factor.model')` / `mfa.factor.table` as the package's default
+ * Eloquent adapter. Non-`final` so consumers may subclass; subclasses MUST
+ * continue satisfying the `Factor` persistence boundary.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -81,9 +80,9 @@ class Factor extends Model implements EloquentFactor
     ];
 
     /**
-     * Create a new Factor bound to the package-configured table
-     * name. Reads the table name lazily on each instantiation so
-     * runtime config swaps (tests, tenancy) take effect immediately.
+     * Create a new Factor bound to the package-configured table name. Reads the
+     * table name lazily on each instantiation so runtime config swaps (tests,
+     * tenancy) take effect immediately.
      *
      * @param  array<string, mixed>  $attributes
      */
@@ -106,9 +105,8 @@ class Factor extends Model implements EloquentFactor
     }
 
     /**
-     * Read the configured factor table, falling back to
-     * `'mfa_factors'` when the key is absent or the Config facade is
-     * not yet bootstrapped.
+     * Read the configured factor table, falling back to `'mfa_factors'` when
+     * the key is absent or the Config facade is not yet bootstrapped.
      *
      * @return string
      */

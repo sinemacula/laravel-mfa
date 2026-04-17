@@ -15,9 +15,9 @@ use Tests\TestCase;
 /**
  * Unit tests for `SmsDriver`.
  *
- * Exercises the SMS-gateway dispatch path, the missing-recipient
- * guard, the message-template substitution, and the end-to-end
- * challenge-issuance path against the in-memory `FakeSmsGateway`.
+ * Exercises the SMS-gateway dispatch path, the missing-recipient guard, the
+ * message-template substitution, and the end-to-end challenge-issuance path
+ * against the in-memory `FakeSmsGateway`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -28,8 +28,8 @@ final class SmsDriverTest extends TestCase
 {
     /**
      * `dispatch()` must reject a null recipient with a clear
-     * `MissingRecipientException` rather than silently dropping the
-     * outbound message.
+     * `MissingRecipientException` rather than silently dropping the outbound
+     * message.
      *
      * @return void
      */
@@ -45,8 +45,8 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * `dispatch()` must reject an empty-string recipient identically
-     * to a null one.
+     * `dispatch()` must reject an empty-string recipient identically to a null
+     * one.
      *
      * @return void
      */
@@ -61,8 +61,8 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * The default message template must substitute the issued code
-     * into the `:code` placeholder.
+     * The default message template must substitute the issued code into the
+     * `:code` placeholder.
      *
      * @return void
      */
@@ -88,8 +88,8 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * A constructor-supplied custom message template must be honoured
-     * verbatim with the `:code` placeholder substituted in place.
+     * A constructor-supplied custom message template must be honoured verbatim
+     * with the `:code` placeholder substituted in place.
      *
      * @return void
      */
@@ -115,8 +115,8 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * `getMessageTemplate()` must return the shipped default when no
-     * override is supplied to the constructor.
+     * `getMessageTemplate()` must return the shipped default when no override
+     * is supplied to the constructor.
      *
      * @return void
      */
@@ -131,8 +131,8 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * `getMessageTemplate()` must return the constructor-supplied
-     * custom template verbatim.
+     * `getMessageTemplate()` must return the constructor-supplied custom
+     * template verbatim.
      *
      * @return void
      */
@@ -147,9 +147,9 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * Issuing a challenge against the bound `FakeSmsGateway` must
-     * record the outbound message and persist a fresh code + expiry
-     * on the underlying factor row.
+     * Issuing a challenge against the bound `FakeSmsGateway` must record the
+     * outbound message and persist a fresh code + expiry on the underlying
+     * factor row.
      *
      * @return void
      */
@@ -176,9 +176,9 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * The constructor must reject a message template missing the
-     * `:code` placeholder — without it, the rendered SMS would ship
-     * the literal template string and never the verification code.
+     * The constructor must reject a message template missing the `:code`
+     * placeholder — without it, the rendered SMS would ship the literal
+     * template string and never the verification code.
      *
      * @return void
      */
@@ -200,8 +200,8 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * A configured alphabet (e.g. hex) must be honoured by the issued
-     * code so consumers can override the default zero-padded numeric.
+     * A configured alphabet (e.g. hex) must be honoured by the issued code so
+     * consumers can override the default zero-padded numeric.
      *
      * @return void
      */
@@ -237,8 +237,8 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * Persist and return a fresh SMS factor owned by a freshly
-     * inserted test user.
+     * Persist and return a fresh SMS factor owned by a freshly inserted test
+     * user.
      *
      * @param  ?string  $recipient
      * @return \SineMacula\Laravel\Mfa\Models\Factor

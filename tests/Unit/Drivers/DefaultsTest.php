@@ -17,10 +17,10 @@ use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
 /**
  * Assertions against each driver's constructor default values.
  *
- * Pins the documented defaults so a silent change to any of them
- * trips a mutation-testing signal and a CI diff. The main driver
- * tests exercise behaviour with explicit values; this class locks
- * down the values the drivers pick when the consumer supplies none.
+ * Pins the documented defaults so a silent change to any of them trips a
+ * mutation-testing signal and a CI diff. The main driver tests exercise
+ * behaviour with explicit values; this class locks down the values the drivers
+ * pick when the consumer supplies none.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -32,9 +32,8 @@ final class DefaultsTest extends TestCase
     use MockeryPHPUnitIntegration;
 
     /**
-     * `AbstractOtpDriver`'s constructor defaults — code length 6,
-     * 10-minute expiry, 3 attempts, no custom alphabet — must be
-     * preserved.
+     * `AbstractOtpDriver`'s constructor defaults — code length 6, 10-minute
+     * expiry, 3 attempts, no custom alphabet — must be preserved.
      *
      * @return void
      */
@@ -42,8 +41,8 @@ final class DefaultsTest extends TestCase
     {
         $driver = new class extends AbstractOtpDriver {
             /**
-             * No-op dispatch — the test only asserts the
-             * constructor defaults exposed via the getters.
+             * No-op dispatch — the test only asserts the constructor defaults
+             * exposed via the getters.
              *
              * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
              * @param  string  $code
@@ -65,9 +64,9 @@ final class DefaultsTest extends TestCase
     }
 
     /**
-     * `EmailDriver`'s constructor defaults — code length 6,
-     * 10-minute expiry, 3 attempts, default `MfaCodeMessage`
-     * Mailable, no custom alphabet — must be preserved.
+     * `EmailDriver`'s constructor defaults — code length 6, 10-minute expiry, 3
+     * attempts, default `MfaCodeMessage` Mailable, no custom alphabet — must be
+     * preserved.
      *
      * @return void
      */
@@ -86,9 +85,9 @@ final class DefaultsTest extends TestCase
     }
 
     /**
-     * `SmsDriver`'s constructor defaults — code length 6, 10-minute
-     * expiry, 3 attempts, the shipped message template, no custom
-     * alphabet — must be preserved.
+     * `SmsDriver`'s constructor defaults — code length 6, 10-minute expiry, 3
+     * attempts, the shipped message template, no custom alphabet — must be
+     * preserved.
      *
      * @return void
      */
@@ -107,9 +106,9 @@ final class DefaultsTest extends TestCase
     }
 
     /**
-     * `BackupCodeDriver`'s constructor defaults — 10-character
-     * codes, the shipped Crockford-style alphabet, and a set size of
-     * 10 — must be preserved.
+     * `BackupCodeDriver`'s constructor defaults — 10-character codes, the
+     * shipped Crockford-style alphabet, and a set size of 10 — must be
+     * preserved.
      *
      * @return void
      */
@@ -123,9 +122,9 @@ final class DefaultsTest extends TestCase
     }
 
     /**
-     * The TOTP driver's default window must be 1 — observed via
-     * reflection on the private `window` property since the value is
-     * never exposed via a getter.
+     * The TOTP driver's default window must be 1 — observed via reflection on
+     * the private `window` property since the value is never exposed via a
+     * getter.
      *
      * @return void
      */

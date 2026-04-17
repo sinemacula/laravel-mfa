@@ -17,10 +17,9 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
 /**
  * Unit tests for `MfaManager::verify()` reason mapping.
  *
- * Split out from `MfaManagerVerifyTest` so each cohesive subject —
- * the verify orchestration pipeline vs. the failure-reason
- * classifier — has a dedicated suite under the project's
- * max-methods-per-class threshold.
+ * Split out from `MfaManagerVerifyTest` so each cohesive subject — the verify
+ * orchestration pipeline vs. the failure-reason classifier — has a dedicated
+ * suite under the project's max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -52,8 +51,8 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
     }
 
     /**
-     * `classifyFailure()` must report `SecretMissing` for a TOTP-shape
-     * factor with no stored secret.
+     * `classifyFailure()` must report `SecretMissing` for a TOTP-shape factor
+     * with no stored secret.
      *
      * @return void
      */
@@ -76,13 +75,13 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::SecretMissing,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::SECRET_MISSING,
         );
     }
 
     /**
-     * `classifyFailure()` must report `CodeExpired` when the factor
-     * carries a pending code whose expiry has passed.
+     * `classifyFailure()` must report `CodeExpired` when the factor carries a
+     * pending code whose expiry has passed.
      *
      * @return void
      */
@@ -110,13 +109,13 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CodeExpired,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_EXPIRED,
         );
     }
 
     /**
-     * `classifyFailure()` must report `CodeInvalid` when a TOTP factor
-     * has a stored secret but verification still fails.
+     * `classifyFailure()` must report `CodeInvalid` when a TOTP factor has a
+     * stored secret but verification still fails.
      *
      * @return void
      */
@@ -143,13 +142,13 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CodeInvalid,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_INVALID,
         );
     }
 
     /**
-     * `classifyFailure()` must report `CodeMissing` when the factor
-     * carries a pending code but no expiry timestamp.
+     * `classifyFailure()` must report `CodeMissing` when the factor carries a
+     * pending code but no expiry timestamp.
      *
      * @return void
      */
@@ -176,14 +175,14 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CodeMissing,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_MISSING,
         );
     }
 
     /**
-     * `classifyFailure()` must report `CodeInvalid` when the factor
-     * carries a valid pending code with a future expiry but the
-     * driver still rejects verification.
+     * `classifyFailure()` must report `CodeInvalid` when the factor carries a
+     * valid pending code with a future expiry but the driver still rejects
+     * verification.
      *
      * @return void
      */
@@ -211,7 +210,7 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CodeInvalid,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_INVALID,
         );
     }
 }

@@ -8,14 +8,14 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 
 /**
- * Dispatched after the MFA manager successfully issues a challenge against
- * a factor.
+ * Dispatched after the MFA manager successfully issues a challenge against a
+ * factor.
  *
  * For delivery-based drivers (email, SMS) this fires after the transport
- * handoff completes; for client-generated drivers (TOTP) this fires to
- * signal that a verification window is now active even though no server
- * transport ran. Consumers can subscribe to audit challenge issuance,
- * trigger rate-limiting side effects, or write UI hints.
+ * handoff completes; for client-generated drivers (TOTP) this fires to signal
+ * that a verification window is now active even though no server transport ran.
+ * Consumers can subscribe to audit challenge issuance, trigger rate-limiting
+ * side effects, or write UI hints.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

@@ -9,14 +9,14 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 
 /**
- * Minimal in-memory Factor implementation used by MfaManager tests
- * that need to exercise the non-Eloquent branch of the orchestration
- * pipeline without touching the database.
+ * Minimal in-memory Factor implementation used by MfaManager tests that need to
+ * exercise the non-Eloquent branch of the orchestration pipeline without
+ * touching the database.
  *
- * Satisfies only the read-only `Factor` contract; the manager's
- * verification pipeline explicitly skips state mutation when the
- * factor does not implement `EloquentFactor`, which is exactly the
- * branch this fixture is designed to exercise.
+ * Satisfies only the read-only `Factor` contract; the manager's verification
+ * pipeline explicitly skips state mutation when the factor does not implement
+ * `EloquentFactor`, which is exactly the branch this fixture is designed to
+ * exercise.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -26,11 +26,11 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 final class InMemoryFactor implements Factor
 {
     /**
-     * Build an in-memory factor double with the provided immutable
-     * state. The optional `$authenticatable` argument lets the fixture
-     * report ownership to the manager's cross-account guard — leaving
-     * it null mirrors the pre-guard "owner unknown" shape and trips the
-     * `FactorOwnershipMismatchException` path.
+     * Build an in-memory factor double with the provided immutable state. The
+     * optional `$authenticatable` argument lets the fixture report ownership to
+     * the manager's cross-account guard — leaving it null mirrors the pre-guard
+     * "owner unknown" shape and trips the `FactorOwnershipMismatchException`
+     * path.
      *
      * @param  string  $driver
      * @param  ?string  $secret
@@ -123,8 +123,8 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the authenticatable bound at construction time, or `null`
-     * when the fixture was built without an owner.
+     * Return the authenticatable bound at construction time, or `null` when the
+     * fixture was built without an owner.
      *
      * @return ?\Illuminate\Contracts\Auth\Authenticatable
      */
@@ -184,8 +184,8 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Report whether the factor is currently locked (i.e. has a
-     * future lock expiry).
+     * Report whether the factor is currently locked (i.e. has a future lock
+     * expiry).
      *
      * @return bool
      */
@@ -195,8 +195,7 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Always returns `null`; the fixture does not track attempt
-     * timestamps.
+     * Always returns `null`; the fixture does not track attempt timestamps.
      *
      * @return ?\Carbon\CarbonInterface
      */

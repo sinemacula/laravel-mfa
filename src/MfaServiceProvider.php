@@ -28,13 +28,12 @@ use SineMacula\Laravel\Mfa\Stores\SessionMfaVerificationStore;
  * MFA service provider.
  *
  * Bootstraps the multi-factor authentication services: the MFA manager
- * singleton, the default policy / verification store / SMS gateway
- * bindings, the middleware aliases, and config + migration publishing.
+ * singleton, the default policy / verification store / SMS gateway bindings,
+ * the middleware aliases, and config + migration publishing.
  *
- * Consumers with their own enforcement policy, stateless verification
- * store, or real SMS gateway rebind the matching contracts in their
- * own service provider; `laravel-iam` ships an opinionated set of
- * bindings for paired-mode use.
+ * Consumers with their own enforcement policy, stateless verification store, or
+ * real SMS gateway rebind the matching contracts in their own service provider;
+ * `laravel-iam` ships an opinionated set of bindings for paired-mode use.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -169,11 +168,10 @@ class MfaServiceProvider extends ServiceProvider
     /**
      * Register the MFA manager singleton.
      *
-     * Built-in driver factories (TOTP, email, SMS, backup codes) are
-     * registered against the manager via the standard `extend()` API at
-     * construction time. Consumers can override any of them by calling
-     * `Mfa::extend('totp', ...)` from their own service provider after
-     * the package's provider has booted.
+     * Built-in driver factories (TOTP, email, SMS, backup codes) are registered
+     * against the manager via the standard `extend()` API at construction time.
+     * Consumers can override any of them by calling `Mfa::extend('totp', ...)`
+     * from their own service provider after the package's provider has booted.
      *
      * @return void
      */
@@ -192,9 +190,9 @@ class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the four shipped factor drivers against the given
-     * manager, delegating per-driver wiring to dedicated factories
-     * that each consume only the slice of config they need.
+     * Register the four shipped factor drivers against the given manager,
+     * delegating per-driver wiring to dedicated factories that each consume
+     * only the slice of config they need.
      *
      * @param  \SineMacula\Laravel\Mfa\MfaManager  $manager
      * @param  \Illuminate\Contracts\Foundation\Application  $app
@@ -218,9 +216,9 @@ class MfaServiceProvider extends ServiceProvider
     /**
      * Register the default MFA policy binding.
      *
-     * Consumers who need external enforcement (organisation-level,
-     * role-level, feature-flag-level) rebind the `MfaPolicy` contract
-     * in their own service provider.
+     * Consumers who need external enforcement (organisation-level, role-level,
+     * feature-flag-level) rebind the `MfaPolicy` contract in their own service
+     * provider.
      *
      * @return void
      */
@@ -232,11 +230,10 @@ class MfaServiceProvider extends ServiceProvider
     /**
      * Register the default MFA verification store binding.
      *
-     * Defaults to the session-backed store. Consumers running a
-     * stateless stack (JWT, personal access tokens) rebind the
-     * `MfaVerificationStore` contract in their own service provider;
-     * `laravel-iam` ships a `DeviceMfaVerificationStore` for paired-
-     * mode stateless operation.
+     * Defaults to the session-backed store. Consumers running a stateless stack
+     * (JWT, personal access tokens) rebind the `MfaVerificationStore` contract
+     * in their own service provider; `laravel-iam` ships a
+     * `DeviceMfaVerificationStore` for paired- mode stateless operation.
      *
      * @return void
      */
@@ -253,9 +250,9 @@ class MfaServiceProvider extends ServiceProvider
     /**
      * Register the default SMS gateway binding.
      *
-     * The shipped default fails loud on first use; consumers who enable
-     * the SMS driver rebind the `SmsGateway` contract to an
-     * implementation that talks to their chosen SMS provider.
+     * The shipped default fails loud on first use; consumers who enable the SMS
+     * driver rebind the `SmsGateway` contract to an implementation that talks
+     * to their chosen SMS provider.
      *
      * @return void
      */
@@ -265,9 +262,9 @@ class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the package's middleware under short aliases so
-     * consumers can reference them as `'mfa'` / `'mfa.skip'` in their
-     * route files without importing FQCNs.
+     * Register the package's middleware under short aliases so consumers can
+     * reference them as `'mfa'` / `'mfa.skip'` in their route files without
+     * importing FQCNs.
      *
      * @return void
      */

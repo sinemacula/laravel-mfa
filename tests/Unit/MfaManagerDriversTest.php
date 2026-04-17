@@ -12,8 +12,7 @@ use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\MfaManager;
 
 /**
- * Unit tests for the `MfaManager` driver factories exposed via
- * `driver($name)`.
+ * Unit tests for the `MfaManager` driver factories exposed via `driver($name)`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -23,8 +22,8 @@ use SineMacula\Laravel\Mfa\MfaManager;
 final class MfaManagerDriversTest extends MfaManagerTestCase
 {
     /**
-     * Resolving the TOTP driver should honour the configured
-     * verification window from `config('mfa.drivers.totp.window')`.
+     * Resolving the TOTP driver should honour the configured verification
+     * window from `config('mfa.drivers.totp.window')`.
      *
      * @return void
      */
@@ -47,8 +46,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the TOTP driver with no `window` configured should
-     * fall back to the shipped default of 1 step.
+     * Resolving the TOTP driver with no `window` configured should fall back to
+     * the shipped default of 1 step.
      *
      * @return void
      */
@@ -72,8 +71,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the email driver with an empty config slice should
-     * surface the shipped defaults verbatim.
+     * Resolving the email driver with an empty config slice should surface the
+     * shipped defaults verbatim.
      *
      * @return void
      */
@@ -93,9 +92,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the email driver should apply every override in the
-     * config slice — code length, expiry, attempts, alphabet, and
-     * mailable.
+     * Resolving the email driver should apply every override in the config
+     * slice — code length, expiry, attempts, alphabet, and mailable.
      *
      * @return void
      */
@@ -120,8 +118,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the SMS driver with an empty config slice should
-     * surface the shipped defaults verbatim.
+     * Resolving the SMS driver with an empty config slice should surface the
+     * shipped defaults verbatim.
      *
      * @return void
      */
@@ -142,9 +140,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the SMS driver should apply every override in the
-     * config slice — code length, expiry, attempts, alphabet, and
-     * message template.
+     * Resolving the SMS driver should apply every override in the config slice
+     * — code length, expiry, attempts, alphabet, and message template.
      *
      * @return void
      */
@@ -170,8 +167,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the backup-code driver with an empty config slice
-     * should surface the shipped defaults verbatim.
+     * Resolving the backup-code driver with an empty config slice should
+     * surface the shipped defaults verbatim.
      *
      * @return void
      */
@@ -190,8 +187,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the backup-code driver should apply every override
-     * in the config slice — code length, alphabet, and code count.
+     * Resolving the backup-code driver should apply every override in the
+     * config slice — code length, alphabet, and code count.
      *
      * @return void
      */
@@ -213,10 +210,9 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Verifying through an extension whose factory returns a
-     * non-`FactorDriver` instance should surface a clear
-     * `LogicException` instead of a fatal type error inside the
-     * verification pipeline.
+     * Verifying through an extension whose factory returns a non-`FactorDriver`
+     * instance should surface a clear `LogicException` instead of a fatal type
+     * error inside the verification pipeline.
      *
      * @return void
      */

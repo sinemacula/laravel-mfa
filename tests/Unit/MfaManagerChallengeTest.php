@@ -42,9 +42,9 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
     /**
      * The manager should hand the Eloquent factor through to the driver
      * unchanged — the per-driver attempt-state policy lives in
-     * `FactorDriver::issueChallenge()` (OTP drivers reset alongside
-     * minting a fresh code; TOTP and backup-code drivers preserve the
-     * lockout because they cannot rotate any secret of their own).
+     * `FactorDriver::issueChallenge()` (OTP drivers reset alongside minting a
+     * fresh code; TOTP and backup-code drivers preserve the lockout because
+     * they cannot rotate any secret of their own).
      *
      * @return void
      */
@@ -87,9 +87,8 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
     }
 
     /**
-     * For non-Eloquent factors the manager should still dispatch the
-     * driver's `issueChallenge()` without attempting to persist any
-     * state.
+     * For non-Eloquent factors the manager should still dispatch the driver's
+     * `issueChallenge()` without attempting to persist any state.
      *
      * @return void
      */
@@ -116,10 +115,10 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
     }
 
     /**
-     * Without a resolved identity the manager must short-circuit
-     * before any driver work — issuing a challenge for "no one" is
-     * meaningless and a stray dispatch would leak side effects to a
-     * factor whose ownership cannot be checked.
+     * Without a resolved identity the manager must short-circuit before any
+     * driver work — issuing a challenge for "no one" is meaningless and a stray
+     * dispatch would leak side effects to a factor whose ownership cannot be
+     * checked.
      *
      * @return void
      */

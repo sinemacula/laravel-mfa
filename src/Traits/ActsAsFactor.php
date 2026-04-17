@@ -10,14 +10,13 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
- * Default implementation of the `Factor` contract for Eloquent
- * models.
+ * Default implementation of the `Factor` contract for Eloquent models.
  *
- * Consumers who want to swap the shipped `Factor` model for their
- * own can apply this trait to their custom model and satisfy the
- * contract with zero additional code. Column names are exposed via
- * override hooks (`get*Name()` methods) so implementations can
- * remap columns without overriding the accessors themselves.
+ * Consumers who want to swap the shipped `Factor` model for their own can apply
+ * this trait to their custom model and satisfy the contract with zero
+ * additional code. Column names are exposed via override hooks (`get*Name()`
+ * methods) so implementations can remap columns without overriding the
+ * accessors themselves.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -92,10 +91,10 @@ trait ActsAsFactor
     }
 
     /**
-     * Return the authenticatable the factor belongs to. Returns `null` when
-     * the `authenticatable` relation has not been loaded — this accessor
-     * MUST NOT trigger a lazy query. Callers that need the related record
-     * should eager-load the relation on the query first.
+     * Return the authenticatable the factor belongs to. Returns `null` when the
+     * `authenticatable` relation has not been loaded — this accessor MUST NOT
+     * trigger a lazy query. Callers that need the related record should
+     * eager-load the relation on the query first.
      *
      * @return ?\Illuminate\Contracts\Auth\Authenticatable
      */

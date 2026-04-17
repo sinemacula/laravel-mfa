@@ -11,11 +11,11 @@ use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 /**
  * Dispatched whenever the MFA manager rejects a verification attempt.
  *
- * Carries a machine-readable failure reason so downstream consumers
- * (audit-log sinks, SIEM pipelines, support tooling) can attribute
- * failures without parsing human-readable messages. Fires for every
- * non-success branch of the manager's verification pipeline — invalid
- * codes, expired challenges, locked factors, unresolvable drivers.
+ * Carries a machine-readable failure reason so downstream consumers (audit-log
+ * sinks, SIEM pipelines, support tooling) can attribute failures without
+ * parsing human-readable messages. Fires for every non-success branch of the
+ * manager's verification pipeline — invalid codes, expired challenges, locked
+ * factors, unresolvable drivers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

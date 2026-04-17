@@ -16,10 +16,9 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 /**
  * Unit tests for `MfaManager` lifecycle mutations.
  *
- * Covers `markVerified()`, `forgetVerification()`, `clearCache()`,
- * `enrol()`, and `disable()`. Split out from the broader state-test
- * family so each subject stays under the project's
- * max-methods-per-class threshold.
+ * Covers `markVerified()`, `forgetVerification()`, `clearCache()`, `enrol()`,
+ * and `disable()`. Split out from the broader state-test family so each subject
+ * stays under the project's max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -31,8 +30,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     use InteractsWithMfaManagerState;
 
     /**
-     * Without an identity `markVerified()` must not touch the
-     * verification store.
+     * Without an identity `markVerified()` must not touch the verification
+     * store.
      *
      * @return void
      */
@@ -49,8 +48,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * With an identity `markVerified()` should delegate to the bound
-     * store's `markVerified()` method.
+     * With an identity `markVerified()` should delegate to the bound store's
+     * `markVerified()` method.
      *
      * @return void
      */
@@ -93,8 +92,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * With an identity `forgetVerification()` should delegate to the
-     * bound store's `forget()` method.
+     * With an identity `forgetVerification()` should delegate to the bound
+     * store's `forget()` method.
      *
      * @return void
      */
@@ -119,8 +118,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Calling `clearCache()` without an identity argument should
-     * flush every cached entry across the manager.
+     * Calling `clearCache()` without an identity argument should flush every
+     * cached entry across the manager.
      *
      * @return void
      */
@@ -145,8 +144,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Scoping `clearCache()` to a single identity must leave other
-     * identities' cache entries intact.
+     * Scoping `clearCache()` to a single identity must leave other identities'
+     * cache entries intact.
      *
      * @return void
      */
@@ -177,8 +176,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Without an identity `enrol()` must not persist the factor or
-     * dispatch the lifecycle event.
+     * Without an identity `enrol()` must not persist the factor or dispatch the
+     * lifecycle event.
      *
      * @return void
      */
@@ -253,8 +252,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Without an identity `disable()` must not delete the factor or
-     * dispatch the lifecycle event.
+     * Without an identity `disable()` must not delete the factor or dispatch
+     * the lifecycle event.
      *
      * @return void
      */
@@ -333,8 +332,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Create an MFA-enabled user and authenticate as them, returning
-     * the user for enrol-flow tests.
+     * Create an MFA-enabled user and authenticate as them, returning the user
+     * for enrol-flow tests.
      *
      * @return \Tests\Fixtures\TestUser
      */
@@ -351,8 +350,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Enrol an MFA-enabled user with a TOTP factor and return the
-     * manager, resolved factor, and user triple for disable-flow tests.
+     * Enrol an MFA-enabled user with a TOTP factor and return the manager,
+     * resolved factor, and user triple for disable-flow tests.
      *
      * @return array{0: \SineMacula\Laravel\Mfa\MfaManager, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: \Tests\Fixtures\TestUser}
      */
@@ -373,8 +372,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Build a fresh TOTP `Factor` model that is NOT yet persisted —
-     * the consumer-side shape that `enrol()` is intended to receive.
+     * Build a fresh TOTP `Factor` model that is NOT yet persisted — the
+     * consumer-side shape that `enrol()` is intended to receive.
      *
      * @param  ?\Tests\Fixtures\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -394,8 +393,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Persist a TOTP factor against the supplied identity and return
-     * the row.
+     * Persist a TOTP factor against the supplied identity and return the row.
      *
      * @param  \Tests\Fixtures\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor

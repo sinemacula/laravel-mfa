@@ -14,13 +14,12 @@ use Tests\Fixtures\NonEloquentIdentity;
 /**
  * Coverage for the manager's FQCN-fallback paths.
  *
- * `assertFactorOwnership()`, `getCachePrefix()`, and
- * `issueBackupCodes()` all branch on `$identity instanceof Model` —
- * Eloquent identities use `getMorphClass()`, non-Eloquent identities
- * fall back to a strict FQCN comparison. The shipped test identities
- * (`TestUser`, `SecondaryUser`, `NonScalarIdentifierUser`) are all
- * Eloquent, so a dedicated non-Eloquent fixture is needed to drive
- * the FQCN branches and keep coverage at 100%.
+ * `assertFactorOwnership()`, `getCachePrefix()`, and `issueBackupCodes()` all
+ * branch on `$identity instanceof Model` — Eloquent identities use
+ * `getMorphClass()`, non-Eloquent identities fall back to a strict FQCN
+ * comparison. The shipped test identities (`TestUser`, `SecondaryUser`,
+ * `NonScalarIdentifierUser`) are all Eloquent, so a dedicated non-Eloquent
+ * fixture is needed to drive the FQCN branches and keep coverage at 100%.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -44,11 +43,11 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * `isSetup()` must complete without throwing when invoked against
-     * a non-Eloquent identity — the cache-prefix builder's FQCN
-     * fallback path is exercised on the way in. The behaviour proved
-     * here is "non-Eloquent identities do not break the cached read";
-     * the FQCN composition itself is private to the manager.
+     * `isSetup()` must complete without throwing when invoked against a
+     * non-Eloquent identity — the cache-prefix builder's FQCN fallback path is
+     * exercised on the way in. The behaviour proved here is "non-Eloquent
+     * identities do not break the cached read"; the FQCN composition itself is
+     * private to the manager.
      *
      * @return void
      */
@@ -62,10 +61,9 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * `assertFactorOwnership()` must reject a non-Eloquent factor whose
-     * owner FQCN matches but whose identifier is non-scalar — exercising
-     * the `sameIdentifier()` short-circuit on the non-string-non-int
-     * branch.
+     * `assertFactorOwnership()` must reject a non-Eloquent factor whose owner
+     * FQCN matches but whose identifier is non-scalar — exercising the
+     * `sameIdentifier()` short-circuit on the non-string-non-int branch.
      *
      * @return void
      */
@@ -90,9 +88,9 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * `issueBackupCodes()` must accept a non-Eloquent identity and
-     * persist the new batch with the identity's FQCN as the morph
-     * type — exercising the FQCN fallback inside the rotation flow.
+     * `issueBackupCodes()` must accept a non-Eloquent identity and persist the
+     * new batch with the identity's FQCN as the morph type — exercising the
+     * FQCN fallback inside the rotation flow.
      *
      * @return void
      */
@@ -119,11 +117,10 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * Without an authenticated identity, `challenge()` short-circuits
-     * before any driver lookup — but with an identity present and an
-     * extension that fails the `FactorDriver` contract, the manager
-     * surfaces a clear `LogicException` rather than a fatal type
-     * error inside the dispatch path.
+     * Without an authenticated identity, `challenge()` short-circuits before
+     * any driver lookup — but with an identity present and an extension that
+     * fails the `FactorDriver` contract, the manager surfaces a clear
+     * `LogicException` rather than a fatal type error inside the dispatch path.
      *
      * @return void
      */

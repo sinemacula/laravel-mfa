@@ -10,9 +10,9 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Skip MFA middleware.
  *
- * Marks the current request to bypass MFA checks. This should be
- * applied to routes that handle the MFA verification flow itself,
- * preventing circular enforcement.
+ * Marks the current request to bypass MFA checks. This should be applied to
+ * routes that handle the MFA verification flow itself, preventing circular
+ * enforcement.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

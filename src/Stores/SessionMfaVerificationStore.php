@@ -14,22 +14,18 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 /**
  * Session-backed MFA verification store.
  *
- * The default `MfaVerificationStore` binding. Stores the last
- * verification timestamp keyed by the authenticatable's auth
- * identifier against Laravel's session store. Verification state is
- * naturally scoped to the current session (and therefore the
- * current device) because sessions are per-device by construction.
+ * The default `MfaVerificationStore` binding. Stores the last verification
+ * timestamp keyed by the auth identifier against Laravel's session, naturally
+ * scoping verification state to the current device.
  *
- * Suitable for SessionGuard, Sanctum, and any other stateful auth
- * stack. Stateless stacks (JWT, Sanctum personal access tokens)
- * should bind an alternative store — see the class-level docblock
- * on `MfaVerificationStore`.
+ * Suitable for SessionGuard, Sanctum, and any stateful auth stack. Stateless
+ * stacks (JWT, Sanctum personal access tokens) should bind an alternative
+ * store.
  *
- * Assumes consumers regenerate the session on auth state change —
- * Laravel's default behaviour on login / logout. Apps that disable
- * session regeneration on login should also call
- * `Mfa::forgetVerification()` so a new identity cannot inherit the
- * prior identity's verification timestamp from the reused session.
+ * Assumes consumers regenerate the session on auth state change (Laravel's
+ * default). Apps that disable regeneration on login must also call
+ * `Mfa::forgetVerification()` so a new identity cannot inherit the prior
+ * identity's verification timestamp from the reused session.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -53,8 +49,8 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
 
     /**
      * Record that the given identity has just completed a successful MFA
-     * verification. Stamps the session at the given time, defaulting to
-     * "now" when no explicit timestamp is supplied.
+     * verification. Stamps the session at the given time, defaulting to "now"
+     * when no explicit timestamp is supplied.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @param  ?\Carbon\CarbonInterface  $at
@@ -71,8 +67,8 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
     }
 
     /**
-     * Return the timestamp of the given identity's most recent successful
-     * MFA verification, or `null` when the identity has never been verified.
+     * Return the timestamp of the given identity's most recent successful MFA
+     * verification, or `null` when the identity has never been verified.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return ?\Carbon\CarbonInterface
@@ -111,9 +107,9 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
      *
      * Keys by auth identifier so a session that changes owner (e.g.
      * impersonation, legacy flows that bypass session regeneration) cannot
-     * inherit a prior identity's verification state. Fails loud when the
-     * auth identifier is non-scalar rather than silently collapsing
-     * distinct identities to a shared key.
+     * inherit a prior identity's verification state. Fails loud when the auth
+     * identifier is non-scalar rather than silently collapsing distinct
+     * identities to a shared key.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return string

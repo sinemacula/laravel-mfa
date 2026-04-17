@@ -14,14 +14,14 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
  * Base class for one-time-code delivery drivers (email, SMS).
  *
  * Collapses the shared code-generation + persistence + constant-time
- * verification logic so concrete drivers only need to describe their
- * transport — sending the code via Laravel's mail subsystem, an SMS
- * gateway, a push notification channel, etc.
+ * verification logic so concrete drivers only need to describe their transport
+ * — sending the code via Laravel's mail subsystem, an SMS gateway, a push
+ * notification channel, etc.
  *
- * Persistence is required: OTP challenges are meaningless without a
- * stored code to compare against. Subclasses therefore operate on
- * `EloquentFactor`-implementing factors only; passing a non-persistable
- * factor raises `UnsupportedFactorException`.
+ * Persistence is required: OTP challenges are meaningless without a stored code
+ * to compare against. Subclasses therefore operate on
+ * `EloquentFactor`-implementing factors only; passing a non-persistable factor
+ * raises `UnsupportedFactorException`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -34,17 +34,14 @@ abstract class AbstractOtpDriver implements FactorDriver
     /**
      * Constructor.
      *
-     * `$alphabet` controls the per-character set used by `generateCode()`:
-     * `null` (default) preserves the historical numeric behaviour;
-     * a non-null string switches to picking characters uniformly from
-     * the supplied alphabet. Empty and single-character alphabets are
-     * rejected at construction so misconfigurations fail fast rather
-     * than at first code issuance.
+     * `$alphabet` controls the `generateCode()` character set: `null` keeps
+     * numeric zero-padded codes; a non-null string picks uniformly from it.
+     * Empty / single-character alphabets are rejected so misconfigurations
+     * fail fast.
      *
-     * `$randomInt` is the injectable randomness seam — defaults to the
-     * PHP built-in `random_int(...)` (CSPRNG-backed). Tests substitute
-     * a deterministic callable to exercise the code generator against
-     * known outputs without relying on the real RNG.
+     * `$randomInt` is the injectable randomness seam — defaults to PHP's
+     * built-in `random_int(...)` (CSPRNG-backed); tests substitute a
+     * deterministic callable.
      *
      * @param  int  $codeLength
      * @param  int  $expiry
@@ -82,8 +79,8 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
-     * Issue a fresh one-time code against the factor and dispatch it
-     * through the subclass transport.
+     * Issue a fresh one-time code against the factor and dispatch it through
+     * the subclass transport.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
@@ -120,8 +117,8 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
-     * Verify the submitted code against the factor's pending code in
-     * constant time.
+     * Verify the submitted code against the factor's pending code in constant
+     * time.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
@@ -145,8 +142,8 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
-     * OTP drivers do not use persistent secrets; their secret material is
-     * the per-challenge code, generated on demand by `issueChallenge()`.
+     * OTP drivers do not use persistent secrets; their secret material is the
+     * per-challenge code, generated on demand by `issueChallenge()`.
      *
      * @return null
      */
@@ -187,8 +184,8 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
-     * Get the configured code alphabet, or null when codes are drawn
-     * from the default numeric set.
+     * Get the configured code alphabet, or null when codes are drawn from the
+     * default numeric set.
      *
      * @return ?string
      */
@@ -198,8 +195,8 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
-     * Deliver the issued code to the factor's recipient via the
-     * subclass's chosen transport.
+     * Deliver the issued code to the factor's recipient via the subclass's
+     * chosen transport.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $code
@@ -208,12 +205,12 @@ abstract class AbstractOtpDriver implements FactorDriver
     abstract protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void;
 
     /**
-     * Generate a one-time code of the configured length. Uses `random_int`
-     * for cryptographic suitability (vs `mt_rand` / `rand`).
+     * Generate a one-time code of the configured length. Uses `random_int` for
+     * cryptographic suitability (vs `mt_rand` / `rand`).
      *
-     * Defaults to a numeric, zero-padded code so the historical contract
-     * holds when no alphabet is configured. When an alphabet is supplied,
-     * each character is drawn uniformly from it via `random_int`.
+     * Defaults to a numeric, zero-padded code so the historical contract holds
+     * when no alphabet is configured. When an alphabet is supplied, each
+     * character is drawn uniformly from it via `random_int`.
      *
      * @return string
      */

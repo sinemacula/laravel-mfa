@@ -14,10 +14,9 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
  *
  * Implements `MultiFactorAuthenticatable` without extending
  * `Illuminate\Database\Eloquent\Model`, used to exercise the manager's
- * FQCN-fallback branches in `assertFactorOwnership()`,
- * `getCachePrefix()`, and `issueBackupCodes()` — those paths only
- * fire for identities the morph map cannot resolve through
- * `getMorphClass()`.
+ * FQCN-fallback branches in `assertFactorOwnership()`, `getCachePrefix()`, and
+ * `issueBackupCodes()` — those paths only fire for identities the morph map
+ * cannot resolve through `getMorphClass()`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -29,9 +28,9 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     /**
      * Constructor.
      *
-     * The configurable `$identifier` lets a single fixture exercise
-     * both the normal scalar branch and the unsupported-shape branch
-     * of the manager's identifier-coercion logic.
+     * The configurable `$identifier` lets a single fixture exercise both the
+     * normal scalar branch and the unsupported-shape branch of the manager's
+     * identifier-coercion logic.
      *
      * @param  mixed  $identifier
      * @param  bool  $mfaEnabled
@@ -88,10 +87,10 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * The upstream `Authenticatable` contract declares this parameter
-     * untyped (its signature `setRememberToken($value)` accepts any
-     * value); the implementation widens to `mixed` so the LSP rule
-     * stays satisfied without losing the static-analysis type signal.
+     * The upstream `Authenticatable` contract declares this parameter untyped
+     * (its signature `setRememberToken($value)` accepts any value); the
+     * implementation widens to `mixed` so the LSP rule stays satisfied without
+     * losing the static-analysis type signal.
      *
      * @param  mixed  $value
      * @return void
@@ -119,10 +118,9 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Always reports the configured value — non-Eloquent identities in
-     * these tests have no real factor store, so the boolean is held
-     * directly to keep the cached `isSetup()` path testable without
-     * touching a builder.
+     * Always reports the configured value — non-Eloquent identities in these
+     * tests have no real factor store, so the boolean is held directly to keep
+     * the cached `isSetup()` path testable without touching a builder.
      *
      * @return bool
      */
@@ -132,9 +130,9 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Return a builder against the shipped Factor model — the manager
-     * only invokes this when `isMfaEnabled()` is true, which the
-     * default fixture configuration avoids.
+     * Return a builder against the shipped Factor model — the manager only
+     * invokes this when `isMfaEnabled()` is true, which the default fixture
+     * configuration avoids.
      *
      * @formatter:off
      *

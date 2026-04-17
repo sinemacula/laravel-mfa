@@ -14,8 +14,8 @@ use Tests\TestCase;
 /**
  * End-to-end backup-code lifecycle.
  *
- * Covers enrolment (one Factor row per code), single-use semantics,
- * and the atomic-consume race defence.
+ * Covers enrolment (one Factor row per code), single-use semantics, and the
+ * atomic-consume race defence.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -27,9 +27,8 @@ final class BackupCodeLifecycleTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * A backup code must verify successfully exactly once; the
-     * second attempt against the same code must fail because the
-     * secret is consumed.
+     * A backup code must verify successfully exactly once; the second attempt
+     * against the same code must fail because the secret is consumed.
      *
      * @return void
      */
@@ -60,9 +59,8 @@ final class BackupCodeLifecycleTest extends TestCase
     }
 
     /**
-     * Two concurrent consumers of the same backup code must produce
-     * exactly one success — the second consumer sees the nulled
-     * secret and fails.
+     * Two concurrent consumers of the same backup code must produce exactly one
+     * success — the second consumer sees the nulled secret and fails.
      *
      * @return void
      */
@@ -99,8 +97,8 @@ final class BackupCodeLifecycleTest extends TestCase
     }
 
     /**
-     * Create a fresh MFA-enrolled test user and authenticate as them
-     * for the rest of the scenario.
+     * Create a fresh MFA-enrolled test user and authenticate as them for the
+     * rest of the scenario.
      *
      * @return \Tests\Fixtures\TestUser
      */

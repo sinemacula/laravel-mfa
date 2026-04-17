@@ -9,17 +9,14 @@ use Illuminate\Contracts\Auth\Authenticatable;
 /**
  * MFA policy contract.
  *
- * Implemented by app-level policies that enforce multi-factor
- * authentication on identities beyond the identity's own
- * `shouldUseMultiFactor()` preference. For example, an
- * organisation-aware policy may require MFA for every member of an
- * organisation that mandates it; a role-aware policy may require
- * MFA for every admin regardless of individual preference.
+ * Implemented by app-level policies that enforce MFA beyond the identity's own
+ * `shouldUseMultiFactor()` preference — e.g. an organisation-aware policy that
+ * mandates MFA for every member, or a role-aware policy that mandates it for
+ * every admin.
  *
- * The MFA manager consults the bound policy in `shouldUse()` after
- * consulting the identity. The package ships a no-op default
- * (`NullMfaPolicy`); consumers who need external enforcement bind
- * their own implementation against this contract.
+ * The MFA manager consults the bound policy in `shouldUse()` after the
+ * identity. The package ships a no-op default (`NullMfaPolicy`); consumers
+ * needing external enforcement bind their own implementation.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -27,8 +24,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 interface MfaPolicy
 {
     /**
-     * Determine whether MFA should be enforced for the given
-     * identity, independent of the identity's own preference.
+     * Determine whether MFA should be enforced for the given identity,
+     * independent of the identity's own preference.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return bool

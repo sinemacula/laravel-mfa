@@ -10,9 +10,9 @@ use SineMacula\Laravel\Mfa\MfaManager;
 /**
  * Test double for `MfaManager` used by the `RequireMfa` middleware tests.
  *
- * Extends the real manager so the facade's `@method` assertions line up,
- * but bypasses the container-backed Manager constructor — we only poke
- * the handful of methods the middleware actually invokes.
+ * Extends the real manager so the facade's `@method` assertions line up, but
+ * bypasses the container-backed Manager constructor — we only poke the handful
+ * of methods the middleware actually invokes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -40,10 +40,10 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
     public ?Collection $factors = null;
 
     /**
-     * Intentionally skip parent::__construct so the fixture can be
-     * instantiated outside a bootstrapped Laravel container — the
-     * middleware tests only exercise the overridden read methods, none
-     * of which touch the manager's container-backed driver registry.
+     * Intentionally skip parent::__construct so the fixture can be instantiated
+     * outside a bootstrapped Laravel container — the middleware tests only
+     * exercise the overridden read methods, none of which touch the manager's
+     * container-backed driver registry.
      *
      * @return void
      *

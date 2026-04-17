@@ -8,14 +8,13 @@ use SineMacula\Laravel\Mfa\Support\FactorSummary;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * Thrown when a previously completed MFA verification has expired and
- * the current identity must re-verify.
+ * Thrown when a previously completed MFA verification has expired and the
+ * current identity must re-verify.
  *
- * Carries a list of `FactorSummary` records describing the factors the
- * identity has available for re-verification — the consuming
- * application uses this payload to render a re-verify UI without
- * needing to know anything about the package's internal factor
- * representation.
+ * Carries a list of `FactorSummary` records describing the factors the identity
+ * has available for re-verification — the consuming application uses this
+ * payload to render a re-verify UI without needing to know anything about the
+ * package's internal factor representation.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

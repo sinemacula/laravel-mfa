@@ -20,15 +20,14 @@ use Tests\Fixtures\TestUser;
 /**
  * Cross-account factor enforcement at the manager boundary.
  *
- * Closes the MFA-bypass / factor-tampering primitive: every entry-
- * point method (`challenge`, `verify`, `disable`) rejects a factor
- * that does not belong to the current identity, and `enrol()` stamps
- * ownership rather than trusting caller-supplied morph columns.
+ * Closes the MFA-bypass / factor-tampering primitive: every entry- point method
+ * (`challenge`, `verify`, `disable`) rejects a factor that does not belong to
+ * the current identity, and `enrol()` stamps ownership rather than trusting
+ * caller-supplied morph columns.
  *
- * Each test exercises the "natural endpoint shape" attack: the
- * acting identity is one user, the supplied factor belongs to a
- * different user, and the manager must throw before any mutation,
- * driver dispatch, or event emission.
+ * Each test exercises the "natural endpoint shape" attack: the acting identity
+ * is one user, the supplied factor belongs to a different user, and the manager
+ * must throw before any mutation, driver dispatch, or event emission.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -55,8 +54,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * `verify()` must throw when the supplied Eloquent factor's morph
-     * columns do not point at the currently authenticated identity.
+     * `verify()` must throw when the supplied Eloquent factor's morph columns
+     * do not point at the currently authenticated identity.
      *
      * @return void
      */
@@ -84,8 +83,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * `challenge()` must throw on the same cross-account shape, and
-     * never invoke the driver's `issueChallenge()`.
+     * `challenge()` must throw on the same cross-account shape, and never
+     * invoke the driver's `issueChallenge()`.
      *
      * @return void
      */
@@ -112,8 +111,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * `disable()` must throw on the same cross-account shape, and
-     * never delete the underlying row.
+     * `disable()` must throw on the same cross-account shape, and never delete
+     * the underlying row.
      *
      * @return void
      */
@@ -168,7 +167,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * Test enrol dispatches MfaFactorEnrolled even when caller spoofs morph columns.
+     * Test enrol dispatches MfaFactorEnrolled even when caller spoofs morph
+     * columns.
      *
      * @return void
      */
@@ -184,9 +184,9 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * A non-Eloquent `Factor` whose `getAuthenticatable()` returns
-     * `null` must be rejected — without an owner reference there is no
-     * way to verify the factor was issued for the current identity.
+     * A non-Eloquent `Factor` whose `getAuthenticatable()` returns `null` must
+     * be rejected — without an owner reference there is no way to verify the
+     * factor was issued for the current identity.
      *
      * @return void
      */
@@ -209,8 +209,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * A non-Eloquent `Factor` bound to a different identity must be
-     * rejected even when the FQCN matches but the identifier does not.
+     * A non-Eloquent `Factor` bound to a different identity must be rejected
+     * even when the FQCN matches but the identifier does not.
      *
      * @return void
      */
@@ -235,10 +235,10 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
 
     /**
      * `enrol()` must NOT silently rewrite the morph columns of an
-     * already-persisted factor row — that would let an attacker hijack
-     * any factor whose primary key they could enumerate by passing it
-     * straight from request input. An existing row is treated like a
-     * verify/disable target: ownership has to already match.
+     * already-persisted factor row — that would let an attacker hijack any
+     * factor whose primary key they could enumerate by passing it straight from
+     * request input. An existing row is treated like a verify/disable target:
+     * ownership has to already match.
      *
      * @return void
      */
@@ -269,10 +269,10 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * `enrol()` of a non-Eloquent factor must reject the call when the
-     * factor's reported owner does not match the current identity.
-     * Mirrors the verify/challenge/disable enforcement so the four
-     * entry points present a single boundary, not three.
+     * `enrol()` of a non-Eloquent factor must reject the call when the factor's
+     * reported owner does not match the current identity. Mirrors the
+     * verify/challenge/disable enforcement so the four entry points present a
+     * single boundary, not three.
      *
      * @return void
      */
@@ -304,10 +304,9 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * The matching-identity branch of non-Eloquent `enrol()` must
-     * succeed end-to-end: persistence is the consumer's job for
-     * non-Eloquent factors, but the cache invalidation and lifecycle
-     * event MUST still fire.
+     * The matching-identity branch of non-Eloquent `enrol()` must succeed
+     * end-to-end: persistence is the consumer's job for non-Eloquent factors,
+     * but the cache invalidation and lifecycle event MUST still fire.
      *
      * @return void
      */
@@ -330,10 +329,9 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * The non-Eloquent assertion branch must also reject a factor
-     * whose owner has the same identifier but a different class —
-     * `User #1` and `Admin #1` are distinct identities even when
-     * their primary keys collide.
+     * The non-Eloquent assertion branch must also reject a factor whose owner
+     * has the same identifier but a different class — `User #1` and `Admin #1`
+     * are distinct identities even when their primary keys collide.
      *
      * @return void
      */
@@ -364,9 +362,9 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
 
     /**
      * Stage a cross-account enrol hijack attempt: the attacker is
-     * authenticated, but the supplied factor's morph columns point at
-     * the victim. Returns the attacker and the spoofed factor for
-     * the assertions to observe.
+     * authenticated, but the supplied factor's morph columns point at the
+     * victim. Returns the attacker and the spoofed factor for the assertions to
+     * observe.
      *
      * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
@@ -394,9 +392,9 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * Stage the cross-account attack shape used by the
-     * verify / challenge / disable regression tests: build two MFA-
-     * enabled users and persist a factor owned by the first.
+     * Stage the cross-account attack shape used by the verify / challenge /
+     * disable regression tests: build two MFA- enabled users and persist a
+     * factor owned by the first.
      *
      * @return array{0: \Tests\Fixtures\TestUser, 1: \Tests\Fixtures\TestUser, 2: \SineMacula\Laravel\Mfa\Models\Factor}
      */

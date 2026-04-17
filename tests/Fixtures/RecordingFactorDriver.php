@@ -8,8 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 
 /**
- * Custom `FactorDriver` fixture that records issue / verify calls and
- * accepts `'correct'` as the only valid code.
+ * Custom `FactorDriver` fixture that records issue / verify calls and accepts
+ * `'correct'` as the only valid code.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -36,8 +36,8 @@ final class RecordingFactorDriver implements FactorDriver
     }
 
     /**
-     * Record the verify call and report success only when the
-     * submitted code is the magic string `'correct'`.
+     * Record the verify call and report success only when the submitted code is
+     * the magic string `'correct'`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code

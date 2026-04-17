@@ -18,10 +18,10 @@ use Tests\TestCase;
 /**
  * `Mfa::issueBackupCodes()` end-to-end lifecycle.
  *
- * Closes the package's first-party recovery-code workflow: the
- * manager mints a fresh batch, atomically replaces any prior batch,
- * persists only the hashed value, dispatches an enrolment event per
- * code, and surfaces the plaintext set exactly once.
+ * Closes the package's first-party recovery-code workflow: the manager mints a
+ * fresh batch, atomically replaces any prior batch, persists only the hashed
+ * value, dispatches an enrolment event per code, and surfaces the plaintext set
+ * exactly once.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -33,10 +33,10 @@ final class IssueBackupCodesTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Without an authenticated MFA-capable identity, the call must
-     * be a no-op (returns `[]`) rather than throw — matches the
-     * established `enrol()` / `disable()` shape so consumers can call
-     * it unconditionally during onboarding flows.
+     * Without an authenticated MFA-capable identity, the call must be a no-op
+     * (returns `[]`) rather than throw — matches the established `enrol()` /
+     * `disable()` shape so consumers can call it unconditionally during
+     * onboarding flows.
      *
      * @return void
      */
@@ -133,10 +133,9 @@ final class IssueBackupCodesTest extends TestCase
     }
 
     /**
-     * A second call atomically replaces the prior batch — every
-     * pre-existing backup-code row is deleted before the new ones are
-     * minted, so there is no overlap window where both batches would
-     * verify.
+     * A second call atomically replaces the prior batch — every pre-existing
+     * backup-code row is deleted before the new ones are minted, so there is no
+     * overlap window where both batches would verify.
      *
      * @return void
      */
@@ -174,8 +173,8 @@ final class IssueBackupCodesTest extends TestCase
     }
 
     /**
-     * Passing an explicit `$count` argument overrides the configured
-     * default batch size for that single call.
+     * Passing an explicit `$count` argument overrides the configured default
+     * batch size for that single call.
      *
      * @return void
      */
@@ -228,8 +227,8 @@ final class IssueBackupCodesTest extends TestCase
     }
 
     /**
-     * Rotation invalidates the manager's per-identity cache so the
-     * next `Mfa::isSetup()` reflects the new batch immediately.
+     * Rotation invalidates the manager's per-identity cache so the next
+     * `Mfa::isSetup()` reflects the new batch immediately.
      *
      * @return void
      */
@@ -248,11 +247,10 @@ final class IssueBackupCodesTest extends TestCase
     }
 
     /**
-     * If a consumer has overridden the shipped `backup_code` driver
-     * with something that is not a `BackupCodeDriver` subclass, the
-     * manager refuses to mint codes against it — the rotation flow
-     * relies on the driver's hashing primitive and would otherwise
-     * silently corrupt state.
+     * If a consumer has overridden the shipped `backup_code` driver with
+     * something that is not a `BackupCodeDriver` subclass, the manager refuses
+     * to mint codes against it — the rotation flow relies on the driver's
+     * hashing primitive and would otherwise silently corrupt state.
      *
      * @return void
      */
@@ -272,9 +270,8 @@ final class IssueBackupCodesTest extends TestCase
     }
 
     /**
-     * Authenticate as a fresh MFA-enabled user and pre-seed an
-     * unrelated TOTP factor so cross-driver isolation assertions have
-     * a fixture to observe.
+     * Authenticate as a fresh MFA-enabled user and pre-seed an unrelated TOTP
+     * factor so cross-driver isolation assertions have a fixture to observe.
      *
      * @return \Tests\Fixtures\TestUser
      */

@@ -53,7 +53,8 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test table name falls back to default when config facade is not bootstrapped.
+     * Test table name falls back to default when config facade is not
+     * bootstrapped.
      *
      * @return void
      */

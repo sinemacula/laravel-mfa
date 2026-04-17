@@ -13,9 +13,9 @@ use Tests\TestCase;
 /**
  * Race-condition unit tests for `BackupCodeDriver::verify()`.
  *
- * Exercises the pessimistic-lock branch that triggers when the factor
- * row disappears (or a concurrent request already consumed the secret)
- * between the in-memory hash compare and the transaction lock.
+ * Exercises the pessimistic-lock branch that triggers when the factor row
+ * disappears (or a concurrent request already consumed the secret) between the
+ * in-memory hash compare and the transaction lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -27,9 +27,9 @@ final class BackupCodeDriverRaceTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * If the underlying factor row disappears between the in-memory
-     * hash compare and the lock-for-update query the verify must
-     * report failure rather than succeed.
+     * If the underlying factor row disappears between the in-memory hash
+     * compare and the lock-for-update query the verify must report failure
+     * rather than succeed.
      *
      * @return void
      */

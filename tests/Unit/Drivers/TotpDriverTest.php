@@ -13,9 +13,8 @@ use Tests\TestCase;
 /**
  * Unit tests for `TotpDriver`.
  *
- * Exercises the Google2FA-backed verification path, secret
- * generation, and the implicit-challenge (no-op) contract for the
- * TOTP driver.
+ * Exercises the Google2FA-backed verification path, secret generation, and the
+ * implicit-challenge (no-op) contract for the TOTP driver.
  *
  * The missing-dependency constructor branch (`Google2FA` class
  * absent) is not exercised here — `pragmarx/google2fa` is installed
@@ -33,8 +32,8 @@ final class TotpDriverTest extends TestCase
     private const string ACCOUNT_NAME = 'user@example.com';
 
     /**
-     * `issueChallenge()` must be a no-op for TOTP — the code is
-     * generated client-side from the shared secret.
+     * `issueChallenge()` must be a no-op for TOTP — the code is generated
+     * client-side from the shared secret.
      *
      * @return void
      */
@@ -95,8 +94,8 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A code that does not match the current TOTP for the stored
-     * secret must fail verification.
+     * A code that does not match the current TOTP for the stored secret must
+     * fail verification.
      *
      * @return void
      */
@@ -115,8 +114,8 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * `generateSecret()` must return a non-empty Base32 string ready
-     * for handing to an authenticator app.
+     * `generateSecret()` must return a non-empty Base32 string ready for
+     * handing to an authenticator app.
      *
      * @return void
      */
@@ -151,8 +150,8 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The provisioning URI must carry the issuer, account name, and
-     * secret in both the label and the query parameters.
+     * The provisioning URI must carry the issuer, account name, and secret in
+     * both the label and the query parameters.
      *
      * @return void
      */
@@ -186,8 +185,8 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The provisioning URI must encode an issuer containing
-     * whitespace exactly once — never doubly encoded.
+     * The provisioning URI must encode an issuer containing whitespace exactly
+     * once — never doubly encoded.
      *
      * @return void
      */
@@ -211,8 +210,7 @@ final class TotpDriverTest extends TestCase
 
     /**
      * The `$secret` parameter on `provisioningUri()` must carry the
-     * `#[\SensitiveParameter]` attribute so it never leaks into a
-     * stack trace.
+     * `#[\SensitiveParameter]` attribute so it never leaks into a stack trace.
      *
      * @return void
      */
@@ -231,9 +229,8 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Build an in-memory `Factor` stub exposing the given stored
-     * secret so the verify branches can be exercised without hitting
-     * the database.
+     * Build an in-memory `Factor` stub exposing the given stored secret so the
+     * verify branches can be exercised without hitting the database.
      *
      * @param  ?string  $secret
      * @return \SineMacula\Laravel\Mfa\Contracts\Factor

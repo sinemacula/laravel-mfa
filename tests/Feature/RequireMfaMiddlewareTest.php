@@ -16,11 +16,10 @@ use Tests\TestCase;
 /**
  * RequireMfa middleware enforcement matrix.
  *
- * Covers the lifecycle branches: skip-flag, shouldUse false, no
- * factors (MfaRequiredException), never verified
- * (MfaRequiredException), expired (MfaExpiredException), and fresh
- * verification (passes). Step-up `mfa:N` parameter parsing lives in
- * its own dedicated test class.
+ * Covers the lifecycle branches: skip-flag, shouldUse false, no factors
+ * (MfaRequiredException), never verified (MfaRequiredException), expired
+ * (MfaExpiredException), and fresh verification (passes). Step-up `mfa:N`
+ * parameter parsing lives in its own dedicated test class.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -36,8 +35,8 @@ final class RequireMfaMiddlewareTest extends TestCase
     private const string NOT_REACHED = 'not reached';
 
     /**
-     * An identity that does not opt into MFA must not trigger the
-     * middleware enforcement chain.
+     * An identity that does not opt into MFA must not trigger the middleware
+     * enforcement chain.
      *
      * @return void
      */
@@ -53,8 +52,8 @@ final class RequireMfaMiddlewareTest extends TestCase
     }
 
     /**
-     * An MFA-enrolled identity with no registered factors must
-     * trigger an `MfaRequiredException` from the middleware.
+     * An MFA-enrolled identity with no registered factors must trigger an
+     * `MfaRequiredException` from the middleware.
      *
      * @return void
      */
@@ -86,9 +85,9 @@ final class RequireMfaMiddlewareTest extends TestCase
     }
 
     /**
-     * An identity with at least one factor but no successful
-     * verification must trigger an `MfaRequiredException` carrying
-     * the factor summaries in the payload.
+     * An identity with at least one factor but no successful verification must
+     * trigger an `MfaRequiredException` carrying the factor summaries in the
+     * payload.
      *
      * @return void
      */
@@ -119,8 +118,8 @@ final class RequireMfaMiddlewareTest extends TestCase
     }
 
     /**
-     * Once the active verification ages past the configured expiry
-     * the middleware must throw `MfaExpiredException`.
+     * Once the active verification ages past the configured expiry the
+     * middleware must throw `MfaExpiredException`.
      *
      * @return void
      */
@@ -152,8 +151,8 @@ final class RequireMfaMiddlewareTest extends TestCase
     }
 
     /**
-     * Setting the `skip_mfa` request attribute must short-circuit
-     * the middleware to the next handler regardless of MFA state.
+     * Setting the `skip_mfa` request attribute must short-circuit the
+     * middleware to the next handler regardless of MFA state.
      *
      * @return void
      */

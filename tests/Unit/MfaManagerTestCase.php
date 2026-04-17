@@ -13,11 +13,10 @@ use Tests\Fixtures;
 /**
  * Dedicated MfaManager test base class.
  *
- * Mirrors the `Tests\TestCase` bootstrap but declares its provider /
- * environment hooks with parameter signatures compatible with the
- * Orchestra TestBench base class under strict PHP 8.3 LSP checks, so
- * test files that depend on this base can load regardless of any
- * upstream signature drift on the shared Tests\TestCase.
+ * Mirrors the `Tests\TestCase` bootstrap but uses provider/environment hook
+ * signatures aligned with Orchestra TestBench under strict PHP 8.3 LSP
+ * checks, so subclasses load regardless of upstream signature drift on the
+ * shared `Tests\TestCase`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -27,8 +26,7 @@ use Tests\Fixtures;
 abstract class MfaManagerTestCase extends BaseTestCase
 {
     /**
-     * Register the package's service provider with the test
-     * application.
+     * Register the package's service provider with the test application.
      *
      * @param  \Illuminate\Foundation\Application  $app
      * @return list<class-string<\Illuminate\Support\ServiceProvider>>
@@ -43,11 +41,9 @@ abstract class MfaManagerTestCase extends BaseTestCase
     /**
      * Configure the application environment for the test suite.
      *
-     * Honours `DB_CONNECTION` (and the matching `DB_HOST` / `DB_PORT`
-     * / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` env vars) so the
-     * CI database matrix runs against the engine the workflow
-     * provisioned — not silently against SQLite. Falls back to in-
-     * memory SQLite for local `composer test` runs.
+     * Honours `DB_CONNECTION` plus `DB_HOST` / `DB_PORT` / `DB_DATABASE` /
+     * `DB_USERNAME` / `DB_PASSWORD` so the CI database matrix runs against the
+     * provisioned engine. Falls back to in-memory SQLite for local runs.
      *
      * @param  \Illuminate\Foundation\Application  $app
      * @return void
@@ -74,10 +70,10 @@ abstract class MfaManagerTestCase extends BaseTestCase
     }
 
     /**
-     * Resolve the test database connection — see `Tests\TestCase` for
-     * the env-driven contract; this shadow on `MfaManagerTestCase`
-     * keeps the manager test family aligned with the same engine
-     * matrix the rest of the suite runs against.
+     * Resolve the test database connection — see `Tests\TestCase` for the
+     * env-driven contract; this shadow on `MfaManagerTestCase` keeps the
+     * manager test family aligned with the same engine matrix the rest of the
+     * suite runs against.
      *
      * @return array<string, mixed>
      */
@@ -106,8 +102,8 @@ abstract class MfaManagerTestCase extends BaseTestCase
     }
 
     /**
-     * Load the package's migration + the test user migration for the
-     * test application database.
+     * Load the package's migration + the test user migration for the test
+     * application database.
      *
      * @return void
      */
@@ -118,9 +114,8 @@ abstract class MfaManagerTestCase extends BaseTestCase
     }
 
     /**
-     * Return the bootstrapped application container as a non-null
-     * value, narrowing the parent's nullable property for static
-     * analysis.
+     * Return the bootstrapped application container as a non-null value,
+     * narrowing the parent's nullable property for static analysis.
      *
      * @return \Illuminate\Foundation\Application
      */

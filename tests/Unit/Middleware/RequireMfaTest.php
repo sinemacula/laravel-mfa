@@ -21,8 +21,8 @@ use Tests\Fixtures\FakeMfaManager;
  * Unit tests for the `RequireMfa` middleware.
  *
  * Uses a test double of the MFA manager bound against the `'mfa'` facade
- * accessor so we can exercise every branch without touching the database
- * or the full service provider stack.
+ * accessor so we can exercise every branch without touching the database or the
+ * full service provider stack.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

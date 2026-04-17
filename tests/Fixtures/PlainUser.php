@@ -9,9 +9,9 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A plain authenticatable that does NOT implement
- * `MultiFactorAuthenticatable`, used to exercise the manager's
- * "authenticated identity is not MFA-capable" branch.
+ * A plain authenticatable that does NOT implement `MultiFactorAuthenticatable`,
+ * used to exercise the manager's "authenticated identity is not MFA-capable"
+ * branch.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

@@ -9,8 +9,8 @@ use Illuminate\Contracts\Auth\Guard;
 use Tests\Fixtures\TestUser;
 
 /**
- * Token-style `Guard` fixture that hands back a pre-bound `TestUser`
- * — mimics the lookup path Sanctum / Passport take.
+ * Token-style `Guard` fixture that hands back a pre-bound `TestUser` — mimics
+ * the lookup path Sanctum / Passport take.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

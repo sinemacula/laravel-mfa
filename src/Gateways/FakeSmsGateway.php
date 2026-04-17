@@ -9,10 +9,10 @@ use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 /**
  * In-memory test double for the SMS gateway contract.
  *
- * Records every outbound message against the gateway so tests can
- * assert dispatch without hitting a real provider. Not intended for
- * production use; tests typically rebind `SmsGateway` to an instance
- * of this class in the container.
+ * Records every outbound message against the gateway so tests can assert
+ * dispatch without hitting a real provider. Not intended for production use;
+ * tests typically rebind `SmsGateway` to an instance of this class in the
+ * container.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

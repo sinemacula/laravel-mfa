@@ -14,9 +14,9 @@ use Tests\TestCase;
 /**
  * RequireMfa middleware step-up `mfa:N` parameter parsing matrix.
  *
- * Split out from the middleware's enforcement-matrix tests so each
- * cohesive subject — lifecycle enforcement vs. route-middleware
- * parameter parsing — has a focused suite.
+ * Split out from the middleware's enforcement-matrix tests so each cohesive
+ * subject — lifecycle enforcement vs. route-middleware parameter parsing — has
+ * a focused suite.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -29,8 +29,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Step-up middleware: a verification within the configured
-     * max-age must pass through.
+     * Step-up middleware: a verification within the configured max-age must
+     * pass through.
      *
      * @return void
      */
@@ -48,8 +48,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     }
 
     /**
-     * Step-up middleware: a verification older than the configured
-     * max-age must throw `MfaExpiredException`.
+     * Step-up middleware: a verification older than the configured max-age must
+     * throw `MfaExpiredException`.
      *
      * @return void
      */
@@ -67,8 +67,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     }
 
     /**
-     * Step-up middleware: a max-age of zero must always throw,
-     * regardless of how recent the verification was.
+     * Step-up middleware: a max-age of zero must always throw, regardless of
+     * how recent the verification was.
      *
      * @return void
      */
@@ -84,9 +84,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     }
 
     /**
-     * Step-up middleware: an explicit `mfa:N` parameter must
-     * override a shorter `default_expiry` config so the per-route
-     * window wins.
+     * Step-up middleware: an explicit `mfa:N` parameter must override a shorter
+     * `default_expiry` config so the per-route window wins.
      *
      * @return void
      */
@@ -109,8 +108,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     }
 
     /**
-     * Step-up middleware: a non-numeric `mfa:N` parameter must
-     * surface a clear `InvalidArgumentException`.
+     * Step-up middleware: a non-numeric `mfa:N` parameter must surface a clear
+     * `InvalidArgumentException`.
      *
      * @return void
      */
@@ -129,8 +128,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     }
 
     /**
-     * Step-up middleware: a negative `mfa:N` parameter must surface
-     * a clear `InvalidArgumentException`.
+     * Step-up middleware: a negative `mfa:N` parameter must surface a clear
+     * `InvalidArgumentException`.
      *
      * @return void
      */
@@ -149,8 +148,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     }
 
     /**
-     * Step-up middleware: a fractional `mfa:N` parameter must
-     * surface a clear `InvalidArgumentException`.
+     * Step-up middleware: a fractional `mfa:N` parameter must surface a clear
+     * `InvalidArgumentException`.
      *
      * @return void
      */
@@ -168,8 +167,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     }
 
     /**
-     * Loosely-numeric parameter inputs that `is_numeric` would accept
-     * but a route max-age must reject.
+     * Loosely-numeric parameter inputs that `is_numeric` would accept but a
+     * route max-age must reject.
      *
      * @return iterable<string, array{0: string}>
      */
@@ -185,10 +184,10 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     }
 
     /**
-     * Tighter parser checks: scientific notation, leading sign,
-     * surrounding whitespace, and empty string must all be rejected.
-     * `is_numeric` would silently coerce these to ints, which is the
-     * opposite of what a route definition needs.
+     * Tighter parser checks: scientific notation, leading sign, surrounding
+     * whitespace, and empty string must all be rejected. `is_numeric` would
+     * silently coerce these to ints, which is the opposite of what a route
+     * definition needs.
      *
      * @param  string  $candidate
      * @return void

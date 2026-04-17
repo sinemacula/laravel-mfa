@@ -15,9 +15,8 @@ use Tests\TestCase;
  * Query-budget regression tests for the verification hot path.
  *
  * Codifies the maximum number of queries each branch of the manager's
- * verification lifecycle is allowed to issue. A new query that
- * sneaks in (eager-load, cache miss, N+1) trips these assertions
- * before production does.
+ * verification lifecycle is allowed to issue. A new query that sneaks in
+ * (eager-load, cache miss, N+1) trips these assertions before production does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -29,9 +28,8 @@ final class VerifyQueryBudgetTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * A successful TOTP verify must stay within the documented
-     * two-query budget: the factor-row update plus the verification
-     * store write.
+     * A successful TOTP verify must stay within the documented two-query
+     * budget: the factor-row update plus the verification store write.
      *
      * @return void
      */
@@ -65,9 +63,8 @@ final class VerifyQueryBudgetTest extends TestCase
     }
 
     /**
-     * Rejecting a verify against a locked factor must not issue any
-     * database queries — the manager's lock check happens entirely
-     * in memory.
+     * Rejecting a verify against a locked factor must not issue any database
+     * queries — the manager's lock check happens entirely in memory.
      *
      * @return void
      */
@@ -95,9 +92,8 @@ final class VerifyQueryBudgetTest extends TestCase
     }
 
     /**
-     * A failed TOTP verify must stay within a single query — the
-     * attempt-count update on the factor row, with no verification
-     * store write.
+     * A failed TOTP verify must stay within a single query — the attempt-count
+     * update on the factor row, with no verification store write.
      *
      * @return void
      */
@@ -125,8 +121,8 @@ final class VerifyQueryBudgetTest extends TestCase
     }
 
     /**
-     * Create a fresh MFA-enrolled test user and authenticate as them
-     * for the rest of the scenario.
+     * Create a fresh MFA-enrolled test user and authenticate as them for the
+     * rest of the scenario.
      *
      * @return \Tests\Fixtures\TestUser
      */

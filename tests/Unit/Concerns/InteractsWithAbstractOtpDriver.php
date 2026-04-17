@@ -17,10 +17,10 @@ use Tests\Fixtures\TestUser;
 /**
  * Shared scaffolding for the `AbstractOtpDriver` test family.
  *
- * Centralises the driver / factor builders used by the issuance,
- * verification, and alphabet-config tests so each file stays under
- * the project's max-methods-per-class threshold without duplicating
- * the stub surface across test classes.
+ * Centralises the driver / factor builders used by the issuance, verification,
+ * and alphabet-config tests so each file stays under the project's
+ * max-methods-per-class threshold without duplicating the stub surface across
+ * test classes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -33,10 +33,10 @@ trait InteractsWithAbstractOtpDriver
     protected const string OTP_RECIPIENT = 'otp@example.com';
 
     /**
-     * Build a concrete subclass of the abstract driver that records
-     * every `dispatch()` invocation, optionally throws, and captures
-     * the order of the dispatch / issueCode / persist calls against
-     * an externally supplied tracker array.
+     * Build a concrete subclass of the abstract driver that records every
+     * `dispatch()` invocation, optionally throws, and captures the order of the
+     * dispatch / issueCode / persist calls against an externally supplied
+     * tracker array.
      *
      * @param  int  $codeLength
      * @param  int  $expiry
@@ -56,8 +56,8 @@ trait InteractsWithAbstractOtpDriver
     ): DispatchTrackingOtpDriver {
         $driver = new class ($codeLength, $expiry, $maxAttempts, $alphabet, $throwOnDispatch) extends DispatchTrackingOtpDriver {
             /**
-             * Wire the configured driver state and the dispatch
-             * behaviour switch.
+             * Wire the configured driver state and the dispatch behaviour
+             * switch.
              *
              * @param  int  $codeLength
              * @param  int  $expiry
@@ -77,8 +77,8 @@ trait InteractsWithAbstractOtpDriver
             }
 
             /**
-             * Capture every dispatch invocation; throw on demand to
-             * simulate transport failure.
+             * Capture every dispatch invocation; throw on demand to simulate
+             * transport failure.
              *
              * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
              * @param  string  $code
@@ -86,11 +86,8 @@ trait InteractsWithAbstractOtpDriver
              *
              * @throws \Tests\Fixtures\Exceptions\DispatchTransportFailureException
              */
-            protected function dispatch(
-                EloquentFactor $factor,
-                #[\SensitiveParameter]
-                string $code,
-            ): void {
+            protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void
+            {
                 $this->order[]      = 'dispatch';
                 $this->dispatched[] = ['factor' => $factor, 'code' => $code];
 
@@ -106,9 +103,9 @@ trait InteractsWithAbstractOtpDriver
     }
 
     /**
-     * Persist a `FactorModel` subclass whose `issueCode()` and
-     * `persist()` methods append to the shared order tracker so call
-     * ordering can be asserted from the outside.
+     * Persist a `FactorModel` subclass whose `issueCode()` and `persist()`
+     * methods append to the shared order tracker so call ordering can be
+     * asserted from the outside.
      *
      * @param  array<int, string>  $tracker
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -132,8 +129,8 @@ trait InteractsWithAbstractOtpDriver
     }
 
     /**
-     * Create a persisted Eloquent factor wired to a freshly inserted
-     * test user so both dispatch and persistence can be observed.
+     * Create a persisted Eloquent factor wired to a freshly inserted test user
+     * so both dispatch and persistence can be observed.
      *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
@@ -157,8 +154,8 @@ trait InteractsWithAbstractOtpDriver
     }
 
     /**
-     * Build a non-Eloquent `Factor` stub — enough surface for the
-     * abstract driver to reject it through `UnsupportedFactorException`.
+     * Build a non-Eloquent `Factor` stub — enough surface for the abstract
+     * driver to reject it through `UnsupportedFactorException`.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\Factor
      */
@@ -168,9 +165,9 @@ trait InteractsWithAbstractOtpDriver
     }
 
     /**
-     * Build a non-Eloquent `Factor` stub returning the supplied code
-     * and expiry so the `verify()` branches can be exercised without
-     * touching the database.
+     * Build a non-Eloquent `Factor` stub returning the supplied code and expiry
+     * so the `verify()` branches can be exercised without touching the
+     * database.
      *
      * @param  ?string  $code
      * @param  ?\Carbon\CarbonInterface  $expires

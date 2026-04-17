@@ -11,8 +11,8 @@ use SineMacula\Laravel\Mfa\MfaManager;
  * Shared scaffolding for the `MfaManager::verify()` test family.
  *
  * Centralises driver stubbing and manager resolution so the verify
- * orchestration tests and the `classifyFailure()` reason-mapping
- * tests can live in separate files without duplicating helpers.
+ * orchestration tests and the `classifyFailure()` reason-mapping tests can live
+ * in separate files without duplicating helpers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

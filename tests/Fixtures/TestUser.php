@@ -19,8 +19,8 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
  *
  * Implements `MultiFactorAuthenticatable` and Laravel's standard
  * `Authenticatable` contract. MFA preference is controlled via the
- * `mfa_enabled` boolean column so individual tests can flip it
- * without reaching into mocks or stubs.
+ * `mfa_enabled` boolean column so individual tests can flip it without reaching
+ * into mocks or stubs.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -95,10 +95,9 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
 
     /**
      * Re-present the morph-relation builder under the intersection type
-     * required by the `MultiFactorAuthenticatable` contract. The shipped
-     * Factor model IS both an Eloquent Model and the Factor contract, so
-     * the cast is sound; this helper hides the generic-invariance gap
-     * from PHPStan.
+     * required by the `MultiFactorAuthenticatable` contract. The shipped Factor
+     * model IS both an Eloquent Model and the Factor contract, so the cast is
+     * sound; this helper hides the generic-invariance gap from PHPStan.
      *
      * @formatter:off
      *
@@ -118,8 +117,8 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
     }
 
     /**
-     * Wrap the dynamic count() call so PHPStan does not flag it as a
-     * dynamic call to a static method.
+     * Wrap the dynamic count() call so PHPStan does not flag it as a dynamic
+     * call to a static method.
      *
      * @formatter:off
      *

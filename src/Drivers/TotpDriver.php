@@ -11,10 +11,9 @@ use SineMacula\Laravel\Mfa\Exceptions\MissingDriverDependencyException;
 /**
  * TOTP factor driver.
  *
- * Verifies time-based one-time passwords using the pragmarx/google2fa
- * library. The library is a suggested dependency and is checked at
- * runtime so the package remains lightweight for applications that
- * do not use TOTP.
+ * Verifies time-based one-time passwords using the pragmarx/google2fa library.
+ * The library is a suggested dependency and is checked at runtime so the
+ * package remains lightweight for applications that do not use TOTP.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -52,9 +51,9 @@ final class TotpDriver implements FactorDriver
     }
 
     /**
-     * TOTP challenges are implicit: the authenticator app generates
-     * codes locally from the shared secret, so there is no server
-     * action to take on challenge issuance.
+     * TOTP challenges are implicit: the authenticator app generates codes
+     * locally from the shared secret, so there is no server action to take on
+     * challenge issuance.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
@@ -101,8 +100,8 @@ final class TotpDriver implements FactorDriver
      * authenticator-app QR code.
      *
      * Wraps `Google2FA::getQRCodeUrl()`, which URL-encodes the issuer and
-     * account name internally — callers should pass raw values rather
-     * than pre-encoding them.
+     * account name internally — callers should pass raw values rather than
+     * pre-encoding them.
      *
      * @param  string  $issuer
      * @param  string  $accountName

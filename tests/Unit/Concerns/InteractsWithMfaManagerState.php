@@ -13,13 +13,10 @@ use Tests\Fixtures\TestUser;
 /**
  * Shared scaffolding for the `MfaManager` state-test family.
  *
- * The original `MfaManagerStateTest` exceeded the project's
- * max-methods-per-class threshold by combining lookup, expiry, and
- * lifecycle assertions in a single file. The class is split into
- * three cohesive subjects (lookups / expiry / lifecycle) and this
- * trait centralises the shared helpers — manager resolution, factor
- * seeding, fake stores, and Mockery teardown — so each split file
- * stays focused on its domain rather than re-declaring scaffolding.
+ * The state suite is split into three subjects (lookups / expiry / lifecycle)
+ * to stay under the max-methods-per-class threshold. This trait centralises
+ * the shared helpers — manager resolution, factor seeding, fake stores, and
+ * Mockery teardown.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -80,8 +77,8 @@ trait InteractsWithMfaManagerState
     }
 
     /**
-     * Build a store mock whose `lastVerifiedAt()` always returns the
-     * supplied timestamp.
+     * Build a store mock whose `lastVerifiedAt()` always returns the supplied
+     * timestamp.
      *
      * @param  \Carbon\Carbon  $at
      * @return \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore

@@ -10,17 +10,17 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use Tests\Fixtures\Exceptions\UnsupportedFixtureMethodException;
 
 /**
- * Default implementation of the `EloquentFactor` contract for test
- * stubs. Extends `AbstractFactorStub` (which covers the parent
- * `Factor` surface) and adds safe defaults for every persistence
- * method — no-op mutators, conventional column-name strings, and a
- * loud-throwing `authenticatable()` that surfaces accidental future
- * callers rather than returning a half-built relation.
+ * Default implementation of the `EloquentFactor` contract for test stubs.
+ * Extends `AbstractFactorStub` (which covers the parent `Factor` surface) and
+ * adds safe defaults for every persistence method — no-op mutators,
+ * conventional column-name strings, and a loud-throwing `authenticatable()`
+ * that surfaces accidental future callers rather than returning a half-built
+ * relation.
  *
- * Test fixtures override only the methods relevant to the scenario
- * they exercise. Keeps each anonymous subclass well below the
- * project's max-methods-per-class threshold without resorting to
- * `@SuppressWarnings` annotations.
+ * Test fixtures override only the methods relevant to the scenario they
+ * exercise. Keeps each anonymous subclass well below the project's
+ * max-methods-per-class threshold without resorting to `@SuppressWarnings`
+ * annotations.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -30,10 +30,9 @@ use Tests\Fixtures\Exceptions\UnsupportedFixtureMethodException;
 abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements EloquentFactor
 {
     /**
-     * Polymorphic relation accessor — required by the contract but
-     * almost never exercised on a non-Model fixture. Throws so an
-     * accidental future caller fails loudly rather than receiving a
-     * half-built relation.
+     * Polymorphic relation accessor — required by the contract but almost never
+     * exercised on a non-Model fixture. Throws so an accidental future caller
+     * fails loudly rather than receiving a half-built relation.
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphTo<\Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model>
      *
@@ -180,11 +179,8 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      * @param  \Carbon\CarbonInterface  $expiresAt
      * @return void
      */
-    public function issueCode(
-        #[\SensitiveParameter]
-        string $code,
-        CarbonInterface $expiresAt,
-    ): void {
+    public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void
+    {
         // Intentionally empty — see method docblock.
     }
 

@@ -13,12 +13,11 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  *
  * Carries only the fields a consuming application needs to render a
  * factor-picker UI (id, driver, label, verified-at, a masked delivery
- * destination). Never leaks `secret`, `code`, `attempts`, or the raw
- * recipient — consumers that need those fields read from the Factor
- * record directly.
+ * destination). Never leaks `secret`, `code`, `attempts`, or the raw recipient
+ * — consumers that need those fields read from the Factor record directly.
  *
- * Immutable, JSON-serialisable, safe to ship through exception payloads
- * and log sinks.
+ * Immutable, JSON-serialisable, safe to ship through exception payloads and log
+ * sinks.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -54,8 +53,8 @@ final readonly class FactorSummary implements \JsonSerializable
     ) {}
 
     /**
-     * Build a summary from a concrete `Factor` instance, masking the
-     * recipient to defence-in-depth against log leakage.
+     * Build a summary from a concrete `Factor` instance, masking the recipient
+     * to defence-in-depth against log leakage.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return self
@@ -78,8 +77,8 @@ final readonly class FactorSummary implements \JsonSerializable
     }
 
     /**
-     * Render the summary as a plain associative array for JSON
-     * serialisation. `verified_at` is emitted as ISO-8601 (or `null`).
+     * Render the summary as a plain associative array for JSON serialisation.
+     * `verified_at` is emitted as ISO-8601 (or `null`).
      *
      * @return array<string, mixed>
      */
@@ -99,9 +98,8 @@ final readonly class FactorSummary implements \JsonSerializable
      * Mask a delivery destination for safe public surfacing.
      *
      * Emails: keep the domain, mask the local-part except the last two
-     * characters. Phone numbers: keep the last four digits, mask the
-     * rest. Any other shape gets its last four characters kept with the
-     * rest masked.
+     * characters. Phone numbers: keep the last four digits, mask the rest. Any
+     * other shape gets its last four characters kept with the rest masked.
      *
      * @param  ?string  $recipient
      * @return ?string
@@ -118,9 +116,9 @@ final readonly class FactorSummary implements \JsonSerializable
     }
 
     /**
-     * Mask an email address: keep the domain intact, mask the local-part
-     * except for the leading two characters (or one if the local-part is
-     * a single character).
+     * Mask an email address: keep the domain intact, mask the local-part except
+     * for the leading two characters (or one if the local-part is a single
+     * character).
      *
      * @param  string  $recipient
      * @return string
@@ -137,9 +135,9 @@ final readonly class FactorSummary implements \JsonSerializable
     }
 
     /**
-     * Mask a phone number / opaque recipient: keep the last four
-     * characters, mask everything before them. If the input is four or
-     * fewer characters, mask all of it.
+     * Mask a phone number / opaque recipient: keep the last four characters,
+     * mask everything before them. If the input is four or fewer characters,
+     * mask all of it.
      *
      * @param  string  $recipient
      * @return string

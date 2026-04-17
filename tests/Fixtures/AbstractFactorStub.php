@@ -11,12 +11,12 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 /**
  * Default implementation of the `Factor` contract for test stubs.
  *
- * Provides safe nulls / zero-default values for every accessor so a
- * test fixture only has to override the methods relevant to the
- * scenario it exercises. Subclasses are typically declared as
- * anonymous classes inside test helpers — extending this base keeps
- * each anonymous class well below the project's max-methods-per-class
- * threshold without resorting to `@SuppressWarnings` annotations.
+ * Provides safe nulls / zero-default values for every accessor so a test
+ * fixture only has to override the methods relevant to the scenario it
+ * exercises. Subclasses are typically declared as anonymous classes inside test
+ * helpers — extending this base keeps each anonymous class well below the
+ * project's max-methods-per-class threshold without resorting to
+ * `@SuppressWarnings` annotations.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

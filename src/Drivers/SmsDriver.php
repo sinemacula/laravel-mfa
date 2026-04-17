@@ -11,10 +11,10 @@ use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
 /**
  * SMS factor driver.
  *
- * Issues one-time codes through a consumer-provided `SmsGateway` and
- * verifies them in constant time. The default gateway binding is
- * `NullSmsGateway`, which throws to surface the missing provider wiring
- * to the developer rather than silently dropping codes.
+ * Issues one-time codes through a consumer-provided `SmsGateway` and verifies
+ * them in constant time. The default gateway binding is `NullSmsGateway`, which
+ * throws to surface the missing provider wiring to the developer rather than
+ * silently dropping codes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -24,10 +24,10 @@ final class SmsDriver extends AbstractOtpDriver
     /**
      * Constructor.
      *
-     * Validates at construction that the message template contains the
-     * `:code` placeholder — without it, the rendered SMS would ship the
-     * literal placeholder string to users. Fail loudly at boot rather
-     * than silently leaking a broken message on every challenge.
+     * Validates at construction that the message template contains the `:code`
+     * placeholder — without it, the rendered SMS would ship the literal
+     * placeholder string to users. Fail loudly at boot rather than silently
+     * leaking a broken message on every challenge.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SmsGateway  $gateway
      * @param  string  $messageTemplate
@@ -73,8 +73,8 @@ final class SmsDriver extends AbstractOtpDriver
     }
 
     /**
-     * Dispatch the code to the factor's recipient phone number via the
-     * bound SMS gateway.
+     * Dispatch the code to the factor's recipient phone number via the bound
+     * SMS gateway.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $code

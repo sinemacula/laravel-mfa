@@ -10,11 +10,10 @@ use SineMacula\Laravel\Mfa\Exceptions\FactorTableAlreadyExistsException;
 /**
  * Migration collision guard.
  *
- * Helper for the shipped factors migration. Surfaces a clear error
- * before any schema mutation if the configured factors table
- * already exists. Consumers who run a prior MFA system can avoid
- * the collision by rebinding `mfa.factor.table` before publishing
- * the migration.
+ * Helper for the shipped factors migration. Surfaces a clear error before any
+ * schema mutation if the configured factors table already exists. Consumers who
+ * run a prior MFA system can avoid the collision by rebinding
+ * `mfa.factor.table` before publishing the migration.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

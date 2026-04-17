@@ -5,8 +5,8 @@ declare(strict_types = 1);
 namespace Tests\Fixtures;
 
 /**
- * Minimal `Factor` fixture reporting against the `my_driver` name —
- * feeds the custom-driver dispatch path without touching persistence.
+ * Minimal `Factor` fixture reporting against the `my_driver` name — feeds the
+ * custom-driver dispatch path without touching persistence.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

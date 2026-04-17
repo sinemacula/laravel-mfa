@@ -12,13 +12,12 @@ use Tests\Fixtures\RecordingFactorDriver;
 use Tests\TestCase;
 
 /**
- * Integration test verifying the `Mfa::extend()` custom-driver
- * registration path.
+ * Integration test verifying the `Mfa::extend()` custom-driver registration
+ * path.
  *
- * A custom driver registered via the Manager's `extend()` API must
- * resolve to the registered instance when requested by name, and
- * its verify / issueChallenge surface must be exercised identically
- * to built-in drivers.
+ * A custom driver registered via the Manager's `extend()` API must resolve to
+ * the registered instance when requested by name, and its verify /
+ * issueChallenge surface must be exercised identically to built-in drivers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -59,16 +58,12 @@ final class CustomDriverExtensionTest extends TestCase
     }
 
     /**
-     * `Mfa::extend('totp', ...)` must override the built-in TOTP
-     * driver registered by `MfaServiceProvider::registerBuiltInDrivers()`.
-     *
-     * Pins the override invariant after the refactor that moved the
-     * built-in factories from `MfaManager::createXDriver()` into
-     * `Mfa::extend()` calls inside the service provider's singleton
-     * closure. Both paths now use the same registry, so a future
-     * Laravel `Manager` upgrade that changed override-precedence
-     * semantics would silently break consumer overrides without
-     * this guard.
+     * `Mfa::extend('totp', ...)` must override the built-in TOTP driver
+     * registered by `MfaServiceProvider::registerBuiltInDrivers()`. Pins the
+     * override invariant — both built-ins and consumer overrides go through
+     * the same `Mfa::extend()` registry, so a future Laravel `Manager`
+     * upgrade that changed override-precedence semantics would silently break
+     * consumer overrides without this guard.
      *
      * @return void
      */

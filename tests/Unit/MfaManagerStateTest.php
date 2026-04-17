@@ -16,12 +16,11 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 /**
  * Unit tests for `MfaManager` lookup-style state queries.
  *
- * Covers `getDefaultDriver()`, `shouldUse()`, `isSetup()`,
- * `hasEverVerified()`, and `getFactors()`. The expiry-window and
- * lifecycle-mutation surfaces live in dedicated sibling files
- * (`MfaManagerExpiryTest`, `MfaManagerLifecycleTest`) so each subject
- * stays under the project's max-methods-per-class threshold without
- * losing its cohesive grouping.
+ * Covers `getDefaultDriver()`, `shouldUse()`, `isSetup()`, `hasEverVerified()`,
+ * and `getFactors()`. The expiry-window and lifecycle-mutation surfaces live in
+ * dedicated sibling files (`MfaManagerExpiryTest`, `MfaManagerLifecycleTest`)
+ * so each subject stays under the project's max-methods-per-class threshold
+ * without losing its cohesive grouping.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -56,9 +55,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity that does not implement
-     * `MultiFactorAuthenticatable` must short-circuit `shouldUse()`
-     * to false.
+     * An identity that does not implement `MultiFactorAuthenticatable` must
+     * short-circuit `shouldUse()` to false.
      *
      * @return void
      */
@@ -90,8 +88,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * When the identity does not opt in but the bound `MfaPolicy`
-     * enforces MFA externally, `shouldUse()` should still return true.
+     * When the identity does not opt in but the bound `MfaPolicy` enforces MFA
+     * externally, `shouldUse()` should still return true.
      *
      * @return void
      */
@@ -116,8 +114,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * If neither the identity nor the policy enforces MFA, the
-     * manager must report `shouldUse()` as false.
+     * If neither the identity nor the policy enforces MFA, the manager must
+     * report `shouldUse()` as false.
      *
      * @return void
      */
@@ -134,8 +132,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Without an identity `isSetup()` must report false rather than
-     * throwing.
+     * Without an identity `isSetup()` must report false rather than throwing.
      *
      * @return void
      */
@@ -145,8 +142,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity with no factor rows in the database must report
-     * `isSetup()` as false.
+     * An identity with no factor rows in the database must report `isSetup()`
+     * as false.
      *
      * @return void
      */
@@ -163,8 +160,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity with at least one persisted factor must report
-     * `isSetup()` as true.
+     * An identity with at least one persisted factor must report `isSetup()` as
+     * true.
      *
      * @return void
      */
@@ -178,8 +175,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Repeated `isSetup()` calls within a single request must hit the
-     * runtime cache rather than re-querying the database.
+     * Repeated `isSetup()` calls within a single request must hit the runtime
+     * cache rather than re-querying the database.
      *
      * @return void
      */
@@ -200,8 +197,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Without an identity `hasEverVerified()` must short-circuit to
-     * false.
+     * Without an identity `hasEverVerified()` must short-circuit to false.
      *
      * @return void
      */
@@ -251,8 +247,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Without an identity `getFactors()` must return null instead of
-     * an empty collection.
+     * Without an identity `getFactors()` must return null instead of an empty
+     * collection.
      *
      * @return void
      */
@@ -262,8 +258,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * With an identity `getFactors()` should return a collection of
-     * persisted factor models.
+     * With an identity `getFactors()` should return a collection of persisted
+     * factor models.
      *
      * @return void
      */
@@ -281,8 +277,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * `getFactors()` should cache its returned collection so repeated
-     * calls within the same request do not re-query the database.
+     * `getFactors()` should cache its returned collection so repeated calls
+     * within the same request do not re-query the database.
      *
      * @return void
      */
@@ -305,12 +301,11 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * `isSetup()` must complete without throwing when the resolved
-     * identity's auth identifier is non-scalar (neither string nor
-     * int). The empty-suffix fallback inside the cache-prefix builder
-     * is exercised on the way in; the actual composition is private
-     * to the manager and asserted indirectly through the no-throw
-     * outcome here.
+     * `isSetup()` must complete without throwing when the resolved identity's
+     * auth identifier is non-scalar (neither string nor int). The empty-suffix
+     * fallback inside the cache-prefix builder is exercised on the way in; the
+     * actual composition is private to the manager and asserted indirectly
+     * through the no-throw outcome here.
      *
      * @return void
      */

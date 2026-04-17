@@ -13,18 +13,18 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 /**
  * Backup code factor driver.
  *
- * Pure-PHP single-use recovery code driver. Each backup code is stored
- * as its own `Factor` row: enrolment mints N rows, successful
- * verification deletes the matching row, replay against a consumed code
- * fails because the row no longer exists.
+ * Pure-PHP single-use recovery code driver. Each backup code is stored as its
+ * own `Factor` row: enrolment mints N rows, successful verification deletes the
+ * matching row, replay against a consumed code fails because the row no longer
+ * exists.
  *
- * Codes are stored hashed on the `secret` column (encrypted at rest via
- * the shipped model's `encrypted` cast). Verification is constant-time
- * via `hash_equals`. Generation draws each character of the configured
- * alphabet uniformly via `random_int` for cryptographic suitability.
+ * Codes are stored hashed on the `secret` column (encrypted at rest via the
+ * shipped model's `encrypted` cast). Verification is constant-time via
+ * `hash_equals`. Generation draws each character of the configured alphabet
+ * uniformly via `random_int` for cryptographic suitability.
  *
- * No challenge issuance — backup codes are pre-minted at enrolment and
- * the user holds them out-of-band.
+ * No challenge issuance — backup codes are pre-minted at enrolment and the user
+ * holds them out-of-band.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -42,8 +42,8 @@ final class BackupCodeDriver implements FactorDriver
      *
      * `$randomInt` is the injectable randomness seam — defaults to PHP's
      * built-in `random_int(...)` (CSPRNG-backed). Tests substitute a
-     * deterministic callable to exercise the generator against known
-     * outputs without relying on the real RNG.
+     * deterministic callable to exercise the generator against known outputs
+     * without relying on the real RNG.
      *
      * @param  int  $codeLength
      * @param  string  $alphabet
@@ -83,9 +83,9 @@ final class BackupCodeDriver implements FactorDriver
     }
 
     /**
-     * Verify the submitted code against the factor's stored hash in
-     * constant time. On success marks the code consumed by clearing the
-     * stored secret — the manager then persists the mutation.
+     * Verify the submitted code against the factor's stored hash in constant
+     * time. On success marks the code consumed by clearing the stored secret —
+     * the manager then persists the mutation.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
@@ -112,10 +112,9 @@ final class BackupCodeDriver implements FactorDriver
     }
 
     /**
-     * Backup codes are minted in batches — this single-code entry point
-     * returns one freshly generated plaintext code. Enrolment flows
-     * typically call `generateSet()` instead to mint the full batch in
-     * one go.
+     * Backup codes are minted in batches — this single-code entry point returns
+     * one freshly generated plaintext code. Enrolment flows typically call
+     * `generateSet()` instead to mint the full batch in one go.
      *
      * @return string
      */
@@ -128,9 +127,9 @@ final class BackupCodeDriver implements FactorDriver
     /**
      * Hash a plaintext code for persistence.
      *
-     * SHA-256 rather than a password hash because backup codes are
-     * already high-entropy random strings; a slow hash adds latency
-     * without meaningful extra security against credential-stuffing.
+     * SHA-256 rather than a password hash because backup codes are already
+     * high-entropy random strings; a slow hash adds latency without meaningful
+     * extra security against credential-stuffing.
      *
      * @param  string  $code
      * @return string
@@ -141,14 +140,13 @@ final class BackupCodeDriver implements FactorDriver
     }
 
     /**
-     * Generate a fresh set of plaintext backup codes. Callers are
-     * responsible for hashing via `hash()` before persistence and
-     * surfacing the plaintext set to the user out-of-band.
+     * Generate a fresh set of plaintext backup codes. Callers must hash via
+     * `hash()` before persistence and surface plaintext to the user
+     * out-of-band.
      *
-     * The optional `$count` argument overrides the configured default
-     * for this single call — useful when a consumer needs a larger
-     * batch for a specific user (admin / break-glass) without rebinding
-     * the driver. Must be a positive integer.
+     * Optional `$count` overrides the configured default for one call (useful
+     * for admin / break-glass batches without rebinding the driver). Must be
+     * positive.
      *
      * @param  ?int  $count
      * @return list<string>
@@ -205,13 +203,13 @@ final class BackupCodeDriver implements FactorDriver
     /**
      * Atomically consume the factor's stored secret.
      *
-     * Uses a pessimistic row lock inside a short transaction to close
-     * the TOCTOU race where two concurrent requests would both match
-     * the same hash. The secret column is cast to `encrypted` on the
-     * shipped model, so we cannot compare encrypted-at-rest values
-     * directly in a WHERE clause — hence the `lockForUpdate()` pattern
-     * rather than a conditional UPDATE. Returns `true` when this
-     * request consumed the code, `false` when another beat us to it.
+     * Uses a pessimistic row lock inside a short transaction to close the
+     * TOCTOU race where two concurrent requests would both match the same hash.
+     * The secret column is cast to `encrypted` on the shipped model, so we
+     * cannot compare encrypted-at-rest values directly in a WHERE clause —
+     * hence the `lockForUpdate()` pattern rather than a conditional UPDATE.
+     * Returns `true` when this request consumed the code, `false` when another
+     * beat us to it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $expectedSecret
@@ -262,9 +260,9 @@ final class BackupCodeDriver implements FactorDriver
     }
 
     /**
-     * Generate a single plaintext backup code from the configured
-     * alphabet + length, picking characters with `random_int` for
-     * cryptographic suitability.
+     * Generate a single plaintext backup code from the configured alphabet +
+     * length, picking characters with `random_int` for cryptographic
+     * suitability.
      *
      * @return string
      */

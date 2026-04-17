@@ -18,12 +18,12 @@ use Tests\Fixtures\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
 
 /**
- * Unit tests covering the verify success path and cache-invalidation
- * invariants on `MfaManager::verify()`.
+ * Unit tests covering the verify success path and cache-invalidation invariants
+ * on `MfaManager::verify()`.
  *
  * Split out from `MfaManagerVerifyTest` so the success-scenario and
- * cache-side-effect assertions stay cohesive and each test class
- * remains under the project's max-methods threshold.
+ * cache-side-effect assertions stay cohesive and each test class remains under
+ * the project's max-methods threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -149,10 +149,10 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     /**
      * Test verify success clears the per-identity manager cache.
      *
-     * Pre-condition: the cache is warmed and the underlying row is
-     * deleted, so a stale cache would still report `isSetup()` true.
-     * The post-verify assertion observes the cache invalidation by
-     * proving `isSetup()` now reflects the deleted state.
+     * Pre-condition: the cache is warmed and the underlying row is deleted, so
+     * a stale cache would still report `isSetup()` true. The post-verify
+     * assertion observes the cache invalidation by proving `isSetup()` now
+     * reflects the deleted state.
      *
      * @return void
      */
@@ -166,9 +166,9 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     /**
      * Test the warming setup remains true before verify is called.
      *
-     * Documents the pre-condition the cache-clear assertion above
-     * relies on: without the cache the underlying-row deletion would
-     * have already flipped `isSetup()` to false.
+     * Documents the pre-condition the cache-clear assertion above relies on:
+     * without the cache the underlying-row deletion would have already flipped
+     * `isSetup()` to false.
      *
      * @return void
      */
@@ -198,8 +198,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     }
 
     /**
-     * Stage the Eloquent-factor success scenario and return the
-     * persisted factor for the assertions to observe.
+     * Stage the Eloquent-factor success scenario and return the persisted
+     * factor for the assertions to observe.
      *
      * @return array{0: \SineMacula\Laravel\Mfa\Models\Factor}
      */
@@ -236,9 +236,9 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     }
 
     /**
-     * Stage the warm-cache verify scenario: enrol a factor, warm the
-     * manager's per-identity cache, delete the row, then run a
-     * successful verify so the post-verify cache state is observable.
+     * Stage the warm-cache verify scenario: enrol a factor, warm the manager's
+     * per-identity cache, delete the row, then run a successful verify so the
+     * post-verify cache state is observable.
      *
      * @return \SineMacula\Laravel\Mfa\MfaManager
      */

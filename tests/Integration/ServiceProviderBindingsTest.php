@@ -19,9 +19,8 @@ use Tests\TestCase;
 /**
  * Integration test for the service provider's container bindings.
  *
- * Asserts every contract the provider binds resolves to the
- * shipped default, and the middleware aliases are registered on
- * the router.
+ * Asserts every contract the provider binds resolves to the shipped default,
+ * and the middleware aliases are registered on the router.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -31,9 +30,8 @@ use Tests\TestCase;
 final class ServiceProviderBindingsTest extends TestCase
 {
     /**
-     * The `'mfa'` alias must resolve to the same `MfaManager`
-     * instance every time — the manager is registered as a
-     * singleton.
+     * The `'mfa'` alias must resolve to the same `MfaManager` instance every
+     * time — the manager is registered as a singleton.
      *
      * @return void
      */
@@ -47,8 +45,8 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `MfaPolicy` contract must
-     * resolve to the shipped `NullMfaPolicy`.
+     * Without a consumer override the `MfaPolicy` contract must resolve to the
+     * shipped `NullMfaPolicy`.
      *
      * @return void
      */
@@ -60,8 +58,8 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `MfaVerificationStore`
-     * contract must resolve to the session-backed default.
+     * Without a consumer override the `MfaVerificationStore` contract must
+     * resolve to the session-backed default.
      *
      * @return void
      */
@@ -73,8 +71,8 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `SmsGateway` contract must
-     * resolve to the loud-failing `NullSmsGateway` default.
+     * Without a consumer override the `SmsGateway` contract must resolve to the
+     * loud-failing `NullSmsGateway` default.
      *
      * @return void
      */
@@ -86,8 +84,8 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * The provider must register the `'mfa'` and `'mfa.skip'`
-     * middleware aliases against the router.
+     * The provider must register the `'mfa'` and `'mfa.skip'` middleware
+     * aliases against the router.
      *
      * @return void
      */

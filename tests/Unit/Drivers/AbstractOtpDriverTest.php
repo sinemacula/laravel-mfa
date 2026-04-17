@@ -13,10 +13,10 @@ use Tests\Unit\Concerns\InteractsWithAbstractOtpDriver;
  * Unit tests for `AbstractOtpDriver`.
  *
  * Exercised via a thin anonymous subclass that captures `dispatch()`
- * invocations, allowing the shared issuance / verification logic to be
- * asserted without touching a concrete transport. The driver / factor
- * scaffolding helpers live on the `InteractsWithAbstractOtpDriver`
- * trait so each test file in the family stays focused on its subject.
+ * invocations, allowing the shared issuance / verification logic to be asserted
+ * without touching a concrete transport. The driver / factor scaffolding
+ * helpers live on the `InteractsWithAbstractOtpDriver` trait so each test file
+ * in the family stays focused on its subject.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -34,9 +34,9 @@ final class AbstractOtpDriverTest extends TestCase
     private const string MATCHING_CODE = '654321';
 
     /**
-     * `issueChallenge()` must reject any factor that does not
-     * implement `EloquentFactor` since OTP drivers persist state
-     * between dispatch and verify.
+     * `issueChallenge()` must reject any factor that does not implement
+     * `EloquentFactor` since OTP drivers persist state between dispatch and
+     * verify.
      *
      * @return void
      */
@@ -140,8 +140,8 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * If the dispatch step throws the issued code must NOT have been
-     * persisted on the factor — issuance is all-or-nothing.
+     * If the dispatch step throws the issued code must NOT have been persisted
+     * on the factor — issuance is all-or-nothing.
      *
      * @return void
      */
@@ -166,8 +166,8 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * `verify()` must report false when the factor has no stored
-     * code regardless of submitted input.
+     * `verify()` must report false when the factor has no stored code
+     * regardless of submitted input.
      *
      * @return void
      */
@@ -180,8 +180,8 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * `verify()` must report false when the factor has a stored code
-     * but no expiry timestamp.
+     * `verify()` must report false when the factor has a stored code but no
+     * expiry timestamp.
      *
      * @return void
      */
@@ -210,8 +210,8 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * A submitted code matching the stored code with a future expiry
-     * must verify successfully.
+     * A submitted code matching the stored code with a future expiry must
+     * verify successfully.
      *
      * @return void
      */
@@ -244,8 +244,8 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * OTP drivers do not use a persistent secret — `generateSecret()`
-     * must return null.
+     * OTP drivers do not use a persistent secret — `generateSecret()` must
+     * return null.
      *
      * @return void
      */
@@ -257,8 +257,8 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * The driver getters must return the values supplied to the
-     * constructor verbatim.
+     * The driver getters must return the values supplied to the constructor
+     * verbatim.
      *
      * @return void
      */
@@ -273,8 +273,8 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * With no alphabet configured the generated code must be
-     * zero-padded numeric of the configured length.
+     * With no alphabet configured the generated code must be zero-padded
+     * numeric of the configured length.
      *
      * @return void
      */
@@ -294,8 +294,8 @@ final class AbstractOtpDriverTest extends TestCase
 
     /**
      * The constructor must reject an empty alphabet with a clear
-     * `InvalidArgumentException` carrying the distinguishing
-     * "received an empty string." suffix.
+     * `InvalidArgumentException` carrying the distinguishing "received an empty
+     * string." suffix.
      *
      * @return void
      */
@@ -311,9 +311,9 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * The constructor must reject a single-character alphabet with a
-     * clear `InvalidArgumentException` carrying the distinguishing
-     * "received a single character." suffix.
+     * The constructor must reject a single-character alphabet with a clear
+     * `InvalidArgumentException` carrying the distinguishing "received a single
+     * character." suffix.
      *
      * @return void
      */
@@ -338,8 +338,8 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * A two-character alphabet must produce codes whose every
-     * character is drawn from that alphabet.
+     * A two-character alphabet must produce codes whose every character is
+     * drawn from that alphabet.
      *
      * @return void
      */
@@ -358,8 +358,8 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * A hex alphabet must produce codes whose every character is a
-     * valid hex digit.
+     * A hex alphabet must produce codes whose every character is a valid hex
+     * digit.
      *
      * @return void
      */

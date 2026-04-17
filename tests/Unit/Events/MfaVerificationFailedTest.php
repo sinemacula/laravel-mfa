@@ -47,13 +47,13 @@ final class MfaVerificationFailedTest extends TestCase
             identity: $identity,
             factor: $factor,
             driver: 'sms',
-            reason: MfaVerificationFailureReason::CodeInvalid,
+            reason: MfaVerificationFailureReason::CODE_INVALID,
         );
 
         self::assertSame($identity, $event->identity);
         self::assertSame($factor, $event->factor);
         self::assertSame('sms', $event->driver);
-        self::assertSame(MfaVerificationFailureReason::CodeInvalid, $event->reason);
+        self::assertSame(MfaVerificationFailureReason::CODE_INVALID, $event->reason);
     }
 
     /**
@@ -69,10 +69,10 @@ final class MfaVerificationFailedTest extends TestCase
             identity: $identity,
             factor: null,
             driver: 'unknown',
-            reason: MfaVerificationFailureReason::DriverUnknown,
+            reason: MfaVerificationFailureReason::DRIVER_UNKNOWN,
         );
 
         self::assertNull($event->factor);
-        self::assertSame(MfaVerificationFailureReason::DriverUnknown, $event->reason);
+        self::assertSame(MfaVerificationFailureReason::DRIVER_UNKNOWN, $event->reason);
     }
 }

@@ -10,9 +10,9 @@ use Tests\TestCase;
 /**
  * Generation-side unit tests for `BackupCodeDriver`.
  *
- * Exercises `generateSet()`, `generateSecret()`, and `hash()` —
- * split from `BackupCodeDriverTest` so the verify-path subject can
- * stay under the project's max-methods-per-class threshold.
+ * Exercises `generateSet()`, `generateSecret()`, and `hash()` — split from
+ * `BackupCodeDriverTest` so the verify-path subject can stay under the
+ * project's max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -22,9 +22,8 @@ use Tests\TestCase;
 final class BackupCodeDriverGenerationTest extends TestCase
 {
     /**
-     * `generateSet()` must produce exactly the configured number of
-     * codes and each code must respect the configured length and
-     * alphabet.
+     * `generateSet()` must produce exactly the configured number of codes and
+     * each code must respect the configured length and alphabet.
      *
      * @return void
      */
@@ -47,8 +46,8 @@ final class BackupCodeDriverGenerationTest extends TestCase
     }
 
     /**
-     * Generated codes within a single set must all be distinct so a
-     * lost code does not invalidate another.
+     * Generated codes within a single set must all be distinct so a lost code
+     * does not invalidate another.
      *
      * @return void
      */
@@ -62,10 +61,10 @@ final class BackupCodeDriverGenerationTest extends TestCase
     }
 
     /**
-     * Passing an explicit positive `$count` overrides the configured
-     * default for that single call — used by the manager-level
-     * `Mfa::issueBackupCodes($count)` rotation API to mint a custom
-     * batch size without rebinding the driver.
+     * Passing an explicit positive `$count` overrides the configured default
+     * for that single call — used by the manager-level
+     * `Mfa::issueBackupCodes($count)` rotation API to mint a custom batch size
+     * without rebinding the driver.
      *
      * @return void
      */
@@ -79,9 +78,8 @@ final class BackupCodeDriverGenerationTest extends TestCase
 
     /**
      * A non-positive `$count` is a deployment-time bug, not a runtime
-     * recoverable state — the driver throws so the misconfiguration
-     * surfaces in the stack trace rather than silently returning an
-     * empty set.
+     * recoverable state — the driver throws so the misconfiguration surfaces in
+     * the stack trace rather than silently returning an empty set.
      *
      * @return void
      */
@@ -96,9 +94,9 @@ final class BackupCodeDriverGenerationTest extends TestCase
     }
 
     /**
-     * `generateSet()` must reject a negative explicit count with a
-     * clear `InvalidArgumentException` — a negative batch size cannot
-     * mint any codes and would otherwise short-circuit silently.
+     * `generateSet()` must reject a negative explicit count with a clear
+     * `InvalidArgumentException` — a negative batch size cannot mint any codes
+     * and would otherwise short-circuit silently.
      *
      * @return void
      */
@@ -113,8 +111,8 @@ final class BackupCodeDriverGenerationTest extends TestCase
     }
 
     /**
-     * `generateSecret()` must return a single plaintext code that
-     * matches the configured alphabet and length.
+     * `generateSecret()` must return a single plaintext code that matches the
+     * configured alphabet and length.
      *
      * @return void
      */
@@ -129,8 +127,8 @@ final class BackupCodeDriverGenerationTest extends TestCase
     }
 
     /**
-     * `hash()` must be deterministic and equivalent to a raw SHA-256
-     * digest of the input.
+     * `hash()` must be deterministic and equivalent to a raw SHA-256 digest of
+     * the input.
      *
      * @return void
      */

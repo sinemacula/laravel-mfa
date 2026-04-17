@@ -13,11 +13,11 @@ use Tests\Unit\Concerns\BuildsFactorSummaries;
 /**
  * Unit tests for the `FactorSummary` projection.
  *
- * Covers construction via `fromFactor()`, recipient masking for email / phone
- * / short strings / empty values, and `jsonSerialize()` shape. Stub-builder
+ * Covers construction via `fromFactor()`, recipient masking for email / phone /
+ * short strings / empty values, and `jsonSerialize()` shape. Stub-builder
  * helpers live on the `BuildsFactorSummaries` trait so the consuming class
- * stays focused on its assertions and below the project's
- * max-methods-per-class threshold.
+ * stays focused on its assertions and below the project's max-methods-per-class
+ * threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -201,11 +201,10 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * A five-character local-part exercises the `min(2, floor(n/2))`
-     * boundary: `floor(5/2) = 2` — but `ceil(5/2) = 3` and
-     * `round(5/2) = 3`, so a regression that swaps `floor` for either
-     * would hand back three plaintext characters. Keep the assertion
-     * exact so the mutation can't slip past.
+     * A five-character local-part exercises the `min(2, floor(n/2))` boundary:
+     * `floor(5/2) = 2` — but `ceil(5/2) = 3` and `round(5/2) = 3`, so a
+     * regression that swaps `floor` for either would hand back three plaintext
+     * characters. Keep the assertion exact so the mutation can't slip past.
      *
      * @return void
      */
@@ -220,8 +219,8 @@ final class FactorSummaryTest extends TestCase
 
     /**
      * A six-character local-part exercises the outer `min(2, …)` cap:
-     * `floor(6/2) = 3`, but `min(2, 3) = 2`. A regression to
-     * `min(3, …)` would expose three plaintext characters.
+     * `floor(6/2) = 3`, but `min(2, 3) = 2`. A regression to `min(3, …)` would
+     * expose three plaintext characters.
      *
      * @return void
      */
@@ -235,10 +234,9 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * A recipient containing more than one `@` exercises the
-     * `explode(..., 2)` limit: only the FIRST `@` may split the
-     * local-part from the domain, so a second `@` belongs in the
-     * domain side untouched.
+     * A recipient containing more than one `@` exercises the `explode(..., 2)`
+     * limit: only the FIRST `@` may split the local-part from the domain, so a
+     * second `@` belongs in the domain side untouched.
      *
      * @return void
      */

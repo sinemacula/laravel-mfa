@@ -13,14 +13,14 @@ use Illuminate\Queue\SerializesModels;
 /**
  * Default Mailable for MFA email-code delivery.
  *
- * Ships an inline HTML body so the package works out of the box with
- * no published views. Consumers who want a branded email / a text
- * alternative subclass this Mailable (or configure the email driver
- * to use their own Mailable class) and override `content()` or
- * `renderHtml()` to point at their own view.
+ * Ships an inline HTML body so the package works out of the box with no
+ * published views. Consumers who want a branded email / a text alternative
+ * subclass this Mailable (or configure the email driver to use their own
+ * Mailable class) and override `content()` or `renderHtml()` to point at their
+ * own view.
  *
- * The code and expiry are exposed as public readonly properties so
- * custom views can render them as `{{ $code }}` / `{{ $expiresInMinutes }}`.
+ * The code and expiry are exposed as public readonly properties so custom views
+ * can render them as `{{ $code }}` / `{{ $expiresInMinutes }}`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -59,9 +59,9 @@ class MfaCodeMessage extends Mailable
     }
 
     /**
-     * Build the content. Uses the `htmlString` parameter on `Content`
-     * so consumers do not need to publish a view for the shipped
-     * default to render.
+     * Build the content. Uses the `htmlString` parameter on `Content` so
+     * consumers do not need to publish a view for the shipped default to
+     * render.
      *
      * @return \Illuminate\Mail\Mailables\Content
      */

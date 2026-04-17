@@ -10,10 +10,10 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 /**
  * Dispatched when a new MFA factor is enrolled against an identity.
  *
- * Fires after the factor record has been persisted and any per-driver
- * setup (TOTP secret generation, backup code minting) has completed.
- * Consumers can subscribe to emit audit-log entries, send confirmation
- * notifications, or trigger downstream access-policy recalculation.
+ * Fires after the factor record has been persisted and any per-driver setup
+ * (TOTP secret generation, backup code minting) has completed. Consumers can
+ * subscribe to emit audit-log entries, send confirmation notifications, or
+ * trigger downstream access-policy recalculation.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

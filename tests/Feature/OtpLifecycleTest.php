@@ -23,8 +23,8 @@ use Tests\TestCase;
  * End-to-end lifecycle for the OTP-delivery drivers (email + SMS).
  *
  * Covers challenge dispatch (via Mail::fake / FakeSmsGateway), code
- * persistence, successful verification, the "wrong code" and "expired
- * code" branches, and event emissions.
+ * persistence, successful verification, the "wrong code" and "expired code"
+ * branches, and event emissions.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -168,9 +168,8 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * Issuing an SMS challenge through the bound `FakeSmsGateway`
-     * should record the outbound message and verify successfully
-     * against the persisted code.
+     * Issuing an SMS challenge through the bound `FakeSmsGateway` should record
+     * the outbound message and verify successfully against the persisted code.
      *
      * @return void
      */
@@ -200,9 +199,8 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * A submitted email code that does not match the persisted code
-     * should fail verification and dispatch a `CodeInvalid` failure
-     * event.
+     * A submitted email code that does not match the persisted code should fail
+     * verification and dispatch a `CodeInvalid` failure event.
      *
      * @return void
      */
@@ -221,14 +219,14 @@ final class OtpLifecycleTest extends TestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CodeInvalid,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_INVALID,
         );
     }
 
     /**
      * A code whose `expires_at` has passed must be rejected with a
-     * `CodeExpired` failure event even when the submitted code
-     * matches the stored value.
+     * `CodeExpired` failure event even when the submitted code matches the
+     * stored value.
      *
      * @return void
      */
@@ -251,15 +249,15 @@ final class OtpLifecycleTest extends TestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CodeExpired,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_EXPIRED,
         );
     }
 
     /**
-     * The OTP driver path must reset the attempt counter when it
-     * issues a fresh code — paired with a transport hop the user has
-     * to receive, so an attacker cannot use it as a free unlock the
-     * way an unconditional manager-side reset would have allowed.
+     * The OTP driver path must reset the attempt counter when it issues a fresh
+     * code — paired with a transport hop the user has to receive, so an
+     * attacker cannot use it as a free unlock the way an unconditional
+     * manager-side reset would have allowed.
      *
      * @return void
      */
@@ -292,8 +290,7 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * Enrol a fresh test user with an email factor and authenticate
-     * as them.
+     * Enrol a fresh test user with an email factor and authenticate as them.
      *
      * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */

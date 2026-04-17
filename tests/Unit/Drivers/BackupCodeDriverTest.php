@@ -16,9 +16,8 @@ use Tests\TestCase;
 /**
  * Unit tests for `BackupCodeDriver`.
  *
- * Exercises the single-use backup-code verification path including
- * the atomic consumption UPDATE, the generation helpers, and the
- * getter surface.
+ * Exercises the single-use backup-code verification path including the atomic
+ * consumption UPDATE, the generation helpers, and the getter surface.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -28,8 +27,8 @@ use Tests\TestCase;
 final class BackupCodeDriverTest extends TestCase
 {
     /**
-     * `issueChallenge()` must be a no-op for the backup-code driver
-     * — backup codes are pre-generated, never re-issued.
+     * `issueChallenge()` must be a no-op for the backup-code driver — backup
+     * codes are pre-generated, never re-issued.
      *
      * @return void
      */
@@ -45,8 +44,8 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * A null stored secret must short-circuit verify to false rather
-     * than fall through to the hash compare.
+     * A null stored secret must short-circuit verify to false rather than fall
+     * through to the hash compare.
      *
      * @return void
      */
@@ -72,8 +71,8 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * A code that hashes to a different value than the stored secret
-     * must fail verification.
+     * A code that hashes to a different value than the stored secret must fail
+     * verification.
      *
      * @return void
      */
@@ -87,8 +86,8 @@ final class BackupCodeDriverTest extends TestCase
 
     /**
      * A non-Eloquent factor must succeed on a hash match without any
-     * persistence side-effect — single-use enforcement is the
-     * orchestration layer's concern in that path.
+     * persistence side-effect — single-use enforcement is the orchestration
+     * layer's concern in that path.
      *
      * @return void
      */
@@ -107,9 +106,9 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * An Eloquent factor must be consumed atomically: the in-memory
-     * attribute and the underlying row both have their secret nulled
-     * and replay must fail.
+     * An Eloquent factor must be consumed atomically: the in-memory attribute
+     * and the underlying row both have their secret nulled and replay must
+     * fail.
      *
      * @return void
      */
@@ -136,9 +135,9 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * If a concurrent consumer deletes the row between the in-memory
-     * hash compare and the conditional UPDATE the verify must report
-     * failure rather than succeed.
+     * If a concurrent consumer deletes the row between the in-memory hash
+     * compare and the conditional UPDATE the verify must report failure rather
+     * than succeed.
      *
      * @return void
      */
@@ -160,9 +159,8 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * An `EloquentFactor` implementation that is not actually an
-     * Eloquent Model should take the early-return branch and return
-     * `true` on a hash match.
+     * An `EloquentFactor` implementation that is not actually an Eloquent Model
+     * should take the early-return branch and return `true` on a hash match.
      *
      * @return void
      */
@@ -178,8 +176,8 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * If a concurrent consumer nulls the secret between the in-memory
-     * compare and the atomic UPDATE, verify must report failure.
+     * If a concurrent consumer nulls the secret between the in-memory compare
+     * and the atomic UPDATE, verify must report failure.
      *
      * @return void
      */
@@ -203,8 +201,8 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * The driver getters must return the values supplied to the
-     * constructor verbatim.
+     * The driver getters must return the values supplied to the constructor
+     * verbatim.
      *
      * @return void
      */
@@ -222,8 +220,8 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * The driver's `NAME` constant must match the registered driver
-     * key consumers reference in their config.
+     * The driver's `NAME` constant must match the registered driver key
+     * consumers reference in their config.
      *
      * @return void
      */
@@ -233,8 +231,8 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * Persist and return an Eloquent factor seeded with the given
-     * secret hash against the shipped model.
+     * Persist and return an Eloquent factor seeded with the given secret hash
+     * against the shipped model.
      *
      * @param  string  $secretHash
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -257,10 +255,9 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * Build an `EloquentFactor` implementation that is NOT an
-     * Eloquent Model — exercises the `consumeAtomic()` early-return
-     * branch where the non-Model path skips the conditional UPDATE
-     * and returns `true` unconditionally.
+     * Build an `EloquentFactor` implementation that is NOT an Eloquent Model —
+     * exercises the `consumeAtomic()` early-return branch where the non-Model
+     * path skips the conditional UPDATE and returns `true` unconditionally.
      *
      * @param  string  $secret
      * @return \SineMacula\Laravel\Mfa\Contracts\EloquentFactor
@@ -271,8 +268,7 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
-     * Build a non-Eloquent `Factor` stub with the supplied stored
-     * secret.
+     * Build a non-Eloquent `Factor` stub with the supplied stored secret.
      *
      * @param  ?string  $secret
      * @return \SineMacula\Laravel\Mfa\Contracts\Factor

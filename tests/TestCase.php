@@ -12,11 +12,11 @@ use SineMacula\Laravel\Mfa\MfaServiceProvider;
 /**
  * Base TestCase for the `sinemacula/laravel-mfa` test suites.
  *
- * Boots an Orchestra TestBench application with the MFA service
- * provider registered, an in-memory SQLite connection, and the
- * shipped migration applied. Concrete tests subclass this directly
- * (via `use RefreshDatabase` when persistence is required) or the
- * thinner `Tests\UnitTestCase` for pure unit scenarios.
+ * Boots an Orchestra TestBench application with the MFA service provider
+ * registered, an in-memory SQLite connection, and the shipped migration
+ * applied. Concrete tests subclass this directly (via `use RefreshDatabase`
+ * when persistence is required) or the thinner `Tests\UnitTestCase` for pure
+ * unit scenarios.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -24,8 +24,7 @@ use SineMacula\Laravel\Mfa\MfaServiceProvider;
 abstract class TestCase extends BaseTestCase
 {
     /**
-     * Register the package's service provider with the test
-     * application.
+     * Register the package's service provider with the test application.
      *
      * @param  \Illuminate\Foundation\Application  $app
      * @return list<class-string<\Illuminate\Support\ServiceProvider>>
@@ -67,13 +66,10 @@ abstract class TestCase extends BaseTestCase
     /**
      * Resolve the test database connection.
      *
-     * Default is in-memory SQLite so a fresh `composer test` run
-     * needs no external services. When CI provisions MySQL or
-     * PostgreSQL and exports `DB_CONNECTION` (and the matching
-     * `DB_HOST` / `DB_PORT` / `DB_DATABASE` / `DB_USERNAME` /
-     * `DB_PASSWORD` env vars) the bootstrap honours them so the
-     * "database-tests" matrix actually runs against the engine the
-     * workflow provisioned — not silently against SQLite three times.
+     * Defaults to in-memory SQLite so `composer test` needs no external
+     * services. Honours `DB_CONNECTION` plus `DB_HOST` / `DB_PORT` /
+     * `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` so the CI database matrix
+     * runs against the provisioned engine.
      *
      * @return array<string, mixed>
      */
@@ -102,8 +98,8 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Load the package's migration + the test user migration for the
-     * test application database.
+     * Load the package's migration + the test user migration for the test
+     * application database.
      *
      * @return void
      */
@@ -114,9 +110,8 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Return the bootstrapped application container as a non-null
-     * value, narrowing the parent's nullable property for static
-     * analysis.
+     * Return the bootstrapped application container as a non-null value,
+     * narrowing the parent's nullable property for static analysis.
      *
      * @return \Illuminate\Foundation\Application
      */
@@ -129,9 +124,8 @@ abstract class TestCase extends BaseTestCase
 
     /**
      * Return the value of the given env var if it is set and non-empty,
-     * otherwise return the supplied default. Centralised so the
-     * connection resolver does not repeat the `getenv` + falsy-check
-     * pattern at every key.
+     * otherwise return the supplied default. Centralised so the connection
+     * resolver does not repeat the `getenv` + falsy-check pattern at every key.
      *
      * @param  string  $key
      * @param  string  $default

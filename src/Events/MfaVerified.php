@@ -8,14 +8,14 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 
 /**
- * Dispatched after the MFA manager records a successful verification
- * against a factor.
+ * Dispatched after the MFA manager records a successful verification against a
+ * factor.
  *
- * Fires after the factor's attempt counters have been reset, the
- * verification timestamp has been stamped, and the bound verification
- * store has been updated for the current identity. Consumers can
- * subscribe to extend the request-scoped verification window, emit
- * audit-log entries, or refresh cached authorisation decisions.
+ * Fires after the factor's attempt counters have been reset, the verification
+ * timestamp has been stamped, and the bound verification store has been updated
+ * for the current identity. Consumers can subscribe to extend the
+ * request-scoped verification window, emit audit-log entries, or refresh cached
+ * authorisation decisions.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

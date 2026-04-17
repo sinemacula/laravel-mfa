@@ -14,9 +14,9 @@ use Tests\TestCase;
 /**
  * Polymorphic-identity integration test.
  *
- * Verifies that the package's polymorphic Factor relation enforces
- * MFA correctly against more than one Eloquent identity class within
- * the same application.
+ * Verifies that the package's polymorphic Factor relation enforces MFA
+ * correctly against more than one Eloquent identity class within the same
+ * application.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -28,9 +28,9 @@ final class PolymorphicIdentityTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Factors persisted against one identity class must not leak
-     * into a sibling identity class — the polymorphic relation
-     * scopes by `authenticatable_type` correctly.
+     * Factors persisted against one identity class must not leak into a sibling
+     * identity class — the polymorphic relation scopes by
+     * `authenticatable_type` correctly.
      *
      * @return void
      */
@@ -88,10 +88,10 @@ final class PolymorphicIdentityTest extends TestCase
     }
 
     /**
-     * Two MFA-capable identity classes that share a primary-key value
-     * (`User #1` and `Admin #1`) MUST get distinct cache entries
-     * within the same request — without that scoping the second
-     * identity inherits the first identity's cached state.
+     * Two MFA-capable identity classes that share a primary-key value (`User
+     * #1` and `Admin #1`) MUST get distinct cache entries within the same
+     * request — without that scoping the second identity inherits the first
+     * identity's cached state.
      *
      * @return void
      */
@@ -133,8 +133,8 @@ final class PolymorphicIdentityTest extends TestCase
     }
 
     /**
-     * The `shouldUse()` enforcement check must respond identically
-     * across both identity classes when neither opts in.
+     * The `shouldUse()` enforcement check must respond identically across both
+     * identity classes when neither opts in.
      *
      * @return void
      */

@@ -14,9 +14,9 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
- * MultiFactorAuthenticatable whose `getAuthIdentifier()` returns an
- * object rather than a scalar, used to exercise the manager's
- * non-scalar auth-identifier fallback branch in `getCachePrefix()`.
+ * MultiFactorAuthenticatable whose `getAuthIdentifier()` returns an object
+ * rather than a scalar, used to exercise the manager's non-scalar
+ * auth-identifier fallback branch in `getCachePrefix()`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -37,8 +37,8 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
     ];
 
     /**
-     * Return a non-scalar auth identifier to exercise the fallback
-     * branch of the manager's `getCachePrefix()` helper.
+     * Return a non-scalar auth identifier to exercise the fallback branch of
+     * the manager's `getCachePrefix()` helper.
      *
      * @return mixed
      */

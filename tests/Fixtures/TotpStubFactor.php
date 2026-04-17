@@ -5,8 +5,8 @@ declare(strict_types = 1);
 namespace Tests\Fixtures;
 
 /**
- * `Factor` fixture exposing a configurable stored secret against the
- * TOTP driver — feeds the verify branches without persistence.
+ * `Factor` fixture exposing a configurable stored secret against the TOTP
+ * driver — feeds the verify branches without persistence.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

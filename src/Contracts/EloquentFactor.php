@@ -12,12 +12,12 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  *
  * Extends the generic `Factor` read surface with the relation and column-name
  * accessors the manager orchestration layer uses when incrementing attempts,
- * applying lockouts, or marking verification — operations that write through
- * to the underlying row and therefore require a persistable implementation.
+ * applying lockouts, or marking verification — operations that write through to
+ * the underlying row and therefore require a persistable implementation.
  *
  * Non-Eloquent implementations (in-memory test doubles, API-backed adapters)
- * satisfy `Factor` alone; the shipped `Factor` model and any consumer
- * subclass intended for persistence satisfy `EloquentFactor`.
+ * satisfy `Factor` alone; the shipped `Factor` model and any consumer subclass
+ * intended for persistence satisfy `EloquentFactor`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -50,8 +50,8 @@ interface EloquentFactor extends Factor
     public function getLabelName(): string;
 
     /**
-     * Column name holding the delivery destination (phone number / email)
-     * for drivers that deliver codes to the identity.
+     * Column name holding the delivery destination (phone number / email) for
+     * drivers that deliver codes to the identity.
      *
      * @return string
      */
@@ -109,9 +109,9 @@ interface EloquentFactor extends Factor
 
     /**
      * Record a new verification attempt against the factor. Increments the
-     * attempt counter and stamps the last-attempted timestamp. Does NOT
-     * persist — callers invoke `persist()` once the full orchestration
-     * step is complete.
+     * attempt counter and stamps the last-attempted timestamp. Does NOT persist
+     * — callers invoke `persist()` once the full orchestration step is
+     * complete.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
@@ -119,18 +119,17 @@ interface EloquentFactor extends Factor
     public function recordAttempt(?CarbonInterface $at = null): void;
 
     /**
-     * Reset the attempt counter and clear any active lockout. Called after
-     * a successful verification or on a fresh challenge issuance.
+     * Reset the attempt counter and clear any active lockout. Called after a
+     * successful verification or on a fresh challenge issuance.
      *
      * @return void
      */
     public function resetAttempts(): void;
 
     /**
-     * Apply a lockout window, deferring further verification attempts until
-     * the given timestamp. Orthogonal to `recordAttempt()`; callers may
-     * lock after recording an attempt that crosses the max-attempts
-     * threshold.
+     * Apply a lockout window, deferring further verification attempts until the
+     * given timestamp. Orthogonal to `recordAttempt()`; callers may lock after
+     * recording an attempt that crosses the max-attempts threshold.
      *
      * @param  \Carbon\CarbonInterface  $until
      * @return void
@@ -139,9 +138,8 @@ interface EloquentFactor extends Factor
 
     /**
      * Record a successful verification. Stamps the verified-at timestamp,
-     * resets attempts, and clears any pending one-time code. Does NOT
-     * persist — callers invoke `persist()` once the full orchestration
-     * step is complete.
+     * resets attempts, and clears any pending one-time code. Does NOT persist —
+     * callers invoke `persist()` once the full orchestration step is complete.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
@@ -149,10 +147,10 @@ interface EloquentFactor extends Factor
     public function recordVerification(?CarbonInterface $at = null): void;
 
     /**
-     * Persist a newly issued one-time code and its expiry against the
-     * factor. Used by OTP-delivery drivers (email, SMS) during challenge
-     * issuance. Does NOT save the model — callers invoke `persist()` once
-     * the challenge handoff completes.
+     * Persist a newly issued one-time code and its expiry against the factor.
+     * Used by OTP-delivery drivers (email, SMS) during challenge issuance. Does
+     * NOT save the model — callers invoke `persist()` once the challenge
+     * handoff completes.
      *
      * @param  string  $code
      * @param  \Carbon\CarbonInterface  $expiresAt
@@ -171,8 +169,8 @@ interface EloquentFactor extends Factor
 
     /**
      * Persist any pending mutations to the underlying storage. The shipped
-     * Eloquent model delegates to `save()`; consumer implementations can
-     * route through their preferred persistence seam.
+     * Eloquent model delegates to `save()`; consumer implementations can route
+     * through their preferred persistence seam.
      *
      * @return void
      */

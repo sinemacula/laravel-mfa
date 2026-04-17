@@ -10,9 +10,9 @@ use SineMacula\Laravel\Mfa\Support\FactorSummary;
 /**
  * Shared FactorSummary builders for the FactorSummary test family.
  *
- * Centralises the two recurring stub-builders so each consuming test
- * file stays focused on its assertions and keeps its method count
- * below the project's max-methods-per-class threshold.
+ * Centralises the two recurring stub-builders so each consuming test file stays
+ * focused on its assertions and keeps its method count below the project's
+ * max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

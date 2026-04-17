@@ -20,10 +20,10 @@ use Tests\TestCase;
 /**
  * End-to-end TOTP lifecycle feature tests.
  *
- * Exercises the full enrolment → challenge → verify flow against a
- * real Factor row, a real Google2FA instance, and the default
- * session-backed verification store. Assertions cover the events
- * fired, the factor state transitions, and the store updates.
+ * Exercises the full enrolment → challenge → verify flow against a real Factor
+ * row, a real Google2FA instance, and the default session-backed verification
+ * store. Assertions cover the events fired, the factor state transitions, and
+ * the store updates.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -105,8 +105,8 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * A failed TOTP verification must increment the attempt counter
-     * and dispatch a `CodeInvalid` failure event.
+     * A failed TOTP verification must increment the attempt counter and
+     * dispatch a `CodeInvalid` failure event.
      *
      * @return void
      */
@@ -126,7 +126,7 @@ final class TotpLifecycleTest extends TestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CodeInvalid,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_INVALID,
         );
     }
 
@@ -182,18 +182,17 @@ final class TotpLifecycleTest extends TestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::FactorLocked,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::FACTOR_LOCKED,
         );
     }
 
     /**
      * Test challenge preserves the attempts count after lockout.
      *
-     * `challenge()` must NOT clear an active TOTP lockout — TOTP has
-     * no per-challenge secret to rotate, so wiping the attempt counter
-     * on every "start MFA" call would let any consumer-side resend
-     * endpoint act as a free unlock against the configured
-     * `max_attempts` defence.
+     * `challenge()` must NOT clear an active TOTP lockout — TOTP has no
+     * per-challenge secret to rotate, so wiping the attempt counter on every
+     * "start MFA" call would let any consumer-side resend endpoint act as a
+     * free unlock against the configured `max_attempts` defence.
      *
      * @return void
      */
@@ -265,10 +264,9 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Backup-code factors share the no-rotation property: their secret
-     * is pre-issued at enrolment, so `challenge()` must also preserve
-     * any active lockout. This catches the same bypass shape against
-     * the recovery factor.
+     * Backup-code factors share the no-rotation property: their secret is
+     * pre-issued at enrolment, so `challenge()` must also preserve any active
+     * lockout. This catches the same bypass shape against the recovery factor.
      *
      * @return void
      */
@@ -302,8 +300,8 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Enrol a TOTP factor and burn through the configured max-attempts
-     * so the factor is in a locked-out state when returned.
+     * Enrol a TOTP factor and burn through the configured max-attempts so the
+     * factor is in a locked-out state when returned.
      *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
@@ -323,8 +321,8 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Enrol a TOTP factor for a freshly created test user and return
-     * the [user, factor, current-code] triple.
+     * Enrol a TOTP factor for a freshly created test user and return the [user,
+     * factor, current-code] triple.
      *
      * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
      */

@@ -10,10 +10,10 @@ use SineMacula\Laravel\Mfa\Exceptions\SmsGatewayNotConfiguredException;
 /**
  * Default SMS gateway binding.
  *
- * Fails loud when the SMS factor driver tries to issue a challenge
- * without a real gateway bound. Consumers who enable the SMS driver
- * must rebind the `SmsGateway` contract to an implementation that
- * talks to their chosen SMS provider (Twilio, Vonage, AWS SNS, etc.).
+ * Fails loud when the SMS factor driver tries to issue a challenge without a
+ * real gateway bound. Consumers who enable the SMS driver must rebind the
+ * `SmsGateway` contract to an implementation that talks to their chosen SMS
+ * provider (Twilio, Vonage, AWS SNS, etc.).
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -21,9 +21,8 @@ use SineMacula\Laravel\Mfa\Exceptions\SmsGatewayNotConfiguredException;
 final readonly class NullSmsGateway implements SmsGateway
 {
     /**
-     * Throw a `SmsGatewayNotConfiguredException` to surface the missing
-     * binding to the developer rather than silently dropping the
-     * outbound message.
+     * Throw a `SmsGatewayNotConfiguredException` to surface the missing binding
+     * to the developer rather than silently dropping the outbound message.
      *
      * @param  string  $to
      * @param  string  $message

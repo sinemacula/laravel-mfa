@@ -9,9 +9,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Guard;
 
 /**
- * Custom `Guard` fixture that hands back a non-Eloquent
- * `GenericUser` — exercises the manager's non-Eloquent
- * authenticatable short-circuit.
+ * Custom `Guard` fixture that hands back a non-Eloquent `GenericUser` —
+ * exercises the manager's non-Eloquent authenticatable short-circuit.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

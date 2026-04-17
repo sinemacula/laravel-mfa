@@ -37,7 +37,7 @@ final class MfaVerificationFailureReasonTest extends TestCase
      */
     public function testFactorLockedCaseValue(): void
     {
-        self::assertSame('factor_locked', MfaVerificationFailureReason::FactorLocked->value);
+        self::assertSame('factor_locked', MfaVerificationFailureReason::FACTOR_LOCKED->value);
     }
 
     /**
@@ -47,7 +47,7 @@ final class MfaVerificationFailureReasonTest extends TestCase
      */
     public function testCodeInvalidCaseValue(): void
     {
-        self::assertSame('code_invalid', MfaVerificationFailureReason::CodeInvalid->value);
+        self::assertSame('code_invalid', MfaVerificationFailureReason::CODE_INVALID->value);
     }
 
     /**
@@ -57,7 +57,7 @@ final class MfaVerificationFailureReasonTest extends TestCase
      */
     public function testCodeExpiredCaseValue(): void
     {
-        self::assertSame('code_expired', MfaVerificationFailureReason::CodeExpired->value);
+        self::assertSame('code_expired', MfaVerificationFailureReason::CODE_EXPIRED->value);
     }
 
     /**
@@ -67,7 +67,7 @@ final class MfaVerificationFailureReasonTest extends TestCase
      */
     public function testCodeMissingCaseValue(): void
     {
-        self::assertSame('code_missing', MfaVerificationFailureReason::CodeMissing->value);
+        self::assertSame('code_missing', MfaVerificationFailureReason::CODE_MISSING->value);
     }
 
     /**
@@ -77,7 +77,7 @@ final class MfaVerificationFailureReasonTest extends TestCase
      */
     public function testSecretMissingCaseValue(): void
     {
-        self::assertSame('secret_missing', MfaVerificationFailureReason::SecretMissing->value);
+        self::assertSame('secret_missing', MfaVerificationFailureReason::SECRET_MISSING->value);
     }
 
     /**
@@ -87,7 +87,7 @@ final class MfaVerificationFailureReasonTest extends TestCase
      */
     public function testDriverUnknownCaseValue(): void
     {
-        self::assertSame('driver_unknown', MfaVerificationFailureReason::DriverUnknown->value);
+        self::assertSame('driver_unknown', MfaVerificationFailureReason::DRIVER_UNKNOWN->value);
     }
 
     /**
@@ -97,7 +97,7 @@ final class MfaVerificationFailureReasonTest extends TestCase
      */
     public function testIdentityUnsupportedCaseValue(): void
     {
-        self::assertSame('identity_unsupported', MfaVerificationFailureReason::IdentityUnsupported->value);
+        self::assertSame('identity_unsupported', MfaVerificationFailureReason::IDENTITY_UNSUPPORTED->value);
     }
 
     /**

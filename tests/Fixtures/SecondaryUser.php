@@ -14,12 +14,12 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
- * A second `MultiFactorAuthenticatable` Eloquent model used to assert
- * that the package's polymorphic factor relation works against more
- * than one identity class within the same application.
+ * A second `MultiFactorAuthenticatable` Eloquent model used to assert that the
+ * package's polymorphic factor relation works against more than one identity
+ * class within the same application.
  *
- * Mirrors `TestUser` but lives on its own table so polymorphic factor
- * lookup must scope by `authenticatable_type` correctly.
+ * Mirrors `TestUser` but lives on its own table so polymorphic factor lookup
+ * must scope by `authenticatable_type` correctly.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -47,8 +47,7 @@ class SecondaryUser extends Model implements Authenticatable, MultiFactorAuthent
     ];
 
     /**
-     * Opt the identity into MFA enforcement based on the test fixture
-     * column.
+     * Opt the identity into MFA enforcement based on the test fixture column.
      *
      * @return bool
      */
@@ -109,8 +108,8 @@ class SecondaryUser extends Model implements Authenticatable, MultiFactorAuthent
     }
 
     /**
-     * Wrap the dynamic count() call so PHPStan does not flag it as a
-     * dynamic call to a static method.
+     * Wrap the dynamic count() call so PHPStan does not flag it as a dynamic
+     * call to a static method.
      *
      * @formatter:off
      *

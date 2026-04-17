@@ -11,10 +11,9 @@ use Tests\Fixtures\TestUser;
 /**
  * Shared scaffolding for the RequireMfa middleware test family.
  *
- * Centralises the middleware invocation helper and the "enrol a TOTP
- * factor for a fresh user" fixture so the enforcement-matrix and
- * step-up-parser test classes stay focused on their respective
- * subjects.
+ * Centralises the middleware invocation helper and the "enrol a TOTP factor for
+ * a fresh user" fixture so the enforcement-matrix and step-up-parser test
+ * classes stay focused on their respective subjects.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -24,8 +23,8 @@ use Tests\Fixtures\TestUser;
 trait InteractsWithRequireMfaMiddleware
 {
     /**
-     * Drive the middleware with the given route-middleware param and
-     * report whether the inner handler was reached.
+     * Drive the middleware with the given route-middleware param and report
+     * whether the inner handler was reached.
      *
      * @param  ?string  $maxAgeMinutes
      * @return bool
@@ -51,8 +50,7 @@ trait InteractsWithRequireMfaMiddleware
     }
 
     /**
-     * Enrol a fresh TOTP factor and return the [user, factor, code]
-     * triple.
+     * Enrol a fresh TOTP factor and return the [user, factor, code] triple.
      *
      * @param  string  $email
      * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
