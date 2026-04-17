@@ -5,21 +5,22 @@ declare(strict_types = 1);
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
-use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Support\FactorSummary;
+use Tests\Feature\Concerns\InteractsWithRequireMfaMiddleware;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
 
 /**
- * RequireMfa middleware dispatch matrix.
+ * RequireMfa middleware enforcement matrix.
  *
- * Covers every branch: skip-flag, shouldUse false, no factors
- * (MfaRequiredException), never verified (MfaRequiredException),
- * expired (MfaExpiredException), fresh verification (passes).
+ * Covers the lifecycle branches: skip-flag, shouldUse false, no
+ * factors (MfaRequiredException), never verified
+ * (MfaRequiredException), expired (MfaExpiredException), and fresh
+ * verification (passes). Step-up `mfa:N` parameter parsing lives in
+ * its own dedicated test class.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -28,6 +29,7 @@ use Tests\TestCase;
  */
 final class RequireMfaMiddlewareTest extends TestCase
 {
+    use InteractsWithRequireMfaMiddleware;
     use RefreshDatabase;
 
     /** @var string Sentinel returned by the inner handler so a missed-throw shows up as a string assertion failure. */
@@ -178,226 +180,5 @@ final class RequireMfaMiddlewareTest extends TestCase
         });
 
         self::assertTrue($reached);
-    }
-
-    /**
-     * Step-up middleware: a verification within the configured
-     * max-age must pass through.
-     *
-     * @return void
-     */
-    public function testStepUpPassesWhenVerificationIsWithinMaxAge(): void
-    {
-        [, $factor, $code] = $this->enrolTotp();
-
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
-
-        $this->travel(4)->minutes();
-
-        $reached = $this->runMiddleware(maxAgeMinutes: '5');
-
-        self::assertTrue($reached);
-    }
-
-    /**
-     * Step-up middleware: a verification older than the configured
-     * max-age must throw `MfaExpiredException`.
-     *
-     * @return void
-     */
-    public function testStepUpThrowsExpiredWhenVerificationOlderThanMaxAge(): void
-    {
-        [, $factor, $code] = $this->enrolTotp();
-
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
-
-        $this->travel(6)->minutes();
-
-        $this->expectException(MfaExpiredException::class);
-
-        $this->runMiddleware(maxAgeMinutes: '5');
-    }
-
-    /**
-     * Step-up middleware: a max-age of zero must always throw,
-     * regardless of how recent the verification was.
-     *
-     * @return void
-     */
-    public function testStepUpZeroAlwaysThrowsEvenForFreshVerification(): void
-    {
-        [, $factor, $code] = $this->enrolTotp();
-
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
-
-        $this->expectException(MfaExpiredException::class);
-
-        $this->runMiddleware(maxAgeMinutes: '0');
-    }
-
-    /**
-     * Step-up middleware: an explicit `mfa:N` parameter must
-     * override a shorter `default_expiry` config so the per-route
-     * window wins.
-     *
-     * @return void
-     */
-    public function testStepUpOverridesShorterDefaultExpiry(): void
-    {
-        // The default config expiry is 14 days; force it to 1 minute so
-        // we can prove that an explicit `mfa:60` parameter wins by
-        // letting a verification 30 minutes old still pass.
-        config()->set('mfa.default_expiry', 1);
-
-        [, $factor, $code] = $this->enrolTotp();
-
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
-
-        $this->travel(30)->minutes();
-
-        $reached = $this->runMiddleware(maxAgeMinutes: '60');
-
-        self::assertTrue($reached);
-    }
-
-    /**
-     * Step-up middleware: a non-numeric `mfa:N` parameter must
-     * surface a clear `InvalidArgumentException`.
-     *
-     * @return void
-     */
-    public function testStepUpRejectsNonNumericParameter(): void
-    {
-        $user = TestUser::create([
-            'email'       => 'badparam@example.test',
-            'mfa_enabled' => true,
-        ]);
-        $this->actingAs($user);
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('RequireMfa middleware max-age parameter must be a non-negative integer');
-
-        $this->runMiddleware(maxAgeMinutes: 'abc');
-    }
-
-    /**
-     * Step-up middleware: a negative `mfa:N` parameter must surface
-     * a clear `InvalidArgumentException`.
-     *
-     * @return void
-     */
-    public function testStepUpRejectsNegativeParameter(): void
-    {
-        $user = TestUser::create([
-            'email'       => 'negparam@example.test',
-            'mfa_enabled' => true,
-        ]);
-        $this->actingAs($user);
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('RequireMfa middleware max-age parameter must be a non-negative integer');
-
-        $this->runMiddleware(maxAgeMinutes: '-1');
-    }
-
-    /**
-     * Step-up middleware: a fractional `mfa:N` parameter must
-     * surface a clear `InvalidArgumentException`.
-     *
-     * @return void
-     */
-    public function testStepUpRejectsFractionalParameter(): void
-    {
-        $user = TestUser::create([
-            'email'       => 'fracparam@example.test',
-            'mfa_enabled' => true,
-        ]);
-        $this->actingAs($user);
-
-        $this->expectException(\InvalidArgumentException::class);
-
-        $this->runMiddleware(maxAgeMinutes: '1.5');
-    }
-
-    /**
-     * Tighter parser checks: scientific notation, leading sign,
-     * surrounding whitespace, and empty string must all be rejected.
-     * `is_numeric` would silently coerce these to ints, which is the
-     * opposite of what a route definition needs.
-     *
-     * @return void
-     */
-    public function testStepUpRejectsLooselyNumericParameters(): void
-    {
-        $user = TestUser::create([
-            'email'       => 'loose@example.test',
-            'mfa_enabled' => true,
-        ]);
-        $this->actingAs($user);
-
-        $candidates = ['1e2', '+5', ' 5', '5 ', ''];
-        $rejected   = [];
-
-        foreach ($candidates as $candidate) {
-            try {
-                $this->runMiddleware(maxAgeMinutes: $candidate);
-            } catch (\InvalidArgumentException) {
-                $rejected[] = $candidate;
-            }
-        }
-
-        self::assertSame($candidates, $rejected);
-    }
-
-    /**
-     * Drive the middleware with the given route-middleware param and
-     * report whether the inner handler was reached.
-     *
-     * @param  ?string  $maxAgeMinutes
-     * @return bool
-     */
-    private function runMiddleware(?string $maxAgeMinutes): bool
-    {
-        $middleware = $this->container()->make(
-            \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
-        );
-
-        $reached = false;
-        $middleware->handle(
-            $this->container()->make(\Illuminate\Http\Request::class),
-            static function () use (&$reached): \Symfony\Component\HttpFoundation\Response {
-                $reached = true;
-
-                return new \Symfony\Component\HttpFoundation\Response('ok');
-            },
-            $maxAgeMinutes,
-        );
-
-        return $reached;
-    }
-
-    /**
-     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
-     */
-    private function enrolTotp(): array
-    {
-        $user = TestUser::create([
-            'email'       => 'totp-mw@example.test',
-            'mfa_enabled' => true,
-        ]);
-        $this->actingAs($user);
-
-        $google = new Google2FA;
-        $secret = $google->generateSecretKey();
-
-        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
-        $factor = Factor::create([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
-            'secret'               => $secret,
-        ]);
-
-        return [$user, $factor, $google->getCurrentOtp($secret)];
     }
 }

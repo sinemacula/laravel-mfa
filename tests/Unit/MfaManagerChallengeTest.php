@@ -139,7 +139,8 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
 
         $this->manager()->challenge('totp', $factor);
 
-        $this->addToAssertionCount(1);
+        $driver->shouldNotHaveReceived('issueChallenge');
+        $dispatcher->shouldNotHaveReceived('dispatch');
     }
 
     /**

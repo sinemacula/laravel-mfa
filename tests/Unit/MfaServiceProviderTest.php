@@ -170,11 +170,26 @@ final class MfaServiceProviderTest extends TestCase
             new \Illuminate\Events\Dispatcher($app),
         ));
 
+        // Snapshot the pre-boot publishable paths so we can assert the
+        // short-circuit leaves them untouched. Using the shared static
+        // registry means other tests may have pre-registered paths
+        // under the real provider class; diffing before/after isolates
+        // this boot's contribution.
+        $providerClass = \SineMacula\Laravel\Mfa\MfaServiceProvider::class;
+        /** @var array<string, mixed> $before */
+        $before = \Illuminate\Support\ServiceProvider::$publishes[$providerClass] ?? [];
+
         $provider = new \SineMacula\Laravel\Mfa\MfaServiceProvider($app);
 
-        // No exception, no publishes registered — confirms the guard works.
         $provider->boot();
 
-        $this->addToAssertionCount(1);
+        /** @var array<string, mixed> $after */
+        $after = \Illuminate\Support\ServiceProvider::$publishes[$providerClass] ?? [];
+
+        self::assertSame(
+            $before,
+            $after,
+            'offerPublishing() must not register publishes under a non-console kernel',
+        );
     }
 }

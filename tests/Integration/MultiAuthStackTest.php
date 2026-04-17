@@ -4,13 +4,13 @@ declare(strict_types = 1);
 
 namespace Tests\Integration;
 
-use Illuminate\Auth\GenericUser;
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Guards\GenericUserGuard;
+use Tests\Fixtures\Guards\StaticUserGuard;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
 
@@ -73,86 +73,9 @@ final class MultiAuthStackTest extends TestCase
         $user = $this->enrolUser('token@example.test');
 
         // Mimic what Sanctum / Passport do: register a guard whose
-        // resolver hands back a real Eloquent identity. The MFA manager
-        // reads through the default guard, so swap it out for the
-        // duration of the assertions.
-        Auth::extend('token', static function ($app, string $name, array $config) use ($user): Guard {
-            // The closure signature is fixed by Laravel's `Auth::extend`
-            // contract; this fake guard ignores the wiring args and
-            // returns the user captured from the outer closure.
-            unset($app, $name, $config);
-
-            return new class ($user) implements Guard {
-                /**
-                 * Capture the resolved identity once at construction.
-                 *
-                 * @param  \Tests\Fixtures\TestUser  $resolved
-                 * @return void
-                 */
-                public function __construct(private readonly TestUser $resolved) {}
-
-                /**
-                 * @return bool
-                 */
-                public function check(): bool
-                {
-                    return true;
-                }
-
-                /**
-                 * @return bool
-                 */
-                public function guest(): bool
-                {
-                    return false;
-                }
-
-                /**
-                 * @return \Tests\Fixtures\TestUser
-                 */
-                public function user(): TestUser
-                {
-                    return $this->resolved;
-                }
-
-                /**
-                 * @return int
-                 */
-                public function id(): int
-                {
-                    return $this->resolved->id;
-                }
-
-                /**
-                 * @param  array<array-key, mixed>  $credentials
-                 * @return bool
-                 */
-                public function validate(array $credentials = []): bool
-                {
-                    return true;
-                }
-
-                /**
-                 * @return bool
-                 */
-                public function hasUser(): bool
-                {
-                    return true;
-                }
-
-                /**
-                 * No-op — the fixture binds its identity at
-                 * construction time.
-                 *
-                 * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
-                 * @return self
-                 */
-                public function setUser(Authenticatable $user): self
-                {
-                    return $this;
-                }
-            };
-        });
+        // resolver hands back a real Eloquent identity — the MFA
+        // manager reads through the default guard, so swap it out.
+        Auth::extend('token', static fn (): Guard => new StaticUserGuard($user));
 
         config()->set('auth.defaults.guard', 'token');
         $this->container()->forgetInstance('mfa');
@@ -177,83 +100,7 @@ final class MultiAuthStackTest extends TestCase
         // The package should treat it as a non-MFA-capable identity
         // (`shouldUse()` returns false) — proving the manager does not
         // assume Eloquent throughout the orchestration surface.
-        Auth::extend('custom', static function (): Guard {
-            return new class implements Guard {
-                /** @var \Illuminate\Auth\GenericUser */
-                private readonly GenericUser $resolved;
-
-                /**
-                 * Build the fixture identity once at construction.
-                 *
-                 * @return void
-                 */
-                public function __construct()
-                {
-                    $this->resolved = new GenericUser(['id' => 99, 'name' => 'Generic']);
-                }
-
-                /**
-                 * @return bool
-                 */
-                public function check(): bool
-                {
-                    return true;
-                }
-
-                /**
-                 * @return bool
-                 */
-                public function guest(): bool
-                {
-                    return false;
-                }
-
-                /**
-                 * @return \Illuminate\Auth\GenericUser
-                 */
-                public function user(): GenericUser
-                {
-                    return $this->resolved;
-                }
-
-                /**
-                 * @return int
-                 */
-                public function id(): int
-                {
-                    return 99;
-                }
-
-                /**
-                 * @param  array<array-key, mixed>  $credentials
-                 * @return bool
-                 */
-                public function validate(array $credentials = []): bool
-                {
-                    return true;
-                }
-
-                /**
-                 * @return bool
-                 */
-                public function hasUser(): bool
-                {
-                    return true;
-                }
-
-                /**
-                 * No-op — the fixture binds its identity at
-                 * construction time.
-                 *
-                 * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
-                 * @return self
-                 */
-                public function setUser(Authenticatable $user): self
-                {
-                    return $this;
-                }
-            };
-        });
+        Auth::extend('custom', static fn (): Guard => new GenericUserGuard);
 
         config()->set('auth.guards.custom', [
             'driver'   => 'custom',

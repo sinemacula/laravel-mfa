@@ -165,32 +165,30 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test secret is encrypted at rest and decrypts on read.
+     * Test secret round-trips through encryption when read back.
      *
      * @return void
      */
-    public function testSecretIsEncryptedAtRestAndDecryptsOnRead(): void
+    public function testSecretRoundTripsThroughEncryption(): void
     {
-        $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
+        $factor = $this->persistFactorWithSecret('JBSWY3DPEHPK3PXP');
 
-        $factor = new Factor([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => $this->authenticatableId($user),
-            'driver'               => 'totp',
-            'secret'               => 'JBSWY3DPEHPK3PXP',
-        ]);
-        $factor->save();
-
-        // Reload from DB to ensure encryption round-trips.
         $reloaded = Factor::query()->findOrFail($factor->id);
 
         self::assertSame('JBSWY3DPEHPK3PXP', $reloaded->secret);
+    }
 
-        // Inspect the raw DB row to confirm the value is not stored as
-        // plaintext.
-        $connection = $factor->getConnection();
+    /**
+     * Test raw secret column is not stored as plaintext.
+     *
+     * @return void
+     */
+    public function testRawSecretColumnIsNotStoredAsPlaintext(): void
+    {
+        $factor = $this->persistFactorWithSecret('JBSWY3DPEHPK3PXP');
 
-        $raw = $connection->table($factor->getTable())
+        $raw = $factor->getConnection()
+            ->table($factor->getTable())
             ->where('id', $factor->id)
             ->first(['secret']);
 
@@ -202,35 +200,30 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Live OTP `code` (email / SMS) must also be encrypted at rest —
-     * defence-in-depth against a read-only DB compromise replaying a
-     * freshly-issued code inside its expiry window.
+     * Test code round-trips through encryption when read back.
      *
      * @return void
      */
-    public function testCodeIsEncryptedAtRestAndDecryptsOnRead(): void
+    public function testCodeRoundTripsThroughEncryption(): void
     {
-        $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
+        $factor = $this->persistFactorWithCode(self::CLEARTEXT_CODE);
 
-        $factor = new Factor([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => $this->authenticatableId($user),
-            'driver'               => 'email',
-            'recipient'            => 'verify@example.test',
-            'code'                 => self::CLEARTEXT_CODE,
-        ]);
-        $factor->save();
-
-        // Reload from DB to ensure encryption round-trips.
         $reloaded = Factor::query()->findOrFail($factor->id);
 
         self::assertSame(self::CLEARTEXT_CODE, $reloaded->code);
+    }
 
-        // Inspect the raw DB row to confirm the value is not stored as
-        // plaintext.
-        $connection = $factor->getConnection();
+    /**
+     * Test raw code column is not stored as plaintext.
+     *
+     * @return void
+     */
+    public function testRawCodeColumnIsNotStoredAsPlaintext(): void
+    {
+        $factor = $this->persistFactorWithCode(self::CLEARTEXT_CODE);
 
-        $raw = $connection->table($factor->getTable())
+        $raw = $factor->getConnection()
+            ->table($factor->getTable())
             ->where('id', $factor->id)
             ->first(['code']);
 
@@ -278,5 +271,48 @@ final class FactorTest extends TestCase
         $key = $user->getKey();
 
         return (string) $key;
+    }
+
+    /**
+     * Persist a TOTP factor carrying the given plaintext secret.
+     *
+     * @param  string  $secret
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function persistFactorWithSecret(string $secret): Factor
+    {
+        $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
+
+        $factor = new Factor([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => $this->authenticatableId($user),
+            'driver'               => 'totp',
+            'secret'               => $secret,
+        ]);
+        $factor->save();
+
+        return $factor;
+    }
+
+    /**
+     * Persist an email factor carrying the given plaintext OTP code.
+     *
+     * @param  string  $code
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function persistFactorWithCode(string $code): Factor
+    {
+        $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
+
+        $factor = new Factor([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => $this->authenticatableId($user),
+            'driver'               => 'email',
+            'recipient'            => 'verify@example.test',
+            'code'                 => $code,
+        ]);
+        $factor->save();
+
+        return $factor;
     }
 }

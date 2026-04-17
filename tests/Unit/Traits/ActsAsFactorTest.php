@@ -75,24 +75,103 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test column name accessors.
+     * Test driver column name accessor.
      *
      * @return void
      */
-    public function testColumnNameAccessors(): void
+    public function testGetDriverNameReturnsDriverColumn(): void
     {
-        $factor = new Factor;
+        self::assertSame('driver', (new Factor)->getDriverName());
+    }
 
-        self::assertSame('driver', $factor->getDriverName());
-        self::assertSame('label', $factor->getLabelName());
-        self::assertSame('recipient', $factor->getRecipientName());
-        self::assertSame('secret', $factor->getSecretName());
-        self::assertSame('code', $factor->getCodeName());
-        self::assertSame('expires_at', $factor->getExpiresAtName());
-        self::assertSame('attempts', $factor->getAttemptsName());
-        self::assertSame('locked_until', $factor->getLockedUntilName());
-        self::assertSame('last_attempted_at', $factor->getLastAttemptedAtName());
-        self::assertSame('verified_at', $factor->getVerifiedAtName());
+    /**
+     * Test label column name accessor.
+     *
+     * @return void
+     */
+    public function testGetLabelNameReturnsLabelColumn(): void
+    {
+        self::assertSame('label', (new Factor)->getLabelName());
+    }
+
+    /**
+     * Test recipient column name accessor.
+     *
+     * @return void
+     */
+    public function testGetRecipientNameReturnsRecipientColumn(): void
+    {
+        self::assertSame('recipient', (new Factor)->getRecipientName());
+    }
+
+    /**
+     * Test secret column name accessor.
+     *
+     * @return void
+     */
+    public function testGetSecretNameReturnsSecretColumn(): void
+    {
+        self::assertSame('secret', (new Factor)->getSecretName());
+    }
+
+    /**
+     * Test code column name accessor.
+     *
+     * @return void
+     */
+    public function testGetCodeNameReturnsCodeColumn(): void
+    {
+        self::assertSame('code', (new Factor)->getCodeName());
+    }
+
+    /**
+     * Test expires_at column name accessor.
+     *
+     * @return void
+     */
+    public function testGetExpiresAtNameReturnsExpiresAtColumn(): void
+    {
+        self::assertSame('expires_at', (new Factor)->getExpiresAtName());
+    }
+
+    /**
+     * Test attempts column name accessor.
+     *
+     * @return void
+     */
+    public function testGetAttemptsNameReturnsAttemptsColumn(): void
+    {
+        self::assertSame('attempts', (new Factor)->getAttemptsName());
+    }
+
+    /**
+     * Test locked_until column name accessor.
+     *
+     * @return void
+     */
+    public function testGetLockedUntilNameReturnsLockedUntilColumn(): void
+    {
+        self::assertSame('locked_until', (new Factor)->getLockedUntilName());
+    }
+
+    /**
+     * Test last_attempted_at column name accessor.
+     *
+     * @return void
+     */
+    public function testGetLastAttemptedAtNameReturnsLastAttemptedAtColumn(): void
+    {
+        self::assertSame('last_attempted_at', (new Factor)->getLastAttemptedAtName());
+    }
+
+    /**
+     * Test verified_at column name accessor.
+     *
+     * @return void
+     */
+    public function testGetVerifiedAtNameReturnsVerifiedAtColumn(): void
+    {
+        self::assertSame('verified_at', (new Factor)->getVerifiedAtName());
     }
 
     /**
@@ -371,17 +450,25 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test is verified reflects verified at presence.
+     * Test is verified is false when verified_at is absent.
      *
      * @return void
      */
-    public function testIsVerifiedReflectsVerifiedAtPresence(): void
+    public function testIsVerifiedIsFalseWhenVerifiedAtIsAbsent(): void
     {
-        $unverified = new Factor;
-        $verified   = new Factor(['verified_at' => Carbon::now()]);
+        self::assertFalse((new Factor)->isVerified());
+    }
 
-        self::assertFalse($unverified->isVerified());
-        self::assertTrue($verified->isVerified());
+    /**
+     * Test is verified is true when verified_at is present.
+     *
+     * @return void
+     */
+    public function testIsVerifiedIsTrueWhenVerifiedAtIsPresent(): void
+    {
+        $factor = new Factor(['verified_at' => Carbon::now()]);
+
+        self::assertTrue($factor->isVerified());
     }
 
     /**
@@ -515,26 +602,73 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test record verification stamps verified at and resets state.
+     * Test record verification stamps the verified_at timestamp.
      *
      * @return void
      */
-    public function testRecordVerificationStampsVerifiedAtAndResetsState(): void
+    public function testRecordVerificationStampsVerifiedAtTimestamp(): void
     {
-        $factor = new Factor([
-            'attempts'     => 2,
-            'locked_until' => Carbon::now()->addMinutes(5),
-            'code'         => self::SAMPLE_CODE,
-            'expires_at'   => Carbon::now()->addMinutes(5),
-        ]);
+        $factor = $this->makeFullyPopulatedFactor();
 
         $factor->recordVerification();
 
         self::assertNotNull($factor->getVerifiedAt());
         self::assertSame(Carbon::now()->getTimestamp(), $factor->getVerifiedAt()->getTimestamp());
+    }
+
+    /**
+     * Test record verification resets the attempt counter to zero.
+     *
+     * @return void
+     */
+    public function testRecordVerificationResetsAttemptCounter(): void
+    {
+        $factor = $this->makeFullyPopulatedFactor();
+
+        $factor->recordVerification();
+
         self::assertSame(0, $factor->getAttempts());
+    }
+
+    /**
+     * Test record verification clears the lockout timestamp.
+     *
+     * @return void
+     */
+    public function testRecordVerificationClearsLockoutTimestamp(): void
+    {
+        $factor = $this->makeFullyPopulatedFactor();
+
+        $factor->recordVerification();
+
         self::assertNull($factor->getLockedUntil());
+    }
+
+    /**
+     * Test record verification clears the pending code.
+     *
+     * @return void
+     */
+    public function testRecordVerificationClearsPendingCode(): void
+    {
+        $factor = $this->makeFullyPopulatedFactor();
+
+        $factor->recordVerification();
+
         self::assertNull($factor->getCode());
+    }
+
+    /**
+     * Test record verification clears the code expiry.
+     *
+     * @return void
+     */
+    public function testRecordVerificationClearsCodeExpiry(): void
+    {
+        $factor = $this->makeFullyPopulatedFactor();
+
+        $factor->recordVerification();
+
         self::assertNull($factor->getExpiresAt());
     }
 
@@ -624,5 +758,20 @@ final class ActsAsFactorTest extends TestCase
         $key = $user->getKey();
 
         return (string) $key;
+    }
+
+    /**
+     * Build a factor with attempts, lockout, code, and expiry populated.
+     *
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function makeFullyPopulatedFactor(): Factor
+    {
+        return new Factor([
+            'attempts'     => 2,
+            'locked_until' => Carbon::now()->addMinutes(5),
+            'code'         => self::SAMPLE_CODE,
+            'expires_at'   => Carbon::now()->addMinutes(5),
+        ]);
     }
 }

@@ -45,7 +45,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
 
         $this->manager()->markVerified();
 
-        $this->addToAssertionCount(1);
+        $store->shouldNotHaveReceived('markVerified');
     }
 
     /**
@@ -69,7 +69,9 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
 
         $this->manager()->markVerified();
 
-        $this->addToAssertionCount(1);
+        $store->shouldHaveReceived('markVerified')
+            ->once()
+            ->with(\Mockery::type(Authenticatable::class));
     }
 
     /**
@@ -87,7 +89,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
 
         $this->manager()->forgetVerification();
 
-        $this->addToAssertionCount(1);
+        $store->shouldNotHaveReceived('forget');
     }
 
     /**
@@ -111,7 +113,9 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
 
         $this->manager()->forgetVerification();
 
-        $this->addToAssertionCount(1);
+        $store->shouldHaveReceived('forget')
+            ->once()
+            ->with(\Mockery::type(Authenticatable::class));
     }
 
     /**
@@ -191,34 +195,35 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * `enrol()` must persist the supplied factor, dispatch
-     * `MfaFactorEnrolled`, and invalidate the identity's setup cache
-     * so the next `isSetup()` call observes the new factor.
+     * Test enrol persists the supplied factor row.
      *
      * @return void
      */
-    public function testEnrolPersistsFactorAndDispatchesEvent(): void
+    public function testEnrolPersistsFactor(): void
     {
-        Event::fake([MfaFactorEnrolled::class]);
-
-        $user = TestUser::query()->create([
-            'email'       => 'enrol@example.test',
-            'mfa_enabled' => true,
-        ]);
-
-        $this->actingAs($user);
-
+        $user    = $this->makeEnrolUser();
+        $factor  = $this->makeUnpersistedTotpFactor($user);
         $manager = $this->manager();
-
-        // Warm the setup cache to "no factors" so we can assert the
-        // post-enrol invalidation forced a fresh lookup.
-        self::assertFalse($manager->isSetup());
-
-        $factor = $this->makeUnpersistedTotpFactor($user);
 
         $manager->enrol($factor);
 
         self::assertTrue($factor->exists, 'enrol() must persist the factor row');
+    }
+
+    /**
+     * Test enrol dispatches the MfaFactorEnrolled event.
+     *
+     * @return void
+     */
+    public function testEnrolDispatchesEnrolledEvent(): void
+    {
+        Event::fake([MfaFactorEnrolled::class]);
+
+        $user    = $this->makeEnrolUser();
+        $factor  = $this->makeUnpersistedTotpFactor($user);
+        $manager = $this->manager();
+
+        $manager->enrol($factor);
 
         Event::assertDispatched(
             MfaFactorEnrolled::class,
@@ -226,6 +231,23 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
                     && $event->factor                                      === $factor
                     && $event->driver                                      === 'totp',
         );
+    }
+
+    /**
+     * Test enrol invalidates the identity's isSetup cache.
+     *
+     * @return void
+     */
+    public function testEnrolInvalidatesIsSetupCache(): void
+    {
+        $user    = $this->makeEnrolUser();
+        $manager = $this->manager();
+
+        // Warm the setup cache to "no factors" so the post-enrol
+        // invalidation must force a fresh lookup.
+        self::assertFalse($manager->isSetup());
+
+        $manager->enrol($this->makeUnpersistedTotpFactor($user));
 
         self::assertTrue($manager->isSetup(), 'cache must be cleared after enrol');
     }
@@ -256,30 +278,13 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * `disable()` must delete the underlying row, dispatch
-     * `MfaFactorDisabled`, and invalidate the identity's setup cache
-     * so a subsequent `isSetup()` call observes the removal.
+     * Test disable deletes the underlying factor row.
      *
      * @return void
      */
-    public function testDisableDeletesFactorAndDispatchesEvent(): void
+    public function testDisableDeletesFactorRow(): void
     {
-        Event::fake([MfaFactorDisabled::class]);
-
-        $user = $this->makeUserWithFactor();
-
-        $this->actingAs($user);
-
-        $manager = $this->manager();
-
-        // Warm the setup cache to "has factor" so we can assert the
-        // post-disable invalidation forced a fresh lookup.
-        self::assertTrue($manager->isSetup());
-
-        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
-        $factor = Factor::query()
-            ->where('authenticatable_id', (string) $user->id)
-            ->sole();
+        [$manager, $factor] = $this->enrolAndResolveFactor();
 
         $manager->disable($factor);
 
@@ -287,14 +292,84 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
             Factor::query()->find($factor->getKey()),
             'disable() must delete the factor row',
         );
+    }
+
+    /**
+     * Test disable dispatches the MfaFactorDisabled event.
+     *
+     * @return void
+     */
+    public function testDisableDispatchesDisabledEvent(): void
+    {
+        Event::fake([MfaFactorDisabled::class]);
+
+        [$manager, $factor, $user] = $this->enrolAndResolveFactor();
+
+        $manager->disable($factor);
 
         Event::assertDispatched(
             MfaFactorDisabled::class,
             static fn (MfaFactorDisabled $event): bool => $event->identity === $user
                     && $event->driver                                      === 'totp',
         );
+    }
+
+    /**
+     * Test disable invalidates the identity's isSetup cache.
+     *
+     * @return void
+     */
+    public function testDisableInvalidatesIsSetupCache(): void
+    {
+        [$manager, $factor] = $this->enrolAndResolveFactor();
+
+        // Warm the setup cache to "has factor" so the post-disable
+        // invalidation must force a fresh lookup.
+        self::assertTrue($manager->isSetup());
+
+        $manager->disable($factor);
 
         self::assertFalse($manager->isSetup(), 'cache must be cleared after disable');
+    }
+
+    /**
+     * Create an MFA-enabled user and authenticate as them, returning
+     * the user for enrol-flow tests.
+     *
+     * @return \Tests\Fixtures\TestUser
+     */
+    private function makeEnrolUser(): TestUser
+    {
+        $user = TestUser::query()->create([
+            'email'       => 'enrol@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        $this->actingAs($user);
+
+        return $user;
+    }
+
+    /**
+     * Enrol an MFA-enabled user with a TOTP factor and return the
+     * manager, resolved factor, and user triple for disable-flow tests.
+     *
+     * @return array{0: \SineMacula\Laravel\Mfa\MfaManager, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: \Tests\Fixtures\TestUser}
+     */
+    private function enrolAndResolveFactor(): array
+    {
+        $user = $this->makeUserWithFactor();
+
+        $this->actingAs($user);
+
+        $manager = $this->manager();
+
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
+        $factor = Factor::query()
+            ->where('authenticatable_id', (string) $user->id)
+            ->sole();
+
+        return [$manager, $factor, $user];
     }
 
     /**

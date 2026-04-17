@@ -38,28 +38,61 @@ final class TotpLifecycleTest extends TestCase
     private const string WRONG_CODE = '000000';
 
     /**
-     * A successful TOTP verification must update both the
-     * verification store and the factor row, and dispatch the
-     * `MfaVerified` event with the matching identity / driver /
-     * factor.
+     * Test successful TOTP verification returns true.
      *
      * @return void
      */
-    public function testSuccessfulVerificationMarksStoreAndFactor(): void
+    public function testSuccessfulVerificationReturnsTrue(): void
+    {
+        [, $factor, $code] = $this->enrolTotp();
+
+        self::assertTrue(Mfa::verify('totp', $factor, $code));
+    }
+
+    /**
+     * Test successful TOTP verification marks the verification store.
+     *
+     * @return void
+     */
+    public function testSuccessfulVerificationMarksVerificationStore(): void
+    {
+        [, $factor, $code] = $this->enrolTotp();
+
+        Mfa::verify('totp', $factor, $code);
+
+        self::assertTrue(Mfa::hasEverVerified());
+        self::assertFalse(Mfa::hasExpired());
+    }
+
+    /**
+     * Test successful TOTP verification stamps the factor verified_at.
+     *
+     * @return void
+     */
+    public function testSuccessfulVerificationStampsFactorVerifiedAt(): void
+    {
+        [, $factor, $code] = $this->enrolTotp();
+
+        Mfa::verify('totp', $factor, $code);
+
+        $factor->refresh();
+
+        self::assertNotNull($factor->getVerifiedAt());
+        self::assertSame(0, $factor->getAttempts());
+    }
+
+    /**
+     * Test successful TOTP verification dispatches MfaVerified event.
+     *
+     * @return void
+     */
+    public function testSuccessfulVerificationDispatchesVerifiedEvent(): void
     {
         Event::fake([MfaVerified::class]);
 
         [$user, $factor, $code] = $this->enrolTotp();
 
-        $result = Mfa::verify('totp', $factor, $code);
-
-        self::assertTrue($result);
-        self::assertTrue(Mfa::hasEverVerified());
-        self::assertFalse(Mfa::hasExpired());
-
-        $factor->refresh();
-        self::assertNotNull($factor->getVerifiedAt());
-        self::assertSame(0, $factor->getAttempts());
+        Mfa::verify('totp', $factor, $code);
 
         Event::assertDispatched(MfaVerified::class, static function (MfaVerified $event) use ($user, $factor): bool {
             $identity = $event->identity;
@@ -83,9 +116,9 @@ final class TotpLifecycleTest extends TestCase
 
         [, $factor] = $this->enrolTotp();
 
-        $result = Mfa::verify('totp', $factor, self::WRONG_CODE);
+        $verified = Mfa::verify('totp', $factor, self::WRONG_CODE);
 
-        self::assertFalse($result);
+        self::assertFalse($verified);
 
         $factor->refresh();
         self::assertSame(1, $factor->getAttempts());
@@ -98,36 +131,54 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Crossing the configured `max_attempts` threshold must lock the
-     * factor; subsequent verifies must short-circuit with a
-     * `FactorLocked` failure event.
+     * Test crossing max_attempts records the configured attempts count.
      *
      * @return void
      */
-    public function testThresholdCrossingAppliesLockout(): void
+    public function testThresholdCrossingRecordsConfiguredAttemptsCount(): void
     {
-        [, $factor] = $this->enrolTotp();
-
-        // TOTP max_attempts is not configured by default; mimic an OTP
-        // driver's config by inlining the expectation. The shipped
-        // email / sms defaults are 3.
-        config()->set('mfa.drivers.totp.max_attempts', 3);
-
-        Mfa::verify('totp', $factor, self::WRONG_CODE);
-        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
-        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
-
-        $factor->refresh();
+        $factor = $this->enrolAndBurnAttempts();
 
         self::assertSame(3, $factor->getAttempts());
+    }
+
+    /**
+     * Test crossing max_attempts stamps a future locked_until.
+     *
+     * @return void
+     */
+    public function testThresholdCrossingStampsFutureLockedUntil(): void
+    {
+        $factor = $this->enrolAndBurnAttempts();
+
         self::assertNotNull($factor->getLockedUntil());
         self::assertTrue($factor->isLocked());
+    }
+
+    /**
+     * Test verifying after lockout returns false.
+     *
+     * @return void
+     */
+    public function testVerifyingAfterLockoutReturnsFalse(): void
+    {
+        $factor = $this->enrolAndBurnAttempts();
+
+        self::assertFalse(Mfa::verify('totp', $factor, self::WRONG_CODE));
+    }
+
+    /**
+     * Test verifying after lockout dispatches FactorLocked failure.
+     *
+     * @return void
+     */
+    public function testVerifyingAfterLockoutDispatchesFactorLockedFailure(): void
+    {
+        $factor = $this->enrolAndBurnAttempts();
 
         Event::fake([MfaVerificationFailed::class]);
 
-        $result = Mfa::verify('totp', $factor, self::WRONG_CODE);
-
-        self::assertFalse($result);
+        Mfa::verify('totp', $factor, self::WRONG_CODE);
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
@@ -136,6 +187,8 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
+     * Test challenge preserves the attempts count after lockout.
+     *
      * `challenge()` must NOT clear an active TOTP lockout — TOTP has
      * no per-challenge secret to rotate, so wiping the attempt counter
      * on every "start MFA" call would let any consumer-side resend
@@ -144,40 +197,69 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return void
      */
-    public function testChallengePreservesTotpLockoutAcrossInvocations(): void
+    public function testChallengePreservesAttemptsAfterLockout(): void
     {
-        [, $factor] = $this->enrolTotp();
-
-        config()->set('mfa.drivers.totp.max_attempts', 3);
-
-        // Burn through `max_attempts` to force the lockout.
-        Mfa::verify('totp', $factor, self::WRONG_CODE);
-        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
-        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
-
-        $factor->refresh();
-
-        $lockedUntilBefore = $factor->getLockedUntil();
-        self::assertNotNull($lockedUntilBefore);
-        self::assertTrue($factor->isLocked());
-
-        Event::fake([MfaChallengeIssued::class]);
+        $factor = $this->enrolAndBurnAttempts();
 
         Mfa::challenge('totp', $factor);
 
         $factor->refresh();
 
-        // The challenge must complete (TOTP has nothing to issue) but
-        // the lockout state survives intact.
         self::assertSame(3, $factor->getAttempts());
+    }
+
+    /**
+     * Test challenge preserves the locked_until timestamp after lockout.
+     *
+     * @return void
+     */
+    public function testChallengePreservesLockedUntilTimestampAfterLockout(): void
+    {
+        $factor = $this->enrolAndBurnAttempts();
+
+        $lockedUntilBefore = $factor->getLockedUntil();
+        self::assertNotNull($lockedUntilBefore);
+
+        Mfa::challenge('totp', $factor);
+
+        $factor->refresh();
 
         $lockedUntilAfter = $factor->getLockedUntil();
         self::assertNotNull($lockedUntilAfter);
-        self::assertTrue($factor->isLocked());
         self::assertSame(
             $lockedUntilBefore->getTimestamp(),
             $lockedUntilAfter->getTimestamp(),
         );
+    }
+
+    /**
+     * Test challenge keeps the factor locked after lockout.
+     *
+     * @return void
+     */
+    public function testChallengeKeepsFactorLockedAfterLockout(): void
+    {
+        $factor = $this->enrolAndBurnAttempts();
+
+        Mfa::challenge('totp', $factor);
+
+        $factor->refresh();
+
+        self::assertTrue($factor->isLocked());
+    }
+
+    /**
+     * Test challenge dispatches MfaChallengeIssued even when locked.
+     *
+     * @return void
+     */
+    public function testChallengeDispatchesEventEvenWhenLocked(): void
+    {
+        $factor = $this->enrolAndBurnAttempts();
+
+        Event::fake([MfaChallengeIssued::class]);
+
+        Mfa::challenge('totp', $factor);
 
         Event::assertDispatched(MfaChallengeIssued::class);
     }
@@ -217,6 +299,27 @@ final class TotpLifecycleTest extends TestCase
 
         self::assertSame(5, $factor->getAttempts());
         self::assertTrue($factor->isLocked());
+    }
+
+    /**
+     * Enrol a TOTP factor and burn through the configured max-attempts
+     * so the factor is in a locked-out state when returned.
+     *
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function enrolAndBurnAttempts(): Factor
+    {
+        [, $factor] = $this->enrolTotp();
+
+        config()->set('mfa.drivers.totp.max_attempts', 3);
+
+        Mfa::verify('totp', $factor, self::WRONG_CODE);
+        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
+        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
+
+        $factor->refresh();
+
+        return $factor;
     }
 
     /**

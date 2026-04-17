@@ -30,8 +30,8 @@ final class SkipMfaTest extends TestCase
         $request    = Request::create('/');
         $response   = new Response('ok');
 
-        $seen   = null;
-        $result = $middleware->handle($request, static function (Request $passed) use (&$seen, $response): Response {
+        $seen    = null;
+        $handled = $middleware->handle($request, static function (Request $passed) use (&$seen, $response): Response {
             $seen = $passed;
 
             return $response;
@@ -44,6 +44,6 @@ final class SkipMfaTest extends TestCase
         // value (the instance we created and handed to the middleware).
         // @SuppressWarnings("php:S3415")
         self::assertSame($request, $seen);
-        self::assertSame($response, $result);
+        self::assertSame($response, $handled);
     }
 }

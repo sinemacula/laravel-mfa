@@ -57,8 +57,8 @@ final class BackupCodeDriverRaceTest extends TestCase
         // $factor still holds its stale state.
         Factor::query()->whereKey($factor->getKey())->delete();
 
-        $result = $driver->verify($factor, $code);
+        $verified = $driver->verify($factor, $code);
 
-        self::assertFalse($result);
+        self::assertFalse($verified);
     }
 }

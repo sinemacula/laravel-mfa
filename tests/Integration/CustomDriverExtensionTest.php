@@ -7,6 +7,8 @@ namespace Tests\Integration;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use Tests\Fixtures\MyDriverFactor;
+use Tests\Fixtures\RecordingFactorDriver;
 use Tests\TestCase;
 
 /**
@@ -26,189 +28,32 @@ use Tests\TestCase;
 final class CustomDriverExtensionTest extends TestCase
 {
     /**
-     * A consumer-supplied driver registered through `Mfa::extend()`
-     * must resolve to the registered instance and respond to
-     * `verify()` invocations identically to a built-in driver.
+     * Test a custom driver registered via Mfa::extend resolves to the
+     * registered instance.
      *
      * @return void
      */
-    public function testCustomDriverCanBeRegisteredAndResolved(): void
+    public function testCustomDriverResolvesToRegisteredInstance(): void
     {
-        $driver = new class implements FactorDriver {
-            /** @var int Issuance call counter for the test assertions. */
-            public int $issueCalls = 0;
-
-            /** @var int Verify call counter for the test assertions. */
-            public int $verifyCalls = 0;
-
-            /**
-             * Record the issuance call without performing any work.
-             *
-             * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-             * @return void
-             */
-            public function issueChallenge(Factor $factor): void
-            {
-                $this->issueCalls++;
-            }
-
-            /**
-             * Record the verify call and report success only when the
-             * submitted code is the magic string `'correct'`.
-             *
-             * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-             * @param  string  $code
-             * @return bool
-             */
-            public function verify(
-                Factor $factor,
-                #[\SensitiveParameter]
-                string $code,
-            ): bool {
-                $this->verifyCalls++;
-
-                return $code === 'correct';
-            }
-
-            /**
-             * Custom driver does not use a persistent secret.
-             *
-             * @return ?string
-             */
-            public function generateSecret(): ?string
-            {
-                return null;
-            }
-        };
+        $driver = new RecordingFactorDriver;
 
         Mfa::extend('my_driver', static fn () => $driver);
 
-        $resolved = Mfa::driver('my_driver');
-        self::assertSame($driver, $resolved);
+        self::assertSame($driver, Mfa::driver('my_driver'));
+    }
 
-        $factor = new class implements Factor {
-            /**
-             * @return mixed
-             */
-            public function getFactorIdentifier(): mixed
-            {
-                return 'x';
-            }
+    /**
+     * Test invoking a custom driver's verify increments its call counter.
+     *
+     * @return void
+     */
+    public function testCustomDriverVerifyCallReachesRegisteredInstance(): void
+    {
+        $driver = new RecordingFactorDriver;
 
-            /**
-             * @return string
-             */
-            public function getDriver(): string
-            {
-                return 'my_driver';
-            }
+        Mfa::extend('my_driver', static fn () => $driver);
 
-            /**
-             * @return ?string
-             */
-            public function getLabel(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getRecipient(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Illuminate\Contracts\Auth\Authenticatable
-             */
-            public function getAuthenticatable(): ?\Illuminate\Contracts\Auth\Authenticatable
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getSecret(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getCode(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getExpiresAt(): ?\Carbon\CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return int
-             */
-            public function getAttempts(): int
-            {
-                return 0;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLockedUntil(): ?\Carbon\CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isLocked(): bool
-            {
-                // Derived from the accessor so this stub does not duplicate
-                // the body of isVerified() — radarlint S4144 flags
-                // structurally identical method bodies.
-                return $this->getLockedUntil() !== null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLastAttemptedAt(): ?\Carbon\CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getVerifiedAt(): ?\Carbon\CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isVerified(): bool
-            {
-                // Verification state is irrelevant — these stubs feed the
-                // dispatch path, never the persistence path.
-                return false;
-            }
-        };
-
-        // Verify() returns false because the factor's not persistable and
-        // the orchestration store can't be updated — but the driver was
-        // still called.
-        Mfa::driver('my_driver')->verify($factor, 'correct');
+        Mfa::driver('my_driver')->verify(new MyDriverFactor, 'correct');
 
         self::assertSame(1, $driver->verifyCalls);
     }

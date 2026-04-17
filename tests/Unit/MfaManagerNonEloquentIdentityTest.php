@@ -44,22 +44,20 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * `getCachePrefix()` must compose a stable cache key for a non-
-     * Eloquent identity by falling back to the identity's FQCN —
-     * proving the morph-class branch is truly optional.
+     * `isSetup()` must complete without throwing when invoked against
+     * a non-Eloquent identity — the cache-prefix builder's FQCN
+     * fallback path is exercised on the way in. The behaviour proved
+     * here is "non-Eloquent identities do not break the cached read";
+     * the FQCN composition itself is private to the manager.
      *
      * @return void
      */
-    public function testCachePrefixUsesFqcnForNonEloquentIdentity(): void
+    public function testIsSetupCompletesForNonEloquentIdentityWithoutThrowing(): void
     {
         $identity = new NonEloquentIdentity('plain-1', mfaEnabled: false);
 
         Auth::shouldReceive('user')->andReturn($identity);
 
-        // The cached `isSetup()` call routes through `getCachePrefix()`
-        // and consults the identity's `isMfaEnabled()` flag — false
-        // here, so the assertion is just that the call completes
-        // without throwing on the FQCN-fallback branch.
         self::assertFalse($this->manager()->isSetup());
     }
 

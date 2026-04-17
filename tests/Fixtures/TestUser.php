@@ -22,6 +22,9 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
  * `mfa_enabled` boolean column so individual tests can flip it
  * without reaching into mocks or stubs.
  *
+ * @author      Ben Carey <bdmc@sinemacula.co.uk>
+ * @copyright   2026 Sine Macula Limited.
+ *
  * @property int $id
  * @property bool $mfa_enabled
  * @property ?string $email

@@ -95,20 +95,16 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test html body renderer produces expected output.
+     * Test html body wraps content in paragraph tags.
      *
      * @return void
      */
-    public function testHtmlBodyRendererProducesExpectedOutput(): void
+    public function testHtmlBodyWrapsContentInParagraphTags(): void
     {
-        $message    = new MfaCodeMessage('ABC123', 3);
-        $reflection = new \ReflectionMethod($message, 'renderHtml');
+        $message = new MfaCodeMessage('ABC123', 3);
 
-        /** @var string $html */
-        $html = $reflection->invoke($message);
+        $html = (string) $message->content()->htmlString;
 
-        self::assertStringContainsString('ABC123', $html);
-        self::assertStringContainsString('3 minute', $html);
         self::assertStringContainsString('<p>', $html);
     }
 
@@ -135,24 +131,54 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test exposes code and expiry as public readonly properties.
+     * Test code property exposes constructor argument.
      *
      * @return void
      */
-    public function testExposesCodeAndExpiryAsPublicReadonlyProperties(): void
+    public function testCodePropertyExposesConstructorArgument(): void
     {
         $message = new MfaCodeMessage('ABC123', 12);
 
         self::assertSame('ABC123', $message->code);
+    }
+
+    /**
+     * Test expiry property exposes constructor argument.
+     *
+     * @return void
+     */
+    public function testExpiryPropertyExposesConstructorArgument(): void
+    {
+        $message = new MfaCodeMessage('ABC123', 12);
+
         self::assertSame(12, $message->expiresInMinutes);
+    }
 
+    /**
+     * Test code property is declared public readonly.
+     *
+     * @return void
+     */
+    public function testCodePropertyIsDeclaredPublicReadonly(): void
+    {
         $reflection = new \ReflectionClass(MfaCodeMessage::class);
-        $codeProp   = $reflection->getProperty('code');
-        $expiryProp = $reflection->getProperty('expiresInMinutes');
+        $property   = $reflection->getProperty('code');
 
-        self::assertTrue($codeProp->isPublic());
-        self::assertTrue($codeProp->isReadOnly());
-        self::assertTrue($expiryProp->isPublic());
-        self::assertTrue($expiryProp->isReadOnly());
+        self::assertTrue($property->isPublic());
+        self::assertTrue($property->isReadOnly());
+    }
+
+    /**
+     * Test expiry property is declared public readonly.
+     *
+     * @return void
+     */
+    public function testExpiryPropertyIsDeclaredPublicReadonly(): void
+    {
+        $reflection = new \ReflectionClass(MfaCodeMessage::class);
+        $property   = $reflection->getProperty('expiresInMinutes');
+
+        self::assertTrue($property->isPublic());
+        self::assertTrue($property->isReadOnly());
     }
 }

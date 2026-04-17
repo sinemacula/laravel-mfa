@@ -131,10 +131,10 @@ final class SessionMfaVerificationStoreTest extends TestCase
 
         $store->markVerified($this->buildIdentity('user-1'));
 
-        $result = $store->lastVerifiedAt($this->buildIdentity('user-1'));
+        $verifiedAt = $store->lastVerifiedAt($this->buildIdentity('user-1'));
 
-        self::assertNotNull($result);
-        self::assertSame(Carbon::now()->getTimestamp(), $result->getTimestamp());
+        self::assertNotNull($verifiedAt);
+        self::assertSame(Carbon::now()->getTimestamp(), $verifiedAt->getTimestamp());
     }
 
     /**

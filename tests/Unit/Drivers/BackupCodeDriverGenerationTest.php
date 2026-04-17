@@ -96,6 +96,10 @@ final class BackupCodeDriverGenerationTest extends TestCase
     }
 
     /**
+     * `generateSet()` must reject a negative explicit count with a
+     * clear `InvalidArgumentException` — a negative batch size cannot
+     * mint any codes and would otherwise short-circuit silently.
+     *
      * @return void
      */
     public function testGenerateSetThrowsWhenExplicitCountIsNegative(): void

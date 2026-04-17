@@ -187,18 +187,16 @@ final class SmsDriverTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(':code placeholder');
 
-        // Assigning the constructed driver so the static analyser does
-        // not flag a "useless object instantiation" — the test is the
-        // failed construction itself, not the resulting instance.
-        $unused = new SmsDriver(
+        // Hand the constructor call to a callable so the instantiation
+        // is observably consumed inside the `expectException` scope —
+        // satisfies php:S1848 without an unreachable post-call
+        // assertion (php-tst-009).
+        $construct = static fn (): SmsDriver => new SmsDriver(
             gateway: new FakeSmsGateway,
             messageTemplate: 'Your verification code is missing the placeholder',
         );
 
-        // Unreachable — the constructor must throw above. Touch the
-        // local so PHP-CS-Fixer / static analysis can confirm it is
-        // observably used inside the test method body.
-        self::assertInstanceOf(SmsDriver::class, $unused);
+        $construct();
     }
 
     /**

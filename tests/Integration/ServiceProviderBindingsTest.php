@@ -39,11 +39,11 @@ final class ServiceProviderBindingsTest extends TestCase
      */
     public function testMfaManagerIsSingleton(): void
     {
-        $a = $this->container()->make('mfa');
-        $b = $this->container()->make('mfa');
+        $first  = $this->container()->make('mfa');
+        $second = $this->container()->make('mfa');
 
-        self::assertInstanceOf(MfaManager::class, $a);
-        self::assertSame($a, $b);
+        self::assertInstanceOf(MfaManager::class, $first);
+        self::assertSame($first, $second);
     }
 
     /**

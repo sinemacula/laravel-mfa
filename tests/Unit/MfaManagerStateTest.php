@@ -305,22 +305,21 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * The cache-prefix builder should accept an identity whose auth
-     * identifier is neither a string nor an int by falling back to an
-     * empty suffix rather than throwing.
+     * `isSetup()` must complete without throwing when the resolved
+     * identity's auth identifier is non-scalar (neither string nor
+     * int). The empty-suffix fallback inside the cache-prefix builder
+     * is exercised on the way in; the actual composition is private
+     * to the manager and asserted indirectly through the no-throw
+     * outcome here.
      *
      * @return void
      */
-    public function testIsSetupHandlesNonScalarAuthIdentifierViaEmptySuffix(): void
+    public function testIsSetupCompletesForNonScalarAuthIdentifierWithoutThrowing(): void
     {
         $identity = new NonScalarIdentifierUser;
 
         Auth::shouldReceive('user')->andReturn($identity);
 
-        // `isSetup()` forces the manager through `getCachePrefix()`,
-        // which must accept an identity whose auth identifier is
-        // neither a string nor an int by falling back to an empty
-        // suffix rather than throwing.
         self::assertFalse($this->manager()->isSetup());
     }
 }

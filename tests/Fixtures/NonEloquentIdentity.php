@@ -38,8 +38,13 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      * @return void
      */
     public function __construct(
+
+        /** Auth identifier reported by the fixture. */
         private readonly mixed $identifier = 'plain-1',
+
+        /** Whether the fixture reports MFA as enabled. */
         private readonly bool $mfaEnabled = false,
+
     ) {}
 
     /**

@@ -36,6 +36,14 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $driver = $this->manager()->driver('totp');
 
         self::assertInstanceOf(TotpDriver::class, $driver);
+
+        $property = new \ReflectionProperty($driver, 'window');
+
+        // Reflection on the private `window` property pins the
+        // factory-resolved value — without it the test would only
+        // observe the resolved class, not the constructor argument.
+        // @SuppressWarnings("php:S3011")
+        self::assertSame(3, $property->getValue($driver));
     }
 
     /**
@@ -52,6 +60,15 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $driver = $this->manager()->driver('totp');
 
         self::assertInstanceOf(TotpDriver::class, $driver);
+
+        $property = new \ReflectionProperty($driver, 'window');
+
+        // Reflection on the private `window` property pins the
+        // factory's default-resolution path — without it the test
+        // would only observe the resolved class, not the fall-back
+        // value of 1.
+        // @SuppressWarnings("php:S3011")
+        self::assertSame(1, $property->getValue($driver));
     }
 
     /**

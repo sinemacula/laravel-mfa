@@ -80,9 +80,9 @@ final class RequireMfaTest extends TestCase
         $request->attributes->set('skip_mfa', true);
         $response = new Response('ok');
 
-        $result = $middleware->handle($request, static fn (): Response => $response);
+        $handled = $middleware->handle($request, static fn (): Response => $response);
 
-        self::assertSame($response, $result);
+        self::assertSame($response, $handled);
     }
 
     /**
@@ -100,9 +100,9 @@ final class RequireMfaTest extends TestCase
         $request    = Request::create('/');
         $response   = new Response('ok');
 
-        $result = $middleware->handle($request, static fn (): Response => $response);
+        $handled = $middleware->handle($request, static fn (): Response => $response);
 
-        self::assertSame($response, $result);
+        self::assertSame($response, $handled);
     }
 
     /**
@@ -227,14 +227,14 @@ final class RequireMfaTest extends TestCase
         $response   = new Response('allowed');
 
         $invoked = false;
-        $result  = $middleware->handle($request, static function (Request $passed) use ($request, &$invoked, $response): Response {
+        $handled = $middleware->handle($request, static function (Request $passed) use ($request, &$invoked, $response): Response {
             $invoked = $passed === $request;
 
             return $response;
         });
 
         self::assertTrue($invoked);
-        self::assertSame($response, $result);
+        self::assertSame($response, $handled);
     }
 
     /**

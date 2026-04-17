@@ -51,23 +51,30 @@ final class IssueBackupCodesTest extends TestCase
     }
 
     /**
-     * The default call mints the configured number of codes, persists
-     * one Factor row per code with a hashed `secret`, returns the
-     * plaintext set exactly once, and dispatches one
-     * `MfaFactorEnrolled` event per code.
+     * Test issueBackupCodes returns the configured number of codes.
      *
      * @return void
      */
-    public function testMintsAndPersistsConfiguredBatch(): void
+    public function testIssueBackupCodesReturnsConfiguredBatchSize(): void
     {
-        $user = $this->loginUser();
-
-        Event::fake([MfaFactorEnrolled::class]);
+        $this->loginUser();
 
         $codes = Mfa::issueBackupCodes();
 
         self::assertCount(10, $codes);
         self::assertContainsOnlyString($codes);
+    }
+
+    /**
+     * Test issueBackupCodes persists one factor row per code.
+     *
+     * @return void
+     */
+    public function testIssueBackupCodesPersistsOneFactorPerCode(): void
+    {
+        $user = $this->loginUser();
+
+        Mfa::issueBackupCodes();
 
         $persisted = Factor::query()
             ->where('authenticatable_id', (string) $user->id)
@@ -75,23 +82,52 @@ final class IssueBackupCodesTest extends TestCase
             ->get();
 
         self::assertCount(10, $persisted);
+    }
+
+    /**
+     * Test issueBackupCodes persists only hashed secrets, never plaintext.
+     *
+     * @return void
+     */
+    public function testIssueBackupCodesPersistsOnlyHashedSecrets(): void
+    {
+        $user = $this->loginUser();
+
+        $codes = Mfa::issueBackupCodes();
+
+        $persisted = Factor::query()
+            ->where('authenticatable_id', (string) $user->id)
+            ->where('driver', 'backup_code')
+            ->get();
 
         $hasher = new BackupCodeDriver;
 
         foreach ($codes as $code) {
-            // Plaintext codes must NOT be persisted — only their hash.
             self::assertCount(
                 0,
                 $persisted->where('secret', $code),
                 'plaintext code must not appear in the persisted secret column',
             );
-            // The hashed counterpart must be present exactly once.
             self::assertCount(
                 1,
                 $persisted->where('secret', $hasher->hash($code)),
                 'every minted code must be persisted as a hashed factor row',
             );
         }
+    }
+
+    /**
+     * Test issueBackupCodes dispatches one enrolled event per code.
+     *
+     * @return void
+     */
+    public function testIssueBackupCodesDispatchesOneEnrolledEventPerCode(): void
+    {
+        $this->loginUser();
+
+        Event::fake([MfaFactorEnrolled::class]);
+
+        Mfa::issueBackupCodes();
 
         Event::assertDispatchedTimes(MfaFactorEnrolled::class, 10);
     }
@@ -154,26 +190,13 @@ final class IssueBackupCodesTest extends TestCase
     }
 
     /**
-     * Rotation must run inside a database transaction — partial state
-     * (old rows deleted but new ones not inserted, or vice versa) is
-     * never visible to a concurrent reader. The "single winner"
-     * concurrency invariant is verified by issuing a fresh batch and
-     * confirming the row count is exactly the new batch size.
+     * Test rotation does not delete factors of other drivers.
      *
      * @return void
      */
-    public function testFinalRowCountReflectsExactlyTheNewBatch(): void
+    public function testRotationDoesNotDeleteFactorsOfOtherDrivers(): void
     {
-        $user = $this->loginUser();
-
-        // Pre-seed an unrelated factor (TOTP) — rotation must not
-        // delete factors of other drivers.
-        Factor::query()->create([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
-            'secret'               => 'JBSWY3DPEHPK3PXP',
-        ]);
+        $user = $this->seedUserWithTotpFactor();
 
         Mfa::issueBackupCodes();
 
@@ -181,12 +204,26 @@ final class IssueBackupCodesTest extends TestCase
             ->where('authenticatable_id', (string) $user->id)
             ->where('driver', 'totp')
             ->get();
+
+        self::assertCount(1, $totp, 'rotation must not touch other drivers');
+    }
+
+    /**
+     * Test final backup_code row count matches the new batch size.
+     *
+     * @return void
+     */
+    public function testFinalBackupCodeRowCountMatchesNewBatchSize(): void
+    {
+        $user = $this->seedUserWithTotpFactor();
+
+        Mfa::issueBackupCodes();
+
         $backup = Factor::query()
             ->where('authenticatable_id', (string) $user->id)
             ->where('driver', 'backup_code')
             ->get();
 
-        self::assertCount(1, $totp, 'rotation must not touch other drivers');
         self::assertCount(10, $backup);
     }
 
@@ -232,6 +269,27 @@ final class IssueBackupCodesTest extends TestCase
         $this->expectExceptionMessage(BackupCodeDriver::class);
 
         Mfa::issueBackupCodes();
+    }
+
+    /**
+     * Authenticate as a fresh MFA-enabled user and pre-seed an
+     * unrelated TOTP factor so cross-driver isolation assertions have
+     * a fixture to observe.
+     *
+     * @return \Tests\Fixtures\TestUser
+     */
+    private function seedUserWithTotpFactor(): TestUser
+    {
+        $user = $this->loginUser();
+
+        Factor::query()->create([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+            'driver'               => 'totp',
+            'secret'               => 'JBSWY3DPEHPK3PXP',
+        ]);
+
+        return $user;
     }
 
     /**

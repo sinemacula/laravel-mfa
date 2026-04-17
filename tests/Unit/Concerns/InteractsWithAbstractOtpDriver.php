@@ -176,7 +176,7 @@ trait InteractsWithAbstractOtpDriver
      * @param  ?\Carbon\CarbonInterface  $expires
      * @return \SineMacula\Laravel\Mfa\Contracts\Factor
      */
-    protected function makeStubFactor(?string $code, ?CarbonInterface $expires): Factor
+    protected function makeStubFactor(#[\SensitiveParameter] ?string $code, ?CarbonInterface $expires): Factor
     {
         return new class ($code, $expires) extends AbstractFactorStub {
             /**

@@ -4,11 +4,10 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
-use Carbon\CarbonInterface;
-use Illuminate\Contracts\Auth\Authenticatable;
 use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
+use Tests\Fixtures\TotpStubFactor;
 use Tests\TestCase;
 
 /**
@@ -239,135 +238,8 @@ final class TotpDriverTest extends TestCase
      * @param  ?string  $secret
      * @return \SineMacula\Laravel\Mfa\Contracts\Factor
      */
-    private function makeFactor(?string $secret): Factor
+    private function makeFactor(#[\SensitiveParameter] ?string $secret): Factor
     {
-        return new class ($secret) implements Factor {
-            /**
-             * Capture the seeded secret value.
-             *
-             * @param  ?string  $secret
-             * @return void
-             */
-            public function __construct(
-                private readonly ?string $secret,
-            ) {}
-
-            /**
-             * @return mixed
-             */
-            public function getFactorIdentifier(): mixed
-            {
-                return 'totp-stub';
-            }
-
-            /**
-             * @return string
-             */
-            public function getDriver(): string
-            {
-                return 'totp';
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getLabel(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getRecipient(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Illuminate\Contracts\Auth\Authenticatable
-             */
-            public function getAuthenticatable(): ?Authenticatable
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getSecret(): ?string
-            {
-                return $this->secret;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getCode(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getExpiresAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return int
-             */
-            public function getAttempts(): int
-            {
-                return 0;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLockedUntil(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isLocked(): bool
-            {
-                // Derived from the accessor so this stub does not duplicate
-                // the body of isVerified() — radarlint S4144 flags
-                // structurally identical method bodies.
-                return $this->getLockedUntil() !== null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLastAttemptedAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getVerifiedAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isVerified(): bool
-            {
-                // Verification state is irrelevant — these stubs cover the
-                // verify-decision path, not the post-verify state machine.
-                return false;
-            }
-        };
+        return new TotpStubFactor($secret);
     }
 }

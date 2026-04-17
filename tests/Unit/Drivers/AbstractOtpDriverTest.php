@@ -52,13 +52,45 @@ final class AbstractOtpDriverTest extends TestCase
     }
 
     /**
-     * Issuance must dispatch the code to the transport before
-     * persisting it on the factor — observed via a shared call-order
-     * tracker.
+     * Test issueChallenge dispatches exactly once to the factor.
      *
      * @return void
      */
-    public function testIssueChallengeDispatchesThenPersistsInOrder(): void
+    public function testIssueChallengeDispatchesExactlyOnceToFactor(): void
+    {
+        $driver = $this->makeDriver();
+        $factor = $this->createEloquentFactor();
+
+        $driver->issueChallenge($factor);
+
+        self::assertCount(1, $driver->dispatched);
+        self::assertSame($factor, $driver->dispatched[0]['factor']);
+    }
+
+    /**
+     * Test issueChallenge dispatches a well-formed numeric code.
+     *
+     * @return void
+     */
+    public function testIssueChallengeDispatchesWellFormedCode(): void
+    {
+        $driver = $this->makeDriver();
+        $factor = $this->createEloquentFactor();
+
+        $driver->issueChallenge($factor);
+
+        $code = $driver->dispatched[0]['code'];
+
+        self::assertIsString($code);
+        self::assertMatchesRegularExpression('/^\d{6}$/', $code);
+    }
+
+    /**
+     * Test issueChallenge dispatches before persisting to the factor.
+     *
+     * @return void
+     */
+    public function testIssueChallengeDispatchesBeforePersistingToFactor(): void
     {
         $order  = [];
         $driver = $this->makeDriver(orderTracker: $order);
@@ -66,20 +98,44 @@ final class AbstractOtpDriverTest extends TestCase
 
         $driver->issueChallenge($factor);
 
-        self::assertCount(1, $driver->dispatched);
-        self::assertSame($factor, $driver->dispatched[0]['factor']);
-
-        $code = $driver->dispatched[0]['code'];
-        self::assertIsString($code);
-        self::assertMatchesRegularExpression('/^\d{6}$/', $code);
-
         // Dispatch must have happened before the persist-bearing issueCode()
         // call, and both sides must be observed.
         self::assertSame(['dispatch', 'issueCode', 'persist'], $order);
+    }
+
+    /**
+     * Test issueChallenge persists the dispatched code onto the factor.
+     *
+     * @return void
+     */
+    public function testIssueChallengePersistsDispatchedCodeOntoFactor(): void
+    {
+        $driver = $this->makeDriver();
+        $factor = $this->createEloquentFactor();
+
+        $driver->issueChallenge($factor);
+
+        $code = $driver->dispatched[0]['code'];
 
         $factor->refresh();
 
         self::assertSame($code, $factor->getCode());
+    }
+
+    /**
+     * Test issueChallenge persists an expiry alongside the code.
+     *
+     * @return void
+     */
+    public function testIssueChallengePersistsExpiryAlongsideCode(): void
+    {
+        $driver = $this->makeDriver();
+        $factor = $this->createEloquentFactor();
+
+        $driver->issueChallenge($factor);
+
+        $factor->refresh();
+
         self::assertNotNull($factor->getExpiresAt());
     }
 

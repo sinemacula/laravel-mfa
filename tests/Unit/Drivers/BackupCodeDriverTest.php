@@ -9,6 +9,7 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
+use Tests\Fixtures\NonModelEloquentBackupCodeFactor;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
 
@@ -264,43 +265,9 @@ final class BackupCodeDriverTest extends TestCase
      * @param  string  $secret
      * @return \SineMacula\Laravel\Mfa\Contracts\EloquentFactor
      */
-    private function makeNonModelEloquentFactor(string $secret): EloquentFactor
+    private function makeNonModelEloquentFactor(#[\SensitiveParameter] string $secret): EloquentFactor
     {
-        return new class ($secret) extends \Tests\Fixtures\AbstractEloquentFactorStub {
-            /**
-             * Capture the seeded secret value.
-             *
-             * @param  ?string  $secret
-             * @return void
-             */
-            public function __construct(
-                private readonly ?string $secret,
-            ) {}
-
-            /**
-             * @return mixed
-             */
-            public function getFactorIdentifier(): mixed
-            {
-                return 'non-model';
-            }
-
-            /**
-             * @return string
-             */
-            public function getDriver(): string
-            {
-                return BackupCodeDriver::NAME;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getSecret(): ?string
-            {
-                return $this->secret;
-            }
-        };
+        return new NonModelEloquentBackupCodeFactor($secret);
     }
 
     /**
@@ -310,7 +277,7 @@ final class BackupCodeDriverTest extends TestCase
      * @param  ?string  $secret
      * @return \SineMacula\Laravel\Mfa\Contracts\Factor
      */
-    private function makeStubFactor(?string $secret): Factor
+    private function makeStubFactor(#[\SensitiveParameter] ?string $secret): Factor
     {
         return new class ($secret) extends \Tests\Fixtures\AbstractFactorStub {
             /**
@@ -320,7 +287,11 @@ final class BackupCodeDriverTest extends TestCase
              * @return void
              */
             public function __construct(
+
+                /** Stored backup-code secret hash. */
+                #[\SensitiveParameter]
                 private readonly ?string $secret,
+
             ) {}
 
             /**

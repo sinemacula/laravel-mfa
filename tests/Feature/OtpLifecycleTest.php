@@ -36,37 +36,133 @@ final class OtpLifecycleTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Issuing an email challenge should send the Mailable, persist
-     * the code, dispatch the challenge event, and then verify
-     * successfully against the persisted code.
+     * Test email challenge sends the mailable to the recipient.
      *
      * @return void
      */
-    public function testEmailChallengeIssuedAndVerified(): void
+    public function testEmailChallengeSendsMailableToRecipient(): void
     {
         Mail::fake();
-        Event::fake([MfaChallengeIssued::class, MfaVerified::class]);
 
         [$user, $factor] = $this->enrolEmail();
 
         Mfa::challenge('email', $factor);
 
+        Mail::assertSent(MfaCodeMessage::class, static fn (MfaCodeMessage $mail): bool => $mail->hasTo($user->email));
+    }
+
+    /**
+     * Test email challenge dispatches the MfaChallengeIssued event.
+     *
+     * @return void
+     */
+    public function testEmailChallengeDispatchesChallengeIssuedEvent(): void
+    {
+        Mail::fake();
+        Event::fake([MfaChallengeIssued::class]);
+
+        [, $factor] = $this->enrolEmail();
+
+        Mfa::challenge('email', $factor);
+
+        Event::assertDispatched(MfaChallengeIssued::class);
+    }
+
+    /**
+     * Test email challenge persists a code on the factor.
+     *
+     * @return void
+     */
+    public function testEmailChallengePersistsCodeOnFactor(): void
+    {
+        Mail::fake();
+
+        [, $factor] = $this->enrolEmail();
+
+        Mfa::challenge('email', $factor);
+
         $factor->refresh();
 
-        Mail::assertSent(MfaCodeMessage::class, static fn (MfaCodeMessage $mail): bool => $mail->hasTo($user->email));
-        Event::assertDispatched(MfaChallengeIssued::class);
+        self::assertNotNull($factor->getCode());
+    }
+
+    /**
+     * Test verifying the persisted email code returns true.
+     *
+     * @return void
+     */
+    public function testVerifyingPersistedEmailCodeReturnsTrue(): void
+    {
+        Mail::fake();
+
+        [, $factor] = $this->enrolEmail();
+
+        Mfa::challenge('email', $factor);
+        $factor->refresh();
 
         $code = $factor->getCode();
         self::assertNotNull($code);
 
-        $result = Mfa::verify('email', $factor, $code);
+        self::assertTrue(Mfa::verify('email', $factor, $code));
+    }
 
-        self::assertTrue($result);
+    /**
+     * Test verifying the persisted email code marks the verification store.
+     *
+     * @return void
+     */
+    public function testVerifyingPersistedEmailCodeMarksVerificationStore(): void
+    {
+        Mail::fake();
+
+        [, $factor] = $this->enrolEmail();
+
+        Mfa::challenge('email', $factor);
+        $factor->refresh();
+
+        Mfa::verify('email', $factor, $factor->getCode() ?? '');
+
         self::assertTrue(Mfa::hasEverVerified());
+    }
+
+    /**
+     * Test verifying the persisted email code dispatches MfaVerified.
+     *
+     * @return void
+     */
+    public function testVerifyingPersistedEmailCodeDispatchesVerifiedEvent(): void
+    {
+        Mail::fake();
+        Event::fake([MfaVerified::class]);
+
+        [, $factor] = $this->enrolEmail();
+
+        Mfa::challenge('email', $factor);
+        $factor->refresh();
+
+        Mfa::verify('email', $factor, $factor->getCode() ?? '');
 
         Event::assertDispatched(MfaVerified::class);
+    }
+
+    /**
+     * Test verifying the persisted email code clears code and expiry.
+     *
+     * @return void
+     */
+    public function testVerifyingPersistedEmailCodeClearsCodeAndExpiry(): void
+    {
+        Mail::fake();
+
+        [, $factor] = $this->enrolEmail();
+
+        Mfa::challenge('email', $factor);
+        $factor->refresh();
+
+        Mfa::verify('email', $factor, $factor->getCode() ?? '');
 
         $factor->refresh();
+
         self::assertNull($factor->getCode());
         self::assertNull($factor->getExpiresAt());
     }
@@ -98,9 +194,9 @@ final class OtpLifecycleTest extends TestCase
             $sent[0]['message'],
         );
 
-        $result = Mfa::verify('sms', $factor, $factor->getCode() ?? '');
+        $verified = Mfa::verify('sms', $factor, $factor->getCode() ?? '');
 
-        self::assertTrue($result);
+        self::assertTrue($verified);
     }
 
     /**
@@ -119,9 +215,9 @@ final class OtpLifecycleTest extends TestCase
         Mfa::challenge('email', $factor);
         $factor->refresh();
 
-        $result = Mfa::verify('email', $factor, '000000');
+        $wrongCodeAttempt = Mfa::verify('email', $factor, '000000');
 
-        self::assertFalse($result);
+        self::assertFalse($wrongCodeAttempt);
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
@@ -149,9 +245,9 @@ final class OtpLifecycleTest extends TestCase
 
         Event::fake([MfaVerificationFailed::class]);
 
-        $result = Mfa::verify('email', $factor, $factor->getCode() ?? '');
+        $expiredCodeAttempt = Mfa::verify('email', $factor, $factor->getCode() ?? '');
 
-        self::assertFalse($result);
+        self::assertFalse($expiredCodeAttempt);
 
         Event::assertDispatched(
             MfaVerificationFailed::class,

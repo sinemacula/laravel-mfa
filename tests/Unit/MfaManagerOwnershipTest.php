@@ -136,42 +136,49 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * `enrol()` must overwrite caller-supplied morph columns with the
-     * current identity — a consumer cannot enrol a factor against the
-     * victim's account by pre-populating relation columns.
+     * Test enrol overwrites caller-supplied morph_id with current identity.
      *
      * @return void
      */
-    public function testEnrolStampsCurrentIdentityOverCallerSuppliedMorphColumns(): void
+    public function testEnrolOverwritesCallerSuppliedMorphId(): void
     {
-        $victim = TestUser::query()->create([
-            'email'       => 'enrol-victim@example.test',
-            'mfa_enabled' => true,
-        ]);
-
-        $attacker = TestUser::query()->create([
-            'email'       => 'enrol-attacker@example.test',
-            'mfa_enabled' => true,
-        ]);
-
-        $this->actingAs($attacker);
-
-        $factor         = new Factor;
-        $factor->driver = 'totp';
-        $factor->secret = 'JBSWY3DPEHPK3PXP';
-        // Caller pre-populates the morph columns to point at the victim;
-        // the manager must overwrite them with the current identity.
-        $factor->authenticatable_type = $victim::class;
-        $factor->authenticatable_id   = (string) $victim->id;
-
-        Event::fake([MfaFactorEnrolled::class]);
+        [$attacker, $factor] = $this->stageEnrolHijackAttempt();
 
         $this->manager()->enrol($factor);
 
         $factor->refresh();
 
         self::assertSame((string) $attacker->id, $factor->authenticatable_id);
+    }
+
+    /**
+     * Test enrol overwrites caller-supplied morph_type with current identity.
+     *
+     * @return void
+     */
+    public function testEnrolOverwritesCallerSuppliedMorphType(): void
+    {
+        [$attacker, $factor] = $this->stageEnrolHijackAttempt();
+
+        $this->manager()->enrol($factor);
+
+        $factor->refresh();
+
         self::assertSame($attacker::class, $factor->authenticatable_type);
+    }
+
+    /**
+     * Test enrol dispatches MfaFactorEnrolled even when caller spoofs morph columns.
+     *
+     * @return void
+     */
+    public function testEnrolDispatchesEnrolledEventWhenCallerSpoofsMorphColumns(): void
+    {
+        [, $factor] = $this->stageEnrolHijackAttempt();
+
+        Event::fake([MfaFactorEnrolled::class]);
+
+        $this->manager()->enrol($factor);
 
         Event::assertDispatched(MfaFactorEnrolled::class);
     }
@@ -353,6 +360,37 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
         $this->expectException(FactorOwnershipMismatchException::class);
 
         $this->manager()->verify('totp', $factor, self::WRONG_CODE);
+    }
+
+    /**
+     * Stage a cross-account enrol hijack attempt: the attacker is
+     * authenticated, but the supplied factor's morph columns point at
+     * the victim. Returns the attacker and the spoofed factor for
+     * the assertions to observe.
+     *
+     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
+     */
+    private function stageEnrolHijackAttempt(): array
+    {
+        $victim = TestUser::query()->create([
+            'email'       => 'enrol-victim@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        $attacker = TestUser::query()->create([
+            'email'       => 'enrol-attacker@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        $this->actingAs($attacker);
+
+        $factor                       = new Factor;
+        $factor->driver               = 'totp';
+        $factor->secret               = 'JBSWY3DPEHPK3PXP';
+        $factor->authenticatable_type = $victim::class;
+        $factor->authenticatable_id   = (string) $victim->id;
+
+        return [$attacker, $factor];
     }
 
     /**

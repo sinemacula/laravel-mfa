@@ -46,17 +46,40 @@ final class InMemoryFactor implements Factor
      * @return void
      */
     public function __construct(
+
+        /** Driver name reported by the factor. */
         private readonly string $driver = 'totp',
+
+        /** Stored secret value. */
         private readonly ?string $secret = null,
+
+        /** Pending one-time code. */
         private readonly ?string $code = null,
+
+        /** Code expiry timestamp. */
         private readonly ?CarbonInterface $expiresAt = null,
+
+        /** Failed verification attempt count. */
         private int $attempts = 0,
+
+        /** Lockout expiry timestamp. */
         private readonly ?CarbonInterface $lockedUntil = null,
+
+        /** Last successful verification timestamp. */
         private readonly ?CarbonInterface $verifiedAt = null,
+
+        /** Delivery recipient (email address, phone number, etc). */
         private readonly ?string $recipient = null,
+
+        /** Human-readable factor label. */
         private readonly ?string $label = null,
+
+        /** Factor identifier returned by `getFactorIdentifier()`. */
         private readonly mixed $identifier = 'factor-id',
+
+        /** Owning authenticatable, or `null` for the unowned shape. */
         private readonly ?Authenticatable $authenticatable = null,
+
     ) {}
 
     /**

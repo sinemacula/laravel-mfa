@@ -123,20 +123,24 @@ final class DefaultsTest extends TestCase
     }
 
     /**
-     * The TOTP driver should accept a constructor-supplied window
-     * override; default and explicit instances must be distinct.
+     * The TOTP driver's default window must be 1 — observed via
+     * reflection on the private `window` property since the value is
+     * never exposed via a getter.
      *
      * @return void
      */
-    public function testTotpDriverUsesWindowOne(): void
+    public function testTotpDriverDefaultsWindowToOne(): void
     {
-        // The Google2FA::verifyKey window is exercised by its own tests;
-        // here we just assert the driver exposes the window param if
-        // needed. Since window is a constructor private property, assert
-        // indirectly by constructing with an explicit non-default.
-        $default  = new TotpDriver;
-        $explicit = new TotpDriver(window: 2);
+        $driver = new TotpDriver;
 
-        self::assertNotSame($default, $explicit);
+        $property = new \ReflectionProperty($driver, 'window');
+
+        // Reflection on the private `window` property is the only way
+        // to observe the constructor default value — the driver does
+        // not expose a public getter, and we explicitly do NOT want a
+        // behavioural test here that would cross into Google2FA's
+        // verifyKey window logic (covered in its own dependency tests).
+        // @SuppressWarnings("php:S3011")
+        self::assertSame(1, $property->getValue($driver));
     }
 }
