@@ -1,10 +1,10 @@
 # Backlog
 
-Forward-looking work tracked against `sinemacula/laravel-mfa`.
+Forward-looking work for `sinemacula/laravel-mfa`. Everything shipped in the 1.0 cycle has been
+cleared from this file — the git log carries the per-commit audit trail. Only the durable
+architectural context and the one explicitly-out-of-repo item remain.
 
-The git log is the audit trail for everything already shipped — this file lists what *remains*.
-Entries are grouped by release, with the resolved-architecture / out-of-scope sections kept as
-durable context for new contributors and the wider IAM glue.
+The 1.0 candidate sits on `feature/release-1.0-prep`.
 
 ---
 
@@ -17,13 +17,8 @@ durable context for new contributors and the wider IAM glue.
   (gate: 85%).
 - **PHPBench benchmarks** covering every hot-path (TOTP, OTP, backup codes, FactorSummary).
 - **`composer check -- --all --no-cache`** exits 0 across the whole repo. No `[[triage]]` rule
-  suppressions in `.qlty/qlty.toml`. **Zero `@SuppressWarnings` annotations** anywhere in the
-  codebase — the previous three test-fixture suppressions were eliminated by the
-  `AbstractFactorStub` / `AbstractEloquentFactorStub` base classes.
-
-The 1.0 candidate sits on `feature/release-1.0-prep`. Every release-blocker, polish, and
-"future improvement" surfaced by the pre-handoff review on commit `4878979` has now landed —
-the package is ready for the external reviewer.
+  suppressions in `.qlty/qlty.toml`. Zero `@SuppressWarnings` annotations anywhere in the
+  codebase.
 
 ---
 
@@ -158,52 +153,3 @@ final readonly class DeviceMfaVerificationStore implements MfaVerificationStore
 
 The MFA package's `MfaVerificationStore::markVerified()` accepts an optional `CarbonInterface $at`
 precisely so this implementation can stamp the device row atomically with the verification event.
-
----
-
-## Shipped
-
-Quick index of the major work that has already landed (full audit trail in `git log`):
-
-**Pre-handoff review fallout (4878979 → current HEAD):**
-
-- **B-24** ✅ Real Sanctum integration test — `laravel/sanctum` added to `require-dev`,
-  `MultiAuthStackTest::testSanctumGuardSeesIdentityAndFactors`.
-- **B-25** ✅ `Mfa::enrol(Factor)` / `Mfa::disable(Factor)` API on the manager — dispatches the
-  previously-orphaned `MfaFactorEnrolled` / `MfaFactorDisabled` events and clears cache.
-- **B-26 / B-27** ✅ README "Identity model setup" snippet uses the correct shipped model
-  (`SineMacula\Laravel\Mfa\Models\Factor::class`); extensibility table references `MfaPolicy`
-  and `config('mfa.factor.model')`.
-- **B-28** ✅ `CHANGELOG.md` populated for the 1.0 release.
-- **B-29** ✅ Consumer-override invariant pinned —
-  `CustomDriverExtensionTest::testConsumerCanOverrideBuiltInTotpDriver`.
-- **B-30** ✅ `Factor::$code` encrypted at rest; migration column widened to `text`; round-trip
-  test added.
-- **B-31** ✅ `BackupCodeDriver` class docblock corrected to reflect `random_int` use.
-- **B-32** ✅ Boundary mutants killed in `FactorSummary::maskEmail()` and
-  `MfaManager::hasExpired()` — Covered MSI rose to 92%.
-- **B-33** ✅ CI matrix verified — `tests` job covers SQLite (default), `database-tests` job
-  covers MySQL + PostgreSQL.
-- **B-34** ✅ `MfaServiceProvider::registerBuiltInDrivers()` invocation switched to `static::`
-  so subclasses can override.
-- **B-35** ✅ `SmsDriver` constructor validates the `:code` placeholder; missing placeholder
-  throws `InvalidArgumentException`.
-- **B-36 / B-37** ✅ README documents the `Mfa::driver()` resolution-cache caveat and the
-  `SessionMfaVerificationStore` session-regenerate assumption.
-- **B-38** ✅ Rate-limit recipe in README defends the per-identity null-key edge.
-- **B-39** ✅ Redundant `is_int` arm removed from `MfaManager::resolveIntConfig()`.
-- **B-40** ✅ `FactorDriver::generateSecret()` contract docblock now matches the four shipped
-  driver implementations.
-- **B-41** ✅ `tests/Fixtures/AbstractFactorStub.php` + `tests/Fixtures/AbstractEloquentFactorStub.php`
-  collapsed three `@SuppressWarnings("php:S1448")` annotations to zero.
-- **B-42** ✅ README documents `php artisan key:rotate` for `APP_KEY` rotation.
-
-**Earlier 1.0 cycle:**
-
-- **B-18** ✅ TOTP provisioning URI helper — `7be3199`.
-- **B-19** ✅ Configurable code alphabet — `c9f6545`.
-- **B-20** ✅ Step-up middleware via parameterised `mfa:N` — `83b463f`, hardened in `ec83773`.
-- **B-22** ✅ Rate-limit recipe in README — `8ffcda1`.
-- **PRD P1** ✅ Documented Twilio `SmsGateway` binding example — `a2b48ef`.
-- **Refactor** ✅ MfaManager surface trimmed to ≤20 methods, ≤3 returns; built-in driver
-  factories moved to `MfaServiceProvider` via `extend()` — `4878979`.
