@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 
@@ -34,6 +35,9 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
 {
     /** @var string Prefix applied to every key written by this store. */
     private const string KEY_PREFIX = 'mfa.verified_at.';
+
+    /** @var string Separator between the identity class and identifier. */
+    private const string KEY_SEPARATOR = '.';
 
     /**
      * Constructor.
@@ -105,11 +109,14 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
     /**
      * Build the session key for the given identity.
      *
-     * Keys by auth identifier so a session that changes owner (e.g.
-     * impersonation, legacy flows that bypass session regeneration) cannot
-     * inherit a prior identity's verification state. Fails loud when the auth
-     * identifier is non-scalar rather than silently collapsing distinct
-     * identities to a shared key.
+     * Scopes by identity class (morph class for Eloquent models, FQCN
+     * otherwise) as well as auth identifier, matching the manager's own
+     * per-identity cache rule. Without that scope two different identity types
+     * sharing the same identifier in one session (e.g. `User#7` and `Admin#7`)
+     * would collide on a single verification slot.
+     *
+     * Fails loud when the auth identifier is non-scalar rather than silently
+     * collapsing distinct identities to a shared key.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return string
@@ -127,6 +134,11 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
             throw new UnsupportedIdentifierException($message);
         }
 
-        return self::KEY_PREFIX . $identifier;
+        $class = $identity instanceof Model
+            // @phpstan-ignore staticMethod.dynamicCall (getMorphClass is defined as an instance method upstream)
+            ? $identity->getMorphClass()
+            : $identity::class;
+
+        return self::KEY_PREFIX . $class . self::KEY_SEPARATOR . $identifier;
     }
 }

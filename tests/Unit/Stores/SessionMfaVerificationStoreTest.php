@@ -12,6 +12,8 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Stores\SessionMfaVerificationStore;
+use Tests\Fixtures\FirstStoreIdentity;
+use Tests\Fixtures\SecondStoreIdentity;
 
 /**
  * Unit tests for the `SessionMfaVerificationStore` default store.
@@ -23,6 +25,15 @@ use SineMacula\Laravel\Mfa\Stores\SessionMfaVerificationStore;
  */
 final class SessionMfaVerificationStoreTest extends TestCase
 {
+    /** @var string Fixed "now" used throughout the suite. */
+    private const string NOW = '2026-04-15T10:00:00+00:00';
+
+    /** @var string Earlier "now" used when contrasting two verifications. */
+    private const string EARLIER = '2026-04-15T09:00:00+00:00';
+
+    /** @var string Identifier suffix reused by single-identity assertions. */
+    private const string IDENTIFIER_SUFFIX = '.user-1';
+
     /**
      * Set up the test fixtures.
      *
@@ -32,7 +43,7 @@ final class SessionMfaVerificationStoreTest extends TestCase
     {
         parent::setUp();
 
-        Carbon::setTestNow('2026-04-15T10:00:00+00:00');
+        Carbon::setTestNow(self::NOW);
     }
 
     /**
@@ -70,10 +81,14 @@ final class SessionMfaVerificationStoreTest extends TestCase
         $session = $this->buildSession();
         $store   = new SessionMfaVerificationStore($session);
 
-        $store->markVerified($this->buildIdentity('user-1'));
+        $identity = $this->buildIdentity('user-1');
+        $store->markVerified($identity);
 
         $expected = Carbon::now()->getTimestamp();
-        self::assertSame($expected, $session->get('mfa.verified_at.user-1'));
+        self::assertSame(
+            $expected,
+            $session->get('mfa.verified_at.' . $identity::class . self::IDENTIFIER_SUFFIX),
+        );
     }
 
     /**
@@ -87,9 +102,13 @@ final class SessionMfaVerificationStoreTest extends TestCase
         $store   = new SessionMfaVerificationStore($session);
         $at      = Carbon::parse('2026-04-14T08:30:00+00:00');
 
-        $store->markVerified($this->buildIdentity(42), $at);
+        $identity = $this->buildIdentity(42);
+        $store->markVerified($identity, $at);
 
-        self::assertSame($at->getTimestamp(), $session->get('mfa.verified_at.42'));
+        self::assertSame(
+            $at->getTimestamp(),
+            $session->get('mfa.verified_at.' . $identity::class . '.42'),
+        );
     }
 
     /**
@@ -144,12 +163,16 @@ final class SessionMfaVerificationStoreTest extends TestCase
      */
     public function testLastVerifiedAtReturnsNullWhenStoredValueIsNotInt(): void
     {
-        $session = $this->buildSession();
-        $session->put('mfa.verified_at.user-1', 'not-an-int');
+        $identity = $this->buildIdentity('user-1');
+        $session  = $this->buildSession();
+        $session->put(
+            'mfa.verified_at.' . $identity::class . self::IDENTIFIER_SUFFIX,
+            'not-an-int',
+        );
 
         $store = new SessionMfaVerificationStore($session);
 
-        self::assertNull($store->lastVerifiedAt($this->buildIdentity('user-1')));
+        self::assertNull($store->lastVerifiedAt($identity));
     }
 
     /**
@@ -159,14 +182,55 @@ final class SessionMfaVerificationStoreTest extends TestCase
      */
     public function testForgetClearsStoredKey(): void
     {
+        $session  = $this->buildSession();
+        $store    = new SessionMfaVerificationStore($session);
+        $identity = $this->buildIdentity('user-1');
+
+        $store->markVerified($identity);
+        $store->forget($identity);
+
+        self::assertFalse(
+            $session->has('mfa.verified_at.' . $identity::class . self::IDENTIFIER_SUFFIX),
+        );
+        self::assertNull($store->lastVerifiedAt($identity));
+    }
+
+    /**
+     * Test keys are scoped by identity class so two different
+     * authenticatables sharing the same identifier do not collide on a single
+     * verification slot.
+     *
+     * @return void
+     */
+    public function testKeysAreScopedByIdentityClass(): void
+    {
         $session = $this->buildSession();
         $store   = new SessionMfaVerificationStore($session);
 
-        $store->markVerified($this->buildIdentity('user-1'));
-        $store->forget($this->buildIdentity('user-1'));
+        $alpha = new FirstStoreIdentity('shared-7');
+        $beta  = new SecondStoreIdentity('shared-7');
 
-        self::assertFalse($session->has('mfa.verified_at.user-1'));
-        self::assertNull($store->lastVerifiedAt($this->buildIdentity('user-1')));
+        Carbon::setTestNow(self::EARLIER);
+        $store->markVerified($alpha);
+
+        Carbon::setTestNow(self::NOW);
+        $store->markVerified($beta);
+
+        $alphaAt = $store->lastVerifiedAt($alpha);
+        $betaAt  = $store->lastVerifiedAt($beta);
+
+        self::assertNotNull($alphaAt);
+        self::assertNotNull($betaAt);
+        self::assertNotSame(
+            $alphaAt->getTimestamp(),
+            $betaAt->getTimestamp(),
+            'Two identity classes sharing an identifier must not share MFA state.',
+        );
+
+        $store->forget($alpha);
+
+        self::assertNull($store->lastVerifiedAt($alpha));
+        self::assertNotNull($store->lastVerifiedAt($beta));
     }
 
     /**
@@ -182,10 +246,10 @@ final class SessionMfaVerificationStoreTest extends TestCase
         $alice = $this->buildIdentity('alice');
         $bob   = $this->buildIdentity('bob');
 
-        Carbon::setTestNow('2026-04-15T09:00:00+00:00');
+        Carbon::setTestNow(self::EARLIER);
         $store->markVerified($alice);
 
-        Carbon::setTestNow('2026-04-15T10:00:00+00:00');
+        Carbon::setTestNow(self::NOW);
         $store->markVerified($bob);
 
         $aliceAt = $store->lastVerifiedAt($alice);
