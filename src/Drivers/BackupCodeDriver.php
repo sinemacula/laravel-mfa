@@ -34,18 +34,39 @@ final class BackupCodeDriver implements FactorDriver
     /** @var string Driver identifier used on Factor::driver. */
     public const string NAME = 'backup_code';
 
+    /** @var callable(int, int): int Bound at construction — `random_int(...)` by default. */
+    private $randomInt;
+
     /**
      * Constructor.
+     *
+     * `$randomInt` is the injectable randomness seam — defaults to PHP's
+     * built-in `random_int(...)` (CSPRNG-backed). Tests substitute a
+     * deterministic callable to exercise the generator against known
+     * outputs without relying on the real RNG.
      *
      * @param  int  $codeLength
      * @param  string  $alphabet
      * @param  int  $codeCount
+     * @param  ?callable(int, int): int  $randomInt
      */
     public function __construct(
+
+        /** Length of each minted backup code, in characters. */
         private readonly int $codeLength = 10,
+
+        /** Character set codes are drawn from. */
         private readonly string $alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
+
+        /** Default number of codes minted per `generateSet()` call. */
         private readonly int $codeCount = 10,
-    ) {}
+
+        // Randomness seam — `null` binds to PHP's CSPRNG `random_int`.
+        ?callable $randomInt = null,
+
+    ) {
+        $this->randomInt = $randomInt ?? random_int(...);
+    }
 
     /**
      * Backup codes have no server-issued challenge — codes are minted at
@@ -55,6 +76,7 @@ final class BackupCodeDriver implements FactorDriver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
      */
+    #[\Override]
     public function issueChallenge(Factor $factor): void
     {
         // No-op — backup codes are pre-issued at enrolment.
@@ -69,11 +91,9 @@ final class BackupCodeDriver implements FactorDriver
      * @param  string  $code
      * @return bool
      */
-    public function verify(
-        Factor $factor,
-        #[\SensitiveParameter]
-        string $code,
-    ): bool {
+    #[\Override]
+    public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
+    {
         $stored = $factor->getSecret();
 
         if ($stored === null || $stored === '' || !hash_equals($stored, $this->hash($code))) {
@@ -99,6 +119,7 @@ final class BackupCodeDriver implements FactorDriver
      *
      * @return string
      */
+    #[\Override]
     public function generateSecret(): string
     {
         return $this->generatePlaintextCode();
@@ -196,11 +217,8 @@ final class BackupCodeDriver implements FactorDriver
      * @param  string  $expectedSecret
      * @return bool
      */
-    private function consumeAtomic(
-        EloquentFactor $factor,
-        #[\SensitiveParameter]
-        string $expectedSecret,
-    ): bool {
+    private function consumeAtomic(EloquentFactor $factor, #[\SensitiveParameter] string $expectedSecret): bool
+    {
         if (!$factor instanceof Model) {
             return true;
         }
@@ -253,10 +271,11 @@ final class BackupCodeDriver implements FactorDriver
     private function generatePlaintextCode(): string
     {
         $alphabetLength = strlen($this->alphabet);
+        $randomInt      = $this->randomInt;
         $code           = '';
 
         for ($i = 0; $i < $this->codeLength; $i++) {
-            $code .= $this->alphabet[random_int(0, $alphabetLength - 1)];
+            $code .= $this->alphabet[$randomInt(0, $alphabetLength - 1)];
         }
 
         return $code;

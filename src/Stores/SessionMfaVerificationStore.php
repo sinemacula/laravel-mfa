@@ -62,6 +62,7 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
+    #[\Override]
     public function markVerified(Authenticatable $identity, ?CarbonInterface $at = null): void
     {
         $timestamp = ($at ?? Carbon::now())->getTimestamp();
@@ -78,6 +79,7 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
+    #[\Override]
     public function lastVerifiedAt(Authenticatable $identity): ?CarbonInterface
     {
         /** @var mixed $timestamp */
@@ -98,6 +100,7 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
+    #[\Override]
     public function forget(Authenticatable $identity): void
     {
         $this->session->forget($this->key($identity));

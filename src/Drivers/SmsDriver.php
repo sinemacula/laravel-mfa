@@ -35,22 +35,31 @@ final class SmsDriver extends AbstractOtpDriver
      * @param  int  $expiry
      * @param  int  $maxAttempts
      * @param  ?string  $alphabet
+     * @param  ?callable(int, int): int  $randomInt
      *
      * @throws \InvalidArgumentException
      */
     public function __construct(
+
+        /** SMS gateway implementation that delivers the rendered message. */
         private readonly SmsGateway $gateway,
+
+        /** Message template; MUST contain the `:code` placeholder. */
         private readonly string $messageTemplate = 'Your verification code is: :code',
+
+        // The remaining parameters are passthroughs to AbstractOtpDriver.
         int $codeLength = 6,
         int $expiry = 10,
         int $maxAttempts = 3,
         ?string $alphabet = null,
+        ?callable $randomInt = null,
+
     ) {
         if (!str_contains($messageTemplate, ':code')) {
             throw new \InvalidArgumentException(sprintf('SmsDriver message template must contain the :code placeholder; received "%s".', $messageTemplate));
         }
 
-        parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet);
+        parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet, $randomInt);
     }
 
     /**
@@ -73,11 +82,9 @@ final class SmsDriver extends AbstractOtpDriver
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException
      */
-    protected function dispatch(
-        EloquentFactor $factor,
-        #[\SensitiveParameter]
-        string $code,
-    ): void {
+    #[\Override]
+    protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void
+    {
         $recipient = $factor->getRecipient();
 
         if ($recipient === null || $recipient === '') {

@@ -29,11 +29,9 @@ final class FakeSmsGateway implements SmsGateway
      * @param  string  $message
      * @return void
      */
-    public function send(
-        string $to,
-        #[\SensitiveParameter]
-        string $message,
-    ): void {
+    #[\Override]
+    public function send(string $to, #[\SensitiveParameter] string $message): void
+    {
         $this->sent[] = [
             'to'      => $to,
             'message' => $message,

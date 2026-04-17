@@ -59,6 +59,7 @@ final class TotpDriver implements FactorDriver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
      */
+    #[\Override]
     public function issueChallenge(Factor $factor): void
     {
         // No-op — TOTP codes are generated client-side.
@@ -71,6 +72,7 @@ final class TotpDriver implements FactorDriver
      * @param  string  $code
      * @return bool
      */
+    #[\Override]
     public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
     {
         $secret = $factor->getSecret();
@@ -87,6 +89,7 @@ final class TotpDriver implements FactorDriver
      *
      * @return string
      */
+    #[\Override]
     public function generateSecret(): string
     {
         /** @var string */
@@ -106,12 +109,8 @@ final class TotpDriver implements FactorDriver
      * @param  string  $secret
      * @return string
      */
-    public function provisioningUri(
-        string $issuer,
-        string $accountName,
-        #[\SensitiveParameter]
-        string $secret,
-    ): string {
+    public function provisioningUri(string $issuer, string $accountName, #[\SensitiveParameter] string $secret): string
+    {
         /** @var string */
         return $this->google2fa->getQRCodeUrl($issuer, $accountName, $secret);
     }

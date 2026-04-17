@@ -33,16 +33,26 @@ final class EmailDriver extends AbstractOtpDriver
      * @param  int  $expiry
      * @param  int  $maxAttempts
      * @param  ?string  $alphabet
+     * @param  ?callable(int, int): int  $randomInt
      */
     public function __construct(
+
+        /** Laravel mailer used to dispatch the outbound code. */
         private readonly Mailer $mailer,
+
+        /** Mailable class responsible for rendering the code email. */
         private readonly string $mailable = MfaCodeMessage::class,
+
+        // The remaining parameters are untyped-here-for-clarity passthroughs
+        // to `AbstractOtpDriver::__construct()` below.
         int $codeLength = 6,
         int $expiry = 10,
         int $maxAttempts = 3,
         ?string $alphabet = null,
+        ?callable $randomInt = null,
+
     ) {
-        parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet);
+        parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet, $randomInt);
     }
 
     /**
@@ -64,11 +74,9 @@ final class EmailDriver extends AbstractOtpDriver
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException
      */
-    protected function dispatch(
-        EloquentFactor $factor,
-        #[\SensitiveParameter]
-        string $code,
-    ): void {
+    #[\Override]
+    protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void
+    {
         $recipient = $factor->getRecipient();
 
         if ($recipient === null || $recipient === '') {

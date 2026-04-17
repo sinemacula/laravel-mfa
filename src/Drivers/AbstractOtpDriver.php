@@ -28,6 +28,9 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
  */
 abstract class AbstractOtpDriver implements FactorDriver
 {
+    /** @var callable(int, int): int Bound at construction — `random_int(...)` by default. */
+    protected $randomInt;
+
     /**
      * Constructor.
      *
@@ -38,24 +41,44 @@ abstract class AbstractOtpDriver implements FactorDriver
      * rejected at construction so misconfigurations fail fast rather
      * than at first code issuance.
      *
+     * `$randomInt` is the injectable randomness seam — defaults to the
+     * PHP built-in `random_int(...)` (CSPRNG-backed). Tests substitute
+     * a deterministic callable to exercise the code generator against
+     * known outputs without relying on the real RNG.
+     *
      * @param  int  $codeLength
      * @param  int  $expiry
      * @param  int  $maxAttempts
      * @param  ?string  $alphabet
+     * @param  ?callable(int, int): int  $randomInt
      *
      * @throws \InvalidArgumentException
      */
     public function __construct(
+
+        /** Length of the one-time code minted by `generateCode()`. */
         protected readonly int $codeLength = 6,
+
+        /** Minutes before an issued code is considered expired. */
         protected readonly int $expiry = 10,
+
+        /** Per-factor attempt ceiling before the manager applies a lockout. */
         protected readonly int $maxAttempts = 3,
+
+        /** Optional character set for `generateCode()`; `null` uses numeric zero-padded codes. */
         protected readonly ?string $alphabet = null,
+
+        // Randomness seam — `null` binds to PHP's built-in CSPRNG `random_int`.
+        ?callable $randomInt = null,
+
     ) {
         if ($alphabet !== null && strlen($alphabet) < 2) {
             $detail = $alphabet === '' ? 'an empty string' : 'a single character';
 
             throw new \InvalidArgumentException('OTP alphabet must contain at least two characters; received ' . $detail . '.');
         }
+
+        $this->randomInt = $randomInt ?? random_int(...);
     }
 
     /**
@@ -67,6 +90,7 @@ abstract class AbstractOtpDriver implements FactorDriver
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
      */
+    #[\Override]
     public function issueChallenge(Factor $factor): void
     {
         if (!$factor instanceof EloquentFactor) {
@@ -103,11 +127,9 @@ abstract class AbstractOtpDriver implements FactorDriver
      * @param  string  $code
      * @return bool
      */
-    public function verify(
-        Factor $factor,
-        #[\SensitiveParameter]
-        string $code,
-    ): bool {
+    #[\Override]
+    public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
+    {
         $stored  = $factor->getCode();
         $expires = $factor->getExpiresAt();
 
@@ -128,6 +150,7 @@ abstract class AbstractOtpDriver implements FactorDriver
      *
      * @return null
      */
+    #[\Override]
     public function generateSecret(): ?string
     {
         return null;
@@ -182,11 +205,7 @@ abstract class AbstractOtpDriver implements FactorDriver
      * @param  string  $code
      * @return void
      */
-    abstract protected function dispatch(
-        EloquentFactor $factor,
-        #[\SensitiveParameter]
-        string $code,
-    ): void;
+    abstract protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void;
 
     /**
      * Generate a one-time code of the configured length. Uses `random_int`
@@ -200,9 +219,11 @@ abstract class AbstractOtpDriver implements FactorDriver
      */
     protected function generateCode(): string
     {
+        $randomInt = $this->randomInt;
+
         if ($this->alphabet === null) {
             return str_pad(
-                (string) random_int(0, (10 ** $this->codeLength) - 1),
+                (string) $randomInt(0, (10 ** $this->codeLength) - 1),
                 $this->codeLength,
                 '0',
                 STR_PAD_LEFT,
@@ -213,7 +234,7 @@ abstract class AbstractOtpDriver implements FactorDriver
         $code           = '';
 
         for ($i = 0; $i < $this->codeLength; $i++) {
-            $code .= $this->alphabet[random_int(0, $alphabetLength - 1)];
+            $code .= $this->alphabet[$randomInt(0, $alphabetLength - 1)];
         }
 
         return $code;

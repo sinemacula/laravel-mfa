@@ -44,6 +44,7 @@ class Mfa extends Facade
      *
      * @return string
      */
+    #[\Override]
     protected static function getFacadeAccessor(): string
     {
         return 'mfa';

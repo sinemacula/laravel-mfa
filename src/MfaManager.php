@@ -79,6 +79,7 @@ class MfaManager extends Manager
      *
      * @return string
      */
+    #[\Override]
     public function getDefaultDriver(): string
     {
         return 'totp';

@@ -83,6 +83,7 @@ final readonly class FactorSummary implements \JsonSerializable
      *
      * @return array<string, mixed>
      */
+    #[\Override]
     public function jsonSerialize(): array
     {
         return [

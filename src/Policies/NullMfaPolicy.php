@@ -28,6 +28,7 @@ final class NullMfaPolicy implements MfaPolicy
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return bool
      */
+    #[\Override]
     public function shouldEnforce(Authenticatable $identity): bool
     {
         return false;
