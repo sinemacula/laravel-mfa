@@ -311,17 +311,14 @@ class MfaManager extends Manager
 
         $this->assertFactorOwnership($factor, $identity);
 
-        // OTP-issuing drivers (email, SMS) reset the attempt counter from
-        // inside `issueChallenge()` once the new code has been minted —
+        // OTP-issuing drivers (email, SMS) reset the attempt counter and
+        // persist the freshly minted code from inside `issueChallenge()` —
         // the reset is paired with a fresh secret and so cannot be used
         // to wipe a lockout without rotating credentials. TOTP and backup
-        // codes have no per-challenge secret, so the manager preserves
-        // their lockout state across challenge calls.
+        // codes have no per-challenge secret to mint and no state to
+        // persist, so their `issueChallenge()` is a no-op and the manager
+        // preserves their lockout state across challenge calls.
         $this->resolveDriver($driver)->issueChallenge($factor);
-
-        if ($factor instanceof EloquentFactor) {
-            $factor->persist();
-        }
 
         $events = $this->container->make(Dispatcher::class);
 
@@ -447,18 +444,24 @@ class MfaManager extends Manager
         }
 
         if ($factor instanceof EloquentFactor && $factor instanceof Model) {
-            // Stamp ownership rather than asserting it: a consumer cannot
-            // enrol a factor against a different account by pre-populating
-            // the morph columns. Reading the column names off the relation
-            // builder so consumer subclasses that customise the relation
-            // name still work.
-            $relation = $factor->authenticatable();
+            // Stamping ownership only makes sense for a brand-new factor.
+            // If the row already exists (e.g. the consumer fetched it by
+            // primary key from request input) we MUST NOT silently
+            // overwrite its morph columns — that would let an attacker
+            // hijack any factor row whose ID they could enumerate. Treat
+            // an existing row as an attempt to re-enrol it under the
+            // current identity and require ownership to already match.
+            if ($factor->exists) {
+                $this->assertFactorOwnership($factor, $identity);
+            } else {
+                $relation = $factor->authenticatable();
 
-            $factor->setAttribute(
-                $relation->getMorphType(),
-                $identity instanceof Model ? $identity->getMorphClass() : $identity::class,
-            );
-            $factor->setAttribute($relation->getForeignKeyName(), $identity->getAuthIdentifier());
+                $factor->setAttribute(
+                    $relation->getMorphType(),
+                    $identity instanceof Model ? $identity->getMorphClass() : $identity::class,
+                );
+                $factor->setAttribute($relation->getForeignKeyName(), $identity->getAuthIdentifier());
+            }
 
             $factor->persist();
         } else {
@@ -614,9 +617,12 @@ class MfaManager extends Manager
         Factor $factor,
         MultiFactorAuthenticatable $identity,
     ): void {
-        // Eloquent identities surface their morph class through
+        // For the Eloquent-factor branch we compare against the identity's
         // `getMorphClass()` so consumers' `morphMap` configuration is
-        // honoured; non-Eloquent identities fall back to the FQCN.
+        // honoured — the string recorded on `authenticatable_type` matches
+        // whatever the morph map resolves the identity to. The non-
+        // Eloquent branch has no morph column to consult and falls back
+        // to a strict FQCN comparison.
         $expectedType = $identity instanceof Model
             ? $identity->getMorphClass()
             : $identity::class;
