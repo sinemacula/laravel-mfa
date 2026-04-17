@@ -52,8 +52,16 @@ use SineMacula\Laravel\Mfa\Models\Factor as ShippedFactorModel;
  * API at construction time, keeping this class free of per-driver
  * construction logic.
  *
+ * The class exceeds the project's max-methods-per-class threshold —
+ * the Manager pattern's coordination role across drivers, factors,
+ * verification store, policy, and cache is intrinsic. Splitting into
+ * traits would shuffle the methods rather than reduce coupling and
+ * obscure the orchestration surface that consumers integrate against.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
+ *
+ * @SuppressWarnings("php:S1448")
  */
 class MfaManager extends Manager
 {
@@ -365,12 +373,6 @@ class MfaManager extends Manager
 
         $this->assertFactorOwnership($factor, $identity);
 
-        $instance = $this->driver($driver);
-
-        if (!$instance instanceof FactorDriver) {
-            throw new \LogicException(sprintf('Driver [%s] must implement %s.', $driver, FactorDriver::class));
-        }
-
         // OTP-issuing drivers (email, SMS) reset the attempt counter and
         // persist the freshly minted code from inside `issueChallenge()` —
         // the reset is paired with a fresh secret and so cannot be used
@@ -378,7 +380,7 @@ class MfaManager extends Manager
         // codes have no per-challenge secret to mint and no state to
         // persist, so their `issueChallenge()` is a no-op and the manager
         // preserves their lockout state across challenge calls.
-        $instance->issueChallenge($factor);
+        $this->resolveDriver($driver)->issueChallenge($factor);
 
         $events = $this->container->make(Dispatcher::class);
         $events->dispatch(new MfaChallengeIssued($identity, $factor, $driver));
@@ -426,73 +428,18 @@ class MfaManager extends Manager
         $events = $this->container->make(Dispatcher::class);
 
         if ($factor->isLocked()) {
-            $events->dispatch(new MfaVerificationFailed(
-                $identity,
-                $factor,
-                $driver,
-                MfaVerificationFailureReason::FactorLocked,
-            ));
+            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, MfaVerificationFailureReason::FactorLocked));
 
             return false;
         }
 
-        $instance = $this->driver($driver);
+        $valid = $this->resolveDriver($driver)->verify($factor, $code);
 
-        if (!$instance instanceof FactorDriver) {
-            throw new \LogicException(sprintf('Driver [%s] must implement %s.', $driver, FactorDriver::class));
+        if ($factor instanceof EloquentFactor) {
+            $this->applyVerificationOutcome($factor, $driver, $valid);
         }
 
-        $valid = $instance->verify($factor, $code);
-
-        // Persist the post-driver outcome on the factor row. Successful
-        // verification stamps verified-at, resets attempts, and clears
-        // any pending OTP code; failure increments the attempt counter
-        // and applies a per-driver lockout once the configured threshold
-        // is crossed. Non-Eloquent factors carry no row to mutate, so
-        // they skip both branches and the manager only emits the event.
-        if ($valid && $factor instanceof EloquentFactor) {
-            $factor->recordVerification();
-            $factor->persist();
-        } elseif ($factor instanceof EloquentFactor) {
-            $factor->recordAttempt();
-
-            $maxAttempts = $this->resolveIntConfig("mfa.drivers.{$driver}.max_attempts", 0);
-
-            if ($maxAttempts > 0 && $factor->getAttempts() >= $maxAttempts) {
-                $factor->applyLockout(
-                    Carbon::now()->addMinutes($this->resolveIntConfig('mfa.lockout_minutes', 15)),
-                );
-            }
-
-            $factor->persist();
-        }
-
-        if ($valid) {
-            /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
-            $store = $this->container->make(MfaVerificationStore::class);
-            $store->markVerified($identity);
-            $this->clearCache($identity);
-
-            $events->dispatch(new MfaVerified($identity, $factor, $driver));
-        } else {
-            // Classify the failure inline. Branches in priority order:
-            // - SecretMissing: TOTP enrolment never completed (no code AND no secret).
-            // - CodeExpired:   pending OTP aged past its window.
-            // - CodeMissing:   pending code exists but has no expiry — treat as missing.
-            // - CodeInvalid:   default — TOTP window mismatch or OTP comparison mismatch.
-            $expiresAt = $factor->getExpiresAt();
-            $pending   = $factor->getCode();
-            $secret    = $factor->getSecret();
-
-            $reason = match (true) {
-                $pending === null   && $secret === null     => MfaVerificationFailureReason::SecretMissing,
-                $expiresAt !== null && $expiresAt->isPast() => MfaVerificationFailureReason::CodeExpired,
-                $pending   !== null && $expiresAt === null  => MfaVerificationFailureReason::CodeMissing,
-                default                                     => MfaVerificationFailureReason::CodeInvalid,
-            };
-
-            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason));
-        }
+        $this->finaliseVerification($identity, $factor, $driver, $valid, $events);
 
         return $valid;
     }
@@ -642,44 +589,166 @@ class MfaManager extends Manager
             throw new \LogicException(sprintf('Driver [%s] must be a %s instance to issue backup codes.', BackupCodeDriver::NAME, BackupCodeDriver::class));
         }
 
-        $modelClass = $this->factorModel();
-        $morphType  = $identity instanceof Model
-            // @phpstan-ignore staticMethod.dynamicCall (getMorphClass is defined as an instance method upstream)
-            ? $identity->getMorphClass()
-            : $identity::class;
-        $morphId    = $identity->getAuthIdentifier();
-        $events     = $this->container->make(Dispatcher::class);
-        $connection = $this->container->make(ConnectionInterface::class);
-
         $codes = $driver->generateSet($count);
 
-        $connection->transaction(function () use ($modelClass, $morphType, $morphId, $codes, $driver, $identity, $events): void {
-            // Delete any prior batch first so the rotation is atomic
-            // with respect to readers — no overlap window where both
-            // old and new codes would verify.
-            $modelClass::query()
-                ->where('authenticatable_type', $morphType)
-                ->where('authenticatable_id', $morphId)
-                ->where('driver', BackupCodeDriver::NAME)
-                ->delete();
-
-            foreach ($codes as $code) {
-                $factor   = new $modelClass;
-                $relation = $factor->authenticatable();
-
-                $factor->setAttribute($relation->getMorphType(), $morphType);
-                $factor->setAttribute($relation->getForeignKeyName(), $morphId);
-                $factor->setAttribute($factor->getDriverName(), BackupCodeDriver::NAME);
-                $factor->setAttribute($factor->getSecretName(), $driver->hash($code));
-                $factor->save();
-
-                $events->dispatch(new MfaFactorEnrolled($identity, $factor, BackupCodeDriver::NAME));
-            }
+        $this->container->make(ConnectionInterface::class)->transaction(function () use ($identity, $driver, $codes): void {
+            $this->rotateBackupCodeBatch($identity, $driver, $codes);
         });
 
         $this->clearCache($identity);
 
         return $codes;
+    }
+
+    /**
+     * Resolve the named factor driver, narrowed to the `FactorDriver`
+     * contract for downstream callers. The base manager's `driver()`
+     * returns `mixed`; this helper locks the return type so callers
+     * do not need to type-hint or assert at every site.
+     *
+     * @param  string  $name
+     * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
+     */
+    private function resolveDriver(string $name): FactorDriver
+    {
+        $instance = $this->driver($name);
+
+        if (!$instance instanceof FactorDriver) {
+            throw new \LogicException(sprintf('Driver [%s] must implement %s.', $name, FactorDriver::class));
+        }
+
+        return $instance;
+    }
+
+    /**
+     * Persist the post-driver verification outcome on the factor row.
+     *
+     * Successful verification stamps `verified_at`, resets attempts,
+     * and clears any pending OTP code; failure increments the attempt
+     * counter and applies a per-driver lockout once the configured
+     * threshold is crossed. Non-Eloquent factors carry no row to
+     * mutate and skip both branches before this method is even called.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  string  $driver
+     * @param  bool  $valid
+     * @return void
+     */
+    private function applyVerificationOutcome(EloquentFactor $factor, string $driver, bool $valid): void
+    {
+        if ($valid) {
+            $factor->recordVerification();
+            $factor->persist();
+
+            return;
+        }
+
+        $factor->recordAttempt();
+
+        $maxAttempts = $this->resolveIntConfig('mfa.drivers.' . $driver . '.max_attempts', 0);
+
+        if ($maxAttempts > 0 && $factor->getAttempts() >= $maxAttempts) {
+            $factor->applyLockout(
+                Carbon::now()->addMinutes($this->resolveIntConfig('mfa.lockout_minutes', 15)),
+            );
+        }
+
+        $factor->persist();
+    }
+
+    /**
+     * Apply the post-verify side effects: stamp the identity-level
+     * verification through the bound store and dispatch `MfaVerified`
+     * on success, or classify the failure and dispatch
+     * `MfaVerificationFailed` with a machine-readable reason on
+     * failure.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $driver
+     * @param  bool  $valid
+     * @param  \Illuminate\Contracts\Events\Dispatcher  $events
+     * @return void
+     */
+    private function finaliseVerification(
+        MultiFactorAuthenticatable $identity,
+        Factor $factor,
+        string $driver,
+        bool $valid,
+        Dispatcher $events,
+    ): void {
+        if ($valid) {
+            /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
+            $store = $this->container->make(MfaVerificationStore::class);
+            $store->markVerified($identity);
+            $this->clearCache($identity);
+
+            $events->dispatch(new MfaVerified($identity, $factor, $driver));
+
+            return;
+        }
+
+        // Classify the failure inline. Branches in priority order:
+        // - SecretMissing: TOTP enrolment never completed (no code AND no secret).
+        // - CodeExpired:   pending OTP aged past its window.
+        // - CodeMissing:   pending code exists but has no expiry — treat as missing.
+        // - CodeInvalid:   default — TOTP window mismatch or OTP comparison mismatch.
+        $expiresAt = $factor->getExpiresAt();
+        $pending   = $factor->getCode();
+        $secret    = $factor->getSecret();
+
+        $reason = match (true) {
+            $pending === null   && $secret === null     => MfaVerificationFailureReason::SecretMissing,
+            $expiresAt !== null && $expiresAt->isPast() => MfaVerificationFailureReason::CodeExpired,
+            $pending   !== null && $expiresAt === null  => MfaVerificationFailureReason::CodeMissing,
+            default                                     => MfaVerificationFailureReason::CodeInvalid,
+        };
+
+        $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason));
+    }
+
+    /**
+     * Atomically replace the identity's existing backup-code factors
+     * with the supplied freshly-minted batch. Runs inside a single
+     * transaction provided by the caller — no overlap window where
+     * both old and new codes would verify.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver  $driver
+     * @param  list<string>  $codes
+     * @return void
+     */
+    private function rotateBackupCodeBatch(
+        MultiFactorAuthenticatable $identity,
+        BackupCodeDriver $driver,
+        array $codes,
+    ): void {
+        $modelClass = $this->factorModel();
+        $morphType  = $identity instanceof Model
+            // @phpstan-ignore staticMethod.dynamicCall (getMorphClass is defined as an instance method upstream)
+            ? $identity->getMorphClass()
+            : $identity::class;
+        $morphId = $identity->getAuthIdentifier();
+        $events  = $this->container->make(Dispatcher::class);
+
+        $modelClass::query()
+            ->where('authenticatable_type', $morphType)
+            ->where('authenticatable_id', $morphId)
+            ->where('driver', BackupCodeDriver::NAME)
+            ->delete();
+
+        foreach ($codes as $code) {
+            $factor   = new $modelClass;
+            $relation = $factor->authenticatable();
+
+            $factor->setAttribute($relation->getMorphType(), $morphType);
+            $factor->setAttribute($relation->getForeignKeyName(), $morphId);
+            $factor->setAttribute($factor->getDriverName(), BackupCodeDriver::NAME);
+            $factor->setAttribute($factor->getSecretName(), $driver->hash($code));
+            $factor->save();
+
+            $events->dispatch(new MfaFactorEnrolled($identity, $factor, BackupCodeDriver::NAME));
+        }
     }
 
     /**

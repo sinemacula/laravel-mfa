@@ -28,7 +28,7 @@ final readonly class MigrationCollisionGuard
      */
     public function __construct(
 
-        /** Schema builder */
+        /** Schema builder used to inspect the configured connection for an existing factors table. */
         private Builder $schema,
 
     ) {}

@@ -46,6 +46,7 @@ class MfaServiceProvider extends ServiceProvider
      *
      * @return void
      */
+    #[\Override]
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/mfa.php', 'mfa');
@@ -65,6 +66,104 @@ class MfaServiceProvider extends ServiceProvider
     {
         $this->offerPublishing();
         $this->registerMiddlewareAliases();
+    }
+
+    /**
+     * Build the TOTP driver from `mfa.drivers.totp` config.
+     *
+     * @param  \Illuminate\Contracts\Config\Repository  $config
+     * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
+     */
+    public static function buildTotpDriver(Repository $config): TotpDriver
+    {
+        /** @var array{window?: int} $driverConfig */
+        $driverConfig = $config->get('mfa.drivers.totp', []);
+
+        return new TotpDriver(window: $driverConfig['window'] ?? 1);
+    }
+
+    /**
+     * Build the email driver from `mfa.drivers.email` config.
+     *
+     * @param  \Illuminate\Contracts\Foundation\Application  $app
+     * @param  \Illuminate\Contracts\Config\Repository  $config
+     * @return \SineMacula\Laravel\Mfa\Drivers\EmailDriver
+     */
+    public static function buildEmailDriver(Application $app, Repository $config): EmailDriver
+    {
+        /**
+         * @var array{
+         *     code_length?: int,
+         *     expiry?: int,
+         *     max_attempts?: int,
+         *     alphabet?: ?string,
+         *     mailable?: class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>
+         * } $driverConfig
+         */
+        $driverConfig = $config->get('mfa.drivers.email', []);
+
+        return new EmailDriver(
+            mailer: $app->make(Mailer::class),
+            mailable: $driverConfig['mailable']        ?? MfaCodeMessage::class,
+            codeLength: $driverConfig['code_length']   ?? 6,
+            expiry: $driverConfig['expiry']            ?? 10,
+            maxAttempts: $driverConfig['max_attempts'] ?? 3,
+            alphabet: $driverConfig['alphabet']        ?? null,
+        );
+    }
+
+    /**
+     * Build the SMS driver from `mfa.drivers.sms` config.
+     *
+     * @param  \Illuminate\Contracts\Foundation\Application  $app
+     * @param  \Illuminate\Contracts\Config\Repository  $config
+     * @return \SineMacula\Laravel\Mfa\Drivers\SmsDriver
+     */
+    public static function buildSmsDriver(Application $app, Repository $config): SmsDriver
+    {
+        /**
+         * @var array{
+         *     code_length?: int,
+         *     expiry?: int,
+         *     max_attempts?: int,
+         *     alphabet?: ?string,
+         *     message_template?: string
+         * } $driverConfig
+         */
+        $driverConfig = $config->get('mfa.drivers.sms', []);
+
+        return new SmsDriver(
+            gateway: $app->make(SmsGateway::class),
+            messageTemplate: $driverConfig['message_template'] ?? 'Your verification code is: :code',
+            codeLength: $driverConfig['code_length']           ?? 6,
+            expiry: $driverConfig['expiry']                    ?? 10,
+            maxAttempts: $driverConfig['max_attempts']         ?? 3,
+            alphabet: $driverConfig['alphabet']                ?? null,
+        );
+    }
+
+    /**
+     * Build the backup-code driver from `mfa.drivers.backup_code` config.
+     *
+     * @param  \Illuminate\Contracts\Config\Repository  $config
+     * @return \SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver
+     */
+    public static function buildBackupCodeDriver(Repository $config): BackupCodeDriver
+    {
+        /**
+         * @var array{
+         *     code_length?: int,
+         *     alphabet?: string,
+         *     code_count?: int
+         * } $driverConfig
+         */
+        $driverConfig = $config->get('mfa.drivers.backup_code', []);
+
+        return new BackupCodeDriver(
+            codeLength: $driverConfig['code_length'] ?? 10,
+            alphabet: $driverConfig['alphabet']      ?? '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
+            codeCount: $driverConfig['code_count']   ?? 10,
+        );
     }
 
     /**
@@ -94,8 +193,8 @@ class MfaServiceProvider extends ServiceProvider
 
     /**
      * Register the four shipped factor drivers against the given
-     * manager, threading per-driver configuration through each
-     * factory closure.
+     * manager, delegating per-driver wiring to dedicated factories
+     * that each consume only the slice of config they need.
      *
      * @param  \SineMacula\Laravel\Mfa\MfaManager  $manager
      * @param  \Illuminate\Contracts\Foundation\Application  $app
@@ -105,75 +204,15 @@ class MfaServiceProvider extends ServiceProvider
     {
         $config = $app->make(Repository::class);
 
-        $manager->extend('totp', function () use ($config): TotpDriver {
-            /** @var array{window?: int} $cfg */
-            $cfg = $config->get('mfa.drivers.totp', []);
-
-            return new TotpDriver(window: $cfg['window'] ?? 1);
-        });
-
-        $manager->extend('email', function () use ($app, $config): EmailDriver {
-            /**
-             * @var array{
-             *     code_length?: int,
-             *     expiry?: int,
-             *     max_attempts?: int,
-             *     alphabet?: ?string,
-             *     mailable?: class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>
-             * } $cfg
-             */
-            $cfg = $config->get('mfa.drivers.email', []);
-
-            return new EmailDriver(
-                mailer: $app->make(Mailer::class),
-                mailable: $cfg['mailable']        ?? MfaCodeMessage::class,
-                codeLength: $cfg['code_length']   ?? 6,
-                expiry: $cfg['expiry']            ?? 10,
-                maxAttempts: $cfg['max_attempts'] ?? 3,
-                alphabet: $cfg['alphabet']        ?? null,
-            );
-        });
-
-        $manager->extend('sms', function () use ($app, $config): SmsDriver {
-            /**
-             * @var array{
-             *     code_length?: int,
-             *     expiry?: int,
-             *     max_attempts?: int,
-             *     alphabet?: ?string,
-             *     message_template?: string
-             * } $cfg
-             */
-            $cfg = $config->get('mfa.drivers.sms', []);
-
-            return new SmsDriver(
-                gateway: $app->make(SmsGateway::class),
-                messageTemplate: $cfg['message_template']
-                                                  ?? 'Your verification code is: :code',
-                codeLength: $cfg['code_length']   ?? 6,
-                expiry: $cfg['expiry']            ?? 10,
-                maxAttempts: $cfg['max_attempts'] ?? 3,
-                alphabet: $cfg['alphabet']        ?? null,
-            );
-        });
-
-        $manager->extend('backup_code', function () use ($config): BackupCodeDriver {
-            /**
-             * @var array{
-             *     code_length?: int,
-             *     alphabet?: string,
-             *     code_count?: int
-             * } $cfg
-             */
-            $cfg = $config->get('mfa.drivers.backup_code', []);
-
-            return new BackupCodeDriver(
-                codeLength: $cfg['code_length'] ?? 10,
-                alphabet: $cfg['alphabet']
-                                                ?? '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
-                codeCount: $cfg['code_count']   ?? 10,
-            );
-        });
+        // Use FQCN-qualified static-method references inside non-static
+        // closures: Laravel's `Manager::extend()` rebinds the closure to
+        // the manager instance, so a `self::` reference would re-scope
+        // to `MfaManager` and miss the factory. The static-method form
+        // sidesteps that rebinding entirely.
+        $manager->extend('totp', fn (): TotpDriver => MfaServiceProvider::buildTotpDriver($config));
+        $manager->extend('email', fn (): EmailDriver => MfaServiceProvider::buildEmailDriver($app, $config));
+        $manager->extend('sms', fn (): SmsDriver => MfaServiceProvider::buildSmsDriver($app, $config));
+        $manager->extend('backup_code', fn (): BackupCodeDriver => MfaServiceProvider::buildBackupCodeDriver($config));
     }
 
     /**

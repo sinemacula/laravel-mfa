@@ -62,15 +62,14 @@ interface FactorDriver
      *
      * Per-driver semantics:
      *
-     * - **TOTP** — returns the shared base32 secret to persist on
+     * - TOTP returns the shared base32 secret to persist on
      *   `Factor::$secret` and render into the provisioning URI.
-     * - **Backup codes** — returns a single fresh plaintext code.
-     *   Consumers calling `BackupCodeDriver::generateSet()` get the
-     *   full batch in one go; `generateSecret()` is the single-shot
-     *   entry point.
-     * - **Email / SMS** — returns `null`. Email and SMS factors mint
-     *   a fresh code per challenge inside `issueChallenge()`, so
-     *   there is no enrolment-time secret to surface.
+     * - BackupCode returns a single fresh plaintext code; consumers
+     *   calling `BackupCodeDriver::generateSet()` get the full batch
+     *   in one go.
+     * - Email and SMS return `null` — both mint a fresh code per
+     *   challenge inside `issueChallenge()`, so there is no
+     *   enrolment-time secret to surface.
      *
      * @return ?string
      */

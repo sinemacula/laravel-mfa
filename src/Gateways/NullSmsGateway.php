@@ -31,15 +31,13 @@ final readonly class NullSmsGateway implements SmsGateway
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\SmsGatewayNotConfiguredException
      */
-    public function send(
-        string $to,
-        #[\SensitiveParameter]
-        string $message,
-    ): void {
-        $msg = 'No SMS gateway is bound. Bind an implementation of '
+    #[\Override]
+    public function send(string $to, #[\SensitiveParameter] string $message): void
+    {
+        $reason = 'No SMS gateway is bound. Bind an implementation of '
             . 'SineMacula\Laravel\Mfa\Contracts\SmsGateway in a service '
             . 'provider before using the SMS factor driver.';
 
-        throw new SmsGatewayNotConfiguredException($msg);
+        throw new SmsGatewayNotConfiguredException($reason);
     }
 }

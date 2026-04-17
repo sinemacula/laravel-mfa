@@ -12,20 +12,9 @@ use Illuminate\Contracts\Auth\Authenticatable;
  *
  * Persists the "last successfully verified" timestamp for an
  * authenticatable identity so the MFA manager can decide whether
- * an existing verification has expired.
- *
- * Ships with `SessionMfaVerificationStore` as the default — keys
- * the timestamp by identifier against Laravel's session store, so
- * verification is scoped to the current session / device on the
- * standalone stateless adoption path.
- *
- * Consumers running a stateless stack (JWT, Sanctum personal
- * access tokens) bind an alternative implementation. In paired
- * mode with `sinemacula/laravel-authentication`, the expected glue
- * is a `DeviceMfaVerificationStore` that reads/writes
- * `last_mfa_verified_at` on the authenticated device record —
- * delivered by the parent `laravel-iam` package rather than this
- * package directly, to keep the zero-dependency guarantee intact.
+ * an existing verification has expired. Bind a custom implementation
+ * to scope verification differently (per-device, per-IP, etc.); the
+ * shipped default keys by session.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
