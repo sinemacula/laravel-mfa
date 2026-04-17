@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Facade;
  *
  * @method static \SineMacula\Laravel\Mfa\Contracts\FactorDriver driver(?string $driver = null)
  * @method static string getDefaultDriver()
+ * @method static class-string<\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> factorModel()
  * @method static static extend(string $driver, \Closure(\Illuminate\Contracts\Foundation\Application): \SineMacula\Laravel\Mfa\Contracts\FactorDriver $callback)
  * @method static bool shouldUse()
  * @method static bool isSetup()

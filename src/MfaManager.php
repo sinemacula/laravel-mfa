@@ -24,6 +24,8 @@ use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException;
+use SineMacula\Laravel\Mfa\Models\Factor as ShippedFactorModel;
 
 /**
  * MFA manager.
@@ -70,6 +72,56 @@ class MfaManager extends Manager
     public function getDefaultDriver(): string
     {
         return 'totp';
+    }
+
+    /**
+     * Resolve the configured factor model class.
+     *
+     * Reads `config('mfa.factor.model')`; falls back to the shipped
+     * `Factor` model when the key is unset (matches the published
+     * default config). Validates that the configured value is a class
+     * string implementing the package's `EloquentFactor` contract —
+     * misconfigured values throw `InvalidFactorModelException` rather
+     * than silently degrading to the default, since the seam exists
+     * precisely so consumers can swap the model and a typo would
+     * otherwise be invisible.
+     *
+     * Consumers wire the resolved class into their identity model's
+     * `morphMany(Mfa::factorModel(), 'authenticatable')` relation, and
+     * the package itself uses it in any code path that needs to
+     * instantiate a fresh factor (for example backup-code rotation).
+     *
+     * @return class-string<\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
+     */
+    public function factorModel(): string
+    {
+        $config = $this->container->make('config');
+
+        /** @var mixed $configured */
+        $configured = $config->get('mfa.factor.model', ShippedFactorModel::class);
+
+        // A null value (consumer cleared the env var, or the config
+        // entry is missing entirely) falls through to the shipped
+        // model — matches the fresh-install contract documented in
+        // `config/mfa.php`.
+        if ($configured === null) {
+            return ShippedFactorModel::class;
+        }
+
+        if (!is_string($configured) || $configured === '') {
+            throw new InvalidFactorModelException(sprintf('mfa.factor.model must be a class string; got [%s].', get_debug_type($configured)));
+        }
+
+        if (!class_exists($configured)) {
+            throw new InvalidFactorModelException(sprintf('mfa.factor.model class [%s] does not exist.', $configured));
+        }
+
+        if (!is_subclass_of($configured, EloquentFactor::class)) {
+            throw new InvalidFactorModelException(sprintf('mfa.factor.model class [%s] must implement %s.', $configured, EloquentFactor::class));
+        }
+
+        /** @var class-string<\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $configured */
+        return $configured;
     }
 
     /**
@@ -311,6 +363,12 @@ class MfaManager extends Manager
 
         $this->assertFactorOwnership($factor, $identity);
 
+        $instance = $this->driver($driver);
+
+        if (!$instance instanceof FactorDriver) {
+            throw new \LogicException(sprintf('Driver [%s] must implement %s.', $driver, FactorDriver::class));
+        }
+
         // OTP-issuing drivers (email, SMS) reset the attempt counter and
         // persist the freshly minted code from inside `issueChallenge()` —
         // the reset is paired with a fresh secret and so cannot be used
@@ -318,10 +376,9 @@ class MfaManager extends Manager
         // codes have no per-challenge secret to mint and no state to
         // persist, so their `issueChallenge()` is a no-op and the manager
         // preserves their lockout state across challenge calls.
-        $this->resolveDriver($driver)->issueChallenge($factor);
+        $instance->issueChallenge($factor);
 
         $events = $this->container->make(Dispatcher::class);
-
         $events->dispatch(new MfaChallengeIssued($identity, $factor, $driver));
     }
 
@@ -377,7 +434,13 @@ class MfaManager extends Manager
             return false;
         }
 
-        $valid = $this->resolveDriver($driver)->verify($factor, $code);
+        $instance = $this->driver($driver);
+
+        if (!$instance instanceof FactorDriver) {
+            throw new \LogicException(sprintf('Driver [%s] must implement %s.', $driver, FactorDriver::class));
+        }
+
+        $valid = $instance->verify($factor, $code);
 
         // Persist the post-driver outcome on the factor row. Successful
         // verification stamps verified-at, resets attempts, and clears
@@ -402,7 +465,32 @@ class MfaManager extends Manager
             $factor->persist();
         }
 
-        $this->finaliseVerification($identity, $factor, $driver, $valid, $events);
+        if ($valid) {
+            /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
+            $store = $this->container->make(MfaVerificationStore::class);
+            $store->markVerified($identity);
+            $this->clearCache($identity);
+
+            $events->dispatch(new MfaVerified($identity, $factor, $driver));
+        } else {
+            // Classify the failure inline. Branches in priority order:
+            // - SecretMissing: TOTP enrolment never completed (no code AND no secret).
+            // - CodeExpired:   pending OTP aged past its window.
+            // - CodeMissing:   pending code exists but has no expiry — treat as missing.
+            // - CodeInvalid:   default — TOTP window mismatch or OTP comparison mismatch.
+            $expiresAt = $factor->getExpiresAt();
+            $pending   = $factor->getCode();
+            $secret    = $factor->getSecret();
+
+            $reason = match (true) {
+                $pending === null   && $secret === null     => MfaVerificationFailureReason::SecretMissing,
+                $expiresAt !== null && $expiresAt->isPast() => MfaVerificationFailureReason::CodeExpired,
+                $pending   !== null && $expiresAt === null  => MfaVerificationFailureReason::CodeMissing,
+                default                                     => MfaVerificationFailureReason::CodeInvalid,
+            };
+
+            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason));
+        }
 
         return $valid;
     }
@@ -512,77 +600,6 @@ class MfaManager extends Manager
 
         $events = $this->container->make(Dispatcher::class);
         $events->dispatch(new MfaFactorDisabled($identity, $factor, $factor->getDriver()));
-    }
-
-    /**
-     * Resolve the named factor driver, narrowed to the
-     * `FactorDriver` contract for downstream callers.
-     *
-     * The base manager's `driver()` returns `mixed`; this helper
-     * locks the return type so callers do not need to hint or
-     * assert at every site.
-     *
-     * @param  string  $driver
-     * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
-     */
-    protected function resolveDriver(string $driver): FactorDriver
-    {
-        $instance = $this->driver($driver);
-
-        if (!$instance instanceof FactorDriver) {
-            throw new \LogicException(sprintf('Driver [%s] must implement %s.', $driver, FactorDriver::class));
-        }
-
-        return $instance;
-    }
-
-    /**
-     * Apply the post-driver outcome side-effects: mark verified and
-     * clear cache + dispatch MfaVerified on success, or dispatch
-     * MfaVerificationFailed with a machine-readable reason on failure.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $driver
-     * @param  bool  $valid
-     * @param  \Illuminate\Contracts\Events\Dispatcher  $events
-     * @return void
-     */
-    private function finaliseVerification(
-        MultiFactorAuthenticatable $identity,
-        Factor $factor,
-        string $driver,
-        bool $valid,
-        Dispatcher $events,
-    ): void {
-        if (!$valid) {
-            // Classify the failure inline. Branches in priority order:
-            // - SecretMissing: TOTP enrolment never completed (no code AND no secret).
-            // - CodeExpired:   pending OTP aged past its window.
-            // - CodeMissing:   pending code exists but has no expiry — treat as missing.
-            // - CodeInvalid:   default — TOTP window mismatch or OTP comparison mismatch.
-            $expiresAt = $factor->getExpiresAt();
-            $code      = $factor->getCode();
-            $secret    = $factor->getSecret();
-
-            $reason = match (true) {
-                $code === null      && $secret === null     => MfaVerificationFailureReason::SecretMissing,
-                $expiresAt !== null && $expiresAt->isPast() => MfaVerificationFailureReason::CodeExpired,
-                $code      !== null && $expiresAt === null  => MfaVerificationFailureReason::CodeMissing,
-                default                                     => MfaVerificationFailureReason::CodeInvalid,
-            };
-
-            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason));
-
-            return;
-        }
-
-        /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
-        $store = $this->container->make(MfaVerificationStore::class);
-        $store->markVerified($identity);
-        $this->clearCache($identity);
-
-        $events->dispatch(new MfaVerified($identity, $factor, $driver));
     }
 
     /**
