@@ -20,8 +20,8 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
  *
  * Codes are stored hashed on the `secret` column (encrypted at rest via
  * the shipped model's `encrypted` cast). Verification is constant-time
- * via `hash_equals`. Generation uses `random_bytes` for cryptographic
- * suitability.
+ * via `hash_equals`. Generation draws each character of the configured
+ * alphabet uniformly via `random_int` for cryptographic suitability.
  *
  * No challenge issuance — backup codes are pre-minted at enrolment and
  * the user holds them out-of-band.

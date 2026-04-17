@@ -59,7 +59,14 @@ class Factor extends Model implements EloquentFactor
 
     /** @var array<string, string> The attributes that should be cast. */
     protected $casts = [
+        // `secret` and `code` are both encrypted at rest. `secret`
+        // holds long-lived material (TOTP keys, hashed backup codes);
+        // `code` holds the live OTP for email / SMS factors during
+        // its expiry window. Encrypting `code` closes a defence-in-
+        // depth gap where read-only DB access would otherwise let
+        // an attacker replay an issued code before it expires.
         'secret'            => 'encrypted',
+        'code'              => 'encrypted',
         'expires_at'        => 'datetime',
         'verified_at'       => 'datetime',
         'locked_until'      => 'datetime',

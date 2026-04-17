@@ -58,9 +58,19 @@ interface FactorDriver
     public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool;
 
     /**
-     * Generate a new persistent secret for drivers that use one
-     * (TOTP). Returns `null` for drivers whose challenges are
-     * issued on demand (email, SMS, backup codes).
+     * Generate the seed material the driver uses for fresh enrolment.
+     *
+     * Per-driver semantics:
+     *
+     * - **TOTP** — returns the shared base32 secret to persist on
+     *   `Factor::$secret` and render into the provisioning URI.
+     * - **Backup codes** — returns a single fresh plaintext code.
+     *   Consumers calling `BackupCodeDriver::generateSet()` get the
+     *   full batch in one go; `generateSecret()` is the single-shot
+     *   entry point.
+     * - **Email / SMS** — returns `null`. Email and SMS factors mint
+     *   a fresh code per challenge inside `issueChallenge()`, so
+     *   there is no enrolment-time secret to surface.
      *
      * @return ?string
      */

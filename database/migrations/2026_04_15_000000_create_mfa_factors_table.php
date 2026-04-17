@@ -66,10 +66,11 @@ return new class extends Migration {
 
             // Currently issued one-time code (email, SMS) and its expiry.
             // Cleared after successful verification or when the next
-            // challenge is issued. Bounded to 32 chars — enough for any
-            // realistic OTP alphabet / length, small enough to defend
-            // against oversized input and keep the index cheap.
-            $blueprint->string('code', 32)->nullable();
+            // challenge is issued. Encrypted at rest via the model's
+            // `encrypted` cast — `text` rather than a fixed length so
+            // the encrypted ciphertext fits regardless of the configured
+            // OTP alphabet / length.
+            $blueprint->text('code')->nullable();
             $blueprint->timestamp('expires_at')->nullable();
 
             // Rate-limiting state. `attempts` is reset on successful

@@ -8,12 +8,16 @@ use Carbon\Carbon;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Support\FactorSummary;
+use Tests\Unit\Concerns\BuildsFactorSummaries;
 
 /**
  * Unit tests for the `FactorSummary` projection.
  *
  * Covers construction via `fromFactor()`, recipient masking for email / phone
- * / short strings / empty values, and `jsonSerialize()` shape.
+ * / short strings / empty values, and `jsonSerialize()` shape. Stub-builder
+ * helpers live on the `BuildsFactorSummaries` trait so the consuming class
+ * stays focused on its assertions and below the project's
+ * max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -22,6 +26,8 @@ use SineMacula\Laravel\Mfa\Support\FactorSummary;
  */
 final class FactorSummaryTest extends TestCase
 {
+    use BuildsFactorSummaries;
+
     /** @var string */
     private const string VERIFIED_AT_ISO = '2026-04-15T12:34:56+00:00';
 
@@ -195,6 +201,57 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
+     * A five-character local-part exercises the `min(2, floor(n/2))`
+     * boundary: `floor(5/2) = 2` — but `ceil(5/2) = 3` and
+     * `round(5/2) = 3`, so a regression that swaps `floor` for either
+     * would hand back three plaintext characters. Keep the assertion
+     * exact so the mutation can't slip past.
+     *
+     * @return void
+     */
+    public function testMaskingEmailWithFiveCharLocalPartKeepsTwoCharsViaFloor(): void
+    {
+        $summary = $this->buildSummaryWithRecipient('alice@example.com');
+
+        // Local-part length 5 → keep min(2, max(1, floor(5/2))) = 2 chars
+        // → `al` + `***` → `al***@example.com`.
+        self::assertSame('al***@example.com', $summary->maskedRecipient);
+    }
+
+    /**
+     * A six-character local-part exercises the outer `min(2, …)` cap:
+     * `floor(6/2) = 3`, but `min(2, 3) = 2`. A regression to
+     * `min(3, …)` would expose three plaintext characters.
+     *
+     * @return void
+     */
+    public function testMaskingEmailWithSixCharLocalPartKeepsTwoCharsViaMinCap(): void
+    {
+        $summary = $this->buildSummaryWithRecipient('foobar@example.com');
+
+        // Local-part length 6 → min(2, floor(6/2)) = min(2, 3) = 2 →
+        // `fo` + `****` → `fo****@example.com`.
+        self::assertSame('fo****@example.com', $summary->maskedRecipient);
+    }
+
+    /**
+     * A recipient containing more than one `@` exercises the
+     * `explode(..., 2)` limit: only the FIRST `@` may split the
+     * local-part from the domain, so a second `@` belongs in the
+     * domain side untouched.
+     *
+     * @return void
+     */
+    public function testMaskingEmailHonoursExplodeLimitOnSecondAtSign(): void
+    {
+        $summary = $this->buildSummaryWithRecipient('alice@inner@example.com');
+
+        // explode('@', $r, 2) → ['alice', 'inner@example.com'].
+        // Local-part length 5 → keep 2, mask 3 → 'al***'.
+        self::assertSame('al***@inner@example.com', $summary->maskedRecipient);
+    }
+
+    /**
      * Test masking email preserves domain.
      *
      * @return void
@@ -311,39 +368,5 @@ final class FactorSummaryTest extends TestCase
             '{"id":"01H","driver":"totp","label":null,"masked_recipient":null,"verified_at":null}',
             (string) json_encode($summary),
         );
-    }
-
-    /**
-     * Build a minimal summary for contract tests.
-     *
-     * @return \SineMacula\Laravel\Mfa\Support\FactorSummary
-     */
-    private function buildMinimalSummary(): FactorSummary
-    {
-        return new FactorSummary(
-            id: '01H',
-            driver: 'totp',
-            label: null,
-            maskedRecipient: null,
-            verifiedAt: null,
-        );
-    }
-
-    /**
-     * Build a FactorSummary via `fromFactor()` for the given recipient.
-     *
-     * @param  string  $recipient
-     * @return \SineMacula\Laravel\Mfa\Support\FactorSummary
-     */
-    private function buildSummaryWithRecipient(string $recipient): FactorSummary
-    {
-        $factor = self::createStub(Factor::class);
-        $factor->method('getFactorIdentifier')->willReturn('id');
-        $factor->method('getDriver')->willReturn('email');
-        $factor->method('getLabel')->willReturn(null);
-        $factor->method('getRecipient')->willReturn($recipient);
-        $factor->method('getVerifiedAt')->willReturn(null);
-
-        return FactorSummary::fromFactor($factor);
     }
 }

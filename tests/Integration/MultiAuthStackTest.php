@@ -271,6 +271,54 @@ final class MultiAuthStackTest extends TestCase
     }
 
     /**
+     * Sanctum's `auth:sanctum` guard authenticates the request via a
+     * personal access token (Bearer) and falls back to the configured
+     * stateful guard for browser sessions. The MFA package must
+     * resolve the same MultiFactorAuthenticatable identity through
+     * Sanctum's TransientToken guard as it does through SessionGuard
+     * — proving the package depends only on `Auth::user()` returning
+     * a `MultiFactorAuthenticatable`, not on Sanctum-specific wiring.
+     *
+     * @return void
+     */
+    public function testSanctumGuardSeesIdentityAndFactors(): void
+    {
+        $user = $this->enrolUser('sanctum@example.test');
+
+        // Register Sanctum's auth driver inside this test so the
+        // package's standalone-auth-stack story is exercised against
+        // the real `auth:sanctum` driver — not just a hand-rolled
+        // token-style guard. Mirrors the wiring a consumer would do
+        // via auth.php when adding Sanctum to an existing app.
+        (new \Laravel\Sanctum\SanctumServiceProvider($this->container()))->boot();
+
+        config()->set('auth.guards.sanctum', [
+            'driver'   => 'sanctum',
+            'provider' => 'users',
+        ]);
+        config()->set('auth.defaults.guard', 'sanctum');
+
+        $this->container()->forgetInstance('mfa');
+        Auth::forgetGuards();
+        Mfa::clearCache();
+
+        // Sanctum::actingAs() handles the rest: it stamps the user as
+        // resolved through the sanctum guard with a TransientToken
+        // (no DB write needed for this test), so subsequent Auth::user()
+        // calls under the `sanctum` guard return our MFA-capable
+        // identity.
+        \Laravel\Sanctum\Sanctum::actingAs($user, ['*']);
+
+        self::assertTrue(Mfa::shouldUse());
+        self::assertTrue(Mfa::isSetup());
+
+        $factors = Mfa::getFactors();
+        self::assertNotNull($factors);
+        self::assertCount(1, $factors);
+        self::assertSame('totp', $factors->first()?->getDriver());
+    }
+
+    /**
      * Persist a fresh MFA-enrolled user with one TOTP factor.
      *
      * @param  string  $email

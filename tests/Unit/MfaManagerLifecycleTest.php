@@ -5,7 +5,10 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\Event;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
+use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerState;
@@ -13,9 +16,10 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 /**
  * Unit tests for `MfaManager` lifecycle mutations.
  *
- * Covers `markVerified()`, `forgetVerification()`, and `clearCache()`.
- * Split out from the broader state-test family so each subject stays
- * under the project's max-methods-per-class threshold.
+ * Covers `markVerified()`, `forgetVerification()`, `clearCache()`,
+ * `enrol()`, and `disable()`. Split out from the broader state-test
+ * family so each subject stays under the project's
+ * max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -166,5 +170,168 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
         // B's cache entry survives the scoped clear.
         $this->actingAs($userB);
         self::assertTrue($manager->isSetup());
+    }
+
+    /**
+     * Without an identity `enrol()` must not persist the factor or
+     * dispatch the lifecycle event.
+     *
+     * @return void
+     */
+    public function testEnrolIsNoopWhenNoIdentity(): void
+    {
+        Event::fake([MfaFactorEnrolled::class]);
+
+        $factor = $this->makeUnpersistedTotpFactor();
+
+        $this->manager()->enrol($factor);
+
+        Event::assertNotDispatched(MfaFactorEnrolled::class);
+        self::assertFalse($factor->exists);
+    }
+
+    /**
+     * `enrol()` must persist the supplied factor, dispatch
+     * `MfaFactorEnrolled`, and invalidate the identity's setup cache
+     * so the next `isSetup()` call observes the new factor.
+     *
+     * @return void
+     */
+    public function testEnrolPersistsFactorAndDispatchesEvent(): void
+    {
+        Event::fake([MfaFactorEnrolled::class]);
+
+        $user = TestUser::query()->create([
+            'email'       => 'enrol@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        $this->actingAs($user);
+
+        $manager = $this->manager();
+
+        // Warm the setup cache to "no factors" so we can assert the
+        // post-enrol invalidation forced a fresh lookup.
+        self::assertFalse($manager->isSetup());
+
+        $factor = $this->makeUnpersistedTotpFactor($user);
+
+        $manager->enrol($factor);
+
+        self::assertTrue($factor->exists, 'enrol() must persist the factor row');
+
+        Event::assertDispatched(
+            MfaFactorEnrolled::class,
+            static fn (MfaFactorEnrolled $event): bool => $event->identity === $user
+                    && $event->factor                                      === $factor
+                    && $event->driver                                      === 'totp',
+        );
+
+        self::assertTrue($manager->isSetup(), 'cache must be cleared after enrol');
+    }
+
+    /**
+     * Without an identity `disable()` must not delete the factor or
+     * dispatch the lifecycle event.
+     *
+     * @return void
+     */
+    public function testDisableIsNoopWhenNoIdentity(): void
+    {
+        Event::fake([MfaFactorDisabled::class]);
+
+        $user = TestUser::query()->create([
+            'email'       => 'orphan-disable@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        // Persist a factor but do NOT actingAs() — disable() should
+        // short-circuit on the missing identity.
+        $factor = $this->persistTotpFactorFor($user);
+
+        $this->manager()->disable($factor);
+
+        Event::assertNotDispatched(MfaFactorDisabled::class);
+        self::assertNotNull(Factor::query()->find($factor->getKey()));
+    }
+
+    /**
+     * `disable()` must delete the underlying row, dispatch
+     * `MfaFactorDisabled`, and invalidate the identity's setup cache
+     * so a subsequent `isSetup()` call observes the removal.
+     *
+     * @return void
+     */
+    public function testDisableDeletesFactorAndDispatchesEvent(): void
+    {
+        Event::fake([MfaFactorDisabled::class]);
+
+        $user = $this->makeUserWithFactor();
+
+        $this->actingAs($user);
+
+        $manager = $this->manager();
+
+        // Warm the setup cache to "has factor" so we can assert the
+        // post-disable invalidation forced a fresh lookup.
+        self::assertTrue($manager->isSetup());
+
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
+        $factor = Factor::query()
+            ->where('authenticatable_id', (string) $user->id)
+            ->sole();
+
+        $manager->disable($factor);
+
+        self::assertNull(
+            Factor::query()->find($factor->getKey()),
+            'disable() must delete the factor row',
+        );
+
+        Event::assertDispatched(
+            MfaFactorDisabled::class,
+            static fn (MfaFactorDisabled $event): bool => $event->identity === $user
+                    && $event->driver                                      === 'totp',
+        );
+
+        self::assertFalse($manager->isSetup(), 'cache must be cleared after disable');
+    }
+
+    /**
+     * Build a fresh TOTP `Factor` model that is NOT yet persisted —
+     * the consumer-side shape that `enrol()` is intended to receive.
+     *
+     * @param  ?\Tests\Fixtures\TestUser  $user
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function makeUnpersistedTotpFactor(?TestUser $user = null): Factor
+    {
+        $factor         = new Factor;
+        $factor->driver = 'totp';
+        $factor->secret = 'JBSWY3DPEHPK3PXP';
+
+        if ($user !== null) {
+            $factor->authenticatable_type = $user::class;
+            $factor->authenticatable_id   = (string) $user->id;
+        }
+
+        return $factor;
+    }
+
+    /**
+     * Persist a TOTP factor against the supplied identity and return
+     * the row.
+     *
+     * @param  \Tests\Fixtures\TestUser  $user
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function persistTotpFactorFor(TestUser $user): Factor
+    {
+        return Factor::query()->create([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+            'driver'               => 'totp',
+            'secret'               => 'JBSWY3DPEHPK3PXP',
+        ]);
     }
 }

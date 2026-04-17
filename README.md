@@ -76,6 +76,10 @@ return [
 ];
 ```
 
+> **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so a key
+> rotation must use `php artisan key:rotate` (Laravel's built-in re-encryption command) rather than
+> simply swapping `APP_KEY` in `.env` — a naive swap leaves existing factor rows un-decryptable.
+
 ## Usage
 
 ### Middleware enforcement
@@ -158,10 +162,17 @@ $driver = Mfa::driver('totp');
 $valid  = $driver->verify($code, $factor);
 ```
 
-### TOTP enrolment
+### Enrolment and disable
 
-Generate a shared secret and a provisioning URI, render the URI as a QR code with the QR-rendering library
-of your choice, then persist the secret on a `Factor` row:
+`Mfa::enrol($factor)` persists a freshly-built factor against the current identity, invalidates the manager's
+setup-state cache, and dispatches `MfaFactorEnrolled`. `Mfa::disable($factor)` deletes the underlying row,
+invalidates the cache, and dispatches `MfaFactorDisabled`. Both are no-ops when no MFA-capable identity is
+authenticated, so they are safe to call unconditionally during a sign-up or settings flow.
+
+#### TOTP
+
+Generate a shared secret and a provisioning URI, render the URI as a QR code with the QR-rendering library of
+your choice, then hand a fresh `Factor` to `Mfa::enrol()`:
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -178,14 +189,25 @@ $uri    = $driver->provisioningUri(
 // Render $uri as a QR code with your library of choice. With endroid/qr-code:
 //   $qr = Builder::create()->writer(new PngWriter)->data($uri)->build();
 
-Factor::create([
-    'authenticatable_type' => $user::class,
-    'authenticatable_id'   => $user->getKey(),
-    'driver'               => 'totp',
-    'label'                => 'Authenticator app',
-    'secret'               => $secret,
-]);
+$factor                       = new Factor;
+$factor->driver               = 'totp';
+$factor->label                = 'Authenticator app';
+$factor->secret               = $secret;
+$factor->authenticatable_type = $user::class;
+$factor->authenticatable_id   = $user->getKey();
+
+Mfa::enrol($factor);
 ```
+
+#### Disabling a factor
+
+```php
+Mfa::disable($factor);
+```
+
+Subscribers to `MfaFactorEnrolled` and `MfaFactorDisabled` receive the identity, the factor, and the driver
+name — enough to drive audit logging, downstream policy recalculation, or operations notifications without
+the consumer having to remember to dispatch lifecycle events themselves.
 
 ### SMS gateway binding
 
@@ -271,6 +293,11 @@ Mfa::extend('webauthn', function ($app) {
 
 Custom drivers must implement `SineMacula\Laravel\Mfa\Contracts\FactorDriver`.
 
+Register your override **before** any code in the request calls `Mfa::driver(...)`. Laravel's manager
+caches resolved drivers per request, so an `extend()` call made after the driver has already been
+resolved that request silently has no effect — bind in a service provider's `register()` (or `boot()`)
+rather than mid-request.
+
 ### Identity model setup
 
 Your identity model implements `MultiFactorAuthenticatable`:
@@ -293,7 +320,7 @@ class AppUser extends User implements MultiFactorAuthenticatable
 
     public function authFactors(): \Illuminate\Contracts\Database\Eloquent\Builder
     {
-        return $this->morphMany(AuthFactor::class, 'authenticatable');
+        return $this->morphMany(\SineMacula\Laravel\Mfa\Models\Factor::class, 'authenticatable');
     }
 }
 ```
@@ -327,7 +354,7 @@ RateLimiter::for('mfa-verify', static function (Request $request): array {
         Limit::perMinute(10)->by($request->ip() ?? 'unknown'),
 
         // Per-identity cap so one compromised IP can't brute many users
-        Limit::perMinute(5)->by((string) $identifier),
+        Limit::perMinute(5)->by((string) ($identifier ?: 'unknown')),
     ];
 });
 ```
@@ -344,6 +371,13 @@ Apply the throttle **only** to the verify endpoint itself — do not gate routes
 (`Mfa::shouldUse()`, `Mfa::isSetup()`, etc.) behind it, since those are called on every request and would
 exhaust the bucket without representing an attack signal.
 
+### Verification store
+
+The default `SessionMfaVerificationStore` assumes consumers regenerate the session on auth state change
+— Laravel's default behaviour on login / logout. Apps that disable session regeneration on login must
+also call `Mfa::forgetVerification()` so a new identity cannot inherit the prior identity's verification
+timestamp from the reused session.
+
 ## Extensibility
 
 All concrete classes in this package are `final` unless explicitly designed for extension. Extension is through
@@ -353,8 +387,8 @@ All concrete classes in this package are `final` unless explicitly designed for 
 |--------------------------|------------------------------------------------------------------------|
 | Custom factor driver     | Implement `FactorDriver`, register via `Mfa::extend()`                 |
 | Custom identity model    | Implement `MultiFactorAuthenticatable` on your Eloquent model          |
-| Organisation enforcement | Implement `EnforcesMfa` on your organisation model                     |
-| Custom factor model      | Swap via configuration (publishable migrations)                        |
+| Organisation enforcement | Implement `MfaPolicy` and bind it via the container                    |
+| Custom factor model      | Set `config('mfa.factor.model')` to your subclass                      |
 
 ## Requirements
 

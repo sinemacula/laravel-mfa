@@ -176,6 +176,32 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
+     * The constructor must reject a message template missing the
+     * `:code` placeholder — without it, the rendered SMS would ship
+     * the literal template string and never the verification code.
+     *
+     * @return void
+     */
+    public function testConstructorRejectsTemplateMissingCodePlaceholder(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage(':code placeholder');
+
+        // Assigning the constructed driver so the static analyser does
+        // not flag a "useless object instantiation" — the test is the
+        // failed construction itself, not the resulting instance.
+        $unused = new SmsDriver(
+            gateway: new FakeSmsGateway,
+            messageTemplate: 'Your verification code is missing the placeholder',
+        );
+
+        // Unreachable — the constructor must throw above. Touch the
+        // local so PHP-CS-Fixer / static analysis can confirm it is
+        // observably used inside the test method body.
+        self::assertInstanceOf(SmsDriver::class, $unused);
+    }
+
+    /**
      * A configured alphabet (e.g. hex) must be honoured by the issued
      * code so consumers can override the default zero-padded numeric.
      *

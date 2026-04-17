@@ -27,6 +27,9 @@ final class FactorTest extends TestCase
     /** @var string */
     private const string TEST_USER_EMAIL = 'alice@example.com';
 
+    /** @var string Cleartext OTP fixture used to assert the code-encryption round-trip. */
+    private const string CLEARTEXT_CODE = '123456';
+
     /**
      * Test implements eloquent factor contract.
      *
@@ -193,6 +196,46 @@ final class FactorTest extends TestCase
         $rawSecret = $raw->secret;
         self::assertIsString($rawSecret);
         self::assertNotSame('JBSWY3DPEHPK3PXP', $rawSecret);
+    }
+
+    /**
+     * Live OTP `code` (email / SMS) must also be encrypted at rest —
+     * defence-in-depth against a read-only DB compromise replaying a
+     * freshly-issued code inside its expiry window.
+     *
+     * @return void
+     */
+    public function testCodeIsEncryptedAtRestAndDecryptsOnRead(): void
+    {
+        $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
+
+        $factor = new Factor([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => $this->authenticatableId($user),
+            'driver'               => 'email',
+            'recipient'            => 'verify@example.test',
+            'code'                 => self::CLEARTEXT_CODE,
+        ]);
+        $factor->save();
+
+        // Reload from DB to ensure encryption round-trips.
+        $reloaded = Factor::query()->findOrFail($factor->id);
+
+        self::assertSame(self::CLEARTEXT_CODE, $reloaded->code);
+
+        // Inspect the raw DB row to confirm the value is not stored as
+        // plaintext.
+        $connection = $factor->getConnection();
+
+        $raw = $connection->table($factor->getTable())
+            ->where('id', $factor->id)
+            ->first(['code']);
+
+        self::assertNotNull($raw);
+        /** @var mixed $rawCode */
+        $rawCode = $raw->code;
+        self::assertIsString($rawCode);
+        self::assertNotSame(self::CLEARTEXT_CODE, $rawCode);
     }
 
     /**

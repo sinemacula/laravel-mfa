@@ -5,10 +5,10 @@ declare(strict_types = 1);
 namespace Tests\Unit\Concerns;
 
 use Carbon\CarbonInterface;
-use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
+use Tests\Fixtures\AbstractFactorStub;
 use Tests\Fixtures\CallOrderTrackingFactor;
 use Tests\Fixtures\DispatchTrackingOtpDriver;
 use Tests\Fixtures\Exceptions\DispatchTransportFailureException;
@@ -161,130 +161,10 @@ trait InteractsWithAbstractOtpDriver
      * abstract driver to reject it through `UnsupportedFactorException`.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\Factor
-     *
-     * @SuppressWarnings("php:S1448")
      */
     protected function makeNonEloquentFactor(): Factor
     {
-        // Anonymous class implements the full Factor contract surface.
-        // The method count is dictated by the contract — splitting
-        // would require fragmenting Factor itself.
-        return new class implements Factor {
-            /**
-             * @return mixed
-             */
-            public function getFactorIdentifier(): mixed
-            {
-                return 'stub';
-            }
-
-            /**
-             * @return string
-             */
-            public function getDriver(): string
-            {
-                return 'email';
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getLabel(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getRecipient(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Illuminate\Contracts\Auth\Authenticatable
-             */
-            public function getAuthenticatable(): ?Authenticatable
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getSecret(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getCode(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getExpiresAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return int
-             */
-            public function getAttempts(): int
-            {
-                return 0;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLockedUntil(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isLocked(): bool
-            {
-                // Derived from the accessor so this stub does not duplicate
-                // the body of isVerified() — radarlint S4144 flags
-                // structurally identical method bodies.
-                return $this->getLockedUntil() !== null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLastAttemptedAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getVerifiedAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isVerified(): bool
-            {
-                return false;
-            }
-        };
+        return new class extends AbstractFactorStub {};
     }
 
     /**
@@ -295,15 +175,10 @@ trait InteractsWithAbstractOtpDriver
      * @param  ?string  $code
      * @param  ?\Carbon\CarbonInterface  $expires
      * @return \SineMacula\Laravel\Mfa\Contracts\Factor
-     *
-     * @SuppressWarnings("php:S1448")
      */
     protected function makeStubFactor(?string $code, ?CarbonInterface $expires): Factor
     {
-        // Anonymous class implements the full Factor contract surface.
-        // The method count is dictated by the contract — splitting
-        // would require fragmenting Factor itself.
-        return new class ($code, $expires) implements Factor {
+        return new class ($code, $expires) extends AbstractFactorStub {
             /**
              * Capture the seeded code / expiry pair.
              *
@@ -315,54 +190,6 @@ trait InteractsWithAbstractOtpDriver
                 private readonly ?string $code,
                 private readonly ?CarbonInterface $expires,
             ) {}
-
-            /**
-             * @return mixed
-             */
-            public function getFactorIdentifier(): mixed
-            {
-                return 'stub';
-            }
-
-            /**
-             * @return string
-             */
-            public function getDriver(): string
-            {
-                return 'email';
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getLabel(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getRecipient(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Illuminate\Contracts\Auth\Authenticatable
-             */
-            public function getAuthenticatable(): ?Authenticatable
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getSecret(): ?string
-            {
-                return null;
-            }
 
             /**
              * @return ?string
@@ -378,57 +205,6 @@ trait InteractsWithAbstractOtpDriver
             public function getExpiresAt(): ?CarbonInterface
             {
                 return $this->expires;
-            }
-
-            /**
-             * @return int
-             */
-            public function getAttempts(): int
-            {
-                return 0;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLockedUntil(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isLocked(): bool
-            {
-                // Derived from the accessor so this stub does not duplicate
-                // the body of isVerified() — radarlint S4144 flags
-                // structurally identical method bodies.
-                return $this->getLockedUntil() !== null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLastAttemptedAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getVerifiedAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isVerified(): bool
-            {
-                return false;
             }
         };
     }

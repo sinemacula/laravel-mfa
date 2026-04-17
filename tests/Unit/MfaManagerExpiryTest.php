@@ -184,6 +184,66 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
+     * The expiry comparison is `elapsed > window` (strict greater-than),
+     * so a verification recorded exactly `window` minutes ago is still
+     * valid. Pins the inclusive boundary so a regression to `>=` is
+     * caught.
+     *
+     * @return void
+     */
+    public function testHasExpiredReturnsFalseAtExactWindowBoundary(): void
+    {
+        $user = TestUser::query()->create(['email' => 'boundary@example.com']);
+
+        $this->actingAs($user);
+
+        // Freeze the clock so the elapsed minutes are exactly the
+        // window — no rounding noise from the wall clock advancing
+        // mid-test.
+        $this->travelTo(Carbon::parse('2026-01-01T12:00:00Z'));
+
+        $this->container()->instance(
+            MfaVerificationStore::class,
+            $this->fixedStore(Carbon::parse('2026-01-01T11:00:00Z')),
+        );
+
+        self::assertFalse(
+            $this->manager()->hasExpired(60),
+            'a verification recorded exactly `window` minutes ago must still be valid',
+        );
+
+        $this->travelBack();
+    }
+
+    /**
+     * One minute past the window the verification must expire. Pairs
+     * with the boundary test above to pin the strictly-greater-than
+     * semantics from both sides.
+     *
+     * @return void
+     */
+    public function testHasExpiredReturnsTrueOneMinuteAfterWindowBoundary(): void
+    {
+        $user = TestUser::query()->create(['email' => 'past-boundary@example.com']);
+
+        $this->actingAs($user);
+
+        $this->travelTo(Carbon::parse('2026-01-01T12:00:00Z'));
+
+        $this->container()->instance(
+            MfaVerificationStore::class,
+            $this->fixedStore(Carbon::parse('2026-01-01T10:59:00Z')),
+        );
+
+        self::assertTrue(
+            $this->manager()->hasExpired(60),
+            'a verification one minute past the window must expire',
+        );
+
+        $this->travelBack();
+    }
+
+    /**
      * A non-numeric `mfa.default_expiry` config value should be
      * coerced to zero, expiring any prior verification.
      *

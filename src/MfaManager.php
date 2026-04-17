@@ -18,6 +18,8 @@ use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
+use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
+use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 
@@ -372,6 +374,77 @@ class MfaManager extends Manager
     }
 
     /**
+     * Enrol a freshly-built factor against the current identity.
+     *
+     * The consumer constructs the factor (TOTP secret already generated,
+     * email recipient already set, backup-code hash already populated,
+     * etc.); this method persists it (via the `EloquentFactor::persist()`
+     * seam), invalidates the identity's setup-state cache so the next
+     * `isSetup()` call sees the new factor, and dispatches
+     * `MfaFactorEnrolled` for downstream subscribers (audit log, ops
+     * notifications, access-policy recalculation).
+     *
+     * No-op when no MFA-capable identity is resolvable from the guard —
+     * matches the established `markVerified()` / `forgetVerification()`
+     * shape so consumers can call this unconditionally during a sign-up
+     * flow without guarding against unauthenticated requests.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @return void
+     */
+    public function enrol(Factor $factor): void
+    {
+        $identity = $this->resolveIdentity();
+
+        if ($identity === null) {
+            return;
+        }
+
+        if ($factor instanceof EloquentFactor) {
+            $factor->persist();
+        }
+
+        $this->clearCache($identity);
+
+        $events = $this->container->make(Dispatcher::class);
+        $events->dispatch(new MfaFactorEnrolled($identity, $factor, $factor->getDriver()));
+    }
+
+    /**
+     * Disable a previously-enrolled factor for the current identity.
+     *
+     * Deletes the underlying row when the factor is an Eloquent model,
+     * invalidates the identity's setup-state cache so the next
+     * `isSetup()` call reflects the removal, and dispatches
+     * `MfaFactorDisabled` for downstream subscribers. Non-Eloquent
+     * `Factor` implementations are left to the consumer to discard;
+     * the event still fires so observers can react.
+     *
+     * No-op when no MFA-capable identity is resolvable, mirroring
+     * `enrol()`'s shape.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @return void
+     */
+    public function disable(Factor $factor): void
+    {
+        $identity = $this->resolveIdentity();
+
+        if ($identity === null) {
+            return;
+        }
+
+        if ($factor instanceof \Illuminate\Database\Eloquent\Model) {
+            $factor->delete();
+        }
+
+        $this->clearCache($identity);
+
+        $events = $this->container->make(Dispatcher::class);
+        $events->dispatch(new MfaFactorDisabled($identity, $factor, $factor->getDriver()));
+    }
+
+    /**
      * Resolve the named factor driver, narrowed to the
      * `FactorDriver` contract for downstream callers.
      *
@@ -413,12 +486,23 @@ class MfaManager extends Manager
         Dispatcher $events,
     ): void {
         if (!$valid) {
-            $events->dispatch(new MfaVerificationFailed(
-                $identity,
-                $factor,
-                $driver,
-                $this->classifyFailure($factor),
-            ));
+            // Classify the failure inline. Branches in priority order:
+            // - SecretMissing: TOTP enrolment never completed (no code AND no secret).
+            // - CodeExpired:   pending OTP aged past its window.
+            // - CodeMissing:   pending code exists but has no expiry — treat as missing.
+            // - CodeInvalid:   default — TOTP window mismatch or OTP comparison mismatch.
+            $expiresAt = $factor->getExpiresAt();
+            $code      = $factor->getCode();
+            $secret    = $factor->getSecret();
+
+            $reason = match (true) {
+                $code === null      && $secret === null     => MfaVerificationFailureReason::SecretMissing,
+                $expiresAt !== null && $expiresAt->isPast() => MfaVerificationFailureReason::CodeExpired,
+                $code      !== null && $expiresAt === null  => MfaVerificationFailureReason::CodeMissing,
+                default                                     => MfaVerificationFailureReason::CodeInvalid,
+            };
+
+            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason));
 
             return;
         }
@@ -479,37 +563,6 @@ class MfaManager extends Manager
     }
 
     /**
-     * Classify the failure reason for a non-successful verification.
-     *
-     * TOTP-shaped drivers fail with `SecretMissing` when the factor has no
-     * persistent secret (expected TOTP enrolment never completed). OTP-
-     * delivery drivers fail with `CodeMissing` when no challenge has been
-     * issued, `CodeExpired` when the pending code has aged out, and
-     * `CodeInvalid` for all other comparison mismatches.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return \SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason
-     */
-    private function classifyFailure(Factor $factor): MfaVerificationFailureReason
-    {
-        $expiresAt = $factor->getExpiresAt();
-        $code      = $factor->getCode();
-        $secret    = $factor->getSecret();
-
-        // Branches in priority order:
-        // - SecretMissing: TOTP enrolment never completed (no code AND no secret).
-        // - CodeExpired:   pending OTP aged past its window.
-        // - CodeMissing:   pending code exists but has no expiry — treat as missing.
-        // - CodeInvalid:   default — TOTP window mismatch or OTP comparison mismatch.
-        return match (true) {
-            $code === null      && $secret === null     => MfaVerificationFailureReason::SecretMissing,
-            $expiresAt !== null && $expiresAt->isPast() => MfaVerificationFailureReason::CodeExpired,
-            $code      !== null && $expiresAt === null  => MfaVerificationFailureReason::CodeMissing,
-            default                                     => MfaVerificationFailureReason::CodeInvalid,
-        };
-    }
-
-    /**
      * Resolve an integer setting from the application config.
      *
      * Two fallback values are accepted so callers can distinguish
@@ -538,11 +591,12 @@ class MfaManager extends Manager
         /** @var mixed $value */
         $value = $config->get($key);
 
-        return match (true) {
-            is_int($value)     => $value,
-            is_numeric($value) => (int) $value,
-            default            => $malformedFallback ?? $default,
-        };
+        // `is_numeric` is true for ints AND numeric-strings; the
+        // subsequent `(int)` cast is identity for ints, so a single
+        // arm covers both shapes without a redundant `is_int` branch.
+        return is_numeric($value)
+            ? (int) $value
+            : ($malformedFallback ?? $default);
     }
 
     /**

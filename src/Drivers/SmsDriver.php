@@ -24,12 +24,19 @@ final class SmsDriver extends AbstractOtpDriver
     /**
      * Constructor.
      *
+     * Validates at construction that the message template contains the
+     * `:code` placeholder — without it, the rendered SMS would ship the
+     * literal placeholder string to users. Fail loudly at boot rather
+     * than silently leaking a broken message on every challenge.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SmsGateway  $gateway
      * @param  string  $messageTemplate
      * @param  int  $codeLength
      * @param  int  $expiry
      * @param  int  $maxAttempts
      * @param  ?string  $alphabet
+     *
+     * @throws \InvalidArgumentException
      */
     public function __construct(
         private readonly SmsGateway $gateway,
@@ -39,6 +46,10 @@ final class SmsDriver extends AbstractOtpDriver
         int $maxAttempts = 3,
         ?string $alphabet = null,
     ) {
+        if (!str_contains($messageTemplate, ':code')) {
+            throw new \InvalidArgumentException(sprintf('SmsDriver message template must contain the :code placeholder; received "%s".', $messageTemplate));
+        }
+
         parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet);
     }
 

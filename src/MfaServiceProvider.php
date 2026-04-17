@@ -80,10 +80,13 @@ class MfaServiceProvider extends ServiceProvider
      */
     protected function registerMfaManager(): void
     {
+        // `static::` rather than `self::` so subclasses overriding
+        // `registerBuiltInDrivers()` are honoured even when the closure
+        // is invoked at resolve time.
         $this->app->singleton('mfa', static function (Application $app): MfaManager {
             $manager = new MfaManager($app);
 
-            self::registerBuiltInDrivers($manager, $app);
+            static::registerBuiltInDrivers($manager, $app);
 
             return $manager;
         });

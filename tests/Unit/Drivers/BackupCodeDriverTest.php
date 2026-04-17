@@ -4,15 +4,11 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
-use Carbon\CarbonInterface;
-use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
-use Tests\Fixtures\Exceptions\UnsupportedFixtureMethodException;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
 
@@ -343,16 +339,7 @@ final class BackupCodeDriverTest extends TestCase
      */
     private function makeNonModelEloquentFactor(string $secret): EloquentFactor
     {
-        /**
-         * Anonymous class implements the full EloquentFactor contract
-         * surface (33 methods). The method count is dictated by the
-         * contract, not by accidental complexity — splitting would
-         * require fragmenting EloquentFactor itself, which is out of
-         * scope for a single-purpose test fixture.
-         *
-         * @SuppressWarnings("php:S1448")
-         */
-        return new class ($secret) implements EloquentFactor {
+        return new class ($secret) extends \Tests\Fixtures\AbstractEloquentFactorStub {
             /**
              * Capture the seeded secret value.
              *
@@ -360,189 +347,8 @@ final class BackupCodeDriverTest extends TestCase
              * @return void
              */
             public function __construct(
-                private ?string $secret,
+                private readonly ?string $secret,
             ) {}
-
-            /**
-             * Required by the contract but never invoked from this
-             * stub — the only test exercising this fixture takes the
-             * non-Model early-return branch in `BackupCodeDriver::verify()`
-             * before any relation lookup happens. Throws so an
-             * accidental future caller fails loudly rather than
-             * receiving a half-built relation.
-             *
-             * @return \Illuminate\Database\Eloquent\Relations\MorphTo<\Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model>
-             *
-             * @throws \Tests\Fixtures\Exceptions\UnsupportedFixtureMethodException
-             */
-            public function authenticatable(): MorphTo
-            {
-                // Wrapping the throw in a `match` keeps the `return`
-                // syntactically present so CodeSniffer's
-                // `InvalidNoReturn` does not flag the @return tag, even
-                // though the function is logically `never`-returning.
-                return match (true) {
-                    default => throw new UnsupportedFixtureMethodException('authenticatable() is unsupported on the non-Model EloquentFactor fixture.'),
-                };
-            }
-
-            /**
-             * @return string
-             */
-            public function getDriverName(): string
-            {
-                return 'driver';
-            }
-
-            /**
-             * @return string
-             */
-            public function getLabelName(): string
-            {
-                return 'label';
-            }
-
-            /**
-             * @return string
-             */
-            public function getRecipientName(): string
-            {
-                return 'recipient';
-            }
-
-            /**
-             * @return string
-             */
-            public function getSecretName(): string
-            {
-                return 'secret';
-            }
-
-            /**
-             * @return string
-             */
-            public function getCodeName(): string
-            {
-                return 'code';
-            }
-
-            /**
-             * @return string
-             */
-            public function getExpiresAtName(): string
-            {
-                return 'expires_at';
-            }
-
-            /**
-             * @return string
-             */
-            public function getAttemptsName(): string
-            {
-                return 'attempts';
-            }
-
-            /**
-             * @return string
-             */
-            public function getLockedUntilName(): string
-            {
-                return 'locked_until';
-            }
-
-            /**
-             * @return string
-             */
-            public function getLastAttemptedAtName(): string
-            {
-                return 'last_attempted_at';
-            }
-
-            /**
-             * @return string
-             */
-            public function getVerifiedAtName(): string
-            {
-                return 'verified_at';
-            }
-
-            /**
-             * No-op — the fixture does not track attempts.
-             *
-             * @param  ?\Carbon\CarbonInterface  $at
-             * @return void
-             */
-            public function recordAttempt(?CarbonInterface $at = null): void
-            {
-                // Intentionally empty — see method docblock.
-            }
-
-            /**
-             * No-op — the fixture does not track attempts.
-             *
-             * @return void
-             */
-            public function resetAttempts(): void
-            {
-                // Intentionally empty — see method docblock.
-            }
-
-            /**
-             * No-op — the fixture does not track lockouts.
-             *
-             * @param  \Carbon\CarbonInterface  $until
-             * @return void
-             */
-            public function applyLockout(CarbonInterface $until): void
-            {
-                // Intentionally empty — see method docblock.
-            }
-
-            /**
-             * No-op — the fixture does not track verifications.
-             *
-             * @param  ?\Carbon\CarbonInterface  $at
-             * @return void
-             */
-            public function recordVerification(?CarbonInterface $at = null): void
-            {
-                // Intentionally empty — see method docblock.
-            }
-
-            /**
-             * No-op — the fixture does not track issued codes.
-             *
-             * @param  string  $code
-             * @param  \Carbon\CarbonInterface  $expiresAt
-             * @return void
-             */
-            public function issueCode(
-                #[\SensitiveParameter]
-                string $code,
-                CarbonInterface $expiresAt,
-            ): void {
-                // Intentionally empty — see method docblock.
-            }
-
-            /**
-             * No-op — the fixture does not track consumed codes.
-             *
-             * @return void
-             */
-            public function consumeCode(): void
-            {
-                // Intentionally empty — see method docblock.
-            }
-
-            /**
-             * No-op — the fixture does not persist anywhere.
-             *
-             * @return void
-             */
-            public function persist(): void
-            {
-                // Intentionally empty — see method docblock.
-            }
 
             /**
              * @return mixed
@@ -563,102 +369,9 @@ final class BackupCodeDriverTest extends TestCase
             /**
              * @return ?string
              */
-            public function getLabel(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getRecipient(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Illuminate\Contracts\Auth\Authenticatable
-             */
-            public function getAuthenticatable(): ?Authenticatable
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
             public function getSecret(): ?string
             {
                 return $this->secret;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getCode(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getExpiresAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return int
-             */
-            public function getAttempts(): int
-            {
-                return 0;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLockedUntil(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isLocked(): bool
-            {
-                // Derived from the accessor so this stub does not duplicate
-                // the body of isVerified() — radarlint S4144 flags
-                // structurally identical method bodies.
-                return $this->getLockedUntil() !== null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLastAttemptedAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getVerifiedAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isVerified(): bool
-            {
-                // Verification state is irrelevant — these stubs cover
-                // the verify-decision path, not post-verify state.
-                return false;
             }
         };
     }
@@ -672,7 +385,7 @@ final class BackupCodeDriverTest extends TestCase
      */
     private function makeStubFactor(?string $secret): Factor
     {
-        return new class ($secret) implements Factor {
+        return new class ($secret) extends \Tests\Fixtures\AbstractFactorStub {
             /**
              * Capture the seeded secret value.
              *
@@ -682,14 +395,6 @@ final class BackupCodeDriverTest extends TestCase
             public function __construct(
                 private readonly ?string $secret,
             ) {}
-
-            /**
-             * @return mixed
-             */
-            public function getFactorIdentifier(): mixed
-            {
-                return 'stub';
-            }
 
             /**
              * @return string
@@ -702,102 +407,9 @@ final class BackupCodeDriverTest extends TestCase
             /**
              * @return ?string
              */
-            public function getLabel(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getRecipient(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Illuminate\Contracts\Auth\Authenticatable
-             */
-            public function getAuthenticatable(): ?Authenticatable
-            {
-                return null;
-            }
-
-            /**
-             * @return ?string
-             */
             public function getSecret(): ?string
             {
                 return $this->secret;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getCode(): ?string
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getExpiresAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return int
-             */
-            public function getAttempts(): int
-            {
-                return 0;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLockedUntil(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isLocked(): bool
-            {
-                // Derived from the accessor so this stub does not duplicate
-                // the body of isVerified() — radarlint S4144 flags
-                // structurally identical method bodies.
-                return $this->getLockedUntil() !== null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getLastAttemptedAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return ?\Carbon\CarbonInterface
-             */
-            public function getVerifiedAt(): ?CarbonInterface
-            {
-                return null;
-            }
-
-            /**
-             * @return bool
-             */
-            public function isVerified(): bool
-            {
-                // Verification state is irrelevant — these stubs cover
-                // the verify-decision path, not post-verify state.
-                return false;
             }
         };
     }

@@ -212,4 +212,74 @@ final class CustomDriverExtensionTest extends TestCase
 
         self::assertSame(1, $driver->verifyCalls);
     }
+
+    /**
+     * `Mfa::extend('totp', ...)` must override the built-in TOTP
+     * driver registered by `MfaServiceProvider::registerBuiltInDrivers()`.
+     *
+     * Pins the override invariant after the refactor that moved the
+     * built-in factories from `MfaManager::createXDriver()` into
+     * `Mfa::extend()` calls inside the service provider's singleton
+     * closure. Both paths now use the same registry, so a future
+     * Laravel `Manager` upgrade that changed override-precedence
+     * semantics would silently break consumer overrides without
+     * this guard.
+     *
+     * @return void
+     */
+    public function testConsumerCanOverrideBuiltInTotpDriver(): void
+    {
+        $marker = new class implements FactorDriver {
+            /**
+             * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+             * @return void
+             */
+            public function issueChallenge(Factor $factor): void
+            {
+                // No-op — never called in this test.
+            }
+
+            /**
+             * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+             * @param  string  $code
+             * @return bool
+             */
+            public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
+            {
+                // Marker driver — return true so the caller can observe
+                // that the override fired without setting up a factor.
+                return true;
+            }
+
+            /**
+             * @return string
+             */
+            public function generateSecret(): string
+            {
+                return 'fake-marker-secret';
+            }
+        };
+
+        // Sanity-check: before the override the built-in TOTP driver
+        // resolves to the package's TotpDriver (not our marker).
+        self::assertNotSame($marker, Mfa::driver('totp'));
+
+        // Resolve the manager singleton and clear Laravel's per-request
+        // driver cache so the override registered next is what the next
+        // `driver('totp')` call sees.
+        $manager = $this->container()->make('mfa');
+        \PHPUnit\Framework\Assert::assertInstanceOf(
+            \SineMacula\Laravel\Mfa\MfaManager::class,
+            $manager,
+        );
+        $manager->forgetDrivers();
+
+        Mfa::extend('totp', static fn (): FactorDriver => $marker);
+
+        self::assertSame(
+            $marker,
+            Mfa::driver('totp'),
+            'Mfa::extend(\'totp\', ...) must override the built-in TOTP driver',
+        );
+    }
 }

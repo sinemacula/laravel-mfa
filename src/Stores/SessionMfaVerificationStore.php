@@ -25,6 +25,12 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
  * should bind an alternative store — see the class-level docblock
  * on `MfaVerificationStore`.
  *
+ * Assumes consumers regenerate the session on auth state change —
+ * Laravel's default behaviour on login / logout. Apps that disable
+ * session regeneration on login should also call
+ * `Mfa::forgetVerification()` so a new identity cannot inherit the
+ * prior identity's verification timestamp from the reused session.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
