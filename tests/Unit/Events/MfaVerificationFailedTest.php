@@ -68,11 +68,11 @@ final class MfaVerificationFailedTest extends TestCase
         $event = new MfaVerificationFailed(
             identity: $identity,
             factor: null,
-            driver: 'unknown',
-            reason: MfaVerificationFailureReason::DRIVER_UNKNOWN,
+            driver: 'totp',
+            reason: MfaVerificationFailureReason::SECRET_MISSING,
         );
 
         self::assertNull($event->factor);
-        self::assertSame(MfaVerificationFailureReason::DRIVER_UNKNOWN, $event->reason);
+        self::assertSame(MfaVerificationFailureReason::SECRET_MISSING, $event->reason);
     }
 }

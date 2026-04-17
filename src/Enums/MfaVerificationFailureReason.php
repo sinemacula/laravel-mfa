@@ -40,14 +40,4 @@ enum MfaVerificationFailureReason: string
      * A TOTP factor has no persistent secret stored.
      */
     case SECRET_MISSING = 'secret_missing';
-
-    /**
-     * The named driver is not registered with the MFA manager.
-     */
-    case DRIVER_UNKNOWN = 'driver_unknown';
-
-    /**
-     * The currently authenticated identity is not MFA-capable.
-     */
-    case IDENTITY_UNSUPPORTED = 'identity_unsupported';
 }

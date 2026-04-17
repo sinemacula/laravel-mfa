@@ -81,32 +81,12 @@ final class MfaVerificationFailureReasonTest extends TestCase
     }
 
     /**
-     * Test driver unknown case value.
+     * Test exposes the five cases the manager actually emits.
      *
      * @return void
      */
-    public function testDriverUnknownCaseValue(): void
+    public function testExposesFiveEmittedCases(): void
     {
-        self::assertSame('driver_unknown', MfaVerificationFailureReason::DRIVER_UNKNOWN->value);
-    }
-
-    /**
-     * Test identity unsupported case value.
-     *
-     * @return void
-     */
-    public function testIdentityUnsupportedCaseValue(): void
-    {
-        self::assertSame('identity_unsupported', MfaVerificationFailureReason::IDENTITY_UNSUPPORTED->value);
-    }
-
-    /**
-     * Test exposes all seven cases.
-     *
-     * @return void
-     */
-    public function testExposesAllSevenCases(): void
-    {
-        self::assertCount(7, MfaVerificationFailureReason::cases());
+        self::assertCount(5, MfaVerificationFailureReason::cases());
     }
 }
