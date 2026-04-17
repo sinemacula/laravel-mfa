@@ -19,6 +19,9 @@ use SineMacula\Laravel\Mfa\MfaManager;
  *
  * @internal
  */
+// Extending the real manager preserves the facade's @method signatures
+// so middleware tests stay type-safe; the parent constructor is
+// intentionally skipped — see __construct below.
 final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
 {
     /** @var bool */
@@ -37,8 +40,10 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
     public ?Collection $factors = null;
 
     /**
-     * Intentionally skip parent::__construct to avoid requiring a full
-     * container; the middleware only calls the overrides below.
+     * Intentionally skip parent::__construct so the fixture can be
+     * instantiated outside a bootstrapped Laravel container — the
+     * middleware tests only exercise the overridden read methods, none
+     * of which touch the manager's container-backed driver registry.
      *
      * @return void
      *

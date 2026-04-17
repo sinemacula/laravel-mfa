@@ -211,7 +211,7 @@ final class BackupCodeDriver implements FactorDriver
         $result = DB::connection($factor->getConnectionName())->transaction(
             static function () use ($factor, $secretColumn, $expectedSecret): bool {
                 /** @var ?\Illuminate\Database\Eloquent\Model $locked */
-                // @phpstan-ignore staticMethod.dynamicCall
+                // @phpstan-ignore staticMethod.dynamicCall (newQuery is an instance method on Eloquent\Model)
                 $locked = $factor->newQuery()
                     ->lockForUpdate()
                     ->find($factor->getKey());

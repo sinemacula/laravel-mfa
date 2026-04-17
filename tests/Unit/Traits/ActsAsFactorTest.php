@@ -14,6 +14,15 @@ use Tests\TestCase;
 /**
  * Unit tests for the `ActsAsFactor` trait via the shipped `Factor` model.
  *
+ * The trait implements the full `EloquentFactor` contract — 32 public
+ * methods spanning column-name accessors, attribute readers, lockout
+ * state, code lifecycle, and persistence. Every public surface has a
+ * paired test (and most readers have separate "value present" /
+ * "value absent" cases), so the class size is intrinsic to the
+ * contract's surface area, not a sign of conflated subjects. The
+ * `php:S1448` suppression below documents that judgment in code so
+ * the next quality-gate refresh does not re-flag it.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  *
@@ -599,7 +608,7 @@ final class ActsAsFactorTest extends TestCase
 
         self::assertTrue($factor->exists);
         self::assertNotNull($factor->id);
-        // @phpstan-ignore staticMethod.dynamicCall
+        // @phpstan-ignore staticMethod.dynamicCall (query() is a magic instance method on Eloquent\Model — PHPStan treats it as static.)
         self::assertTrue(Factor::query()->whereKey($factor->id)->exists());
     }
 

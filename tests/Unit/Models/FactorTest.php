@@ -63,7 +63,10 @@ final class FactorTest extends TestCase
         // throws, exercising the defensive fallback in `resolveConfiguredTable`.
         $previous = \Illuminate\Support\Facades\Facade::getFacadeApplication();
 
-        \Illuminate\Support\Facades\Facade::setFacadeApplication(null); // @phpstan-ignore argument.type
+        // Tear-down accepts null even though the upstream stub claims
+        // non-null is required.
+        // @phpstan-ignore argument.type
+        \Illuminate\Support\Facades\Facade::setFacadeApplication(null);
         \Illuminate\Support\Facades\Facade::clearResolvedInstance('config');
 
         try {

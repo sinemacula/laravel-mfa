@@ -57,7 +57,10 @@ final class RequireMfaTest extends TestCase
     protected function tearDown(): void
     {
         Facade::clearResolvedInstances();
-        Facade::setFacadeApplication(null); // @phpstan-ignore argument.type
+        // Tear-down accepts null even though the upstream stub claims
+        // non-null is required.
+        // @phpstan-ignore argument.type
+        Facade::setFacadeApplication(null);
         Container::setInstance(null);
 
         parent::tearDown();
@@ -119,6 +122,9 @@ final class RequireMfaTest extends TestCase
         $manager            = new FakeMfaManager;
         $manager->shouldUse = true;
         $manager->isSetup   = false;
+        // The fake's `$factors` is typed Collection<int, Factor>; the
+        // test injects a Collection of MockObject Factor doubles that
+        // satisfy the interface but not PHPStan's strict-class check.
         // @phpstan-ignore assign.propertyType
         $manager->factors = new Collection([$factor]);
         $this->bindManager($manager);
@@ -181,6 +187,9 @@ final class RequireMfaTest extends TestCase
         $manager->isSetup         = true;
         $manager->hasEverVerified = true;
         $manager->hasExpired      = true;
+        // The fake's `$factors` is typed Collection<int, Factor>; the
+        // test injects a Collection of MockObject Factor doubles that
+        // satisfy the interface but not PHPStan's strict-class check.
         // @phpstan-ignore assign.propertyType
         $manager->factors = new Collection([$factor]);
         $this->bindManager($manager);

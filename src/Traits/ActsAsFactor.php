@@ -35,7 +35,11 @@ trait ActsAsFactor
      */
     public function authenticatable(): MorphTo
     {
-        return $this->morphTo(); // @phpstan-ignore return.type
+        // morphTo() returns `MorphTo<Model, $this>` but the EloquentFactor
+        // contract requires `MorphTo<Model, Model>` — the bound is widened,
+        // not narrowed.
+        // @phpstan-ignore return.type
+        return $this->morphTo();
     }
 
     /**
