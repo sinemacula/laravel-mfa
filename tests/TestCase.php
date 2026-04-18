@@ -25,6 +25,41 @@ use SineMacula\Laravel\Mfa\MfaServiceProvider;
 abstract class TestCase extends BaseTestCase
 {
     /**
+     * Resolve the test database connection.
+     *
+     * Defaults to in-memory SQLite so `composer test` needs no external
+     * services. Honours `DB_CONNECTION` plus `DB_HOST` / `DB_PORT` /
+     * `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` so the CI database matrix
+     * runs against the provisioned engine. Static so the CI bootstrap-sanity
+     * workflow can call it without instantiating this abstract class.
+     *
+     * @return array<string, mixed>
+     */
+    public static function resolveDatabaseConnection(): array
+    {
+        $driver = getenv('DB_CONNECTION');
+
+        if ($driver === false || $driver === '' || $driver === 'sqlite') {
+            return [
+                'driver'   => 'sqlite',
+                'database' => ':memory:',
+                'prefix'   => '',
+            ];
+        }
+
+        return [
+            'driver'   => $driver,
+            'host'     => self::envOrDefault('DB_HOST', '127.0.0.1'),
+            'port'     => self::envOrDefault('DB_PORT', $driver === 'pgsql' ? '5432' : '3306'),
+            'database' => self::envOrDefault('DB_DATABASE', 'laravel_mfa_test'),
+            'username' => self::envOrDefault('DB_USERNAME', $driver === 'pgsql' ? 'postgres' : 'root'),
+            'password' => self::envOrDefault('DB_PASSWORD', ''),
+            'prefix'   => '',
+            'charset'  => $driver === 'pgsql' ? 'utf8' : 'utf8mb4',
+        ];
+    }
+
+    /**
      * Register the package's service provider with the test application.
      *
      * @param  \Illuminate\Foundation\Application  $app
@@ -54,7 +89,7 @@ abstract class TestCase extends BaseTestCase
         $config->set('app.key', 'base64:' . base64_encode(random_bytes(32)));
 
         $config->set('database.default', 'testing');
-        $config->set('database.connections.testing', $this->resolveDatabaseConnection());
+        $config->set('database.connections.testing', self::resolveDatabaseConnection());
 
         $config->set('auth.defaults.guard', 'web');
         $config->set('auth.guards.web', [
@@ -65,40 +100,6 @@ abstract class TestCase extends BaseTestCase
             'driver' => 'eloquent',
             'model'  => Fixtures\TestUser::class,
         ]);
-    }
-
-    /**
-     * Resolve the test database connection.
-     *
-     * Defaults to in-memory SQLite so `composer test` needs no external
-     * services. Honours `DB_CONNECTION` plus `DB_HOST` / `DB_PORT` /
-     * `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` so the CI database matrix
-     * runs against the provisioned engine.
-     *
-     * @return array<string, mixed>
-     */
-    protected function resolveDatabaseConnection(): array
-    {
-        $driver = getenv('DB_CONNECTION');
-
-        if ($driver === false || $driver === '' || $driver === 'sqlite') {
-            return [
-                'driver'   => 'sqlite',
-                'database' => ':memory:',
-                'prefix'   => '',
-            ];
-        }
-
-        return [
-            'driver'   => $driver,
-            'host'     => self::envOrDefault('DB_HOST', '127.0.0.1'),
-            'port'     => self::envOrDefault('DB_PORT', $driver === 'pgsql' ? '5432' : '3306'),
-            'database' => self::envOrDefault('DB_DATABASE', 'laravel_mfa_test'),
-            'username' => self::envOrDefault('DB_USERNAME', $driver === 'pgsql' ? 'postgres' : 'root'),
-            'password' => self::envOrDefault('DB_PASSWORD', ''),
-            'prefix'   => '',
-            'charset'  => $driver === 'pgsql' ? 'utf8' : 'utf8mb4',
-        ];
     }
 
     /**

@@ -147,12 +147,7 @@ jobs:
                 run: |
                     php -r '
                         require "vendor/autoload.php";
-                        require "tests/TestCase.php";
-                        $reflection = new ReflectionClass(Tests\TestCase::class);
-                        $method = $reflection->getMethod("resolveDatabaseConnection");
-                        $method->setAccessible(true);
-                        $instance = $reflection->newInstanceWithoutConstructor();
-                        $resolved = $method->invoke($instance);
+                        $resolved = Tests\TestCase::resolveDatabaseConnection();
                         fwrite(STDOUT, sprintf("Test bootstrap resolved driver: %s\n", $resolved["driver"]));
                         if ($resolved["driver"] !== getenv("DB_CONNECTION")) {
                             fwrite(STDERR, sprintf("FAIL: bootstrap returned [%s] but DB_CONNECTION=[%s]\n", $resolved["driver"], getenv("DB_CONNECTION")));
