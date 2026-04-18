@@ -31,6 +31,8 @@ final class BackupCodeLifecycleTest extends TestCase
      * against the same code must fail because the secret is consumed.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testBackupCodeVerifiesOnceThenFails(): void
     {
@@ -79,16 +81,16 @@ final class BackupCodeLifecycleTest extends TestCase
             'secret'               => $driver->hash($code),
         ]);
 
-        // Simulate a second concurrent request that already consumed
-        // the row via the same atomic UPDATE the driver uses.
+        // Simulate a second concurrent request that already consumed the row
+        // via the same atomic UPDATE the driver uses.
         $twinFactor = $factor->replicate();
         $twinFactor->setAttribute('id', $factor->getKey());
         $twinFactor->exists = true;
 
         $firstResult = $driver->verify($factor, $code);
 
-        // Reload the row; the second attempt sees the nulled secret
-        // and must fail even though it holds a stale in-memory copy.
+        // Reload the row; the second attempt sees the nulled secret and must
+        // fail even though it holds a stale in-memory copy.
         $factor->refresh();
         $secondResult = $driver->verify($factor, $code);
 

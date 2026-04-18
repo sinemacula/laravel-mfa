@@ -51,10 +51,10 @@ final class BackupCodeDriverRaceTest extends TestCase
             'secret'               => $driver->hash($code),
         ]);
 
-        // Simulate a concurrent request deleting the row after the
-        // in-memory read in verify() but before the transaction lock.
-        // Delete directly via the query builder so our in-memory
-        // $factor still holds its stale state.
+        // Simulate a concurrent request deleting the row after the in-memory
+        // read in verify() but before the transaction lock. Delete directly via
+        // the query builder so our in-memory $factor still holds its stale
+        // state.
         Factor::query()->whereKey($factor->getKey())->delete();
 
         $verified = $driver->verify($factor, $code);

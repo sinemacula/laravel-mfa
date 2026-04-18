@@ -7,7 +7,7 @@ namespace Tests\Unit;
 use Carbon\Carbon;
 use Illuminate\Config\Repository;
 use Illuminate\Support\Facades\Event;
-use Mockery;
+use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
@@ -52,6 +52,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      * never invoke the driver.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyReturnsFalseWhenNoIdentity(): void
     {
@@ -67,6 +69,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      * `MfaVerificationFailed` event with the `FactorLocked` reason.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyReturnsFalseAndDispatchesWhenFactorLocked(): void
     {
@@ -75,9 +79,9 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver: 'totp',
-            secret: 'JBSWY3DPEHPK3PXP',
-            lockedUntil: Carbon::now()->addMinutes(5),
+            driver         : 'totp',
+            secret         : 'JBSWY3DPEHPK3PXP',
+            lockedUntil    : Carbon::now()->addMinutes(5),
             authenticatable: $user,
         );
 
@@ -102,6 +106,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      * counter and dispatch the failure event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyFailurePersistsAttemptAndDispatchesFailure(): void
     {
@@ -141,6 +147,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      * expiry on the factor.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyFailureAppliesLockoutAtMaxAttemptsThreshold(): void
     {
@@ -183,6 +191,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      * matter how many failed attempts have accrued.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyFailureSkipsLockoutWhenMaxAttemptsIsZero(): void
     {
@@ -217,6 +227,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      * manager's safe default rather than break lockout.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyFailureUsesFallbackLockoutMinutesWhenConfigIsNonInt(): void
     {
@@ -254,6 +266,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      * lockout disabled.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyFailureTreatsNonIntMaxAttemptsAsZero(): void
     {
@@ -288,6 +302,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
      * side-effect while still dispatching the failure event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyFailureOnNonEloquentFactorSkipsStateMutation(): void
     {
@@ -296,9 +312,9 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver: 'totp',
-            secret: 'JBSWY3DPEHPK3PXP',
-            attempts: 0,
+            driver         : 'totp',
+            secret         : 'JBSWY3DPEHPK3PXP',
+            attempts       : 0,
             authenticatable: $user,
         );
 
@@ -331,6 +347,21 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
     }
 
     /**
+     * Resolve the package's MFA manager from the container.
+     *
+     * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function manager(): MfaManager
+    {
+        $manager = $this->container()->make('mfa');
+        Assert::assertInstanceOf(MfaManager::class, $manager);
+
+        return $manager;
+    }
+
+    /**
      * Build a no-op driver stub whose `verify` method is never expected to run
      * (used when the pipeline short-circuits before driver dispatch).
      *
@@ -343,18 +374,5 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $driver->shouldNotReceive('verify');
 
         return $driver;
-    }
-
-    /**
-     * Resolve the package's MFA manager from the container.
-     *
-     * @return \SineMacula\Laravel\Mfa\MfaManager
-     */
-    private function manager(): MfaManager
-    {
-        $manager = $this->container()->make('mfa');
-        \PHPUnit\Framework\Assert::assertInstanceOf(MfaManager::class, $manager);
-
-        return $manager;
     }
 }

@@ -33,6 +33,8 @@ final class GenericUserGuard implements Guard
     }
 
     /**
+     * Report that the fixture always has an authenticated identity.
+     *
      * @return bool
      */
     public function check(): bool
@@ -41,6 +43,8 @@ final class GenericUserGuard implements Guard
     }
 
     /**
+     * Report that the fixture is never a guest.
+     *
      * @return bool
      */
     public function guest(): bool
@@ -49,6 +53,8 @@ final class GenericUserGuard implements Guard
     }
 
     /**
+     * Return the pre-built non-Eloquent identity.
+     *
      * @return \Illuminate\Auth\GenericUser
      */
     public function user(): GenericUser
@@ -57,6 +63,8 @@ final class GenericUserGuard implements Guard
     }
 
     /**
+     * Return the fixture identity's auth identifier.
+     *
      * @return int
      */
     public function id(): int
@@ -65,6 +73,8 @@ final class GenericUserGuard implements Guard
     }
 
     /**
+     * Accept any credentials — the fixture has a single pre-built identity.
+     *
      * @param  array<array-key, mixed>  $credentials
      * @return bool
      */
@@ -74,6 +84,8 @@ final class GenericUserGuard implements Guard
     }
 
     /**
+     * Report that the fixture always has a bound identity.
+     *
      * @return bool
      */
     public function hasUser(): bool

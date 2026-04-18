@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests;
 
 use Illuminate\Config\Repository;
+use Illuminate\Foundation\Application;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
@@ -41,6 +42,9 @@ abstract class TestCase extends BaseTestCase
      *
      * @param  \Illuminate\Foundation\Application  $app
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Random\RandomException
      */
     protected function defineEnvironment(mixed $app): void
     {
@@ -115,7 +119,7 @@ abstract class TestCase extends BaseTestCase
      *
      * @return \Illuminate\Foundation\Application
      */
-    protected function container(): \Illuminate\Foundation\Application
+    protected function container(): Application
     {
         Assert::assertNotNull($this->app);
 

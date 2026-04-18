@@ -34,6 +34,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * store.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testMarkVerifiedIsNoopWhenNoIdentity(): void
     {
@@ -52,6 +54,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * `markVerified()` method.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testMarkVerifiedDelegatesToStore(): void
     {
@@ -78,6 +82,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * verification store.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testForgetVerificationIsNoopWhenNoIdentity(): void
     {
@@ -96,6 +102,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * store's `forget()` method.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testForgetVerificationDelegatesToStore(): void
     {
@@ -122,6 +130,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * cached entry across the manager.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testClearCacheWithoutIdentityFlushesEverything(): void
     {
@@ -148,6 +158,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * cache entries intact.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testClearCacheScopedToIdentityLeavesOthersAlone(): void
     {
@@ -180,6 +192,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * lifecycle event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnrolIsNoopWhenNoIdentity(): void
     {
@@ -197,6 +211,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * Test enrol persists the supplied factor row.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnrolPersistsFactor(): void
     {
@@ -213,6 +229,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * Test enrol dispatches the MfaFactorEnrolled event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnrolDispatchesEnrolledEvent(): void
     {
@@ -227,8 +245,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
         Event::assertDispatched(
             MfaFactorEnrolled::class,
             static fn (MfaFactorEnrolled $event): bool => $event->identity === $user
-                    && $event->factor                                      === $factor
-                    && $event->driver                                      === 'totp',
+                && $event->factor                                          === $factor
+                && $event->driver                                          === 'totp',
         );
     }
 
@@ -236,14 +254,16 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * Test enrol invalidates the identity's isSetup cache.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnrolInvalidatesIsSetupCache(): void
     {
         $user    = $this->makeEnrolUser();
         $manager = $this->manager();
 
-        // Warm the setup cache to "no factors" so the post-enrol
-        // invalidation must force a fresh lookup.
+        // Warm the setup cache to "no factors" so the post-enrol invalidation
+        // must force a fresh lookup.
         self::assertFalse($manager->isSetup());
 
         $manager->enrol($this->makeUnpersistedTotpFactor($user));
@@ -256,6 +276,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * the lifecycle event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testDisableIsNoopWhenNoIdentity(): void
     {
@@ -280,6 +302,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * Test disable deletes the underlying factor row.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testDisableDeletesFactorRow(): void
     {
@@ -297,6 +321,8 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * Test disable dispatches the MfaFactorDisabled event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testDisableDispatchesDisabledEvent(): void
     {
@@ -309,7 +335,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
         Event::assertDispatched(
             MfaFactorDisabled::class,
             static fn (MfaFactorDisabled $event): bool => $event->identity === $user
-                    && $event->driver                                      === 'totp',
+                && $event->driver                                          === 'totp',
         );
     }
 
@@ -317,58 +343,20 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * Test disable invalidates the identity's isSetup cache.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testDisableInvalidatesIsSetupCache(): void
     {
         [$manager, $factor] = $this->enrolAndResolveFactor();
 
-        // Warm the setup cache to "has factor" so the post-disable
-        // invalidation must force a fresh lookup.
+        // Warm the setup cache to "has factor" so the post-disable invalidation
+        // must force a fresh lookup.
         self::assertTrue($manager->isSetup());
 
         $manager->disable($factor);
 
         self::assertFalse($manager->isSetup(), 'cache must be cleared after disable');
-    }
-
-    /**
-     * Create an MFA-enabled user and authenticate as them, returning the user
-     * for enrol-flow tests.
-     *
-     * @return \Tests\Fixtures\TestUser
-     */
-    private function makeEnrolUser(): TestUser
-    {
-        $user = TestUser::query()->create([
-            'email'       => 'enrol@example.test',
-            'mfa_enabled' => true,
-        ]);
-
-        $this->actingAs($user);
-
-        return $user;
-    }
-
-    /**
-     * Enrol an MFA-enabled user with a TOTP factor and return the manager,
-     * resolved factor, and user triple for disable-flow tests.
-     *
-     * @return array{0: \SineMacula\Laravel\Mfa\MfaManager, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: \Tests\Fixtures\TestUser}
-     */
-    private function enrolAndResolveFactor(): array
-    {
-        $user = $this->makeUserWithFactor();
-
-        $this->actingAs($user);
-
-        $manager = $this->manager();
-
-        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
-        $factor = Factor::query()
-            ->where('authenticatable_id', (string) $user->id)
-            ->sole();
-
-        return [$manager, $factor, $user];
     }
 
     /**
@@ -393,6 +381,24 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
+     * Create an MFA-enabled user and authenticate as them, returning the user
+     * for enrol-flow tests.
+     *
+     * @return \Tests\Fixtures\TestUser
+     */
+    private function makeEnrolUser(): TestUser
+    {
+        $user = TestUser::query()->create([
+            'email'       => 'enrol@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        $this->actingAs($user);
+
+        return $user;
+    }
+
+    /**
      * Persist a TOTP factor against the supplied identity and return the row.
      *
      * @param  \Tests\Fixtures\TestUser  $user
@@ -406,5 +412,33 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
+    }
+
+    /**
+     * Enrol an MFA-enabled user with a TOTP factor and return the manager,
+     * resolved factor, and user triple for disable-flow tests.
+     *
+     * @formatter:off
+     *
+     * @return array{0: \SineMacula\Laravel\Mfa\MfaManager, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: \Tests\Fixtures\TestUser}
+     *
+     * @formatter:on
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function enrolAndResolveFactor(): array
+    {
+        $user = $this->makeUserWithFactor();
+
+        $this->actingAs($user);
+
+        $manager = $this->manager();
+
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
+        $factor = Factor::query()
+            ->where('authenticatable_id', (string) $user->id)
+            ->sole();
+
+        return [$manager, $factor, $user];
     }
 }

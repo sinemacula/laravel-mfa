@@ -29,11 +29,11 @@ trait BuildsFactorSummaries
     protected function buildMinimalSummary(): FactorSummary
     {
         return new FactorSummary(
-            id: '01H',
-            driver: 'totp',
-            label: null,
+            id             : '01H',
+            driver         : 'totp',
+            label          : null,
             maskedRecipient: null,
-            verifiedAt: null,
+            verifiedAt     : null,
         );
     }
 
@@ -42,6 +42,8 @@ trait BuildsFactorSummaries
      *
      * @param  string  $recipient
      * @return \SineMacula\Laravel\Mfa\Support\FactorSummary
+     *
+     * @throws \PHPUnit\Framework\MockObject\Exception
      */
     protected function buildSummaryWithRecipient(string $recipient): FactorSummary
     {

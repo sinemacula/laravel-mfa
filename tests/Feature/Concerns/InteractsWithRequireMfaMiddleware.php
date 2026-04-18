@@ -4,8 +4,11 @@ declare(strict_types = 1);
 
 namespace Tests\Feature\Concerns;
 
+use Illuminate\Http\Request;
 use PragmaRX\Google2FA\Google2FA;
+use SineMacula\Laravel\Mfa\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Fixtures\TestUser;
 
 /**
@@ -28,20 +31,22 @@ trait InteractsWithRequireMfaMiddleware
      *
      * @param  ?string  $maxAgeMinutes
      * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     protected function runMiddleware(?string $maxAgeMinutes): bool
     {
         $middleware = $this->container()->make(
-            \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
+            RequireMfa::class,
         );
 
         $reached = false;
         $middleware->handle(
-            $this->container()->make(\Illuminate\Http\Request::class),
-            static function () use (&$reached): \Symfony\Component\HttpFoundation\Response {
+            $this->container()->make(Request::class),
+            static function () use (&$reached): Response {
                 $reached = true;
 
-                return new \Symfony\Component\HttpFoundation\Response('ok');
+                return new Response('ok');
             },
             $maxAgeMinutes,
         );
@@ -54,6 +59,10 @@ trait InteractsWithRequireMfaMiddleware
      *
      * @param  string  $email
      * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     protected function enrolTotp(string $email = 'totp-mw@example.test'): array
     {

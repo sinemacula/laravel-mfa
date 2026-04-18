@@ -6,7 +6,6 @@ namespace Tests\Unit;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
-use Mockery;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
@@ -58,6 +57,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
      * Test successful Eloquent verify returns true.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifySuccessReturnsTrueForEloquentFactor(): void
     {
@@ -70,6 +71,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
      * Test successful Eloquent verify resets the attempt counter.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifySuccessResetsAttemptCounter(): void
     {
@@ -86,6 +89,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
      * Test successful Eloquent verify stamps the factor verified_at.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifySuccessStampsVerifiedAtOnFactor(): void
     {
@@ -102,6 +107,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
      * Test successful Eloquent verify clears the pending code.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifySuccessClearsPendingCode(): void
     {
@@ -118,6 +125,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
      * Test successful Eloquent verify dispatches MfaVerified event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifySuccessDispatchesVerifiedEvent(): void
     {
@@ -134,6 +143,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
      * Test successful Eloquent verify does not dispatch a failure event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifySuccessDoesNotDispatchFailureEvent(): void
     {
@@ -171,6 +182,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
      * `isSetup()` to false.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testCacheStaysWarmAfterUnderlyingRowDeletion(): void
     {
@@ -241,6 +254,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
      * post-verify cache state is observable.
      *
      * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     private function seedWarmedCacheVerifyScenario(): MfaManager
     {

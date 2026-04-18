@@ -8,12 +8,11 @@ use PhpBench\Attributes as Bench;
 use SineMacula\Laravel\Mfa\Support\FactorSummary;
 
 /**
- * Benchmarks for `FactorSummary::fromFactor()` and its JSON
- * serialisation.
+ * Benchmarks for `FactorSummary::fromFactor()` and its JSON serialisation.
  *
- * Exercised on every `MfaRequiredException` / `MfaExpiredException`
- * emission, which runs once per gated request against each of the
- * user's registered factors — so this is a soft hot path.
+ * Exercised on every `MfaRequiredException` / `MfaExpiredException` emission,
+ * which runs once per gated request against each of the user's registered
+ * factors — so this is a soft hot path.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -30,8 +29,8 @@ final class FactorSummaryBench
     private InMemoryFactor $smsFactor;
 
     /**
-     * Build one factor double per shipped driver type so each
-     * benchmark targets a representative summary shape.
+     * Build one factor double per shipped driver type so each benchmark targets
+     * a representative summary shape.
      *
      * @return void
      */
@@ -39,18 +38,18 @@ final class FactorSummaryBench
     {
         $this->totpFactor = new InMemoryFactor(
             driver: 'totp',
-            label: 'Authy',
+            label : 'Authy',
         );
 
         $this->emailFactor = new InMemoryFactor(
-            driver: 'email',
-            label: 'Primary email',
+            driver   : 'email',
+            label    : 'Primary email',
             recipient: 'somebody@example.com',
         );
 
         $this->smsFactor = new InMemoryFactor(
-            driver: 'sms',
-            label: 'Work phone',
+            driver   : 'sms',
+            label    : 'Work phone',
             recipient: '+441234567890',
         );
     }

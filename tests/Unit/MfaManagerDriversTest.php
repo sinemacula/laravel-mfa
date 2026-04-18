@@ -5,11 +5,15 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Illuminate\Config\Repository;
+use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
+use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\TestUser;
 
 /**
  * Unit tests for the `MfaManager` driver factories exposed via `driver($name)`.
@@ -26,6 +30,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * window from `config('mfa.drivers.totp.window')`.
      *
      * @return void
+     *
+     * @throws \ReflectionException
      */
     public function testTotpDriverBuildsWithConfiguredWindow(): void
     {
@@ -38,9 +44,9 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
 
         $property = new \ReflectionProperty($driver, 'window');
 
-        // Reflection on the private `window` property pins the
-        // factory-resolved value — without it the test would only
-        // observe the resolved class, not the constructor argument.
+        // Reflection on the private `window` property pins the factory-resolved
+        // value — without it the test would only observe the resolved class,
+        // not the constructor argument.
         // @SuppressWarnings("php:S3011")
         self::assertSame(3, $property->getValue($driver));
     }
@@ -50,6 +56,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * the shipped default of 1 step.
      *
      * @return void
+     *
+     * @throws \ReflectionException
      */
     public function testTotpDriverDefaultsWindowToOneWhenUnset(): void
     {
@@ -62,10 +70,9 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
 
         $property = new \ReflectionProperty($driver, 'window');
 
-        // Reflection on the private `window` property pins the
-        // factory's default-resolution path — without it the test
-        // would only observe the resolved class, not the fall-back
-        // value of 1.
+        // Reflection on the private `window` property pins the factory's
+        // default-resolution path — without it the test would only observe the
+        // resolved class, not the fall-back value of 1.
         // @SuppressWarnings("php:S3011")
         self::assertSame(1, $property->getValue($driver));
     }
@@ -105,7 +112,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
             'expiry'       => 20,
             'max_attempts' => 7,
             'alphabet'     => '0123456789ABCDEF',
-            'mailable'     => \SineMacula\Laravel\Mfa\Mail\MfaCodeMessage::class,
+            'mailable'     => MfaCodeMessage::class,
         ]);
 
         /** @var \SineMacula\Laravel\Mfa\Drivers\EmailDriver $driver */
@@ -215,26 +222,28 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * error inside the verification pipeline.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyThrowsWhenExtendedDriverIsNotAFactorDriver(): void
     {
-        // The base Manager's extend() accepts any callable returning
-        // mixed; resolveDriver guards the FactorDriver contract at the
-        // boundary so a misconfigured extension surfaces a LogicException
-        // rather than a fatal type error deep inside verify().
+        // The base Manager's extend() accepts any callable returning mixed;
+        // resolveDriver guards the FactorDriver contract at the boundary so a
+        // misconfigured extension surfaces a LogicException rather than a fatal
+        // type error deep inside verify().
         $manager = $this->manager();
         $manager->extend('not-a-driver', fn (): \stdClass => new \stdClass);
 
-        $user = \Tests\Fixtures\TestUser::query()->create([
+        $user = TestUser::query()->create([
             'email'       => 'extend@example.test',
             'mfa_enabled' => true,
         ]);
         $this->actingAs($user);
 
-        // Stamp ownership onto the factor so the bad-driver guard
-        // fires ahead of the ownership guard — the test's subject is
-        // the LogicException, not a cross-account rejection.
-        $factor                       = new \SineMacula\Laravel\Mfa\Models\Factor;
+        // Stamp ownership onto the factor so the bad-driver guard fires ahead
+        // of the ownership guard — the test's subject is the LogicException,
+        // not a cross-account rejection.
+        $factor                       = new Factor;
         $factor->authenticatable_type = $user::class;
         $factor->authenticatable_id   = (string) $user->id;
 
@@ -248,11 +257,13 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * Resolve the package's MFA manager from the container.
      *
      * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     private function manager(): MfaManager
     {
         $manager = $this->container()->make('mfa');
-        \PHPUnit\Framework\Assert::assertInstanceOf(MfaManager::class, $manager);
+        Assert::assertInstanceOf(MfaManager::class, $manager);
 
         return $manager;
     }

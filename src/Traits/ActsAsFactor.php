@@ -35,8 +35,8 @@ trait ActsAsFactor
     public function authenticatable(): MorphTo
     {
         // morphTo() returns `MorphTo<Model, $this>` but the EloquentFactor
-        // contract requires `MorphTo<Model, Model>` — the bound is widened,
-        // not narrowed.
+        // contract requires `MorphTo<Model, Model>` — the bound is widened, not
+        // narrowed.
         // @phpstan-ignore return.type
         return $this->morphTo();
     }
@@ -65,6 +65,16 @@ trait ActsAsFactor
     }
 
     /**
+     * Column name holding the driver identifier.
+     *
+     * @return string
+     */
+    public function getDriverName(): string
+    {
+        return 'driver';
+    }
+
+    /**
      * Return the factor's human-readable label.
      *
      * @return ?string
@@ -78,6 +88,16 @@ trait ActsAsFactor
     }
 
     /**
+     * Column name holding the human-readable label.
+     *
+     * @return string
+     */
+    public function getLabelName(): string
+    {
+        return 'label';
+    }
+
+    /**
      * Return the factor's delivery destination (phone number / email).
      *
      * @return ?string
@@ -88,6 +108,16 @@ trait ActsAsFactor
         $value = $this->getAttribute($this->getRecipientName());
 
         return is_string($value) ? $value : null;
+    }
+
+    /**
+     * Column name holding the delivery destination.
+     *
+     * @return string
+     */
+    public function getRecipientName(): string
+    {
+        return 'recipient';
     }
 
     /**
@@ -124,6 +154,16 @@ trait ActsAsFactor
     }
 
     /**
+     * Column name holding the persistent secret.
+     *
+     * @return string
+     */
+    public function getSecretName(): string
+    {
+        return 'secret';
+    }
+
+    /**
      * Return the currently issued one-time code, if any.
      *
      * @return ?string
@@ -134,6 +174,16 @@ trait ActsAsFactor
         $value = $this->getAttribute($this->getCodeName());
 
         return is_string($value) ? $value : null;
+    }
+
+    /**
+     * Column name holding the pending one-time code.
+     *
+     * @return string
+     */
+    public function getCodeName(): string
+    {
+        return 'code';
     }
 
     /**
@@ -150,16 +200,25 @@ trait ActsAsFactor
     }
 
     /**
-     * Return the number of consecutive failed attempts.
+     * Column name holding the expiry of the pending one-time code.
      *
-     * @return int
+     * @return string
      */
-    public function getAttempts(): int
+    public function getExpiresAtName(): string
     {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getAttemptsName());
+        return 'expires_at';
+    }
 
-        return is_int($value) ? $value : 0;
+    /**
+     * Determine whether the factor is currently locked.
+     *
+     * @return bool
+     */
+    public function isLocked(): bool
+    {
+        $until = $this->getLockedUntil();
+
+        return $until !== null && $until->isFuture();
     }
 
     /**
@@ -176,15 +235,13 @@ trait ActsAsFactor
     }
 
     /**
-     * Determine whether the factor is currently locked.
+     * Column name holding the lockout expiry timestamp.
      *
-     * @return bool
+     * @return string
      */
-    public function isLocked(): bool
+    public function getLockedUntilName(): string
     {
-        $until = $this->getLockedUntil();
-
-        return $until !== null && $until->isFuture();
+        return 'locked_until';
     }
 
     /**
@@ -201,16 +258,13 @@ trait ActsAsFactor
     }
 
     /**
-     * Return when the factor was last successfully verified.
+     * Column name holding the last-attempted timestamp.
      *
-     * @return ?\Carbon\CarbonInterface
+     * @return string
      */
-    public function getVerifiedAt(): ?CarbonInterface
+    public function getLastAttemptedAtName(): string
     {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getVerifiedAtName());
-
-        return $value instanceof CarbonInterface ? $value : null;
+        return 'last_attempted_at';
     }
 
     /**
@@ -225,93 +279,16 @@ trait ActsAsFactor
     }
 
     /**
-     * Column name holding the driver identifier.
+     * Return when the factor was last successfully verified.
      *
-     * @return string
+     * @return ?\Carbon\CarbonInterface
      */
-    public function getDriverName(): string
+    public function getVerifiedAt(): ?CarbonInterface
     {
-        return 'driver';
-    }
+        /** @var mixed $value */
+        $value = $this->getAttribute($this->getVerifiedAtName());
 
-    /**
-     * Column name holding the human-readable label.
-     *
-     * @return string
-     */
-    public function getLabelName(): string
-    {
-        return 'label';
-    }
-
-    /**
-     * Column name holding the delivery destination.
-     *
-     * @return string
-     */
-    public function getRecipientName(): string
-    {
-        return 'recipient';
-    }
-
-    /**
-     * Column name holding the persistent secret.
-     *
-     * @return string
-     */
-    public function getSecretName(): string
-    {
-        return 'secret';
-    }
-
-    /**
-     * Column name holding the pending one-time code.
-     *
-     * @return string
-     */
-    public function getCodeName(): string
-    {
-        return 'code';
-    }
-
-    /**
-     * Column name holding the expiry of the pending one-time code.
-     *
-     * @return string
-     */
-    public function getExpiresAtName(): string
-    {
-        return 'expires_at';
-    }
-
-    /**
-     * Column name holding the failed-attempt counter.
-     *
-     * @return string
-     */
-    public function getAttemptsName(): string
-    {
-        return 'attempts';
-    }
-
-    /**
-     * Column name holding the lockout expiry timestamp.
-     *
-     * @return string
-     */
-    public function getLockedUntilName(): string
-    {
-        return 'locked_until';
-    }
-
-    /**
-     * Column name holding the last-attempted timestamp.
-     *
-     * @return string
-     */
-    public function getLastAttemptedAtName(): string
-    {
-        return 'last_attempted_at';
+        return $value instanceof CarbonInterface ? $value : null;
     }
 
     /**
@@ -343,14 +320,26 @@ trait ActsAsFactor
     }
 
     /**
-     * Reset the attempt counter and clear any active lockout.
+     * Column name holding the failed-attempt counter.
      *
-     * @return void
+     * @return string
      */
-    public function resetAttempts(): void
+    public function getAttemptsName(): string
     {
-        $this->setAttribute($this->getAttemptsName(), 0);
-        $this->setAttribute($this->getLockedUntilName(), null);
+        return 'attempts';
+    }
+
+    /**
+     * Return the number of consecutive failed attempts.
+     *
+     * @return int
+     */
+    public function getAttempts(): int
+    {
+        /** @var mixed $value */
+        $value = $this->getAttribute($this->getAttemptsName());
+
+        return is_int($value) ? $value : 0;
     }
 
     /**
@@ -381,16 +370,14 @@ trait ActsAsFactor
     }
 
     /**
-     * Persist a newly issued one-time code and its expiry.
+     * Reset the attempt counter and clear any active lockout.
      *
-     * @param  string  $code
-     * @param  \Carbon\CarbonInterface  $expiresAt
      * @return void
      */
-    public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void
+    public function resetAttempts(): void
     {
-        $this->setAttribute($this->getCodeName(), $code);
-        $this->setAttribute($this->getExpiresAtName(), $expiresAt);
+        $this->setAttribute($this->getAttemptsName(), 0);
+        $this->setAttribute($this->getLockedUntilName(), null);
     }
 
     /**
@@ -402,6 +389,19 @@ trait ActsAsFactor
     {
         $this->setAttribute($this->getCodeName(), null);
         $this->setAttribute($this->getExpiresAtName(), null);
+    }
+
+    /**
+     * Persist a newly issued one-time code and its expiry.
+     *
+     * @param  string  $code
+     * @param  \Carbon\CarbonInterface  $expiresAt
+     * @return void
+     */
+    public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void
+    {
+        $this->setAttribute($this->getCodeName(), $code);
+        $this->setAttribute($this->getExpiresAtName(), $expiresAt);
     }
 
     /**

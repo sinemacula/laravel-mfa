@@ -68,6 +68,8 @@ final class TotpLifecycleTest extends TestCase
      * Test successful TOTP verification stamps the factor verified_at.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSuccessfulVerificationStampsFactorVerifiedAt(): void
     {
@@ -85,6 +87,8 @@ final class TotpLifecycleTest extends TestCase
      * Test successful TOTP verification dispatches MfaVerified event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSuccessfulVerificationDispatchesVerifiedEvent(): void
     {
@@ -109,6 +113,8 @@ final class TotpLifecycleTest extends TestCase
      * dispatch a `CodeInvalid` failure event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testFailedVerificationIncrementsAttemptsAndFiresFailureEvent(): void
     {
@@ -159,6 +165,8 @@ final class TotpLifecycleTest extends TestCase
      * Test verifying after lockout returns false.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyingAfterLockoutReturnsFalse(): void
     {
@@ -171,6 +179,8 @@ final class TotpLifecycleTest extends TestCase
      * Test verifying after lockout dispatches FactorLocked failure.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyingAfterLockoutDispatchesFactorLockedFailure(): void
     {
@@ -195,6 +205,8 @@ final class TotpLifecycleTest extends TestCase
      * free unlock against the configured `max_attempts` defence.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testChallengePreservesAttemptsAfterLockout(): void
     {
@@ -211,6 +223,8 @@ final class TotpLifecycleTest extends TestCase
      * Test challenge preserves the locked_until timestamp after lockout.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testChallengePreservesLockedUntilTimestampAfterLockout(): void
     {
@@ -235,6 +249,8 @@ final class TotpLifecycleTest extends TestCase
      * Test challenge keeps the factor locked after lockout.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testChallengeKeepsFactorLockedAfterLockout(): void
     {
@@ -251,6 +267,8 @@ final class TotpLifecycleTest extends TestCase
      * Test challenge dispatches MfaChallengeIssued even when locked.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testChallengeDispatchesEventEvenWhenLocked(): void
     {
@@ -269,6 +287,8 @@ final class TotpLifecycleTest extends TestCase
      * lockout. This catches the same bypass shape against the recovery factor.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testChallengePreservesBackupCodeLockoutAcrossInvocations(): void
     {
@@ -300,31 +320,14 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Enrol a TOTP factor and burn through the configured max-attempts so the
-     * factor is in a locked-out state when returned.
-     *
-     * @return \SineMacula\Laravel\Mfa\Models\Factor
-     */
-    private function enrolAndBurnAttempts(): Factor
-    {
-        [, $factor] = $this->enrolTotp();
-
-        config()->set('mfa.drivers.totp.max_attempts', 3);
-
-        Mfa::verify('totp', $factor, self::WRONG_CODE);
-        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
-        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
-
-        $factor->refresh();
-
-        return $factor;
-    }
-
-    /**
      * Enrol a TOTP factor for a freshly created test user and return the [user,
      * factor, current-code] triple.
      *
      * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     private function enrolTotp(): array
     {
@@ -347,5 +350,28 @@ final class TotpLifecycleTest extends TestCase
         ]);
 
         return [$user, $factor, $google->getCurrentOtp($secret)];
+    }
+
+    /**
+     * Enrol a TOTP factor and burn through the configured max-attempts so the
+     * factor is in a locked-out state when returned.
+     *
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function enrolAndBurnAttempts(): Factor
+    {
+        [, $factor] = $this->enrolTotp();
+
+        config()->set('mfa.drivers.totp.max_attempts', 3);
+
+        Mfa::verify('totp', $factor, self::WRONG_CODE);
+        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
+        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
+
+        $factor->refresh();
+
+        return $factor;
     }
 }

@@ -39,11 +39,13 @@ final class BackupCodeRotationConnectionTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Rotation reads and writes on the factor model's connection, so rows
-     * land on the secondary connection and the default connection is left
-     * untouched.
+     * Rotation reads and writes on the factor model's connection, so rows land
+     * on the secondary connection and the default connection is left untouched.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testRotationWritesToFactorModelConnection(): void
     {
@@ -81,6 +83,9 @@ final class BackupCodeRotationConnectionTest extends TestCase
      * batch is discarded.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testRotationRollsBackOnFactorModelConnectionWhenMidRotationFailureOccurs(): void
     {
@@ -90,8 +95,8 @@ final class BackupCodeRotationConnectionTest extends TestCase
 
         config()->set('mfa.factor.model', SecondaryConnectionFactor::class);
 
-        // Seed a pre-existing backup-code row on the secondary connection.
-        // It must still be there after the aborted rotation.
+        // Seed a pre-existing backup-code row on the secondary connection. It
+        // must still be there after the aborted rotation.
         $prior                       = new SecondaryConnectionFactor;
         $prior->authenticatable_type = $user->getMorphClass();
         $prior->authenticatable_id   = (string) $user->id;
@@ -101,9 +106,9 @@ final class BackupCodeRotationConnectionTest extends TestCase
 
         $priorId = $prior->id;
 
-        // Force the rotation to fail after a few inserts so we can prove
-        // the transaction rolls back in-flight writes on the factor
-        // model's connection.
+        // Force the rotation to fail after a few inserts so we can prove the
+        // transaction rolls back in-flight writes on the factor model's
+        // connection.
         /** @var \Illuminate\Events\Dispatcher $events */
         $events = $this->container()->make(Dispatcher::class);
 
@@ -143,6 +148,8 @@ final class BackupCodeRotationConnectionTest extends TestCase
      *
      * @param  \Illuminate\Foundation\Application  $app
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     #[\Override]
     protected function defineEnvironment(mixed $app): void
@@ -157,6 +164,39 @@ final class BackupCodeRotationConnectionTest extends TestCase
             'database' => ':memory:',
             'prefix'   => '',
         ]);
+    }
+
+    /**
+     * Create the `mfa_factors` table on the secondary connection so
+     * `SecondaryConnectionFactor` has somewhere to write.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function prepareSecondaryConnection(): void
+    {
+        $schema = $this->container()->make('db')
+            ->connection('secondary')
+            ->getSchemaBuilder();
+
+        $schema->create('mfa_factors', static function (Blueprint $blueprint): void {
+            $blueprint->ulid('id')->primary();
+            $blueprint->string('authenticatable_type');
+            $blueprint->string('authenticatable_id');
+            $blueprint->index(['authenticatable_type', 'authenticatable_id']);
+            $blueprint->string('driver')->index();
+            $blueprint->string('label')->nullable();
+            $blueprint->string('recipient')->nullable();
+            $blueprint->text('secret')->nullable();
+            $blueprint->text('code')->nullable();
+            $blueprint->timestamp('expires_at')->nullable();
+            $blueprint->unsignedInteger('attempts')->default(0);
+            $blueprint->timestamp('locked_until')->nullable();
+            $blueprint->timestamp('last_attempted_at')->nullable();
+            $blueprint->timestamp('verified_at')->nullable();
+            $blueprint->timestamps();
+        });
     }
 
     /**
@@ -196,36 +236,5 @@ final class BackupCodeRotationConnectionTest extends TestCase
             ->where('driver', BackupCodeDriver::NAME)
             ->toBase()
             ->count();
-    }
-
-    /**
-     * Create the `mfa_factors` table on the secondary connection so
-     * `SecondaryConnectionFactor` has somewhere to write.
-     *
-     * @return void
-     */
-    private function prepareSecondaryConnection(): void
-    {
-        $schema = $this->container()->make('db')
-            ->connection('secondary')
-            ->getSchemaBuilder();
-
-        $schema->create('mfa_factors', static function (Blueprint $blueprint): void {
-            $blueprint->ulid('id')->primary();
-            $blueprint->string('authenticatable_type');
-            $blueprint->string('authenticatable_id');
-            $blueprint->index(['authenticatable_type', 'authenticatable_id']);
-            $blueprint->string('driver')->index();
-            $blueprint->string('label')->nullable();
-            $blueprint->string('recipient')->nullable();
-            $blueprint->text('secret')->nullable();
-            $blueprint->text('code')->nullable();
-            $blueprint->timestamp('expires_at')->nullable();
-            $blueprint->unsignedInteger('attempts')->default(0);
-            $blueprint->timestamp('locked_until')->nullable();
-            $blueprint->timestamp('last_attempted_at')->nullable();
-            $blueprint->timestamp('verified_at')->nullable();
-            $blueprint->timestamps();
-        });
     }
 }

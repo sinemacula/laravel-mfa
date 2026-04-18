@@ -33,6 +33,8 @@ final class StaticUserGuard implements Guard
     ) {}
 
     /**
+     * Report that the fixture always has an authenticated identity.
+     *
      * @return bool
      */
     public function check(): bool
@@ -41,6 +43,8 @@ final class StaticUserGuard implements Guard
     }
 
     /**
+     * Report that the fixture is never a guest.
+     *
      * @return bool
      */
     public function guest(): bool
@@ -49,6 +53,8 @@ final class StaticUserGuard implements Guard
     }
 
     /**
+     * Return the pre-bound test user identity.
+     *
      * @return \Tests\Fixtures\TestUser
      */
     public function user(): TestUser
@@ -57,6 +63,8 @@ final class StaticUserGuard implements Guard
     }
 
     /**
+     * Return the bound identity's auth identifier.
+     *
      * @return int
      */
     public function id(): int
@@ -65,6 +73,8 @@ final class StaticUserGuard implements Guard
     }
 
     /**
+     * Accept any credentials — the fixture has a single pre-bound identity.
+     *
      * @param  array<array-key, mixed>  $credentials
      * @return bool
      */
@@ -74,6 +84,8 @@ final class StaticUserGuard implements Guard
     }
 
     /**
+     * Report that the fixture always has a bound identity.
+     *
      * @return bool
      */
     public function hasUser(): bool

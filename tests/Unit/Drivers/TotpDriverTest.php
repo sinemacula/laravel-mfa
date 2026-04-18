@@ -16,10 +16,10 @@ use Tests\TestCase;
  * Exercises the Google2FA-backed verification path, secret generation, and the
  * implicit-challenge (no-op) contract for the TOTP driver.
  *
- * The missing-dependency constructor branch (`Google2FA` class
- * absent) is not exercised here — `pragmarx/google2fa` is installed
- * as a `require-dev` dependency, making it impossible to simulate the
- * absent-class condition from inside the autoloaded test process.
+ * The missing-dependency constructor branch (`Google2FA` class absent) is not
+ * exercised here — `pragmarx/google2fa` is installed as a `require-dev`
+ * dependency, making it impossible to simulate the absent-class condition from
+ * inside the autoloaded test process.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -42,8 +42,8 @@ final class TotpDriverTest extends TestCase
         $driver = new TotpDriver;
         $factor = $this->makeFactor(secret: 'IGNORED');
 
-        // No return value, no state mutation, no exception — the TOTP
-        // challenge is generated client-side.
+        // No return value, no state mutation, no exception — the TOTP challenge
+        // is generated client-side.
         $driver->issueChallenge($factor);
 
         self::assertSame('IGNORED', $factor->getSecret());
@@ -53,6 +53,10 @@ final class TotpDriverTest extends TestCase
      * A null stored secret must short-circuit verify to false.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testVerifyReturnsFalseWhenSecretIsNull(): void
     {
@@ -66,6 +70,10 @@ final class TotpDriverTest extends TestCase
      * An empty stored secret must short-circuit verify to false.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testVerifyReturnsFalseWhenSecretIsEmptyString(): void
     {
@@ -80,6 +88,10 @@ final class TotpDriverTest extends TestCase
      * successfully.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testVerifyReturnsTrueForCurrentTotpCode(): void
     {
@@ -98,6 +110,10 @@ final class TotpDriverTest extends TestCase
      * fail verification.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testVerifyReturnsFalseForWrongCode(): void
     {
@@ -107,9 +123,9 @@ final class TotpDriverTest extends TestCase
         $driver = new TotpDriver;
         $factor = $this->makeFactor(secret: $secret);
 
-        // '000000' is astronomically unlikely to be the current TOTP
-        // for a freshly generated secret — the Google2FA algorithm
-        // draws from 10^6 candidates across the active window.
+        // '000000' is astronomically unlikely to be the current TOTP for a
+        // freshly generated secret — the Google2FA algorithm draws from 10^6
+        // candidates across the active window.
         self::assertFalse($driver->verify($factor, '000000'));
     }
 
@@ -118,6 +134,10 @@ final class TotpDriverTest extends TestCase
      * handing to an authenticator app.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testGenerateSecretReturnsNonEmptyBase32String(): void
     {
@@ -134,6 +154,10 @@ final class TotpDriverTest extends TestCase
      * authenticator apps can render it as a QR code.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testProvisioningUriReturnsOtpauthScheme(): void
     {
@@ -141,9 +165,9 @@ final class TotpDriverTest extends TestCase
         $secret = $driver->generateSecret();
 
         $uri = $driver->provisioningUri(
-            issuer: 'Acme',
+            issuer     : 'Acme',
             accountName: self::ACCOUNT_NAME,
-            secret: $secret,
+            secret     : $secret,
         );
 
         self::assertStringStartsWith('otpauth://totp/', $uri);
@@ -154,6 +178,10 @@ final class TotpDriverTest extends TestCase
      * both the label and the query parameters.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testProvisioningUriIncludesIssuerAndAccountAndSecret(): void
     {
@@ -161,9 +189,9 @@ final class TotpDriverTest extends TestCase
         $secret = $driver->generateSecret();
 
         $uri = $driver->provisioningUri(
-            issuer: 'Acme',
+            issuer     : 'Acme',
             accountName: self::ACCOUNT_NAME,
-            secret: $secret,
+            secret     : $secret,
         );
 
         // The label segment is `Issuer:AccountName`, URL-encoded by the
@@ -189,6 +217,10 @@ final class TotpDriverTest extends TestCase
      * once — never doubly encoded.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testProvisioningUriDoesNotDoubleEncodeIssuer(): void
     {
@@ -196,14 +228,14 @@ final class TotpDriverTest extends TestCase
         $secret = $driver->generateSecret();
 
         $uri = $driver->provisioningUri(
-            issuer: 'Acme Co',
+            issuer     : 'Acme Co',
             accountName: self::ACCOUNT_NAME,
-            secret: $secret,
+            secret     : $secret,
         );
 
         // `Acme Co` should be encoded exactly once. A double-encoded value
-        // would surface as `Acme%2520Co`; the wrapper must trust the
-        // library's single pass.
+        // would surface as `Acme%2520Co`; the wrapper must trust the library's
+        // single pass.
         self::assertStringNotContainsString('Acme%2520Co', $uri);
         self::assertStringContainsString('Acme%20Co', $uri);
     }

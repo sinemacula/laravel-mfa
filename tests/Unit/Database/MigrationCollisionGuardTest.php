@@ -32,10 +32,9 @@ final class MigrationCollisionGuardTest extends TestCase
 
         $guard = new MigrationCollisionGuard($schema);
 
-        // Capture the public outcome as a tagged sentinel: the closure
-        // returns it only when the guard returns normally, so the
-        // assertion below proves the no-op rather than relying on
-        // implicit teardown semantics.
+        // Capture the public outcome as a tagged sentinel: the closure returns
+        // it only when the guard returns normally, so the assertion below
+        // proves the no-op rather than relying on implicit teardown semantics.
         $outcome = (static function () use ($guard): string {
 
             $guard->ensureNotExists('mfa_factors');

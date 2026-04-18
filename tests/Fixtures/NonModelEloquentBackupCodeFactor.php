@@ -32,6 +32,8 @@ final class NonModelEloquentBackupCodeFactor extends AbstractEloquentFactorStub
     ) {}
 
     /**
+     * Return the fixture's fixed factor identifier.
+     *
      * @return mixed
      */
     public function getFactorIdentifier(): mixed
@@ -40,6 +42,8 @@ final class NonModelEloquentBackupCodeFactor extends AbstractEloquentFactorStub
     }
 
     /**
+     * Return the backup-code driver name.
+     *
      * @return string
      */
     public function getDriver(): string
@@ -48,6 +52,8 @@ final class NonModelEloquentBackupCodeFactor extends AbstractEloquentFactorStub
     }
 
     /**
+     * Return the seeded secret hash.
+     *
      * @return ?string
      */
     public function getSecret(): ?string

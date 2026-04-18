@@ -45,9 +45,9 @@ final class MfaVerificationFailedTest extends TestCase
 
         $event = new MfaVerificationFailed(
             identity: $identity,
-            factor: $factor,
-            driver: 'sms',
-            reason: MfaVerificationFailureReason::CODE_INVALID,
+            factor  : $factor,
+            driver  : 'sms',
+            reason  : MfaVerificationFailureReason::CODE_INVALID,
         );
 
         self::assertSame($identity, $event->identity);
@@ -67,9 +67,9 @@ final class MfaVerificationFailedTest extends TestCase
 
         $event = new MfaVerificationFailed(
             identity: $identity,
-            factor: null,
-            driver: 'totp',
-            reason: MfaVerificationFailureReason::SECRET_MISSING,
+            factor  : null,
+            driver  : 'totp',
+            reason  : MfaVerificationFailureReason::SECRET_MISSING,
         );
 
         self::assertNull($event->factor);

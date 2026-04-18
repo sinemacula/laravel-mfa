@@ -75,11 +75,11 @@ final class MfaExpiredExceptionTest extends TestCase
     public function testFactorsArePreserved(): void
     {
         $summary = new FactorSummary(
-            id: '01HABCDEF',
-            driver: 'email',
-            label: 'Work email',
+            id             : '01HABCDEF',
+            driver         : 'email',
+            label          : 'Work email',
             maskedRecipient: 'al***@example.com',
-            verifiedAt: null,
+            verifiedAt     : null,
         );
 
         $exception = new MfaExpiredException([$summary]);

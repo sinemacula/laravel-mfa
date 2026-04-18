@@ -39,6 +39,8 @@ final class OtpLifecycleTest extends TestCase
      * Test email challenge sends the mailable to the recipient.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailChallengeSendsMailableToRecipient(): void
     {
@@ -55,6 +57,8 @@ final class OtpLifecycleTest extends TestCase
      * Test email challenge dispatches the MfaChallengeIssued event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailChallengeDispatchesChallengeIssuedEvent(): void
     {
@@ -72,6 +76,8 @@ final class OtpLifecycleTest extends TestCase
      * Test email challenge persists a code on the factor.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailChallengePersistsCodeOnFactor(): void
     {
@@ -90,6 +96,8 @@ final class OtpLifecycleTest extends TestCase
      * Test verifying the persisted email code returns true.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyingPersistedEmailCodeReturnsTrue(): void
     {
@@ -110,6 +118,8 @@ final class OtpLifecycleTest extends TestCase
      * Test verifying the persisted email code marks the verification store.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyingPersistedEmailCodeMarksVerificationStore(): void
     {
@@ -129,6 +139,8 @@ final class OtpLifecycleTest extends TestCase
      * Test verifying the persisted email code dispatches MfaVerified.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyingPersistedEmailCodeDispatchesVerifiedEvent(): void
     {
@@ -149,6 +161,8 @@ final class OtpLifecycleTest extends TestCase
      * Test verifying the persisted email code clears code and expiry.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyingPersistedEmailCodeClearsCodeAndExpiry(): void
     {
@@ -172,6 +186,8 @@ final class OtpLifecycleTest extends TestCase
      * the outbound message and verify successfully against the persisted code.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSmsChallengeIssuedAndVerifiedViaBoundGateway(): void
     {
@@ -203,6 +219,8 @@ final class OtpLifecycleTest extends TestCase
      * verification and dispatch a `CodeInvalid` failure event.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailVerificationFailsWithWrongCode(): void
     {
@@ -229,6 +247,8 @@ final class OtpLifecycleTest extends TestCase
      * stored value.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testExpiredCodeIsRejected(): void
     {
@@ -260,6 +280,8 @@ final class OtpLifecycleTest extends TestCase
      * manager-side reset would have allowed.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailChallengeResetsAttemptsAlongsideFreshCode(): void
     {
@@ -267,8 +289,8 @@ final class OtpLifecycleTest extends TestCase
 
         [, $factor] = $this->enrolEmail();
 
-        // Stage a previously-locked-out factor: max attempts burned and
-        // a future lockout still active.
+        // Stage a previously-locked-out factor: max attempts burned and a
+        // future lockout still active.
         $factor->forceFill([
             'attempts'     => 3,
             'locked_until' => now()->addMinutes(15),
@@ -280,9 +302,9 @@ final class OtpLifecycleTest extends TestCase
 
         $factor->refresh();
 
-        // OTP rotation closes the bypass risk: a brand-new code lands
-        // in the user's inbox alongside the cleared lockout, so an
-        // attacker without inbox access cannot exploit the reset.
+        // OTP rotation closes the bypass risk: a brand-new code lands in the
+        // user's inbox alongside the cleared lockout, so an attacker without
+        // inbox access cannot exploit the reset.
         self::assertSame(0, $factor->getAttempts());
         self::assertNull($factor->getLockedUntil());
         self::assertFalse($factor->isLocked());
@@ -315,6 +337,8 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
+     * Enrol a fresh test user with an SMS factor and authenticate as them.
+     *
      * @param  string  $phone
      * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */

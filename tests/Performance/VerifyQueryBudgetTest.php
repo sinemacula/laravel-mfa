@@ -6,6 +6,7 @@ namespace Tests\Performance;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
@@ -32,6 +33,11 @@ final class VerifyQueryBudgetTest extends TestCase
      * budget: the factor-row update plus the verification store write.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testTotpVerifyHitBudget(): void
     {
@@ -45,21 +51,22 @@ final class VerifyQueryBudgetTest extends TestCase
             'secret'               => $secret,
         ]);
 
-        $google = new \PragmaRX\Google2FA\Google2FA;
+        $google = new Google2FA;
         $code   = $google->getCurrentOtp($secret);
 
         $count = $this->countQueries(
             static fn () => Mfa::verify('totp', $factor, $code),
         );
 
-        // Budget: one update on the factor row for recordVerification +
-        // one write to the verification store (session-backed, not a DB
-        // connection in the default binding). Session writes happen via
-        // the session driver, not the database — so the DB budget is 1.
-        self::assertLessThanOrEqual(2, $count, sprintf(
-            'TOTP verify hit exceeded query budget: %d queries',
+        // Budget: one update on the factor row for recordVerification + one
+        // write to the verification store (session-backed, not a DB connection
+        // in the default binding). Session writes happen via the session
+        // driver, not the database — so the DB budget is 1.
+        self::assertLessThanOrEqual(
+            2,
             $count,
-        ));
+            sprintf('TOTP verify hit exceeded query budget: %d queries', $count),
+        );
     }
 
     /**
@@ -67,6 +74,8 @@ final class VerifyQueryBudgetTest extends TestCase
      * queries — the manager's lock check happens entirely in memory.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testTotpVerifyLockedBudget(): void
     {
@@ -85,10 +94,11 @@ final class VerifyQueryBudgetTest extends TestCase
         );
 
         // Locked factor: the manager rejects without touching the DB.
-        self::assertSame(0, $count, sprintf(
-            'Locked factor rejection issued queries: %d',
+        self::assertSame(
+            0,
             $count,
-        ));
+            sprintf('Locked factor rejection issued queries: %d', $count),
+        );
     }
 
     /**
@@ -96,6 +106,8 @@ final class VerifyQueryBudgetTest extends TestCase
      * update on the factor row, with no verification store write.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testTotpVerifyMissBudget(): void
     {
@@ -112,12 +124,13 @@ final class VerifyQueryBudgetTest extends TestCase
             static fn () => Mfa::verify('totp', $factor, '000000'),
         );
 
-        // One update on the factor row for recordAttempt. No verification
-        // store write on failure.
-        self::assertLessThanOrEqual(1, $count, sprintf(
-            'TOTP verify miss exceeded query budget: %d queries',
+        // One update on the factor row for recordAttempt. No verification store
+        // write on failure.
+        self::assertLessThanOrEqual(
+            1,
             $count,
-        ));
+            sprintf('TOTP verify miss exceeded query budget: %d queries', $count),
+        );
     }
 
     /**

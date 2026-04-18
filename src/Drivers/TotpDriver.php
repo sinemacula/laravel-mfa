@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
+use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Exceptions\MissingDriverDependencyException;
@@ -31,14 +32,16 @@ final class TotpDriver implements FactorDriver
      * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingDriverDependencyException
      */
     public function __construct(
+
+        /** Clock-drift tolerance in 30-second steps on either side of "now". */
         private readonly int $window = 1,
+
     ) {
         // @codeCoverageIgnoreStart
         // This branch only fires when `pragmarx/google2fa` is absent,
         // which cannot be exercised under the package's own test suite
-        // without uninstalling the dev dependency. The exception contract
-        // is still asserted elsewhere via a dedicated class-exists mock.
-        if (!class_exists(\PragmaRX\Google2FA\Google2FA::class)) {
+        // without uninstalling the dev dependency.
+        if (!class_exists(Google2FA::class)) {
             $message = 'The pragmarx/google2fa package is required for the '
                 . 'TOTP MFA driver. Install it via: composer '
                 . 'require pragmarx/google2fa';
@@ -47,7 +50,7 @@ final class TotpDriver implements FactorDriver
         }
         // @codeCoverageIgnoreEnd
 
-        $this->google2fa = new \PragmaRX\Google2FA\Google2FA;
+        $this->google2fa = new Google2FA;
     }
 
     /**
@@ -70,6 +73,10 @@ final class TotpDriver implements FactorDriver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @return bool
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     #[\Override]
     public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
@@ -87,6 +94,10 @@ final class TotpDriver implements FactorDriver
      * Generate a new TOTP shared secret.
      *
      * @return string
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     #[\Override]
     public function generateSecret(): string

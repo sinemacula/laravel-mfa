@@ -57,17 +57,6 @@ class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Bootstrap any application services.
-     *
-     * @return void
-     */
-    public function boot(): void
-    {
-        $this->offerPublishing();
-        $this->registerMiddlewareAliases();
-    }
-
-    /**
      * Build the TOTP driver from `mfa.drivers.totp` config.
      *
      * @param  \Illuminate\Contracts\Config\Repository  $config
@@ -87,6 +76,8 @@ class MfaServiceProvider extends ServiceProvider
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\EmailDriver
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public static function buildEmailDriver(Application $app, Repository $config): EmailDriver
     {
@@ -102,12 +93,12 @@ class MfaServiceProvider extends ServiceProvider
         $driverConfig = $config->get('mfa.drivers.email', []);
 
         return new EmailDriver(
-            mailer: $app->make(Mailer::class),
-            mailable: $driverConfig['mailable']        ?? MfaCodeMessage::class,
-            codeLength: $driverConfig['code_length']   ?? 6,
-            expiry: $driverConfig['expiry']            ?? 10,
+            mailer     : $app->make(Mailer::class),
+            mailable   : $driverConfig['mailable']     ?? MfaCodeMessage::class,
+            codeLength : $driverConfig['code_length']  ?? 6,
+            expiry     : $driverConfig['expiry']       ?? 10,
             maxAttempts: $driverConfig['max_attempts'] ?? 3,
-            alphabet: $driverConfig['alphabet']        ?? null,
+            alphabet   : $driverConfig['alphabet']     ?? null,
         );
     }
 
@@ -117,6 +108,8 @@ class MfaServiceProvider extends ServiceProvider
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\SmsDriver
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public static function buildSmsDriver(Application $app, Repository $config): SmsDriver
     {
@@ -132,12 +125,12 @@ class MfaServiceProvider extends ServiceProvider
         $driverConfig = $config->get('mfa.drivers.sms', []);
 
         return new SmsDriver(
-            gateway: $app->make(SmsGateway::class),
+            gateway        : $app->make(SmsGateway::class),
             messageTemplate: $driverConfig['message_template'] ?? 'Your verification code is: :code',
-            codeLength: $driverConfig['code_length']           ?? 6,
-            expiry: $driverConfig['expiry']                    ?? 10,
-            maxAttempts: $driverConfig['max_attempts']         ?? 3,
-            alphabet: $driverConfig['alphabet']                ?? null,
+            codeLength     : $driverConfig['code_length']      ?? 6,
+            expiry         : $driverConfig['expiry']           ?? 10,
+            maxAttempts    : $driverConfig['max_attempts']     ?? 3,
+            alphabet       : $driverConfig['alphabet']         ?? null,
         );
     }
 
@@ -160,57 +153,20 @@ class MfaServiceProvider extends ServiceProvider
 
         return new BackupCodeDriver(
             codeLength: $driverConfig['code_length'] ?? 10,
-            alphabet: $driverConfig['alphabet']      ?? '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
-            codeCount: $driverConfig['code_count']   ?? 10,
+            alphabet  : $driverConfig['alphabet']    ?? '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
+            codeCount : $driverConfig['code_count']  ?? 10,
         );
     }
 
     /**
-     * Register the MFA manager singleton.
-     *
-     * Built-in driver factories (TOTP, email, SMS, backup codes) are registered
-     * against the manager via the standard `extend()` API at construction time.
-     * Consumers can override any of them by calling `Mfa::extend('totp', ...)`
-     * from their own service provider after the package's provider has booted.
+     * Bootstrap any application services.
      *
      * @return void
      */
-    protected function registerMfaManager(): void
+    public function boot(): void
     {
-        // `static::` rather than `self::` so subclasses overriding
-        // `registerBuiltInDrivers()` are honoured even when the closure
-        // is invoked at resolve time.
-        $this->app->singleton('mfa', static function (Application $app): MfaManager {
-            $manager = new MfaManager($app);
-
-            static::registerBuiltInDrivers($manager, $app);
-
-            return $manager;
-        });
-    }
-
-    /**
-     * Register the four shipped factor drivers against the given manager,
-     * delegating per-driver wiring to dedicated factories that each consume
-     * only the slice of config they need.
-     *
-     * @param  \SineMacula\Laravel\Mfa\MfaManager  $manager
-     * @param  \Illuminate\Contracts\Foundation\Application  $app
-     * @return void
-     */
-    protected static function registerBuiltInDrivers(MfaManager $manager, Application $app): void
-    {
-        $config = $app->make(Repository::class);
-
-        // Use FQCN-qualified static-method references inside non-static
-        // closures: Laravel's `Manager::extend()` rebinds the closure to
-        // the manager instance, so a `self::` reference would re-scope
-        // to `MfaManager` and miss the factory. The static-method form
-        // sidesteps that rebinding entirely.
-        $manager->extend('totp', fn (): TotpDriver => MfaServiceProvider::buildTotpDriver($config));
-        $manager->extend('email', fn (): EmailDriver => MfaServiceProvider::buildEmailDriver($app, $config));
-        $manager->extend('sms', fn (): SmsDriver => MfaServiceProvider::buildSmsDriver($app, $config));
-        $manager->extend('backup_code', fn (): BackupCodeDriver => MfaServiceProvider::buildBackupCodeDriver($config));
+        $this->offerPublishing();
+        $this->registerMiddlewareAliases();
     }
 
     /**
@@ -262,19 +218,53 @@ class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the package's middleware under short aliases so consumers can
-     * reference them as `'mfa'` / `'mfa.skip'` in their route files without
-     * importing FQCNs.
+     * Register the MFA manager singleton.
+     *
+     * Built-in driver factories (TOTP, email, SMS, backup codes) are registered
+     * against the manager via the standard `extend()` API at construction time.
+     * Consumers can override any of them by calling `Mfa::extend('totp', ...)`
+     * from their own service provider after the package's provider has booted.
      *
      * @return void
      */
-    protected function registerMiddlewareAliases(): void
+    protected function registerMfaManager(): void
     {
-        /** @var \Illuminate\Routing\Router $router */
-        $router = $this->app->make(Router::class);
+        // `static::` rather than `self::` so subclasses overriding
+        // `registerBuiltInDrivers()` are honoured even when the closure is
+        // invoked at resolve time.
+        $this->app->singleton('mfa', static function (Application $app): MfaManager {
+            $manager = new MfaManager($app);
 
-        $router->aliasMiddleware('mfa', RequireMfa::class);
-        $router->aliasMiddleware('mfa.skip', SkipMfa::class);
+            static::registerBuiltInDrivers($manager, $app);
+
+            return $manager;
+        });
+    }
+
+    /**
+     * Register the four shipped factor drivers against the given manager,
+     * delegating per-driver wiring to dedicated factories that each consume
+     * only the slice of config they need.
+     *
+     * @param  \SineMacula\Laravel\Mfa\MfaManager  $manager
+     * @param  \Illuminate\Contracts\Foundation\Application  $app
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    protected static function registerBuiltInDrivers(MfaManager $manager, Application $app): void
+    {
+        $config = $app->make(Repository::class);
+
+        // Use FQCN-qualified static-method references inside non-static
+        // closures: Laravel's `Manager::extend()` rebinds the closure to the
+        // manager instance, so a `self::` reference would re-scope to
+        // `MfaManager` and miss the factory. The static-method form sidesteps
+        // that rebinding entirely.
+        $manager->extend('totp', fn (): TotpDriver => MfaServiceProvider::buildTotpDriver($config));
+        $manager->extend('email', fn (): EmailDriver => MfaServiceProvider::buildEmailDriver($app, $config));
+        $manager->extend('sms', fn (): SmsDriver => MfaServiceProvider::buildSmsDriver($app, $config));
+        $manager->extend('backup_code', fn (): BackupCodeDriver => MfaServiceProvider::buildBackupCodeDriver($config));
     }
 
     /**
@@ -295,5 +285,23 @@ class MfaServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../database/migrations/' => $this->app->databasePath('migrations'),
         ], 'mfa-migrations');
+    }
+
+    /**
+     * Register the package's middleware under short aliases so consumers can
+     * reference them as `'mfa'` / `'mfa.skip'` in their route files without
+     * importing FQCNs.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    protected function registerMiddlewareAliases(): void
+    {
+        /** @var \Illuminate\Routing\Router $router */
+        $router = $this->app->make(Router::class);
+
+        $router->aliasMiddleware('mfa', RequireMfa::class);
+        $router->aliasMiddleware('mfa.skip', SkipMfa::class);
     }
 }

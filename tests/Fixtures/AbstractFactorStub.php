@@ -26,6 +26,8 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 abstract class AbstractFactorStub implements Factor
 {
     /**
+     * Return the stub's fixed factor identifier.
+     *
      * @return mixed
      */
     public function getFactorIdentifier(): mixed
@@ -34,6 +36,8 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
+     * Return the stub's default driver name.
+     *
      * @return string
      */
     public function getDriver(): string
@@ -42,6 +46,8 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
+     * Return the stub's default label (none).
+     *
      * @return ?string
      */
     public function getLabel(): ?string
@@ -50,6 +56,8 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
+     * Return the stub's default recipient (none).
+     *
      * @return ?string
      */
     public function getRecipient(): ?string
@@ -58,6 +66,8 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
+     * Return the stub's default owning identity (none).
+     *
      * @return ?\Illuminate\Contracts\Auth\Authenticatable
      */
     public function getAuthenticatable(): ?Authenticatable
@@ -66,6 +76,8 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
+     * Return the stub's default secret (none).
+     *
      * @return ?string
      */
     public function getSecret(): ?string
@@ -74,6 +86,8 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
+     * Return the stub's default pending code (none).
+     *
      * @return ?string
      */
     public function getCode(): ?string
@@ -82,6 +96,8 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
+     * Return the stub's default code expiry (none).
+     *
      * @return ?\Carbon\CarbonInterface
      */
     public function getExpiresAt(): ?CarbonInterface
@@ -90,6 +106,8 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
+     * Return the stub's default attempt count (zero).
+     *
      * @return int
      */
     public function getAttempts(): int
@@ -98,6 +116,22 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
+     * Report whether the stub is currently locked.
+     *
+     * @return bool
+     */
+    public function isLocked(): bool
+    {
+        // Derived from the accessor so subclasses can flip the lock state by
+        // overriding `getLockedUntil()` alone — and so the body is not
+        // byte-identical to `isVerified()` (radarlint S4144 flags structurally
+        // identical method bodies).
+        return $this->getLockedUntil() !== null;
+    }
+
+    /**
+     * Return the stub's default lockout expiry (none).
+     *
      * @return ?\Carbon\CarbonInterface
      */
     public function getLockedUntil(): ?CarbonInterface
@@ -106,18 +140,8 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
-     * @return bool
-     */
-    public function isLocked(): bool
-    {
-        // Derived from the accessor so subclasses can flip the lock
-        // state by overriding `getLockedUntil()` alone — and so the
-        // body is not byte-identical to `isVerified()` (radarlint
-        // S4144 flags structurally identical method bodies).
-        return $this->getLockedUntil() !== null;
-    }
-
-    /**
+     * Return the stub's default last-attempted timestamp (none).
+     *
      * @return ?\Carbon\CarbonInterface
      */
     public function getLastAttemptedAt(): ?CarbonInterface
@@ -126,18 +150,22 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getVerifiedAt(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
+     * Report whether the stub has been verified at least once.
+     *
      * @return bool
      */
     public function isVerified(): bool
     {
         return $this->getVerifiedAt() !== null;
+    }
+
+    /**
+     * Return the stub's default verification timestamp (none).
+     *
+     * @return ?\Carbon\CarbonInterface
+     */
+    public function getVerifiedAt(): ?CarbonInterface
+    {
+        return null;
     }
 }

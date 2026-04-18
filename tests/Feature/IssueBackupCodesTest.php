@@ -39,6 +39,9 @@ final class IssueBackupCodesTest extends TestCase
      * onboarding flows.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testReturnsEmptyArrayWhenNoIdentity(): void
     {
@@ -54,6 +57,9 @@ final class IssueBackupCodesTest extends TestCase
      * Test issueBackupCodes returns the configured number of codes.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testIssueBackupCodesReturnsConfiguredBatchSize(): void
     {
@@ -69,6 +75,9 @@ final class IssueBackupCodesTest extends TestCase
      * Test issueBackupCodes persists one factor row per code.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testIssueBackupCodesPersistsOneFactorPerCode(): void
     {
@@ -88,6 +97,9 @@ final class IssueBackupCodesTest extends TestCase
      * Test issueBackupCodes persists only hashed secrets, never plaintext.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testIssueBackupCodesPersistsOnlyHashedSecrets(): void
     {
@@ -120,6 +132,9 @@ final class IssueBackupCodesTest extends TestCase
      * Test issueBackupCodes dispatches one enrolled event per code.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testIssueBackupCodesDispatchesOneEnrolledEventPerCode(): void
     {
@@ -138,6 +153,9 @@ final class IssueBackupCodesTest extends TestCase
      * overlap window where both batches would verify.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testRotationDeletesPriorBatch(): void
     {
@@ -177,6 +195,9 @@ final class IssueBackupCodesTest extends TestCase
      * batch size for that single call.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testHonoursExplicitCountArgument(): void
     {
@@ -192,6 +213,9 @@ final class IssueBackupCodesTest extends TestCase
      * Test rotation does not delete factors of other drivers.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testRotationDoesNotDeleteFactorsOfOtherDrivers(): void
     {
@@ -211,6 +235,9 @@ final class IssueBackupCodesTest extends TestCase
      * Test final backup_code row count matches the new batch size.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testFinalBackupCodeRowCountMatchesNewBatchSize(): void
     {
@@ -231,6 +258,9 @@ final class IssueBackupCodesTest extends TestCase
      * `Mfa::isSetup()` reflects the new batch immediately.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testRotationInvalidatesSetupCache(): void
     {
@@ -241,8 +271,8 @@ final class IssueBackupCodesTest extends TestCase
 
         Mfa::issueBackupCodes();
 
-        // Without the cache invalidation this assertion would still
-        // see the stale `false` value.
+        // Without the cache invalidation this assertion would still see the
+        // stale `false` value.
         self::assertTrue(Mfa::isSetup());
     }
 
@@ -253,20 +283,40 @@ final class IssueBackupCodesTest extends TestCase
      * hashing primitive and would otherwise silently corrupt state.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testThrowsWhenBackupCodeDriverWasOverriddenWithIncompatibleImplementation(): void
     {
         $this->loginUser();
 
         // Replace the bound driver with a no-op that does not extend
-        // `BackupCodeDriver` — `issueBackupCodes()` must reject it
-        // rather than silently bypass the rotation invariants.
+        // `BackupCodeDriver` — `issueBackupCodes()` must reject it rather than
+        // silently bypass the rotation invariants.
         Mfa::extend('backup_code', static fn (): FactorDriver => new NoopFactorDriver);
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(BackupCodeDriver::class);
 
         Mfa::issueBackupCodes();
+    }
+
+    /**
+     * Authenticate as a fresh MFA-enabled test user and return them.
+     *
+     * @return \Tests\Fixtures\TestUser
+     */
+    private function loginUser(): TestUser
+    {
+        $user = TestUser::create([
+            'email'       => 'backup-rotation@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        $this->actingAs($user);
+
+        return $user;
     }
 
     /**
@@ -285,23 +335,6 @@ final class IssueBackupCodesTest extends TestCase
             'driver'               => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
-
-        return $user;
-    }
-
-    /**
-     * Authenticate as a fresh MFA-enabled test user and return them.
-     *
-     * @return \Tests\Fixtures\TestUser
-     */
-    private function loginUser(): TestUser
-    {
-        $user = TestUser::create([
-            'email'       => 'backup-rotation@example.test',
-            'mfa_enabled' => true,
-        ]);
-
-        $this->actingAs($user);
 
         return $user;
     }

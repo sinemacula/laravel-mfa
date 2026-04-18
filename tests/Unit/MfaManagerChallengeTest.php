@@ -6,7 +6,7 @@ namespace Tests\Unit;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Facades\Event;
-use Mockery;
+use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
@@ -47,6 +47,8 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
      * they cannot rotate any secret of their own).
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testChallengeDispatchesToDriverAndPersistsEloquentFactor(): void
     {
@@ -75,8 +77,8 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
 
         $factor->refresh();
 
-        // The mock driver is a no-op; the manager must NOT have wiped
-        // the attempt counter on its own behalf.
+        // The mock driver is a no-op; the manager must NOT have wiped the
+        // attempt counter on its own behalf.
         self::assertSame(4, $factor->getAttempts());
 
         Event::assertDispatched(
@@ -91,6 +93,8 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
      * `issueChallenge()` without attempting to persist any state.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testChallengeDispatchesThroughInMemoryFactorWithoutMutation(): void
     {
@@ -121,6 +125,8 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
      * checked.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testChallengeIsNoopWhenNoIdentity(): void
     {
@@ -158,11 +164,13 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
      * Resolve the package's MFA manager from the container.
      *
      * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     private function manager(): MfaManager
     {
         $manager = $this->container()->make('mfa');
-        \PHPUnit\Framework\Assert::assertInstanceOf(MfaManager::class, $manager);
+        Assert::assertInstanceOf(MfaManager::class, $manager);
 
         return $manager;
     }

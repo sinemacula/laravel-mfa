@@ -34,6 +34,8 @@ final class ServiceProviderBindingsTest extends TestCase
      * time — the manager is registered as a singleton.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testMfaManagerIsSingleton(): void
     {
@@ -49,6 +51,8 @@ final class ServiceProviderBindingsTest extends TestCase
      * shipped `NullMfaPolicy`.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testDefaultMfaPolicyIsNull(): void
     {
@@ -62,6 +66,8 @@ final class ServiceProviderBindingsTest extends TestCase
      * resolve to the session-backed default.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testDefaultVerificationStoreIsSessionBacked(): void
     {
@@ -75,6 +81,8 @@ final class ServiceProviderBindingsTest extends TestCase
      * loud-failing `NullSmsGateway` default.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testDefaultSmsGatewayIsNull(): void
     {
@@ -88,6 +96,8 @@ final class ServiceProviderBindingsTest extends TestCase
      * aliases against the router.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testMiddlewareAliasesAreRegistered(): void
     {

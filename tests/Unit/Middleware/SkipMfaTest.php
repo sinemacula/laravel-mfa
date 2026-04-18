@@ -39,9 +39,9 @@ final class SkipMfaTest extends TestCase
 
         self::assertTrue($request->attributes->get('skip_mfa'));
         // S3415 wants a literal "expected" on the left, but the
-        // middleware-passthrough assertion can only compare two
-        // runtime references — `$request` IS the canonical expected
-        // value (the instance we created and handed to the middleware).
+        // middleware-passthrough assertion can only compare two runtime
+        // references — `$request` IS the canonical expected value (the instance
+        // we created and handed to the middleware).
         // @SuppressWarnings("php:S3415")
         self::assertSame($request, $seen);
         self::assertSame($response, $handled);

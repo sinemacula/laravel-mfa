@@ -742,7 +742,7 @@ final class ActsAsFactorTest extends TestCase
 
         self::assertTrue($factor->exists);
         self::assertNotNull($factor->id);
-        // @phpstan-ignore staticMethod.dynamicCall (query() is a magic instance method on Eloquent\Model — PHPStan treats it as static.)
+        // @phpstan-ignore staticMethod.dynamicCall
         self::assertTrue(Factor::query()->whereKey($factor->id)->exists());
     }
 

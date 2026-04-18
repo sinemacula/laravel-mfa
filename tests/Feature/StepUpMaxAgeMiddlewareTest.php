@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use Tests\Feature\Concerns\InteractsWithRequireMfaMiddleware;
@@ -25,14 +26,18 @@ use Tests\TestCase;
  */
 final class StepUpMaxAgeMiddlewareTest extends TestCase
 {
-    use InteractsWithRequireMfaMiddleware;
-    use RefreshDatabase;
+    use InteractsWithRequireMfaMiddleware, RefreshDatabase;
 
     /**
      * Step-up middleware: a verification within the configured max-age must
      * pass through.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testStepUpPassesWhenVerificationIsWithinMaxAge(): void
     {
@@ -52,6 +57,11 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
      * throw `MfaExpiredException`.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testStepUpThrowsExpiredWhenVerificationOlderThanMaxAge(): void
     {
@@ -71,6 +81,11 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
      * how recent the verification was.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testStepUpZeroAlwaysThrowsEvenForFreshVerification(): void
     {
@@ -88,12 +103,17 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
      * `default_expiry` config so the per-route window wins.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testStepUpOverridesShorterDefaultExpiry(): void
     {
-        // The default config expiry is 14 days; force it to 1 minute so
-        // we can prove that an explicit `mfa:60` parameter wins by
-        // letting a verification 30 minutes old still pass.
+        // The default config expiry is 14 days; force it to 1 minute so we can
+        // prove that an explicit `mfa:60` parameter wins by letting a
+        // verification 30 minutes old still pass.
         config()->set('mfa.default_expiry', 1);
 
         [, $factor, $code] = $this->enrolTotp();
@@ -112,6 +132,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
      * `InvalidArgumentException`.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testStepUpRejectsNonNumericParameter(): void
     {
@@ -132,6 +154,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
      * `InvalidArgumentException`.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testStepUpRejectsNegativeParameter(): void
     {
@@ -152,6 +176,8 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
      * `InvalidArgumentException`.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testStepUpRejectsFractionalParameter(): void
     {
@@ -191,8 +217,10 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
      *
      * @param  string  $candidate
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('looselyNumericParameterProvider')]
+    #[DataProvider('looselyNumericParameterProvider')]
     public function testStepUpRejectsLooselyNumericParameter(string $candidate): void
     {
         $user = TestUser::create([

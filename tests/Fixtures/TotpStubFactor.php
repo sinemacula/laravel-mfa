@@ -30,6 +30,8 @@ final class TotpStubFactor extends AbstractFactorStub
     ) {}
 
     /**
+     * Return the fixture's fixed factor identifier.
+     *
      * @return mixed
      */
     public function getFactorIdentifier(): mixed
@@ -38,6 +40,8 @@ final class TotpStubFactor extends AbstractFactorStub
     }
 
     /**
+     * Return the TOTP driver name.
+     *
      * @return string
      */
     public function getDriver(): string
@@ -46,6 +50,8 @@ final class TotpStubFactor extends AbstractFactorStub
     }
 
     /**
+     * Return the seeded TOTP secret.
+     *
      * @return ?string
      */
     public function getSecret(): ?string

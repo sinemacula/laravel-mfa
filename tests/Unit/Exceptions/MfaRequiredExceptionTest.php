@@ -75,11 +75,11 @@ final class MfaRequiredExceptionTest extends TestCase
     public function testFactorsArePreserved(): void
     {
         $summary = new FactorSummary(
-            id: '01HABCDEF',
-            driver: 'totp',
-            label: 'Phone',
+            id             : '01HABCDEF',
+            driver         : 'totp',
+            label          : 'Phone',
             maskedRecipient: null,
-            verifiedAt: null,
+            verifiedAt     : null,
         );
 
         $exception = new MfaRequiredException([$summary]);

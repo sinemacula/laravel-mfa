@@ -25,16 +25,20 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 final class NoopFactorDriver implements FactorDriver
 {
     /**
+     * No-op — fixture exists only to register a driver name.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
      */
     public function issueChallenge(Factor $factor): void
     {
-        // Intentional no-op — fixture exists only to register a
-        // driver name; runtime behaviour is irrelevant.
+        // Intentional no-op — fixture exists only to register a driver name;
+        // runtime behaviour is irrelevant.
     }
 
     /**
+     * Always report verification failure — the fixture does not verify.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @return bool
@@ -45,6 +49,8 @@ final class NoopFactorDriver implements FactorDriver
     }
 
     /**
+     * Return a null secret — the fixture does not mint credentials.
+     *
      * @return ?string
      */
     public function generateSecret(): ?string

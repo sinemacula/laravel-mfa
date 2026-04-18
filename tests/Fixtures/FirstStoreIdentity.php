@@ -8,9 +8,9 @@ use Illuminate\Contracts\Auth\Authenticatable;
 
 /**
  * First of two distinct Authenticatable classes used by the session-store
- * identity-class scoping test. Paired with `SecondStoreIdentity` to prove
- * that two different identity classes sharing an identifier do not collide
- * on a single verification slot in `SessionMfaVerificationStore`.
+ * identity-class scoping test. Paired with `SecondStoreIdentity` to prove that
+ * two different identity classes sharing an identifier do not collide on a
+ * single verification slot in `SessionMfaVerificationStore`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

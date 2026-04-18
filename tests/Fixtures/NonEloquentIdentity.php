@@ -47,6 +47,8 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     ) {}
 
     /**
+     * Return the fixture's seeded auth identifier.
+     *
      * @return mixed
      */
     public function getAuthIdentifier(): mixed
@@ -55,6 +57,8 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
+     * Return the conventional auth-identifier column name.
+     *
      * @return string
      */
     public function getAuthIdentifierName(): string
@@ -63,6 +67,8 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
+     * Return a placeholder password — the fixture does not authenticate.
+     *
      * @return string
      */
     public function getAuthPassword(): string
@@ -71,6 +77,8 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
+     * Return the conventional password column name.
+     *
      * @return string
      */
     public function getAuthPasswordName(): string
@@ -79,6 +87,8 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
+     * Return an empty remember token — the fixture has no persistent session.
+     *
      * @return string
      */
     public function getRememberToken(): string
@@ -102,6 +112,8 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
+     * Return the conventional remember-token column name.
+     *
      * @return string
      */
     public function getRememberTokenName(): string
@@ -110,6 +122,8 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
+     * Always opt the fixture into MFA enforcement.
+     *
      * @return bool
      */
     public function shouldUseMultiFactor(): bool
@@ -142,7 +156,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      */
     public function authFactors(): Builder
     {
-        // @phpstan-ignore staticMethod.dynamicCall (newQuery is an instance method on Eloquent\Model)
+        // @phpstan-ignore staticMethod.dynamicCall
         $builder = (new Factor)->newQuery();
 
         return self::coerceFactorBuilder($builder);

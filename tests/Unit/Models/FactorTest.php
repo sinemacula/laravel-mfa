@@ -7,6 +7,7 @@ namespace Tests\Unit\Models;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Facade;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
@@ -61,21 +62,21 @@ final class FactorTest extends TestCase
     public function testTableNameFallsBackToDefaultWhenConfigFacadeIsNotBootstrapped(): void
     {
         // Swap out the bound Facade application so `Config::string(...)`
-        // throws, exercising the defensive fallback in `resolveConfiguredTable`.
-        $previous = \Illuminate\Support\Facades\Facade::getFacadeApplication();
+        // throws, exercising the defensive fallback in
+        // `resolveConfiguredTable`.
+        $previous = Facade::getFacadeApplication();
 
-        // Tear-down accepts null even though the upstream stub claims
-        // non-null is required.
+        // Tear-down accepts null even though the upstream stub claims non-null
+        // is required.
         // @phpstan-ignore argument.type
-        \Illuminate\Support\Facades\Facade::setFacadeApplication(null);
-        \Illuminate\Support\Facades\Facade::clearResolvedInstance('config');
+        Facade::setFacadeApplication(null);
+        Facade::clearResolvedInstance('config');
 
         try {
             $factor = new Factor;
-
             self::assertSame('mfa_factors', $factor->getTable());
         } finally {
-            \Illuminate\Support\Facades\Facade::setFacadeApplication($previous);
+            Facade::setFacadeApplication($previous);
         }
     }
 
@@ -194,6 +195,7 @@ final class FactorTest extends TestCase
             ->first(['secret']);
 
         self::assertNotNull($raw);
+
         /** @var mixed $rawSecret */
         $rawSecret = $raw->secret;
         self::assertIsString($rawSecret);
@@ -229,6 +231,7 @@ final class FactorTest extends TestCase
             ->first(['code']);
 
         self::assertNotNull($raw);
+
         /** @var mixed $rawCode */
         $rawCode = $raw->code;
         self::assertIsString($rawCode);

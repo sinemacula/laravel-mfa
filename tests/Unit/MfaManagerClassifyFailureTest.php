@@ -6,7 +6,6 @@ namespace Tests\Unit;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
-use Mockery;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
@@ -55,6 +54,8 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
      * with no stored secret.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testClassifyFailureReturnsSecretMissingForTotpShapedFactorWithoutSecret(): void
     {
@@ -84,6 +85,8 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
      * pending code whose expiry has passed.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testClassifyFailureReturnsCodeExpiredWhenPendingCodeHasExpired(): void
     {
@@ -92,9 +95,9 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver: 'email',
-            code: self::VALID_CODE,
-            expiresAt: Carbon::now()->subMinute(),
+            driver         : 'email',
+            code           : self::VALID_CODE,
+            expiresAt      : Carbon::now()->subMinute(),
             authenticatable: $user,
         );
 
@@ -118,6 +121,8 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
      * stored secret but verification still fails.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testClassifyFailureReturnsCodeInvalidForTotpSecretMismatch(): void
     {
@@ -126,8 +131,8 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver: 'totp',
-            secret: 'JBSWY3DPEHPK3PXP',
+            driver         : 'totp',
+            secret         : 'JBSWY3DPEHPK3PXP',
             authenticatable: $user,
         );
 
@@ -151,6 +156,8 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
      * pending code but no expiry timestamp.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testClassifyFailureReturnsCodeMissingWhenPendingCodeHasNoExpiry(): void
     {
@@ -159,8 +166,8 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver: 'email',
-            code: self::VALID_CODE,
+            driver         : 'email',
+            code           : self::VALID_CODE,
             authenticatable: $user,
         );
 
@@ -185,6 +192,8 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
      * verification.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testClassifyFailureReturnsCodeInvalidForValidPendingCodeWithFutureExpiry(): void
     {
@@ -193,9 +202,9 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver: 'email',
-            code: self::VALID_CODE,
-            expiresAt: Carbon::now()->addMinutes(5),
+            driver         : 'email',
+            code           : self::VALID_CODE,
+            expiresAt      : Carbon::now()->addMinutes(5),
             authenticatable: $user,
         );
 

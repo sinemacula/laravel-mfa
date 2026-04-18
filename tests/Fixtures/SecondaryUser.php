@@ -67,6 +67,9 @@ class SecondaryUser extends Model implements Authenticatable, MultiFactorAuthent
     }
 
     /**
+     * Return the identity's factor builder narrowed to the package intersection
+     * type required by `MultiFactorAuthenticatable`.
+     *
      * @formatter:off
      *
      * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
@@ -79,11 +82,29 @@ class SecondaryUser extends Model implements Authenticatable, MultiFactorAuthent
     }
 
     /**
+     * Define the polymorphic relation to the shipped Factor model.
+     *
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany<\SineMacula\Laravel\Mfa\Models\Factor, $this>
      */
     public function factors(): MorphMany
     {
         return $this->morphMany(Factor::class, 'authenticatable');
+    }
+
+    /**
+     * Wrap the dynamic count() call so PHPStan does not flag it as a dynamic
+     * call to a static method.
+     *
+     * @formatter:off
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>  $builder
+     * @return int
+     *
+     * @formatter:on
+     */
+    private static function countFactors(Builder $builder): int
+    {
+        return $builder->toBase()->count();
     }
 
     /**
@@ -105,21 +126,5 @@ class SecondaryUser extends Model implements Authenticatable, MultiFactorAuthent
 
         /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> $builder */
         return $builder;
-    }
-
-    /**
-     * Wrap the dynamic count() call so PHPStan does not flag it as a dynamic
-     * call to a static method.
-     *
-     * @formatter:off
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>  $builder
-     * @return int
-     *
-     * @formatter:on
-     */
-    private static function countFactors(Builder $builder): int
-    {
-        return $builder->toBase()->count();
     }
 }

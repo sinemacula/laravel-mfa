@@ -135,7 +135,7 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
         }
 
         $class = $identity instanceof Model
-            // @phpstan-ignore staticMethod.dynamicCall (getMorphClass is defined as an instance method upstream)
+            // @phpstan-ignore staticMethod.dynamicCall
             ? $identity->getMorphClass()
             : $identity::class;
 

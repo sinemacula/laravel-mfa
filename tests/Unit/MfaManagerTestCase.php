@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Illuminate\Config\Repository;
+use Illuminate\Foundation\Application;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
@@ -14,9 +15,9 @@ use Tests\Fixtures;
  * Dedicated MfaManager test base class.
  *
  * Mirrors the `Tests\TestCase` bootstrap but uses provider/environment hook
- * signatures aligned with Orchestra TestBench under strict PHP 8.3 LSP
- * checks, so subclasses load regardless of upstream signature drift on the
- * shared `Tests\TestCase`.
+ * signatures aligned with Orchestra TestBench under strict PHP 8.3 LSP checks,
+ * so subclasses load regardless of upstream signature drift on the shared
+ * `Tests\TestCase`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -47,6 +48,9 @@ abstract class MfaManagerTestCase extends BaseTestCase
      *
      * @param  \Illuminate\Foundation\Application  $app
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Random\RandomException
      */
     protected function defineEnvironment(mixed $app): void
     {
@@ -119,7 +123,7 @@ abstract class MfaManagerTestCase extends BaseTestCase
      *
      * @return \Illuminate\Foundation\Application
      */
-    protected function container(): \Illuminate\Foundation\Application
+    protected function container(): Application
     {
         Assert::assertNotNull($this->app);
 
@@ -127,6 +131,9 @@ abstract class MfaManagerTestCase extends BaseTestCase
     }
 
     /**
+     * Return the env var value for `$key`, falling back to `$default` when
+     * unset or empty.
+     *
      * @param  string  $key
      * @param  string  $default
      * @return string

@@ -9,6 +9,7 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
+use Tests\Fixtures\AbstractFactorStub;
 use Tests\Fixtures\NonModelEloquentBackupCodeFactor;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
@@ -99,9 +100,9 @@ final class BackupCodeDriverTest extends TestCase
 
         self::assertTrue($driver->verify($factor, $plain));
 
-        // Non-Eloquent factors have no persistence side-effect, the
-        // stored secret remains unchanged — single-use enforcement is
-        // the orchestration layer's concern for non-Eloquent factors.
+        // Non-Eloquent factors have no persistence side-effect, the stored
+        // secret remains unchanged — single-use enforcement is the
+        // orchestration layer's concern for non-Eloquent factors.
         self::assertSame($driver->hash($plain), $factor->getSecret());
     }
 
@@ -120,12 +121,12 @@ final class BackupCodeDriverTest extends TestCase
 
         self::assertTrue($driver->verify($factor, $plain));
 
-        // In-memory factor attribute cleared for the manager's
-        // subsequent persist().
+        // In-memory factor attribute cleared for the manager's subsequent
+        // persist().
         self::assertNull($factor->getSecret());
 
-        // Underlying row was updated in place — a fresh fetch sees
-        // the nulled secret.
+        // Underlying row was updated in place — a fresh fetch sees the nulled
+        // secret.
         /** @var \SineMacula\Laravel\Mfa\Models\Factor $fresh */
         $fresh = FactorModel::query()->where($factor->getKeyName(), $factor->getKey())->sole();
         self::assertNull($fresh->getSecret());
@@ -148,9 +149,9 @@ final class BackupCodeDriverTest extends TestCase
         $hash   = $driver->hash($plain);
         $factor = $this->makeEloquentFactor($hash);
 
-        // Simulate a concurrent request having already consumed AND
-        // purged the row between the outer verify() loading the in-
-        // memory factor and the atomic lockForUpdate() query running.
+        // Simulate a concurrent request having already consumed AND purged the
+        // row between the outer verify() loading the in-memory factor and the
+        // atomic lockForUpdate() query running.
         DB::table($factor->getTable())
             ->where($factor->getKeyName(), $factor->getKey())
             ->delete();
@@ -188,11 +189,11 @@ final class BackupCodeDriverTest extends TestCase
         $hash   = $driver->hash($plain);
         $factor = $this->makeEloquentFactor($hash);
 
-        // Simulate a concurrent request having already consumed the
-        // code: null the secret directly on the underlying row between
-        // the in-memory hash compare and the atomic UPDATE. The
-        // in-memory attribute still holds the hash so the hash_equals
-        // check passes, but the conditional UPDATE affects zero rows.
+        // Simulate a concurrent request having already consumed the code: null
+        // the secret directly on the underlying row between the in-memory hash
+        // compare and the atomic UPDATE. The in-memory attribute still holds
+        // the hash so the hash_equals check passes, but the conditional UPDATE
+        // affects zero rows.
         DB::table($factor->getTable())
             ->where($factor->getKeyName(), $factor->getKey())
             ->update([$factor->getSecretName() => null]);
@@ -210,8 +211,8 @@ final class BackupCodeDriverTest extends TestCase
     {
         $driver = new BackupCodeDriver(
             codeLength: 14,
-            alphabet: '01',
-            codeCount: 7,
+            alphabet  : '01',
+            codeCount : 7,
         );
 
         self::assertSame(14, $driver->getCodeLength());
@@ -228,6 +229,51 @@ final class BackupCodeDriverTest extends TestCase
     public function testNameConstantMatchesDriverIdentifier(): void
     {
         self::assertSame('backup_code', BackupCodeDriver::NAME);
+    }
+
+    /**
+     * Build a non-Eloquent `Factor` stub with the supplied stored secret.
+     *
+     * @param  ?string  $secret
+     * @return \SineMacula\Laravel\Mfa\Contracts\Factor
+     */
+    private function makeStubFactor(#[\SensitiveParameter] ?string $secret): Factor
+    {
+        return new class ($secret) extends AbstractFactorStub {
+            /**
+             * Capture the seeded secret value.
+             *
+             * @param  ?string  $secret
+             * @return void
+             */
+            public function __construct(
+
+                /** Stored backup-code secret hash. */
+                #[\SensitiveParameter]
+                private readonly ?string $secret,
+
+            ) {}
+
+            /**
+             * Return the backup-code driver name.
+             *
+             * @return string
+             */
+            public function getDriver(): string
+            {
+                return BackupCodeDriver::NAME;
+            }
+
+            /**
+             * Return the seeded secret hash.
+             *
+             * @return ?string
+             */
+            public function getSecret(): ?string
+            {
+                return $this->secret;
+            }
+        };
     }
 
     /**
@@ -265,46 +311,5 @@ final class BackupCodeDriverTest extends TestCase
     private function makeNonModelEloquentFactor(#[\SensitiveParameter] string $secret): EloquentFactor
     {
         return new NonModelEloquentBackupCodeFactor($secret);
-    }
-
-    /**
-     * Build a non-Eloquent `Factor` stub with the supplied stored secret.
-     *
-     * @param  ?string  $secret
-     * @return \SineMacula\Laravel\Mfa\Contracts\Factor
-     */
-    private function makeStubFactor(#[\SensitiveParameter] ?string $secret): Factor
-    {
-        return new class ($secret) extends \Tests\Fixtures\AbstractFactorStub {
-            /**
-             * Capture the seeded secret value.
-             *
-             * @param  ?string  $secret
-             * @return void
-             */
-            public function __construct(
-
-                /** Stored backup-code secret hash. */
-                #[\SensitiveParameter]
-                private readonly ?string $secret,
-
-            ) {}
-
-            /**
-             * @return string
-             */
-            public function getDriver(): string
-            {
-                return BackupCodeDriver::NAME;
-            }
-
-            /**
-             * @return ?string
-             */
-            public function getSecret(): ?string
-            {
-                return $this->secret;
-            }
-        };
     }
 }

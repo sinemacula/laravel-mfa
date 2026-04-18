@@ -5,9 +5,11 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Illuminate\Support\Facades\Auth;
+use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\InMemoryFactor;
 use Tests\Fixtures\NonEloquentIdentity;
 
@@ -66,6 +68,8 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
      * `sameIdentifier()` short-circuit on the non-string-non-int branch.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testNonScalarIdentifierIsRejectedAsOwnershipMismatch(): void
     {
@@ -93,6 +97,9 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
      * FQCN fallback inside the rotation flow.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testIssueBackupCodesAcceptsNonEloquentIdentity(): void
     {
@@ -104,11 +111,11 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 
         self::assertCount(2, $codes);
 
-        // Persisted rows must carry the identity's FQCN as the morph
-        // type — proving the `: $identity::class` fallback fired.
+        // Persisted rows must carry the identity's FQCN as the morph type —
+        // proving the `: $identity::class` fallback fired.
         self::assertCount(
             2,
-            \SineMacula\Laravel\Mfa\Models\Factor::query()
+            Factor::query()
                 ->where('authenticatable_type', NonEloquentIdentity::class)
                 ->where('authenticatable_id', 'plain-issue')
                 ->where('driver', 'backup_code')
@@ -123,6 +130,8 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
      * `LogicException` rather than a fatal type error inside the dispatch path.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testChallengeThrowsLogicExceptionForNonFactorDriverExtension(): void
     {
@@ -142,6 +151,21 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
+     * Resolve the package's MFA manager from the container.
+     *
+     * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function manager(): MfaManager
+    {
+        $manager = $this->container()->make('mfa');
+        Assert::assertInstanceOf(MfaManager::class, $manager);
+
+        return $manager;
+    }
+
+    /**
      * Register a stub driver under the given name on the MFA manager.
      *
      * @param  string  $name
@@ -151,18 +175,5 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     private function stubDriver(string $name, FactorDriver $driver): void
     {
         $this->manager()->extend($name, fn (): FactorDriver => $driver);
-    }
-
-    /**
-     * Resolve the package's MFA manager from the container.
-     *
-     * @return \SineMacula\Laravel\Mfa\MfaManager
-     */
-    private function manager(): MfaManager
-    {
-        $manager = $this->container()->make('mfa');
-        \PHPUnit\Framework\Assert::assertInstanceOf(MfaManager::class, $manager);
-
-        return $manager;
     }
 }

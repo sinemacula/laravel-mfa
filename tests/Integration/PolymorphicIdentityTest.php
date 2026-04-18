@@ -33,6 +33,8 @@ final class PolymorphicIdentityTest extends TestCase
      * `authenticatable_type` correctly.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testFactorsAreScopedToTheirOwningIdentityType(): void
     {
@@ -60,10 +62,10 @@ final class PolymorphicIdentityTest extends TestCase
             'recipient'            => $secondary->email,
         ]);
 
-        // No manual `Mfa::clearCache()` between identity switches —
-        // the manager's per-identity cache scopes by morph class as
-        // well as identifier, so two distinct authenticatable classes
-        // sharing a primary key value get distinct cache slots.
+        // No manual `Mfa::clearCache()` between identity switches — the
+        // manager's per-identity cache scopes by morph class as well as
+        // identifier, so two distinct authenticatable classes sharing a primary
+        // key value get distinct cache slots.
         $this->actingAs($primary);
         self::assertTrue(Mfa::shouldUse());
         self::assertTrue(Mfa::isSetup());
@@ -102,11 +104,10 @@ final class PolymorphicIdentityTest extends TestCase
             'mfa_enabled' => true,
         ]);
 
-        // Force the secondary onto the same primary-key value so the
-        // only thing distinguishing the two identities in the cache is
-        // the morph class. Pre-key-collision the cache prefix would
-        // produce identical keys and one identity's setup state would
-        // win the cache slot.
+        // Force the secondary onto the same primary-key value so the only thing
+        // distinguishing the two identities in the cache is the morph class.
+        // Pre-key-collision the cache prefix would produce identical keys and
+        // one identity's setup state would win the cache slot.
         $secondary = SecondaryUser::create([
             'email'       => 'shared-secondary@example.test',
             'mfa_enabled' => true,
@@ -126,9 +127,9 @@ final class PolymorphicIdentityTest extends TestCase
         self::assertTrue(Mfa::isSetup());
 
         $this->actingAs($secondary);
-        // Without per-class cache scoping this would erroneously return
-        // true because the cached "isSetup" entry for the shared id
-        // would still be in memory.
+        // Without per-class cache scoping this would erroneously return true
+        // because the cached "isSetup" entry for the shared id would still be
+        // in memory.
         self::assertFalse(Mfa::isSetup());
     }
 
@@ -137,6 +138,8 @@ final class PolymorphicIdentityTest extends TestCase
      * identity classes when neither opts in.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnforcementWorksAcrossBothIdentityClasses(): void
     {

@@ -98,7 +98,7 @@ final class SmsDriverTest extends TestCase
         $gateway  = new FakeSmsGateway;
         $template = 'OTP :code — keep it secret.';
         $driver   = new SmsDriver(
-            gateway: $gateway,
+            gateway        : $gateway,
             messageTemplate: $template,
         );
         $factor = $this->makeFactor(recipient: '+441111111111');
@@ -139,7 +139,7 @@ final class SmsDriverTest extends TestCase
     public function testGetMessageTemplateReturnsCustomValue(): void
     {
         $driver = new SmsDriver(
-            gateway: new FakeSmsGateway,
+            gateway        : new FakeSmsGateway,
             messageTemplate: 'Code: :code',
         );
 
@@ -187,12 +187,11 @@ final class SmsDriverTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(':code placeholder');
 
-        // Hand the constructor call to a callable so the instantiation
-        // is observably consumed inside the `expectException` scope —
-        // satisfies php:S1848 without an unreachable post-call
-        // assertion (php-tst-009).
+        // Hand the constructor call to a callable so the instantiation is
+        // observably consumed inside the `expectException` scope — satisfies
+        // php:S1848 without an unreachable post-call assertion (php-tst-009).
         $construct = static fn (): SmsDriver => new SmsDriver(
-            gateway: new FakeSmsGateway,
+            gateway        : new FakeSmsGateway,
             messageTemplate: 'Your verification code is missing the placeholder',
         );
 
@@ -209,9 +208,9 @@ final class SmsDriverTest extends TestCase
     {
         $gateway = new FakeSmsGateway;
         $driver  = new SmsDriver(
-            gateway: $gateway,
+            gateway   : $gateway,
             codeLength: 8,
-            alphabet: '0123456789ABCDEF',
+            alphabet  : '0123456789ABCDEF',
         );
         $factor = $this->makeFactor(recipient: '+442222222222');
 

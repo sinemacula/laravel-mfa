@@ -11,10 +11,10 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 /**
  * Non-persisting `Factor` implementation used for benchmarks.
  *
- * Skips Eloquent / database overhead so the benchmarks measure the
- * driver verification logic in isolation. Mutable properties so
- * benchmarks can reset a factor's code, expiry, or secret between
- * iterations without reconstructing the entire object.
+ * Skips Eloquent / database overhead so the benchmarks measure the driver
+ * verification logic in isolation. Mutable properties so benchmarks can reset a
+ * factor's code, expiry, or secret between iterations without reconstructing
+ * the entire object.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -39,18 +39,43 @@ final class InMemoryFactor implements Factor
      * @return void
      */
     public function __construct(
+
+        /** Registered driver name (e.g. `'totp'`, `'backup_code'`). */
         public string $driver,
+
+        /** Factor identifier returned by `getFactorIdentifier()`. */
         public ?string $id = 'bench-factor',
+
+        /** Optional human-readable label. */
         public ?string $label = null,
+
+        /** Delivery destination for OTP drivers; null otherwise. */
         public ?string $recipient = null,
+
+        /** Stored secret / hash material the driver verifies against. */
         public ?string $secret = null,
+
+        /** Pending one-time code awaiting verification. */
         public ?string $code = null,
+
+        /** Expiry timestamp of the pending code. */
         public ?CarbonInterface $expiresAt = null,
+
+        /** Consecutive failed verification attempts. */
         public int $attempts = 0,
+
+        /** Lockout expiry after too many failed attempts. */
         public ?CarbonInterface $lockedUntil = null,
+
+        /** Timestamp of the most recent verification attempt. */
         public ?CarbonInterface $lastAttemptedAt = null,
+
+        /** Timestamp of the most recent successful verification. */
         public ?CarbonInterface $verifiedAt = null,
+
+        /** Owning authenticatable, if bound. */
         public ?Authenticatable $authenticatable = null,
+
     ) {}
 
     /**

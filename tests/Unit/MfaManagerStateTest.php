@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
@@ -35,6 +36,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * The shipped default driver should be `'totp'`.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testGetDefaultDriverReturnsTotp(): void
     {
@@ -48,6 +51,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * regardless of the bound policy.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testShouldUseReturnsFalseWhenNoIdentityResolved(): void
     {
@@ -59,6 +64,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * short-circuit `shouldUse()` to false.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testShouldUseReturnsFalseWhenIdentityIsNotMfaAuthenticatable(): void
     {
@@ -74,6 +81,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * `shouldUse()` return true without consulting the policy.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testShouldUseReturnsTrueWhenIdentityOptsIn(): void
     {
@@ -92,6 +101,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * externally, `shouldUse()` should still return true.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testShouldUseReturnsTrueWhenPolicyEnforces(): void
     {
@@ -118,6 +129,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * report `shouldUse()` as false.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testShouldUseReturnsFalseWhenNeitherIdentityNorPolicyEnforce(): void
     {
@@ -135,6 +148,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * Without an identity `isSetup()` must report false rather than throwing.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testIsSetupReturnsFalseWhenNoIdentity(): void
     {
@@ -146,6 +161,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * as false.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testIsSetupReturnsFalseWhenIdentityHasNoFactors(): void
     {
@@ -164,6 +181,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * true.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testIsSetupReturnsTrueWhenIdentityHasFactor(): void
     {
@@ -179,6 +198,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * cache rather than re-querying the database.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testIsSetupCachesResultBetweenCalls(): void
     {
@@ -200,6 +221,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * Without an identity `hasEverVerified()` must short-circuit to false.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasEverVerifiedReturnsFalseWhenNoIdentity(): void
     {
@@ -211,6 +234,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * `hasEverVerified()` must return false.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasEverVerifiedReturnsFalseWhenStoreReturnsNull(): void
     {
@@ -231,6 +256,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * `hasEverVerified()` must return true.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasEverVerifiedReturnsTrueWhenStoreReturnsTimestamp(): void
     {
@@ -240,7 +267,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->container()->instance(
             MfaVerificationStore::class,
-            $this->fixedStore(\Carbon\Carbon::now()->subMinute()),
+            $this->fixedStore(Carbon::now()->subMinute()),
         );
 
         self::assertTrue($this->manager()->hasEverVerified());
@@ -251,6 +278,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * collection.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testGetFactorsReturnsNullWhenNoIdentity(): void
     {
@@ -262,6 +291,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * factor models.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testGetFactorsReturnsCollectionOfFactors(): void
     {
@@ -281,6 +312,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * within the same request do not re-query the database.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testGetFactorsCachesCollectionBetweenCalls(): void
     {
@@ -308,6 +341,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      * through the no-throw outcome here.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testIsSetupCompletesForNonScalarAuthIdentifierWithoutThrowing(): void
     {

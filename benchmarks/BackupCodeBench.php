@@ -10,9 +10,8 @@ use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 /**
  * Hot-path benchmarks for backup-code verification.
  *
- * Uses an in-memory factor so the atomic-consume conditional UPDATE
- * is skipped; benchmarking disk roundtrips belongs in the
- * performance suite, not here.
+ * Uses an in-memory factor so the atomic-consume conditional UPDATE is skipped;
+ * benchmarking disk roundtrips belongs in the performance suite, not here.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -30,8 +29,8 @@ final class BackupCodeBench
     private string $plaintext = 'ABCDEFGHJK';
 
     /**
-     * Build the driver and reusable factor double once per benchmark
-     * subject lifetime.
+     * Build the driver and reusable factor double once per benchmark subject
+     * lifetime.
      *
      * @return void
      */
@@ -42,8 +41,8 @@ final class BackupCodeBench
     }
 
     /**
-     * Reset the factor's stored hash before each iteration so a hit
-     * benchmark does not leak state across revs.
+     * Reset the factor's stored hash before each iteration so a hit benchmark
+     * does not leak state across revs.
      *
      * @return void
      */

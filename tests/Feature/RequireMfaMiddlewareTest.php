@@ -5,10 +5,13 @@ declare(strict_types = 1);
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Support\FactorSummary;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Feature\Concerns\InteractsWithRequireMfaMiddleware;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
@@ -28,8 +31,7 @@ use Tests\TestCase;
  */
 final class RequireMfaMiddlewareTest extends TestCase
 {
-    use InteractsWithRequireMfaMiddleware;
-    use RefreshDatabase;
+    use InteractsWithRequireMfaMiddleware, RefreshDatabase;
 
     /** @var string Sentinel returned by the inner handler so a missed-throw shows up as a string assertion failure. */
     private const string NOT_REACHED = 'not reached';
@@ -39,6 +41,8 @@ final class RequireMfaMiddlewareTest extends TestCase
      * enforcement chain.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testPassesWhenMfaDisabled(): void
     {
@@ -56,6 +60,8 @@ final class RequireMfaMiddlewareTest extends TestCase
      * `MfaRequiredException` from the middleware.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testRaisesRequiredExceptionWhenNoFactors(): void
     {
@@ -70,10 +76,10 @@ final class RequireMfaMiddlewareTest extends TestCase
 
         try {
             $middleware = $this->container()->make(
-                \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
+                RequireMfa::class,
             );
             $middleware->handle(
-                $this->container()->make(\Illuminate\Http\Request::class),
+                $this->container()->make(Request::class),
                 static fn (): mixed => self::NOT_REACHED,
             );
 
@@ -90,6 +96,11 @@ final class RequireMfaMiddlewareTest extends TestCase
      * payload.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testRaisesRequiredExceptionWhenNeverVerified(): void
     {
@@ -97,10 +108,10 @@ final class RequireMfaMiddlewareTest extends TestCase
 
         try {
             $middleware = $this->container()->make(
-                \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
+                RequireMfa::class,
             );
             $middleware->handle(
-                $this->container()->make(\Illuminate\Http\Request::class),
+                $this->container()->make(Request::class),
                 static fn (): mixed => self::NOT_REACHED,
             );
 
@@ -122,6 +133,11 @@ final class RequireMfaMiddlewareTest extends TestCase
      * middleware must throw `MfaExpiredException`.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testRaisesExpiredExceptionWhenVerificationAgedOut(): void
     {
@@ -135,10 +151,10 @@ final class RequireMfaMiddlewareTest extends TestCase
 
         try {
             $middleware = $this->container()->make(
-                \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
+                RequireMfa::class,
             );
             $middleware->handle(
-                $this->container()->make(\Illuminate\Http\Request::class),
+                $this->container()->make(Request::class),
                 static fn (): mixed => self::NOT_REACHED,
             );
 
@@ -155,6 +171,8 @@ final class RequireMfaMiddlewareTest extends TestCase
      * middleware to the next handler regardless of MFA state.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSkipAttributeBypassesEnforcement(): void
     {
@@ -164,18 +182,18 @@ final class RequireMfaMiddlewareTest extends TestCase
         ]);
         $this->actingAs($user);
 
-        $request = $this->container()->make(\Illuminate\Http\Request::class);
+        $request = $this->container()->make(Request::class);
         $request->attributes->set('skip_mfa', true);
 
         $middleware = $this->container()->make(
-            \SineMacula\Laravel\Mfa\Middleware\RequireMfa::class,
+            RequireMfa::class,
         );
 
         $reached = false;
-        $middleware->handle($request, static function () use (&$reached): \Symfony\Component\HttpFoundation\Response {
+        $middleware->handle($request, static function () use (&$reached): Response {
             $reached = true;
 
-            return new \Symfony\Component\HttpFoundation\Response('ok');
+            return new Response('ok');
         });
 
         self::assertTrue($reached);

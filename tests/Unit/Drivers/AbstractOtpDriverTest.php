@@ -159,8 +159,8 @@ final class AbstractOtpDriverTest extends TestCase
 
         $factor->refresh();
 
-        // Nothing was persisted — the model was never saved after the
-        // throwing dispatch.
+        // Nothing was persisted — the model was never saved after the throwing
+        // dispatch.
         self::assertNull($factor->getCode());
         self::assertNull($factor->getExpiresAt());
     }
@@ -202,7 +202,7 @@ final class AbstractOtpDriverTest extends TestCase
     {
         $driver = $this->makeDriver();
         $factor = $this->makeStubFactor(
-            code: self::STORED_CODE,
+            code   : self::STORED_CODE,
             expires: Carbon::now()->subMinute(),
         );
 
@@ -219,7 +219,7 @@ final class AbstractOtpDriverTest extends TestCase
     {
         $driver = $this->makeDriver();
         $factor = $this->makeStubFactor(
-            code: self::MATCHING_CODE,
+            code   : self::MATCHING_CODE,
             expires: Carbon::now()->addMinutes(5),
         );
 
@@ -236,7 +236,7 @@ final class AbstractOtpDriverTest extends TestCase
     {
         $driver = $this->makeDriver();
         $factor = $this->makeStubFactor(
-            code: self::MATCHING_CODE,
+            code   : self::MATCHING_CODE,
             expires: Carbon::now()->addMinutes(5),
         );
 
@@ -302,9 +302,9 @@ final class AbstractOtpDriverTest extends TestCase
     public function testConstructorRejectsEmptyAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        // Asserting the distinguishing suffix (not just the shared
-        // prefix) so a future refactor that swaps the two branch
-        // strings cannot silently flip the diagnostic.
+        // Asserting the distinguishing suffix (not just the shared prefix) so a
+        // future refactor that swaps the two branch strings cannot silently
+        // flip the diagnostic.
         $this->expectExceptionMessage('received an empty string.');
 
         $this->makeDriver(alphabet: '');

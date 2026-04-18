@@ -7,6 +7,8 @@ namespace Tests\Integration;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Sanctum\Sanctum;
+use Laravel\Sanctum\SanctumServiceProvider;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Guards\GenericUserGuard;
@@ -20,12 +22,11 @@ use Tests\TestCase;
  *
  * Three guards are exercised:
  *
- *   1. The default session guard (SessionGuard via the testbench
- *      bootstrap).
- *   2. A token-style stateless guard (the same lookup path Sanctum
- *      / Passport take when they bind a user).
- *   3. A custom in-memory guard built on `Illuminate\Contracts\Auth\Guard`
- *      that hands back a fixture identity directly.
+ *   1. The default session guard (SessionGuard via the testbench bootstrap).
+ *   2. A token-style stateless guard (the same lookup path Sanctum / Passport
+ *      take when they bind a user).
+ *   3. A custom in-memory guard built on `Illuminate\Contracts\Auth\Guard` that
+ *      hands back a fixture identity directly.
  *
  * Each guard authenticates a user, then asks the MFA manager to verify setup
  * state, run a TOTP verification, and report `hasEverVerified()`.
@@ -44,6 +45,8 @@ final class MultiAuthStackTest extends TestCase
      * identity and surface its persisted factors.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSessionGuardSeesIdentityAndFactors(): void
     {
@@ -61,6 +64,8 @@ final class MultiAuthStackTest extends TestCase
      * the manager must surface the same setup state and factor collection.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testTokenStyleGuardSeesIdentityAndFactors(): void
     {
@@ -71,9 +76,9 @@ final class MultiAuthStackTest extends TestCase
 
         $user = $this->enrolUser('token@example.test');
 
-        // Mimic what Sanctum / Passport do: register a guard whose
-        // resolver hands back a real Eloquent identity — the MFA
-        // manager reads through the default guard, so swap it out.
+        // Mimic what Sanctum / Passport do: register a guard whose resolver
+        // hands back a real Eloquent identity — the MFA manager reads through
+        // the default guard, so swap it out.
         Auth::extend('token', static fn (): Guard => new StaticUserGuard($user));
 
         config()->set('auth.defaults.guard', 'token');
@@ -92,13 +97,15 @@ final class MultiAuthStackTest extends TestCase
      * throughout.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testCustomAuthenticatableGuardWithoutEloquentBindsCorrectly(): void
     {
-        // Custom guard that hands back a non-Eloquent Authenticatable.
-        // The package should treat it as a non-MFA-capable identity
-        // (`shouldUse()` returns false) — proving the manager does not
-        // assume Eloquent throughout the orchestration surface.
+        // Custom guard that hands back a non-Eloquent Authenticatable. The
+        // package should treat it as a non-MFA-capable identity (`shouldUse()`
+        // returns false) — proving the manager does not assume Eloquent
+        // throughout the orchestration surface.
         Auth::extend('custom', static fn (): Guard => new GenericUserGuard);
 
         config()->set('auth.guards.custom', [
@@ -109,8 +116,8 @@ final class MultiAuthStackTest extends TestCase
         $this->container()->forgetInstance('mfa');
         Mfa::clearCache();
 
-        // GenericUser does not implement MultiFactorAuthenticatable, so
-        // the manager must short-circuit cleanly rather than throw.
+        // GenericUser does not implement MultiFactorAuthenticatable, so the
+        // manager must short-circuit cleanly rather than throw.
         self::assertFalse(Mfa::shouldUse());
         self::assertFalse(Mfa::isSetup());
         self::assertNull(Mfa::getFactors());
@@ -123,17 +130,19 @@ final class MultiAuthStackTest extends TestCase
      * on Sanctum-specific wiring.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSanctumGuardSeesIdentityAndFactors(): void
     {
         $user = $this->enrolUser('sanctum@example.test');
 
-        // Register Sanctum's auth driver inside this test so the
-        // package's standalone-auth-stack story is exercised against
-        // the real `auth:sanctum` driver — not just a hand-rolled
-        // token-style guard. Mirrors the wiring a consumer would do
-        // via auth.php when adding Sanctum to an existing app.
-        (new \Laravel\Sanctum\SanctumServiceProvider($this->container()))->boot();
+        // Register Sanctum's auth driver inside this test so the package's
+        // standalone-auth-stack story is exercised against the real
+        // `auth:sanctum` driver — not just a hand-rolled token-style guard.
+        // Mirrors the wiring a consumer would do via auth.php when adding
+        // Sanctum to an existing app.
+        (new SanctumServiceProvider($this->container()))->boot();
 
         config()->set('auth.guards.sanctum', [
             'driver'   => 'sanctum',
@@ -145,12 +154,11 @@ final class MultiAuthStackTest extends TestCase
         Auth::forgetGuards();
         Mfa::clearCache();
 
-        // Sanctum::actingAs() handles the rest: it stamps the user as
-        // resolved through the sanctum guard with a TransientToken
-        // (no DB write needed for this test), so subsequent Auth::user()
-        // calls under the `sanctum` guard return our MFA-capable
-        // identity.
-        \Laravel\Sanctum\Sanctum::actingAs($user, ['*']);
+        // Sanctum::actingAs() handles the rest: it stamps the user as resolved
+        // through the sanctum guard with a TransientToken (no DB write needed
+        // for this test), so subsequent Auth::user() calls under the `sanctum`
+        // guard return our MFA-capable identity.
+        Sanctum::actingAs($user, ['*']);
 
         self::assertTrue(Mfa::shouldUse());
         self::assertTrue(Mfa::isSetup());

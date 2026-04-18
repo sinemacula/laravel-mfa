@@ -167,8 +167,8 @@ final class FactorSummaryTest extends TestCase
     {
         $summary = $this->buildSummaryWithRecipient('a@example.com');
 
-        // Local-part length 1 → keep min(2, max(1, floor(1/2))) = 1 char →
-        // `a` + at least one `*` → `a*@example.com`.
+        // Local-part length 1 → keep min(2, max(1, floor(1/2))) = 1 char → `a`
+        // + at least one `*` → `a*@example.com`.
         self::assertSame('a*@example.com', $summary->maskedRecipient);
     }
 
@@ -181,8 +181,8 @@ final class FactorSummaryTest extends TestCase
     {
         $summary = $this->buildSummaryWithRecipient('ab@example.com');
 
-        // Local-part length 2 → keep min(2, max(1, floor(2/2))) = 1 char →
-        // `a` + `*` → `a*@example.com`.
+        // Local-part length 2 → keep min(2, max(1, floor(2/2))) = 1 char → `a`
+        // + `*` → `a*@example.com`.
         self::assertSame('a*@example.com', $summary->maskedRecipient);
     }
 
@@ -228,8 +228,8 @@ final class FactorSummaryTest extends TestCase
     {
         $summary = $this->buildSummaryWithRecipient('foobar@example.com');
 
-        // Local-part length 6 → min(2, floor(6/2)) = min(2, 3) = 2 →
-        // `fo` + `****` → `fo****@example.com`.
+        // Local-part length 6 → min(2, floor(6/2)) = min(2, 3) = 2 → `fo` +
+        // `****` → `fo****@example.com`.
         self::assertSame('fo****@example.com', $summary->maskedRecipient);
     }
 
@@ -307,11 +307,11 @@ final class FactorSummaryTest extends TestCase
         $verifiedAt = Carbon::parse(self::VERIFIED_AT_ISO);
 
         $summary = new FactorSummary(
-            id: '01H',
-            driver: 'email',
-            label: 'Primary',
+            id             : '01H',
+            driver         : 'email',
+            label          : 'Primary',
             maskedRecipient: self::SAMPLE_MASKED_EMAIL,
-            verifiedAt: $verifiedAt,
+            verifiedAt     : $verifiedAt,
         );
 
         self::assertSame([
@@ -331,11 +331,11 @@ final class FactorSummaryTest extends TestCase
     public function testJsonSerializeShapeWithNullFields(): void
     {
         $summary = new FactorSummary(
-            id: '01H',
-            driver: 'totp',
-            label: null,
+            id             : '01H',
+            driver         : 'totp',
+            label          : null,
             maskedRecipient: null,
-            verifiedAt: null,
+            verifiedAt     : null,
         );
 
         self::assertSame([
@@ -355,11 +355,11 @@ final class FactorSummaryTest extends TestCase
     public function testJsonEncodesViaJsonSerializable(): void
     {
         $summary = new FactorSummary(
-            id: '01H',
-            driver: 'totp',
-            label: null,
+            id             : '01H',
+            driver         : 'totp',
+            label          : null,
             maskedRecipient: null,
-            verifiedAt: null,
+            verifiedAt     : null,
         );
 
         self::assertJsonStringEqualsJsonString(

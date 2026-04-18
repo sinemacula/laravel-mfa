@@ -23,6 +23,8 @@ final class SanityTest extends TestCase
      * registered by the service provider.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testManagerResolvesFromContainer(): void
     {
@@ -36,6 +38,8 @@ final class SanityTest extends TestCase
      * is configured.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testDefaultDriverIsTotp(): void
     {

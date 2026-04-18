@@ -4,8 +4,10 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
+use Illuminate\Contracts\Mail\Mailer;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use PHPUnit\Framework\TestCase;
+use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
@@ -48,11 +50,8 @@ final class DefaultsTest extends TestCase
              * @param  string  $code
              * @return void
              */
-            protected function dispatch(
-                \SineMacula\Laravel\Mfa\Contracts\EloquentFactor $factor,
-                #[\SensitiveParameter]
-                string $code,
-            ): void {
+            protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void
+            {
                 // Intentionally empty — see method docblock.
             }
         };
@@ -73,7 +72,7 @@ final class DefaultsTest extends TestCase
     public function testEmailDriverDefaults(): void
     {
         /** @var \Illuminate\Contracts\Mail\Mailer&\Mockery\MockInterface $mailer */
-        $mailer = \Mockery::mock(\Illuminate\Contracts\Mail\Mailer::class);
+        $mailer = \Mockery::mock(Mailer::class);
 
         $driver = new EmailDriver(mailer: $mailer);
 
@@ -127,6 +126,8 @@ final class DefaultsTest extends TestCase
      * getter.
      *
      * @return void
+     *
+     * @throws \ReflectionException
      */
     public function testTotpDriverDefaultsWindowToOne(): void
     {
@@ -134,12 +135,11 @@ final class DefaultsTest extends TestCase
 
         $property = new \ReflectionProperty($driver, 'window');
 
-        // Reflection on the private `window` property is the only way
-        // to observe the constructor default value — the driver does
-        // not expose a public getter, and we explicitly do NOT want a
-        // behavioural test here that would cross into Google2FA's
-        // verifyKey window logic (covered in its own dependency tests).
-        // @SuppressWarnings("php:S3011")
+        // Reflection on the private `window` property is the only way to
+        // observe the constructor default value — the driver does not expose a
+        // public getter, and we explicitly do NOT want a behavioural test here
+        // that would cross into Google2FA's verifyKey window logic (covered in
+        // its own dependency tests). @SuppressWarnings("php:S3011")
         self::assertSame(1, $property->getValue($driver));
     }
 }

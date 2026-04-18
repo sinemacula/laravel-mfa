@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Concerns;
 
 use Carbon\Carbon;
+use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -43,11 +44,13 @@ trait InteractsWithMfaManagerState
      * Resolve the package's MFA manager instance from the container.
      *
      * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     protected function manager(): MfaManager
     {
         $manager = $this->container()->make('mfa');
-        \PHPUnit\Framework\Assert::assertInstanceOf(MfaManager::class, $manager);
+        Assert::assertInstanceOf(MfaManager::class, $manager);
 
         return $manager;
     }

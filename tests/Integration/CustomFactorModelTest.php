@@ -35,11 +35,13 @@ final class CustomFactorModelTest extends TestCase
      * default behaviour.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testReturnsShippedFactorModelByDefault(): void
     {
-        // A null value (env var unset, key cleared) must fall back to
-        // the shipped model — matches a fresh install with no override.
+        // A null value (env var unset, key cleared) must fall back to the
+        // shipped model — matches a fresh install with no override.
         config()->set('mfa.factor.model', null);
 
         self::assertSame(Factor::class, Mfa::factorModel());
@@ -50,6 +52,8 @@ final class CustomFactorModelTest extends TestCase
      * `EloquentFactor` contract returns the configured class.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testReturnsConfiguredCustomFactorModel(): void
     {
@@ -66,6 +70,8 @@ final class CustomFactorModelTest extends TestCase
      * package writes through.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testConfiguredModelInstanceSatisfiesEloquentFactorContract(): void
     {
@@ -83,6 +89,8 @@ final class CustomFactorModelTest extends TestCase
      * flowing through to a `class_exists` call that would emit a soft warning.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testRejectsNonStringConfigValue(): void
     {
@@ -99,6 +107,8 @@ final class CustomFactorModelTest extends TestCase
      * cleared" but is never a valid model class.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testRejectsEmptyStringConfigValue(): void
     {
@@ -116,6 +126,8 @@ final class CustomFactorModelTest extends TestCase
      * resulting stack trace.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testRejectsNonExistentClass(): void
     {
@@ -134,6 +146,8 @@ final class CustomFactorModelTest extends TestCase
      * boot.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testRejectsClassThatDoesNotImplementEloquentFactor(): void
     {

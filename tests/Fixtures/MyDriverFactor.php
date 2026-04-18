@@ -16,6 +16,8 @@ namespace Tests\Fixtures;
 final class MyDriverFactor extends AbstractFactorStub
 {
     /**
+     * Return the fixture's fixed factor identifier.
+     *
      * @return mixed
      */
     public function getFactorIdentifier(): mixed
@@ -24,6 +26,8 @@ final class MyDriverFactor extends AbstractFactorStub
     }
 
     /**
+     * Return the fixture's custom driver name.
+     *
      * @return string
      */
     public function getDriver(): string

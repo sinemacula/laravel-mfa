@@ -58,8 +58,8 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
     }
 
     /**
-     * Determine whether the user has at least one enrolled factor —
-     * matches the canonical rule documented on the
+     * Determine whether the user has at least one enrolled factor — matches the
+     * canonical rule documented on the
      * `MultiFactorAuthenticatable::isMfaEnabled()` contract.
      *
      * @return bool
@@ -96,6 +96,22 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
     }
 
     /**
+     * Wrap the dynamic count() call so PHPStan does not flag it as a dynamic
+     * call to a static method.
+     *
+     * @formatter:off
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>  $builder
+     * @return int
+     *
+     * @formatter:on
+     */
+    private static function countFactors(Builder $builder): int
+    {
+        return $builder->toBase()->count();
+    }
+
+    /**
      * Re-present the morph-relation builder under the intersection type
      * required by the `MultiFactorAuthenticatable` contract. The shipped Factor
      * model IS both an Eloquent Model and the Factor contract, so the cast is
@@ -116,21 +132,5 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
 
         /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> $builder */
         return $builder;
-    }
-
-    /**
-     * Wrap the dynamic count() call so PHPStan does not flag it as a dynamic
-     * call to a static method.
-     *
-     * @formatter:off
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>  $builder
-     * @return int
-     *
-     * @formatter:on
-     */
-    private static function countFactors(Builder $builder): int
-    {
-        return $builder->toBase()->count();
     }
 }

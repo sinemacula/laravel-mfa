@@ -40,16 +40,17 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      */
     public function authenticatable(): MorphTo
     {
-        // Wrapping the throw in a `match` keeps the `return`
-        // syntactically present so CodeSniffer's `InvalidNoReturn`
-        // does not flag the @return tag, even though the function is
-        // logically `never`-returning.
+        // Wrapping the throw in a `match` keeps the `return` syntactically
+        // present so CodeSniffer's `InvalidNoReturn` does not flag the @return
+        // tag, even though the function is logically `never`-returning.
         return match (true) {
             default => throw new UnsupportedFixtureMethodException('authenticatable() is unsupported on this stub fixture; override it in the subclass if your test needs it.'),
         };
     }
 
     /**
+     * Return the conventional driver column name.
+     *
      * @return string
      */
     public function getDriverName(): string
@@ -58,6 +59,8 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Return the conventional label column name.
+     *
      * @return string
      */
     public function getLabelName(): string
@@ -66,6 +69,8 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Return the conventional recipient column name.
+     *
      * @return string
      */
     public function getRecipientName(): string
@@ -74,6 +79,8 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Return the conventional secret column name.
+     *
      * @return string
      */
     public function getSecretName(): string
@@ -82,6 +89,8 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Return the conventional code column name.
+     *
      * @return string
      */
     public function getCodeName(): string
@@ -90,6 +99,8 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Return the conventional expires-at column name.
+     *
      * @return string
      */
     public function getExpiresAtName(): string
@@ -98,6 +109,8 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Return the conventional attempts column name.
+     *
      * @return string
      */
     public function getAttemptsName(): string
@@ -106,6 +119,8 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Return the conventional locked-until column name.
+     *
      * @return string
      */
     public function getLockedUntilName(): string
@@ -114,6 +129,8 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Return the conventional last-attempted-at column name.
+     *
      * @return string
      */
     public function getLastAttemptedAtName(): string
@@ -122,6 +139,8 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Return the conventional verified-at column name.
+     *
      * @return string
      */
     public function getVerifiedAtName(): string

@@ -32,6 +32,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * Without an identity verification is always treated as expired.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredReturnsTrueWhenNoIdentity(): void
     {
@@ -43,6 +45,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * expired so the consumer is forced to verify.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredReturnsTrueWhenNoPriorVerification(): void
     {
@@ -63,6 +67,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * `mfa.default_expiry` value.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredUsesConfiguredDefaultExpiryWhenParameterOmitted(): void
     {
@@ -86,6 +92,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * valid.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredReturnsFalseForRecentVerificationWithExplicitExpiry(): void
     {
@@ -106,6 +114,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * verification.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredReturnsTrueWhenExplicitExpiryIsZero(): void
     {
@@ -125,6 +135,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * A negative explicit expiry must be treated identically to zero.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredReturnsTrueWhenExplicitExpiryIsNegative(): void
     {
@@ -145,6 +157,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * defence and treated as expired.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredReturnsTrueForFutureDatedVerification(): void
     {
@@ -152,8 +166,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        // Clock-skew defence: a store that reports a verification in
-        // the future should not be trusted as "still valid".
+        // Clock-skew defence: a store that reports a verification in the future
+        // should not be trusted as "still valid".
         $this->container()->instance(
             MfaVerificationStore::class,
             $this->fixedStore(Carbon::now()->addMinutes(30)),
@@ -167,6 +181,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * expire.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredReturnsTrueWhenElapsedExceedsExpiry(): void
     {
@@ -188,6 +204,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * the inclusive boundary so a regression to `>=` is caught.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredReturnsFalseAtExactWindowBoundary(): void
     {
@@ -195,9 +213,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        // Freeze the clock so the elapsed minutes are exactly the
-        // window — no rounding noise from the wall clock advancing
-        // mid-test.
+        // Freeze the clock so the elapsed minutes are exactly the window — no
+        // rounding noise from the wall clock advancing mid-test.
         $this->travelTo(Carbon::parse('2026-01-01T12:00:00Z'));
 
         $this->container()->instance(
@@ -219,6 +236,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * sides.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredReturnsTrueOneMinuteAfterWindowBoundary(): void
     {
@@ -246,6 +265,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * zero, expiring any prior verification.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredDefaultsToFallbackExpiryWhenConfigIsNonNumeric(): void
     {
@@ -262,8 +283,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
         );
 
         // A non-numeric config falls back to 0 via the manager's
-        // `resolveIntConfig()` defence (with `malformedFallback: 0`),
-        // meaning any prior verification is treated as expired.
+        // `resolveIntConfig()` defence (with `malformedFallback: 0`), meaning
+        // any prior verification is treated as expired.
         self::assertTrue($this->manager()->hasExpired());
     }
 
@@ -272,6 +293,8 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
      * an int and respected.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testHasExpiredCoercesNumericStringConfigToInt(): void
     {

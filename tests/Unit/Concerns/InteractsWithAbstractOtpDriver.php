@@ -189,6 +189,8 @@ trait InteractsWithAbstractOtpDriver
             ) {}
 
             /**
+             * Return the seeded pending code.
+             *
              * @return ?string
              */
             public function getCode(): ?string
@@ -197,6 +199,8 @@ trait InteractsWithAbstractOtpDriver
             }
 
             /**
+             * Return the seeded code expiry.
+             *
              * @return ?\Carbon\CarbonInterface
              */
             public function getExpiresAt(): ?CarbonInterface

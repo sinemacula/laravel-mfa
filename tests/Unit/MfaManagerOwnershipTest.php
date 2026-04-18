@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Illuminate\Support\Facades\Event;
+use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
@@ -58,6 +59,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * do not point at the currently authenticated identity.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyRejectsEloquentFactorOwnedByDifferentIdentity(): void
     {
@@ -87,6 +90,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * invoke the driver's `issueChallenge()`.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testChallengeRejectsEloquentFactorOwnedByDifferentIdentity(): void
     {
@@ -115,6 +120,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * the underlying row.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testDisableRejectsEloquentFactorOwnedByDifferentIdentity(): void
     {
@@ -138,6 +145,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * Test enrol overwrites caller-supplied morph_id with current identity.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnrolOverwritesCallerSuppliedMorphId(): void
     {
@@ -154,6 +163,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * Test enrol overwrites caller-supplied morph_type with current identity.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnrolOverwritesCallerSuppliedMorphType(): void
     {
@@ -171,6 +182,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * columns.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnrolDispatchesEnrolledEventWhenCallerSpoofsMorphColumns(): void
     {
@@ -189,6 +202,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * factor was issued for the current identity.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyRejectsNonEloquentFactorWithUnknownOwner(): void
     {
@@ -213,6 +228,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * even when the FQCN matches but the identifier does not.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyRejectsNonEloquentFactorOwnedByDifferentIdentifier(): void
     {
@@ -241,6 +258,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * ownership has to already match.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnrolRejectsExistingRowOwnedByDifferentIdentity(): void
     {
@@ -257,10 +276,10 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
         } finally {
             $victimsFactor->refresh();
 
-            // The existing row must be untouched — morph columns still
-            // point at the original victim. Both users share a class
-            // (TestUser), so the diagnostic value is that the row's
-            // foreign key is the victim's id, not the attacker's.
+            // The existing row must be untouched — morph columns still point at
+            // the original victim. Both users share a class (TestUser), so the
+            // diagnostic value is that the row's foreign key is the victim's
+            // id, not the attacker's.
             self::assertSame((string) $victim->id, $victimsFactor->authenticatable_id);
             self::assertSame($victim::class, $victimsFactor->authenticatable_type);
 
@@ -275,6 +294,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * single boundary, not three.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnrolRejectsNonEloquentFactorOwnedByDifferentIdentity(): void
     {
@@ -309,6 +330,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * but the cache invalidation and lifecycle event MUST still fire.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnrolAcceptsNonEloquentFactorOwnedByCurrentIdentity(): void
     {
@@ -334,14 +357,16 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * are distinct identities even when their primary keys collide.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyRejectsNonEloquentFactorOwnedByDifferentClassWithSameIdentifier(): void
     {
         $primary = TestUser::query()->create(['email' => 'primary@example.test']);
 
-        // Force the secondary identity onto the same primary-key value
-        // so the only difference is the FQCN — proving the manager
-        // distinguishes by class, not just ID.
+        // Force the secondary identity onto the same primary-key value so the
+        // only difference is the FQCN — proving the manager distinguishes by
+        // class, not just ID.
         $secondary = SecondaryUser::query()->create(['email' => 'secondary@example.test']);
         $secondary->forceFill(['id' => $primary->getKey()])->saveQuietly();
         $secondary->refresh();
@@ -358,37 +383,6 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
         $this->expectException(FactorOwnershipMismatchException::class);
 
         $this->manager()->verify('totp', $factor, self::WRONG_CODE);
-    }
-
-    /**
-     * Stage a cross-account enrol hijack attempt: the attacker is
-     * authenticated, but the supplied factor's morph columns point at the
-     * victim. Returns the attacker and the spoofed factor for the assertions to
-     * observe.
-     *
-     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
-     */
-    private function stageEnrolHijackAttempt(): array
-    {
-        $victim = TestUser::query()->create([
-            'email'       => 'enrol-victim@example.test',
-            'mfa_enabled' => true,
-        ]);
-
-        $attacker = TestUser::query()->create([
-            'email'       => 'enrol-attacker@example.test',
-            'mfa_enabled' => true,
-        ]);
-
-        $this->actingAs($attacker);
-
-        $factor                       = new Factor;
-        $factor->driver               = 'totp';
-        $factor->secret               = 'JBSWY3DPEHPK3PXP';
-        $factor->authenticatable_type = $victim::class;
-        $factor->authenticatable_id   = (string) $victim->id;
-
-        return [$attacker, $factor];
     }
 
     /**
@@ -437,12 +431,45 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * Resolve the package's MFA manager from the container.
      *
      * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     private function manager(): MfaManager
     {
         $manager = $this->container()->make('mfa');
-        \PHPUnit\Framework\Assert::assertInstanceOf(MfaManager::class, $manager);
+        Assert::assertInstanceOf(MfaManager::class, $manager);
 
         return $manager;
+    }
+
+    /**
+     * Stage a cross-account enrol hijack attempt: the attacker is
+     * authenticated, but the supplied factor's morph columns point at the
+     * victim. Returns the attacker and the spoofed factor for the assertions to
+     * observe.
+     *
+     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
+     */
+    private function stageEnrolHijackAttempt(): array
+    {
+        $victim = TestUser::query()->create([
+            'email'       => 'enrol-victim@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        $attacker = TestUser::query()->create([
+            'email'       => 'enrol-attacker@example.test',
+            'mfa_enabled' => true,
+        ]);
+
+        $this->actingAs($attacker);
+
+        $factor                       = new Factor;
+        $factor->driver               = 'totp';
+        $factor->secret               = 'JBSWY3DPEHPK3PXP';
+        $factor->authenticatable_type = $victim::class;
+        $factor->authenticatable_id   = (string) $victim->id;
+
+        return [$attacker, $factor];
     }
 }
