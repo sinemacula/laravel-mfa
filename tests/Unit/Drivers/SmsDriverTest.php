@@ -6,6 +6,7 @@ namespace Tests\Unit\Drivers;
 
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
 use SineMacula\Laravel\Mfa\Gateways\FakeSmsGateway;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
@@ -184,7 +185,7 @@ final class SmsDriverTest extends TestCase
      */
     public function testConstructorRejectsTemplateMissingCodePlaceholder(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidDriverConfigurationException::class);
         $this->expectExceptionMessage(':code placeholder');
 
         // Hand the constructor call to a callable so the instantiation is

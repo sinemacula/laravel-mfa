@@ -142,6 +142,23 @@ class AppUser extends User implements MultiFactorAuthenticatable
 Canonical rule: `isMfaEnabled()` means "has at least one enrolled factor". Per-request verification freshness
 lives separately on `Mfa::hasExpired()` / the verification store, so keep the two predicates orthogonal.
 
+> **Consumed backup codes.** A spent backup-code row keeps its `Factor` record — only the `secret` is
+> nulled — so an audit trail survives. If backup codes are the only factor type a user might hold, filter
+> spent rows out of `isMfaEnabled()` so a user who has consumed every recovery code does not read as
+> "enabled" despite holding no usable credential:
+>
+> ```php
+> public function isMfaEnabled(): bool
+> {
+>     return $this->authFactors()
+>         ->where(function ($query) {
+>             $query->where('driver', '!=', 'backup_code')
+>                 ->orWhereNotNull('secret');
+>         })
+>         ->exists();
+> }
+> ```
+
 ## Usage
 
 The `Mfa` facade is the primary surface. The manager orchestrates drivers, enforces factor ownership, handles

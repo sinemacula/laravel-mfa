@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 
 /**
@@ -34,6 +35,12 @@ abstract class AbstractOtpDriver implements FactorDriver
     /**
      * Constructor.
      *
+     * `$codeLength`, `$expiry`, and `$maxAttempts` are validated at construction
+     * time so deployment-time misconfigurations surface in the stack trace
+     * rather than as a broken user flow. `$codeLength` and `$expiry` must be at
+     * least 1; `$maxAttempts` must be non-negative (0 is the documented
+     * "lockout disabled" value).
+     *
      * `$alphabet` controls the `generateCode()` character set: `null` keeps
      * numeric zero-padded codes; a non-null string picks uniformly from it.
      * Empty / single-character alphabets are rejected so misconfigurations
@@ -49,7 +56,7 @@ abstract class AbstractOtpDriver implements FactorDriver
      * @param  ?string  $alphabet
      * @param  ?callable(int, int): int  $randomInt
      *
-     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
      */
     public function __construct(
 
@@ -69,11 +76,10 @@ abstract class AbstractOtpDriver implements FactorDriver
         ?callable $randomInt = null,
 
     ) {
-        if ($alphabet !== null && strlen($alphabet) < 2) {
-            $detail = $alphabet === '' ? 'an empty string' : 'a single character';
-
-            throw new \InvalidArgumentException('OTP alphabet must contain at least two characters; received ' . $detail . '.');
-        }
+        $this->assertValidCodeLength($codeLength);
+        $this->assertValidExpiry($expiry);
+        $this->assertValidMaxAttempts($maxAttempts);
+        $this->assertValidAlphabet($alphabet);
 
         $this->randomInt = $randomInt ?? random_int(...);
     }
@@ -235,5 +241,71 @@ abstract class AbstractOtpDriver implements FactorDriver
         }
 
         return $code;
+    }
+
+    /**
+     * Reject code lengths below 1 — the numeric path would otherwise mint a
+     * one-character `"0"` code and the alphabet path an empty string.
+     *
+     * @param  int  $codeLength
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     */
+    private function assertValidCodeLength(int $codeLength): void
+    {
+        if ($codeLength < 1) {
+            throw InvalidDriverConfigurationException::codeLengthTooSmall('OTP code length', $codeLength);
+        }
+    }
+
+    /**
+     * Reject expiry windows below 1 minute — any issued code would otherwise
+     * be "expired" on arrival.
+     *
+     * @param  int  $expiry
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     */
+    private function assertValidExpiry(int $expiry): void
+    {
+        if ($expiry < 1) {
+            throw InvalidDriverConfigurationException::expiryTooSmall('OTP expiry', $expiry);
+        }
+    }
+
+    /**
+     * Reject negative `maxAttempts` — the manager's `>=` lockout threshold
+     * would never match, silently disabling the lockout.
+     *
+     * @param  int  $maxAttempts
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     */
+    private function assertValidMaxAttempts(int $maxAttempts): void
+    {
+        if ($maxAttempts < 0) {
+            throw InvalidDriverConfigurationException::negativeMaxAttempts('OTP max attempts', $maxAttempts);
+        }
+    }
+
+    /**
+     * Reject alphabets with fewer than two characters — a single-character
+     * alphabet mints zero-entropy codes; an empty alphabet explodes inside
+     * `random_int(0, -1)`. `null` is the documented "use the default numeric
+     * set" signal and bypasses the check.
+     *
+     * @param  ?string  $alphabet
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     */
+    private function assertValidAlphabet(?string $alphabet): void
+    {
+        if ($alphabet !== null && strlen($alphabet) < 2) {
+            throw InvalidDriverConfigurationException::alphabetTooShort('OTP alphabet', $alphabet);
+        }
     }
 }

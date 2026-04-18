@@ -47,6 +47,16 @@ interface MultiFactorAuthenticatable extends Authenticatable
      * The shipped `Mfa::isSetup()` caches and reports whatever this method
      * returns.
      *
+     * Spent backup-code rows: a consumed backup-code factor is marked spent
+     * by nulling its `secret` column, but the row itself is kept for audit
+     * purposes. Implementations whose product treats backup codes as a
+     * standalone usable factor (rather than strictly a recovery path behind a
+     * stronger primary) SHOULD exclude consumed rows from this predicate
+     * — `authFactors()->where(fn ($q) => $q->whereNotNull('secret')
+     * ->orWhere('driver', '!=', 'backup_code'))->exists()` is the canonical
+     * shape. Without that filter a user who has consumed every recovery code
+     * will still read as "enabled" despite holding no usable credential.
+     *
      * @return bool
      */
     public function isMfaEnabled(): bool;

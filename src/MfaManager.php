@@ -24,6 +24,7 @@ use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
+use SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException;
 use SineMacula\Laravel\Mfa\Models\Factor as ShippedFactorModel;
@@ -262,13 +263,18 @@ class MfaManager extends Manager
      *
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account
-     * factor-tampering primitive.
+     * factor-tampering primitive. Throws `FactorDriverMismatchException` when
+     * the requested driver name does not match the factor's own
+     * `getDriver()` — routing one driver's logic through a factor registered
+     * against another is always a caller bug.
      *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
      */
     public function challenge(string $driver, Factor $factor): void
     {
@@ -278,6 +284,7 @@ class MfaManager extends Manager
             return;
         }
 
+        $this->assertDriverMatchesFactor($driver, $factor);
         $this->assertFactorOwnership($factor, $identity);
 
         // OTP-issuing drivers (email, SMS) reset the attempt counter and
@@ -311,7 +318,11 @@ class MfaManager extends Manager
      *
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account MFA-bypass
-     * primitive.
+     * primitive. Throws `FactorDriverMismatchException` when the requested
+     * driver name does not match the factor's own `getDriver()` — routing
+     * one driver's logic through a factor registered against another is
+     * always a caller bug and would otherwise produce confusing persistence,
+     * transport, and audit-event semantics.
      *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -319,6 +330,8 @@ class MfaManager extends Manager
      * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
      */
     public function verify(string $driver, Factor $factor, #[\SensitiveParameter] string $code): bool
     {
@@ -328,6 +341,7 @@ class MfaManager extends Manager
             return false;
         }
 
+        $this->assertDriverMatchesFactor($driver, $factor);
         $this->assertFactorOwnership($factor, $identity);
 
         $events = $this->container->make(Dispatcher::class);
@@ -680,6 +694,29 @@ class MfaManager extends Manager
         return is_numeric($value)
             ? (int) $value
             : ($malformedFallback ?? $default);
+    }
+
+    /**
+     * Verify that the requested driver name matches the factor's own
+     * `getDriver()`.
+     *
+     * Routing one driver's logic through a factor that was registered against
+     * another is a caller bug: it does not bypass ownership (that check still
+     * runs) but it would produce confusing persistence, transport, and
+     * audit-event semantics — for example verifying an email-factor row with
+     * the TOTP driver. Fail loudly so the mistake cannot hide.
+     *
+     * @param  string  $driver
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
+     */
+    private function assertDriverMatchesFactor(string $driver, Factor $factor): void
+    {
+        if ($driver !== $factor->getDriver()) {
+            throw FactorDriverMismatchException::for($driver, $factor);
+        }
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Drivers;
 
 use Carbon\Carbon;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use Tests\TestCase;
 use Tests\Unit\Concerns\InteractsWithAbstractOtpDriver;
@@ -294,14 +295,14 @@ final class AbstractOtpDriverTest extends TestCase
 
     /**
      * The constructor must reject an empty alphabet with a clear
-     * `InvalidArgumentException` carrying the distinguishing "received an empty
-     * string." suffix.
+     * `InvalidDriverConfigurationException` carrying the distinguishing
+     * "received an empty string." suffix.
      *
      * @return void
      */
     public function testConstructorRejectsEmptyAlphabet(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidDriverConfigurationException::class);
         // Asserting the distinguishing suffix (not just the shared prefix) so a
         // future refactor that swaps the two branch strings cannot silently
         // flip the diagnostic.
@@ -312,14 +313,14 @@ final class AbstractOtpDriverTest extends TestCase
 
     /**
      * The constructor must reject a single-character alphabet with a clear
-     * `InvalidArgumentException` carrying the distinguishing "received a single
-     * character." suffix.
+     * `InvalidDriverConfigurationException` carrying the distinguishing
+     * "received a single character." suffix.
      *
      * @return void
      */
     public function testConstructorRejectsSingleCharacterAlphabet(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidDriverConfigurationException::class);
         $this->expectExceptionMessage('received a single character.');
 
         $this->makeDriver(alphabet: 'A');
@@ -335,6 +336,80 @@ final class AbstractOtpDriverTest extends TestCase
         $driver = $this->makeDriver(alphabet: 'ABCDEF');
 
         self::assertSame('ABCDEF', $driver->getAlphabet());
+    }
+
+    /**
+     * A zero code length is a deployment-time bug — the numeric path would
+     * otherwise mint a one-character `"0"` code, and the alphabet path would
+     * return an empty string. Reject at construction so the misconfiguration
+     * surfaces in the stack trace rather than the user flow.
+     *
+     * @return void
+     */
+    public function testConstructorRejectsZeroCodeLength(): void
+    {
+        $this->expectException(InvalidDriverConfigurationException::class);
+        $this->expectExceptionMessage('OTP code length must be at least 1');
+
+        $this->makeDriver(codeLength: 0);
+    }
+
+    /**
+     * A negative code length is nonsensical — reject at construction for the
+     * same reason a zero length is rejected.
+     *
+     * @return void
+     */
+    public function testConstructorRejectsNegativeCodeLength(): void
+    {
+        $this->expectException(InvalidDriverConfigurationException::class);
+        $this->expectExceptionMessage('OTP code length must be at least 1');
+
+        $this->makeDriver(codeLength: -1);
+    }
+
+    /**
+     * A zero expiry would make every issued code expired on arrival — reject at
+     * construction so the broken window surfaces at boot rather than on the
+     * first verification attempt.
+     *
+     * @return void
+     */
+    public function testConstructorRejectsZeroExpiry(): void
+    {
+        $this->expectException(InvalidDriverConfigurationException::class);
+        $this->expectExceptionMessage('OTP expiry must be at least 1 minute');
+
+        $this->makeDriver(expiry: 0);
+    }
+
+    /**
+     * A negative expiry is nonsensical — reject at construction for the same
+     * reason a zero expiry is rejected.
+     *
+     * @return void
+     */
+    public function testConstructorRejectsNegativeExpiry(): void
+    {
+        $this->expectException(InvalidDriverConfigurationException::class);
+        $this->expectExceptionMessage('OTP expiry must be at least 1 minute');
+
+        $this->makeDriver(expiry: -5);
+    }
+
+    /**
+     * A negative `maxAttempts` would never match the `>=` threshold the manager
+     * uses to apply a lockout — reject at construction so the misconfiguration
+     * cannot silently disable lockouts.
+     *
+     * @return void
+     */
+    public function testConstructorRejectsNegativeMaxAttempts(): void
+    {
+        $this->expectException(InvalidDriverConfigurationException::class);
+        $this->expectExceptionMessage('OTP max attempts must be zero or greater');
+
+        $this->makeDriver(maxAttempts: -1);
     }
 
     /**

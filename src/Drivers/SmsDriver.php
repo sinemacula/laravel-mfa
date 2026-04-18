@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Drivers;
 
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
 
 /**
@@ -37,7 +38,7 @@ final class SmsDriver extends AbstractOtpDriver
      * @param  ?string  $alphabet
      * @param  ?callable(int, int): int  $randomInt
      *
-     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
      */
     public function __construct(
 
@@ -55,9 +56,7 @@ final class SmsDriver extends AbstractOtpDriver
         ?callable $randomInt = null,
 
     ) {
-        if (!str_contains($messageTemplate, ':code')) {
-            throw new \InvalidArgumentException(sprintf('SmsDriver message template must contain the :code placeholder; received "%s".', $messageTemplate));
-        }
+        self::assertValidMessageTemplate($messageTemplate);
 
         parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet, $randomInt);
     }
@@ -94,5 +93,25 @@ final class SmsDriver extends AbstractOtpDriver
         $message = str_replace(':code', $code, $this->messageTemplate);
 
         $this->gateway->send($recipient, $message);
+    }
+
+    /**
+     * Reject message templates missing the `:code` placeholder — without it,
+     * the rendered SMS would ship the literal template string to users on
+     * every challenge.
+     *
+     * Static so the check runs before `parent::__construct()` has initialised
+     * readonly properties on `$this`.
+     *
+     * @param  string  $template
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     */
+    private static function assertValidMessageTemplate(string $template): void
+    {
+        if (!str_contains($template, ':code')) {
+            throw InvalidDriverConfigurationException::templateMissingPlaceholder('SmsDriver message template', $template, ':code');
+        }
     }
 }
