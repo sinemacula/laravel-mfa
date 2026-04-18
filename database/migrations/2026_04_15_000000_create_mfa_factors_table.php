@@ -25,7 +25,7 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        $table = Config::string('mfa.factor.table', 'mfa_factors');
+        $table = self::resolveTable();
 
         $schema = Schema::getConnection()->getSchemaBuilder();
 
@@ -98,8 +98,21 @@ return new class extends Migration {
      */
     public function down(): void
     {
+        Schema::dropIfExists(self::resolveTable());
+    }
+
+    /**
+     * Read the configured factor table, treating a missing or empty config
+     * value as `'mfa_factors'`. Mirrors the shipped `Factor` model's
+     * `resolveConfiguredTable()` so migrate-up and migrate-down see the same
+     * table name even when the consumer has set the config to an empty string.
+     *
+     * @return string
+     */
+    private static function resolveTable(): string
+    {
         $table = Config::string('mfa.factor.table', 'mfa_factors');
 
-        Schema::dropIfExists($table);
+        return $table === '' ? 'mfa_factors' : $table;
     }
 };
