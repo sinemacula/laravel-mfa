@@ -32,6 +32,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * @return void
      *
      * @throws \ReflectionException
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testTotpDriverBuildsWithConfiguredWindow(): void
     {
@@ -58,6 +59,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * @return void
      *
      * @throws \ReflectionException
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testTotpDriverDefaultsWindowToOneWhenUnset(): void
     {
@@ -82,6 +84,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * shipped defaults verbatim.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailDriverBuildsWithDefaults(): void
     {
@@ -103,6 +107,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * slice — code length, expiry, attempts, alphabet, and mailable.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailDriverBuildsWithConfiguredOverrides(): void
     {
@@ -129,6 +135,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * shipped defaults verbatim.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSmsDriverBuildsWithDefaults(): void
     {
@@ -151,6 +159,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * — code length, expiry, attempts, alphabet, and message template.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSmsDriverBuildsWithConfiguredOverrides(): void
     {
@@ -178,6 +188,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * surface the shipped defaults verbatim.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testBackupCodeDriverBuildsWithDefaults(): void
     {
@@ -198,6 +210,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * config slice — code length, alphabet, and code count.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testBackupCodeDriverBuildsWithConfiguredOverrides(): void
     {
@@ -240,10 +254,13 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         ]);
         $this->actingAs($user);
 
-        // Stamp ownership onto the factor so the bad-driver guard fires ahead
-        // of the ownership guard — the test's subject is the LogicException,
-        // not a cross-account rejection.
+        // Stamp ownership AND driver onto the factor so the bad-driver guard
+        // fires ahead of the ownership / driver-mismatch guards — the test's
+        // subject is the LogicException raised when the extension factory
+        // returns something that is not a FactorDriver, not a cross-account
+        // rejection or a driver/factor identity mismatch.
         $factor                       = new Factor;
+        $factor->driver               = 'not-a-driver';
         $factor->authenticatable_type = $user::class;
         $factor->authenticatable_id   = (string) $user->id;
 

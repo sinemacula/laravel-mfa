@@ -32,6 +32,8 @@ final class BackupCodeDriverRaceTest extends TestCase
      * rather than succeed.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testConsumeReturnsFalseWhenRowVanishes(): void
     {

@@ -97,9 +97,10 @@ final readonly class FactorSummary implements \JsonSerializable
     /**
      * Mask a delivery destination for safe public surfacing.
      *
-     * Emails: keep the domain, mask the local-part except the last two
-     * characters. Phone numbers: keep the last four digits, mask the rest. Any
-     * other shape gets its last four characters kept with the rest masked.
+     * Emails: keep the domain, mask the local-part except its leading two
+     * characters (or one if the local-part is a single character). Phone
+     * numbers and any other opaque shape: keep the last four characters, mask
+     * the rest; inputs of four characters or fewer are fully masked.
      *
      * @param  ?string  $recipient
      * @return ?string

@@ -72,9 +72,14 @@ interface Factor
     public function getAuthenticatable(): ?Authenticatable;
 
     /**
-     * Return the persistent secret for drivers that use one (TOTP); returns
-     * `null` for drivers that generate one-time codes on demand (email, SMS,
-     * backup codes).
+     * Return the persistent secret material stored against the factor.
+     *
+     * Semantics vary by driver:
+     * - TOTP: the shared secret used to derive time-based codes.
+     * - Backup code: the SHA-256 hash of a single recovery code (nulled once
+     *   the code has been consumed).
+     * - Email / SMS: `null` — these drivers generate one-time codes on demand
+     *   and store them on `getCode()` instead.
      *
      * @return ?string
      */

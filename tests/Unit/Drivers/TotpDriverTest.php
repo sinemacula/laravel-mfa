@@ -199,8 +199,8 @@ final class TotpDriverTest extends TestCase
         // satisfied by the `issuer=Acme` query parameter alone.
         self::assertStringContainsString('Acme:user%40example.com', $uri);
 
-        // Both the `secret` and `issuer` query parameters must be present
-        // (the latter is the standard auth-app behaviour for grouping).
+        // Both the `secret` and `issuer` query parameters must be present (the
+        // latter is the standard auth-app behaviour for grouping).
         $query = parse_url($uri, PHP_URL_QUERY);
         self::assertIsString($query);
 

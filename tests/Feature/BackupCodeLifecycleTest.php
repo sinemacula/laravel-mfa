@@ -61,10 +61,18 @@ final class BackupCodeLifecycleTest extends TestCase
     }
 
     /**
-     * Two concurrent consumers of the same backup code must produce exactly one
-     * success — the second consumer sees the nulled secret and fails.
+     * The atomic-consume path must defend against the stale-in-memory-copy
+     * race: a second request still holding the pre-consumption snapshot must
+     * fail even though its in-memory hash would otherwise match. We stage the
+     * race by consuming through one handle, then verifying through an
+     * independent handle whose attributes were snapshotted before consumption
+     * — the in-memory hash still equals the expected secret, but the
+     * conditional UPDATE finds a row whose stored secret is already null and
+     * returns false.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testConcurrentConsumptionHasASingleWinner(): void
     {
@@ -81,18 +89,19 @@ final class BackupCodeLifecycleTest extends TestCase
             'secret'               => $driver->hash($code),
         ]);
 
-        // Simulate a second concurrent request that already consumed the row
-        // via the same atomic UPDATE the driver uses.
-        $twinFactor = $factor->replicate();
-        $twinFactor->setAttribute('id', $factor->getKey());
-        $twinFactor->exists = true;
+        // Snapshot a second, independently-loaded handle of the same row BEFORE
+        // the first consumer runs — this models the concurrent shape where two
+        // requests each loaded the factor and still believe the secret is
+        // present.
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $twinFactor */
+        $twinFactor = Factor::query()->findOrFail($factor->getKey());
 
         $firstResult = $driver->verify($factor, $code);
 
-        // Reload the row; the second attempt sees the nulled secret and must
-        // fail even though it holds a stale in-memory copy.
-        $factor->refresh();
-        $secondResult = $driver->verify($factor, $code);
+        // Run the twin's verify against its stale snapshot. The in-memory hash
+        // still matches, but the atomic UPDATE sees the nulled row and reports
+        // failure.
+        $secondResult = $driver->verify($twinFactor, $code);
 
         self::assertTrue($firstResult);
         self::assertFalse($secondResult);
