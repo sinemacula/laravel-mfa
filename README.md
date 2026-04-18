@@ -6,27 +6,42 @@
 [![Code Coverage](https://qlty.sh/gh/sinemacula/projects/laravel-mfa/coverage.svg)](https://qlty.sh/gh/sinemacula/projects/laravel-mfa)
 [![Total Downloads](https://img.shields.io/packagist/dt/sinemacula/laravel-mfa.svg)](https://packagist.org/packages/sinemacula/laravel-mfa)
 
-Driver-based multi-factor authentication for Laravel. Supports **TOTP**, **email codes**, **SMS codes**, and **backup
+Driver-based multi-factor authentication for Laravel. Ships **TOTP**, **email codes**, **SMS codes**, and **backup
 codes** out of the box, with a pluggable driver API for custom factor types.
 
-Works with any authentication stack - SessionGuard, Sanctum, Passport, custom guards, or
-`sinemacula/laravel-authentication`. No coupling, no opinions about your auth layer. Attach middleware to enforce MFA on
-any route; catch structured exceptions to render whatever UI your app needs.
+Composes with any authentication stack — SessionGuard, Sanctum, Passport, a custom guard, or
+`sinemacula/laravel-authentication`. No runtime coupling to the auth layer: depends only on Laravel's standard
+`Authenticatable` contract. Attach middleware to enforce MFA on any route; catch structured exceptions to render
+whatever UI you like.
 
 ## Features
 
-- **Four built-in factor drivers**: TOTP, email code, SMS code, backup codes - register via the MFA manager
-- **Pluggable driver API**: register custom factor drivers through the Laravel-style `extend()` method
-- **Route enforcement middleware**: single middleware to require MFA verification on any route or route group
-- **Route skip mechanism**: mark verification endpoints as exempt to prevent enforcement loops
-- **Structured exceptions**: `MfaRequiredException` and `MfaExpiredException` carry the user's available factors
-- **MFA state inspection**: query whether the current user has MFA set up, should use MFA, or has an expired
-  verification
-- **Polymorphic identity support**: works with any Eloquent identity type (User, Admin, etc.) via polymorphic
-  association
-- **Constant-time verification**: all built-in drivers use `hash_equals()` for timing-attack resistance
-- **Configurable everything**: per-driver code length, expiry, max attempts, and global verification expiry
-- **Zero ecosystem coupling**: depends only on Laravel and the standard `Authenticatable` contract
+- **Four built-in factor drivers**: TOTP, email code, SMS code, backup codes.
+- **Pluggable driver API**: register custom factor drivers via the Laravel-style `Mfa::extend()` method.
+- **Route enforcement middleware**: `mfa` gates a route, `mfa.skip` exempts the verification endpoints.
+- **Step-up lever**: `mfa:N` overrides the global expiry per route group to require a recent verification for
+  sensitive actions.
+- **Structured exceptions**: `MfaRequiredException` and `MfaExpiredException` carry a masked `FactorSummary`
+  list suitable for rendering a factor-picker UI.
+- **Lifecycle events**: `MfaChallengeIssued`, `MfaVerified`, `MfaVerificationFailed`, `MfaFactorEnrolled`,
+  `MfaFactorDisabled` dispatched by the manager, not by consumer code.
+- **Polymorphic identity support**: works with any Eloquent identity type (`User`, `Admin`, ...) via the
+  shipped `authenticatable_type` / `authenticatable_id` morph.
+- **Encrypted at rest**: factor `secret` and `code` columns are `encrypted`-cast; backup codes hash to SHA-256
+  before persistence.
+- **Per-factor lockouts**: configurable `max_attempts` + `lockout_minutes` for OTP drivers.
+- **Zero ecosystem coupling**: depends only on Laravel and the standard `Authenticatable` contract.
+
+## Design Notes
+
+Adoption-focused quick-starts are below. Maintainer-oriented security and lifecycle contracts live in
+`docs/design/`:
+
+- `docs/design/verification-lifecycle-and-events.md`
+- `docs/design/backup-code-consumption.md`
+- `docs/design/attempts-and-lockout.md`
+- `docs/design/per-device-verification-and-step-up.md`
+- `docs/design/factor-payload-hygiene.md`
 
 ## Installation
 
@@ -52,11 +67,12 @@ The TOTP driver checks for this package at runtime and raises a clear error if i
 
 ## Configuration
 
-The published `mfa.php` config controls global expiry and per-driver settings:
+The published `mfa.php` config controls global expiry, lockout, and per-driver settings:
 
 ```php
 return [
-    'default_expiry' => 20160, // minutes (14 days)
+    'default_expiry'  => 20160, // minutes (14 days)
+    'lockout_minutes' => 15,
 
     'drivers' => [
         'totp' => [
@@ -64,276 +80,30 @@ return [
         ],
         'email' => [
             'code_length'  => 6,
-            'expiry'       => 10,  // minutes
+            'expiry'       => 10,
             'max_attempts' => 3,
         ],
         'sms' => [
-            'code_length'  => 6,
-            'expiry'       => 10,
-            'max_attempts' => 3,
+            'code_length'      => 6,
+            'expiry'           => 10,
+            'max_attempts'     => 3,
+            'message_template' => 'Your verification code is: :code',
+        ],
+        'backup_code' => [
+            'code_length' => 10,
+            'code_count'  => 10,
         ],
     ],
 ];
 ```
 
-> **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so a key
-> rotation must use `php artisan key:rotate` (Laravel's built-in re-encryption command) rather than
-> simply swapping `APP_KEY` in `.env` — a naive swap leaves existing factor rows un-decryptable.
+> **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so a key rotation
+> must use `php artisan key:rotate` rather than simply swapping `APP_KEY` in `.env` — a naive swap leaves
+> existing factor rows un-decryptable.
 
-## Usage
+## Identity Model
 
-### Middleware enforcement
-
-Apply `RequireMfa` to routes that need MFA protection:
-
-```php
-use SineMacula\Laravel\Mfa\Middleware\RequireMfa;
-use SineMacula\Laravel\Mfa\Middleware\SkipMfa;
-
-Route::middleware([RequireMfa::class])->group(function () {
-    Route::get('/dashboard', DashboardController::class);
-    Route::get('/settings', SettingsController::class);
-});
-
-// Exempt the verification endpoints themselves
-Route::middleware([SkipMfa::class])->group(function () {
-    Route::post('/mfa/verify', MfaVerifyController::class);
-});
-```
-
-### Step-up authentication
-
-The `mfa` middleware accepts an optional `max-age` minutes parameter to override the global `default_expiry`
-on a per-route basis. Use it to gate sensitive actions behind a recent verification without forcing the global
-expiry to be aggressive:
-
-```php
-// Standard MFA gate (uses default_expiry from config)
-Route::middleware('mfa')->group(function () {
-    Route::get('/dashboard', DashboardController::class);
-});
-
-// Step-up gate: require verification within the last 5 minutes
-Route::middleware('mfa:5')->delete('/account', AccountController::class);
-
-// Strict every-request gate for the highest-risk actions
-Route::middleware('mfa:0')->post('/api/admin/delete-everything', NukeController::class);
-```
-
-`mfa:0` rejects every request — it requires the user to step through verification immediately before the
-action — so reserve it for actions that justify the friction.
-
-When MFA is required but not verified, `MfaRequiredException` is thrown. When a previous verification has expired,
-`MfaExpiredException` is thrown. Both carry the user's available factors:
-
-```php
-use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
-
-// In your exception handler
-$this->renderable(function (MfaRequiredException $e) {
-    return response()->json([
-        'message' => $e->getMessage(),
-        'factors' => $e->getFactors(),
-    ], 401);
-});
-```
-
-### MFA state inspection
-
-Use the `Mfa` facade to query the current user's MFA state:
-
-```php
-use SineMacula\Laravel\Mfa\Facades\Mfa;
-
-Mfa::shouldUse();       // bool - should the current user complete MFA?
-Mfa::isSetup();         // bool - has the user set up at least one factor?
-Mfa::hasExpired();      // bool - has the current verification expired?
-Mfa::getFactors();      // Collection|null - the user's registered factors
-```
-
-### Verifying a code
-
-Resolve a driver through the manager and verify directly (most consumers prefer `Mfa::verify(...)` which adds
-ownership enforcement, lockout handling, attempt counting, and lifecycle events around the same call):
-
-```php
-use SineMacula\Laravel\Mfa\Facades\Mfa;
-
-$driver = Mfa::driver('totp');
-$valid  = $driver->verify($factor, $code);
-```
-
-### Enrolment and disable
-
-`Mfa::enrol($factor)` stamps the current identity onto the factor's polymorphic columns, persists it,
-invalidates the manager's setup-state cache, and dispatches `MfaFactorEnrolled`. `Mfa::disable($factor)`
-checks ownership, deletes the underlying row, invalidates the cache, and dispatches `MfaFactorDisabled`.
-Both are no-ops when no MFA-capable identity is authenticated, so they are safe to call unconditionally
-during a sign-up or settings flow. Ownership is managed by the package — consumers do **not** populate
-`authenticatable_type` / `authenticatable_id` themselves; any caller-supplied values on the new factor are
-overwritten with the current identity. `verify()`, `challenge()`, and `disable()` throw
-`FactorOwnershipMismatchException` when handed a factor owned by a different identity, closing the
-"look up factor by ID from request input" cross-account-bypass shape.
-
-#### TOTP
-
-Generate a shared secret and a provisioning URI, render the URI as a QR code with the QR-rendering library of
-your choice, then hand a fresh `Factor` to `Mfa::enrol()`:
-
-```php
-use SineMacula\Laravel\Mfa\Facades\Mfa;
-use SineMacula\Laravel\Mfa\Models\Factor;
-
-$driver = Mfa::driver('totp');
-$secret = $driver->generateSecret();
-$uri    = $driver->provisioningUri(
-    issuer: config('app.name'),
-    accountName: $user->email,
-    secret: $secret,
-);
-
-// Render $uri as a QR code with your library of choice. With endroid/qr-code:
-//   $qr = Builder::create()->writer(new PngWriter)->data($uri)->build();
-
-$factor         = new Factor;
-$factor->driver = 'totp';
-$factor->label  = 'Authenticator app';
-$factor->secret = $secret;
-
-// `Mfa::enrol()` stamps the current identity's morph columns itself —
-// callers do not (and should not) populate them.
-Mfa::enrol($factor);
-```
-
-#### Backup codes
-
-Backup codes are the package's first-party recovery factor. `Mfa::issueBackupCodes($count = null)` mints a
-fresh batch for the current identity, atomically replaces any prior batch (so there is no overlap window
-where both old and new codes would verify), persists each code as its own `Factor` row with the SHA-256
-hash on `secret`, dispatches one `MfaFactorEnrolled` event per code, and returns the plaintext set
-**exactly once** for downstream display / download:
-
-```php
-use SineMacula\Laravel\Mfa\Facades\Mfa;
-
-// In your settings controller, after the user re-authenticates:
-$plaintextCodes = Mfa::issueBackupCodes();
-
-// Render `$plaintextCodes` to the user — this is the only chance.
-// Subsequent reads return the hashed `secret` column (not recoverable).
-return view('mfa.backup-codes', ['codes' => $plaintextCodes]);
-```
-
-Pass an explicit `$count` argument to override the configured default batch size for that single call:
-
-```php
-$twentyCodes = Mfa::issueBackupCodes(20);
-```
-
-The configured default batch size is set via `MFA_BACKUP_CODE_COUNT` (default `10`).
-
-#### Disabling a factor
-
-```php
-Mfa::disable($factor);
-```
-
-Subscribers to `MfaFactorEnrolled` and `MfaFactorDisabled` receive the identity, the factor, and the driver
-name — enough to drive audit logging, downstream policy recalculation, or operations notifications without
-the consumer having to remember to dispatch lifecycle events themselves.
-
-### SMS gateway binding
-
-The SMS driver delegates outbound delivery to a `SmsGateway` implementation. The package ships a
-`NullSmsGateway` default that throws `SmsGatewayNotConfiguredException` to surface missing wiring loudly —
-consumers who enable the SMS driver bind their own implementation against the contract.
-
-Worked example with Twilio (`composer require twilio/sdk`):
-
-```php
-// app/Mfa/TwilioSmsGateway.php
-namespace App\Mfa;
-
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
-use Twilio\Exceptions\RestException;
-use Twilio\Rest\Client;
-
-final readonly class TwilioSmsGateway implements SmsGateway
-{
-    public function __construct(
-        private Client $twilio,
-        private string $fromNumber,
-    ) {}
-
-    public function send(string $to, #[\SensitiveParameter] string $message): void
-    {
-        try {
-            $this->twilio->messages->create($to, [
-                'from' => $this->fromNumber,
-                'body' => $message,
-            ]);
-        } catch (RestException $e) {
-            // Translate the SDK-specific failure into something the
-            // verification UI can render — a non-throwing return implies
-            // the message reached Twilio for downstream delivery.
-            throw new \RuntimeException(
-                'Failed to dispatch MFA SMS via Twilio: ' . $e->getMessage(),
-                previous: $e,
-            );
-        }
-    }
-}
-```
-
-Bind it in a service provider:
-
-```php
-// app/Providers/AppServiceProvider.php
-use App\Mfa\TwilioSmsGateway;
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
-use Twilio\Rest\Client;
-
-public function register(): void
-{
-    $this->app->singleton(SmsGateway::class, static function ($app): TwilioSmsGateway {
-        return new TwilioSmsGateway(
-            twilio: new Client(
-                config('services.twilio.sid'),
-                config('services.twilio.token'),
-            ),
-            fromNumber: config('services.twilio.from'),
-        );
-    });
-}
-```
-
-Vonage, AWS SNS, MessageBird, or any in-house gateway follows the same shape — implement
-`SmsGateway::send(string $to, string $message): void`, bind it in a service provider, you're done. The
-contract intentionally exposes only the recipient and the rendered message (the package owns code
-generation, template substitution, lockouts, and verification state) so the gateway adapter stays thin.
-
-### Custom factor drivers
-
-Register a custom driver via the `extend()` API:
-
-```php
-use SineMacula\Laravel\Mfa\Facades\Mfa;
-
-Mfa::extend('webauthn', function ($app) {
-    return new WebAuthnDriver(/* ... */);
-});
-```
-
-Custom drivers must implement `SineMacula\Laravel\Mfa\Contracts\FactorDriver`.
-
-Register your override **before** any code in the request calls `Mfa::driver(...)`. Laravel's manager
-caches resolved drivers per request, so an `extend()` call made after the driver has already been
-resolved that request silently has no effect — bind in a service provider's `register()` (or `boot()`)
-rather than mid-request.
-
-### Identity model setup
-
-Your identity model implements `MultiFactorAuthenticatable`:
+Implement `MultiFactorAuthenticatable` on the identity the authentication stack hands back:
 
 ```php
 use Illuminate\Database\Eloquent\Builder;
@@ -351,15 +121,6 @@ class AppUser extends User implements MultiFactorAuthenticatable
 
     public function isMfaEnabled(): bool
     {
-        // Canonical rule: MFA is "enabled" once the identity has at least
-        // one enrolled factor. Per-request verification freshness is owned
-        // separately by `Mfa::hasExpired()` / the verification store, so
-        // `isMfaEnabled()` deliberately does NOT look at `verified_at`.
-        //
-        // If your product policy is stricter — e.g. "enabled" must mean
-        // the factor has completed its first verification — swap in
-        // `->whereNotNull('verified_at')->exists()` here. Keep it
-        // consistent with whatever `Mfa::isSetup()` should report.
         return $this->authFactors()->exists();
     }
 
@@ -370,78 +131,223 @@ class AppUser extends User implements MultiFactorAuthenticatable
 
     public function factors(): MorphMany
     {
-        // Resolves through `Mfa::factorModel()` so consumers who swap
-        // the shipped model via `config('mfa.factor.model')` get their
-        // subclass back here without any further wiring.
+        // Resolves through `Mfa::factorModel()` so consumers swapping the
+        // shipped model via `config('mfa.factor.model')` get their subclass
+        // back without any further wiring.
         return $this->morphMany(Mfa::factorModel(), 'authenticatable');
     }
 }
 ```
 
-## Security model
+Canonical rule: `isMfaEnabled()` means "has at least one enrolled factor". Per-request verification freshness
+lives separately on `Mfa::hasExpired()` / the verification store, so keep the two predicates orthogonal.
+
+## Usage
+
+The `Mfa` facade is the primary surface. The manager orchestrates drivers, enforces factor ownership, handles
+lockouts and attempt counting, and dispatches lifecycle events:
+
+```php
+use SineMacula\Laravel\Mfa\Facades\Mfa;
+
+Mfa::shouldUse();                       // bool
+Mfa::isSetup();                         // bool
+Mfa::hasEverVerified();                 // bool
+Mfa::hasExpired();                      // bool
+Mfa::getFactors();                      // Collection|null
+
+Mfa::challenge($driver, $factor);       // MfaChallengeIssued
+Mfa::verify($driver, $factor, $code);   // MfaVerified | MfaVerificationFailed
+Mfa::enrol($factor);                    // MfaFactorEnrolled
+Mfa::disable($factor);                  // MfaFactorDisabled
+Mfa::issueBackupCodes();                // atomic rotation — returns plaintext once
+```
+
+Ownership is stamped by the package, never trusted from the caller — `verify()`, `challenge()`, and `disable()`
+throw `FactorOwnershipMismatchException` when handed a factor owned by a different identity, closing the
+"look up factor by ID from request input" cross-account-bypass shape.
+
+### Middleware enforcement
+
+The shipped `RequireMfa` middleware gates a route behind a valid MFA verification. The `mfa` alias is
+registered automatically; `mfa.skip` exempts the verification endpoints themselves:
+
+```php
+Route::middleware('mfa')->group(function () {
+    Route::get('/dashboard', DashboardController::class);
+});
+
+Route::middleware('mfa.skip')->post('/mfa/verify', MfaVerifyController::class);
+```
+
+An optional `max-age` parameter overrides `default_expiry` per route group — the step-up lever for sensitive
+actions:
+
+```php
+Route::middleware('mfa:5')->delete('/account', AccountController::class);   // re-verify within 5 min
+Route::middleware('mfa:0')->post('/admin/danger', DangerController::class); // every request
+```
+
+When MFA is required, `MfaRequiredException` is thrown; when a prior verification has expired,
+`MfaExpiredException`. Both carry a masked `FactorSummary` list safe to ship through JSON bodies and log
+sinks:
+
+```php
+use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
+
+$this->renderable(function (MfaRequiredException $e) {
+    return response()->json([
+        'message' => $e->getMessage(),
+        'factors' => $e->getFactors(),
+    ], 401);
+});
+```
+
+### TOTP enrolment
+
+Generate a shared secret and a provisioning URI, render the URI as a QR code, then hand a fresh `Factor` to
+`Mfa::enrol()`:
+
+```php
+use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Models\Factor;
+
+$driver = Mfa::driver('totp');
+$secret = $driver->generateSecret();
+$uri    = $driver->provisioningUri(
+    issuer: config('app.name'),
+    accountName: $user->email,
+    secret: $secret,
+);
+
+// Render $uri as a QR code with your library of choice.
+
+$factor         = new Factor;
+$factor->driver = 'totp';
+$factor->label  = 'Authenticator app';
+$factor->secret = $secret;
+
+// `Mfa::enrol()` stamps the identity's morph columns itself —
+// callers do not (and should not) populate them.
+Mfa::enrol($factor);
+```
+
+### Backup codes
+
+`Mfa::issueBackupCodes()` atomically replaces any prior batch (no overlap window where both old and new codes
+would verify), persists each code as its own `Factor` row with the SHA-256 hash on `secret`, dispatches one
+`MfaFactorEnrolled` event per code, and returns the plaintext set **exactly once**:
+
+```php
+$codes = Mfa::issueBackupCodes();
+
+// Render `$codes` to the user — this is the only chance. Subsequent
+// reads return the hashed `secret` column (not recoverable).
+return view('mfa.backup-codes', ['codes' => $codes]);
+```
+
+Pass an explicit `$count` argument to override the configured default batch size for that single call:
+`Mfa::issueBackupCodes(20)`.
+
+### SMS gateway binding
+
+The SMS driver delegates outbound delivery to a `SmsGateway` implementation. The shipped `NullSmsGateway`
+throws `SmsGatewayNotConfiguredException` to surface missing wiring loudly — consumers enabling the SMS
+driver bind their own implementation:
+
+```php
+use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use Twilio\Rest\Client;
+
+final readonly class TwilioSmsGateway implements SmsGateway
+{
+    public function __construct(
+        private Client $twilio,
+        private string $fromNumber,
+    ) {}
+
+    public function send(string $to, #[\SensitiveParameter] string $message): void
+    {
+        $this->twilio->messages->create($to, [
+            'from' => $this->fromNumber,
+            'body' => $message,
+        ]);
+    }
+}
+```
+
+Bind it in a service provider:
+
+```php
+$this->app->singleton(SmsGateway::class, static fn ($app): TwilioSmsGateway => new TwilioSmsGateway(
+    twilio: new Client(config('services.twilio.sid'), config('services.twilio.token')),
+    fromNumber: config('services.twilio.from'),
+));
+```
+
+The contract exposes only the recipient and rendered message — the package owns code generation, template
+substitution, lockouts, and verification state — so the adapter stays thin.
+
+### Custom factor drivers
+
+```php
+Mfa::extend('webauthn', fn ($app) => new WebAuthnDriver(/* ... */));
+```
+
+Custom drivers must implement `SineMacula\Laravel\Mfa\Contracts\FactorDriver`. Register the driver **before**
+any request code calls `Mfa::driver(...)`: Laravel's manager caches resolved drivers per request, so an
+`extend()` call made after the driver is already resolved silently has no effect. Bind in a service
+provider's `register()` / `boot()` rather than mid-request.
+
+## Security Model
 
 ### Rate limiting
 
-The package's per-factor lockout (`max_attempts` + `lockout_minutes`) protects an individual factor row from
-runaway attempts on the same code, but it does not by itself defend against:
-
-- Distributed brute-force across many factors (e.g. an attacker with a leaked email list trying common codes).
-- DoS against the lockout window: flooding the verify endpoint with bad codes to push every legitimate user into
-  the cooldown.
-
-Layer Laravel's built-in `RateLimiter` on top of the verify endpoint to close those gaps. Define the limiter in a
-service provider:
+The per-factor lockout (`max_attempts` + `lockout_minutes`) protects an individual factor from runaway
+attempts on the same code, but does not by itself defend against distributed brute force across many factors
+or DoS against the lockout window. Layer Laravel's built-in `RateLimiter` on the verify endpoint:
 
 ```php
-// app/Providers/AppServiceProvider.php (boot method)
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 
 RateLimiter::for('mfa-verify', static function (Request $request): array {
-    $identifier = optional($request->user())->getAuthIdentifier()
-        ?? $request->ip();
+    $identifier = optional($request->user())->getAuthIdentifier() ?? $request->ip();
 
     return [
-        // Per-IP cap for unauthenticated / spray attacks
         Limit::perMinute(10)->by($request->ip() ?? 'unknown'),
-
-        // Per-identity cap so one compromised IP can't brute many users
         Limit::perMinute(5)->by((string) ($identifier ?: 'unknown')),
     ];
 });
-```
 
-Then attach the throttle alongside `SkipMfa` on the verification endpoint:
-
-```php
-// routes/web.php
 Route::post('/mfa/verify', VerifyController::class)
     ->middleware(['mfa.skip', 'throttle:mfa-verify']);
 ```
 
-Apply the throttle **only** to the verify endpoint itself — do not gate routes that merely read MFA state
-(`Mfa::shouldUse()`, `Mfa::isSetup()`, etc.) behind it, since those are called on every request and would
-exhaust the bucket without representing an attack signal.
+Apply the throttle **only** to the verify endpoint — state-read routes (`Mfa::shouldUse()`, `Mfa::isSetup()`,
+etc.) are called on every request and would exhaust the bucket without representing an attack signal.
 
 ### Verification store
 
-The default `SessionMfaVerificationStore` assumes consumers regenerate the session on auth state change
-— Laravel's default behaviour on login / logout. Apps that disable session regeneration on login must
-also call `Mfa::forgetVerification()` so a new identity cannot inherit the prior identity's verification
-timestamp from the reused session.
+The default `SessionMfaVerificationStore` assumes consumers regenerate the session on auth state change —
+Laravel's default on login / logout. Apps that disable session regeneration on login must call
+`Mfa::forgetVerification()` themselves on auth state change, so a new identity cannot inherit the prior
+identity's verification timestamp from a reused session.
 
 ## Extensibility
 
 All concrete classes in this package are `final` unless explicitly designed for extension. Extension is through
 **composition and DI**, not inheritance:
 
-| Extension point          | How                                                                    |
-|--------------------------|------------------------------------------------------------------------|
-| Custom factor driver     | Implement `FactorDriver`, register via `Mfa::extend()`                 |
-| Custom identity model    | Implement `MultiFactorAuthenticatable` on your Eloquent model          |
-| Organisation enforcement | Implement `MfaPolicy` and bind it via the container                    |
-| Custom factor model      | Set `config('mfa.factor.model')` to your subclass                      |
+| Extension point           | How                                                            |
+|---------------------------|----------------------------------------------------------------|
+| Custom factor driver      | Implement `FactorDriver`, register via `Mfa::extend()`         |
+| Custom identity model     | Implement `MultiFactorAuthenticatable` on your Eloquent model  |
+| Organisation enforcement  | Implement `MfaPolicy` and bind it via the container            |
+| Custom verification store | Implement `MfaVerificationStore` and bind it via the container |
+| Custom factor model       | Set `config('mfa.factor.model')` to your subclass              |
+| Custom SMS gateway        | Implement `SmsGateway` and bind it via the container           |
 
 ## Requirements
 
@@ -451,9 +357,16 @@ All concrete classes in this package are `final` unless explicitly designed for 
 ## Testing
 
 ```bash
-composer test
-composer test:coverage
-composer check
+composer test               # all suites in parallel (Paratest)
+composer test:coverage      # all suites with clover coverage
+composer test:unit          # unit suite only
+composer test:feature       # feature suite only
+composer test:integration   # integration suite only
+composer test:performance   # performance budget suite (serial)
+composer test:mutation      # scoped mutation gate
+composer test:mutation:full # full mutation suite (no thresholds)
+composer bench              # PHPBench hot-path benchmarks
+composer check              # static analysis + style
 ```
 
 ## Changelog
@@ -462,14 +375,13 @@ See [CHANGELOG.md](CHANGELOG.md) for a list of notable changes.
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)
-for guidelines on branching, commits, code quality, and pull requests.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)for guidelines on branching, commits, code
+quality, and pull requests.
 
 ## Security
 
-If you discover a security vulnerability, please report it responsibly.
-See [SECURITY.md](SECURITY.md) for the disclosure policy and contact
-details.
+If you discover a security vulnerability, please report it responsibly. See [SECURITY.md](SECURITY.md) for the
+disclosure policy and contact details.
 
 ## License
 
