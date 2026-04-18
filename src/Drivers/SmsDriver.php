@@ -22,11 +22,14 @@ use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
  */
 final class SmsDriver extends AbstractOtpDriver
 {
+    /** @var string Placeholder the message template MUST carry; replaced with the issued code at dispatch. */
+    private const string CODE_PLACEHOLDER = ':code';
+
     /**
      * Constructor.
      *
-     * Validates at construction that the message template contains the `:code`
-     * placeholder — without it, the rendered SMS would ship the literal
+     * Validates at construction that the message template contains the
+     * `CODE_PLACEHOLDER` — without it, the rendered SMS would ship the literal
      * placeholder string to users. Fail loudly at boot rather than silently
      * leaking a broken message on every challenge.
      *
@@ -45,8 +48,8 @@ final class SmsDriver extends AbstractOtpDriver
         /** SMS gateway implementation that delivers the rendered message. */
         private readonly SmsGateway $gateway,
 
-        /** Message template; MUST contain the `:code` placeholder. */
-        private readonly string $messageTemplate = 'Your verification code is: :code',
+        /** Message template; MUST contain the `CODE_PLACEHOLDER` constant. */
+        private readonly string $messageTemplate = 'Your verification code is: ' . self::CODE_PLACEHOLDER,
 
         // The remaining parameters are passthroughs to AbstractOtpDriver.
         int $codeLength = 6,
@@ -90,13 +93,13 @@ final class SmsDriver extends AbstractOtpDriver
             throw new MissingRecipientException('SMS factor has no recipient configured; cannot deliver code.');
         }
 
-        $message = str_replace(':code', $code, $this->messageTemplate);
+        $message = str_replace(self::CODE_PLACEHOLDER, $code, $this->messageTemplate);
 
         $this->gateway->send($recipient, $message);
     }
 
     /**
-     * Reject message templates missing the `:code` placeholder — without it,
+     * Reject message templates missing the `CODE_PLACEHOLDER` — without it,
      * the rendered SMS would ship the literal template string to users on
      * every challenge.
      *
@@ -110,8 +113,8 @@ final class SmsDriver extends AbstractOtpDriver
      */
     private static function assertValidMessageTemplate(string $template): void
     {
-        if (!str_contains($template, ':code')) {
-            throw InvalidDriverConfigurationException::templateMissingPlaceholder('SmsDriver message template', $template, ':code');
+        if (!str_contains($template, self::CODE_PLACEHOLDER)) {
+            throw InvalidDriverConfigurationException::templateMissingPlaceholder('SmsDriver message template', $template, self::CODE_PLACEHOLDER);
         }
     }
 }
