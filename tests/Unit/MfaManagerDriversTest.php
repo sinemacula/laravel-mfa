@@ -32,6 +32,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * @return void
      *
      * @throws \ReflectionException
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testTotpDriverBuildsWithConfiguredWindow(): void
     {
@@ -83,6 +84,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * shipped defaults verbatim.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailDriverBuildsWithDefaults(): void
     {
@@ -104,6 +107,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * slice — code length, expiry, attempts, alphabet, and mailable.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailDriverBuildsWithConfiguredOverrides(): void
     {
@@ -130,6 +135,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * shipped defaults verbatim.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSmsDriverBuildsWithDefaults(): void
     {
@@ -152,6 +159,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * — code length, expiry, attempts, alphabet, and message template.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSmsDriverBuildsWithConfiguredOverrides(): void
     {
@@ -179,6 +188,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * surface the shipped defaults verbatim.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testBackupCodeDriverBuildsWithDefaults(): void
     {
@@ -199,6 +210,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      * config slice — code length, alphabet, and code count.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testBackupCodeDriverBuildsWithConfiguredOverrides(): void
     {

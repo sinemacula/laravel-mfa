@@ -99,9 +99,9 @@ final class SmsDriver extends AbstractOtpDriver
     }
 
     /**
-     * Reject message templates missing the `CODE_PLACEHOLDER` — without it,
-     * the rendered SMS would ship the literal template string to users on
-     * every challenge.
+     * Reject message templates missing the `CODE_PLACEHOLDER` — without it, the
+     * rendered SMS would ship the literal template string to users on every
+     * challenge.
      *
      * Static so the check runs before `parent::__construct()` has initialised
      * readonly properties on `$this`.

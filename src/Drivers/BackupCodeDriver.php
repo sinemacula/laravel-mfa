@@ -103,6 +103,8 @@ final class BackupCodeDriver implements FactorDriver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @return bool
+     *
+     * @throws \Throwable
      */
     #[\Override]
     public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
@@ -114,27 +116,14 @@ final class BackupCodeDriver implements FactorDriver
         }
 
         // Single-use consumption: an atomic conditional UPDATE closes the
-        // TOCTOU race where two concurrent requests would both match the
-        // same code. Only the request whose UPDATE finds the still-
-        // unconsumed secret wins; the loser sees zero affected rows and
-        // returns false. Non-Eloquent factors have no row to consume, so
-        // the comparison alone constitutes the verification result.
+        // TOCTOU race where two concurrent requests would both match the same
+        // code. Only the request whose UPDATE finds the still- unconsumed
+        // secret wins; the loser sees zero affected rows and returns false.
+        // Non-Eloquent factors have no row to consume, so the comparison alone
+        // constitutes the verification result.
         return $factor instanceof EloquentFactor
             ? $this->consumeAtomic($factor, $stored)
             : true;
-    }
-
-    /**
-     * Backup codes are minted in batches — this single-code entry point returns
-     * one freshly generated plaintext code. Enrolment flows typically call
-     * `generateSet()` instead to mint the full batch in one go.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function generateSecret(): string
-    {
-        return $this->generatePlaintextCode();
     }
 
     /**
@@ -150,6 +139,19 @@ final class BackupCodeDriver implements FactorDriver
     public function hash(#[\SensitiveParameter] string $code): string
     {
         return hash('sha256', $code);
+    }
+
+    /**
+     * Backup codes are minted in batches — this single-code entry point returns
+     * one freshly generated plaintext code. Enrolment flows typically call
+     * `generateSet()` instead to mint the full batch in one go.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function generateSecret(): string
+    {
+        return $this->generatePlaintextCode();
     }
 
     /**
@@ -228,6 +230,39 @@ final class BackupCodeDriver implements FactorDriver
     }
 
     /**
+     * Reject code lengths below 1 — a zero length would mint empty-string
+     * codes.
+     *
+     * @param  int  $codeLength
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     */
+    private function assertValidCodeLength(int $codeLength): void
+    {
+        if ($codeLength < 1) {
+            throw InvalidDriverConfigurationException::codeLengthTooSmall('Backup-code length', $codeLength);
+        }
+    }
+
+    /**
+     * Reject alphabets with fewer than two characters — a single-character
+     * alphabet mints zero-entropy codes; an empty alphabet explodes inside
+     * `random_int(0, -1)`.
+     *
+     * @param  string  $alphabet
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     */
+    private function assertValidAlphabet(string $alphabet): void
+    {
+        if (strlen($alphabet) < 2) {
+            throw InvalidDriverConfigurationException::alphabetTooShort('Backup-code alphabet', $alphabet);
+        }
+    }
+
+    /**
      * Atomically consume the factor's stored secret.
      *
      * Uses a pessimistic row lock inside a short transaction to close the
@@ -241,6 +276,8 @@ final class BackupCodeDriver implements FactorDriver
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $expectedSecret
      * @return bool
+     *
+     * @throws \Throwable
      */
     private function consumeAtomic(EloquentFactor $factor, #[\SensitiveParameter] string $expectedSecret): bool
     {
@@ -253,6 +290,7 @@ final class BackupCodeDriver implements FactorDriver
         /** @var bool $result */
         $result = DB::connection($factor->getConnectionName())->transaction(
             static function () use ($factor, $secretColumn, $expectedSecret): bool {
+
                 /** @var ?\Illuminate\Database\Eloquent\Model $locked */
                 // @phpstan-ignore staticMethod.dynamicCall
                 $locked = $factor->newQuery()
@@ -287,36 +325,23 @@ final class BackupCodeDriver implements FactorDriver
     }
 
     /**
-     * Reject code lengths below 1 — a zero length would mint empty-string
-     * codes.
+     * Generate a single plaintext backup code from the configured alphabet +
+     * length, picking characters with `random_int` for cryptographic
+     * suitability.
      *
-     * @param  int  $codeLength
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     * @return string
      */
-    private function assertValidCodeLength(int $codeLength): void
+    private function generatePlaintextCode(): string
     {
-        if ($codeLength < 1) {
-            throw InvalidDriverConfigurationException::codeLengthTooSmall('Backup-code length', $codeLength);
-        }
-    }
+        $alphabetLength = strlen($this->alphabet);
+        $randomInt      = $this->randomInt;
+        $code           = '';
 
-    /**
-     * Reject alphabets with fewer than two characters — a single-character
-     * alphabet mints zero-entropy codes; an empty alphabet explodes inside
-     * `random_int(0, -1)`.
-     *
-     * @param  string  $alphabet
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
-     */
-    private function assertValidAlphabet(string $alphabet): void
-    {
-        if (strlen($alphabet) < 2) {
-            throw InvalidDriverConfigurationException::alphabetTooShort('Backup-code alphabet', $alphabet);
+        for ($i = 0; $i < $this->codeLength; $i++) {
+            $code .= $this->alphabet[$randomInt(0, $alphabetLength - 1)];
         }
+
+        return $code;
     }
 
     /**
@@ -361,25 +386,5 @@ final class BackupCodeDriver implements FactorDriver
         }
 
         throw InvalidDriverConfigurationException::codeSpaceSmallerThanBatch('Backup-code code space', $alphabetLength, $this->codeLength, $capacity, $count);
-    }
-
-    /**
-     * Generate a single plaintext backup code from the configured alphabet +
-     * length, picking characters with `random_int` for cryptographic
-     * suitability.
-     *
-     * @return string
-     */
-    private function generatePlaintextCode(): string
-    {
-        $alphabetLength = strlen($this->alphabet);
-        $randomInt      = $this->randomInt;
-        $code           = '';
-
-        for ($i = 0; $i < $this->codeLength; $i++) {
-            $code .= $this->alphabet[$randomInt(0, $alphabetLength - 1)];
-        }
-
-        return $code;
     }
 }

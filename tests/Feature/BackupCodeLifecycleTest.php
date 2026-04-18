@@ -71,6 +71,8 @@ final class BackupCodeLifecycleTest extends TestCase
      * returns false.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testConcurrentConsumptionHasASingleWinner(): void
     {
@@ -87,18 +89,18 @@ final class BackupCodeLifecycleTest extends TestCase
             'secret'               => $driver->hash($code),
         ]);
 
-        // Snapshot a second, independently-loaded handle of the same row
-        // BEFORE the first consumer runs — this models the concurrent shape
-        // where two requests each loaded the factor and still believe the
-        // secret is present.
+        // Snapshot a second, independently-loaded handle of the same row BEFORE
+        // the first consumer runs — this models the concurrent shape where two
+        // requests each loaded the factor and still believe the secret is
+        // present.
         /** @var \SineMacula\Laravel\Mfa\Models\Factor $twinFactor */
         $twinFactor = Factor::query()->findOrFail($factor->getKey());
 
         $firstResult = $driver->verify($factor, $code);
 
-        // Run the twin's verify against its stale snapshot. The in-memory
-        // hash still matches, but the atomic UPDATE sees the nulled row and
-        // reports failure.
+        // Run the twin's verify against its stale snapshot. The in-memory hash
+        // still matches, but the atomic UPDATE sees the nulled row and reports
+        // failure.
         $secondResult = $driver->verify($twinFactor, $code);
 
         self::assertTrue($firstResult);

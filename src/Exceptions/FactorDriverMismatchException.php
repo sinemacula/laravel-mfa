@@ -11,15 +11,15 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  *
  * Thrown by the MFA manager when `challenge()` or `verify()` is called with a
  * driver name that does not match the supplied factor's registered driver.
- * Routing one driver's logic through a factor registered against another
- * would produce confusing persistence, transport, and audit-event semantics —
- * failing loudly surfaces the caller bug at the entry point rather than
- * letting it leak into the pipeline.
+ * Routing one driver's logic through a factor registered against another would
+ * produce confusing persistence, transport, and audit-event semantics — failing
+ * loudly surfaces the caller bug at the entry point rather than letting it leak
+ * into the pipeline.
  *
- * Extends `\InvalidArgumentException` so generic catch blocks and any
- * existing contributor expectations at that type continue to match; the
- * dedicated subclass lets consumers distinguish mismatch faults from other
- * argument errors when they want typed handling.
+ * Extends `\InvalidArgumentException` so generic catch blocks and any existing
+ * contributor expectations at that type continue to match; the dedicated
+ * subclass lets consumers distinguish mismatch faults from other argument
+ * errors when they want typed handling.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -38,10 +38,12 @@ final class FactorDriverMismatchException extends \InvalidArgumentException
      */
     public static function for(string $requested, Factor $factor): self
     {
-        return new self(sprintf(
-            'Driver mismatch: requested [%s] but factor is registered against [%s].',
-            $requested,
-            $factor->getDriver(),
-        ));
+        return new self(
+            sprintf(
+                'Driver mismatch: requested [%s] but factor is registered against [%s].',
+                $requested,
+                $factor->getDriver(),
+            ),
+        );
     }
 }

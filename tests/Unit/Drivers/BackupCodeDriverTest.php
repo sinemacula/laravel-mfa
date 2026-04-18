@@ -49,6 +49,8 @@ final class BackupCodeDriverTest extends TestCase
      * through to the hash compare.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testVerifyReturnsFalseWhenStoredSecretIsNull(): void
     {
@@ -62,6 +64,8 @@ final class BackupCodeDriverTest extends TestCase
      * An empty stored secret must short-circuit verify to false.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testVerifyReturnsFalseWhenStoredSecretIsEmptyString(): void
     {
@@ -76,6 +80,8 @@ final class BackupCodeDriverTest extends TestCase
      * verification.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testVerifyReturnsFalseForWrongCodeHash(): void
     {
@@ -91,6 +97,8 @@ final class BackupCodeDriverTest extends TestCase
      * layer's concern in that path.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testVerifyReturnsTrueForNonEloquentFactorWithoutPersistence(): void
     {
@@ -112,6 +120,8 @@ final class BackupCodeDriverTest extends TestCase
      * fail.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testVerifyConsumesEloquentFactorAtomically(): void
     {
@@ -141,6 +151,8 @@ final class BackupCodeDriverTest extends TestCase
      * than succeed.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testVerifyReturnsFalseWhenConcurrentConsumerDeletedTheRow(): void
     {
@@ -164,6 +176,8 @@ final class BackupCodeDriverTest extends TestCase
      * should take the early-return branch and return `true` on a hash match.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testVerifyReturnsTrueForEloquentFactorThatIsNotAnEloquentModel(): void
     {
@@ -181,6 +195,8 @@ final class BackupCodeDriverTest extends TestCase
      * and the atomic UPDATE, verify must report failure.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     public function testVerifyReturnsFalseWhenConcurrentConsumeWinsFirst(): void
     {

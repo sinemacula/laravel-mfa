@@ -35,11 +35,11 @@ abstract class AbstractOtpDriver implements FactorDriver
     /**
      * Constructor.
      *
-     * `$codeLength`, `$expiry`, and `$maxAttempts` are validated at construction
-     * time so deployment-time misconfigurations surface in the stack trace
-     * rather than as a broken user flow. `$codeLength` and `$expiry` must be at
-     * least 1; `$maxAttempts` must be non-negative (0 is the documented
-     * "lockout disabled" value).
+     * `$codeLength`, `$expiry`, and `$maxAttempts` are validated at
+     * construction time so deployment-time misconfigurations surface in the
+     * stack trace rather than as a broken user flow. `$codeLength` and
+     * `$expiry` must be at least 1; `$maxAttempts` must be non-negative (0 is
+     * the documented "lockout disabled" value).
      *
      * `$alphabet` controls the `generateCode()` character set: `null` keeps
      * numeric zero-padded codes; a non-null string picks uniformly from it.
@@ -103,20 +103,20 @@ abstract class AbstractOtpDriver implements FactorDriver
         $code      = $this->generateCode();
         $expiresAt = Carbon::now()->addMinutes($this->expiry);
 
-        // Dispatch before persist: if the transport throws, nothing is
-        // stored against the factor, so the user does not end up with a
-        // "valid" code they never received.
+        // Dispatch before persist: if the transport throws, nothing is stored
+        // against the factor, so the user does not end up with a "valid" code
+        // they never received.
         $this->dispatch($factor, $code);
 
         $factor->issueCode($code, $expiresAt);
 
-        // Pair the attempt-state reset with a freshly minted code: the
-        // OTP family rotates its secret on every challenge, so clearing
-        // a prior lockout cannot be used as a free unlock — the attacker
-        // has to receive the new code through the configured transport
-        // before they can verify against it. Drivers that do NOT rotate
-        // a secret per challenge (TOTP, backup codes) deliberately
-        // preserve their lockout state across `challenge()` calls.
+        // Pair the attempt-state reset with a freshly minted code: the OTP
+        // family rotates its secret on every challenge, so clearing a prior
+        // lockout cannot be used as a free unlock — the attacker has to receive
+        // the new code through the configured transport before they can verify
+        // against it. Drivers that do NOT rotate a secret per challenge (TOTP,
+        // backup codes) deliberately preserve their lockout state across
+        // `challenge()` calls.
         $factor->resetAttempts();
 
         $factor->persist();
@@ -201,16 +201,6 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
-     * Deliver the issued code to the factor's recipient via the subclass's
-     * chosen transport.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
-     * @param  string  $code
-     * @return void
-     */
-    abstract protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void;
-
-    /**
      * Generate a one-time code of the configured length. Uses `random_int` for
      * cryptographic suitability (vs `mt_rand` / `rand`).
      *
@@ -244,6 +234,16 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
+     * Deliver the issued code to the factor's recipient via the subclass's
+     * chosen transport.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  string  $code
+     * @return void
+     */
+    abstract protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void;
+
+    /**
      * Reject code lengths below 1 — the numeric path would otherwise mint a
      * one-character `"0"` code and the alphabet path an empty string.
      *
@@ -260,8 +260,8 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
-     * Reject expiry windows below 1 minute — any issued code would otherwise
-     * be "expired" on arrival.
+     * Reject expiry windows below 1 minute — any issued code would otherwise be
+     * "expired" on arrival.
      *
      * @param  int  $expiry
      * @return void

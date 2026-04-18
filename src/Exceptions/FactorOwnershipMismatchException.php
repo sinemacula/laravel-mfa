@@ -34,10 +34,12 @@ final class FactorOwnershipMismatchException extends \RuntimeException
      */
     public static function for(Factor $factor, MultiFactorAuthenticatable $identity): self
     {
-        return new self(sprintf(
-            'Factor [%s] does not belong to the current identity [%s].',
-            $factor->getDriver(),
-            $identity::class,
-        ));
+        return new self(
+            sprintf(
+                'Factor [%s] does not belong to the current identity [%s].',
+                $factor->getDriver(),
+                $identity::class,
+            ),
+        );
     }
 }
