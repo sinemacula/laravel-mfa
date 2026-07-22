@@ -35,12 +35,11 @@ final class TotpDriver implements FactorDriver
 
         /** Clock-drift tolerance in 30-second steps on either side of "now". */
         private readonly int $window = 1,
-
     ) {
         // @codeCoverageIgnoreStart
-        // This branch only fires when `pragmarx/google2fa` is absent,
-        // which cannot be exercised under the package's own test suite
-        // without uninstalling the dev dependency.
+        // This branch only fires when `pragmarx/google2fa` is absent, which
+        // cannot be exercised under the package's own test suite without
+        // uninstalling the dev dependency.
         if (!class_exists(Google2FA::class)) {
             $message = 'The pragmarx/google2fa package is required for the '
                 . 'TOTP MFA driver. Install it via: composer '
@@ -49,7 +48,6 @@ final class TotpDriver implements FactorDriver
             throw new MissingDriverDependencyException($message);
         }
         // @codeCoverageIgnoreEnd
-
         $this->google2fa = new Google2FA;
     }
 

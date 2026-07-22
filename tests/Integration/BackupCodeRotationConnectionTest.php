@@ -26,8 +26,8 @@ use Tests\TestCase;
  * non-default database connection relies on the documented atomic-replace
  * guarantee holding on THAT connection. If the manager opened the outer
  * transaction against the default connection, the rotation's delete-then-
- * insert work would run outside any transaction on the factor connection and
- * a failure mid-rotation would leave the identity with zero backup codes.
+ * insert work would run outside any transaction on the factor connection and a
+ * failure mid-rotation would leave the identity with zero backup codes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

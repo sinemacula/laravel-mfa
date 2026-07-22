@@ -49,7 +49,6 @@ final readonly class FactorSummary implements \JsonSerializable
 
         /** When the factor was last successfully verified. */
         public ?CarbonInterface $verifiedAt,
-
     ) {}
 
     /**

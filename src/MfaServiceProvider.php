@@ -38,7 +38,7 @@ use SineMacula\Laravel\Mfa\Stores\SessionMfaVerificationStore;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-class MfaServiceProvider extends ServiceProvider
+final class MfaServiceProvider extends ServiceProvider
 {
     /**
      * Register any application services.
@@ -235,7 +235,7 @@ class MfaServiceProvider extends ServiceProvider
         $this->app->singleton('mfa', static function (Application $app): MfaManager {
             $manager = new MfaManager($app);
 
-            static::registerBuiltInDrivers($manager, $app);
+            self::registerBuiltInDrivers($manager, $app);
 
             return $manager;
         });

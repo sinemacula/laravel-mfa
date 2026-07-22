@@ -35,6 +35,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
      *
      * @return void
      */
+    #[\Override]
     protected function tearDown(): void
     {
         if (class_exists(\Mockery::class)) {
@@ -65,7 +66,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     /**
      * `assertFactorOwnership()` must reject a non-Eloquent factor whose owner
      * FQCN matches but whose identifier is non-scalar — exercising the
-     * `sameIdentifier()` short-circuit on the non-string-non-int branch.
+     * `isSameIdentifier()` short-circuit on the non-string-non-int branch.
      *
      * @return void
      *
@@ -85,7 +86,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
         $this->stubDriver('totp', $driver);
 
         // Both sides of the identifier comparison are non-scalar so
-        // `sameIdentifier()` collapses to false and the manager throws.
+        // `isSameIdentifier()` collapses to false and the manager throws.
         $this->expectException(FactorOwnershipMismatchException::class);
 
         $this->manager()->verify('totp', $factor, '000000');

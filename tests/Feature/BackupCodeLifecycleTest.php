@@ -65,10 +65,9 @@ final class BackupCodeLifecycleTest extends TestCase
      * race: a second request still holding the pre-consumption snapshot must
      * fail even though its in-memory hash would otherwise match. We stage the
      * race by consuming through one handle, then verifying through an
-     * independent handle whose attributes were snapshotted before consumption
-     * — the in-memory hash still equals the expected secret, but the
-     * conditional UPDATE finds a row whose stored secret is already null and
-     * returns false.
+     * independent handle whose attributes were snapshotted before consumption —
+     * the in-memory hash still equals the expected secret, but the conditional
+     * UPDATE finds a row whose stored secret is already null and returns false.
      *
      * @return void
      *

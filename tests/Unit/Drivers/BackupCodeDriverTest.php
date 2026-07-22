@@ -267,7 +267,6 @@ final class BackupCodeDriverTest extends TestCase
                 /** Stored backup-code secret hash. */
                 #[\SensitiveParameter]
                 private readonly ?string $secret,
-
             ) {}
 
             /**
@@ -275,6 +274,7 @@ final class BackupCodeDriverTest extends TestCase
              *
              * @return string
              */
+            #[\Override]
             public function getDriver(): string
             {
                 return BackupCodeDriver::NAME;
@@ -285,6 +285,7 @@ final class BackupCodeDriverTest extends TestCase
              *
              * @return ?string
              */
+            #[\Override]
             public function getSecret(): ?string
             {
                 return $this->secret;

@@ -7,8 +7,8 @@ namespace SineMacula\Laravel\Mfa\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
+use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
-use SineMacula\Laravel\Mfa\Traits\ActsAsFactor;
 
 /**
  * Default shipped Factor Eloquent model.
@@ -16,8 +16,8 @@ use SineMacula\Laravel\Mfa\Traits\ActsAsFactor;
  * Polymorphic factor record bound to an authenticatable identity via the
  * `authenticatable()` morphTo relation. ULID primary key. Swappable via
  * `config('mfa.factor.model')` / `mfa.factor.table` as the package's default
- * Eloquent adapter. Non-`final` so consumers may subclass; subclasses MUST
- * continue satisfying the `Factor` persistence boundary.
+ * Eloquent adapter. Subclasses MUST continue satisfying the `Factor`
+ * persistence boundary.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -35,6 +35,8 @@ use SineMacula\Laravel\Mfa\Traits\ActsAsFactor;
  * @property int $attempts
  * @property ?\Carbon\CarbonInterface $locked_until
  * @property ?\Carbon\CarbonInterface $last_attempted_at
+ *
+ * @inheritable
  */
 class Factor extends Model implements EloquentFactor
 {
@@ -54,17 +56,6 @@ class Factor extends Model implements EloquentFactor
         'attempts',
         'locked_until',
         'last_attempted_at',
-    ];
-
-    /** @var array<string, string> The attributes that should be cast. */
-    protected $casts = [
-        'secret'            => 'encrypted',
-        'code'              => 'encrypted',
-        'expires_at'        => 'datetime',
-        'verified_at'       => 'datetime',
-        'locked_until'      => 'datetime',
-        'last_attempted_at' => 'datetime',
-        'attempts'          => 'integer',
     ];
 
     /** @var list<string> The attributes that should be hidden for serialization. */
@@ -96,6 +87,25 @@ class Factor extends Model implements EloquentFactor
     public function uniqueIds(): array
     {
         return ['id'];
+    }
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'secret'            => 'encrypted',
+            'code'              => 'encrypted',
+            'expires_at'        => 'datetime',
+            'verified_at'       => 'datetime',
+            'locked_until'      => 'datetime',
+            'last_attempted_at' => 'datetime',
+            'attempts'          => 'integer',
+        ];
     }
 
     /**

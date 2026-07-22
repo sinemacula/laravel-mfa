@@ -39,6 +39,5 @@ final readonly class MfaChallengeIssued
 
         /** Driver name that handled the challenge issuance. */
         public string $driver,
-
     ) {}
 }

@@ -28,7 +28,6 @@ final class NonModelEloquentBackupCodeFactor extends AbstractEloquentFactorStub
         /** Stored backup-code secret hash. */
         #[\SensitiveParameter]
         private readonly ?string $secret,
-
     ) {}
 
     /**
@@ -36,6 +35,7 @@ final class NonModelEloquentBackupCodeFactor extends AbstractEloquentFactorStub
      *
      * @return mixed
      */
+    #[\Override]
     public function getFactorIdentifier(): mixed
     {
         return 'non-model';
@@ -46,6 +46,7 @@ final class NonModelEloquentBackupCodeFactor extends AbstractEloquentFactorStub
      *
      * @return string
      */
+    #[\Override]
     public function getDriver(): string
     {
         return BackupCodeDriver::NAME;
@@ -56,6 +57,7 @@ final class NonModelEloquentBackupCodeFactor extends AbstractEloquentFactorStub
      *
      * @return ?string
      */
+    #[\Override]
     public function getSecret(): ?string
     {
         return $this->secret;

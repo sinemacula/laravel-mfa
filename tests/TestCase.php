@@ -65,6 +65,7 @@ abstract class TestCase extends BaseTestCase
      * @param  \Illuminate\Foundation\Application  $app
      * @return list<class-string<\Illuminate\Support\ServiceProvider>>
      */
+    #[\Override]
     protected function getPackageProviders(mixed $app): array
     {
         return [
@@ -81,6 +82,7 @@ abstract class TestCase extends BaseTestCase
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Random\RandomException
      */
+    #[\Override]
     protected function defineEnvironment(mixed $app): void
     {
         /** @var \Illuminate\Config\Repository $config */
@@ -108,6 +110,7 @@ abstract class TestCase extends BaseTestCase
      *
      * @return void
      */
+    #[\Override]
     protected function defineDatabaseMigrations(): void
     {
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');

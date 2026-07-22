@@ -38,6 +38,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @throws \Tests\Fixtures\Exceptions\UnsupportedFixtureMethodException
      */
+    #[\Override]
     public function authenticatable(): MorphTo
     {
         // Wrapping the throw in a `match` keeps the `return` syntactically
@@ -53,6 +54,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return string
      */
+    #[\Override]
     public function getDriverName(): string
     {
         return 'driver';
@@ -63,6 +65,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return string
      */
+    #[\Override]
     public function getLabelName(): string
     {
         return 'label';
@@ -73,6 +76,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return string
      */
+    #[\Override]
     public function getRecipientName(): string
     {
         return 'recipient';
@@ -83,6 +87,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return string
      */
+    #[\Override]
     public function getSecretName(): string
     {
         return 'secret';
@@ -93,6 +98,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return string
      */
+    #[\Override]
     public function getCodeName(): string
     {
         return 'code';
@@ -103,6 +109,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return string
      */
+    #[\Override]
     public function getExpiresAtName(): string
     {
         return 'expires_at';
@@ -113,6 +120,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return string
      */
+    #[\Override]
     public function getAttemptsName(): string
     {
         return 'attempts';
@@ -123,6 +131,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return string
      */
+    #[\Override]
     public function getLockedUntilName(): string
     {
         return 'locked_until';
@@ -133,6 +142,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return string
      */
+    #[\Override]
     public function getLastAttemptedAtName(): string
     {
         return 'last_attempted_at';
@@ -143,6 +153,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return string
      */
+    #[\Override]
     public function getVerifiedAtName(): string
     {
         return 'verified_at';
@@ -154,6 +165,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
+    #[\Override]
     public function recordAttempt(?CarbonInterface $at = null): void
     {
         // Intentionally empty — see method docblock.
@@ -164,6 +176,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return void
      */
+    #[\Override]
     public function resetAttempts(): void
     {
         // Intentionally empty — see method docblock.
@@ -175,6 +188,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      * @param  \Carbon\CarbonInterface  $until
      * @return void
      */
+    #[\Override]
     public function applyLockout(CarbonInterface $until): void
     {
         // Intentionally empty — see method docblock.
@@ -186,6 +200,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
+    #[\Override]
     public function recordVerification(?CarbonInterface $at = null): void
     {
         // Intentionally empty — see method docblock.
@@ -198,6 +213,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      * @param  \Carbon\CarbonInterface  $expiresAt
      * @return void
      */
+    #[\Override]
     public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void
     {
         // Intentionally empty — see method docblock.
@@ -208,6 +224,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return void
      */
+    #[\Override]
     public function consumeCode(): void
     {
         // Intentionally empty — see method docblock.
@@ -218,6 +235,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      *
      * @return void
      */
+    #[\Override]
     public function persist(): void
     {
         // Intentionally empty — see method docblock.

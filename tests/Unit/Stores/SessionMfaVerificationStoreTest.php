@@ -39,6 +39,7 @@ final class SessionMfaVerificationStoreTest extends TestCase
      *
      * @return void
      */
+    #[\Override]
     protected function setUp(): void
     {
         parent::setUp();
@@ -51,6 +52,7 @@ final class SessionMfaVerificationStoreTest extends TestCase
      *
      * @return void
      */
+    #[\Override]
     protected function tearDown(): void
     {
         Carbon::setTestNow();
@@ -196,9 +198,8 @@ final class SessionMfaVerificationStoreTest extends TestCase
     }
 
     /**
-     * Test keys are scoped by identity class so two different
-     * authenticatables sharing the same identifier do not collide on a single
-     * verification slot.
+     * Test keys are scoped by identity class so two different authenticatables
+     * sharing the same identifier do not collide on a single verification slot.
      *
      * @return void
      */

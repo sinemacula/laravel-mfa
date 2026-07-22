@@ -30,6 +30,7 @@ final class NoopFactorDriver implements FactorDriver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
      */
+    #[\Override]
     public function issueChallenge(Factor $factor): void
     {
         // Intentional no-op — fixture exists only to register a driver name;
@@ -43,6 +44,7 @@ final class NoopFactorDriver implements FactorDriver
      * @param  string  $code
      * @return bool
      */
+    #[\Override]
     public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
     {
         return false;
@@ -53,6 +55,7 @@ final class NoopFactorDriver implements FactorDriver
      *
      * @return ?string
      */
+    #[\Override]
     public function generateSecret(): ?string
     {
         return null;

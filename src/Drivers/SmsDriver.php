@@ -51,13 +51,20 @@ final class SmsDriver extends AbstractOtpDriver
         /** Message template; MUST contain the `CODE_PLACEHOLDER` constant. */
         private readonly string $messageTemplate = 'Your verification code is: ' . self::CODE_PLACEHOLDER,
 
-        // The remaining parameters are passthroughs to AbstractOtpDriver.
+        // Generated code length; passthrough to `AbstractOtpDriver`.
         int $codeLength = 6,
-        int $expiry = 10,
-        int $maxAttempts = 3,
-        ?string $alphabet = null,
-        ?callable $randomInt = null,
 
+        // Code lifetime in minutes; passthrough to `AbstractOtpDriver`.
+        int $expiry = 10,
+
+        // Lockout threshold; passthrough to `AbstractOtpDriver`.
+        int $maxAttempts = 3,
+
+        // Optional code alphabet; passthrough to `AbstractOtpDriver`.
+        ?string $alphabet = null,
+
+        // Randomness seam; passthrough to `AbstractOtpDriver`.
+        ?callable $randomInt = null,
     ) {
         self::assertValidMessageTemplate($messageTemplate);
 

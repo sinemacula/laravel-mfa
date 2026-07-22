@@ -19,9 +19,6 @@ use SineMacula\Laravel\Mfa\MfaManager;
  *
  * @internal
  */
-// Extending the real manager preserves the facade's @method signatures
-// so middleware tests stay type-safe; the parent constructor is
-// intentionally skipped — see __construct below.
 final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
 {
     /** @var bool */
@@ -56,6 +53,7 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
      *
      * @return bool
      */
+    #[\Override]
     public function shouldUse(): bool
     {
         return $this->shouldUse;
@@ -66,6 +64,7 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
      *
      * @return bool
      */
+    #[\Override]
     public function isSetup(): bool
     {
         return $this->isSetup;
@@ -76,6 +75,7 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
      *
      * @return bool
      */
+    #[\Override]
     public function hasEverVerified(): bool
     {
         return $this->hasEverVerified;
@@ -87,6 +87,7 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
      * @param  ?int  $expiresAfter
      * @return bool
      */
+    #[\Override]
     public function hasExpired(?int $expiresAfter = null): bool
     {
         return $this->hasExpired;
@@ -101,6 +102,7 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
      *
      * @formatter:on
      */
+    #[\Override]
     public function getFactors(): ?Collection
     {
         return $this->factors;

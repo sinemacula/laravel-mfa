@@ -38,6 +38,5 @@ final readonly class MfaFactorDisabled
 
         /** Driver name the disabled factor was registered with. */
         public string $driver,
-
     ) {}
 }

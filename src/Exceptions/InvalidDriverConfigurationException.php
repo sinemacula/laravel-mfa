@@ -17,9 +17,9 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * and existing test expectations working without churn.
  *
  * Factory methods cover each violation shape the package currently raises so
- * the message format stays consistent across drivers — call sites pass a
- * short natural-language context string (e.g. `'OTP code length'`,
- * `'Backup-code alphabet'`) and the factory assembles the rest.
+ * the message format stays consistent across drivers — call sites pass a short
+ * natural-language context string (e.g. `'OTP code length'`, `'Backup-code
+ * alphabet'`) and the factory assembles the rest.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -54,9 +54,9 @@ final class InvalidDriverConfigurationException extends \InvalidArgumentExceptio
     }
 
     /**
-     * Raised when a configured `maxAttempts` is negative — the manager's
-     * `>=` lockout threshold would never match and the lockout would silently
-     * never apply.
+     * Raised when a configured `maxAttempts` is negative — the manager's `>=`
+     * lockout threshold would never match and the lockout would silently never
+     * apply.
      *
      * @param  string  $context
      * @param  int  $got

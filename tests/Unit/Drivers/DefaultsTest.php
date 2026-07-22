@@ -50,6 +50,7 @@ final class DefaultsTest extends TestCase
              * @param  string  $code
              * @return void
              */
+            #[\Override]
             protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void
             {
                 // Intentionally empty — see method docblock.
