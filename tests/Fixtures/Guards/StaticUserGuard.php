@@ -29,14 +29,16 @@ final class StaticUserGuard implements Guard
 
         /** Resolved identity returned by the guard. */
         private readonly TestUser $resolved,
-
     ) {}
 
     /**
      * Report that the fixture always has an authenticated identity.
      *
+     * @imperative
+     *
      * @return bool
      */
+    #[\Override]
     public function check(): bool
     {
         return true;
@@ -45,8 +47,11 @@ final class StaticUserGuard implements Guard
     /**
      * Report that the fixture is never a guest.
      *
+     * @imperative
+     *
      * @return bool
      */
+    #[\Override]
     public function guest(): bool
     {
         return false;
@@ -57,6 +62,7 @@ final class StaticUserGuard implements Guard
      *
      * @return \Tests\Fixtures\TestUser
      */
+    #[\Override]
     public function user(): TestUser
     {
         return $this->resolved;
@@ -67,6 +73,7 @@ final class StaticUserGuard implements Guard
      *
      * @return int
      */
+    #[\Override]
     public function id(): int
     {
         return $this->resolved->id;
@@ -78,6 +85,7 @@ final class StaticUserGuard implements Guard
      * @param  array<array-key, mixed>  $credentials
      * @return bool
      */
+    #[\Override]
     public function validate(array $credentials = []): bool
     {
         return true;
@@ -88,6 +96,7 @@ final class StaticUserGuard implements Guard
      *
      * @return bool
      */
+    #[\Override]
     public function hasUser(): bool
     {
         return true;
@@ -99,6 +108,7 @@ final class StaticUserGuard implements Guard
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
      * @return self
      */
+    #[\Override]
     public function setUser(Authenticatable $user): self
     {
         return $this;

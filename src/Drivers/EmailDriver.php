@@ -42,14 +42,20 @@ final class EmailDriver extends AbstractOtpDriver
         /** Mailable class responsible for rendering the code email. */
         private readonly string $mailable = MfaCodeMessage::class,
 
-        // The remaining parameters are untyped-here-for-clarity passthroughs
-        // to `AbstractOtpDriver::__construct()` below.
+        // Generated code length; passthrough to `AbstractOtpDriver`.
         int $codeLength = 6,
-        int $expiry = 10,
-        int $maxAttempts = 3,
-        ?string $alphabet = null,
-        ?callable $randomInt = null,
 
+        // Code lifetime in minutes; passthrough to `AbstractOtpDriver`.
+        int $expiry = 10,
+
+        // Lockout threshold; passthrough to `AbstractOtpDriver`.
+        int $maxAttempts = 3,
+
+        // Optional code alphabet; passthrough to `AbstractOtpDriver`.
+        ?string $alphabet = null,
+
+        // Randomness seam; passthrough to `AbstractOtpDriver`.
+        ?callable $randomInt = null,
     ) {
         parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet, $randomInt);
     }

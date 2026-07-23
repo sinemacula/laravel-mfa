@@ -30,6 +30,7 @@ final class RecordingFactorDriver implements FactorDriver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
      */
+    #[\Override]
     public function issueChallenge(Factor $factor): void
     {
         $this->issueCalls++;
@@ -43,6 +44,7 @@ final class RecordingFactorDriver implements FactorDriver
      * @param  string  $code
      * @return bool
      */
+    #[\Override]
     public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
     {
         $this->verifyCalls++;
@@ -55,6 +57,7 @@ final class RecordingFactorDriver implements FactorDriver
      *
      * @return ?string
      */
+    #[\Override]
     public function generateSecret(): ?string
     {
         return null;

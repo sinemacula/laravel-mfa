@@ -48,7 +48,7 @@ final class BackupCodeBench
      */
     public function setUp(): void
     {
-        $this->factor->secret = $this->driver->hash($this->plaintext);
+        $this->factor->setSecret($this->driver->hash($this->plaintext));
     }
 
     /**

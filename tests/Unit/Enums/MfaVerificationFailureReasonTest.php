@@ -27,7 +27,7 @@ final class MfaVerificationFailureReasonTest extends TestCase
         $reflection = new \ReflectionEnum(MfaVerificationFailureReason::class);
 
         self::assertTrue($reflection->isBacked());
-        self::assertSame('string', (string) $reflection->getBackingType());
+        self::assertSame('string', $reflection->getBackingType()->getName());
     }
 
     /**

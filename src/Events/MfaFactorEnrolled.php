@@ -37,6 +37,5 @@ final readonly class MfaFactorEnrolled
 
         /** Driver name the factor is registered with. */
         public string $driver,
-
     ) {}
 }

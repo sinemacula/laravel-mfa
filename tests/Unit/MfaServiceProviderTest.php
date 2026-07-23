@@ -163,14 +163,17 @@ final class MfaServiceProviderTest extends TestCase
      */
     public function testOfferPublishingIsSkippedWhenNotRunningInConsole(): void
     {
-        // Build a throwaway testbench kernel whose `runningInConsole()`
-        // returns false so we exercise the early-return in `offerPublishing()`.
+        // Build a throwaway testbench kernel whose `runningInConsole()` returns
+        // false so we exercise the early-return in `offerPublishing()`.
         $app = new class extends Application {
             /**
              * Running in console.
              *
+             * @imperative
+             *
              * @return bool
              */
+            #[\Override]
             public function runningInConsole(): bool
             {
                 return false;

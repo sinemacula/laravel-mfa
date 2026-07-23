@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Traits;
+namespace SineMacula\Laravel\Mfa\Concerns;
 
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  */
-trait ActsAsFactor
+trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
     /**
      * Polymorphic relation to the owning authenticatable identity.

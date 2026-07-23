@@ -53,6 +53,7 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
      *
      * @return bool
      */
+    #[\Override]
     public function shouldUseMultiFactor(): bool
     {
         return true;
@@ -63,6 +64,7 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
      *
      * @return bool
      */
+    #[\Override]
     public function isMfaEnabled(): bool
     {
         return false;
@@ -77,6 +79,7 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
      *
      * @formatter:on
      */
+    #[\Override]
     public function authFactors(): Builder
     {
         return self::coerceFactorBuilder($this->factors()->getQuery());
@@ -100,6 +103,8 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
      *
      * @param  mixed  $builder
      * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     *
+     * @throws \Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException
      *
      * @formatter:on
      */

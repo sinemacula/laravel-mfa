@@ -50,5 +50,6 @@ abstract class DispatchTrackingOtpDriver extends AbstractOtpDriver
      * @param  string  $code
      * @return void
      */
+    #[\Override]
     abstract protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void;
 }

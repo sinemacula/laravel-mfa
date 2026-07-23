@@ -29,7 +29,6 @@ final class FirstStoreIdentity implements Authenticatable
 
         /** Auth identifier reported by the fixture. */
         private readonly string $identifier,
-
     ) {}
 
     /**

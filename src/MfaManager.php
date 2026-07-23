@@ -51,16 +51,18 @@ use SineMacula\Laravel\Mfa\Models\Factor as ShippedFactorModel;
  * `extend()` API, keeping this class free of per-driver construction logic.
  *
  * Exceeds the project's max-methods-per-class threshold by design: the Manager
- * pattern's coordination role across drivers, factors, store, policy, and
- * cache is intrinsic and splitting into traits would shuffle methods rather
- * than reduce coupling.
+ * pattern's coordination role across drivers, factors, store, policy, and cache
+ * is intrinsic and splitting into traits would shuffle methods rather than
+ * reduce coupling.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
  *
+ * @inheritable
+ *
  * @SuppressWarnings("php:S1448")
  */
-class MfaManager extends Manager
+class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
     /** @var string Cache key for the setup state */
     private const string CACHE_KEY_SETUP = 'setup';
@@ -189,17 +191,17 @@ class MfaManager extends Manager
 
         // `verifiedAt === null` means no prior verification exists.
         // `window <= 0` is the documented "require verification on every
-        // request" setting and treats any prior verification as expired. A
-        // negative `elapsed` means `verifiedAt` is in the future (clock skew or
-        // a malicious store write) — treat as expired rather than trusting a
-        // future-dated verification.
-        $elapsed = $verifiedAt?->diffInMinutes(Carbon::now(), false);
+        // request" setting and treats any prior verification as expired.
+        if ($verifiedAt === null || $window <= 0) {
+            return true;
+        }
 
-        return $verifiedAt === null
-            || $window <= 0
-            || $elapsed === null
-            || $elapsed < 0
-            || $elapsed > $window;
+        // A negative `elapsed` means `verifiedAt` is in the future (clock skew
+        // or a malicious store write) - treat as expired rather than trusting a
+        // future-dated verification.
+        $elapsed = $verifiedAt->diffInMinutes(Carbon::now(), false);
+
+        return $elapsed < 0 || $elapsed > $window;
     }
 
     /**
@@ -264,9 +266,9 @@ class MfaManager extends Manager
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account
      * factor-tampering primitive. Throws `FactorDriverMismatchException` when
-     * the requested driver name does not match the factor's own
-     * `getDriver()` — routing one driver's logic through a factor registered
-     * against another is always a caller bug.
+     * the requested driver name does not match the factor's own `getDriver()` —
+     * routing one driver's logic through a factor registered against another is
+     * always a caller bug.
      *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -288,9 +290,9 @@ class MfaManager extends Manager
         $this->assertFactorOwnership($factor, $identity);
 
         // OTP-issuing drivers (email, SMS) reset the attempt counter and
-        // persist the freshly minted code from inside `issueChallenge()` —
-        // the reset is paired with a fresh secret and so cannot be used to wipe
-        // a lockout without rotating credentials. TOTP and backup codes have no
+        // persist the freshly minted code from inside `issueChallenge()` — the
+        // reset is paired with a fresh secret and so cannot be used to wipe a
+        // lockout without rotating credentials. TOTP and backup codes have no
         // per-challenge secret to mint and no state to persist, so their
         // `issueChallenge()` is a no-op and the manager preserves their lockout
         // state across challenge calls.
@@ -319,10 +321,10 @@ class MfaManager extends Manager
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account MFA-bypass
      * primitive. Throws `FactorDriverMismatchException` when the requested
-     * driver name does not match the factor's own `getDriver()` — routing
-     * one driver's logic through a factor registered against another is
-     * always a caller bug and would otherwise produce confusing persistence,
-     * transport, and audit-event semantics.
+     * driver name does not match the factor's own `getDriver()` — routing one
+     * driver's logic through a factor registered against another is always a
+     * caller bug and would otherwise produce confusing persistence, transport,
+     * and audit-event semantics.
      *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -516,8 +518,8 @@ class MfaManager extends Manager
      * Atomically replaces existing `backup_code` factors in a single
      * transaction: prior rows deleted, a fresh batch minted via
      * `BackupCodeDriver`, one `Factor` row per code persisted with the hashed
-     * value on `secret`. Returns the plaintext set exactly once — the codes
-     * are NEVER recoverable after this method returns.
+     * value on `secret`. Returns the plaintext set exactly once — the codes are
+     * NEVER recoverable after this method returns.
      *
      * Each new factor dispatches `MfaFactorEnrolled`; the setup-state cache is
      * invalidated so `isSetup()` reflects the new batch immediately.
@@ -527,8 +529,7 @@ class MfaManager extends Manager
      * @param  ?int  $count
      * @return list<string>
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \Throwable
+     * @throws \LogicException
      */
     public function issueBackupCodes(?int $count = null): array
     {
@@ -580,7 +581,7 @@ class MfaManager extends Manager
      *
      * @return class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException
      */
     public function factorModel(): string
     {
@@ -732,6 +733,8 @@ class MfaManager extends Manager
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
      */
     private function assertFactorOwnership(Factor $factor, MultiFactorAuthenticatable $identity): void
     {
@@ -750,12 +753,12 @@ class MfaManager extends Manager
             $relation   = $factor->authenticatable();
             $factorType = $factor->getAttribute($relation->getMorphType());
             $factorId   = $factor->getAttribute($relation->getForeignKeyName());
-            $matches    = $factorType === $expectedType && $this->sameIdentifier($factorId, $expectedId);
+            $matches    = $factorType === $expectedType && $this->isSameIdentifier($factorId, $expectedId);
         } else {
             $owner   = $factor->getAuthenticatable();
             $matches = $owner !== null
                 && $owner::class === $identity::class
-                && $this->sameIdentifier($owner->getAuthIdentifier(), $expectedId);
+                && $this->isSameIdentifier($owner->getAuthIdentifier(), $expectedId);
         }
 
         if (!$matches) {
@@ -773,7 +776,7 @@ class MfaManager extends Manager
      * @param  mixed  $right
      * @return bool
      */
-    private function sameIdentifier(mixed $left, mixed $right): bool
+    private function isSameIdentifier(mixed $left, mixed $right): bool
     {
         if ((!is_string($left) && !is_int($left)) || (!is_string($right) && !is_int($right))) {
             return false;
@@ -790,6 +793,8 @@ class MfaManager extends Manager
      *
      * @param  string  $name
      * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
+     *
+     * @throws \LogicException
      */
     private function resolveDriver(string $name): FactorDriver
     {
@@ -867,10 +872,11 @@ class MfaManager extends Manager
         }
 
         // Classify the failure inline. Branches in priority order:
-        // - SECRET_MISSING: TOTP enrolment never completed (no code AND no secret).
-        // - CODE_EXPIRED:   pending OTP aged past its window.
-        // - CODE_MISSING:   pending code exists but has no expiry — treat as missing.
-        // - CODE_INVALID:   default — TOTP window mismatch or OTP comparison mismatch.
+        // SECRET_MISSING when TOTP enrolment never completed (no code and no
+        // secret); CODE_EXPIRED when the pending OTP aged past its window;
+        // CODE_MISSING when a pending code exists but has no expiry - treat as
+        // missing; CODE_INVALID otherwise - TOTP window mismatch or OTP
+        // comparison mismatch.
         $expiresAt = $factor->getExpiresAt();
         $pending   = $factor->getCode();
         $secret    = $factor->getSecret();

@@ -30,6 +30,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return mixed
      */
+    #[\Override]
     public function getFactorIdentifier(): mixed
     {
         return 'stub';
@@ -40,6 +41,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return string
      */
+    #[\Override]
     public function getDriver(): string
     {
         return 'email';
@@ -50,6 +52,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return ?string
      */
+    #[\Override]
     public function getLabel(): ?string
     {
         return null;
@@ -60,6 +63,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return ?string
      */
+    #[\Override]
     public function getRecipient(): ?string
     {
         return null;
@@ -70,6 +74,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return ?\Illuminate\Contracts\Auth\Authenticatable
      */
+    #[\Override]
     public function getAuthenticatable(): ?Authenticatable
     {
         return null;
@@ -80,6 +85,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return ?string
      */
+    #[\Override]
     public function getSecret(): ?string
     {
         return null;
@@ -90,6 +96,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return ?string
      */
+    #[\Override]
     public function getCode(): ?string
     {
         return null;
@@ -100,6 +107,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return ?\Carbon\CarbonInterface
      */
+    #[\Override]
     public function getExpiresAt(): ?CarbonInterface
     {
         return null;
@@ -110,6 +118,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return int
      */
+    #[\Override]
     public function getAttempts(): int
     {
         return 0;
@@ -120,6 +129,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return bool
      */
+    #[\Override]
     public function isLocked(): bool
     {
         // Derived from the accessor so subclasses can flip the lock state by
@@ -134,6 +144,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return ?\Carbon\CarbonInterface
      */
+    #[\Override]
     public function getLockedUntil(): ?CarbonInterface
     {
         return null;
@@ -144,6 +155,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return ?\Carbon\CarbonInterface
      */
+    #[\Override]
     public function getLastAttemptedAt(): ?CarbonInterface
     {
         return null;
@@ -154,6 +166,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return bool
      */
+    #[\Override]
     public function isVerified(): bool
     {
         return $this->getVerifiedAt() !== null;
@@ -164,6 +177,7 @@ abstract class AbstractFactorStub implements Factor
      *
      * @return ?\Carbon\CarbonInterface
      */
+    #[\Override]
     public function getVerifiedAt(): ?CarbonInterface
     {
         return null;

@@ -47,6 +47,7 @@ final class CallOrderTrackingFactor extends Factor
      * @param  \Carbon\CarbonInterface  $expiresAt
      * @return void
      */
+    #[\Override]
     public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void
     {
         $this->tracker[] = 'issueCode';
@@ -58,6 +59,7 @@ final class CallOrderTrackingFactor extends Factor
      *
      * @return void
      */
+    #[\Override]
     public function persist(): void
     {
         $this->tracker[] = 'persist';

@@ -212,8 +212,8 @@ final class FactorSummaryTest extends TestCase
     {
         $summary = $this->buildSummaryWithRecipient('alice@example.com');
 
-        // Local-part length 5 → keep min(2, max(1, floor(5/2))) = 2 chars
-        // → `al` + `***` → `al***@example.com`.
+        // Local-part length 5 → keep min(2, max(1, floor(5/2))) = 2 chars →
+        // `al` + `***` → `al***@example.com`.
         self::assertSame('al***@example.com', $summary->maskedRecipient);
     }
 
@@ -244,8 +244,8 @@ final class FactorSummaryTest extends TestCase
     {
         $summary = $this->buildSummaryWithRecipient('alice@inner@example.com');
 
-        // explode('@', $r, 2) → ['alice', 'inner@example.com'].
-        // Local-part length 5 → keep 2, mask 3 → 'al***'.
+        // explode('@', $r, 2) → ['alice', 'inner@example.com']. Local-part
+        // length 5 → keep 2, mask 3 → 'al***'.
         self::assertSame('al***@inner@example.com', $summary->maskedRecipient);
     }
 

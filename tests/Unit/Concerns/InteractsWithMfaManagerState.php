@@ -15,9 +15,9 @@ use Tests\Fixtures\TestUser;
  * Shared scaffolding for the `MfaManager` state-test family.
  *
  * The state suite is split into three subjects (lookups / expiry / lifecycle)
- * to stay under the max-methods-per-class threshold. This trait centralises
- * the shared helpers — manager resolution, factor seeding, fake stores, and
- * Mockery teardown.
+ * to stay under the max-methods-per-class threshold. This trait centralises the
+ * shared helpers — manager resolution, factor seeding, fake stores, and Mockery
+ * teardown.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.

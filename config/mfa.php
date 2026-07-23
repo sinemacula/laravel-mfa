@@ -75,10 +75,10 @@ return [
             'expiry'       => (int) env('MFA_EMAIL_EXPIRY_MINUTES', 10),
             'max_attempts' => (int) env('MFA_EMAIL_MAX_ATTEMPTS', 3),
 
-            // Optional alphabet override. `null` keeps the default
-            // numeric code; supply a non-empty string of two or more
-            // characters to draw from a custom set (Crockford base32,
-            // hex, alphabetic for voice delivery, etc.).
+            // Optional alphabet override. `null` keeps the default numeric
+            // code; supply a non-empty string of two or more characters to draw
+            // from a custom set (Crockford base32, hex, alphabetic for voice
+            // delivery, etc.).
             'alphabet' => env('MFA_EMAIL_ALPHABET'),
         ],
 
@@ -91,8 +91,8 @@ return [
                 'Your verification code is: :code',
             ),
 
-            // See email.alphabet above. SMS deliveries often benefit
-            // from an unambiguous Crockford-base32 set, e.g.
+            // See email.alphabet above. SMS deliveries often benefit from an
+            // unambiguous Crockford-base32 set, e.g.
             // '0123456789ABCDEFGHJKMNPQRSTVWXYZ'.
             'alphabet' => env('MFA_SMS_ALPHABET'),
         ],

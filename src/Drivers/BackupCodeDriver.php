@@ -35,8 +35,8 @@ final class BackupCodeDriver implements FactorDriver
     /** @var string Driver identifier used on Factor::driver. */
     public const string NAME = 'backup_code';
 
-    /** @var callable(int, int): int Bound at construction — `random_int(...)` by default. */
-    private $randomInt;
+    /** @var \Closure(int, int): int Bound at construction - `random_int(...)` by default. */
+    private \Closure $randomInt;
 
     /**
      * Constructor.
@@ -73,12 +73,11 @@ final class BackupCodeDriver implements FactorDriver
 
         // Randomness seam — `null` binds to PHP's CSPRNG `random_int`.
         ?callable $randomInt = null,
-
     ) {
         $this->assertValidCodeLength($codeLength);
         $this->assertValidAlphabet($alphabet);
 
-        $this->randomInt = $randomInt ?? random_int(...);
+        $this->randomInt = $randomInt === null ? random_int(...) : $randomInt(...);
     }
 
     /**
@@ -166,9 +165,8 @@ final class BackupCodeDriver implements FactorDriver
      * The returned batch is guaranteed distinct: a duplicate draw is re-rolled
      * rather than returned, so consumers receive exactly `$effectiveCount`
      * unique recovery codes. Configurations whose code space is smaller than
-     * the requested batch size (`alphabet^codeLength < count`) are rejected
-     * — the package cannot mint a distinct batch from a code space that
-     * small.
+     * the requested batch size (`alphabet^codeLength < count`) are rejected —
+     * the package cannot mint a distinct batch from a code space that small.
      *
      * @param  ?int  $count
      * @return list<string>
@@ -191,9 +189,11 @@ final class BackupCodeDriver implements FactorDriver
             // two identical codes (which would persist as two rows sharing a
             // credential, masquerading as separate recovery codes). The outer
             // code-space check guarantees this loop terminates.
-            if (!in_array($candidate, $codes, true)) {
-                $codes[] = $candidate;
+            if (in_array($candidate, $codes, true)) {
+                continue;
             }
+
+            $codes[] = $candidate;
         }
 
         return $codes;
@@ -273,6 +273,8 @@ final class BackupCodeDriver implements FactorDriver
      * Returns `true` when this request consumed the code, `false` when another
      * beat us to it.
      *
+     * @imperative
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $expectedSecret
      * @return bool
@@ -345,8 +347,8 @@ final class BackupCodeDriver implements FactorDriver
     }
 
     /**
-     * Reject batch counts below 1 — the driver cannot mint a sensible zero-
-     * or negative-sized batch.
+     * Reject batch counts below 1 — the driver cannot mint a sensible zero- or
+     * negative-sized batch.
      *
      * @param  int  $count
      * @return void

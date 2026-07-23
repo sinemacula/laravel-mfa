@@ -65,7 +65,7 @@ are what downstream code (audit sinks, admin tooling, custom factor models) can 
 
 ## Implementation Anchors
 
-- `src/Traits/ActsAsFactor.php`: `recordAttempt()`, `resetAttempts()`, `applyLockout()`, `isLocked()`,
+- `src/Concerns/ActsAsFactor.php`: `recordAttempt()`, `resetAttempts()`, `applyLockout()`, `isLocked()`,
   `recordVerification()`, `consumeCode()`.
 - `src/MfaManager.php`: lock-check short-circuit in `verify()`, `applyVerificationOutcome()` and its
   `resolveIntConfig()` calls for `mfa.drivers.<driver>.max_attempts` and `mfa.lockout_minutes`.

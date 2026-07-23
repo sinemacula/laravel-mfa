@@ -42,9 +42,8 @@ return new class extends Migration {
             $blueprint->index(['authenticatable_type', 'authenticatable_id']);
 
             // Driver name this factor is registered against (e.g. 'totp',
-            // 'email', 'sms', 'backup_code'). Indexed because a single
-            // identity may have multiple factors and lookups typically
-            // filter by driver.
+            // 'email', 'sms', 'backup_code'). Indexed because a single identity
+            // may have multiple factors and lookups typically filter by driver.
             $blueprint->string('driver')->index();
 
             // Optional human-readable label (e.g. "Work phone", "Authy").
@@ -53,38 +52,36 @@ return new class extends Migration {
             $blueprint->string('label')->nullable();
 
             // Delivery destination for OTP-delivery drivers. Stores the phone
-            // number for SMS factors (E.164-formatted), email address for
-            // email factors, and is null for factors that don't deliver to
-            // the identity over the network (TOTP, backup codes). Captured
-            // at enrolment time — intentionally not resolved live from the
+            // number for SMS factors (E.164-formatted), email address for email
+            // factors, and is null for factors that don't deliver to the
+            // identity over the network (TOTP, backup codes). Captured at
+            // enrolment time — intentionally not resolved live from the
             // identity so a silent address change cannot redirect codes.
             $blueprint->string('recipient')->nullable();
 
-            // Persistent secret for drivers that use one (TOTP). Encrypted
-            // at rest via the model's `encrypted` cast.
+            // Persistent secret for drivers that use one (TOTP). Encrypted at
+            // rest via the model's `encrypted` cast.
             $blueprint->text('secret')->nullable();
 
             // Currently issued one-time code (email, SMS) and its expiry.
-            // Cleared after successful verification or when the next
-            // challenge is issued. Encrypted at rest via the model's
-            // `encrypted` cast — `text` rather than a fixed length so
-            // the encrypted ciphertext fits regardless of the configured
-            // OTP alphabet / length.
+            // Cleared after successful verification or when the next challenge
+            // is issued. Encrypted at rest via the model's `encrypted` cast —
+            // `text` rather than a fixed length so the encrypted ciphertext
+            // fits regardless of the configured OTP alphabet / length.
             $blueprint->text('code')->nullable();
             $blueprint->timestamp('expires_at')->nullable();
 
             // Rate-limiting state. `attempts` is reset on successful
             // verification or new challenge issuance. `locked_until` is set
-            // when the configured max-attempts threshold is reached and
-            // cleared on unlock. `last_attempted_at` is set on every verify
-            // call regardless of outcome.
+            // when the configured max-attempts threshold is reached and cleared
+            // on unlock. `last_attempted_at` is set on every verify call
+            // regardless of outcome.
             $blueprint->unsignedInteger('attempts')->default(0);
             $blueprint->timestamp('locked_until')->nullable();
             $blueprint->timestamp('last_attempted_at')->nullable();
 
-            // When the factor last completed a successful verification.
-            // `null` means the factor has never been verified (new
-            // enrolment).
+            // When the factor last completed a successful verification. `null`
+            // means the factor has never been verified (new enrolment).
             $blueprint->timestamp('verified_at')->nullable();
 
             $blueprint->timestamps();
