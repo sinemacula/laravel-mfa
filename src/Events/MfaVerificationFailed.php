@@ -16,9 +16,9 @@ use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
  * parsing human-readable messages. Fires for the outcomes the manager itself
  * classifies — locked factors and the driver-reported verify() miss (invalid
  * code, expired challenge, missing code, missing secret). Unresolved driver
- * names and non-MFA-capable identities are handled outside the verify path
- * (a thrown `LogicException` and a short-circuit to `false` respectively) and
- * do NOT emit this event.
+ * names and non-MFA-capable identities are handled outside the verify path (a
+ * thrown `LogicException` and a short-circuit to `false` respectively) and do
+ * NOT emit this event.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -46,6 +46,5 @@ final readonly class MfaVerificationFailed
 
         /** Machine-readable reason for the failure. */
         public MfaVerificationFailureReason $reason,
-
     ) {}
 }

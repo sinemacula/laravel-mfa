@@ -18,10 +18,10 @@ use Symfony\Component\HttpFoundation\Response;
  * structured exceptions depending on the identity's state, so the consuming
  * application can render different UIs for each case:
  *
- * - No factors set up OR factors exist but the identity has never
- *   verified → `MfaRequiredException`
- * - Prior verification exists but has aged past the configured expiry
- *   window → `MfaExpiredException`
+ * - No factors set up OR factors exist but the identity has never verified →
+ *   `MfaRequiredException`
+ * - Prior verification exists but has aged past the configured expiry window →
+ *   `MfaExpiredException`
  *
  * Both exceptions carry a list of `FactorSummary` records with masked delivery
  * destinations so they are safe to ship through JSON response bodies and log
@@ -31,10 +31,10 @@ use Symfony\Component\HttpFoundation\Response;
  * bypass enforcement entirely — used on the verification endpoints themselves
  * to avoid circular enforcement.
  *
- * Optional route-middleware parameter overrides the configured
- * `default_expiry` per route group: `mfa:5` requires a verification no older
- * than five minutes; `mfa:0` forces re-verification on every request. This is
- * the step-up lever for sensitive actions.
+ * Optional route-middleware parameter overrides the configured `default_expiry`
+ * per route group: `mfa:5` requires a verification no older than five minutes;
+ * `mfa:0` forces re-verification on every request. This is the step-up lever
+ * for sensitive actions.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -57,7 +57,6 @@ final class RequireMfa
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException
-     * @throws \InvalidArgumentException
      */
     public function handle(Request $request, \Closure $next, ?string $maxAgeMinutes = null): Response
     {
@@ -89,8 +88,8 @@ final class RequireMfa
     }
 
     /**
-     * Parse the route-middleware `max-age` parameter into integer minutes
-     * (or null when absent).
+     * Parse the route-middleware `max-age` parameter into integer minutes (or
+     * null when absent).
      *
      * Accepts decimal-digit strings only — `is_numeric` would pass scientific
      * notation, leading signs, whitespace, and decimals, none of which are

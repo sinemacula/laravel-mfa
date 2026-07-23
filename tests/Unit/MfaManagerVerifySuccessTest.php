@@ -44,6 +44,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
      *
      * @return void
      */
+    #[\Override]
     protected function tearDown(): void
     {
         if (class_exists(\Mockery::class)) {

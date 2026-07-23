@@ -20,6 +20,7 @@ final class MyDriverFactor extends AbstractFactorStub
      *
      * @return mixed
      */
+    #[\Override]
     public function getFactorIdentifier(): mixed
     {
         return 'x';
@@ -30,6 +31,7 @@ final class MyDriverFactor extends AbstractFactorStub
      *
      * @return string
      */
+    #[\Override]
     public function getDriver(): string
     {
         return 'my_driver';

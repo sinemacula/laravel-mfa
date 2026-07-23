@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Tests\Unit\Traits;
+namespace Tests\Unit\Concerns;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -44,6 +44,7 @@ final class ActsAsFactorTest extends TestCase
      *
      * @return void
      */
+    #[\Override]
     protected function setUp(): void
     {
         parent::setUp();
@@ -56,6 +57,7 @@ final class ActsAsFactorTest extends TestCase
      *
      * @return void
      */
+    #[\Override]
     protected function tearDown(): void
     {
         Carbon::setTestNow();

@@ -62,10 +62,10 @@ final class CustomDriverExtensionTest extends TestCase
     /**
      * `Mfa::extend('totp', ...)` must override the built-in TOTP driver
      * registered by `MfaServiceProvider::registerBuiltInDrivers()`. Pins the
-     * override invariant — both built-ins and consumer overrides go through
-     * the same `Mfa::extend()` registry, so a future Laravel `Manager`
-     * upgrade that changed override-precedence semantics would silently break
-     * consumer overrides without this guard.
+     * override invariant — both built-ins and consumer overrides go through the
+     * same `Mfa::extend()` registry, so a future Laravel `Manager` upgrade that
+     * changed override-precedence semantics would silently break consumer
+     * overrides without this guard.
      *
      * @return void
      *
@@ -80,6 +80,7 @@ final class CustomDriverExtensionTest extends TestCase
              * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
              * @return void
              */
+            #[\Override]
             public function issueChallenge(Factor $factor): void
             {
                 // No-op — never called in this test.
@@ -92,10 +93,11 @@ final class CustomDriverExtensionTest extends TestCase
              * @param  string  $code
              * @return bool
              */
+            #[\Override]
             public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
             {
-                // Marker driver — return true so the caller can observe
-                // that the override fired without setting up a factor.
+                // Marker driver — return true so the caller can observe that
+                // the override fired without setting up a factor.
                 return true;
             }
 
@@ -104,6 +106,7 @@ final class CustomDriverExtensionTest extends TestCase
              *
              * @return string
              */
+            #[\Override]
             public function generateSecret(): string
             {
                 return 'fake-marker-secret';

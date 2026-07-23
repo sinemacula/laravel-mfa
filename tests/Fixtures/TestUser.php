@@ -29,7 +29,7 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
  * @property bool $mfa_enabled
  * @property ?string $email
  */
-class TestUser extends Model implements Authenticatable, MultiFactorAuthenticatable
+final class TestUser extends Model implements Authenticatable, MultiFactorAuthenticatable
 {
     use AuthenticatableTrait, HasApiTokens;
 
@@ -42,16 +42,12 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
         'mfa_enabled',
     ];
 
-    /** @var array<string, string> */
-    protected $casts = [
-        'mfa_enabled' => 'boolean',
-    ];
-
     /**
      * Determine whether MFA should be applied for this test user.
      *
      * @return bool
      */
+    #[\Override]
     public function shouldUseMultiFactor(): bool
     {
         return (bool) $this->getAttribute('mfa_enabled');
@@ -64,6 +60,7 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
      *
      * @return bool
      */
+    #[\Override]
     public function isMfaEnabled(): bool
     {
         return self::countFactors($this->authFactors()) > 0;
@@ -78,6 +75,7 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
      *
      * @formatter:on
      */
+    #[\Override]
     public function authFactors(): Builder
     {
         $builder = $this->factors()->getQuery();
@@ -93,6 +91,19 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
     public function factors(): MorphMany
     {
         return $this->morphMany(Factor::class, 'authenticatable');
+    }
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'mfa_enabled' => 'boolean',
+        ];
     }
 
     /**
@@ -121,6 +132,8 @@ class TestUser extends Model implements Authenticatable, MultiFactorAuthenticata
      *
      * @param  mixed  $builder
      * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     *
+     * @throws \Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException
      *
      * @formatter:on
      */

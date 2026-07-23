@@ -43,7 +43,6 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
 
         /** Whether the fixture reports MFA as enabled. */
         private readonly bool $mfaEnabled = false,
-
     ) {}
 
     /**
@@ -51,6 +50,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @return mixed
      */
+    #[\Override]
     public function getAuthIdentifier(): mixed
     {
         return $this->identifier;
@@ -61,6 +61,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @return string
      */
+    #[\Override]
     public function getAuthIdentifierName(): string
     {
         return 'id';
@@ -71,6 +72,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @return string
      */
+    #[\Override]
     public function getAuthPassword(): string
     {
         return 'unused-password';
@@ -81,6 +83,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @return string
      */
+    #[\Override]
     public function getAuthPasswordName(): string
     {
         return 'password';
@@ -91,6 +94,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @return string
      */
+    #[\Override]
     public function getRememberToken(): string
     {
         return '';
@@ -105,6 +109,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      * @param  mixed  $value
      * @return void
      */
+    #[\Override]
     public function setRememberToken(mixed $value): void
     {
         // no-op — fixture does not persist remember tokens.
@@ -116,6 +121,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @return string
      */
+    #[\Override]
     public function getRememberTokenName(): string
     {
         return 'remember_token';
@@ -126,6 +132,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @return bool
      */
+    #[\Override]
     public function shouldUseMultiFactor(): bool
     {
         return true;
@@ -138,6 +145,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @return bool
      */
+    #[\Override]
     public function isMfaEnabled(): bool
     {
         return $this->mfaEnabled;
@@ -154,6 +162,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @formatter:on
      */
+    #[\Override]
     public function authFactors(): Builder
     {
         // @phpstan-ignore staticMethod.dynamicCall
@@ -170,6 +179,8 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @param  mixed  $builder
      * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     *
+     * @throws \Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException
      *
      * @formatter:on
      */

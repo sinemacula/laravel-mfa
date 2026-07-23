@@ -96,8 +96,8 @@ final class BackupCodeDriverGenerationTest extends TestCase
 
     /**
      * `generateSet()` must reject a negative explicit count with a clear
-     * `InvalidDriverConfigurationException` — a negative batch size cannot
-     * mint any codes and would otherwise short-circuit silently.
+     * `InvalidDriverConfigurationException` — a negative batch size cannot mint
+     * any codes and would otherwise short-circuit silently.
      *
      * @return void
      */
@@ -180,8 +180,8 @@ final class BackupCodeDriverGenerationTest extends TestCase
 
     /**
      * An empty alphabet would explode later with a raw `ValueError` from
-     * `random_int(0, -1)` — reject at construction so the misconfiguration is
-     * a package-level error, not a runtime crash.
+     * `random_int(0, -1)` — reject at construction so the misconfiguration is a
+     * package-level error, not a runtime crash.
      *
      * @return void
      */
@@ -218,7 +218,8 @@ final class BackupCodeDriverGenerationTest extends TestCase
      */
     public function testGenerateSetRejectsBatchLargerThanCodeSpace(): void
     {
-        // Alphabet=2, length=3 -> capacity=8; request 9.
+        // A two-character alphabet at length three caps the space at eight
+        // distinct codes; requesting nine must therefore fail.
         $driver = new BackupCodeDriver(
             codeLength: 3,
             alphabet  : 'AB',

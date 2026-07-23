@@ -48,7 +48,6 @@ final readonly class SessionMfaVerificationStore implements MfaVerificationStore
 
         /** Session store used to persist verification timestamps. */
         private Session $session,
-
     ) {}
 
     /**

@@ -24,6 +24,8 @@ use Illuminate\Queue\SerializesModels;
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
+ *
+ * @inheritable
  */
 class MfaCodeMessage extends Mailable
 {
@@ -43,7 +45,6 @@ class MfaCodeMessage extends Mailable
 
         /** Minutes until the code expires from the factor's point of view. */
         public readonly int $expiresInMinutes,
-
     ) {}
 
     /**

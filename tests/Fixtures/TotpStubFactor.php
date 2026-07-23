@@ -26,7 +26,6 @@ final class TotpStubFactor extends AbstractFactorStub
         /** Stored TOTP shared secret. */
         #[\SensitiveParameter]
         private readonly ?string $secret,
-
     ) {}
 
     /**
@@ -34,6 +33,7 @@ final class TotpStubFactor extends AbstractFactorStub
      *
      * @return mixed
      */
+    #[\Override]
     public function getFactorIdentifier(): mixed
     {
         return 'totp-stub';
@@ -44,6 +44,7 @@ final class TotpStubFactor extends AbstractFactorStub
      *
      * @return string
      */
+    #[\Override]
     public function getDriver(): string
     {
         return 'totp';
@@ -54,6 +55,7 @@ final class TotpStubFactor extends AbstractFactorStub
      *
      * @return ?string
      */
+    #[\Override]
     public function getSecret(): ?string
     {
         return $this->secret;

@@ -35,8 +35,11 @@ final class GenericUserGuard implements Guard
     /**
      * Report that the fixture always has an authenticated identity.
      *
+     * @imperative
+     *
      * @return bool
      */
+    #[\Override]
     public function check(): bool
     {
         return true;
@@ -45,8 +48,11 @@ final class GenericUserGuard implements Guard
     /**
      * Report that the fixture is never a guest.
      *
+     * @imperative
+     *
      * @return bool
      */
+    #[\Override]
     public function guest(): bool
     {
         return false;
@@ -57,6 +63,7 @@ final class GenericUserGuard implements Guard
      *
      * @return \Illuminate\Auth\GenericUser
      */
+    #[\Override]
     public function user(): GenericUser
     {
         return $this->resolved;
@@ -67,6 +74,7 @@ final class GenericUserGuard implements Guard
      *
      * @return int
      */
+    #[\Override]
     public function id(): int
     {
         return 99;
@@ -78,6 +86,7 @@ final class GenericUserGuard implements Guard
      * @param  array<array-key, mixed>  $credentials
      * @return bool
      */
+    #[\Override]
     public function validate(array $credentials = []): bool
     {
         return true;
@@ -88,6 +97,7 @@ final class GenericUserGuard implements Guard
      *
      * @return bool
      */
+    #[\Override]
     public function hasUser(): bool
     {
         return true;
@@ -99,6 +109,7 @@ final class GenericUserGuard implements Guard
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
      * @return self
      */
+    #[\Override]
     public function setUser(Authenticatable $user): self
     {
         return $this;

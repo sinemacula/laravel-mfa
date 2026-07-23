@@ -29,8 +29,8 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
  */
 abstract class AbstractOtpDriver implements FactorDriver
 {
-    /** @var callable(int, int): int Bound at construction — `random_int(...)` by default. */
-    protected $randomInt;
+    /** @var \Closure(int, int): int Bound at construction - `random_int(...)` by default. */
+    protected \Closure $randomInt;
 
     /**
      * Constructor.
@@ -43,8 +43,8 @@ abstract class AbstractOtpDriver implements FactorDriver
      *
      * `$alphabet` controls the `generateCode()` character set: `null` keeps
      * numeric zero-padded codes; a non-null string picks uniformly from it.
-     * Empty / single-character alphabets are rejected so misconfigurations
-     * fail fast.
+     * Empty / single-character alphabets are rejected so misconfigurations fail
+     * fast.
      *
      * `$randomInt` is the injectable randomness seam — defaults to PHP's
      * built-in `random_int(...)` (CSPRNG-backed); tests substitute a
@@ -74,14 +74,13 @@ abstract class AbstractOtpDriver implements FactorDriver
 
         // Randomness seam — `null` binds to PHP's built-in CSPRNG `random_int`.
         ?callable $randomInt = null,
-
     ) {
         $this->assertValidCodeLength($codeLength);
         $this->assertValidExpiry($expiry);
         $this->assertValidMaxAttempts($maxAttempts);
         $this->assertValidAlphabet($alphabet);
 
-        $this->randomInt = $randomInt ?? random_int(...);
+        $this->randomInt = $randomInt === null ? random_int(...) : $randomInt(...);
     }
 
     /**

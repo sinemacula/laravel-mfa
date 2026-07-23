@@ -67,10 +67,20 @@ trait InteractsWithAbstractOtpDriver
              * @return void
              */
             public function __construct(
+
+                // Generated code length; passthrough to `AbstractOtpDriver`.
                 int $codeLength,
+
+                // Code lifetime in minutes; passthrough to `AbstractOtpDriver`.
                 int $expiry,
+
+                // Lockout threshold; passthrough to `AbstractOtpDriver`.
                 int $maxAttempts,
+
+                // Optional code alphabet; passthrough to `AbstractOtpDriver`.
                 ?string $alphabet,
+
+                /** Whether `dispatch()` should throw to simulate failure. */
                 private readonly bool $throwOnDispatch,
             ) {
                 parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet);
@@ -86,6 +96,7 @@ trait InteractsWithAbstractOtpDriver
              *
              * @throws \Tests\Fixtures\Exceptions\DispatchTransportFailureException
              */
+            #[\Override]
             protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void
             {
                 $this->order[]      = 'dispatch';
@@ -184,7 +195,11 @@ trait InteractsWithAbstractOtpDriver
              * @return void
              */
             public function __construct(
+
+                /** Seeded pending one-time code. */
                 private readonly ?string $code,
+
+                /** Seeded expiry for the pending code. */
                 private readonly ?CarbonInterface $expires,
             ) {}
 
@@ -193,6 +208,7 @@ trait InteractsWithAbstractOtpDriver
              *
              * @return ?string
              */
+            #[\Override]
             public function getCode(): ?string
             {
                 return $this->code;
@@ -203,6 +219,7 @@ trait InteractsWithAbstractOtpDriver
              *
              * @return ?\Carbon\CarbonInterface
              */
+            #[\Override]
             public function getExpiresAt(): ?CarbonInterface
             {
                 return $this->expires;

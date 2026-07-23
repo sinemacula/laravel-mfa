@@ -41,7 +41,7 @@ use Illuminate\Support\Facades\Facade;
  *
  * @see         \SineMacula\Laravel\Mfa\MfaManager
  */
-class Mfa extends Facade
+final class Mfa extends Facade
 {
     /**
      * Get the registered name of the component.

@@ -39,6 +39,5 @@ final readonly class MfaVerified
 
         /** Driver name that handled the verification. */
         public string $driver,
-
     ) {}
 }

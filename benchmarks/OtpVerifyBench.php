@@ -13,9 +13,9 @@ use SineMacula\Laravel\Mfa\Gateways\FakeSmsGateway;
 /**
  * Hot-path benchmarks for the OTP-delivery driver verification path.
  *
- * Exercised via the SMS driver, whose verify logic comes entirely
- * from `AbstractOtpDriver` — the same path the email driver takes —
- * so this bench covers both transports' verification cost.
+ * Exercised via the SMS driver, whose verify logic comes entirely from
+ * `AbstractOtpDriver` — the same path the email driver takes — so this bench
+ * covers both transports' verification cost.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited.
@@ -36,8 +36,8 @@ final class OtpVerifyBench
     private InMemoryFactor $factorExpired;
 
     /**
-     * Build a single SMS driver instance and the two factor doubles
-     * the verify benches reuse across iterations.
+     * Build a single SMS driver instance and the two factor doubles the verify
+     * benches reuse across iterations.
      *
      * @return void
      */
@@ -50,18 +50,15 @@ final class OtpVerifyBench
     }
 
     /**
-     * Reset the factor codes / expiries before each iteration so a
-     * verify call cannot leak mutated state across runs.
+     * Reset the factor codes / expiries before each iteration so a verify call
+     * cannot leak mutated state across runs.
      *
      * @return void
      */
     public function setUp(): void
     {
-        $this->factorHit->code      = self::CODE;
-        $this->factorHit->expiresAt = Carbon::now()->addMinutes(10);
-
-        $this->factorExpired->code      = self::CODE;
-        $this->factorExpired->expiresAt = Carbon::now()->subMinute();
+        $this->factorHit->seedCode(self::CODE, Carbon::now()->addMinutes(10));
+        $this->factorExpired->seedCode(self::CODE, Carbon::now()->subMinute());
     }
 
     /**
@@ -89,8 +86,7 @@ final class OtpVerifyBench
     }
 
     /**
-     * Measure the cost of an expired-code verify (the early-return
-     * branch).
+     * Measure the cost of an expired-code verify (the early-return branch).
      *
      * @return void
      */

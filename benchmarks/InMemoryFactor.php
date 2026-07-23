@@ -41,48 +41,72 @@ final class InMemoryFactor implements Factor
     public function __construct(
 
         /** Registered driver name (e.g. `'totp'`, `'backup_code'`). */
-        public string $driver,
+        private string $driver,
 
         /** Factor identifier returned by `getFactorIdentifier()`. */
-        public ?string $id = 'bench-factor',
+        private ?string $id = 'bench-factor',
 
         /** Optional human-readable label. */
-        public ?string $label = null,
+        private ?string $label = null,
 
         /** Delivery destination for OTP drivers; null otherwise. */
-        public ?string $recipient = null,
+        private ?string $recipient = null,
 
         /** Stored secret / hash material the driver verifies against. */
-        public ?string $secret = null,
+        #[\SensitiveParameter] private ?string $secret = null,
 
         /** Pending one-time code awaiting verification. */
-        public ?string $code = null,
+        private ?string $code = null,
 
         /** Expiry timestamp of the pending code. */
-        public ?CarbonInterface $expiresAt = null,
+        private ?CarbonInterface $expiresAt = null,
 
         /** Consecutive failed verification attempts. */
-        public int $attempts = 0,
+        private int $attempts = 0,
 
         /** Lockout expiry after too many failed attempts. */
-        public ?CarbonInterface $lockedUntil = null,
+        private ?CarbonInterface $lockedUntil = null,
 
         /** Timestamp of the most recent verification attempt. */
-        public ?CarbonInterface $lastAttemptedAt = null,
+        private ?CarbonInterface $lastAttemptedAt = null,
 
         /** Timestamp of the most recent successful verification. */
-        public ?CarbonInterface $verifiedAt = null,
+        private ?CarbonInterface $verifiedAt = null,
 
         /** Owning authenticatable, if bound. */
-        public ?Authenticatable $authenticatable = null,
-
+        private ?Authenticatable $authenticatable = null,
     ) {}
+
+    /**
+     * Replace the stored secret material between benchmark iterations.
+     *
+     * @param  ?string  $secret
+     * @return void
+     */
+    public function setSecret(#[\SensitiveParameter] ?string $secret): void
+    {
+        $this->secret = $secret;
+    }
+
+    /**
+     * Seed the pending one-time code and its expiry between iterations.
+     *
+     * @param  ?string  $code
+     * @param  ?\Carbon\CarbonInterface  $expiresAt
+     * @return void
+     */
+    public function seedCode(#[\SensitiveParameter] ?string $code, ?CarbonInterface $expiresAt): void
+    {
+        $this->code      = $code;
+        $this->expiresAt = $expiresAt;
+    }
 
     /**
      * Return the configured factor identifier.
      *
      * @return mixed
      */
+    #[\Override]
     public function getFactorIdentifier(): mixed
     {
         return $this->id;
@@ -93,6 +117,7 @@ final class InMemoryFactor implements Factor
      *
      * @return string
      */
+    #[\Override]
     public function getDriver(): string
     {
         return $this->driver;
@@ -103,6 +128,7 @@ final class InMemoryFactor implements Factor
      *
      * @return ?string
      */
+    #[\Override]
     public function getLabel(): ?string
     {
         return $this->label;
@@ -113,6 +139,7 @@ final class InMemoryFactor implements Factor
      *
      * @return ?string
      */
+    #[\Override]
     public function getRecipient(): ?string
     {
         return $this->recipient;
@@ -123,6 +150,7 @@ final class InMemoryFactor implements Factor
      *
      * @return ?\Illuminate\Contracts\Auth\Authenticatable
      */
+    #[\Override]
     public function getAuthenticatable(): ?Authenticatable
     {
         return $this->authenticatable;
@@ -133,6 +161,7 @@ final class InMemoryFactor implements Factor
      *
      * @return ?string
      */
+    #[\Override]
     public function getSecret(): ?string
     {
         return $this->secret;
@@ -143,6 +172,7 @@ final class InMemoryFactor implements Factor
      *
      * @return ?string
      */
+    #[\Override]
     public function getCode(): ?string
     {
         return $this->code;
@@ -153,6 +183,7 @@ final class InMemoryFactor implements Factor
      *
      * @return ?\Carbon\CarbonInterface
      */
+    #[\Override]
     public function getExpiresAt(): ?CarbonInterface
     {
         return $this->expiresAt;
@@ -163,6 +194,7 @@ final class InMemoryFactor implements Factor
      *
      * @return int
      */
+    #[\Override]
     public function getAttempts(): int
     {
         return $this->attempts;
@@ -173,6 +205,7 @@ final class InMemoryFactor implements Factor
      *
      * @return ?\Carbon\CarbonInterface
      */
+    #[\Override]
     public function getLockedUntil(): ?CarbonInterface
     {
         return $this->lockedUntil;
@@ -183,6 +216,7 @@ final class InMemoryFactor implements Factor
      *
      * @return bool
      */
+    #[\Override]
     public function isLocked(): bool
     {
         return $this->lockedUntil !== null && $this->lockedUntil->isFuture();
@@ -193,6 +227,7 @@ final class InMemoryFactor implements Factor
      *
      * @return ?\Carbon\CarbonInterface
      */
+    #[\Override]
     public function getLastAttemptedAt(): ?CarbonInterface
     {
         return $this->lastAttemptedAt;
@@ -203,6 +238,7 @@ final class InMemoryFactor implements Factor
      *
      * @return ?\Carbon\CarbonInterface
      */
+    #[\Override]
     public function getVerifiedAt(): ?CarbonInterface
     {
         return $this->verifiedAt;
@@ -213,6 +249,7 @@ final class InMemoryFactor implements Factor
      *
      * @return bool
      */
+    #[\Override]
     public function isVerified(): bool
     {
         return $this->verifiedAt !== null;

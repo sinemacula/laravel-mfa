@@ -126,8 +126,8 @@ final class MultiAuthStackTest extends TestCase
     /**
      * The MFA package must resolve the same `MultiFactorAuthenticatable`
      * identity through Sanctum's TransientToken guard as it does through
-     * SessionGuard — proving the package depends only on `Auth::user()`, not
-     * on Sanctum-specific wiring.
+     * SessionGuard — proving the package depends only on `Auth::user()`, not on
+     * Sanctum-specific wiring.
      *
      * @return void
      *
