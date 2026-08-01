@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## 1.0.0 (2026-08-01)
+
+
+### Features
+
+* 1.0 release — driver-based MFA for Laravel ([#1](https://github.com/sinemacula/laravel-mfa/issues/1)) ([af6d486](https://github.com/sinemacula/laravel-mfa/commit/af6d486206837d28d027ef1926aa3d3c139bb0a6))
+
 ## [1.0.0] - 2026-04-16
 
 Initial release of `sinemacula/laravel-mfa`.
