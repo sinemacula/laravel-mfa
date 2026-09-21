@@ -84,7 +84,10 @@ name = "osv-scanner"
 
 [[plugin]]
 name = "php-codesniffer"
-version = "4.0.1"
+# 4.0.1 is covered by a security advisory, so composer refuses to install it and
+# the plugin fails outright rather than reporting findings. 4.0.2 is the first
+# release without it.
+version = "4.0.4"
 mode = "comment"
 package_file = ".qlty/configs/composer.json"
 package_filters = ["slevomat", "dealerdirect", "sinemacula"]
@@ -97,15 +100,26 @@ package_filters = ["slevomat", "dealerdirect", "sinemacula"]
 [plugins.definitions.php-codesniffer.drivers.lint]
 success_codes = [0, 1, 2, 3]
 
-# Pinned to the last php-cs-fixer release whose symfony/console stays on the 7.x
-# line. 3.90+ pulls symfony/console 8 (requires PHP 8.4.1 and uses 8.4-only
-# syntax), which qlty's PHP 8.3 runner cannot parse. Bump once the runner ships
-# PHP 8.4.
+# The standards ship a phpdoc_line_span option that only exists from 3.94.0, so
+# anything older exits with an unknown-option error. Raising the version also
+# lets the fixer accept symfony/console 8, which needs PHP 8.4.1, and the
+# sandbox install ignores platform requirements, so the Symfony line is pinned
+# explicitly. The pins have to go through extra_packages: qlty ignores that key
+# whenever package_file is set on the same plugin.
 [[plugin]]
 name = "php-cs-fixer"
-package_file = ".qlty/configs/composer.json"
-package_filters = ["sinemacula"]
-version = "3.89.0"
+version = "3.95.25"
+extra_packages = [
+    "sinemacula/coding-standards@1.23.2",
+    "symfony/console@^7.4",
+    "symfony/event-dispatcher@^7.4",
+    "symfony/filesystem@^7.4",
+    "symfony/finder@^7.4",
+    "symfony/options-resolver@^7.4",
+    "symfony/process@^7.4",
+    "symfony/stopwatch@^7.4",
+    "symfony/string@^7.4",
+]
 
 [[plugin]]
 name = "radarlint-php"
