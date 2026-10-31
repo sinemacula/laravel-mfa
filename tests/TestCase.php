@@ -148,7 +148,7 @@ abstract class TestCase extends BaseTestCase
             'host'      => getenv('DB_HOST') ?: '127.0.0.1',
             'port'      => getenv('DB_PORT') ?: $this->defaultPort($driver),
             'database'  => getenv('DB_DATABASE') ?: 'laravel_mfa_test',
-            'username'  => getenv('DB_USERNAME') ?: ($driver === 'pgsql' ? 'postgres' : 'root'),
+            'username'  => getenv('DB_USERNAME') ?: $this->defaultUsername($driver),
             'password'  => getenv('DB_PASSWORD') ?: '',
             'prefix'    => '',
             'charset'   => $driver === 'pgsql' ? 'utf8' : 'utf8mb4',
@@ -203,5 +203,16 @@ abstract class TestCase extends BaseTestCase
     private function defaultPort(string $driver): string
     {
         return $driver === 'pgsql' ? '5432' : '3306';
+    }
+
+    /**
+     * Return the default database username for the given driver.
+     *
+     * @param  string  $driver
+     * @return string
+     */
+    private function defaultUsername(string $driver): string
+    {
+        return $driver === 'pgsql' ? 'postgres' : 'root';
     }
 }
