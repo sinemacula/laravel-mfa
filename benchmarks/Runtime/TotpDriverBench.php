@@ -2,9 +2,12 @@
 
 declare(strict_types = 1);
 
-namespace Benchmarks;
+namespace Benchmarks\Runtime;
 
-use PhpBench\Attributes as Bench;
+use Benchmarks\Support\InMemoryFactor;
+use PhpBench\Attributes\BeforeMethods;
+use PhpBench\Attributes\Iterations;
+use PhpBench\Attributes\Revs;
 use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 
@@ -16,15 +19,15 @@ use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
  * visible. `issueChallenge()` is a no-op for TOTP so we don't benchmark it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
-#[Bench\BeforeMethods('setUp')]
+#[BeforeMethods('setUp')]
 final class TotpDriverBench
 {
     /** @var \SineMacula\Laravel\Mfa\Drivers\TotpDriver */
     private TotpDriver $driver;
 
-    /** @var \Benchmarks\InMemoryFactor */
+    /** @var \Benchmarks\Support\InMemoryFactor */
     private InMemoryFactor $factor;
 
     /** @var string */
@@ -47,6 +50,10 @@ final class TotpDriverBench
      * verify-hit benches always operate on a valid code.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function setUp(): void
     {
@@ -61,9 +68,13 @@ final class TotpDriverBench
      * Measure the cost of a successful TOTP verify.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchVerifyHit(): void
     {
         $this->driver->verify($this->factor, $this->code);
@@ -73,9 +84,13 @@ final class TotpDriverBench
      * Measure the cost of a mismatched TOTP verify.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchVerifyMiss(): void
     {
         $this->driver->verify($this->factor, '000000');

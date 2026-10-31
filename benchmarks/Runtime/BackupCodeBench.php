@@ -2,9 +2,12 @@
 
 declare(strict_types = 1);
 
-namespace Benchmarks;
+namespace Benchmarks\Runtime;
 
-use PhpBench\Attributes as Bench;
+use Benchmarks\Support\InMemoryFactor;
+use PhpBench\Attributes\BeforeMethods;
+use PhpBench\Attributes\Iterations;
+use PhpBench\Attributes\Revs;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 
 /**
@@ -14,15 +17,15 @@ use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
  * benchmarking disk roundtrips belongs in the performance suite, not here.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
-#[Bench\BeforeMethods('setUp')]
+#[BeforeMethods('setUp')]
 final class BackupCodeBench
 {
     /** @var \SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver */
     private BackupCodeDriver $driver;
 
-    /** @var \Benchmarks\InMemoryFactor */
+    /** @var \Benchmarks\Support\InMemoryFactor */
     private InMemoryFactor $factor;
 
     /** @var string */
@@ -56,8 +59,8 @@ final class BackupCodeBench
      *
      * @return void
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchVerifyHit(): void
     {
         $this->driver->verify($this->factor, $this->plaintext);
@@ -68,8 +71,8 @@ final class BackupCodeBench
      *
      * @return void
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchVerifyMiss(): void
     {
         $this->driver->verify($this->factor, 'WRONGCODE1');
@@ -80,8 +83,8 @@ final class BackupCodeBench
      *
      * @return void
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(100)]
+    #[Iterations(3)]
+    #[Revs(100)]
     public function benchGenerateSet(): void
     {
         $this->driver->generateSet();
