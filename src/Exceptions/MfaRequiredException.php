@@ -10,7 +10,7 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * has factors but has never verified against them).
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class MfaRequiredException extends AbstractMfaHttpException
 {

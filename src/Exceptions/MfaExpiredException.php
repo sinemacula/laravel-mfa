@@ -9,7 +9,7 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * current identity must re-verify.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class MfaExpiredException extends AbstractMfaHttpException
 {

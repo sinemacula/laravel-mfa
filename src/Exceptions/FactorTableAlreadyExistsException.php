@@ -12,6 +12,6 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * to rebind `mfa.factor.table` to avoid the collision.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class FactorTableAlreadyExistsException extends \RuntimeException {}

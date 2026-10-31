@@ -56,7 +56,7 @@ use SineMacula\Laravel\Mfa\Models\Factor as ShippedFactorModel;
  * reduce coupling.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @inheritable
  *

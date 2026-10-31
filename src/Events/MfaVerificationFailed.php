@@ -21,7 +21,7 @@ use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
  * NOT emit this event.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final readonly class MfaVerificationFailed
 {

@@ -12,7 +12,7 @@ use SineMacula\Laravel\Mfa\Database\MigrationCollisionGuard;
  * Create the MFA factors table.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 
 return new class extends Migration {
