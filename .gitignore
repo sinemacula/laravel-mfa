@@ -9,8 +9,12 @@
 clover.xml
 composer.lock
 
-# qlty writes these symlinks to the root so PHP-CS-Fixer / PHPCS / PHPStan
-# can auto-discover their configs out of `.qlty/configs/`.
-/.php-cs-fixer.dist.php
+# Root-level shadows of the shared qlty configs (the canonical copies live in
+# .qlty/configs/); tooling may materialise these at the repo root - ignore them
+# so they are never committed and never shadow the real configs.
 /phpcs.xml
 /phpstan.neon
+/.php-cs-fixer.dist.php
+/.editorconfig-checker.json
+/.markdownlint.json
+/.yamllint.yaml

@@ -3,14 +3,6 @@
     source: {
         directories: [
             "src"
-        ],
-        excludes: [
-            "Contracts",
-            "Exceptions",
-            "Enums",
-            "Events",
-            "Facades",
-            "MfaServiceProvider.php"
         ]
     },
     logs: {
@@ -21,19 +13,9 @@
         configDir: ".",
         customPath: "vendor/bin/phpunit"
     },
-    timeout: 15,
+    initialTestsPhpOptions: "-d memory_limit=1G",
+    timeout: 30,
     mutators: {
-        "@default": true,
-        // String concatenation mutations on error messages do not exercise
-        // any observable behaviour — the message text is not asserted and
-        // a mangled string is still unambiguous to the developer reading
-        // logs. Exclude to keep the MSI signal focused on logic.
-        "Concat": false,
-        "ConcatOperandRemoval": false,
-        // Visibility mutations (protected → public) change the reachable
-        // API surface but do not change runtime behaviour, so they cannot
-        // be caught by test assertions without reflection plumbing that
-        // adds no real safety.
-        "ProtectedVisibility": false
+        "@default": true
     }
 }
