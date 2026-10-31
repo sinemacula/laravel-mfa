@@ -6,9 +6,11 @@ namespace Tests\Unit;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
+use SineMacula\Laravel\Mfa\MfaManager;
 use Tests\Fixtures\InMemoryFactor;
 use Tests\Fixtures\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
@@ -21,10 +23,11 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
  * suite under the project's max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 {
     use InteractsWithMfaManagerVerify;

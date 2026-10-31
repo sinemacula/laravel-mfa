@@ -14,12 +14,12 @@ use SineMacula\Laravel\Mfa\Models\Factor;
  * and that both sides fire.
  *
  * Lives in `tests/Fixtures` so it can be referenced by name (rather than
- * defined inline as an anonymous class) — that lets PHPStan read the docblock
- * on `bindTracker()`'s by-ref array parameter, which it cannot when the same
- * class is declared inside a trait method.
+ * defined inline as an anonymous class) — that lets PHPStan read the typed
+ * `$tracker` property, which callers bind by reference from the outside so the
+ * model itself carries no behavior beyond the recording overrides.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
@@ -27,18 +27,6 @@ final class CallOrderTrackingFactor extends Factor
 {
     /** @var array<int, string> Externally-bound call-order tracker. */
     public array $tracker = [];
-
-    /**
-     * Bind the externally owned order tracker by reference so persistence-side
-     * calls can be observed.
-     *
-     * @param  array<int, string>  $tracker
-     * @return void
-     */
-    public function bindTracker(array &$tracker): void
-    {
-        $this->tracker = &$tracker;
-    }
 
     /**
      * Record the call order before delegating to the parent implementation.

@@ -6,6 +6,7 @@ namespace Tests\Unit\Database;
 
 use Illuminate\Database\Connection;
 use Illuminate\Database\Schema\Builder;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Database\MigrationCollisionGuard;
 use SineMacula\Laravel\Mfa\Exceptions\FactorTableAlreadyExistsException;
@@ -14,10 +15,11 @@ use SineMacula\Laravel\Mfa\Exceptions\FactorTableAlreadyExistsException;
  * Unit tests for the `MigrationCollisionGuard`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MigrationCollisionGuard::class)]
 final class MigrationCollisionGuardTest extends TestCase
 {
     /**

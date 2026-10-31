@@ -9,7 +9,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Sanctum\SanctumServiceProvider;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Guards\GenericUserGuard;
 use Tests\Fixtures\Guards\StaticUserGuard;
@@ -32,10 +34,11 @@ use Tests\TestCase;
  * state, run a TOTP verification, and report `hasEverVerified()`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class MultiAuthStackTest extends TestCase
 {
     use RefreshDatabase;
@@ -45,8 +48,6 @@ final class MultiAuthStackTest extends TestCase
      * identity and surface its persisted factors.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSessionGuardSeesIdentityAndFactors(): void
     {
@@ -64,8 +65,6 @@ final class MultiAuthStackTest extends TestCase
      * the manager must surface the same setup state and factor collection.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testTokenStyleGuardSeesIdentityAndFactors(): void
     {
@@ -97,8 +96,6 @@ final class MultiAuthStackTest extends TestCase
      * throughout.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testCustomAuthenticatableGuardWithoutEloquentBindsCorrectly(): void
     {
@@ -130,8 +127,6 @@ final class MultiAuthStackTest extends TestCase
      * Sanctum-specific wiring.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSanctumGuardSeesIdentityAndFactors(): void
     {

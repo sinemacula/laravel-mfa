@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Events;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
@@ -14,10 +15,11 @@ use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
  * Unit tests for the `MfaVerificationFailed` event DTO.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaVerificationFailed::class)]
 final class MfaVerificationFailedTest extends TestCase
 {
     /**

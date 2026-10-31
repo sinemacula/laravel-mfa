@@ -6,8 +6,10 @@ namespace Tests\Unit;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\NonScalarIdentifierUser;
 use Tests\Fixtures\PlainUser;
@@ -24,10 +26,11 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
  * without losing its cohesive grouping.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class MfaManagerStateTest extends MfaManagerTestCase
 {
     use InteractsWithMfaManagerState;

@@ -5,8 +5,10 @@ declare(strict_types = 1);
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
@@ -18,10 +20,12 @@ use Tests\TestCase;
  * atomic-consume race defence.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
+#[CoversClass(BackupCodeDriver::class)]
 final class BackupCodeLifecycleTest extends TestCase
 {
     use RefreshDatabase;
@@ -31,8 +35,6 @@ final class BackupCodeLifecycleTest extends TestCase
      * against the same code must fail because the secret is consumed.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testBackupCodeVerifiesOnceThenFails(): void
     {

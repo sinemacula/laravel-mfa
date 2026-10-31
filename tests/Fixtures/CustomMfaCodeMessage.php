@@ -11,7 +11,7 @@ use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
  * `$mailable` class argument is honoured by the email driver.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */

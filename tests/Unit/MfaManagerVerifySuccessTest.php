@@ -6,6 +6,7 @@ namespace Tests\Unit;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
@@ -25,10 +26,11 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
  * the project's max-methods threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
 {
     use InteractsWithMfaManagerVerify;

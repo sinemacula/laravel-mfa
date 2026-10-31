@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Exceptions;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Exceptions\MissingDriverDependencyException;
 
@@ -11,10 +12,11 @@ use SineMacula\Laravel\Mfa\Exceptions\MissingDriverDependencyException;
  * Unit tests for the `MissingDriverDependencyException` exception.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MissingDriverDependencyException::class)]
 final class MissingDriverDependencyExceptionTest extends TestCase
 {
     /**

@@ -9,7 +9,7 @@ namespace Tests\Fixtures;
  * driver — feeds the verify branches without persistence.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */

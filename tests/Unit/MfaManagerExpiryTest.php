@@ -6,7 +6,9 @@ namespace Tests\Unit;
 
 use Carbon\Carbon;
 use Illuminate\Config\Repository;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\MfaManager;
 use Tests\Fixtures\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 
@@ -20,10 +22,11 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
  * and the malformed / numeric-string config paths.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class MfaManagerExpiryTest extends MfaManagerTestCase
 {
     use InteractsWithMfaManagerState;

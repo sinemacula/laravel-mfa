@@ -6,6 +6,7 @@ namespace Tests\Unit\Drivers;
 
 use Illuminate\Contracts\Mail\Mailer;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
@@ -25,10 +26,15 @@ use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
  * pick when the consumer supplies none.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(AbstractOtpDriver::class)]
+#[CoversClass(BackupCodeDriver::class)]
+#[CoversClass(EmailDriver::class)]
+#[CoversClass(SmsDriver::class)]
+#[CoversClass(TotpDriver::class)]
 final class DefaultsTest extends TestCase
 {
     use MockeryPHPUnitIntegration;

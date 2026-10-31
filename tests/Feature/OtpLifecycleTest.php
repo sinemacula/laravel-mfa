@@ -7,7 +7,11 @@ namespace Tests\Feature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
+use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
+use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
@@ -15,6 +19,7 @@ use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Gateways\FakeSmsGateway;
 use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
@@ -27,10 +32,14 @@ use Tests\TestCase;
  * branches, and event emissions.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
+#[CoversClass(AbstractOtpDriver::class)]
+#[CoversClass(EmailDriver::class)]
+#[CoversClass(SmsDriver::class)]
 final class OtpLifecycleTest extends TestCase
 {
     use RefreshDatabase;
@@ -39,8 +48,6 @@ final class OtpLifecycleTest extends TestCase
      * Test email challenge sends the mailable to the recipient.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailChallengeSendsMailableToRecipient(): void
     {
@@ -57,8 +64,6 @@ final class OtpLifecycleTest extends TestCase
      * Test email challenge dispatches the MfaChallengeIssued event.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailChallengeDispatchesChallengeIssuedEvent(): void
     {
@@ -76,8 +81,6 @@ final class OtpLifecycleTest extends TestCase
      * Test email challenge persists a code on the factor.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailChallengePersistsCodeOnFactor(): void
     {
@@ -96,8 +99,6 @@ final class OtpLifecycleTest extends TestCase
      * Test verifying the persisted email code returns true.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyingPersistedEmailCodeReturnsTrue(): void
     {
@@ -118,8 +119,6 @@ final class OtpLifecycleTest extends TestCase
      * Test verifying the persisted email code marks the verification store.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyingPersistedEmailCodeMarksVerificationStore(): void
     {
@@ -139,8 +138,6 @@ final class OtpLifecycleTest extends TestCase
      * Test verifying the persisted email code dispatches MfaVerified.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyingPersistedEmailCodeDispatchesVerifiedEvent(): void
     {
@@ -161,8 +158,6 @@ final class OtpLifecycleTest extends TestCase
      * Test verifying the persisted email code clears code and expiry.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testVerifyingPersistedEmailCodeClearsCodeAndExpiry(): void
     {
@@ -186,8 +181,6 @@ final class OtpLifecycleTest extends TestCase
      * the outbound message and verify successfully against the persisted code.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testSmsChallengeIssuedAndVerifiedViaBoundGateway(): void
     {
@@ -219,8 +212,6 @@ final class OtpLifecycleTest extends TestCase
      * verification and dispatch a `CodeInvalid` failure event.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEmailVerificationFailsWithWrongCode(): void
     {

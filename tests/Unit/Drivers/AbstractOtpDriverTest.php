@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use Tests\TestCase;
 use Tests\Unit\Concerns\InteractsWithAbstractOtpDriver;
@@ -18,10 +20,11 @@ use Tests\Unit\Concerns\InteractsWithAbstractOtpDriver;
  * threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(AbstractOtpDriver::class)]
 final class AbstractOtpDriverTest extends TestCase
 {
     use InteractsWithAbstractOtpDriver;

@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use Tests\TestCase;
 use Tests\Unit\Concerns\InteractsWithAbstractOtpDriver;
@@ -22,10 +24,11 @@ use Tests\Unit\Concerns\InteractsWithAbstractOtpDriver;
  * generator (observed via the dispatched payload).
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(AbstractOtpDriver::class)]
 final class AbstractOtpDriverIssuanceTest extends TestCase
 {
     use InteractsWithAbstractOtpDriver;

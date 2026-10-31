@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Enums;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 
@@ -11,10 +12,11 @@ use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
  * Unit tests for the `MfaVerificationFailureReason` enum.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaVerificationFailureReason::class)]
 final class MfaVerificationFailureReasonTest extends TestCase
 {
     /**

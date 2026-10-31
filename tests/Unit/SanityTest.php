@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
+use PHPUnit\Framework\Attributes\CoversNothing;
 use SineMacula\Laravel\Mfa\MfaManager;
 use Tests\TestCase;
 
@@ -12,10 +13,11 @@ use Tests\TestCase;
  * and exposes the MFA manager on the container.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversNothing]
 final class SanityTest extends TestCase
 {
     /**

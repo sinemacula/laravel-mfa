@@ -6,6 +6,7 @@ namespace Tests\Unit;
 
 use Illuminate\Config\Repository;
 use PHPUnit\Framework\Assert;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
@@ -19,10 +20,11 @@ use Tests\Fixtures\TestUser;
  * Unit tests for the `MfaManager` driver factories exposed via `driver($name)`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class MfaManagerDriversTest extends MfaManagerTestCase
 {
     /**
