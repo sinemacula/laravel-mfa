@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
@@ -123,7 +124,11 @@ final readonly class ProofService
      * bound to its current sign-in and stamped with the verification generation
      * read before the proof was checked, observing nothing beyond the proof
      * itself, and return it; `null` when the identity has no sign-in the store
-     * knows of, so nothing is recorded.
+     * knows of, so nothing is recorded. The proof, bound as it is now, is
+     * stored once the storage connection's open transaction, if any, commits,
+     * and never when it rolls back, so a verification undone with it leaves no
+     * proof. A store that refuses it throws `ProofRefusedException` then: at
+     * once with no transaction open, otherwise from the commit.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  int  $generation
@@ -136,7 +141,6 @@ final readonly class ProofService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     public function record(MultiFactorAuthenticatable $identity, int $generation, ProofKind $kind, string $method, ?Channel $channel, ?string $reference, Purpose $purpose): ?Proof
@@ -162,7 +166,7 @@ final readonly class ProofService
             $generation,
         );
 
-        $store->record($proof);
+        AfterStorageCommit::run($this->container, static fn () => $store->record($proof));
 
         return $proof;
     }
