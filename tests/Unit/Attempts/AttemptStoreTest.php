@@ -24,8 +24,8 @@ use Tests\TestCase;
 #[CoversClass(AttemptStore::class)]
 final class AttemptStoreTest extends TestCase
 {
-    /** @var string The key of the row under test. */
-    private const string KEY = 'row-key';
+    /** @var string A row key, as long as the digests the store is keyed by. */
+    private const string KEY = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08';
 
     /** @var int The Unix time the tests run at. */
     private const int NOW = 1793534400;
@@ -175,18 +175,15 @@ final class AttemptStoreTest extends TestCase
     {
         $store = $this->store();
 
-        $store->hold('first', AttemptScope::FACTOR, 1, self::NOW + 60);
-        $store->hold('second', AttemptScope::FACTOR, 2, self::NOW + 120);
-        $store->hold('third', AttemptScope::FACTOR, 3, self::NOW + 180);
+        $store->hold($this->key('first'), AttemptScope::FACTOR, 1, self::NOW + 60);
+        $store->hold($this->key('second'), AttemptScope::FACTOR, 2, self::NOW + 120);
+        $store->hold($this->key('third'), AttemptScope::FACTOR, 3, self::NOW + 180);
 
-        $rows = $store->read(['second', 'missing', 'third']);
+        $rows = $store->read([$this->key('second'), $this->key('missing'), $this->key('third')]);
 
-        ksort($rows);
-
-        self::assertSame([
-            'second' => ['hits' => 2, 'ends' => self::NOW + 120],
-            'third'  => ['hits' => 3, 'ends' => self::NOW + 180],
-        ], $rows);
+        self::assertCount(2, $rows);
+        self::assertSame(['hits' => 2, 'ends' => self::NOW + 120], $rows[$this->key('second')]);
+        self::assertSame(['hits' => 3, 'ends' => self::NOW + 180], $rows[$this->key('third')]);
     }
 
     /**
@@ -199,6 +196,19 @@ final class AttemptStoreTest extends TestCase
     private function store(): AttemptStore
     {
         return $this->container()->make(AttemptStore::class);
+    }
+
+    /**
+     * A row key named for the test, as long as the digests the store is keyed
+     * by: the key column has a fixed width, which some databases pad a shorter
+     * key to.
+     *
+     * @param  string  $name
+     * @return string
+     */
+    private function key(string $name): string
+    {
+        return hash('sha256', $name);
     }
 
     /**
