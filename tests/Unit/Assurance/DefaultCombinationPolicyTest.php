@@ -88,6 +88,11 @@ final class DefaultCombinationPolicyTest extends TestCase
         yield 'email after a phone code' => [SessionProofs::phoneCode(), new Channel(ChannelKind::EMAIL, SessionProofs::EMAIL), true];
         yield 'email to the address signed in with' => [SessionProofs::emailCode(), new Channel(ChannelKind::EMAIL, SessionProofs::EMAIL), false];
         yield 'email to the same address in another case' => [SessionProofs::emailCode(), new Channel(ChannelKind::EMAIL, 'Person@Example.COM'), false];
+        yield 'email to the same accented address in another case' => [
+            SessionProofs::emailCode('élodie@example.com'),
+            new Channel(ChannelKind::EMAIL, 'ÉLODIE@example.com'),
+            false,
+        ];
         yield 'email to another address' => [SessionProofs::emailCode(), new Channel(ChannelKind::EMAIL, SessionProofs::OTHER_EMAIL), true];
         yield 'SMS after an email code' => [SessionProofs::emailCode(), new Channel(ChannelKind::SMS, SessionProofs::PHONE), true];
         yield 'the passkey signed in with' => [SessionProofs::passkeySignIn(SessionProofs::verified()), new Channel(ChannelKind::PASSKEY, SessionProofs::PASSKEY), false];
@@ -579,6 +584,12 @@ final class DefaultCombinationPolicyTest extends TestCase
             [],
             [RequirementPart::MINIMUM_LEVEL],
         ];
+        yield 'an unknown first factor is not lifted by a recovery code' => [
+            [SessionProofs::unknownFirstFactor(), SessionProofs::recoveryCode()],
+            $everything,
+            [],
+            $all,
+        ];
         yield 'two first factors meet nothing' => [
             [SessionProofs::password(), SessionProofs::passkeySignIn(SessionProofs::verified()), SessionProofs::totp()],
             $everything,
@@ -635,6 +646,25 @@ final class DefaultCombinationPolicyTest extends TestCase
         self::assertSame(AssuranceLevel::AAL1, $evaluation->level);
         self::assertSame(['pwd'], $evaluation->amr);
         self::assertSame([RequirementPart::ADDITIONAL_VERIFICATION], $evaluation->unmet);
+    }
+
+    /**
+     * A proof that counts for nothing does not stop the proofs after it from
+     * counting.
+     *
+     * @return void
+     */
+    public function testAProofBoundElsewhereDoesNotHideTheProofsAfterIt(): void
+    {
+        $evaluation = $this->evaluate(
+            Requirement::none()->withAdditionalVerification(),
+            SessionProofs::password(),
+            SessionProofs::totp(application: 'mobile'),
+            SessionProofs::totp(),
+        );
+
+        self::assertTrue($evaluation->accepted);
+        self::assertSame([RequirementPart::ADDITIONAL_VERIFICATION], $evaluation->met);
     }
 
     /**
