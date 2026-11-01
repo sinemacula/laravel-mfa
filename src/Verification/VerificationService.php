@@ -170,6 +170,10 @@ final readonly class VerificationService
      *   `locked` for an attempt a lockout refused and `not_found` for a factor
      *   removed in the meantime.
      *
+     * A backup code verified for an enrolment is refused before the attempt,
+     * with `not_accepted`, since a recovery code cannot confirm an enrolment:
+     * the code is not used up and nothing is counted.
+     *
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account MFA-bypass
      * primitive, before anything is counted. Throws
@@ -202,8 +206,48 @@ final readonly class VerificationService
         $this->drivers->assertMatchesFactor($driver, $factor);
         FactorOwnership::assert($factor, $identity);
 
-        $events     = $this->container->make(Dispatcher::class);
-        $resolved   = $this->drivers->resolve($registry, $driver);
+        $events   = $this->container->make(Dispatcher::class);
+        $resolved = $this->drivers->resolve($registry, $driver);
+
+        // A recovery code cannot confirm an enrolment, so it is refused before
+        // the attempt is made: the single-use code is not spent, nothing is
+        // counted and nothing is reported as verified.
+        if ($resolved instanceof BackupCodeDriver && $purpose === Purpose::ENROLLMENT) {
+            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, FailureReason::NOT_ACCEPTED, 'A recovery code cannot confirm an enrolment.'));
+
+            return false;
+        }
+
+        return $this->makeAttempt($identity, $factor, $driver, $resolved, $code, $purpose, $events);
+    }
+
+    /**
+     * Make the attempt to verify the code against the factor through the
+     * resolved driver, for the purpose given, and apply what it found: bring
+     * the factor up to date, record the proof on success, and dispatch the
+     * outcome.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $driver
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $resolved
+     * @param  string  $code
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @param  \Illuminate\Contracts\Events\Dispatcher  $events
+     * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    private function makeAttempt(
+        MultiFactorAuthenticatable $identity,
+        Factor $factor,
+        string $driver,
+        FactorDriver $resolved,
+        #[\SensitiveParameter] string $code,
+        Purpose $purpose,
+        Dispatcher $events,
+    ): bool {
         $binding    = $resolved instanceof CodeDeliveryDriver ? $this->binding($identity, $purpose) : null;
         $verified   = $factor;
         $check      = null;
@@ -302,8 +346,8 @@ final readonly class VerificationService
      * on the factor's channel otherwise, named by the factor's destination when
      * it has one and by the factor itself when not. A driver whose channel
      * cannot carry a factor proves nothing, and neither does a factor whose
-     * identifier cannot name it, or a recovery code verified for an enrolment,
-     * which a recovery code cannot confirm.
+     * identifier cannot name it. A recovery code never reaches here for an
+     * enrolment, which `verify()` refuses before the attempt.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  int  $generation
@@ -318,10 +362,7 @@ final readonly class VerificationService
     private function recordProof(MultiFactorAuthenticatable $identity, int $generation, Factor $factor, string $driver, FactorDriver $resolved, Purpose $purpose): void
     {
         if ($resolved instanceof BackupCodeDriver) {
-
-            if ($purpose !== Purpose::ENROLLMENT) {
-                $this->proofs->record($identity, $generation, ProofKind::RECOVERY_CODE, $driver, null, null, $purpose);
-            }
+            $this->proofs->record($identity, $generation, ProofKind::RECOVERY_CODE, $driver, null, null, $purpose);
 
             return;
         }

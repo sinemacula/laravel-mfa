@@ -108,8 +108,8 @@ final readonly class AttemptService
      * stored under the lock (the attempt's own factor when it keeps no state,
      * `null` for a recovery code), so it checks against the stored factor, not
      * what the caller read before, and whatever it writes (a TOTP step, a
-     * delivered code used up, the time it was verified) commits with the count.
-     * A verification that throws counts nothing.
+     * delivered code used up, the factor's last use) commits with the count. A
+     * verification that throws counts nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Attempts\Attempt  $attempt
      * @param  \Closure(?\SineMacula\Laravel\Mfa\Contracts\Factor): bool  $verify

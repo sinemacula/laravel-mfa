@@ -907,25 +907,38 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
-     * A backup code verified for an enrolment is accepted but proves nothing,
-     * since a recovery code cannot confirm an enrolment.
+     * A backup code verified for an enrolment is refused before the attempt,
+     * since a recovery code cannot confirm an enrolment: the code is not used
+     * up, nothing is counted, nothing is proved and nothing is reported as
+     * verified.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testABackupCodeVerifiedForAnEnrolmentRecordsNothing(): void
+    public function testABackupCodeVerifiedForAnEnrollmentIsRefused(): void
     {
         $user   = $this->signIn();
         $factor = $this->backupCodeFactor($user);
 
         Auth::login($user);
 
-        Event::fake([MfaVerified::class]);
+        Event::fake([MfaVerified::class, MfaVerificationFailed::class]);
 
-        self::assertTrue($this->service()->verify($this->manager(), BackupCodeDriver::NAME, $factor, 'PLAIN12345', Purpose::ENROLLMENT));
+        self::assertFalse($this->service()->verify($this->manager(), BackupCodeDriver::NAME, $factor, 'PLAIN12345', Purpose::ENROLLMENT));
+        self::assertSame(hash('sha256', 'PLAIN12345'), $factor->refresh()->getSecret());
         self::assertSame([], $this->container()->make(ProofService::class)->proofs());
-        Event::assertDispatched(MfaVerified::class);
+        self::assertSame(0, DB::table('mfa_attempts')->count());
+
+        Event::assertNotDispatched(MfaVerified::class);
+        Event::assertDispatched(
+            MfaVerificationFailed::class,
+            static fn (MfaVerificationFailed $event): bool => $event->identity === $user
+                && $event->factor                                              === $factor
+                && $event->driver                                              === BackupCodeDriver::NAME
+                && $event->reason                                              === FailureReason::NOT_ACCEPTED
+                && $event->detail                                              === 'A recovery code cannot confirm an enrolment.',
+        );
     }
 
     /**
