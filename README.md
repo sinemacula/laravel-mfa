@@ -172,7 +172,7 @@ Mfa::getFactors();                      // Collection|null
 
 Mfa::challenge($driver, $factor);       // MfaChallengeIssued
 Mfa::verify($driver, $factor, $code);   // MfaVerified | MfaVerificationFailed
-Mfa::enroll($factor);                    // MfaFactorEnrolled
+Mfa::enroll($factor);                   // MfaFactorEnrolled
 Mfa::disable($factor);                  // MfaFactorDisabled
 Mfa::issueBackupCodes();                // atomic rotation — returns plaintext once
 ```

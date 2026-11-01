@@ -153,7 +153,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      */
     public function testEnrollOverwritesCallerSuppliedMorphId(): void
     {
-        [$attacker, $factor] = $this->stageEnrolHijackAttempt();
+        [$attacker, $factor] = $this->stageEnrollHijackAttempt();
 
         $this->manager()->enroll($factor);
 
@@ -172,7 +172,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      */
     public function testEnrollOverwritesCallerSuppliedMorphType(): void
     {
-        [$attacker, $factor] = $this->stageEnrolHijackAttempt();
+        [$attacker, $factor] = $this->stageEnrollHijackAttempt();
 
         $this->manager()->enroll($factor);
 
@@ -191,7 +191,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      */
     public function testEnrollDispatchesEnrolledEventWhenCallerSpoofsMorphColumns(): void
     {
-        [, $factor] = $this->stageEnrolHijackAttempt();
+        [, $factor] = $this->stageEnrollHijackAttempt();
 
         Event::fake([MfaFactorEnrolled::class]);
 
@@ -454,7 +454,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      *
      * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
-    private function stageEnrolHijackAttempt(): array
+    private function stageEnrollHijackAttempt(): array
     {
         $victim = TestUser::query()->create([
             'email'       => 'enroll-victim@example.test',

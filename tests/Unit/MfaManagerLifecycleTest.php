@@ -219,7 +219,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      */
     public function testEnrollPersistsFactor(): void
     {
-        $user    = $this->makeEnrolUser();
+        $user    = $this->makeEnrollUser();
         $factor  = $this->makeUnpersistedTotpFactor($user);
         $manager = $this->manager();
 
@@ -239,7 +239,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     {
         Event::fake([MfaFactorEnrolled::class]);
 
-        $user    = $this->makeEnrolUser();
+        $user    = $this->makeEnrollUser();
         $factor  = $this->makeUnpersistedTotpFactor($user);
         $manager = $this->manager();
 
@@ -262,7 +262,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      */
     public function testEnrollInvalidatesIsSetupCache(): void
     {
-        $user    = $this->makeEnrolUser();
+        $user    = $this->makeEnrollUser();
         $manager = $this->manager();
 
         // Warm the setup cache to "no factors" so the post-enrol invalidation
@@ -389,7 +389,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      *
      * @return \Tests\Fixtures\TestUser
      */
-    private function makeEnrolUser(): TestUser
+    private function makeEnrollUser(): TestUser
     {
         $user = TestUser::query()->create([
             'email'       => 'enroll@example.test',
