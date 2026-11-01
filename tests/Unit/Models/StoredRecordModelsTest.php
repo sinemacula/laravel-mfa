@@ -135,7 +135,7 @@ final class StoredRecordModelsTest extends TestCase
      * @return void
      */
     #[DataProvider('hidden')]
-    public function testHidesWhatItMustNeverSerialise(string $model, array $hidden): void
+    public function testHidesWhatItMustNeverSerialize(string $model, array $hidden): void
     {
         self::assertSame($hidden, (new $model)->getHidden());
     }
