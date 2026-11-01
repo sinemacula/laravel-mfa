@@ -43,10 +43,10 @@ final class IndexNameTest extends TestCase
      */
     public function testANameThatWouldNotFitIsCutShortAndHashed(): void
     {
-        $table = str_repeat('t', 52);
+        $table = 'mfa_' . str_repeat('t', 48);
         $name  = IndexName::for($table, '_owner_index');
 
-        self::assertSame(str_repeat('t', 42) . '_' . substr(hash('sha256', $table), 0, 8) . '_owner_index', $name);
+        self::assertSame('mfa_' . str_repeat('t', 38) . '_' . substr(hash('sha256', $table), 0, 8) . '_owner_index', $name);
         self::assertSame(63, strlen($name));
         self::assertSame($name, IndexName::for($table, '_owner_index'));
     }

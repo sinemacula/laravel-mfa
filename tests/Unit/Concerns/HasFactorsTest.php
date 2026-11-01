@@ -95,6 +95,24 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
+     * Deleting the identity deletes its factors, and only its own.
+     *
+     * @return void
+     */
+    public function testDeletingTheIdentityDeletesItsFactors(): void
+    {
+        $identity = $this->createHolder('one@example.test');
+        $other    = $this->createHolder('two@example.test');
+
+        $this->createFactor($identity, 'confirmed');
+        $kept = $this->createFactor($other, 'confirmed');
+
+        $identity->delete();
+
+        self::assertSame([$kept->id], Factor::query()->pluck('id')->all());
+    }
+
+    /**
      * Create an identity.
      *
      * @param  string  $email

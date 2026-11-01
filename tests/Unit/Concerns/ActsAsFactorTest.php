@@ -607,7 +607,8 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test record verification stamps the verified_at timestamp.
+     * Test record verification stamps the verified_at timestamp, and the last
+     * use with it.
      *
      * @return void
      */
@@ -619,6 +620,7 @@ final class ActsAsFactorTest extends TestCase
 
         self::assertNotNull($factor->getVerifiedAt());
         self::assertSame(Carbon::now()->getTimestamp(), $factor->getVerifiedAt()->getTimestamp());
+        self::assertSame(Carbon::now()->getTimestamp(), $factor->getLastUsedAt()?->getTimestamp());
     }
 
     /**
