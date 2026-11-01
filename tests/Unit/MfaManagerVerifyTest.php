@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -69,7 +69,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
     /**
      * A locked factor must short-circuit to false and dispatch a
-     * `MfaVerificationFailed` event with the `FactorLocked` reason.
+     * `MfaVerificationFailed` event with the `locked` reason.
      *
      * @return void
      *
@@ -99,7 +99,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::FACTOR_LOCKED
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::LOCKED
                 && $event->driver                                            === 'totp',
         );
     }
@@ -141,7 +141,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_INVALID,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::INVALID_CODE,
         );
     }
 

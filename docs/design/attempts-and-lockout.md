@@ -20,7 +20,7 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
   15.
 - A locked factor short-circuits `verify()` before the driver is called. The attempt counter is NOT incremented on
   that branch — the attempt never reached the driver. A `MfaVerificationFailed` event still fires with reason
-  `FACTOR_LOCKED`.
+  `locked`.
 - A successful verification clears the lockout as a side effect of `resetAttempts()`. A stale `locked_until` in the
   future is not a permanent bar; a later legitimate success unblocks subsequent attempts.
 - `isLocked()` is the live check: `locked_until !== null && locked_until->isFuture()`. A past `locked_until` is not
@@ -30,7 +30,7 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
 
 ## Success Path
 
-- `verify()` reads `$factor->isLocked()`. If the factor is locked, the verification service dispatches a `FACTOR_LOCKED`
+- `verify()` reads `$factor->isLocked()`. If the factor is locked, the verification service dispatches a `locked`
   failure and returns `false` without touching the counter or the driver.
 - Otherwise the verification service calls `FactorDriver::verify($factor, $code)`.
 - On driver success, the verification service calls `$factor->recordVerification()`. The trait stamps `verified_at`,

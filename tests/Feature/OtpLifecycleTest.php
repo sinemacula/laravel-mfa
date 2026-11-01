@@ -13,7 +13,7 @@ use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
-use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
@@ -209,7 +209,7 @@ final class OtpLifecycleTest extends TestCase
 
     /**
      * A submitted email code that does not match the persisted code should fail
-     * verification and dispatch a `CodeInvalid` failure event.
+     * verification and dispatch an `invalid_code` failure event.
      *
      * @return void
      */
@@ -228,14 +228,13 @@ final class OtpLifecycleTest extends TestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_INVALID,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::INVALID_CODE,
         );
     }
 
     /**
-     * A code whose `expires_at` has passed must be rejected with a
-     * `CodeExpired` failure event even when the submitted code matches the
-     * stored value.
+     * A code whose `expires_at` has passed must be rejected with an `expired`
+     * failure event even when the submitted code matches the stored value.
      *
      * @return void
      *
@@ -260,7 +259,7 @@ final class OtpLifecycleTest extends TestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_EXPIRED,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::EXPIRED,
         );
     }
 

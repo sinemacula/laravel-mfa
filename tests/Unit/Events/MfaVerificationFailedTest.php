@@ -8,7 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
-use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 
 /**
@@ -49,13 +49,15 @@ final class MfaVerificationFailedTest extends TestCase
             identity: $identity,
             factor  : $factor,
             driver  : 'sms',
-            reason  : MfaVerificationFailureReason::CODE_INVALID,
+            reason  : FailureReason::INVALID_CODE,
+            detail  : 'The code did not match.',
         );
 
         self::assertSame($identity, $event->identity);
         self::assertSame($factor, $event->factor);
         self::assertSame('sms', $event->driver);
-        self::assertSame(MfaVerificationFailureReason::CODE_INVALID, $event->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $event->reason);
+        self::assertSame('The code did not match.', $event->detail);
     }
 
     /**
@@ -71,10 +73,11 @@ final class MfaVerificationFailedTest extends TestCase
             identity: $identity,
             factor  : null,
             driver  : 'totp',
-            reason  : MfaVerificationFailureReason::SECRET_MISSING,
+            reason  : FailureReason::NOT_CONFIRMED,
+            detail  : 'The factor was never confirmed.',
         );
 
         self::assertNull($event->factor);
-        self::assertSame(MfaVerificationFailureReason::SECRET_MISSING, $event->reason);
+        self::assertSame(FailureReason::NOT_CONFIRMED, $event->reason);
     }
 }

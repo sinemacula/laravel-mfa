@@ -18,6 +18,9 @@ The current note set is:
 - `capability-services.md`: how the package is organised by capability, the manager as a one-line delegation to each
   capability's service, the `*Bindings` class each capability registers its wiring through, and what the services
   share.
+- `assurance-vocabulary.md`: the values assurance is described with (channels, observed properties, proofs,
+  levels, requirements and their composition, evaluations, verification results), what each refuses, their serialised
+  forms, and the enums whose values are stable names.
 - `verification-lifecycle-and-events.md`: the five lifecycle events (`MfaChallengeIssued`, `MfaVerified`,
   `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`), who dispatches them, and the exact ordering
   against driver calls and store writes.

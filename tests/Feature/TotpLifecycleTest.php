@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
-use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
@@ -127,7 +127,7 @@ final class TotpLifecycleTest extends TestCase
 
     /**
      * A failed TOTP verification must increment the attempt counter and
-     * dispatch a `CodeInvalid` failure event.
+     * dispatch an `invalid_code` failure event.
      *
      * @return void
      *
@@ -151,7 +151,7 @@ final class TotpLifecycleTest extends TestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_INVALID,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::INVALID_CODE,
         );
     }
 
@@ -205,7 +205,7 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test verifying after lockout dispatches FactorLocked failure.
+     * Test verifying after lockout dispatches a locked failure.
      *
      * @return void
      *
@@ -213,7 +213,7 @@ final class TotpLifecycleTest extends TestCase
      * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
      * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
-    public function testVerifyingAfterLockoutDispatchesFactorLockedFailure(): void
+    public function testVerifyingAfterLockoutDispatchesLockedFailure(): void
     {
         $factor = $this->enrollAndBurnAttempts();
 
@@ -223,7 +223,7 @@ final class TotpLifecycleTest extends TestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::FACTOR_LOCKED,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::LOCKED,
         );
     }
 

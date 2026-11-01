@@ -35,9 +35,10 @@ registers it with the container, and the classes only it uses:
 | `Factors`       | Factor reads (`isSetup()`, `getFactors()`), their cache, ownership, `FactorSummary` |
 | `Drivers`       | The TOTP, email and SMS drivers, and the resolver the services run drivers through  |
 | `Codes`         | Delivery of email and SMS codes: `MfaCodeMessage` and the default `NullSmsGateway`  |
-| `Requirements`  | Whether MFA applies (`shouldUse()`) and the default `NullMfaPolicy`                 |
-| `Proofs`        | The recorded verification (`hasExpired()`) and `SessionMfaVerificationStore`        |
-| `Verification`  | `challenge()` and `verify()`                                                        |
+| `Requirements`  | Whether MFA applies (`shouldUse()`), the default `NullMfaPolicy`, `Requirement`     |
+| `Proofs`        | The recorded verification (`hasExpired()`), `SessionMfaVerificationStore`, `Proof`  |
+| `Verification`  | `challenge()`, `verify()` and `VerificationResult`                                  |
+| `Assurance`     | `Channel`, `ObservedProperties` and `Evaluation`                                    |
 | `Enrollment`    | `enroll()`                                                                          |
 | `Lifecycle`     | `disable()`                                                                         |
 | `RecoveryCodes` | Backup codes: `issueBackupCodes()` and `BackupCodeDriver`                           |
@@ -45,8 +46,8 @@ registers it with the container, and the classes only it uses:
 | `Testing`       | Test doubles for applications: `FakeSmsGateway`                                     |
 
 `Contracts`, `Concerns`, `Models`, `Events`, `Exceptions`, `Enums` and `Facades` hold what their names say for every
-capability, and `Config`, `Database` and `Support` the internal helpers the capabilities share. The `Mfa` facade and
-`MfaManager` stay the entry point: each manager method hands its call to the service of its capability, so nothing you
-call changes with the layout. The services and `*Bindings` classes are internal; extend the package through the points
-in the table above. How the layout works is described in
-[the capability services design note](../design/capability-services.md).
+capability (the values and enums assurance is described with are in [Proofs, assurance and requirements](assurance.md)),
+and `Config`, `Database` and `Support` the internal helpers the capabilities share. The `Mfa` facade and `MfaManager`
+stay the entry point: each manager method hands its call to the service of its capability, so nothing you call changes
+with the layout. The services and `*Bindings` classes are internal; extend the package through the points in the table
+above. How the layout works is described in [the capability services design note](../design/capability-services.md).

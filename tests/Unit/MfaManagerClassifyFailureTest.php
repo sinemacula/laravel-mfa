@@ -8,7 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\MfaManager;
 use Tests\Fixtures\InMemoryFactor;
@@ -54,14 +54,13 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
     }
 
     /**
-     * `classifyFailure()` must report `SecretMissing` for a TOTP-shape factor
-     * with no stored secret.
+     * A TOTP-shape factor with no stored secret fails as `not_confirmed`.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testClassifyFailureReturnsSecretMissingForTotpShapedFactorWithoutSecret(): void
+    public function testClassifyFailureReturnsNotConfirmedForTotpShapedFactorWithoutSecret(): void
     {
         $user = TestUser::query()->create(['email' => 'cf1@example.com']);
 
@@ -80,19 +79,18 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::SECRET_MISSING,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::NOT_CONFIRMED,
         );
     }
 
     /**
-     * `classifyFailure()` must report `CodeExpired` when the factor carries a
-     * pending code whose expiry has passed.
+     * A factor whose pending code's expiry has passed fails as `expired`.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testClassifyFailureReturnsCodeExpiredWhenPendingCodeHasExpired(): void
+    public function testClassifyFailureReturnsExpiredWhenPendingCodeHasExpired(): void
     {
         $user = TestUser::query()->create(['email' => 'cf2@example.com']);
 
@@ -116,19 +114,20 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_EXPIRED,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::EXPIRED
+                && $event->detail                                            === 'The pending code has expired.',
         );
     }
 
     /**
-     * `classifyFailure()` must report `CodeInvalid` when a TOTP factor has a
-     * stored secret but verification still fails.
+     * A TOTP factor with a stored secret whose verification still fails fails
+     * as `invalid_code`.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testClassifyFailureReturnsCodeInvalidForTotpSecretMismatch(): void
+    public function testClassifyFailureReturnsInvalidCodeForTotpSecretMismatch(): void
     {
         $user = TestUser::query()->create(['email' => 'cf3@example.com']);
 
@@ -151,19 +150,19 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_INVALID,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::INVALID_CODE,
         );
     }
 
     /**
-     * `classifyFailure()` must report `CodeMissing` when the factor carries a
-     * pending code but no expiry timestamp.
+     * A factor with a pending code but no expiry timestamp fails as `expired`,
+     * with a detail that says no live code exists.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testClassifyFailureReturnsCodeMissingWhenPendingCodeHasNoExpiry(): void
+    public function testClassifyFailureReturnsExpiredWhenPendingCodeHasNoExpiry(): void
     {
         $user = TestUser::query()->create(['email' => 'cf4@example.com']);
 
@@ -186,20 +185,20 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_MISSING,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::EXPIRED
+                && $event->detail                                            === 'The pending code has no expiry, so no live code exists.',
         );
     }
 
     /**
-     * `classifyFailure()` must report `CodeInvalid` when the factor carries a
-     * valid pending code with a future expiry but the driver still rejects
-     * verification.
+     * A factor with a valid pending code and a future expiry that the driver
+     * still rejects fails as `invalid_code`.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testClassifyFailureReturnsCodeInvalidForValidPendingCodeWithFutureExpiry(): void
+    public function testClassifyFailureReturnsInvalidCodeForValidPendingCodeWithFutureExpiry(): void
     {
         $user = TestUser::query()->create(['email' => 'cf5@example.com']);
 
@@ -223,7 +222,7 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === MfaVerificationFailureReason::CODE_INVALID,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::INVALID_CODE,
         );
     }
 }
