@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
-use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
@@ -38,6 +38,21 @@ use Tests\TestCase;
 #[CoversClass(VerificationService::class)]
 final class VerificationServiceTest extends TestCase
 {
+    /** @var string The detail of a locked factor's failure. */
+    private const string LOCKED = 'The factor is locked after too many failed attempts.';
+
+    /** @var string The detail of a factor whose enrolment never completed. */
+    private const string UNCONFIRMED = 'The factor has no pending code or secret, so its enrolment never completed.';
+
+    /** @var string The detail of an expired pending code. */
+    private const string EXPIRED = 'The pending code has expired.';
+
+    /** @var string The detail of a pending code without an expiry. */
+    private const string NO_EXPIRY = 'The pending code has no expiry, so no live code exists.';
+
+    /** @var string The detail of a code that did not match. */
+    private const string MISMATCH = 'The code did not match.';
+
     /**
      * Release the frozen clock and the Mockery expectations.
      *
@@ -223,7 +238,7 @@ final class VerificationServiceTest extends TestCase
         Event::fake();
 
         self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
-        $this->assertFailedWith(MfaVerificationFailureReason::FACTOR_LOCKED);
+        $this->assertFailedWith(FailureReason::LOCKED, self::LOCKED);
         Event::assertNotDispatched(MfaVerified::class);
     }
 
@@ -330,7 +345,8 @@ final class VerificationServiceTest extends TestCase
             static fn (MfaVerificationFailed $event): bool => $event->identity === $user
                 && $event->factor                                              === $factor
                 && $event->driver                                              === 'totp'
-                && $event->reason                                              === MfaVerificationFailureReason::CODE_INVALID,
+                && $event->reason                                              === FailureReason::INVALID_CODE
+                && $event->detail                                              === self::MISMATCH,
         );
     }
 
@@ -422,39 +438,40 @@ final class VerificationServiceTest extends TestCase
 
     /**
      * Factor states (pending code, secret, minutes until the code expires) and
-     * the failure reason each explains.
+     * the failure reason and detail each explains.
      *
-     * @return iterable<string, array{?string, ?string, ?int, \SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason}>
+     * @return iterable<string, array{?string, ?string, ?int, \SineMacula\Laravel\Mfa\Enums\FailureReason, string}>
      */
     public static function failureReasons(): iterable
     {
-        yield 'no code and no secret' => [null, null, null, MfaVerificationFailureReason::SECRET_MISSING];
-        yield 'no code and no secret, past an expiry' => [null, null, -1, MfaVerificationFailureReason::SECRET_MISSING];
-        yield 'an expired code without a secret' => ['123456', null, -1, MfaVerificationFailureReason::CODE_EXPIRED];
-        yield 'an expired code with a secret' => ['123456', 'secret', -1, MfaVerificationFailureReason::CODE_EXPIRED];
-        yield 'a secret past an expiry' => [null, 'secret', -1, MfaVerificationFailureReason::CODE_EXPIRED];
-        yield 'a code without an expiry' => ['123456', null, null, MfaVerificationFailureReason::CODE_MISSING];
-        yield 'a code with a secret and no expiry' => ['123456', 'secret', null, MfaVerificationFailureReason::CODE_MISSING];
-        yield 'a live code' => ['123456', 'secret', 5, MfaVerificationFailureReason::CODE_INVALID];
-        yield 'a live code without a secret' => ['123456', null, 5, MfaVerificationFailureReason::CODE_INVALID];
-        yield 'a secret without a code' => [null, 'secret', null, MfaVerificationFailureReason::CODE_INVALID];
-        yield 'a secret with a future expiry' => [null, 'secret', 5, MfaVerificationFailureReason::CODE_INVALID];
+        yield 'no code and no secret' => [null, null, null, FailureReason::NOT_CONFIRMED, self::UNCONFIRMED];
+        yield 'no code and no secret, past an expiry' => [null, null, -1, FailureReason::NOT_CONFIRMED, self::UNCONFIRMED];
+        yield 'an expired code without a secret' => ['123456', null, -1, FailureReason::EXPIRED, self::EXPIRED];
+        yield 'an expired code with a secret' => ['123456', 'secret', -1, FailureReason::EXPIRED, self::EXPIRED];
+        yield 'a secret past an expiry' => [null, 'secret', -1, FailureReason::EXPIRED, self::EXPIRED];
+        yield 'a code without an expiry' => ['123456', null, null, FailureReason::EXPIRED, self::NO_EXPIRY];
+        yield 'a code with a secret and no expiry' => ['123456', 'secret', null, FailureReason::EXPIRED, self::NO_EXPIRY];
+        yield 'a live code' => ['123456', 'secret', 5, FailureReason::INVALID_CODE, self::MISMATCH];
+        yield 'a live code without a secret' => ['123456', null, 5, FailureReason::INVALID_CODE, self::MISMATCH];
+        yield 'a secret without a code' => [null, 'secret', null, FailureReason::INVALID_CODE, self::MISMATCH];
+        yield 'a secret with a future expiry' => [null, 'secret', 5, FailureReason::INVALID_CODE, self::MISMATCH];
     }
 
     /**
      * A failed verification is reported with the reason the factor's state
-     * explains.
+     * explains, and the detail that tells apart failures sharing a reason.
      *
      * @param  ?string  $code
      * @param  ?string  $secret
      * @param  ?int  $expiresInMinutes
-     * @param  \SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason  $reason
+     * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
+     * @param  string  $detail
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     #[DataProvider('failureReasons')]
-    public function testAFailureIsReportedWithItsReason(?string $code, ?string $secret, ?int $expiresInMinutes, MfaVerificationFailureReason $reason): void
+    public function testAFailureIsReportedWithItsReason(?string $code, ?string $secret, ?int $expiresInMinutes, FailureReason $reason, string $detail): void
     {
         $user      = $this->signIn();
         $expiresAt = $expiresInMinutes === null ? null : Carbon::now()->addMinutes($expiresInMinutes);
@@ -465,21 +482,22 @@ final class VerificationServiceTest extends TestCase
         Event::fake();
 
         self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '000000'));
-        $this->assertFailedWith($reason);
+        $this->assertFailedWith($reason, $detail);
     }
 
     /**
-     * Assert one failure was reported, with the given reason.
+     * Assert one failure was reported, with the given reason and detail.
      *
-     * @param  \SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason  $reason
+     * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
+     * @param  string  $detail
      * @return void
      */
-    private function assertFailedWith(MfaVerificationFailureReason $reason): void
+    private function assertFailedWith(FailureReason $reason, string $detail): void
     {
         Event::assertDispatchedTimes(MfaVerificationFailed::class, 1);
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === $reason && $event->driver === 'totp',
+            static fn (MfaVerificationFailed $event): bool => $event->reason === $reason && $event->detail === $detail && $event->driver === 'totp',
         );
     }
 

@@ -21,9 +21,9 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
 - On successful verification, `MfaVerified` fires after the verification-store write. A listener that reads
   `Mfa::hasExpired()` inside `MfaVerified` observes the fresh timestamp — there is no "event fires, state catches up"
   window.
-- `MfaVerificationFailed` always carries a `MfaVerificationFailureReason`. The enum is narrowed to the cases the
-  verification service actually emits: `FACTOR_LOCKED`, `CODE_INVALID`, `CODE_EXPIRED`, `CODE_MISSING`,
-  `SECRET_MISSING`.
+- `MfaVerificationFailed` always carries a `FailureReason` and an internal `detail`. The verification service emits
+  four of the reasons: `locked`, `invalid_code`, `expired` and `not_confirmed`. The detail tells apart failures that
+  share a reason, such as an expired code and a code without an expiry, and is for listeners and logs only.
 - `MfaFactorEnrolled` fires after the factor row has been persisted (`EloquentFactor::persist()` for Eloquent
   factors). Non-Eloquent factors still dispatch the event; the consumer owns their storage.
 - `MfaFactorDisabled` fires after the row has been deleted for Eloquent factors. Non-Eloquent factors still dispatch
@@ -40,7 +40,7 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
 
 - `challenge()` resolves the identity, asserts factor ownership, calls `FactorDriver::issueChallenge($factor)`, then
   dispatches `MfaChallengeIssued($identity, $factor, $driver)`.
-- `verify()` resolves the identity, asserts ownership, rejects if `$factor->isLocked()` with a `FACTOR_LOCKED`
+- `verify()` resolves the identity, asserts ownership, rejects if `$factor->isLocked()` with a `locked`
   failure, calls `FactorDriver::verify($factor, $code)`, persists the success/failure side effects on the factor row,
   writes through `MfaVerificationStore::markVerified()` on success, then dispatches either `MfaVerified` or
   `MfaVerificationFailed` last.
@@ -53,15 +53,15 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
 
 ## Failure / Edge Cases
 
-- `verify()` on a locked factor emits `MfaVerificationFailed` with `FACTOR_LOCKED` and returns `false` without
+- `verify()` on a locked factor emits `MfaVerificationFailed` with `locked` and returns `false` without
   calling the driver. The attempt counter is not incremented because the attempt never reached the driver.
 - On driver-level verification failure, the verification service classifies the reason from the factor's post-verify
-  state using the priority order `SECRET_MISSING > CODE_EXPIRED > CODE_MISSING > CODE_INVALID`. `CODE_INVALID` is the
-  default — `CODE_MISSING` only fires when a pending code exists but has no expiry stamp (a driver-persistence bug, not
-  a user error).
+  state in priority order: `not_confirmed` when there is neither a pending code nor a secret, `expired` when the code's
+  expiry has passed, `expired` again when a pending code has no expiry stamp (a driver-persistence bug, not a user
+  error, told apart by its detail), and `invalid_code` otherwise, the default.
 - Unsupported identities short-circuit to `false` without dispatching `MfaVerificationFailed`. Unresolved drivers throw
   from `DriverResolver::resolve()` before any event is dispatched. Those branches are deliberately outside the event
-  taxonomy — the enum does not advertise a case for them.
+  taxonomy.
 - Non-Eloquent factors participate in the lifecycle events but carry no row to mutate. `applyVerificationOutcome()`
   is skipped for them; attempt counters and lockouts only exist on factors whose implementation persists them.
 - Backup-code rotation inside `issueBackupCodes()` opens its transaction on the factor model's connection, not the
@@ -78,7 +78,7 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
   `assert()`. `src/Factors/FactorStateCache.php`: `clear()`.
 - `src/Events/MfaChallengeIssued.php`, `src/Events/MfaVerified.php`, `src/Events/MfaVerificationFailed.php`,
   `src/Events/MfaFactorEnrolled.php`, `src/Events/MfaFactorDisabled.php`.
-- `src/Enums/MfaVerificationFailureReason.php`: the narrowed failure taxonomy.
+- `src/Enums/FailureReason.php`: the failure reasons, shared with the rest of the package.
 - `src/Contracts/FactorDriver.php`: the driver-side `issueChallenge()` / `verify()` contract the verification service
   wraps.
 - `src/Exceptions/FactorOwnershipMismatchException.php`: the pre-event rejection path.
@@ -106,13 +106,13 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
 - `tests/Unit/MfaManagerLifecycleTest.php`
   `testDisableInvalidatesIsSetupCache`
 - `tests/Unit/MfaManagerClassifyFailureTest.php`
-  `testClassifyFailureReturnsSecretMissingForTotpShapedFactorWithoutSecret`
+  `testClassifyFailureReturnsNotConfirmedForTotpShapedFactorWithoutSecret`
 - `tests/Unit/MfaManagerClassifyFailureTest.php`
-  `testClassifyFailureReturnsCodeExpiredWhenPendingCodeHasExpired`
+  `testClassifyFailureReturnsExpiredWhenPendingCodeHasExpired`
 - `tests/Unit/MfaManagerClassifyFailureTest.php`
-  `testClassifyFailureReturnsCodeMissingWhenPendingCodeHasNoExpiry`
+  `testClassifyFailureReturnsExpiredWhenPendingCodeHasNoExpiry`
 - `tests/Unit/MfaManagerClassifyFailureTest.php`
-  `testClassifyFailureReturnsCodeInvalidForTotpSecretMismatch`
+  `testClassifyFailureReturnsInvalidCodeForTotpSecretMismatch`
 - `tests/Unit/Verification/VerificationServiceTest.php`
   `testAFailureIsReportedWithItsReason`
 
@@ -123,7 +123,7 @@ Update this note when any of the following change:
 - the set of five events or the payload shape of any of them
 - the rule that the package's services dispatch events and drivers do not
 - the ordering rule that `MfaVerified` fires after the verification-store write
-- the failure-reason taxonomy on `MfaVerificationFailureReason` or the priority order used to classify a driver
+- the failure reasons the verification service emits, their details, or the priority order used to classify a driver
   failure
 - whether enrolment and disable still invalidate the setup cache before dispatching
 - whether ownership mismatches continue to fail before any event is emitted

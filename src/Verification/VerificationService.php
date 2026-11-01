@@ -14,7 +14,7 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
-use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
@@ -148,7 +148,7 @@ final readonly class VerificationService
         $events = $this->container->make(Dispatcher::class);
 
         if ($factor->isLocked()) {
-            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, MfaVerificationFailureReason::FACTOR_LOCKED));
+            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, FailureReason::LOCKED, 'The factor is locked after too many failed attempts.'));
 
             return false;
         }
@@ -231,23 +231,23 @@ final readonly class VerificationService
             return;
         }
 
-        // Classify the failure inline. Branches in priority order:
-        // SECRET_MISSING when TOTP enrolment never completed (no code and no
-        // secret); CODE_EXPIRED when the pending OTP aged past its window;
-        // CODE_MISSING when a pending code exists but has no expiry - treat as
-        // missing; CODE_INVALID otherwise - TOTP window mismatch or OTP
-        // comparison mismatch.
+        // Classify the failure inline. Branches in priority order: not
+        // confirmed when TOTP enrolment never completed (no code and no
+        // secret); expired when the pending code aged past its window, or when
+        // a pending code has no expiry, so no live code exists; an invalid code
+        // otherwise - a TOTP window mismatch or an OTP comparison mismatch. The
+        // detail keeps the two expired cases apart.
         $expiresAt = $factor->getExpiresAt();
         $pending   = $factor->getCode();
         $secret    = $factor->getSecret();
 
-        $reason = match (true) {
-            $pending === null   && $secret === null     => MfaVerificationFailureReason::SECRET_MISSING,
-            $expiresAt !== null && $expiresAt->isPast() => MfaVerificationFailureReason::CODE_EXPIRED,
-            $pending   !== null && $expiresAt === null  => MfaVerificationFailureReason::CODE_MISSING,
-            default                                     => MfaVerificationFailureReason::CODE_INVALID,
+        [$reason, $detail] = match (true) {
+            $pending === null   && $secret === null     => [FailureReason::NOT_CONFIRMED, 'The factor has no pending code or secret, so its enrolment never completed.'],
+            $expiresAt !== null && $expiresAt->isPast() => [FailureReason::EXPIRED, 'The pending code has expired.'],
+            $pending   !== null && $expiresAt === null  => [FailureReason::EXPIRED, 'The pending code has no expiry, so no live code exists.'],
+            default                                     => [FailureReason::INVALID_CODE, 'The code did not match.'],
         };
 
-        $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason));
+        $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason, $detail));
     }
 }
