@@ -13,41 +13,45 @@ the `mfa` manager is resolved, so a misconfiguration fails before anyone verifie
 [Checking the configuration](#checking-the-configuration)). Settings are read each time they are used, never cached
 between requests.
 
-| Key                             | Default                            | Bounds                                 | Env                                 |
-|---------------------------------|------------------------------------|----------------------------------------|-------------------------------------|
-| `applications`                  | `[]`                               | see [Applications](#applications)      |                                     |
-| `storage.connection`            | `null`                             | a configured connection, or `null`     | `MFA_STORAGE_CONNECTION`            |
-| `factor.model`                  | `Models\Factor`                    | an Eloquent `EloquentFactor` model     | `MFA_FACTOR_MODEL`                  |
-| `factor.table`                  | `mfa_factors`                      | a table name                           | `MFA_FACTOR_TABLE`                  |
-| `identity_state.table`          | `mfa_identity_states`              | a table name                           | `MFA_IDENTITY_STATE_TABLE`          |
-| `totp.algorithm`                | `sha1`                             | `sha1`, `sha256`, `sha512`             | `MFA_TOTP_ALGORITHM`                |
-| `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   |
-| `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   |
-| `totp.window`                   | `1`                                | 0 to 3 steps                           | `MFA_TOTP_WINDOW`                   |
-| `codes.length`                  | `6`                                | 6 to 10 digits                         | `MFA_CODES_LENGTH`                  |
-| `codes.ttl_minutes`             | `10`                               | 1 to 10 minutes                        | `MFA_CODES_TTL_MINUTES`             |
-| `codes.resend_cooldown_seconds` | `60`                               | 0 to the code lifetime                 | `MFA_CODES_RESEND_COOLDOWN_SECONDS` |
-| `codes.factor_send_limit`       | `5`                                | 1 to 50                                | `MFA_CODES_FACTOR_SEND_LIMIT`       |
-| `codes.identity_send_limit`     | `10`                               | 1 to 100                               | `MFA_CODES_IDENTITY_SEND_LIMIT`     |
-| `codes.send_window_minutes`     | `60`                               | 1 to 1440 minutes                      | `MFA_CODES_SEND_WINDOW_MINUTES`     |
-| `codes.sms_message`             | `Your verification code is: :code` | carries `:code`                        | `MFA_CODES_SMS_MESSAGE`             |
-| `codes.mailable`                | `Codes\MfaCodeMessage`             | `MfaCodeMessage` or a subclass         |                                     |
-| `recovery_codes.count`          | `10`                               | 1 to 50                                | `MFA_RECOVERY_CODES_COUNT`          |
-| `recovery_codes.length`         | `12`                               | 1 to 64, and 40 bits with the alphabet | `MFA_RECOVERY_CODES_LENGTH`         |
-| `recovery_codes.alphabet`       | `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` | see [Recovery codes](#recovery-codes)  | `MFA_RECOVERY_CODES_ALPHABET`       |
-| `recovery_codes.low_count`      | `3`                                | 0 to the set's size                    | `MFA_RECOVERY_CODES_LOW_COUNT`      |
-| `attempts.factor_limit`         | `5`                                | 1 to 20                                | `MFA_ATTEMPTS_FACTOR_LIMIT`         |
-| `attempts.identity_limit`       | `20`                               | 1 to 100                               | `MFA_ATTEMPTS_IDENTITY_LIMIT`       |
-| `attempts.ip_limit`             | `100`                              | 1 to 10000                             | `MFA_ATTEMPTS_IP_LIMIT`             |
-| `attempts.window_seconds`       | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_WINDOW_SECONDS`       |
-| `attempts.lockout_seconds`      | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_LOCKOUT_SECONDS`      |
-| `attempts.failure_ceiling`      | `100`                              | 1 to 100                               | `MFA_ATTEMPTS_FAILURE_CEILING`      |
-| `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        |
-| `proofs.max_age_minutes`        | `20160`                            | 0 to 525600 minutes                    | `MFA_PROOFS_MAX_AGE_MINUTES`        |
-| `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    |
+| Key                             | Default                            | Bounds                                 | Env                                 | Applied |
+|---------------------------------|------------------------------------|----------------------------------------|-------------------------------------|---------|
+| `applications`                  | `[]`                               | see [Applications](#applications)      |                                     | not yet |
+| `storage.connection`            | `null`                             | a configured connection, or `null`     | `MFA_STORAGE_CONNECTION`            | yes     |
+| `factor.model`                  | `Models\Factor`                    | an Eloquent `EloquentFactor` model     | `MFA_FACTOR_MODEL`                  | yes     |
+| `factor.table`                  | `mfa_factors`                      | a table name                           | `MFA_FACTOR_TABLE`                  | yes     |
+| `identity_state.table`          | `mfa_identity_states`              | a table name                           | `MFA_IDENTITY_STATE_TABLE`          | yes     |
+| `totp.algorithm`                | `sha1`                             | `sha1`, `sha256`, `sha512`             | `MFA_TOTP_ALGORITHM`                | not yet |
+| `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   | not yet |
+| `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   | not yet |
+| `totp.window`                   | `1`                                | 0 to 3 steps                           | `MFA_TOTP_WINDOW`                   | yes     |
+| `codes.length`                  | `6`                                | 6 to 10 digits                         | `MFA_CODES_LENGTH`                  | yes     |
+| `codes.ttl_minutes`             | `10`                               | 1 to 10 minutes                        | `MFA_CODES_TTL_MINUTES`             | yes     |
+| `codes.resend_cooldown_seconds` | `60`                               | 0 to the code lifetime                 | `MFA_CODES_RESEND_COOLDOWN_SECONDS` | not yet |
+| `codes.factor_send_limit`       | `5`                                | 1 to 50                                | `MFA_CODES_FACTOR_SEND_LIMIT`       | not yet |
+| `codes.identity_send_limit`     | `10`                               | 1 to 100                               | `MFA_CODES_IDENTITY_SEND_LIMIT`     | not yet |
+| `codes.send_window_minutes`     | `60`                               | 1 to 1440 minutes                      | `MFA_CODES_SEND_WINDOW_MINUTES`     | not yet |
+| `codes.sms_message`             | `Your verification code is: :code` | carries `:code`                        | `MFA_CODES_SMS_MESSAGE`             | yes     |
+| `codes.mailable`                | `Codes\MfaCodeMessage`             | `MfaCodeMessage` or a subclass         |                                     | yes     |
+| `recovery_codes.count`          | `10`                               | 1 to 50                                | `MFA_RECOVERY_CODES_COUNT`          | yes     |
+| `recovery_codes.length`         | `12`                               | 1 to 64, and 40 bits with the alphabet | `MFA_RECOVERY_CODES_LENGTH`         | yes     |
+| `recovery_codes.alphabet`       | `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` | see [Recovery codes](#recovery-codes)  | `MFA_RECOVERY_CODES_ALPHABET`       | yes     |
+| `recovery_codes.low_count`      | `3`                                | 0 to the set's size                    | `MFA_RECOVERY_CODES_LOW_COUNT`      | not yet |
+| `attempts.factor_limit`         | `5`                                | 1 to 20                                | `MFA_ATTEMPTS_FACTOR_LIMIT`         | yes     |
+| `attempts.identity_limit`       | `20`                               | 1 to 100                               | `MFA_ATTEMPTS_IDENTITY_LIMIT`       | not yet |
+| `attempts.ip_limit`             | `100`                              | 1 to 10000                             | `MFA_ATTEMPTS_IP_LIMIT`             | not yet |
+| `attempts.window_seconds`       | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_WINDOW_SECONDS`       | not yet |
+| `attempts.lockout_seconds`      | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_LOCKOUT_SECONDS`      | yes     |
+| `attempts.failure_ceiling`      | `100`                              | 1 to 100                               | `MFA_ATTEMPTS_FAILURE_CEILING`      | not yet |
+| `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        | not yet |
+| `proofs.max_age_minutes`        | `20160`                            | 0 to 525600 minutes                    | `MFA_PROOFS_MAX_AGE_MINUTES`        | yes     |
+| `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    | not yet |
 
 Every class name is relative to `SineMacula\Laravel\Mfa`. Numbers may be integers or the digit strings `env()` returns;
 anything else, a sign, padding, a fraction or an exponent included, is refused.
+
+**Applied** says whether anything reads the setting yet. A setting marked *not yet* is checked with the rest, so a
+deployment can set it now and a bad value still fails, but no flow applies it: setting it changes nothing until the
+flow that reads it ships. Do not rely on one for protection in the meantime.
 
 ## Applications
 
@@ -72,6 +76,11 @@ name:
 ],
 ```
 
+No flow reads an application's block yet: every key below is checked, but none is applied. Until the flows that read
+them ship, the shipped drivers verify a factor of any type whichever application asks, no factor is required by this
+configuration alone, the TOTP driver accepts `totp.window` steps for every application, and the limits and freshness
+are not enforced. Use your own policy binding (`Contracts\MfaPolicy`) and routes to decide who must verify.
+
 | Key                         | Default                   | Meaning                                                                                                                                |
 |-----------------------------|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | `types`                     | `[]`                      | The factor types the application enables, by driver name; none is on until listed                                                      |
@@ -80,17 +89,19 @@ name:
 | `recovery_codes.level`      | `aal2`                    | The assurance level a session needs to be issued recovery codes: `aal1`, `aal2` or `aal3`                                              |
 | `bootstrap.enabled`         | `false`                   | Whether a pending session with no factor may enrol its first one                                                                       |
 | `bootstrap.types`           | `[]`                      | The types it may enrol: types the application enables, at least one while bootstrap is on                                              |
-| `limits.confirmed_per_type` | `5`                       | Confirmed factors of one type an identity may enrol through the application, 1 to `limits.confirmed`                                   |
+| `limits.confirmed_per_type` | `5`, at most the total    | Confirmed factors of one type an identity may enrol through the application, 1 to `limits.confirmed`                                   |
 | `limits.confirmed`          | `10`                      | Confirmed factors an identity may enrol through the application in total, 1 to 50                                                      |
 | `limits.pending`            | `2`                       | Enrolments an identity may have pending through the application at once, 1 to 10                                                       |
 | `totp_window`               | `totp.window`             | TOTP time steps accepted either side of the current one, 0 to 3                                                                        |
 | `freshness`                 | 900 seconds per operation | How fresh a proof must be for each named operation, 1 to 86400 seconds                                                                 |
 | `first_factor`              | `null`                    | The first factor the application's guard signs people in with: a `method` and the `channel` kind it proves                             |
 
-An application with no block, and one whose block leaves a key out, takes the defaults: no type, no requirement, no
-recovery codes and no bootstrap, so a name nobody configured enables nothing. A key the block does not know, in it or
-in one of its nested blocks, is refused rather than ignored, so a misspelt key cannot leave a setting at its default
-unnoticed.
+An application with no block, and one whose block leaves a key out or sets it to `null`, takes the defaults: no type, no
+requirement, no recovery codes and no bootstrap, so once the flows apply the block a name nobody configured enables
+nothing. Left unset, `limits.confirmed_per_type` is 5, or `limits.confirmed` when that is lower; set explicitly above
+it, it is refused. A key the block does not know, in it or in one of its nested blocks, is refused rather than ignored,
+so a misspelt key cannot leave a setting at its default unnoticed, and an `applications` value that is not an array is
+refused too.
 
 `limits` count only the enrolments made through the application: a factor enrolled through another counts against that
 application's limits, never this one's, and an application never removes, hides or changes a factor enrolled through
@@ -109,8 +120,9 @@ which an authentication layer's adapter provides; with neither, the configuratio
 is refused, as it declares nothing.
 
 Each code type an application enables needs something to deliver its codes: `sms` a `Contracts\SmsGateway` other than
-the package's `NullSmsGateway`, and `email` a mailer. Enabling one without it fails the configuration check, rather than
-the first send.
+the package's `NullSmsGateway`, and `email` a mailer bound in the container (looked up, not built, so the check builds
+no mail transport). Enabling one without it fails the configuration check, rather than the first send. A binding the
+container cannot build, such as a gateway bound to a class that does not exist, is reported under the application too.
 
 ## Storage
 
@@ -132,8 +144,9 @@ recovery codes, removing a factor, a reset, a verification racing one of them) w
 transaction, which two connections cannot commit as one. Each such change locks the identity's row in the identity
 states table first and its factors second, so two changes for one identity run one after the other. The factor model
 must therefore live there too: the shipped `Models\Factor` takes the storage connection unless a subclass names a
-connection of its own, and a factor model, shipped or custom, on any other connection fails with a
-`ModelOffStorageConnectionException` when the package boots, rather than splitting a change across two transactions.
+connection of its own, and a factor model, shipped or custom, on any other connection fails the configuration check
+when the package boots, and with a `ModelOffStorageConnectionException` before any such change opens its transaction,
+rather than splitting a change across two transactions.
 Connections are compared by name, a model's own or the default one, so two names for one database count as two
 connections. Identity models may live on any connection: the shipped factor model always names the storage connection,
 the default one included, so an identity's factor relation reads and writes the factors there rather than on the
@@ -181,8 +194,9 @@ Eloquent model implementing `Contracts\EloquentFactor`, fail the configuration c
 ],
 ```
 
-`algorithm`, `digits` and `period` are the parameters new TOTP enrolments use; the defaults (SHA-1, 6 digits, 30 seconds)
-are what authenticator apps expect. A period is at most 120 seconds. `window` is the number of time steps either side of
+`algorithm`, `digits` and `period` are the parameters new TOTP enrolments will use; the defaults (SHA-1, 6 digits, 30
+seconds) are what authenticator apps expect, and they are what the TOTP driver uses today whatever is set, as these
+three are not applied yet. A period is at most 120 seconds. `window` is the number of time steps either side of
 the current one a code is accepted for, absorbing clock skew and entry delay, for an application that sets no
 `totp_window` of its own. It is at most 3; the default of 1 follows RFC 6238, which recommends allowing at most one step
 for transmission delay.
@@ -205,7 +219,8 @@ for transmission delay.
 A code sent by SMS or email has `length` digits, at least 6, and works for `ttl_minutes` after it is sent, at most 10.
 `resend_cooldown_seconds` is how long after a code is sent another may be sent to the same factor, never longer than the
 code's lifetime, and `factor_send_limit` and `identity_send_limit` cap how many one factor and one identity, across its
-factors and sessions, are sent within `send_window_minutes`. `sms_message` is the SMS text, which must carry the `:code`
+factors and sessions, are sent within `send_window_minutes`; these four are checked but not applied yet, so nothing
+limits sending until the flow that applies them ships. `sms_message` is the SMS text, which must carry the `:code`
 placeholder the code replaces, and `mailable` the email message class, `Codes\MfaCodeMessage` or a subclass of it.
 
 ## Recovery codes
@@ -220,11 +235,13 @@ placeholder the code replaces, and `mailable` the email message class, `Codes\Mf
 ```
 
 A set holds `count` codes of `length` characters drawn from `alphabet`. A code is normalised before it is checked: case
-is folded, and spaces and hyphens are removed. Its entropy is therefore measured on what is left, as the length times the
-bits of each character, counting characters that differ only in case once, and it must be at least 40 bits. The default,
-12 characters from 32 (digits and capitals without `0`, `1`, `I` and `O`), gives 60. The alphabet is printable ASCII
-with at least two distinct characters, and no spaces or hyphens, which normalisation would remove. `low_count` is how few
-unused codes count as running low, from 0 (never) to the set's size.
+is folded, and spaces and hyphens are removed. Its entropy is therefore measured on what is left, as the length times
+the bits of each character, and it must be at least 40 bits. The default, 12 characters from 32 (digits and capitals
+without `0`, `1`, `I` and `O`), gives 60. The alphabet is at least two printable ASCII characters, without spaces or
+hyphens, which normalisation would remove, and no character may appear twice, counting two that differ only in case as
+the same: a repeated character would be drawn more often than the others, so the codes would carry less entropy than the
+measure says. `low_count` is how few unused codes count as running low, from 0 (never) to the set's size; left unset it
+is 3, or the set's size when that is smaller. It is checked but not applied yet.
 
 ## Attempts
 
@@ -239,10 +256,12 @@ unused codes count as running low, from 0 (never) to the set's size.
 ],
 ```
 
-`factor_limit` failed attempts in a row lock a factor, of any type, for `lockout_seconds`. `identity_limit` failed
-attempts across an identity's factors and recovery codes, and `ip_limit` from one IP address, within `window_seconds`
-lock the identity and throttle the address. `failure_ceiling` consecutive failures disable a factor until the person
-proves another, it is rebound or the identity is reset; it is at most 100, the most NIST SP 800-63B-4 allows.
+`factor_limit` failed attempts in a row lock a factor, of any type, for `lockout_seconds`. These two are applied today.
+`identity_limit` failed attempts across an identity's factors and recovery codes, and `ip_limit` from one IP address,
+within `window_seconds`, are to lock the identity and throttle the address, and `failure_ceiling` consecutive failures
+are to disable a factor until the person proves another, it is rebound or the identity is reset; it is at most 100, the
+most NIST SP 800-63B-4 allows. These four are checked but not applied yet: until they are, only the per-factor lockout
+limits guessing.
 
 ## Enrolment
 
@@ -252,7 +271,8 @@ proves another, it is rebound or the identity is reset; it is at most 100, the m
 ],
 ```
 
-A pending factor can be confirmed for `ttl_minutes` after its enrolment starts, at most 60; after that it is abandoned.
+A pending factor is to be confirmable for `ttl_minutes` after its enrolment starts, at most 60, and abandoned after
+that. It is checked but not applied yet.
 
 ## Proofs
 
@@ -274,8 +294,8 @@ require a fresh verification for one route group instead.
 ],
 ```
 
-`prune_after_days` is how long pruning keeps abandoned enrolments, expired codes, and used or replaced recovery codes
-after they stop being usable.
+`prune_after_days` is how long pruning is to keep abandoned enrolments, expired codes, and used or replaced recovery
+codes after they stop being usable. It is checked but not applied yet: the package prunes nothing so far.
 
 ## Checking the configuration
 
@@ -294,5 +314,8 @@ php artisan mfa:check
 ```
 
 It prints `[<subject>] OK` for each subject without a problem and each problem as an error, and exits `1` when there is
-one. The boot check is skipped while `mfa:check` runs, so the command reports the problems rather than failing on the
-first. It reads configuration and the container only, and opens no database connection.
+one. The boot check is skipped while `mfa:check` runs, behind any option (`php artisan -v mfa:check`), so the command
+reports the problems rather than failing on the first. It is skipped too while `config:cache`, `config:clear`,
+`config:show`, `optimize:clear`, `package:discover`, `list` or `help` runs, so a bad configuration, a cached one
+included, can still be inspected and cleared; resolving the `mfa` manager checks it whatever command runs. It reads
+configuration and the container only, and opens no database connection.

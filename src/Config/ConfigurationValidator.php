@@ -203,7 +203,8 @@ final readonly class ConfigurationValidator
     /**
      * Refuse an application that enables a code type with nothing bound to
      * deliver its codes: `sms` with the package's `NullSmsGateway` still bound
-     * as the `SmsGateway`, or `email` with no mailer that resolves.
+     * as the `SmsGateway`, or `email` with no mailer bound. The mailer is only
+     * looked up, never built, so the check builds no mail transport.
      *
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $application
      * @return void
@@ -216,13 +217,7 @@ final readonly class ConfigurationValidator
             throw new \LogicException(sprintf('The application enables sms, but no SMS gateway is bound: bind your gateway to %s.', SmsGateway::class));
         }
 
-        if (!$application->enables('email')) {
-            return;
-        }
-
-        try {
-            $this->container->make(Mailer::class);
-        } catch (BindingResolutionException) {
+        if ($application->enables('email') && !$this->container->bound(Mailer::class)) {
             throw new \LogicException(sprintf('The application enables email, but no mailer is bound to %s.', Mailer::class));
         }
     }
@@ -245,7 +240,8 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * The problem a check finds, or `null` when it finds none.
+     * The problem a check finds, or `null` when it finds none. A binding the
+     * container cannot build is a problem of the subject that needs it.
      *
      * @param  \Closure(): mixed  $check
      * @return ?string
@@ -254,7 +250,7 @@ final readonly class ConfigurationValidator
     {
         try {
             $check();
-        } catch (InvalidFactorModelException|\LogicException $exception) {
+        } catch (BindingResolutionException|InvalidFactorModelException|\LogicException $exception) {
             return $exception->getMessage();
         }
 

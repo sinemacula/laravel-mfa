@@ -20,8 +20,10 @@ return [
     | An application enables no factor type and requires no factor until it
     | says so, and one that is not listed here enables nothing. Every
     | configured application declares the first factor its guard signs people
-    | in with, unless a first factor resolver is bound. See the configuration
-    | guide for every key, its default and its bounds:
+    | in with, unless a first factor resolver is bound. Every key is checked
+    | when the package boots, but no flow applies these blocks yet. See the
+    | configuration guide for every key, its default, its bounds and whether
+    | it is applied yet:
     |
     | 'web' => [
     |     'types'          => ['totp'],
@@ -138,9 +140,10 @@ return [
     |---------------------------------------------------------------------------
     |
     | How many codes a set holds (1 to 50), each code's length (1 to 64) and
-    | alphabet, which together must give at least 40 bits of entropy once a
-    | code is normalised (case folded, spaces and hyphens removed), and how few
-    | unused codes count as running low (0 to the set's size).
+    | alphabet (no character repeated, ignoring case), which together must
+    | give at least 40 bits of entropy once a code is normalised (case folded,
+    | spaces and hyphens removed), and how few unused codes count as running
+    | low (0 to the set's size).
     |
     */
 

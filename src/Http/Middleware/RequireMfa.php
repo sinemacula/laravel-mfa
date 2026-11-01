@@ -31,10 +31,10 @@ use Symfony\Component\HttpFoundation\Response;
  * bypass enforcement entirely — used on the verification endpoints themselves
  * to avoid circular enforcement.
  *
- * Optional route-middleware parameter overrides the configured `default_expiry`
- * per route group: `mfa:5` requires a verification no older than five minutes;
- * `mfa:0` forces re-verification on every request. This is the step-up lever
- * for sensitive actions.
+ * Optional route-middleware parameter overrides the configured
+ * `mfa.proofs.max_age_minutes` per route group: `mfa:5` requires a verification
+ * no older than five minutes; `mfa:0` forces re-verification on every request.
+ * This is the step-up lever for sensitive actions.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

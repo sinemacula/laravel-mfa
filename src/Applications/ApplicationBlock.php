@@ -49,7 +49,8 @@ final readonly class ApplicationBlock
 
     /**
      * The application's block, refusing one that is not an array or holds a key
-     * the block does not know; an application with no block has every default.
+     * the block does not know, and refusing `mfa.applications` when it is not
+     * an array; an application with no block has every default.
      *
      * @return array<array-key, mixed>
      *
@@ -57,8 +58,13 @@ final readonly class ApplicationBlock
      */
     public function all(): array
     {
-        $applications = $this->config->get(ApplicationSettings::APPLICATIONS);
-        $settings     = is_array($applications) ? $applications[$this->name] ?? [] : [];
+        $applications = $this->config->get(ApplicationSettings::APPLICATIONS) ?? [];
+
+        if (!is_array($applications)) {
+            throw new \InvalidArgumentException(sprintf('%s must be an array of application blocks keyed by name.', ApplicationSettings::APPLICATIONS));
+        }
+
+        $settings = $applications[$this->name] ?? [];
 
         if (!is_array($settings)) {
             throw new \InvalidArgumentException(sprintf('%s must be an array.', $this->key()));

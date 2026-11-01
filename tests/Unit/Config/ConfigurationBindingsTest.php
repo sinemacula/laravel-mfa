@@ -7,6 +7,7 @@ namespace Tests\Unit\Config;
 use Illuminate\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Config\ConfigurationBindings;
 use SineMacula\Laravel\Mfa\Config\ConfigurationValidator;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
@@ -14,8 +15,8 @@ use Tests\TestCase;
 
 /**
  * Unit tests for `ConfigurationBindings`: the configuration is checked once the
- * application has booted, unless `mfa:check` is the console command running,
- * and on demand.
+ * application has booted, unless the console command running is `mfa:check` or
+ * a configuration maintenance command, and on demand.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -94,22 +95,77 @@ final class ConfigurationBindingsTest extends TestCase
     }
 
     /**
-     * While `mfa:check` runs, the boot check is skipped so the command can
-     * report the problems itself.
+     * The console arguments of the commands the boot check is skipped for:
+     * `mfa:check`, behind any option, and the commands that list, describe,
+     * discover, cache or clear configuration.
      *
+     * @return iterable<string, array{list<string>}>
+     */
+    public static function uncheckedCommands(): iterable
+    {
+        yield 'mfa:check' => [['artisan', 'mfa:check']];
+        yield 'mfa:check behind a flag' => [['artisan', '-v', 'mfa:check']];
+        yield 'mfa:check behind an option with its value' => [['artisan', '--env=production', 'mfa:check']];
+        yield 'config:cache' => [['artisan', 'config:cache']];
+        yield 'config:clear' => [['artisan', 'config:clear']];
+        yield 'config:show' => [['artisan', 'config:show', 'mfa']];
+        yield 'help' => [['artisan', 'help', 'mfa:check']];
+        yield 'list' => [['artisan', 'list']];
+        yield 'optimize:clear' => [['artisan', 'optimize:clear']];
+        yield 'package:discover' => [['artisan', 'package:discover', '--ansi']];
+    }
+
+    /**
+     * While `mfa:check` or a configuration maintenance command runs, the boot
+     * check is skipped, so the command can report the problems itself, or a bad
+     * cached configuration can still be cleared.
+     *
+     * @param  list<string>  $argv
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBootSkipsTheCheckWhileTheCheckCommandRuns(): void
+    #[DataProvider('uncheckedCommands')]
+    public function testBootSkipsTheCheckWhileAnUncheckedCommandRuns(array $argv): void
     {
         $this->container()->make(Repository::class)->set('mfa.totp.window', 9);
 
-        $_SERVER['argv'] = ['artisan', 'mfa:check'];
+        $_SERVER['argv'] = $argv;
 
         ConfigurationBindings::boot($this->container());
 
-        $_SERVER['argv'] = ['artisan', 'migrate'];
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * The console arguments of commands the boot check runs for: any other
+     * command, one that only mentions a skipped command as an argument, and
+     * none at all.
+     *
+     * @return iterable<string, array{list<string>}>
+     */
+    public static function checkedCommands(): iterable
+    {
+        yield 'migrate' => [['artisan', 'migrate']];
+        yield 'a skipped command as a later argument' => [['artisan', 'queue:work', 'mfa:check']];
+        yield 'an option alone' => [['artisan', '--version']];
+        yield 'no command' => [['artisan']];
+    }
+
+    /**
+     * Any other console command runs the boot check.
+     *
+     * @param  list<string>  $argv
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[DataProvider('checkedCommands')]
+    public function testBootChecksWhileAnyOtherCommandRuns(array $argv): void
+    {
+        $this->container()->make(Repository::class)->set('mfa.totp.window', 9);
+
+        $_SERVER['argv'] = $argv;
 
         $this->expectException(InvalidConfigurationException::class);
 

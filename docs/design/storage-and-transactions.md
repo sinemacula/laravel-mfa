@@ -20,10 +20,11 @@ cannot interleave.
   the migrator's.
 - Every package table lives on the storage connection: `mfa_factors` and `mfa_identity_states`, and every table added
   later. A change that depends on the identity's whole factor state writes several of them in one transaction, which
-  two connections cannot commit as one, so a configured model on another connection is refused
-  (`ModelOffStorageConnectionException`) when the package boots (`Database\StorageBindings`, from the provider's
-  `boot()`) and again before any such change. Connections are compared by name, a model's own or `database.default`,
-  so no connection is opened, and two names for one database count as two connections.
+  two connections cannot commit as one, so a configured model on another connection is refused by the configuration
+  check (`Config\ConfigurationValidator`, under its `factor` subject) when the package boots and when the manager is
+  resolved, and again (`ModelOffStorageConnectionException`) before any such change. Connections are compared by name,
+  a model's own or `database.default`, so no connection is opened, and two names for one database count as two
+  connections.
 - `Support\FactorStateTransaction` is the one transaction of those changes: confirming an identity's first additional
   factor, replacing its recovery codes, removing a factor, a reset, and a verification racing any of them. It opens a
   transaction on the storage connection, locks the identity's row in `mfa_identity_states` first, then the identity's
@@ -80,7 +81,7 @@ cannot interleave.
 ## Implementation Anchors
 
 - `src/Database/StorageConnection.php`: `name()`, `resolvedName()`, `nameOf()`, `assertHolds()`.
-- `src/Database/StorageBindings.php`: `boot()`; `src/MfaServiceProvider.php`: `boot()`.
+- `src/Config/ConfigurationValidator.php`: `checkFactorModel()`, `checkStorageConnection()`.
 - `src/Database/WriteConnection.php`: `query()`; `src/Factors/FactorService.php`: `getFactors()`.
 - `src/Support/FactorStateTransaction.php`: `forIdentity()`, `forFactor()`, the lock order in `run()`;
   `src/Support/FactorOwnerColumns.php`: `of()`.
@@ -98,14 +99,14 @@ cannot interleave.
 - `tests/Unit/Support/FactorOwnerColumnsTest.php`
 - `tests/Unit/Support/FactorStateTransactionTest.php`
 - `tests/Unit/Database/StorageConnectionTest.php`
-- `tests/Unit/Database/StorageBindingsTest.php`
+- `tests/Unit/Config/ConfigurationValidatorTest.php` `testAFactorModelOnTheStorageConnectionHasNoProblem`
 - `tests/Unit/Models/FactorTest.php` `testTakesTheStorageConnection`, `testKeepsAConnectionTheClassNames`
 - `tests/Integration/MigrationSmokeTest.php` `testIdentityStatesTableHasOneRowPerOwner`,
   `testALongIdentityStatesTableNameGivesAShortOwnerIndexName`
 
 ## Change Triggers
 
-- A new package table: its model and its migration take the resolver, and `StorageBindings` checks its model.
+- A new package table: its model and its migration take the resolver, and `ConfigurationValidator` checks its model.
 - A new change that depends on the identity's whole factor state: it runs in `FactorStateTransaction`.
 - Any change to the lock order, to how the identity's row is locked, or to how connections are compared.
 - A new read that decides a verification, a lockout or ownership outside `FactorStateTransaction`: it goes through

@@ -5,11 +5,15 @@ declare(strict_types = 1);
 namespace Tests\Feature\Console;
 
 use Illuminate\Config\Repository;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\PendingCommand;
+use Orchestra\Testbench\Attributes\DefineEnvironment;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
+use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use Tests\TestCase;
 
@@ -28,6 +32,38 @@ final class CheckConfigurationCommandTest extends TestCase
 {
     /** @var list<string> The package-wide subjects, in the order they are reported. */
     private const array SUBJECTS = ['storage', 'factor', 'identity_state', 'totp', 'codes', 'recovery_codes', 'attempts', 'enrollment', 'proofs', 'lifecycle', 'applications'];
+
+    /** @var array<array-key, mixed> The console arguments before the test. */
+    private array $argv = [];
+
+    /**
+     * Keep the console arguments, which a test changes before the application
+     * boots.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        $argv = $_SERVER['argv'] ?? [];
+
+        $this->argv = is_array($argv) ? $argv : [];
+
+        parent::setUp();
+    }
+
+    /**
+     * Put the console arguments back.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function tearDown(): void
+    {
+        $_SERVER['argv'] = $this->argv;
+
+        parent::tearDown();
+    }
 
     /**
      * The command is registered under its name.
@@ -103,6 +139,26 @@ final class CheckConfigurationCommandTest extends TestCase
     }
 
     /**
+     * A factor model that is not one, configured before the package boots, does
+     * not stop the command from booting: it reports the model under its subject
+     * and fails.
+     *
+     * @return void
+     */
+    #[DefineEnvironment('bootAsTheCheckCommandWithABrokenFactorModel')]
+    public function testTheCommandReportsAFactorModelProblemPresentAtBoot(): void
+    {
+        $command = $this->artisan('mfa:check');
+
+        self::assertInstanceOf(PendingCommand::class, $command);
+
+        $command->expectsOutput('[storage] OK')
+            ->expectsOutput(sprintf('[factor] mfa.factor.model class [stdClass] must extend %s and implement %s.', Model::class, EloquentFactor::class))
+            ->assertExitCode(1)
+            ->run();
+    }
+
+    /**
      * A configured application without a problem is reported as OK.
      *
      * @return void
@@ -123,5 +179,21 @@ final class CheckConfigurationCommandTest extends TestCase
         $command->expectsOutput('[applications.web] OK')
             ->assertExitCode(0)
             ->run();
+    }
+
+    /**
+     * Boot as `mfa:check` with a factor model that is not one, as a deployment
+     * would.
+     *
+     * @param  \Illuminate\Foundation\Application  $app
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    protected function bootAsTheCheckCommandWithABrokenFactorModel(Application $app): void
+    {
+        $_SERVER['argv'] = ['artisan', 'mfa:check'];
+
+        $app->make(Repository::class)->set('mfa.factor.model', \stdClass::class);
     }
 }

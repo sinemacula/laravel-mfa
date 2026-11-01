@@ -88,8 +88,8 @@ final class RecoveryCodeSettingsTest extends TestCase
 
     /**
      * The alphabet defaults to digits and capitals without 0, 1, I and O, and
-     * reads one of at least two distinct printable ASCII characters, ignoring
-     * case.
+     * reads one of at least two printable ASCII characters, none repeated once
+     * case is folded.
      *
      * @return void
      */
@@ -101,25 +101,26 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * An alphabet with fewer than two distinct characters once case is folded,
-     * a space, a hyphen, a character outside printable ASCII, or a value that
-     * is not a string is refused.
+     * An alphabet with fewer than two characters, a character repeated or one
+     * that repeats another once case is folded (either would make the draw
+     * favour it), a space, a hyphen, a character outside printable ASCII, or a
+     * value that is not a string is refused.
      *
      * @return void
      */
     public function testTheAlphabetRefusesWhatNormalizationWouldChange(): void
     {
         self::assertRefused(
-            ['', 'A', 'aA', 'AB CD', 'AB-CD', "AB\tCD", "AB\x7F", 'ABÉ', null],
+            ['', 'A', 'AA', 'aA', 'ABA', 'aAB', str_repeat('A', 63) . 'B', 'AB CD', 'AB-CD', "AB\tCD", "AB\x7F", 'ABÉ', null],
             'alphabet',
             static fn (RecoveryCodeSettings $settings): string => $settings->alphabet(),
-            'mfa.recovery_codes.alphabet must be at least two distinct printable ASCII characters, ignoring case, without spaces or hyphens.',
+            'mfa.recovery_codes.alphabet must be at least two printable ASCII characters, none repeated ignoring case, without spaces or hyphens.',
         );
     }
 
     /**
-     * The low-count threshold defaults to 3 and reaches from 0 to the set's
-     * size, which bounds it.
+     * The low-count threshold defaults to 3, or to the set's size when the set
+     * is smaller, and reaches from 0 to the set's size, which bounds it.
      *
      * @return void
      */
@@ -129,6 +130,11 @@ final class RecoveryCodeSettingsTest extends TestCase
         self::assertSame(0, self::settingsWith(['low_count' => 0])->lowCount());
         self::assertSame(10, self::settingsWith(['low_count' => '10'])->lowCount());
         self::assertSame(4, self::settingsWith(['count' => 4, 'low_count' => 4])->lowCount());
+        self::assertSame(3, self::settingsWith(['count' => 3])->lowCount());
+        self::assertSame(2, self::settingsWith(['count' => 2])->lowCount());
+        self::assertSame(1, self::settingsWith(['count' => '1'])->lowCount());
+
+        self::settingsWith(['count' => 2, 'length' => 12])->validate();
 
         self::assertRefused(
             [-1, 11, 'few'],
@@ -139,8 +145,25 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * Entropy is the length times the bits of each distinct character once case
-     * is folded: the default gives 60 bits.
+     * A low-count threshold configured above a smaller set's size is refused,
+     * though the default would have followed the set down.
+     *
+     * @return void
+     */
+    public function testAConfiguredLowCountAboveASmallerSetIsRefused(): void
+    {
+        $settings = self::settingsWith(['count' => 2, 'low_count' => 3]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('mfa.recovery_codes.low_count must be an integer from 0 to 2.');
+
+        $settings->validate();
+    }
+
+    /**
+     * Entropy is the length times the bits of each character of the alphabet,
+     * every one a distinct symbol once case is folded: the default gives 60
+     * bits.
      *
      * @return void
      */
@@ -148,7 +171,7 @@ final class RecoveryCodeSettingsTest extends TestCase
     {
         self::assertEqualsWithDelta(60.0, self::settingsWith([])->entropyBits(), 0.0001);
         self::assertEqualsWithDelta(16.0, self::settingsWith(['alphabet' => 'abcd', 'length' => 8])->entropyBits(), 0.0001);
-        self::assertEqualsWithDelta(8.0, self::settingsWith(['alphabet' => 'aAbB', 'length' => 8])->entropyBits(), 0.0001);
+        self::assertEqualsWithDelta(8.0, self::settingsWith(['alphabet' => 'aB', 'length' => 8])->entropyBits(), 0.0001);
     }
 
     /**

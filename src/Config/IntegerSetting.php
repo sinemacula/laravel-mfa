@@ -11,9 +11,7 @@ use Illuminate\Contracts\Config\Repository;
  * an integer, or the canonical decimal string `env()` returns for one (no plus
  * sign, padding, whitespace, exponent or fraction, and nothing past the integer
  * range), within its range. Anything else fails closed with an
- * `InvalidArgumentException` naming the key and the range. A reader whose
- * message names a guard, or another setting, parses with `parse()` and keeps
- * its own message.
+ * `InvalidArgumentException` naming the key and the range.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

@@ -146,8 +146,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
     }
 
     /**
-     * Crossing the configured `max_attempts` threshold must record a lockout
-     * expiry on the factor.
+     * Crossing the configured `mfa.attempts.factor_limit` threshold must record
+     * a lockout expiry on the factor.
      *
      * @return void
      *

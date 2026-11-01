@@ -23,7 +23,6 @@ use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
-use SineMacula\Laravel\Mfa\Exceptions\ModelOffStorageConnectionException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
@@ -154,7 +153,8 @@ final class MfaServiceProviderTest extends TestCase
 
     /**
      * Booting checks that the configured factor model lives on the storage
-     * connection, refusing one on another connection before anything is served.
+     * connection, refusing one on another connection before anything is served,
+     * as one of the configuration's problems.
      *
      * @return void
      *
@@ -164,7 +164,8 @@ final class MfaServiceProviderTest extends TestCase
     {
         $this->container()->make(Repository::class)->set('mfa.factor.model', SecondaryConnectionFactor::class);
 
-        $this->expectException(ModelOffStorageConnectionException::class);
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('[factor] mfa.factor.model class [' . SecondaryConnectionFactor::class . '] must be on the storage connection');
 
         (new MfaServiceProvider($this->container()))->boot();
     }

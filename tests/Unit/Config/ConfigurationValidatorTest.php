@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Config;
 
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -173,6 +174,36 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
+     * The shipped factor model follows the storage connection wherever it is,
+     * and a model naming the storage connection as its own is accepted. The
+     * settings are put back afterwards, so the test's migrations roll back.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAFactorModelOnTheStorageConnectionHasNoProblem(): void
+    {
+        $original = $this->config()->get('mfa');
+
+        $this->config()->set('database.connections.secondary', ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
+        $this->config()->set('mfa.storage.connection', 'secondary');
+
+        try {
+            $shipped = $this->validator()->report();
+
+            $this->config()->set('mfa.factor.model', SecondaryConnectionFactor::class);
+
+            $secondary = $this->validator()->report();
+        } finally {
+            $this->config()->set('mfa', $original);
+        }
+
+        self::assertSame(self::SHIPPED, $shipped);
+        self::assertSame(self::SHIPPED, $secondary);
+    }
+
+    /**
      * A configured application with a declared first factor and a type that
      * needs no delivery binding has no problem.
      *
@@ -229,8 +260,9 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * An application that enables `email` with no mailer that resolves is
-     * refused; one that does not enable it needs none.
+     * An application that enables `email` in a container with no mailer bound
+     * is refused; one that does not enable it needs none, and a bound mailer is
+     * enough without being built.
      *
      * @return void
      *
@@ -240,13 +272,40 @@ final class ConfigurationValidatorTest extends TestCase
     {
         $this->configureApplication(['types' => ['email'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
-        $this->container()->offsetUnset('mailer');
+        $container = new Container;
+        $validator = new ConfigurationValidator($container, $this->config());
 
-        self::assertSame(['The application enables email, but no mailer is bound to ' . Mailer::class . '.'], $this->validator()->report()['applications.web']);
+        self::assertSame(['The application enables email, but no mailer is bound to ' . Mailer::class . '.'], $validator->report()['applications.web']);
+
+        // A binding that could not be built: the check passes only by not
+        // building it.
+        $container->bind(Mailer::class, 'App\Missing\Mailer');
+
+        self::assertSame([], $validator->report()['applications.web']);
 
         $this->configureApplication(['types' => ['totp'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
-        self::assertSame([], $this->validator()->report()['applications.web']);
+        self::assertSame([], (new ConfigurationValidator(new Container, $this->config()))->report()['applications.web']);
+    }
+
+    /**
+     * A binding the container cannot build is reported under the subject that
+     * needs it, rather than escaping the report.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testABrokenBindingIsReportedUnderItsSubject(): void
+    {
+        $this->configureApplication(['types' => ['sms'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        $this->container()->bind(SmsGateway::class, 'App\Missing\Gateway');
+
+        $problems = $this->validator()->report()['applications.web'];
+
+        self::assertCount(1, $problems);
+        self::assertStringContainsString('App\Missing\Gateway', $problems[0]);
     }
 
     /**

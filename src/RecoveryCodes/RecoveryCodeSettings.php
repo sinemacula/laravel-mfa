@@ -17,9 +17,10 @@ use SineMacula\Laravel\Mfa\Config\IntegerSetting;
  *
  * A code is normalised before it is checked (case folded, spaces and hyphens
  * removed), so its entropy is measured on what is left: the length times the
- * bits of each character, counting characters that differ only in case once.
- * The alphabet is printable ASCII without spaces or hyphens, which
- * normalisation would remove, and a code must carry at least
+ * bits of each character. The alphabet is printable ASCII without spaces or
+ * hyphens, which normalisation would remove, and no character appears in it
+ * twice once case is folded, so each character a code is drawn from is a
+ * distinct symbol drawn with equal probability. A code must carry at least
  * `MINIMUM_ENTROPY_BITS`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -38,7 +39,7 @@ final readonly class RecoveryCodeSettings
     /** @var string The alphabet when none is configured: digits and capitals, without 0, 1, I and O. */
     private const string ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
-    /** @var int The low-count threshold when none is configured; its greatest is the set's size. */
+    /** @var int The low-count threshold when none is configured and the set holds at least as many codes. */
     private const int LOW_COUNT = 3;
 
     /** @var array<string, array{0: int, 1: int, 2: int}> Default, least and greatest value of each other numeric setting. */
@@ -84,8 +85,10 @@ final readonly class RecoveryCodeSettings
     }
 
     /**
-     * The characters codes are drawn from: at least two distinct ones after
-     * case folding, printable ASCII, and no spaces or hyphens.
+     * The characters codes are drawn from: at least two, printable ASCII, no
+     * spaces or hyphens, and none appearing twice once case is folded, so a
+     * uniform draw over the alphabet is a uniform draw over the symbols a
+     * normalised code can hold.
      *
      * @return string
      *
@@ -95,8 +98,8 @@ final readonly class RecoveryCodeSettings
     {
         $alphabet = $this->config->get(self::PREFIX . 'alphabet', self::ALPHABET);
 
-        if (!is_string($alphabet) || preg_match('/^[\x21-\x2C\x2E-\x7E]+$/', $alphabet) !== 1 || self::symbols($alphabet) < 2) {
-            $message = '%salphabet must be at least two distinct printable ASCII characters, ignoring case, without spaces or hyphens.';
+        if (!is_string($alphabet) || preg_match('/^[\x21-\x2C\x2E-\x7E]{2,}$/', $alphabet) !== 1 || self::symbols($alphabet) !== strlen($alphabet)) {
+            $message = '%salphabet must be at least two printable ASCII characters, none repeated ignoring case, without spaces or hyphens.';
 
             throw new \InvalidArgumentException(sprintf($message, self::PREFIX));
         }
@@ -106,7 +109,7 @@ final readonly class RecoveryCodeSettings
 
     /**
      * How few unused codes count as running low, from 0 (never) to the set's
-     * size.
+     * size; 3 by default, or the set's size when the set is smaller.
      *
      * @return int
      *
@@ -114,7 +117,9 @@ final readonly class RecoveryCodeSettings
      */
     public function lowCount(): int
     {
-        return IntegerSetting::read($this->config, self::PREFIX . 'low_count', self::LOW_COUNT, 0, $this->count());
+        $count = $this->count();
+
+        return IntegerSetting::read($this->config, self::PREFIX . 'low_count', min(self::LOW_COUNT, $count), 0, $count);
     }
 
     /**
@@ -126,7 +131,7 @@ final readonly class RecoveryCodeSettings
      */
     public function entropyBits(): float
     {
-        return $this->length() * log(self::symbols($this->alphabet()), 2);
+        return $this->length() * log(strlen($this->alphabet()), 2);
     }
 
     /**

@@ -24,7 +24,7 @@ final class ApplicationBlockTest extends TestCase
 {
     /**
      * The block is read as configured, and is empty for an application with
-     * none or when the applications block is not an array.
+     * none or when no applications are configured.
      *
      * @return void
      */
@@ -32,7 +32,22 @@ final class ApplicationBlockTest extends TestCase
     {
         self::assertSame(['types' => ['totp']], self::block(['types' => ['totp']])->all());
         self::assertSame([], (new ApplicationBlock(new Repository, 'web'))->all());
-        self::assertSame([], (new ApplicationBlock(new Repository(['mfa' => ['applications' => 'web']]), 'web'))->all());
+        self::assertSame([], (new ApplicationBlock(new Repository(['mfa' => ['applications' => null]]), 'web'))->all());
+        self::assertSame([], (new ApplicationBlock(new Repository(['mfa' => ['applications' => ['admin' => []]]]), 'web'))->all());
+    }
+
+    /**
+     * An applications block that is not an array is refused, rather than
+     * leaving the application with every default.
+     *
+     * @return void
+     */
+    public function testRefusesAnApplicationsBlockThatIsNotAnArray(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('mfa.applications must be an array of application blocks keyed by name.');
+
+        (new ApplicationBlock(new Repository(['mfa' => ['applications' => 'web']]), 'web'))->all();
     }
 
     /**

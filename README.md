@@ -95,9 +95,11 @@ return [
 ];
 ```
 
-Every setting has a production-safe default and enforced bounds, and an application enables nothing until it lists it.
-The package checks the whole configuration when it boots, and `php artisan mfa:check` reports every problem for a
-deploy pipeline. See [Configuration](docs/guides/configuration.md) for every key, its default and its bounds.
+Every setting has a production-safe default and enforced bounds. The package checks the whole configuration when it
+boots, and `php artisan mfa:check` reports every problem for a deploy pipeline. Not every setting is applied yet: the
+application blocks, among others, are checked but no flow reads them, so listing a type or a requirement there enforces
+nothing for now. See [Configuration](docs/guides/configuration.md) for every key, its default, its bounds and whether it
+is applied yet.
 
 > **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so a key rotation
 > must use `php artisan key:rotate` rather than simply swapping `APP_KEY` in `.env` — a naive swap leaves

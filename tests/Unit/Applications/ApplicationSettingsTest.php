@@ -115,8 +115,8 @@ final class ApplicationSettingsTest extends TestCase
 
     /**
      * An application with an empty block, or under a name with a dot, takes the
-     * same defaults; a malformed applications block leaves every application
-     * with them.
+     * same defaults, as does every application while no applications are
+     * configured at all.
      *
      * @return void
      */
@@ -124,7 +124,46 @@ final class ApplicationSettingsTest extends TestCase
     {
         self::assertSame(RequirementMode::NEVER, self::settings([])->requirement());
         self::assertSame(['sms'], (new ApplicationSettings(self::config(['admin.panel' => ['types' => ['sms']]]), 'admin.panel'))->types());
-        self::assertSame([], (new ApplicationSettings(new Repository(['mfa' => ['applications' => 'web']]), self::APPLICATION))->types());
+        self::assertSame([], (new ApplicationSettings(new Repository(['mfa' => ['applications' => null]]), self::APPLICATION))->types());
+    }
+
+    /**
+     * An applications block that is not an array is refused by every reader,
+     * even one built before it was set, rather than leaving every application
+     * with the defaults.
+     *
+     * @return void
+     */
+    public function testAMalformedApplicationsBlockIsRefusedWhenRead(): void
+    {
+        $config   = self::config([self::APPLICATION => ['types' => ['totp']]]);
+        $settings = new ApplicationSettings($config, self::APPLICATION);
+
+        self::assertSame(['totp'], $settings->types());
+
+        $config->set(ApplicationSettings::APPLICATIONS, 'web');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('mfa.applications must be an array of application blocks keyed by name.');
+
+        $settings->types();
+    }
+
+    /**
+     * Left unset, the per-type limit follows a total limit configured below its
+     * default of 5, rather than failing a setting nobody configured.
+     *
+     * @return void
+     */
+    public function testThePerTypeLimitDefaultFollowsALowerTotal(): void
+    {
+        $lower = self::settings(['limits' => ['confirmed' => 3]]);
+
+        self::assertSame(3, $lower->confirmedPerTypeLimit());
+        self::assertSame(5, self::settings(['limits' => ['confirmed' => 5]])->confirmedPerTypeLimit());
+        self::assertSame(5, self::settings(['limits' => ['confirmed' => '6']])->confirmedPerTypeLimit());
+
+        $lower->validate();
     }
 
     /**
@@ -262,6 +301,11 @@ final class ApplicationSettingsTest extends TestCase
         yield 'a bootstrap flag that is not a boolean' => [
             ['bootstrap' => ['enabled' => 1]],
             static fn (ApplicationSettings $settings): bool => $settings->allowsBootstrap(),
+            self::KEY . 'bootstrap.enabled must be true or false.',
+        ];
+        yield 'a bootstrap flag that is not a boolean beside its types' => [
+            ['types' => ['totp'], 'bootstrap' => ['enabled' => 'yes', 'types' => ['totp']]],
+            $bootstrap,
             self::KEY . 'bootstrap.enabled must be true or false.',
         ];
         yield 'bootstrap types that are not a list' => [['types' => ['totp'], 'bootstrap' => ['types' => 'totp']], $bootstrap, $bootTypes];

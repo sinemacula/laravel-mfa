@@ -192,7 +192,8 @@ final readonly class ApplicationSettings
      */
     public function bootstrapTypes(): array
     {
-        $types = $this->block->names('bootstrap.types', $this->block->nested('bootstrap')['types'] ?? []);
+        $enabled = $this->allowsBootstrap();
+        $types   = $this->block->names('bootstrap.types', $this->block->nested('bootstrap')['types'] ?? []);
 
         if (array_diff($types, $this->types()) !== []) {
             $message = '%s must list only types the application enables in %s.';
@@ -200,7 +201,7 @@ final readonly class ApplicationSettings
             throw new \InvalidArgumentException(sprintf($message, $this->block->key('bootstrap.types'), $this->block->key('types')));
         }
 
-        if ($types === [] && $this->allowsBootstrap()) {
+        if ($types === [] && $enabled) {
             throw new \InvalidArgumentException(sprintf('%s must list at least one type while bootstrap is enabled.', $this->block->key('bootstrap.types')));
         }
 
@@ -209,7 +210,8 @@ final readonly class ApplicationSettings
 
     /**
      * How many confirmed factors of one type an identity may enrol through the
-     * application, from 1 to the total limit; 5 by default.
+     * application, from 1 to the total limit; 5 by default, or the total limit
+     * when that is lower.
      *
      * @return int
      *
@@ -217,7 +219,9 @@ final readonly class ApplicationSettings
      */
     public function confirmedPerTypeLimit(): int
     {
-        return $this->limit('confirmed_per_type', 5, $this->confirmedLimit());
+        $total = $this->confirmedLimit();
+
+        return $this->limit('confirmed_per_type', min(5, $total), $total);
     }
 
     /**

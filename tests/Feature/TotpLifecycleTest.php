@@ -156,7 +156,8 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test crossing max_attempts records the configured attempts count.
+     * Test crossing `mfa.attempts.factor_limit` records the configured attempts
+     * count.
      *
      * @return void
      *
@@ -172,7 +173,7 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test crossing max_attempts stamps a future locked_until.
+     * Test crossing `mfa.attempts.factor_limit` stamps a future locked_until.
      *
      * @return void
      *
@@ -233,7 +234,7 @@ final class TotpLifecycleTest extends TestCase
      * `challenge()` must NOT clear an active TOTP lockout — TOTP has no
      * per-challenge secret to rotate, so wiping the attempt counter on every
      * "start MFA" call would let any consumer-side resend endpoint act as a
-     * free unlock against the configured `max_attempts` defence.
+     * free unlock against the configured `mfa.attempts.factor_limit` defence.
      *
      * @return void
      *
