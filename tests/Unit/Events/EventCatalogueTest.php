@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Events\BootstrapEnrollmentCompleted;
 use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Events\ContextEvent;
 use SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned;
+use SineMacula\Laravel\Mfa\Events\EnrollmentEvent;
 use SineMacula\Laravel\Mfa\Events\EnrollmentExpired;
 use SineMacula\Laravel\Mfa\Events\EnrollmentStarted;
 use SineMacula\Laravel\Mfa\Events\EventContext;
@@ -51,6 +52,7 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(ContextEvent::class)]
+#[CoversClass(EnrollmentEvent::class)]
 #[CoversClass(EnrollmentStarted::class)]
 #[CoversClass(FactorConfirmed::class)]
 #[CoversClass(EnrollmentAbandoned::class)]
@@ -102,37 +104,44 @@ final class EventCatalogueTest extends TestCase
 
     /**
      * Every event, built from a factor that holds a secret, a delivered code, a
-     * credential reference and a full destination.
+     * credential reference and a full destination, with what it is for.
      *
-     * @return iterable<string, array{\Closure(\SineMacula\Laravel\Mfa\Factors\FactorSummary): \SineMacula\Laravel\Mfa\Contracts\MfaEvent}>
+     * @return iterable<string, array{\Closure(\SineMacula\Laravel\Mfa\Factors\FactorSummary): \SineMacula\Laravel\Mfa\Contracts\MfaEvent, ?\SineMacula\Laravel\Mfa\Enums\Purpose}>
      */
     public static function events(): iterable
     {
         $actor   = new Actor(TestUser::class, '2');
         $context = self::CONTEXT;
 
-        yield 'EnrollmentStarted' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentStarted($context, $factor)];
-        yield 'FactorConfirmed' => [static fn (FactorSummary $factor): MfaEvent => new FactorConfirmed($context, $factor)];
-        yield 'EnrollmentAbandoned' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentAbandoned($context, $factor)];
-        yield 'EnrollmentExpired' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentExpired($context, $factor)];
-        yield 'BootstrapEnrollmentCompleted' => [static fn (FactorSummary $factor): MfaEvent => new BootstrapEnrollmentCompleted($context, $factor)];
-        yield 'PasskeyAssociated' => [static fn (FactorSummary $factor): MfaEvent => new PasskeyAssociated($context, $factor)];
-        yield 'FactorRenamed' => [static fn (FactorSummary $factor): MfaEvent => new FactorRenamed($context, $factor, 'Old label')];
-        yield 'PreferredFactorChanged' => [static fn (FactorSummary $factor): MfaEvent => new PreferredFactorChanged($context, $factor, $factor)];
-        yield 'FactorRemoved' => [static fn (FactorSummary $factor): MfaEvent => new FactorRemoved($context, $factor, $actor)];
-        yield 'FactorDisabled' => [static fn (FactorSummary $factor): MfaEvent => new FactorDisabled($context, $factor)];
-        yield 'FactorsReset' => [static fn (): MfaEvent => new FactorsReset($context, $actor, 'Lost phone', false)];
-        yield 'LockoutApplied' => [static fn (FactorSummary $factor): MfaEvent => new LockoutApplied($context, $factor, CarbonImmutable::now()->addMinutes(15))];
-        yield 'LockoutLifted' => [static fn (FactorSummary $factor): MfaEvent => new LockoutLifted($context, $factor, $actor)];
-        yield 'CodeSent' => [static fn (FactorSummary $factor): MfaEvent => new CodeSent($context, $factor, Purpose::SIGN_IN, 'challenge-1')];
-        yield 'VerificationPassed' => [static fn (FactorSummary $factor): MfaEvent => new VerificationPassed($context, $factor, 'email', Purpose::STEP_UP, 'challenge-1')];
+        yield 'EnrollmentStarted' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentStarted($context, $factor), Purpose::ENROLLMENT];
+        yield 'FactorConfirmed' => [static fn (FactorSummary $factor): MfaEvent => new FactorConfirmed($context, $factor), Purpose::ENROLLMENT];
+        yield 'EnrollmentAbandoned' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentAbandoned($context, $factor), Purpose::ENROLLMENT];
+        yield 'EnrollmentExpired' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentExpired($context, $factor), Purpose::ENROLLMENT];
+        yield 'BootstrapEnrollmentCompleted' => [static fn (FactorSummary $factor): MfaEvent => new BootstrapEnrollmentCompleted($context, $factor), Purpose::ENROLLMENT];
+        yield 'PasskeyAssociated' => [static fn (FactorSummary $factor): MfaEvent => new PasskeyAssociated($context, $factor), Purpose::ENROLLMENT];
+        yield 'FactorRenamed' => [static fn (FactorSummary $factor): MfaEvent => new FactorRenamed($context, $factor, 'Old label'), null];
+        yield 'PreferredFactorChanged' => [static fn (FactorSummary $factor): MfaEvent => new PreferredFactorChanged($context, $factor, $factor), null];
+        yield 'FactorRemoved' => [static fn (FactorSummary $factor): MfaEvent => new FactorRemoved($context, $factor, $actor), null];
+        yield 'FactorDisabled' => [static fn (FactorSummary $factor): MfaEvent => new FactorDisabled($context, $factor, Purpose::SIGN_IN), Purpose::SIGN_IN];
+        yield 'FactorsReset' => [static fn (): MfaEvent => new FactorsReset($context, $actor, 'Lost phone', false), null];
+        yield 'LockoutApplied' => [
+            static fn (FactorSummary $factor): MfaEvent => new LockoutApplied($context, $factor, CarbonImmutable::now()->addMinutes(15), Purpose::STEP_UP),
+            Purpose::STEP_UP,
+        ];
+        yield 'LockoutLifted' => [static fn (FactorSummary $factor): MfaEvent => new LockoutLifted($context, $factor, $actor), null];
+        yield 'CodeSent' => [static fn (FactorSummary $factor): MfaEvent => new CodeSent($context, $factor, Purpose::SIGN_IN, 'challenge-1'), Purpose::SIGN_IN];
+        yield 'VerificationPassed' => [
+            static fn (FactorSummary $factor): MfaEvent => new VerificationPassed($context, $factor, 'email', Purpose::STEP_UP, 'challenge-1'),
+            Purpose::STEP_UP,
+        ];
         yield 'VerificationFailed' => [
             static fn (FactorSummary $factor): MfaEvent => new VerificationFailed($context, $factor, 'email', Purpose::SIGN_IN, FailureReason::INVALID_CODE, 'challenge-1'),
+            Purpose::SIGN_IN,
         ];
-        yield 'RecoveryCodesGenerated' => [static fn (): MfaEvent => new RecoveryCodesGenerated($context, 10, 3, $actor)];
-        yield 'RecoveryCodeUsed' => [static fn (): MfaEvent => new RecoveryCodeUsed($context, 9)];
-        yield 'RecoveryCodesLow' => [static fn (): MfaEvent => new RecoveryCodesLow($context, 2)];
-        yield 'RecoveryCodesRemoved' => [static fn (): MfaEvent => new RecoveryCodesRemoved($context, $actor)];
+        yield 'RecoveryCodesGenerated' => [static fn (): MfaEvent => new RecoveryCodesGenerated($context, 10, 3, $actor), null];
+        yield 'RecoveryCodeUsed' => [static fn (): MfaEvent => new RecoveryCodeUsed($context, 9, Purpose::STEP_UP), Purpose::STEP_UP];
+        yield 'RecoveryCodesLow' => [static fn (): MfaEvent => new RecoveryCodesLow($context, 2, Purpose::SIGN_IN), Purpose::SIGN_IN];
+        yield 'RecoveryCodesRemoved' => [static fn (): MfaEvent => new RecoveryCodesRemoved($context, $actor), null];
     }
 
     /**
@@ -141,17 +150,18 @@ final class EventCatalogueTest extends TestCase
      * queue or encoded as JSON; each still carries its context.
      *
      * @param  \Closure(\SineMacula\Laravel\Mfa\Factors\FactorSummary): \SineMacula\Laravel\Mfa\Contracts\MfaEvent  $build
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return void
      */
     #[DataProvider('events')]
-    public function testNoEventCarriesASecretACodeAUriOrAFullDestination(\Closure $build): void
+    public function testNoEventCarriesASecretACodeAUriOrAFullDestination(\Closure $build, ?Purpose $purpose): void
     {
         $event = $build(FactorSummary::fromFactor($this->sensitiveFactor()));
 
-        $serialised = serialize($event);
+        $serialized = serialize($event);
         $encoded    = (string) json_encode($event);
 
-        foreach ([$serialised, $encoded] as $payload) {
+        foreach ([$serialized, $encoded] as $payload) {
             self::assertStringNotContainsString(self::SECRET, $payload);
             self::assertStringNotContainsString(self::CODE, $payload);
             self::assertStringNotContainsString(self::DESTINATION, $payload);
@@ -159,9 +169,10 @@ final class EventCatalogueTest extends TestCase
             self::assertStringNotContainsString('otpauth://', $payload);
         }
 
-        self::assertStringNotContainsString(Factor::class, $serialised);
+        self::assertStringNotContainsString(Factor::class, $serialized);
         self::assertSame(self::CONTEXT, $event->context());
-        self::assertEquals($event, unserialize($serialised));
+        self::assertSame($purpose, $event->purpose());
+        self::assertEquals($event, unserialize($serialized));
     }
 
     /**
@@ -169,15 +180,33 @@ final class EventCatalogueTest extends TestCase
      * context it was built with.
      *
      * @param  \Closure(\SineMacula\Laravel\Mfa\Factors\FactorSummary): \SineMacula\Laravel\Mfa\Contracts\MfaEvent  $build
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return void
      */
     #[DataProvider('events')]
-    public function testEveryEventCarriesItsContext(\Closure $build): void
+    public function testEveryEventCarriesItsContext(\Closure $build, ?Purpose $purpose): void
     {
         $event = $build(FactorSummary::fromFactor($this->sensitiveFactor()));
 
         self::assertInstanceOf(ContextEvent::class, $event);
         self::assertSame(EventContext::KEYS, array_keys($event->context()));
+    }
+
+    /**
+     * Every event says what it was for: the purpose of the attempt, code or
+     * proof behind it where that varies, enrolment for an enrolment's events,
+     * and nothing for a change made outside any verification.
+     *
+     * @param  \Closure(\SineMacula\Laravel\Mfa\Factors\FactorSummary): \SineMacula\Laravel\Mfa\Contracts\MfaEvent  $build
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return void
+     */
+    #[DataProvider('events')]
+    public function testEveryEventSaysWhatItWasFor(\Closure $build, ?Purpose $purpose): void
+    {
+        $event = $build(FactorSummary::fromFactor($this->sensitiveFactor()));
+
+        self::assertSame($purpose, $event->purpose());
     }
 
     /**
@@ -203,8 +232,8 @@ final class EventCatalogueTest extends TestCase
         $reset = new FactorsReset(self::CONTEXT, $actor);
         self::assertSame([$actor, null, true], [$reset->actor, $reset->reason, $reset->reenrollmentRequired]);
 
-        $applied = new LockoutApplied(self::CONTEXT, null, $until);
-        self::assertSame([null, $until], [$applied->factor, $applied->lockedUntil]);
+        $applied = new LockoutApplied(self::CONTEXT, null, $until, Purpose::SIGN_IN);
+        self::assertSame([null, $until, Purpose::SIGN_IN], [$applied->factor, $applied->lockedUntil, $applied->purpose]);
 
         $lifted = new LockoutLifted(self::CONTEXT);
         self::assertSame([null, null], [$lifted->factor, $lifted->actor]);
@@ -221,8 +250,14 @@ final class EventCatalogueTest extends TestCase
         $generated = new RecoveryCodesGenerated(self::CONTEXT, 10, 3);
         self::assertSame([10, 3, null], [$generated->count, $generated->generation, $generated->actor]);
 
-        self::assertSame(9, (new RecoveryCodeUsed(self::CONTEXT, 9))->remaining);
-        self::assertSame(2, (new RecoveryCodesLow(self::CONTEXT, 2))->remaining);
+        $used = new RecoveryCodeUsed(self::CONTEXT, 9, Purpose::STEP_UP);
+        self::assertSame([9, Purpose::STEP_UP], [$used->remaining, $used->purpose]);
+
+        $low = new RecoveryCodesLow(self::CONTEXT, 2, Purpose::SIGN_IN);
+        self::assertSame([2, Purpose::SIGN_IN], [$low->remaining, $low->purpose]);
+
+        $disabled = new FactorDisabled(self::CONTEXT, $factor, Purpose::REAUTHENTICATE);
+        self::assertSame([$factor, Purpose::REAUTHENTICATE], [$disabled->factor, $disabled->purpose]);
         self::assertNull((new RecoveryCodesRemoved(self::CONTEXT))->actor);
         self::assertSame($factor, (new FactorConfirmed(self::CONTEXT, $factor))->factor);
     }

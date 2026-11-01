@@ -44,4 +44,15 @@ final readonly class VerificationPassed extends ContextEvent
     ) {
         parent::__construct($context);
     }
+
+    /**
+     * What the action the event reports was for.
+     *
+     * @return \SineMacula\Laravel\Mfa\Enums\Purpose
+     */
+    #[\Override]
+    public function purpose(): Purpose
+    {
+        return $this->purpose;
+    }
 }

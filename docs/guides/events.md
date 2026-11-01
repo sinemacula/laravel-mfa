@@ -4,28 +4,28 @@
 
 Every event the package dispatches is a class in `SineMacula\Laravel\Mfa\Events`:
 
-| Event                          | Fired when                                                                  | Payload                                              |
-|--------------------------------|-----------------------------------------------------------------------------|------------------------------------------------------|
-| `EnrollmentStarted`            | An enrolment starts: a pending factor awaits confirmation                   | `factor`                                             |
-| `FactorConfirmed`              | A pending factor is confirmed, and so becomes usable                        | `factor`                                             |
-| `EnrollmentAbandoned`          | An enrolment is restarted, cancelled or out of confirmation attempts        | `factor`                                             |
-| `EnrollmentExpired`            | An enrolment's grant expires before it was confirmed                        | `factor`                                             |
-| `BootstrapEnrollmentCompleted` | A factor is confirmed during a pending sign-in by an identity that had none | `factor`                                             |
-| `PasskeyAssociated`            | A passkey is associated with the identity as a factor                       | `factor`                                             |
-| `FactorRenamed`                | A factor is given a new label                                               | `factor`, `previousLabel`                            |
-| `PreferredFactorChanged`       | The identity chooses another preferred factor                               | `factor`, `previous`                                 |
-| `FactorRemoved`                | A factor is removed, by the identity or by someone else                     | `factor`, `actor`                                    |
-| `FactorDisabled`               | A factor reaches the failure ceiling and is disabled                        | `factor`                                             |
-| `FactorsReset`                 | Someone resets the identity's factors                                       | `actor`, `reason`, `reenrollmentRequired`            |
-| `LockoutApplied`               | Failed attempts lock a factor, or the identity across its factors           | `factor` (null for the identity), `lockedUntil`      |
-| `LockoutLifted`                | A lockout is lifted before it ends                                          | `factor` (null for the identity), `actor`            |
-| `CodeSent`                     | A code is sent by SMS or email                                              | `factor`, `purpose`, `challengeId`                   |
-| `VerificationPassed`           | An attempt passes, once per attempt                                         | `factor`, `type`, `purpose`, `challengeId`           |
-| `VerificationFailed`           | An attempt fails, once per attempt                                          | `factor`, `type`, `purpose`, `reason`, `challengeId` |
-| `RecoveryCodesGenerated`       | A new recovery code set replaces any earlier one                            | `count`, `generation`, `actor`                       |
-| `RecoveryCodeUsed`             | A recovery code is redeemed                                                 | `remaining`                                          |
-| `RecoveryCodesLow`             | A redemption leaves the set at or below its low count                       | `remaining`                                          |
-| `RecoveryCodesRemoved`         | The identity's recovery code set is removed                                 | `actor`                                              |
+| Event                          | Fired when                                                                  | Payload                                                    |
+|--------------------------------|-----------------------------------------------------------------------------|------------------------------------------------------------|
+| `EnrollmentStarted`            | An enrolment starts: a pending factor awaits confirmation                   | `factor`                                                   |
+| `FactorConfirmed`              | A pending factor is confirmed, and so becomes usable                        | `factor`                                                   |
+| `EnrollmentAbandoned`          | An enrolment is restarted, cancelled or out of confirmation attempts        | `factor`                                                   |
+| `EnrollmentExpired`            | An enrolment's grant expires before it was confirmed                        | `factor`                                                   |
+| `BootstrapEnrollmentCompleted` | A factor is confirmed during a pending sign-in by an identity that had none | `factor`                                                   |
+| `PasskeyAssociated`            | A passkey is associated with the identity as a factor                       | `factor`                                                   |
+| `FactorRenamed`                | A factor is given a new label                                               | `factor`, `previousLabel`                                  |
+| `PreferredFactorChanged`       | The identity chooses another preferred factor                               | `factor`, `previous`                                       |
+| `FactorRemoved`                | A factor is removed, by the identity or by someone else                     | `factor`, `actor`                                          |
+| `FactorDisabled`               | A factor reaches the failure ceiling and is disabled                        | `factor`, `purpose`                                        |
+| `FactorsReset`                 | Someone resets the identity's factors                                       | `actor`, `reason`, `reenrollmentRequired`                  |
+| `LockoutApplied`               | Failed attempts lock a factor, or the identity across its factors           | `factor` (null for the identity), `lockedUntil`, `purpose` |
+| `LockoutLifted`                | A lockout is lifted before it ends                                          | `factor` (null for the identity), `actor`                  |
+| `CodeSent`                     | A code is sent by SMS or email                                              | `factor`, `purpose`, `challengeId`                         |
+| `VerificationPassed`           | An attempt passes, once per attempt                                         | `factor`, `type`, `purpose`, `challengeId`                 |
+| `VerificationFailed`           | An attempt fails, once per attempt                                          | `factor`, `type`, `purpose`, `reason`, `challengeId`       |
+| `RecoveryCodesGenerated`       | A new recovery code set replaces any earlier one                            | `count`, `generation`, `actor`                             |
+| `RecoveryCodeUsed`             | A recovery code is redeemed                                                 | `remaining`, `purpose`                                     |
+| `RecoveryCodesLow`             | A redemption leaves the set at or below its low count                       | `remaining`, `purpose`                                     |
+| `RecoveryCodesRemoved`         | The identity's recovery code set is removed                                 | `actor`                                                    |
 
 The flows that dispatch them are built over the package's enrolment, verification, recovery code and lifecycle
 capabilities; until each flow ships, its events are declared but not yet dispatched, and the earlier
@@ -37,6 +37,11 @@ destination, status, preferred, last use), `previous` another; `purpose` is an `
 `enrollment` and `reauthenticate`); `reason` an `Enums\FailureReason`; `actor` an `Events\Actor` (type and id), set when
 someone other than the identity took the action; `challengeId` the authentication challenge an attempt went through,
 when it went through one; `type` the type proved or tried (`recovery_code` for a recovery code).
+
+Every event also says what it was for through `$event->purpose()`: the purpose of the attempt, code or proof behind it
+for the events that carry a `purpose` field, `enrollment` for the enrolment events (from `EnrollmentStarted` to
+`PasskeyAssociated` in the table), and `null` for a change made outside any verification, such as a rename, a removal,
+a reset or a new recovery code set. A listener can tell a sign-in recovery from a step-up one by it.
 
 ## Context
 

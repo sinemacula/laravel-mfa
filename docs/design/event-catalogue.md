@@ -8,8 +8,12 @@ event carries is built, and why every event is dispatched only after the change 
 ## Invariants
 
 - Every event is a final readonly class in `Events` extending `Events\ContextEvent`, which implements
-  `Contracts\MfaEvent`, so one listener takes them all. The catalogue is listed in [Events](../guides/events.md); its
-  class and field names are stable.
+  `Contracts\MfaEvent`, so one listener takes them all; the enrolment events extend it through `Events\EnrollmentEvent`.
+  The catalogue is listed in [Events](../guides/events.md); its class and field names are stable.
+- Every event says what it was for through `MfaEvent::purpose()`: an `Enums\Purpose` field where it varies (codes sent,
+  verification, the failure ceiling, lockouts, recovery code use and a low set), `enrollment` for the enrolment events,
+  and `null` for a change made outside any verification (renames, preferred factor, removal, reset, lifted lockouts,
+  recovery code sets generated or removed).
 - An event carries a factor as a `Factors\FactorSummary` (id, type, label, masked destination, status, preferred, last
   use), never the model, a secret, a code, a provisioning URI, a credential reference or a full destination, so a queued
   listener can serialise it. Who took an action on someone else's factors is an `Events\Actor`, a type and an id.
@@ -51,13 +55,15 @@ event carries is built, and why every event is dispatched only after the change 
 
 ## Authoritative Tests
 
-- `tests/Unit/Events/EventCatalogueTest.php` `testNoEventCarriesASecretACodeAUriOrAFullDestination`
+- `tests/Unit/Events/EventCatalogueTest.php` `testNoEventCarriesASecretACodeAUriOrAFullDestination`,
+  `testEveryEventSaysWhatItWasFor`
 - `tests/Unit/Events/EventDispatcherTest.php` `testARollbackDispatchesNothing`
 - `tests/Unit/Events/EventContextTest.php`
 - `tests/Unit/Context/DefaultEventContextResolverTest.php`
 
 ## Change Triggers
 
-- A new event: a class in `Events` extending `ContextEvent`, a row in the events guide, and a row in the catalogue test.
+- A new event: a class in `Events` extending `ContextEvent`, its purpose, a row in the events guide, and a row in the
+  catalogue test.
 - A new context key: `EventContext::KEYS`, the guide and the resolvers.
 - Any change to when events are dispatched relative to the transaction.

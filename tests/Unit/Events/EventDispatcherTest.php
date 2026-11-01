@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -43,7 +44,7 @@ final class EventDispatcherTest extends TestCase
     {
         Event::fake([RecoveryCodeUsed::class]);
 
-        $this->dispatcher()->dispatch(new RecoveryCodeUsed([], 4));
+        $this->dispatcher()->dispatch(new RecoveryCodeUsed([], 4, Purpose::SIGN_IN));
 
         Event::assertDispatched(RecoveryCodeUsed::class, static fn (RecoveryCodeUsed $event): bool => $event->remaining === 4);
     }
@@ -62,7 +63,7 @@ final class EventDispatcherTest extends TestCase
 
         DB::connection()->transaction(function (): void {
 
-            $this->dispatcher()->dispatch(new RecoveryCodeUsed([], 4));
+            $this->dispatcher()->dispatch(new RecoveryCodeUsed([], 4, Purpose::SIGN_IN));
 
             Event::assertNotDispatched(RecoveryCodeUsed::class);
         });
@@ -84,7 +85,7 @@ final class EventDispatcherTest extends TestCase
         try {
             DB::connection()->transaction(function (): void {
 
-                $this->dispatcher()->dispatch(new RecoveryCodeUsed([], 4));
+                $this->dispatcher()->dispatch(new RecoveryCodeUsed([], 4, Purpose::SIGN_IN));
 
                 throw new \RuntimeException('The change failed.');
             });
@@ -112,7 +113,7 @@ final class EventDispatcherTest extends TestCase
         try {
             DB::connection('secondary')->transaction(function (): void {
 
-                $this->dispatcher()->dispatch(new RecoveryCodeUsed([], 4));
+                $this->dispatcher()->dispatch(new RecoveryCodeUsed([], 4, Purpose::SIGN_IN));
 
                 Event::assertDispatchedTimes(RecoveryCodeUsed::class, 1);
 
@@ -137,7 +138,7 @@ final class EventDispatcherTest extends TestCase
         $this->container()->forgetInstance('db.transactions');
         $this->container()->offsetUnset('db.transactions');
 
-        $this->dispatcher()->dispatch(new RecoveryCodeUsed([], 4));
+        $this->dispatcher()->dispatch(new RecoveryCodeUsed([], 4, Purpose::SIGN_IN));
 
         Event::assertDispatchedTimes(RecoveryCodeUsed::class, 1);
     }
@@ -195,7 +196,6 @@ final class EventDispatcherTest extends TestCase
     public function testTheResolverIsHandedTheIdentityAndTheRequest(): void
     {
         $identity = new NonEloquentIdentity;
-        /** @var \ArrayObject<int, mixed> $seen */
         /** @var \ArrayObject<int, mixed> $seen */
         $seen = new \ArrayObject;
 
