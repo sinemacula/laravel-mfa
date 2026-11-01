@@ -136,28 +136,6 @@ final readonly class TotpFactor implements Factor
     }
 
     /**
-     * No delivered code.
-     *
-     * @return ?string
-     */
-    #[\Override]
-    public function getCode(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * No code expiry.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getExpiresAt(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
      * Never verified.
      *
      * @return ?\Carbon\CarbonInterface

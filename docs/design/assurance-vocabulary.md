@@ -67,8 +67,8 @@ referencing another's.
   again and compared with the input.
 - A failure reason says what a caller may be told; a factor that does not exist and one that belongs to someone else
   both answer `not_found`, and only the detail, in events and logs, says which.
-- A pending code without an expiry fails as `expired`, as no live code exists, and its detail tells it apart from an
-  expired code.
+- A delivered code with no live challenge (none sent, out of attempts or expired) fails as `expired`, and its detail
+  says which.
 - `strictest()` with no inputs is the requirement that asks for nothing.
 
 ## Implementation Anchors

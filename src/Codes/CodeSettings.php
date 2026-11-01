@@ -9,11 +9,12 @@ use SineMacula\Laravel\Mfa\Config\IntegerSetting;
 
 /**
  * The delivered code settings in `mfa.codes`, read on every call and validated
- * as they are read: the length and lifetime of a code sent by SMS or email, the
- * cooldown before another may be sent, the caps on how many are sent, the SMS
- * message and the email message class. A value outside its bounds fails closed
- * with an `InvalidArgumentException` naming the key; the package checks them
- * when it boots and `mfa:check` reports them.
+ * as they are read: the length and lifetime of a code sent by SMS or email, how
+ * many attempts one challenge allows and how long its resends may run, the
+ * cooldown before another code may be sent, the caps on how many are sent, the
+ * SMS message and the email message class. A value outside its bounds fails
+ * closed with an `InvalidArgumentException` naming the key; the package checks
+ * them when it boots and `mfa:check` reports them.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,10 +35,17 @@ final readonly class CodeSettings
     /** @var int The resend cooldown when none is configured, in seconds; its greatest is the code lifetime. */
     private const int RESEND_COOLDOWN_SECONDS = 60;
 
+    /** @var int The challenge lifetime when none is configured, in minutes; its least is the code lifetime. */
+    private const int CHALLENGE_TTL_MINUTES = 30;
+
+    /** @var int The greatest challenge lifetime, in minutes. */
+    private const int MAX_CHALLENGE_TTL_MINUTES = 60;
+
     /** @var array<string, array{0: int, 1: int, 2: int}> Default, least and greatest value of each other numeric setting. */
     private const array NUMBERS = [
         'length'              => [6, 6, 10],
         'ttl_minutes'         => [10, 1, 10],
+        'max_attempts'        => [5, 1, 10],
         'factor_send_limit'   => [5, 1, 50],
         'identity_send_limit' => [10, 1, 100],
         'send_window_minutes' => [60, 1, 1440],
@@ -79,8 +87,35 @@ final readonly class CodeSettings
     }
 
     /**
-     * How long after a code is sent another may be sent for the same factor, in
-     * seconds, from 0 to the code lifetime.
+     * How many codes may be checked against one challenge, 1 to 10. A resend
+     * keeps the count, so a new code never brings new attempts.
+     *
+     * @return int
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function maxAttempts(): int
+    {
+        return $this->number('max_attempts');
+    }
+
+    /**
+     * How long a challenge lasts from its first code, in minutes, from the code
+     * lifetime to 60: a resend sends a new code for the same challenge, which
+     * never works past this.
+     *
+     * @return int
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function challengeTtlMinutes(): int
+    {
+        return IntegerSetting::read($this->config, self::PREFIX . 'challenge_ttl_minutes', self::CHALLENGE_TTL_MINUTES, $this->ttlMinutes(), self::MAX_CHALLENGE_TTL_MINUTES);
+    }
+
+    /**
+     * How long after a code is sent another may be sent for the same challenge,
+     * in seconds, from 0 to the code lifetime.
      *
      * @return int
      *
@@ -176,6 +211,8 @@ final readonly class CodeSettings
     public function validate(): void
     {
         $this->length();
+        $this->maxAttempts();
+        $this->challengeTtlMinutes();
         $this->resendCooldownSeconds();
         $this->factorSendLimit();
         $this->identitySendLimit();

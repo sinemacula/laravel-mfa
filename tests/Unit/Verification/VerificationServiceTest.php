@@ -14,30 +14,37 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Attempts\Lockout;
+use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
+use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
+use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
  * Tests for `VerificationService`: challenges and verification run only for the
- * current identity's own factor through its own driver, count the outcome
- * through the attempt service, which locks the factor at the configured attempt
- * limit, and report each outcome with its event.
+ * current identity's own factor through its own driver, send and check a
+ * delivered code bound to this session, application and purpose, count the
+ * outcome through the attempt service, which locks the factor at the configured
+ * attempt limit, and report each outcome with its event.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -51,13 +58,10 @@ final class VerificationServiceTest extends TestCase
     private const string LOCKED = 'The factor is locked after too many failed attempts.';
 
     /** @var string The detail of a factor whose enrolment never completed. */
-    private const string UNCONFIRMED = 'The factor has no pending code or secret, so its enrolment never completed.';
+    private const string UNCONFIRMED = 'The factor has no secret, so its enrolment never completed.';
 
-    /** @var string The detail of an expired pending code. */
-    private const string EXPIRED = 'The pending code has expired.';
-
-    /** @var string The detail of a pending code without an expiry. */
-    private const string NO_EXPIRY = 'The pending code has no expiry, so no live code exists.';
+    /** @var string The address the email factor delivers to. */
+    private const string ADDRESS = 'verify@example.com';
 
     /** @var string The detail of a code that did not match. */
     private const string MISMATCH = 'The code did not match.';
@@ -116,7 +120,7 @@ final class VerificationServiceTest extends TestCase
 
         Event::fake();
 
-        $this->service()->challenge($this->manager(), 'totp', $factor);
+        self::assertNull($this->service()->challenge($this->manager(), 'totp', $factor));
 
         Event::assertDispatched(
             MfaChallengeIssued::class,
@@ -317,8 +321,8 @@ final class VerificationServiceTest extends TestCase
 
     /**
      * A success is recorded on the factor in the attempt's transaction: when
-     * counting it fails, the pending code is not consumed and the factor is not
-     * stamped as verified.
+     * counting it fails, the delivered code is left unused and the factor
+     * unstamped, so the same code is accepted once counting works again.
      *
      * @return void
      *
@@ -326,24 +330,23 @@ final class VerificationServiceTest extends TestCase
      */
     public function testASuccessIsRecordedWithItsCount(): void
     {
+        $sender = FakeEmailSender::fake($this->container());
         $user   = $this->signIn();
-        $factor = $this->eloquentFactor($user);
+        $factor = $this->emailFactor($user);
 
-        $factor->issueCode('123456', Carbon::now()->addMinutes(5));
-        $factor->persist();
+        $this->service()->challenge($this->manager(), 'email', $factor);
 
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldReceive('verify')->twice()->andReturn(false, true);
+        $code = $sender->lastCodeTo(self::ADDRESS);
 
-        $this->stubDriver($driver);
-        $this->service()->verify($this->manager(), 'totp', $factor, '000000');
+        self::assertNotNull($code);
+        self::assertFalse($this->service()->verify($this->manager(), 'email', $factor, $code === '000000' ? '111111' : '000000'));
 
         IdentityState::saving(static function (): void {
             throw new MidRotationFailureException('counting failed');
         });
 
         try {
-            $this->service()->verify($this->manager(), 'totp', $factor, '123456');
+            $this->service()->verify($this->manager(), 'email', $factor, $code);
 
             self::fail('The failure to count must propagate.');
         } catch (MidRotationFailureException $exception) {
@@ -352,9 +355,13 @@ final class VerificationServiceTest extends TestCase
 
         $stored = Factor::query()->findOrFail($factor->id);
 
-        self::assertSame('123456', $stored->getCode());
+        self::assertNull(Code::query()->sole()->consumed_at);
         self::assertNull($stored->getVerifiedAt());
         self::assertSame(1, $stored->getConsecutiveFailures());
+
+        IdentityState::flushEventListeners();
+
+        self::assertTrue($this->service()->verify($this->manager(), 'email', $factor, $code));
     }
 
     /**
@@ -599,33 +606,22 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
-     * Factor states (pending code, secret, minutes until the code expires) and
-     * the failure reason and detail each explains.
+     * Factor secrets, and the failure reason and detail a miss on each
+     * explains.
      *
-     * @return iterable<string, array{?string, ?string, ?int, \SineMacula\Laravel\Mfa\Enums\FailureReason, string}>
+     * @return iterable<string, array{?string, \SineMacula\Laravel\Mfa\Enums\FailureReason, string}>
      */
     public static function failureReasons(): iterable
     {
-        yield 'no code and no secret' => [null, null, null, FailureReason::NOT_CONFIRMED, self::UNCONFIRMED];
-        yield 'no code and no secret past an expiry' => [null, null, -1, FailureReason::NOT_CONFIRMED, self::UNCONFIRMED];
-        yield 'an expired code without a secret' => ['123456', null, -1, FailureReason::EXPIRED, self::EXPIRED];
-        yield 'an expired code with a secret' => ['123456', 'secret', -1, FailureReason::EXPIRED, self::EXPIRED];
-        yield 'a secret past an expiry' => [null, 'secret', -1, FailureReason::EXPIRED, self::EXPIRED];
-        yield 'a code without an expiry' => ['123456', null, null, FailureReason::EXPIRED, self::NO_EXPIRY];
-        yield 'a code with a secret and no expiry' => ['123456', 'secret', null, FailureReason::EXPIRED, self::NO_EXPIRY];
-        yield 'a live code' => ['123456', 'secret', 5, FailureReason::INVALID_CODE, self::MISMATCH];
-        yield 'a live code without a secret' => ['123456', null, 5, FailureReason::INVALID_CODE, self::MISMATCH];
-        yield 'a secret without a code' => [null, 'secret', null, FailureReason::INVALID_CODE, self::MISMATCH];
-        yield 'a secret with a future expiry' => [null, 'secret', 5, FailureReason::INVALID_CODE, self::MISMATCH];
+        yield 'no secret' => [null, FailureReason::NOT_CONFIRMED, self::UNCONFIRMED];
+        yield 'a secret' => ['secret', FailureReason::INVALID_CODE, self::MISMATCH];
     }
 
     /**
-     * A failed verification is reported with the reason the factor's state
-     * explains, and the detail that tells apart failures sharing a reason.
+     * A failed verification through a driver that does not deliver codes is
+     * reported with the reason the factor's state explains, and its detail.
      *
-     * @param  ?string  $code
      * @param  ?string  $secret
-     * @param  ?int  $expiresInMinutes
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @return void
@@ -633,11 +629,10 @@ final class VerificationServiceTest extends TestCase
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     #[DataProvider('failureReasons')]
-    public function testAFailureIsReportedWithItsReason(?string $code, ?string $secret, ?int $expiresInMinutes, FailureReason $reason, string $detail): void
+    public function testAFailureIsReportedWithItsReason(?string $secret, FailureReason $reason, string $detail): void
     {
-        $user      = $this->signIn();
-        $expiresAt = $expiresInMinutes === null ? null : Carbon::now()->addMinutes($expiresInMinutes);
-        $factor    = new InMemoryFactor(secret: $secret, code: $code, expiresAt: $expiresAt, authenticatable: $user);
+        $user   = $this->signIn();
+        $factor = new InMemoryFactor(secret: $secret, authenticatable: $user);
 
         $this->stubDriver($this->driverAnswering(false));
 
@@ -645,6 +640,215 @@ final class VerificationServiceTest extends TestCase
 
         self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '000000'));
         $this->assertFailedWith($reason, $detail);
+    }
+
+    /**
+     * A delivered code is sent bound to this session and the purpose, reported
+     * as a challenge, and accepted only for that purpose.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function testADeliveredCodeIsBoundToTheSessionAndPurpose(): void
+    {
+        $sender = FakeEmailSender::fake($this->container());
+        $user   = $this->signIn();
+        $factor = $this->emailFactor($user);
+
+        Event::fake([MfaChallengeIssued::class]);
+
+        $result = $this->service()->challenge($this->manager(), 'email', $factor, Purpose::STEP_UP);
+        $code   = $sender->lastCodeTo(self::ADDRESS);
+
+        self::assertNotNull($result);
+        self::assertTrue($result->wasSent());
+        self::assertNotNull($code);
+        Event::assertDispatched(MfaChallengeIssued::class, static fn (MfaChallengeIssued $event): bool => $event->driver === 'email');
+
+        $row = Code::query()->find($result->challengeId);
+
+        self::assertInstanceOf(Code::class, $row);
+        self::assertSame('step_up', $row->purpose);
+        self::assertSame('web', $row->application);
+
+        self::assertFalse($this->service()->verify($this->manager(), 'email', $factor, $code));
+        self::assertTrue($this->service()->verify($this->manager(), 'email', $factor, $code, Purpose::STEP_UP));
+    }
+
+    /**
+     * A send refused for its cooldown is returned with its reason and is not
+     * reported as a challenge.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function testARefusedSendIsNotReportedAsAChallenge(): void
+    {
+        FakeEmailSender::fake($this->container());
+
+        $factor = $this->emailFactor($this->signIn());
+
+        $this->service()->challenge($this->manager(), 'email', $factor);
+
+        Event::fake([MfaChallengeIssued::class]);
+
+        $result = $this->service()->challenge($this->manager(), 'email', $factor);
+
+        self::assertNotNull($result);
+        self::assertSame(FailureReason::SENDING_CAPPED, $result->reason);
+        Event::assertNotDispatched(MfaChallengeIssued::class);
+    }
+
+    /**
+     * Sending a code neither resets the factor's failures in a row nor lifts
+     * its lockout.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function testSendingACodeResetsNothing(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 3);
+
+        FakeEmailSender::fake($this->container());
+
+        $user   = $this->signIn();
+        $factor = $this->emailFactor($user);
+
+        for ($failure = 0; $failure < 3; $failure++) {
+            self::assertFalse($this->service()->verify($this->manager(), 'email', $factor, '000000'));
+        }
+
+        $before = $this->lockoutOf($user, $factor);
+
+        self::assertNotNull($before);
+        self::assertTrue($this->service()->challenge($this->manager(), 'email', $factor)?->wasSent());
+
+        $factor->refresh();
+
+        self::assertSame(3, $factor->getConsecutiveFailures());
+        self::assertEquals($before->until, $this->lockoutOf($user, $factor)?->until);
+    }
+
+    /**
+     * A delivered code is bound to the application a bound resolver names for
+     * the request.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function testADeliveredCodeIsBoundToTheResolvedApplication(): void
+    {
+        FakeEmailSender::fake($this->container());
+
+        $resolver = \Mockery::mock(ApplicationResolver::class);
+        $resolver->shouldReceive('resolve')->with(\Mockery::type(Request::class))->andReturn('admin');
+
+        $this->container()->instance(ApplicationResolver::class, $resolver);
+
+        $result = $this->service()->challenge($this->manager(), 'email', $this->emailFactor($this->signIn()));
+        $row    = Code::query()->find($result?->challengeId);
+
+        self::assertInstanceOf(Code::class, $row);
+        self::assertSame('admin', $row->application);
+    }
+
+    /**
+     * Rows of a delivered code's failure: whether a code was sent first, and
+     * the reason and detail the check that follows fails with.
+     *
+     * @return iterable<string, array{bool, \SineMacula\Laravel\Mfa\Enums\FailureReason, string}>
+     */
+    public static function deliveredCodeFailures(): iterable
+    {
+        yield 'a wrong code' => [true, FailureReason::INVALID_CODE, self::MISMATCH];
+        yield 'no code sent' => [false, FailureReason::EXPIRED, 'No code was sent for this factor, session, application and purpose.'];
+    }
+
+    /**
+     * A failed delivered code is reported with the reason and detail its check
+     * found, never by the factor's secret.
+     *
+     * @param  bool  $sent
+     * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
+     * @param  string  $detail
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    #[DataProvider('deliveredCodeFailures')]
+    public function testADeliveredCodeFailureIsReportedWithWhatItsCheckFound(bool $sent, FailureReason $reason, string $detail): void
+    {
+        FakeEmailSender::fake($this->container());
+
+        $factor = $this->emailFactor($this->signIn());
+
+        if ($sent) {
+            $this->service()->challenge($this->manager(), 'email', $factor);
+        }
+
+        Event::fake([MfaVerificationFailed::class]);
+
+        self::assertFalse($this->service()->verify($this->manager(), 'email', $factor, '000000'));
+        Event::assertDispatchedTimes(MfaVerificationFailed::class, 1);
+        Event::assertDispatched(
+            MfaVerificationFailed::class,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === $reason && $event->detail === $detail && $event->driver === 'email',
+        );
+    }
+
+    /**
+     * A delivered code is bound to an identity with a string key, as it is
+     * stored on the factor.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function testADeliveredCodeIsBoundToAStringKeyedIdentity(): void
+    {
+        FakeEmailSender::fake($this->container());
+
+        $identity = new NonEloquentIdentity('plain-1');
+
+        $this->actingAs($identity);
+
+        $result = $this->service()->challenge($this->manager(), 'email', $this->ownedEmailFactor($identity));
+        $row    = Code::query()->find($result?->challengeId);
+
+        self::assertInstanceOf(Code::class, $row);
+        self::assertSame(NonEloquentIdentity::class, $row->authenticatable_type);
+        self::assertSame('plain-1', $row->authenticatable_id);
+    }
+
+    /**
+     * A delivered code is never bound to an identity with an empty key.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function testADeliveredCodeIsNeverBoundToAnEmptyIdentityKey(): void
+    {
+        $identity = new NonEloquentIdentity('');
+
+        $this->actingAs($identity);
+
+        $this->expectException(UnsupportedIdentifierException::class);
+        $this->expectExceptionMessage('A delivered code is bound to an identity with a string or integer key; got [string].');
+
+        $this->service()->verify($this->manager(), 'email', $this->ownedEmailFactor($identity), '000000');
     }
 
     /**
@@ -772,6 +976,39 @@ final class VerificationServiceTest extends TestCase
         $this->actingAs($user);
 
         return $user;
+    }
+
+    /**
+     * Create an email factor for the user, delivering to its address.
+     *
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function emailFactor(TestUser $user): Factor
+    {
+        return Factor::query()->create([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'email',
+            'destination'          => self::ADDRESS,
+        ]);
+    }
+
+    /**
+     * Create an email factor owned by the identity, delivering to the test
+     * address.
+     *
+     * @param  \Tests\Fixtures\Identities\NonEloquentIdentity  $identity
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function ownedEmailFactor(NonEloquentIdentity $identity): Factor
+    {
+        return Factor::query()->create([
+            'authenticatable_type' => NonEloquentIdentity::class,
+            'authenticatable_id'   => $identity->getAuthIdentifier(),
+            'type'                 => 'email',
+            'destination'          => self::ADDRESS,
+        ]);
     }
 
     /**

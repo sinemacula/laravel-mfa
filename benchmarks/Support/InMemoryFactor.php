@@ -14,8 +14,7 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  *
  * Skips Eloquent / database overhead so the benchmarks measure the driver
  * verification logic in isolation. Mutable properties so benchmarks can reset a
- * factor's code, expiry, or secret between iterations without reconstructing
- * the entire object.
+ * factor's secret between iterations without reconstructing the entire object.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -32,8 +31,6 @@ final class InMemoryFactor implements Factor
      * @param  ?string  $label
      * @param  ?string  $destination
      * @param  ?string  $secret
-     * @param  ?string  $code
-     * @param  ?\Carbon\CarbonInterface  $expiresAt
      * @param  ?\Carbon\CarbonInterface  $verifiedAt
      * @param  ?\Illuminate\Contracts\Auth\Authenticatable  $authenticatable
      * @return void
@@ -55,12 +52,6 @@ final class InMemoryFactor implements Factor
         /** Stored secret / hash material the driver verifies against. */
         #[\SensitiveParameter] private ?string $secret = null,
 
-        /** Pending one-time code awaiting verification. */
-        private ?string $code = null,
-
-        /** Expiry timestamp of the pending code. */
-        private ?CarbonInterface $expiresAt = null,
-
         /** Timestamp of the most recent successful verification. */
         private ?CarbonInterface $verifiedAt = null,
 
@@ -77,19 +68,6 @@ final class InMemoryFactor implements Factor
     public function setSecret(#[\SensitiveParameter] ?string $secret): void
     {
         $this->secret = $secret;
-    }
-
-    /**
-     * Seed the pending one-time code and its expiry between iterations.
-     *
-     * @param  ?string  $code
-     * @param  ?\Carbon\CarbonInterface  $expiresAt
-     * @return void
-     */
-    public function seedCode(#[\SensitiveParameter] ?string $code, ?CarbonInterface $expiresAt): void
-    {
-        $this->code      = $code;
-        $this->expiresAt = $expiresAt;
     }
 
     /**
@@ -156,28 +134,6 @@ final class InMemoryFactor implements Factor
     public function getSecret(): ?string
     {
         return $this->secret;
-    }
-
-    /**
-     * Return the configured one-time code value.
-     *
-     * @return ?string
-     */
-    #[\Override]
-    public function getCode(): ?string
-    {
-        return $this->code;
-    }
-
-    /**
-     * Return the configured code expiry.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getExpiresAt(): ?CarbonInterface
-    {
-        return $this->expiresAt;
     }
 
     /**

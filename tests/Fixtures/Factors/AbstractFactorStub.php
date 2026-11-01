@@ -95,28 +95,6 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
-     * Return the stub's default pending code (none).
-     *
-     * @return ?string
-     */
-    #[\Override]
-    public function getCode(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * Return the stub's default code expiry (none).
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getExpiresAt(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
      * Report whether the stub has been verified at least once.
      *
      * @return bool

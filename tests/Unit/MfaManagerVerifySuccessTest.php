@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
@@ -105,24 +104,6 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
         $factor->refresh();
 
         self::assertNotNull($factor->getVerifiedAt());
-    }
-
-    /**
-     * Test successful Eloquent verify clears the pending code.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testVerifySuccessClearsPendingCode(): void
-    {
-        [$factor] = $this->seedEloquentVerifySuccessScenario();
-
-        $this->manager()->verify('email', $factor, self::VALID_CODE);
-
-        $factor->refresh();
-
-        self::assertNull($factor->getCode());
     }
 
     /**
@@ -231,8 +212,6 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
             'authenticatable_id'   => (string) $user->id,
             'type'                 => 'email',
             'destination'          => 'v2@example.com',
-            'code'                 => self::VALID_CODE,
-            'expires_at'           => Carbon::now()->addMinutes(10),
             'consecutive_failures' => 1,
         ]);
 

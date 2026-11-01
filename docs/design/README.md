@@ -41,9 +41,12 @@ The current note set is:
 - `attempts-and-lockout.md`: the durable failure counts on the factor and identity rows, the temporary throttles of
   the identity and the address, when each locks and what resets it, the failure ceiling, and why parallel guesses
   cannot overrun a cap.
+- `delivered-codes.md`: the email and SMS codes the package sends and checks on its own: what a code is bound to, its
+  keyed hash, resends, the cooldown, the attempt budget and the delivery caps, the sender contracts, and the encrypted
+  queued message.
 - `per-device-verification-and-step-up.md`: the `MfaVerificationStore` seam, the default session-scoped
   implementation, the `mfa:N` step-up route-parameter contract, and the fail-closed rules inside `hasExpired()`.
-- `factor-payload-hygiene.md`: encryption at rest for `secret` / `code`, the `FactorSummary` projection used on
+- `factor-payload-hygiene.md`: encryption at rest for `secret`, the `FactorSummary` projection used on
   exception payloads, and the destination-masking rules.
 
 These documents are secondary to the code and tests, not a replacement for them. If a note and a cited test disagree,

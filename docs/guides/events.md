@@ -31,13 +31,14 @@ The flows that dispatch them are built over the package's enrolment, verificatio
 capabilities; until each flow ships, its events are declared but not yet dispatched, and the earlier
 `MfaChallengeIssued`, `MfaVerified`, `MfaVerificationFailed`, `MfaFactorEnrolled` and `MfaFactorDisabled` events,
 described in [the lifecycle events design note](../design/verification-lifecycle-and-events.md), are dispatched instead.
-`LockoutApplied`, `LockoutLifted` and `FactorDisabled` are dispatched already, by the attempt caps (see
-[Attempts and lockouts](attempts.md)).
+`CodeSent` is dispatched already, once for every code the package sends, resends included, with the id of the code's
+challenge (see [Delivered Codes](../design/delivered-codes.md)). `LockoutApplied`, `LockoutLifted` and
+`FactorDisabled` are dispatched already, by the attempt caps (see [Attempts and lockouts](attempts.md)).
 
 The names of the events and of their fields are stable. `factor` is a `Factors\FactorSummary` (id, type, label, masked
 destination, status, preferred, last use), `previous` another; `purpose` is an `Enums\Purpose` (`sign_in`, `step_up`,
 `enrollment` and `reauthenticate`); `reason` an `Enums\FailureReason`; `actor` an `Events\Actor` (type and id), set when
-someone other than the identity took the action; `challengeId` the authentication challenge an attempt went through,
+someone other than the identity took the action; `challengeId` the challenge a code or an attempt went through,
 when it went through one; `type` the type proved or tried (`recovery_code` for a recovery code).
 
 Every event also says what it was for through `$event->purpose()`: the purpose of the attempt, code or proof behind it

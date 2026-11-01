@@ -39,8 +39,11 @@ are described here.
   lockout that ends last (`Lockout::strictest()`), and counted nowhere: it never extends a lockout or a throttle. The
   outcome carries the `Attempts\Lockout`: its scope and when it ends, or no time at the ceiling.
 - The verification is handed the factor as stored under the lock (`Attempts\LockedFactors::find()`), not the instance
-  the caller read, so a replaced secret or a resent code is the one checked, and what it writes to that factor commits
-  with the count.
+  the caller read, so a replaced secret is the one checked, and what it writes to that factor commits with the count.
+  A delivered code is checked by the code service inside the same transaction, against the code the request's session
+  was sent, so the code it uses up commits with the count too.
+- A delivered code's challenge keeps its own attempt budget (see [Delivered Codes](delivered-codes.md)); a guess at it
+  is also an attempt here, counted against the factor, the identity and the address like any other.
 - Only a success resets a durable count: the factor's failures in a row are reset only by a success of that factor, and
   the identity's run only by a success of any. A success resets no other factor's count, lifts no lockout or throttle,
   and takes no slot of the address's window. It enables the identity's other factors the failure ceiling disabled, since
@@ -48,8 +51,8 @@ are described here.
   again.
 - A lockout ending forgives nothing: the factor's failures in a row stay at or past the limit, so its next failure locks
   it again, one guess per lockout period, until a success or the failure ceiling.
-- Sending or resending a code resets no count and lifts no lockout: `AbstractOtpDriver::issueChallenge()` writes only
-  the code, and the verification service's challenge writes nothing else.
+- Sending or resending a code resets no count and lifts no lockout: the code service writes only the code's challenge,
+  and the verification service's challenge writes nothing else.
 - `mfa_attempts` rows are keyed by `Attempts\AttemptKeys`: an HMAC-SHA256 digest of the scope and subject, keyed with a
   key derived from `app.key`, so the table names no factor, identity or address. Rotating the application key starts
   every throttle afresh and keeps the durable counts.
@@ -79,9 +82,9 @@ are described here.
   the factors as stored under the lock. The service reads the identity's state, finds the attempted factor among the
   locked ones, reads the factor's lockout row, and refuses the attempt while a lockout applies.
 - Otherwise it runs the verification inside the transaction, so a driver's own change (a TOTP step) and the verification
-  service's record of a success (the consumed code, `verified_at`, `last_used_at`) commit with the count, and counts the
-  outcome on the locked rows: a success resets as above; a failure records the identity's window, in one upsert, and
-  its run, then the factor's failures in a row, its lockout or its disablement.
+  service's record of a success (the delivered code used up, `verified_at`, `last_used_at`) commit with the count, and
+  counts the outcome on the locked rows: a success resets as above; a failure records the identity's window, in one
+  upsert, and its run, then the factor's failures in a row, its lockout or its disablement.
 - The identity's state row is read `FOR UPDATE`, a lock the transaction already holds, so a lockout committed while the
   attempt waited is never answered from an older snapshot. The throttle rows are read with plain reads: a locking read
   of a missing key would take a gap lock on MySQL and let two identities' first failures deadlock.
@@ -95,7 +98,7 @@ are described here.
   committed: with a limit of one, one guess reaches a driver and the next is refused. Parallel guesses from one address
   for several identities each take a slot in one statement, so the slots taken never pass `ip_limit`.
 - A verification that throws rolls the transaction back, counting nothing, and the address's slot is given back before
-  the exception propagates; the same holds when recording a success fails, so a code is never consumed without its
+  the exception propagates; the same holds when recording a success fails, so a code is never used up without its
   count. A database error is never read as a refusal or a pass.
 - The identity's window is counted with one upsert, never an `UPDATE` that may find no row: inside the transaction,
   such an update holds a gap lock on MySQL until the commit, and two identities recording their first failure in the
@@ -146,7 +149,7 @@ are described here.
 - `tests/Unit/Verification/VerificationServiceTest.php` `testAnAttemptOnAnotherIdentitysFactorChargesNobody`,
   `testAFailureIsCountedAgainstTheRequestsAddress`, `testTheAttemptReachingTheLimitLocksTheFactor`,
   `testARemovedFactorIsNotFoundWithoutReachingTheDriver`, `testTheDriverVerifiesTheFactorAsStored`,
-  `testASuccessIsRecordedWithItsCount`
+  `testASuccessIsRecordedWithItsCount`, `testSendingACodeResetsNothing`
 - `tests/Feature/OtpLifecycleTest.php` `testEmailChallengeResetsNothing`
 - `tests/Feature/TotpLifecycleTest.php` `testChallengePreservesTheLockoutEndAfterLockout`
 

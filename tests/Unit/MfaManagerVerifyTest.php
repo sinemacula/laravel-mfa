@@ -175,8 +175,6 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
             'authenticatable_id'   => (string) $user->id,
             'type'                 => 'email',
             'destination'          => 'v5@example.com',
-            'code'                 => '999999',
-            'expires_at'           => Carbon::now()->addMinutes(10),
             'consecutive_failures' => 2,
         ]);
 

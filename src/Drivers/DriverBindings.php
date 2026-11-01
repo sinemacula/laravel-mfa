@@ -6,9 +6,9 @@ namespace SineMacula\Laravel\Mfa\Drivers;
 
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
-use Illuminate\Contracts\Mail\Mailer;
 use SineMacula\Laravel\Mfa\Codes\CodeSettings;
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Contracts\EmailSender;
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\MfaManager;
 
 /**
@@ -22,7 +22,9 @@ use SineMacula\Laravel\Mfa\MfaManager;
  * container extender or resolving callback on `mfa`, since Laravel's `Manager`
  * resolves the most recent registration. Each factory reads only the settings
  * its driver needs: the TOTP settings from `mfa.totp` and the application's
- * `totp_window`, and the code length, lifetime and message from `mfa.codes`.
+ * `totp_window`, and the message from `mfa.codes`, with the application's bound
+ * sender. The code's length and lifetime belong to the code service, not the
+ * drivers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -83,7 +85,8 @@ final class DriverBindings
     }
 
     /**
-     * Build the email driver with the code settings in `mfa.codes`.
+     * Build the email driver with the bound `EmailSender` and the message class
+     * in `mfa.codes`.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Config\Repository  $config
@@ -94,18 +97,15 @@ final class DriverBindings
      */
     public static function email(Application $app, Repository $config): EmailDriver
     {
-        $codes = new CodeSettings($config);
-
         return new EmailDriver(
-            mailer    : $app->make(Mailer::class),
-            mailable  : $codes->mailable(),
-            codeLength: $codes->length(),
-            expiry    : $codes->ttlMinutes(),
+            sender  : $app->make(EmailSender::class),
+            mailable: (new CodeSettings($config))->mailable(),
         );
     }
 
     /**
-     * Build the SMS driver with the code settings in `mfa.codes`.
+     * Build the SMS driver with the bound `SmsSender` and the message in
+     * `mfa.codes`.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Config\Repository  $config
@@ -116,13 +116,9 @@ final class DriverBindings
      */
     public static function sms(Application $app, Repository $config): SmsDriver
     {
-        $codes = new CodeSettings($config);
-
         return new SmsDriver(
-            gateway        : $app->make(SmsGateway::class),
-            messageTemplate: $codes->smsMessage(),
-            codeLength     : $codes->length(),
-            expiry         : $codes->ttlMinutes(),
+            sender         : $app->make(SmsSender::class),
+            messageTemplate: (new CodeSettings($config))->smsMessage(),
         );
     }
 }

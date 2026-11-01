@@ -37,8 +37,9 @@ whatever UI you like.
   change commits (see [Events](docs/guides/events.md)).
 - **Polymorphic identity support**: works with any Eloquent identity type (`User`, `Admin`, ...) via the
   shipped `authenticatable_type` / `authenticatable_id` morph.
-- **Encrypted at rest**: factor `secret` and `code` columns are `encrypted`-cast; backup codes hash to SHA-256
-  before persistence.
+- **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; backup codes hash to SHA-256 before
+  persistence; email and SMS codes are stored only as keyed hashes bound to their factor, session, application and
+  purpose, and the package's email code message encrypts its payload whenever it is queued.
 - **Attempt caps and lockouts**: failures are counted per factor, per identity and per IP address in the database, with
   no cache; too many lock the factor, the identity or the address out before the driver is called, and a factor that
   reaches the failure ceiling is disabled. See [Attempts and lockouts](docs/guides/attempts.md).
@@ -144,7 +145,7 @@ Mfa::hasEverVerified();                 // bool
 Mfa::hasExpired();                      // bool
 Mfa::getFactors();                      // Collection|null
 
-Mfa::challenge($driver, $factor);       // MfaChallengeIssued
+Mfa::challenge($driver, $factor);       // MfaChallengeIssued; a SendResult for email and SMS
 Mfa::verify($driver, $factor, $code);   // MfaVerified | MfaVerificationFailed
 Mfa::enroll($factor);                   // MfaFactorEnrolled
 Mfa::disable($factor);                  // MfaFactorDisabled
@@ -249,26 +250,36 @@ return view('mfa.backup-codes', ['codes' => $codes]);
 Pass an explicit `$count` argument to override the configured default batch size for that single call:
 `Mfa::issueBackupCodes(20)`.
 
-### SMS gateway binding
+### SMS and email senders
 
-The SMS driver delegates outbound delivery to a `SmsGateway` implementation. The shipped `NullSmsGateway`
-throws `SmsGatewayNotConfiguredException` to surface missing wiring loudly — consumers enabling the SMS
-driver bind their own implementation:
+The email and SMS drivers deliver their codes through senders the application binds: `SmsSender` for SMS and
+`EmailSender` for email. The shipped defaults throw `SenderNotConfiguredException`, and the configuration check refuses
+an application that enables `sms` or `email` while its default is still bound, so a missing binding fails loudly before
+anyone is sent a code. Email can go through Laravel's mailer with the package's own sender:
 
 ```php
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
+use SineMacula\Laravel\Mfa\Contracts\EmailSender;
+
+$this->app->singleton(EmailSender::class, MailEmailSender::class);
+```
+
+An SMS sender wraps the application's provider:
+
+```php
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use Twilio\Rest\Client;
 
-final readonly class TwilioSmsGateway implements SmsGateway
+final readonly class TwilioSmsSender implements SmsSender
 {
     public function __construct(
         private Client $twilio,
         private string $fromNumber,
     ) {}
 
-    public function send(string $to, #[\SensitiveParameter] string $message): void
+    public function send(string $phoneNumber, #[\SensitiveParameter] string $message): void
     {
-        $this->twilio->messages->create($to, [
+        $this->twilio->messages->create($phoneNumber, [
             'from' => $this->fromNumber,
             'body' => $message,
         ]);
@@ -279,14 +290,16 @@ final readonly class TwilioSmsGateway implements SmsGateway
 Bind it in a service provider:
 
 ```php
-$this->app->singleton(SmsGateway::class, static fn ($app): TwilioSmsGateway => new TwilioSmsGateway(
+$this->app->singleton(SmsSender::class, static fn ($app): TwilioSmsSender => new TwilioSmsSender(
     twilio: new Client(config('services.twilio.sid'), config('services.twilio.token')),
     fromNumber: config('services.twilio.from'),
 ));
 ```
 
-The contract exposes only the destination and rendered message — the package owns code generation, template
-substitution, lockouts, and verification state — so the adapter stays thin.
+The contracts expose only the destination and the message: the package owns drawing, hashing, binding and checking the
+code, the resend cooldown, the delivery caps and lockouts, so the adapter stays thin. Sending for a factor answers a
+`Codes\SendResult`: sent, with the challenge's id and expiry, or refused with `sending_capped` and the seconds to wait.
+In tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` capture the messages instead.
 
 ### Custom factor drivers
 
@@ -350,7 +363,8 @@ All concrete classes in this package are `final` unless explicitly designed for 
 | Custom factor model        | Set `config('mfa.factor.model')` to your subclass              |
 | Custom recovery code model | Set `config('mfa.recovery_codes.model')` to your subclass      |
 | Event context              | Implement `EventContextResolver` and bind it via the container |
-| Custom SMS gateway         | Implement `SmsGateway` and bind it via the container           |
+| SMS delivery               | Implement `SmsSender` and bind it via the container            |
+| Email delivery             | Bind `MailEmailSender`, or your own `EmailSender`              |
 
 The security and lifecycle contracts behind the package, for maintainers and reviewers, are in
 [docs/design](docs/design/README.md).

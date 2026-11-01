@@ -17,12 +17,12 @@ use Tests\TestCase;
  * Unit tests for the `ActsAsFactor` trait via the shipped `Factor` model.
  *
  * The trait implements the full `EloquentFactor` contract, its public methods
- * spanning column-name accessors, attribute readers, verification state, code
- * lifecycle, and persistence. Every public surface has a paired test (and most
- * readers have separate "value present" / "value absent" cases), so the class
- * size is intrinsic to the contract's surface area, not a sign of conflated
- * subjects. The `php:S1448` suppression below documents that judgement in code
- * so the next quality-gate refresh does not re-flag it.
+ * spanning column-name accessors, attribute readers, verification state and
+ * persistence. Every public surface has a paired test (and most readers have
+ * separate "value present" / "value absent" cases), so the class size is
+ * intrinsic to the contract's surface area, not a sign of conflated subjects.
+ * The `php:S1448` suppression below documents that judgement in code so the
+ * next quality-gate refresh does not re-flag it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,9 +38,6 @@ final class ActsAsFactorTest extends TestCase
 
     /** @var string */
     private const string TEST_USER_EMAIL = 'alice@example.com';
-
-    /** @var string */
-    private const string SAMPLE_CODE = '123456';
 
     /**
      * Set up the test fixtures.
@@ -116,26 +113,6 @@ final class ActsAsFactorTest extends TestCase
     public function testGetSecretNameReturnsSecretColumn(): void
     {
         self::assertSame('secret', (new Factor)->getSecretName());
-    }
-
-    /**
-     * Test code column name accessor.
-     *
-     * @return void
-     */
-    public function testGetCodeNameReturnsCodeColumn(): void
-    {
-        self::assertSame('code', (new Factor)->getCodeName());
-    }
-
-    /**
-     * Test expires_at column name accessor.
-     *
-     * @return void
-     */
-    public function testGetExpiresAtNameReturnsExpiresAtColumn(): void
-    {
-        self::assertSame('expires_at', (new Factor)->getExpiresAtName());
     }
 
     /**
@@ -247,52 +224,6 @@ final class ActsAsFactorTest extends TestCase
     public function testGetSecretReturnsNullWhenUnset(): void
     {
         self::assertNull((new Factor)->getSecret());
-    }
-
-    /**
-     * Test get code returns string value.
-     *
-     * @return void
-     */
-    public function testGetCodeReturnsStringValue(): void
-    {
-        $factor = new Factor(['code' => self::SAMPLE_CODE]);
-
-        self::assertSame(self::SAMPLE_CODE, $factor->getCode());
-    }
-
-    /**
-     * Test get code returns null when unset.
-     *
-     * @return void
-     */
-    public function testGetCodeReturnsNullWhenUnset(): void
-    {
-        self::assertNull((new Factor)->getCode());
-    }
-
-    /**
-     * Test get expires at returns carbon when set.
-     *
-     * @return void
-     */
-    public function testGetExpiresAtReturnsCarbonWhenSet(): void
-    {
-        $at     = Carbon::now()->addMinutes(5);
-        $factor = new Factor(['expires_at' => $at]);
-
-        self::assertNotNull($factor->getExpiresAt());
-        self::assertSame($at->getTimestamp(), $factor->getExpiresAt()->getTimestamp());
-    }
-
-    /**
-     * Test get expires at returns null when unset.
-     *
-     * @return void
-     */
-    public function testGetExpiresAtReturnsNullWhenUnset(): void
-    {
-        self::assertNull((new Factor)->getExpiresAt());
     }
 
     /**
@@ -439,34 +370,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test record verification clears the pending code.
-     *
-     * @return void
-     */
-    public function testRecordVerificationClearsPendingCode(): void
-    {
-        $factor = $this->makeFullyPopulatedFactor();
-
-        $factor->recordVerification();
-
-        self::assertNull($factor->getCode());
-    }
-
-    /**
-     * Test record verification clears the code expiry.
-     *
-     * @return void
-     */
-    public function testRecordVerificationClearsCodeExpiry(): void
-    {
-        $factor = $this->makeFullyPopulatedFactor();
-
-        $factor->recordVerification();
-
-        self::assertNull($factor->getExpiresAt());
-    }
-
-    /**
      * Test record verification uses provided timestamp.
      *
      * @return void
@@ -480,41 +383,6 @@ final class ActsAsFactorTest extends TestCase
 
         self::assertNotNull($factor->getVerifiedAt());
         self::assertSame($at->getTimestamp(), $factor->getVerifiedAt()->getTimestamp());
-    }
-
-    /**
-     * Test issue code persists code and expiry.
-     *
-     * @return void
-     */
-    public function testIssueCodePersistsCodeAndExpiry(): void
-    {
-        $factor    = new Factor;
-        $expiresAt = Carbon::now()->addMinutes(10);
-
-        $factor->issueCode('987654', $expiresAt);
-
-        self::assertSame('987654', $factor->getCode());
-        self::assertNotNull($factor->getExpiresAt());
-        self::assertSame($expiresAt->getTimestamp(), $factor->getExpiresAt()->getTimestamp());
-    }
-
-    /**
-     * Test consume code clears code and expiry.
-     *
-     * @return void
-     */
-    public function testConsumeCodeClearsCodeAndExpiry(): void
-    {
-        $factor = new Factor([
-            'code'       => self::SAMPLE_CODE,
-            'expires_at' => Carbon::now()->addMinutes(5),
-        ]);
-
-        $factor->consumeCode();
-
-        self::assertNull($factor->getCode());
-        self::assertNull($factor->getExpiresAt());
     }
 
     /**
@@ -555,7 +423,7 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Build a factor with failures in a row, code, and expiry populated.
+     * Build a factor with failures in a row populated.
      *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
@@ -563,8 +431,6 @@ final class ActsAsFactorTest extends TestCase
     {
         return new Factor([
             'consecutive_failures' => 2,
-            'code'                 => self::SAMPLE_CODE,
-            'expires_at'           => Carbon::now()->addMinutes(5),
         ]);
     }
 }

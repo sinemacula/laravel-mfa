@@ -161,6 +161,7 @@ final class ForgetIdentityTest extends TestCase
             'application' => 'web',
             'code_hash'   => hash('sha256', 'c' . $factor->id),
             'sent_at'     => $now,
+            'sent_times'  => [$now->getTimestamp()],
             'expires_at'  => $now,
         ]);
         RecoveryCode::query()->create([...$owner, 'code_hash' => 'hash', 'generation' => 1]);

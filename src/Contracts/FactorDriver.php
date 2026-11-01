@@ -12,9 +12,11 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
  * Each factor type is a driver behind this one contract, registered with the
  * manager under the type's name: it states the channel kind its factors travel
  * on and the `amr` values (RFC 8176) a proof by it adds, starts an enrolment,
- * confirms a pending factor, sends a code where the type has one, and verifies
- * a code. An application adds a type, or replaces a shipped one, by registering
- * its own driver.
+ * confirms a pending factor, issues a challenge, and verifies a code. A type
+ * whose codes are delivered to a destination implements `CodeDeliveryDriver` as
+ * well: the package then sends and checks its codes itself, and the driver only
+ * delivers them. An application adds a type, or replaces a shipped one, by
+ * registering its own driver.
  *
  * The services around a driver own the attempt counters, lockouts, events and
  * the verification record: a driver must not change them. It may change the
@@ -67,9 +69,9 @@ interface FactorDriver
     public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool;
 
     /**
-     * Issue a challenge for the factor: send a code for a type that delivers
-     * one (email, SMS), and nothing for a type whose codes are made where they
-     * are held (TOTP).
+     * Issue a challenge for the factor: nothing for a type whose codes are made
+     * where they are held (TOTP). A type whose codes are delivered has them
+     * sent through `CodeDeliveryDriver::deliver()` instead.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void

@@ -39,6 +39,7 @@ as itself, an IPv6 address by its /64 network.
 | The identity's failures within the window  | A row of `mfa_attempts`, scope `identity`  | Expires with its window, `window_seconds` after the first failure in it; cleared when lifted |
 | The identity's lockout                     | `locked_until` on its state row            | Expires `lockout_seconds` after the failure that applied it; lifted early only by an action  |
 | An IP address's failures within the window | A row of `mfa_attempts`, scope `ip`        | Expires with its window, `window_seconds` after the first attempt in it                      |
+| A sent code's challenge's attempts         | A row of `mfa_codes`, its `attempts`       | Kept across resends and capped at `codes.max_attempts`; ends with the challenge              |
 
 Durable counts are kept on the factor and identity state rows and only a success resets them; the throttles in
 `mfa_attempts` expire on their own. The two are kept apart on purpose: a factor's lockout ending does not forgive its
@@ -66,10 +67,11 @@ lock an identity out with requests of their own. The IP address is charged whoev
 The identity's lockout and the factor's lockout are read, the driver is called and the outcome counted in one
 transaction holding the identity's factor state lock (see [Storage](configuration.md#storage)), so parallel guesses
 against one identity are made one after the other and cannot overrun a cap. The driver is handed the factor as stored
-under that lock, so it checks the secret or code stored now rather than what the request read earlier, and a success
-consumes a sent code in the same transaction: two requests with the same code cannot both pass. The IP address's slot
-is taken before, in one statement, and given back unless the attempt fails, so parallel guesses from one address
-across many identities cannot overrun its cap either.
+under that lock, so it checks the secret stored now rather than what the request read earlier. A code sent by email or
+SMS is checked by the code service instead, against the code sent to the request's session, inside the same transaction,
+so its use commits with the count and two requests with the same code cannot both pass. The IP address's slot is taken
+before, in one statement, and given back unless the attempt fails, so parallel guesses from one address across many
+identities cannot overrun its cap either.
 
 Call `Mfa::verify()` outside a transaction of your own on the storage connection. On MySQL, whose default isolation
 level is `REPEATABLE READ`, a transaction that has already read answers later plain reads from that first snapshot,

@@ -120,11 +120,14 @@ return [
     |---------------------------------------------------------------------------
     |
     | Codes sent by SMS or email: their digits (6 to 10), lifetime (1 to 10
-    | minutes), the cooldown before another is sent (up to the lifetime), the
-    | caps on how many one factor and one identity are sent within the send
-    | window, the SMS message (which must carry `:code`) and the email message
-    | class (`MfaCodeMessage` or a subclass), and the table the codes are
-    | stored in, hashed.
+    | minutes), how many attempts one challenge allows (1 to 10), how long a
+    | challenge's resends may run from its first code (the lifetime to 60
+    | minutes), the cooldown before a resend (up to the lifetime), the caps on
+    | how many one factor and one identity are sent within the send window,
+    | across every session, the SMS message (which must carry `:code`) and the
+    | email message class (`MfaCodeMessage` or a subclass), and the table the
+    | codes are stored in, as keyed hashes. An application that enables `sms`
+    | or `email` must bind an `SmsSender` or `EmailSender` to deliver them.
     |
     */
 
@@ -132,6 +135,8 @@ return [
         'table'                   => env('MFA_CODES_TABLE', 'mfa_codes'),
         'length'                  => env('MFA_CODES_LENGTH', 6),
         'ttl_minutes'             => env('MFA_CODES_TTL_MINUTES', 10),
+        'max_attempts'            => env('MFA_CODES_MAX_ATTEMPTS', 5),
+        'challenge_ttl_minutes'   => env('MFA_CODES_CHALLENGE_TTL_MINUTES', 30),
         'resend_cooldown_seconds' => env('MFA_CODES_RESEND_COOLDOWN_SECONDS', 60),
         'factor_send_limit'       => env('MFA_CODES_FACTOR_SEND_LIMIT', 5),
         'identity_send_limit'     => env('MFA_CODES_IDENTITY_SEND_LIMIT', 10),

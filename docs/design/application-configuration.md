@@ -48,9 +48,10 @@ before anything relies on it.
 - An application declares the first factor its guard uses (a method and a channel kind other than `unknown`), or a
   `Contracts\FirstFactorResolver` is bound to report it. A configured application with neither is a misconfiguration:
   an unknown first factor accepts no further factor and establishes no level.
-- A code type an application enables has something to deliver its codes: `sms` a `Contracts\SmsGateway` other than the
-  package's `NullSmsGateway`, `email` a mailer bound in the container. The mailer is looked up, not built, so the boot
-  check of every request builds no mail transport.
+- A code type an application enables has something to deliver its codes: `sms` a `Contracts\SmsSender` other than the
+  package's `NullSmsSender`, `email` a `Contracts\EmailSender` other than its `NullEmailSender`; and either has the
+  application key its codes are hashed with (see [Delivered Codes](delivered-codes.md)). The package's
+  `MailEmailSender` looks its mailer up only to send, so the boot check of every request builds no mail transport.
 - `Config\ConfigurationValidator` runs every check and groups the problems by subject: `storage`, `factor`,
   `identity_state`, each capability block, `applications`, and `applications.{name}`. It runs once the application has
   booted (`Config\ConfigurationBindings::boot()`, from the provider's `boot()`, deferred until every provider has
@@ -105,8 +106,7 @@ before anything relies on it.
   `validate()`; `src/MfaServiceProvider.php`: `boot()`, `registerManager()`.
 - `src/Console/CheckConfigurationCommand.php`; `src/Exceptions/InvalidConfigurationException.php`.
 - The readers: `src/Drivers/DriverBindings.php`, `src/RecoveryCodes/RecoveryCodeBindings.php`,
-  `src/Verification/VerificationService.php` (`applyVerificationOutcome()`), `src/Proofs/ProofService.php`
-  (`hasExpired()`).
+  `src/Attempts/AttemptService.php` (`attempt()`, `lockout()`), `src/Proofs/ProofService.php` (`hasExpired()`).
 
 ## Authoritative Tests
 

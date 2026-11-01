@@ -465,52 +465,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the currently issued one-time code, if any.
-     *
-     * @return ?string
-     */
-    public function getCode(): ?string
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getCodeName());
-
-        return is_string($value) ? $value : null;
-    }
-
-    /**
-     * Column name holding the pending one-time code.
-     *
-     * @return string
-     */
-    public function getCodeName(): string
-    {
-        return 'code';
-    }
-
-    /**
-     * Return when the currently issued one-time code expires.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getExpiresAt(): ?CarbonInterface
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getExpiresAtName());
-
-        return $value instanceof CarbonInterface ? $value : null;
-    }
-
-    /**
-     * Column name holding the expiry of the pending one-time code.
-     *
-     * @return string
-     */
-    public function getExpiresAtName(): string
-    {
-        return 'expires_at';
-    }
-
-    /**
      * Determine whether the factor has ever completed a successful
      * verification.
      *
@@ -545,8 +499,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Stamp a successful verification, as the last use too, and clear any
-     * pending one-time code.
+     * Stamp a successful verification, as the last use too.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
@@ -557,7 +510,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
 
         $this->setAttribute($this->getVerifiedAtName(), $at);
         $this->setAttribute($this->getLastUsedAtName(), $at);
-        $this->consumeCode();
     }
 
     /**
@@ -570,30 +522,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     {
         $this->setAttribute($this->getStatusName(), FactorStatus::CONFIRMED->value);
         $this->setAttribute($this->getConfirmedAtName(), $at ?? Carbon::now());
-    }
-
-    /**
-     * Clear any pending one-time code and its expiry.
-     *
-     * @return void
-     */
-    public function consumeCode(): void
-    {
-        $this->setAttribute($this->getCodeName(), null);
-        $this->setAttribute($this->getExpiresAtName(), null);
-    }
-
-    /**
-     * Persist a newly issued one-time code and its expiry.
-     *
-     * @param  string  $code
-     * @param  \Carbon\CarbonInterface  $expiresAt
-     * @return void
-     */
-    public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void
-    {
-        $this->setAttribute($this->getCodeName(), $code);
-        $this->setAttribute($this->getExpiresAtName(), $expiresAt);
     }
 
     /**

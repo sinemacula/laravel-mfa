@@ -15,7 +15,7 @@ use Symfony\Component\Console\Input\ArgvInput;
  * at it.
  *
  * The boot check waits until every service provider has booted, so a binding an
- * application makes in its own provider's `boot()` (an SMS gateway, a first
+ * application makes in its own provider's `boot()` (an SMS sender, a first
  * factor resolver) counts. It is skipped while `mfa:check` runs, which reports
  * the same problems instead of failing on them, and while one of the console
  * commands that list, describe, discover, cache or clear configuration runs, so

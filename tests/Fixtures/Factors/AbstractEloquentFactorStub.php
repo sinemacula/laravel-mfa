@@ -239,28 +239,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional code column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getCodeName(): string
-    {
-        return 'code';
-    }
-
-    /**
-     * Return the conventional expires-at column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getExpiresAtName(): string
-    {
-        return 'expires_at';
-    }
-
-    /**
      * Return the conventional verified-at column name.
      *
      * @return string
@@ -291,30 +269,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      */
     #[\Override]
     public function confirm(?CarbonInterface $at = null): void
-    {
-        // Intentionally empty — see method docblock.
-    }
-
-    /**
-     * No-op — the fixture does not track issued codes.
-     *
-     * @param  string  $code
-     * @param  \Carbon\CarbonInterface  $expiresAt
-     * @return void
-     */
-    #[\Override]
-    public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void
-    {
-        // Intentionally empty — see method docblock.
-    }
-
-    /**
-     * No-op — the fixture does not track consumed codes.
-     *
-     * @return void
-     */
-    #[\Override]
-    public function consumeCode(): void
     {
         // Intentionally empty — see method docblock.
     }
