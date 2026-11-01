@@ -29,42 +29,36 @@ use Tests\Fixtures\Identities\TestUser;
 final class MfaManagerDriversTest extends MfaManagerTestCase
 {
     /**
-     * Resolving the TOTP driver should honour the configured verification
-     * window from `config('mfa.totp.window')`.
+     * Resolving the TOTP driver should give a driver that reads the configured
+     * settings in `config('mfa.totp')`.
      *
      * @return void
      *
-     * @throws \ReflectionException
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testTotpDriverBuildsWithConfiguredWindow(): void
+    public function testTotpDriverReadsTheConfiguredSettings(): void
     {
         $config = app(Repository::class);
-        $config->set('mfa.totp.window', 3);
+        $config->set('mfa.totp', ['algorithm' => 'sha512', 'digits' => 8, 'period' => 60]);
 
         $driver = $this->manager()->driver('totp');
 
         self::assertInstanceOf(TotpDriver::class, $driver);
 
-        $property = new \ReflectionProperty($driver, 'window');
+        $parameters = $driver->parameters();
 
-        // Reflection on the private `window` property pins the factory-resolved
-        // value — without it the test would only observe the resolved class,
-        // not the constructor argument.
-        // @SuppressWarnings("php:S3011")
-        self::assertSame(3, $property->getValue($driver));
+        self::assertSame(['sha512', 8, 60], [$parameters->algorithm, $parameters->digits, $parameters->period]);
     }
 
     /**
-     * Resolving the TOTP driver with no `window` configured should fall back to
-     * the shipped default of 1 step.
+     * Resolving the TOTP driver with no settings configured should fall back to
+     * the defaults authenticator apps expect: SHA-1, 6 digits, 30 seconds.
      *
      * @return void
      *
-     * @throws \ReflectionException
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testTotpDriverDefaultsWindowToOneWhenUnset(): void
+    public function testTotpDriverDefaultsWhenUnset(): void
     {
         $config = app(Repository::class);
         $config->set('mfa.totp', []);
@@ -73,13 +67,9 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
 
         self::assertInstanceOf(TotpDriver::class, $driver);
 
-        $property = new \ReflectionProperty($driver, 'window');
+        $parameters = $driver->parameters();
 
-        // Reflection on the private `window` property pins the factory's
-        // default-resolution path — without it the test would only observe the
-        // resolved class, not the fall-back value of 1.
-        // @SuppressWarnings("php:S3011")
-        self::assertSame(1, $property->getValue($driver));
+        self::assertSame(['sha1', 6, 30], [$parameters->algorithm, $parameters->digits, $parameters->period]);
     }
 
     /**

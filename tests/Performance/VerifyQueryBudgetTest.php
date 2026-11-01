@@ -7,11 +7,11 @@ namespace Tests\Performance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -35,37 +35,30 @@ final class VerifyQueryBudgetTest extends TestCase
 
     /**
      * A successful TOTP verify must stay within the documented two-query
-     * budget: the factor-row update plus the verification store write.
+     * budget: the accepted step's compare-and-set and the factor-row update.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testTotpVerifyHitBudget(): void
     {
-        $user   = $this->loginUser();
-        $secret = 'JBSWY3DPEHPK3PXP';
+        $user = $this->loginUser();
 
         $factor = Factor::create([
+            ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => $secret,
         ]);
 
-        $google = new Google2FA;
-        $code   = $google->getCurrentOtp($secret);
+        $code = AuthenticatorApp::code($factor);
 
         $count = $this->countQueries(
             static fn () => Mfa::verify('totp', $factor, $code),
         );
 
-        // Budget: one update on the factor row for recordVerification + one
-        // write to the verification store (session-backed, not a DB connection
-        // in the default binding). Session writes happen via the session
-        // driver, not the database — so the DB budget is 1.
+        // Budget: one conditional update recording the accepted time step, and
+        // one update on the factor row for recordVerification. The verification
+        // store is session-backed in the default binding, so its write goes
+        // through the session driver, not the database.
         self::assertLessThanOrEqual(
             2,
             $count,
@@ -86,10 +79,9 @@ final class VerifyQueryBudgetTest extends TestCase
         $user = $this->loginUser();
 
         $factor = Factor::create([
+            ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => 'JBSWY3DPEHPK3PXP',
             'locked_until'         => now()->addHour(),
         ]);
 
@@ -116,10 +108,9 @@ final class VerifyQueryBudgetTest extends TestCase
         $user = $this->loginUser();
 
         $factor = Factor::create([
+            ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 
         $count = $this->countQueries(
