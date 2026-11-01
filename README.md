@@ -326,11 +326,12 @@ etc.) are called on every request and would exhaust the bucket without represent
 
 ### Proof store
 
-Each verification on a signed-in session records a proof, kept by the default `SessionProofStore` in the Laravel
-session for the identity's current sign-in. Laravel's `Login` event begins a sign-in and `Logout` ends it, so a new
-identity on a reused session inherits nothing. A guard that fires neither event calls `Proofs\GuardHooks::signedIn()`
-and `signedOut()` instead; one that does neither leaves no proof to rely on. A stateless guard rebinds
-`Contracts\ProofStore`. See [Recorded proofs](docs/guides/proofs.md).
+Each verification on a signed-in session records a proof, kept by the default `SessionProofStore` in the Laravel session
+for the identity's current sign-in on the application. Laravel's `Login` event begins a sign-in on the guard's
+application and `Logout` or `CurrentDeviceLogout` ends it, so a new identity on a reused session inherits nothing. A
+guard that fires neither event calls `Proofs\GuardHooks::signedIn()` and `signedOut()` instead; one that does neither
+leaves no proof to rely on. A stateless guard rebinds `Contracts\ProofStore`.
+See [Recorded proofs](docs/guides/proofs.md).
 
 ## Extensibility
 

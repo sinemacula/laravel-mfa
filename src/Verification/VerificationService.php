@@ -112,6 +112,9 @@ final readonly class VerificationService
      * driver.
      *
      * - Rejects the attempt when the factor is locked.
+     * - Reads the identity's verification generation, when it has a sign-in a
+     *   proof can be recorded on, before the driver runs, so a generation
+     *   advanced while the code is checked leaves the proof behind.
      * - Runs the driver's verification logic.
      * - On success: resets attempts, stamps the factor's last use, clears any
      *   pending code, records the proof on the identity's current sign-in
@@ -157,15 +160,16 @@ final readonly class VerificationService
             return false;
         }
 
-        $resolved = $this->drivers->resolve($registry, $driver);
-        $valid    = $resolved->verify($factor, $code);
+        $generation = $this->proofs->generationFor($identity);
+        $resolved   = $this->drivers->resolve($registry, $driver);
+        $valid      = $resolved->verify($factor, $code);
 
         if ($factor instanceof EloquentFactor) {
             $this->applyVerificationOutcome($factor, $valid);
         }
 
-        if ($valid) {
-            $this->recordProof($identity, $factor, $driver, $resolved);
+        if ($valid && $generation !== null) {
+            $this->recordProof($identity, $generation, $factor, $driver, $resolved);
         }
 
         $this->finalizeVerification($identity, $factor, $driver, $valid, $events);
@@ -211,15 +215,16 @@ final readonly class VerificationService
 
     /**
      * Record the proof a successful verification made on the identity's current
-     * sign-in: a recovery code proof for a backup code, which travels on no
+     * sign-in, stamped with the verification generation read before the code
+     * was checked: a recovery code proof for a backup code, which travels on no
      * channel, and an additional factor proof on the factor's channel
      * otherwise, named by the factor's destination when it has one and by the
-     * factor itself when not. Without a sign-in the store knows of, nothing is
-     * recorded and the driver is not asked for its channel. A driver whose
-     * channel cannot carry a factor proves nothing, and neither does a factor
-     * whose identifier cannot name it.
+     * factor itself when not. A driver whose channel cannot carry a factor
+     * proves nothing, and neither does a factor whose identifier cannot name
+     * it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  int  $generation
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $resolved
@@ -227,14 +232,10 @@ final readonly class VerificationService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function recordProof(MultiFactorAuthenticatable $identity, Factor $factor, string $driver, FactorDriver $resolved): void
+    private function recordProof(MultiFactorAuthenticatable $identity, int $generation, Factor $factor, string $driver, FactorDriver $resolved): void
     {
-        if (!$this->proofs->hasSignIn($identity)) {
-            return;
-        }
-
         if ($resolved instanceof BackupCodeDriver) {
-            $this->proofs->record($identity, ProofKind::RECOVERY_CODE, $driver, null, null, Purpose::STEP_UP);
+            $this->proofs->record($identity, $generation, ProofKind::RECOVERY_CODE, $driver, null, null, Purpose::STEP_UP);
 
             return;
         }
@@ -247,8 +248,9 @@ final readonly class VerificationService
         }
 
         $reference = (string) $identifier;
+        $channel   = new Channel($kind, $factor->getDestination() ?? $reference);
 
-        $this->proofs->record($identity, ProofKind::ADDITIONAL_FACTOR, $driver, new Channel($kind, $factor->getDestination() ?? $reference), $reference, Purpose::STEP_UP);
+        $this->proofs->record($identity, $generation, ProofKind::ADDITIONAL_FACTOR, $driver, $channel, $reference, Purpose::STEP_UP);
     }
 
     /**

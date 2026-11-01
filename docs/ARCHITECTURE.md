@@ -14,7 +14,8 @@ working.
 
 - Identity model implements `MultiFactorAuthenticatable`.
 - Default `SessionProofStore` keeps each sign-in's proofs in the session (per-device by
-  construction), begun on Laravel's `Login` event and forgotten on `Logout`.
+  construction), one sign-in per identity and application, begun on Laravel's `Login` event and
+  forgotten on `Logout` or `CurrentDeviceLogout`.
 - Works behind SessionGuard, Sanctum, Passport, or any custom guard whose `Auth::user()` returns
   a `MultiFactorAuthenticatable`. Sanctum integration is asserted by
   `tests/Integration/MultiAuthStackTest::testSanctumGuardSeesIdentityAndFactors`.
@@ -55,10 +56,11 @@ Historical record of the architectural calls made during the 1.0 cycle.
   `FactorDriver::issueChallenge(Factor): void` implements per-factor-type transport (no-op for TOTP,
   mail dispatch for email, gateway dispatch for SMS, no-op for backup codes since they are
   pre-issued).
-- **D4 — Per-device verification is the default.** In paired mode the verification timestamp
-  lives on the `Device` record; in standalone mode it lives on the session (which is already
-  per-device). The step-up middleware (`mfa:N`) is the escape hatch for "re-verify before this
-  specific action regardless of device state".
+- **D4 — Per-device verification is the default.** A session's proofs are its own. In paired
+  mode they live in the authentication package's session record, through a rebound `ProofStore`;
+  in standalone mode they live in the Laravel session, through `SessionProofStore` (which is
+  already per-device). The step-up middleware (`mfa:N`) is the escape hatch for "re-verify before
+  this specific action regardless of device state".
 - **D5 — Built-in driver factories live in the capability bindings.** The four shipped drivers
   (TOTP, email, SMS, backup codes) are registered against the manager via the standard
   `Mfa::extend(...)` API from `Drivers\DriverBindings` and `RecoveryCodes\RecoveryCodeBindings`,

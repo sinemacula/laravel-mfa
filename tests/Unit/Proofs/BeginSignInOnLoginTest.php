@@ -11,6 +11,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Proofs\BeginSignInOnLogin;
+use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
 use Tests\Fixtures\Identities\PlainUser;
@@ -19,8 +20,8 @@ use Tests\TestCase;
 
 /**
  * Tests for `BeginSignInOnLogin`: Laravel's `Login` event begins a new sign-in,
- * named by a fresh random id, for an identity that can hold factors, and leaves
- * every other identity alone.
+ * named by a fresh random id, on the application its guard acts for, for an
+ * identity that can hold factors, and leaves every other identity alone.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -47,20 +48,22 @@ final class BeginSignInOnLoginTest extends TestCase
      * Every sign-in begins under a fresh lowercase ULID.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testBeginsASignInUnderAFreshId(): void
     {
-        $store    = new SessionProofStore(new Store('test', new ArraySessionHandler(10)));
-        $listener = new BeginSignInOnLogin($store);
+        $store    = $this->bindStore(new SessionProofStore(new Store('test', new ArraySessionHandler(10))));
+        $listener = $this->listener();
         $user     = $this->user();
 
         $listener(new Login('web', $user, false));
 
-        $first = $store->currentSession($user);
+        $first = $store->currentSession($user, 'web');
 
         $listener(new Login('web', $user, false));
 
-        $second = $store->currentSession($user);
+        $second = $store->currentSession($user, 'web');
 
         self::assertIsString($first);
         self::assertIsString($second);
@@ -69,16 +72,41 @@ final class BeginSignInOnLoginTest extends TestCase
     }
 
     /**
+     * The sign-in begins on the application the event's guard acts for, and
+     * leaves the identity's sign-in on another alone.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBeginsTheSignInOnTheGuardsApplication(): void
+    {
+        $store = $this->bindStore(new SessionProofStore(new Store('test', new ArraySessionHandler(10))));
+        $user  = $this->user();
+
+        $store->begin($user, 'web', 'sign-in-1');
+
+        $this->listener()(new Login('admin', $user, false));
+
+        self::assertSame('sign-in-1', $store->currentSession($user, 'web'));
+        self::assertIsString($store->currentSession($user, 'admin'));
+    }
+
+    /**
      * An identity that cannot hold factors begins no sign-in.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testLeavesAnIdentityThatCannotHoldFactorsAlone(): void
     {
         $store = \Mockery::mock(ProofStore::class);
         $store->shouldNotReceive('begin');
 
-        (new BeginSignInOnLogin($store))(new Login('web', new PlainUser, false));
+        $this->bindStore($store);
+
+        $this->listener()(new Login('web', new PlainUser, false));
 
         $store->shouldNotHaveReceived('begin');
 
@@ -90,17 +118,48 @@ final class BeginSignInOnLoginTest extends TestCase
      * its own rather than failing.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testLeavesAnIdentityWhoseKeyCannotNameARecordAlone(): void
     {
         $store = \Mockery::mock(ProofStore::class);
         $store->shouldReceive('begin')->once()->andThrow(new UnsupportedIdentifierException('Unsupported.'));
 
-        (new BeginSignInOnLogin($store))(new Login('web', new NonScalarIdentifierUser, false));
+        $this->bindStore($store);
+
+        $this->listener()(new Login('web', new NonScalarIdentifierUser, false));
 
         $store->shouldHaveReceived('begin')->once();
 
         $this->addToAssertionCount(1);
+    }
+
+    /**
+     * Bind the store the listener's proof service reaches.
+     *
+     * @template TStore of \SineMacula\Laravel\Mfa\Contracts\ProofStore
+     *
+     * @param  TStore  $store
+     * @return TStore
+     */
+    private function bindStore(ProofStore $store): ProofStore
+    {
+        $this->container()->instance(ProofStore::class, $store);
+
+        return $store;
+    }
+
+    /**
+     * The listener under test.
+     *
+     * @return \SineMacula\Laravel\Mfa\Proofs\BeginSignInOnLogin
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function listener(): BeginSignInOnLogin
+    {
+        return new BeginSignInOnLogin($this->container()->make(ProofService::class));
     }
 
     /**

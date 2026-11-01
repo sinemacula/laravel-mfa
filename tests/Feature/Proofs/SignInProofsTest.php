@@ -33,10 +33,11 @@ use Tests\TestCase;
 /**
  * End-to-end tests of the proofs a sign-in keeps: a verification on a signed-in
  * session records its proof, Laravel's sign-in and sign-out events clear what
- * the session held so a new identity on a reused session inherits nothing, a
- * guard that fires neither event nor calls the hooks has no usable proof, a
- * custom guard's hooks record its first factor, and advancing the identity's
- * verification generation invalidates its other sessions.
+ * the session held so a new identity on a reused session inherits nothing, each
+ * guard's application keeps its own sign-in, a guard that fires neither event
+ * nor calls the hooks has no usable proof, a custom guard's hooks record its
+ * first factor, and advancing the identity's verification generation
+ * invalidates its other sessions.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -103,6 +104,121 @@ final class SignInProofsTest extends TestCase
         Auth::setUser($user);
 
         self::assertSame([], Mfa::proofs());
+    }
+
+    /**
+     * Signing out of the current device forgets every proof of the sign-in, as
+     * signing out does.
+     *
+     * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
+     */
+    public function testSigningOutOfTheCurrentDeviceForgetsTheProofs(): void
+    {
+        $user = $this->createUser('alice@example.test');
+
+        Auth::login($user);
+
+        [$factor, $code] = $this->enrollTotp($user);
+
+        Mfa::verify('totp', $factor, $code);
+
+        self::assertCount(1, Mfa::proofs());
+
+        Auth::logoutCurrentDevice();
+        Auth::setUser($user);
+
+        self::assertSame([], Mfa::proofs());
+    }
+
+    /**
+     * Two session guards over the same identity keep their own sign-ins:
+     * signing in to or out of one leaves the other's sign-in and proofs alone,
+     * and the other still records what it proves.
+     *
+     * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
+     */
+    public function testSigningInToOrOutOfOneGuardLeavesAnotherAlone(): void
+    {
+        config()->set('auth.guards.admin', ['driver' => 'session', 'provider' => 'users']);
+
+        $user = $this->createUser('alice@example.test');
+
+        Auth::login($user);
+
+        [$factor, $code] = $this->enrollTotp($user);
+
+        Mfa::verify('totp', $factor, $code);
+
+        Auth::guard('admin')->login($user);
+
+        self::assertCount(1, Mfa::proofs());
+
+        Auth::guard('admin')->logout();
+
+        self::assertCount(1, Mfa::proofs());
+
+        $factor->refresh();
+
+        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertCount(2, Mfa::proofs());
+    }
+
+    /**
+     * A guard that fires neither event nor calls the hooks gains nothing from
+     * the identity's sign-in through another guard: its verification records
+     * nothing, it has no proofs, and the other guard's are untouched.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
+     */
+    public function testAGuardCallingNeitherHookGainsNothingFromAnotherGuardsSignIn(): void
+    {
+        config()->set('auth.guards.admin', ['driver' => 'session', 'provider' => 'users']);
+
+        $user = $this->createUser('alice@example.test');
+
+        Auth::login($user);
+
+        [$factor, $code] = $this->enrollTotp($user);
+
+        Mfa::verify('totp', $factor, $code);
+
+        Auth::guard('admin')->setUser($user);
+        Auth::shouldUse('admin');
+
+        $factor->refresh();
+
+        self::assertTrue(Mfa::verify('totp', $factor, $code));
+
+        $admin = Mfa::proofs();
+
+        Auth::shouldUse('web');
+
+        $web = Mfa::proofs();
+
+        self::assertSame([], $admin);
+        self::assertCount(1, $web);
+
+        Auth::shouldUse('admin');
+
+        $this->expectException(MfaRequiredException::class);
+
+        $this->container()->make(RequireMfa::class)->handle(
+            $this->container()->make(Request::class),
+            static fn (): Response => new Response('reached'),
+        );
     }
 
     /**
@@ -205,7 +321,7 @@ final class SignInProofsTest extends TestCase
         self::assertSame([ProofKind::FIRST_FACTOR, ProofKind::ADDITIONAL_FACTOR], array_map(static fn (Proof $proof): ProofKind => $proof->kind, $proofs));
         self::assertSame('guard-session-1', $proofs[1]->binding->sessionId);
 
-        GuardHooks::signedOut($user);
+        GuardHooks::signedOut($user, 'web');
 
         self::assertSame([], Mfa::proofs());
     }
@@ -237,8 +353,8 @@ final class SignInProofsTest extends TestCase
             ));
         };
 
-        $phone->begin($user, 'phone-sign-in');
-        $laptop->begin($user, 'laptop-sign-in');
+        $phone->begin($user, 'web', 'phone-sign-in');
+        $laptop->begin($user, 'web', 'laptop-sign-in');
         $proveOn($phone, 'phone-sign-in', 0);
         $proveOn($laptop, 'laptop-sign-in', 0);
 

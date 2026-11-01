@@ -64,10 +64,11 @@ final class VerifyQueryBudgetTest extends TestCase
             static fn () => Mfa::verify('totp', $factor, $code),
         );
 
-        // Budget: one update on the factor row for recordVerification + one
-        // read of the identity's verification generation, which the proof
-        // recorded on the signed-in session carries. The proof itself is
-        // written to the session, not the database.
+        // Budget: one read of the identity's verification generation, taken
+        // before the driver runs and carried by the proof recorded on the
+        // signed-in session, + one update on the factor row for
+        // recordVerification. The proof itself is written to the session, not
+        // the database.
         self::assertLessThanOrEqual(
             2,
             $count,
@@ -108,8 +109,10 @@ final class VerifyQueryBudgetTest extends TestCase
     }
 
     /**
-     * A failed TOTP verify must stay within a single query — the attempt-count
-     * update on the factor row, with no proof recorded.
+     * A failed TOTP verify on a signed-in session must stay within two queries:
+     * the read of the verification generation, made before the code is checked
+     * so a proof never carries a generation advanced while it was checked, and
+     * the attempt-count update on the factor row, with no proof recorded.
      *
      * @return void
      */
@@ -128,10 +131,11 @@ final class VerifyQueryBudgetTest extends TestCase
             static fn () => Mfa::verify('totp', $factor, '000000'),
         );
 
-        // One update on the factor row for recordAttempt. No proof is recorded
-        // on failure.
+        // One read of the identity's verification generation, taken before the
+        // driver runs, plus one update on the factor row for recordAttempt. No
+        // proof is recorded on failure.
         self::assertLessThanOrEqual(
-            1,
+            2,
             $count,
             sprintf('TOTP verify miss exceeded query budget: %d queries', $count),
         );

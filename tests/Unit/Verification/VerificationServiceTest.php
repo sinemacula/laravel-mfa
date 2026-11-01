@@ -21,6 +21,7 @@ use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Factors\InMemoryFactor;
@@ -524,6 +525,33 @@ final class VerificationServiceTest extends TestCase
         self::assertSame(BackupCodeDriver::NAME, $proofs[0]->method);
         self::assertNull($proofs[0]->channel);
         self::assertNull($proofs[0]->reference);
+    }
+
+    /**
+     * A proof is stamped with the verification generation read before the
+     * driver checked the code, so a generation advanced while it is checked
+     * leaves the proof behind rather than letting it count.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAGenerationAdvancedWhileTheCodeIsCheckedLeavesTheProofBehind(): void
+    {
+        $user   = $this->signIn();
+        $factor = $this->eloquentFactor($user);
+        $driver = \Mockery::mock(FactorDriver::class);
+
+        $driver->shouldReceive('verify')->once()->andReturnUsing(static fn (): bool => VerificationGeneration::advance($user) > 0);
+        $driver->shouldReceive('channelKind')->andReturn(ChannelKind::AUTHENTICATOR_APP);
+
+        Auth::login($user);
+
+        $this->stubDriver($driver);
+
+        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
+        self::assertSame(1, VerificationGeneration::current($user));
+        self::assertSame([], $this->container()->make(ProofService::class)->proofs());
     }
 
     /**

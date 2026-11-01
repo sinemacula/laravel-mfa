@@ -50,7 +50,7 @@ final class GuardHooksTest extends TestCase
 
         GuardHooks::signedIn($user, $proof);
 
-        self::assertSame('guard-session-1', $this->store()->currentSession($user));
+        self::assertSame('guard-session-1', $this->store()->currentSession($user, 'web'));
         self::assertSame([$proof->toArray()], array_map(static fn (Proof $proof): array => $proof->toArray(), $this->store()->proofs($user, 'web')));
     }
 
@@ -68,26 +68,30 @@ final class GuardHooksTest extends TestCase
         GuardHooks::signedIn($user, $this->firstFactor());
         GuardHooks::signedIn($user, $this->firstFactor(7, 'guard-session-2'));
 
-        self::assertSame('guard-session-2', $this->store()->currentSession($user));
+        self::assertSame('guard-session-2', $this->store()->currentSession($user, 'web'));
         self::assertCount(1, $this->store()->proofs($user, 'web'));
     }
 
     /**
-     * Signing out forgets the sign-in and every proof of it.
+     * Signing out of an application forgets the sign-in there and every proof
+     * of it, and leaves the identity's sign-in on another alone.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testSignedOutForgetsTheSignIn(): void
+    public function testSignedOutForgetsTheSignInOnTheApplication(): void
     {
         $user = $this->user();
 
         GuardHooks::signedIn($user, $this->firstFactor());
-        GuardHooks::signedOut($user);
+        GuardHooks::signedIn($user, $this->firstFactor(7, 'guard-session-2', 'admin'));
+        GuardHooks::signedOut($user, 'web');
 
-        self::assertNull($this->store()->currentSession($user));
+        self::assertNull($this->store()->currentSession($user, 'web'));
         self::assertSame([], $this->store()->proofs($user, 'web'));
+        self::assertSame('guard-session-2', $this->store()->currentSession($user, 'admin'));
+        self::assertCount(1, $this->store()->proofs($user, 'admin'));
     }
 
     /**
@@ -109,7 +113,7 @@ final class GuardHooksTest extends TestCase
             self::assertSame('A guard signs an identity in with a proof of kind [first_factor], not [additional_factor].', $exception->getMessage());
         }
 
-        self::assertNull($this->store()->currentSession($user));
+        self::assertNull($this->store()->currentSession($user, 'web'));
     }
 
     /**
@@ -177,13 +181,14 @@ final class GuardHooksTest extends TestCase
 
     /**
      * The proof of the password the test user with the given key signed in with
-     * on the `web` application, at generation 0, bound to the guard's session.
+     * on the application, at generation 0, bound to the guard's session.
      *
      * @param  int  $id
      * @param  string  $session
+     * @param  string  $application
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
-    private function firstFactor(int $id = 7, string $session = 'guard-session-1'): Proof
+    private function firstFactor(int $id = 7, string $session = 'guard-session-1', string $application = 'web'): Proof
     {
         return self::proof([
             'kind'       => ProofKind::FIRST_FACTOR,
@@ -191,7 +196,7 @@ final class GuardHooksTest extends TestCase
             'channel'    => new Channel(ChannelKind::PASSWORD),
             'reference'  => null,
             'provedAt'   => CarbonImmutable::now()->subSecond(),
-            'binding'    => new ProofBinding(TestUser::class, (string) $id, 'web', $session, Purpose::SIGN_IN),
+            'binding'    => new ProofBinding(TestUser::class, (string) $id, $application, $session, Purpose::SIGN_IN),
             'generation' => 0,
         ]);
     }

@@ -12,27 +12,36 @@ use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException;
 
 /**
- * The default proof store: each identity's current sign-in and the full records
- * of its proofs, kept in the Laravel session under `mfa.proofs`.
+ * The default proof store: each identity's current sign-in on each application
+ * and the full records of its proofs, kept in the Laravel session under
+ * `mfa.proofs`.
  *
  * A sign-in begins on Laravel's `Login` event, or through
- * `GuardHooks::signedIn()` for a guard that fires none, and ends on `Logout` or
- * `GuardHooks::signedOut()`; beginning one forgets the proofs of the one
- * before. Records are kept per identity, by its type and key, so two identity
- * types sharing a key never share one, and every proof is read back against the
- * identity, the application, the sign-in and the identity's verification
- * generation it is asked for.
+ * `GuardHooks::signedIn()` for a guard that fires none, and ends on `Logout`,
+ * `CurrentDeviceLogout` or `GuardHooks::signedOut()`; beginning one forgets the
+ * proofs of the one before. Records are kept per identity, by its type and key,
+ * and per application, so two identity types sharing a key never share one, and
+ * signing in or out of one application leaves the identity's sign-in on another
+ * alone. Every proof is read back against the identity, the application, the
+ * sign-in and the identity's verification generation it is asked for.
  *
- * It fails closed. A proof bound to another sign-in is refused when it is
- * recorded. When the proofs are read, one is left out when it is bound to
- * another identity, application or sign-in, was made after now, was made under
- * another verification generation than the identity's current one, or cannot be
- * read back; an identity with no sign-in has none.
+ * It fails closed. A proof bound to another sign-in, or to an application the
+ * identity has not signed in to, is refused when it is recorded. When the
+ * proofs are read, one is left out when it is bound to another identity,
+ * application or sign-in, was made after now, was made under another
+ * verification generation than the identity's current one, or cannot be read
+ * back; an identity with no sign-in on the application has none.
  *
- * The records are bounded: an identity's sign-in keeps at most 50 proofs, and
- * recording more forgets the earliest recorded, though never the first factor.
- * The session holds each channel's full destination, so it must be stored where
- * the application keeps its other session secrets.
+ * The records are bounded: a sign-in keeps at most 50 proofs, and recording
+ * more forgets the earliest recorded, though never the latest first factor. The
+ * session holds each channel's full destination, so it must be stored where the
+ * application keeps its other session secrets.
+ *
+ * Like anything else kept in the Laravel session, the records are written back
+ * whole when a request ends, so two overlapping requests on one session may
+ * each save their own copy. Forgetting a factor's proofs therefore holds on the
+ * current session only as far as its requests are serialised; advancing the
+ * identity's verification generation is what stops a proof counting everywhere.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -57,10 +66,11 @@ final readonly class SessionProofStore implements ProofStore
     ) {}
 
     /**
-     * Begin a new sign-in for the identity, forgetting every proof of the one
-     * before.
+     * Begin a new sign-in for the identity on the application, forgetting every
+     * proof of the one before.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @param  string  $sessionId
      * @return void
      *
@@ -68,29 +78,30 @@ final readonly class SessionProofStore implements ProofStore
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
-    public function begin(MultiFactorAuthenticatable $identity, string $sessionId): void
+    public function begin(MultiFactorAuthenticatable $identity, string $application, string $sessionId): void
     {
-        $this->write(ProofOwner::of($identity), ['session' => self::sessionId($sessionId), 'proofs' => []]);
+        $this->write(ProofOwner::of($identity), $application, ['session' => self::sessionId($sessionId), 'proofs' => []]);
     }
 
     /**
-     * The session id of the identity's current sign-in, or `null` when it has
-     * none.
+     * The session id of the identity's current sign-in on the application, or
+     * `null` when it has none.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @return ?string
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
-    public function currentSession(MultiFactorAuthenticatable $identity): ?string
+    public function currentSession(MultiFactorAuthenticatable $identity, string $application): ?string
     {
-        return $this->read(ProofOwner::of($identity))['session'] ?? null;
+        return $this->read(ProofOwner::of($identity), $application)['session'] ?? null;
     }
 
     /**
-     * Record a proof for its identity's current sign-in, refusing one bound to
-     * any other.
+     * Record a proof for its identity's current sign-in on its application,
+     * refusing one bound to any other.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
@@ -100,8 +111,9 @@ final readonly class SessionProofStore implements ProofStore
     #[\Override]
     public function record(Proof $proof): void
     {
-        $owner  = ProofOwner::boundBy($proof->binding);
-        $record = $this->read($owner);
+        $owner       = ProofOwner::boundBy($proof->binding);
+        $application = $proof->binding->application;
+        $record      = $this->read($owner, $application);
 
         if ($record === null || $record['session'] !== $proof->binding->sessionId) {
             throw new ProofRefusedException('The proof is not bound to its identity\'s current sign-in, so it cannot be recorded.');
@@ -109,7 +121,7 @@ final readonly class SessionProofStore implements ProofStore
 
         $record['proofs'][] = $proof->toArray();
 
-        $this->write($owner, ['session' => $record['session'], 'proofs' => self::bounded($record['proofs'])]);
+        $this->write($owner, $application, ['session' => $record['session'], 'proofs' => self::bounded($record['proofs'])]);
     }
 
     /**
@@ -126,7 +138,7 @@ final readonly class SessionProofStore implements ProofStore
     public function proofs(MultiFactorAuthenticatable $identity, string $application): array
     {
         $owner  = ProofOwner::of($identity);
-        $record = $this->read($owner);
+        $record = $this->read($owner, $application);
 
         if ($record === null) {
             return [];
@@ -164,8 +176,8 @@ final readonly class SessionProofStore implements ProofStore
 
     /**
      * Stop counting every proof the identity made with the factor on this
-     * session. Other sessions stop counting it when the identity's verification
-     * generation is advanced.
+     * session, on every application it has signed in to. Other sessions stop
+     * counting it when the identity's verification generation is advanced.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
@@ -176,33 +188,46 @@ final readonly class SessionProofStore implements ProofStore
     #[\Override]
     public function forgetFactor(MultiFactorAuthenticatable $identity, string $factorId): void
     {
-        $owner  = ProofOwner::of($identity);
-        $record = $this->read($owner);
+        $owner = ProofOwner::of($identity);
 
-        if ($record === null) {
-            return;
+        foreach (array_keys($this->owned($owner)) as $application) {
+
+            $record = $this->read($owner, (string) $application);
+
+            if ($record === null) {
+                continue;
+            }
+
+            $kept = array_filter($record['proofs'], static fn (array $stored): bool => ($stored['reference'] ?? null) !== $factorId);
+
+            $this->write($owner, (string) $application, ['session' => $record['session'], 'proofs' => array_values($kept)]);
         }
-
-        $kept = array_filter($record['proofs'], static fn (array $stored): bool => ($stored['reference'] ?? null) !== $factorId);
-
-        $this->write($owner, ['session' => $record['session'], 'proofs' => array_values($kept)]);
     }
 
     /**
-     * Forget the identity's current sign-in and every proof of it.
+     * Forget the identity's current sign-in on the application and every proof
+     * of it, leaving its sign-ins on other applications alone.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
-    public function forget(MultiFactorAuthenticatable $identity): void
+    public function forget(MultiFactorAuthenticatable $identity, string $application): void
     {
         $slot    = ProofOwner::of($identity)->slot();
         $records = $this->records();
+        $owned   = is_array($records[$slot] ?? null) ? $records[$slot] : [];
 
-        unset($records[$slot]);
+        unset($owned[$application]);
+
+        if ($owned === []) {
+            unset($records[$slot]);
+        } else {
+            $records[$slot] = $owned;
+        }
 
         $this->session->put(self::SESSION_KEY, $records);
     }
@@ -240,47 +265,57 @@ final readonly class SessionProofStore implements ProofStore
     }
 
     /**
-     * Keep at most `LIMIT` proofs, forgetting the earliest recorded that is not
-     * a first factor.
+     * Keep at most `LIMIT` proofs, forgetting the earliest recorded other than
+     * the latest first factor, so the sign-in's first factor is kept and an
+     * additional proof is never crowded out by earlier first factors.
      *
      * @param  list<array<array-key, mixed>>  $proofs
      * @return list<array<array-key, mixed>>
      */
     private static function bounded(array $proofs): array
     {
-        while (count($proofs) > self::LIMIT) {
+        $firstFactor = null;
 
-            $index = null;
+        foreach ($proofs as $position => $stored) {
 
-            foreach ($proofs as $position => $stored) {
-                if (($stored['kind'] ?? null) !== ProofKind::FIRST_FACTOR->value) {
-                    $index = $position;
-                    break;
-                }
+            if (($stored['kind'] ?? null) !== ProofKind::FIRST_FACTOR->value) {
+                continue;
             }
 
-            if ($index === null) {
+            $firstFactor = $position;
+        }
+
+        $excess = count($proofs) - self::LIMIT;
+
+        foreach (array_keys($proofs) as $position) {
+
+            if ($excess <= 0) {
                 break;
             }
 
-            unset($proofs[$index]);
+            if ($position === $firstFactor) {
+                continue;
+            }
 
-            $proofs = array_values($proofs);
+            unset($proofs[$position]);
+
+            $excess--;
         }
 
-        return $proofs;
+        return array_values($proofs);
     }
 
     /**
-     * The owner's record: its sign-in's session id and its stored proofs, or
-     * `null` when it has none or what is stored is not one.
+     * The owner's record on the application: its sign-in's session id and its
+     * stored proofs, or `null` when it has none or what is stored is not one.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
+     * @param  string  $application
      * @return ?array{session: string, proofs: list<array<array-key, mixed>>}
      */
-    private function read(ProofOwner $owner): ?array
+    private function read(ProofOwner $owner, string $application): ?array
     {
-        $record = $this->records()[$owner->slot()] ?? null;
+        $record = $this->owned($owner)[$application] ?? null;
 
         if (!is_array($record)) {
             return null;
@@ -300,23 +335,39 @@ final readonly class SessionProofStore implements ProofStore
     }
 
     /**
-     * Store the owner's record.
+     * Store the owner's record on the application.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
+     * @param  string  $application
      * @param  array{session: string, proofs: list<array<array-key, mixed>>}  $record
      * @return void
      */
-    private function write(ProofOwner $owner, array $record): void
+    private function write(ProofOwner $owner, string $application, array $record): void
     {
         $records = $this->records();
+        $owned   = $this->owned($owner);
 
-        $records[$owner->slot()] = $record;
+        $owned[$application]     = $record;
+        $records[$owner->slot()] = $owned;
 
         $this->session->put(self::SESSION_KEY, $records);
     }
 
     /**
-     * Every identity's record in the session, keyed by owner.
+     * The owner's records, keyed by application.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
+     * @return array<array-key, mixed>
+     */
+    private function owned(ProofOwner $owner): array
+    {
+        $owned = $this->records()[$owner->slot()] ?? null;
+
+        return is_array($owned) ? $owned : [];
+    }
+
+    /**
+     * Every identity's records in the session, keyed by owner.
      *
      * @return array<array-key, mixed>
      */

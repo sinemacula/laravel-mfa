@@ -15,8 +15,10 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  * records rather than one time and a list of `amr` values.
  *
  * A sign-in instance is named by the session id every proof made in it is bound
- * to: it begins when the identity signs in, and a proof bound to any other
- * session is never kept. The default keeps the records in the Laravel session;
+ * to: it begins when the identity signs in to an application, and a proof bound
+ * to any other session is never kept. An identity's sign-ins on different
+ * applications are separate: beginning or forgetting one leaves the others
+ * alone. The default keeps the records in the Laravel session;
  * a stateless guard rebinds the contract, keyed by an id that names one
  * sign-in, not merely a device.
  *
@@ -33,35 +35,39 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 interface ProofStore
 {
     /**
-     * Begin a new sign-in for the identity, named by the session id its proofs
-     * will be bound to, forgetting every proof of the sign-in before it.
+     * Begin a new sign-in for the identity on the application, named by the
+     * session id its proofs will be bound to, forgetting every proof of the
+     * sign-in before it on that application.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @param  string  $sessionId
      * @return void
      *
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function begin(MultiFactorAuthenticatable $identity, string $sessionId): void;
+    public function begin(MultiFactorAuthenticatable $identity, string $application, string $sessionId): void;
 
     /**
-     * The session id of the identity's current sign-in, the one a proof must be
-     * bound to for the store to keep it, or `null` when the identity has no
-     * sign-in the store knows of.
+     * The session id of the identity's current sign-in on the application, the
+     * one a proof must be bound to for the store to keep it, or `null` when the
+     * identity has no sign-in there the store knows of.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @return ?string
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function currentSession(MultiFactorAuthenticatable $identity): ?string;
+    public function currentSession(MultiFactorAuthenticatable $identity, string $application): ?string;
 
     /**
      * Record a proof for the sign-in it is bound to.
      *
-     * A proof that is not bound to its identity's current sign-in is refused by
-     * throwing, never kept, so the change the call is part of rolls back.
+     * A proof that is not bound to its identity's current sign-in on its
+     * application is refused by throwing, never kept, so a caller recording it
+     * inside a transaction rolls that change back with it.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
@@ -95,13 +101,15 @@ interface ProofStore
     public function forgetFactor(MultiFactorAuthenticatable $identity, string $factorId): void;
 
     /**
-     * Forget the identity's current sign-in and every proof of it, as on
-     * sign-out, so another identity on a reused session inherits nothing.
+     * Forget the identity's current sign-in on the application and every proof
+     * of it, as on sign-out, so another identity on a reused session inherits
+     * nothing, leaving its sign-ins on other applications alone.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function forget(MultiFactorAuthenticatable $identity): void;
+    public function forget(MultiFactorAuthenticatable $identity, string $application): void;
 }

@@ -40,10 +40,15 @@ nothing.
 
 ## Sign-ins
 
-A sign-in is the run of a session between signing in and signing out, named by the session id its proofs are bound to.
-With a guard that fires Laravel's `Login` and `Logout` events, such as the session guard, nothing needs doing: `Login`
-begins a new sign-in for the identity and `Logout` forgets it. Beginning a sign-in forgets everything the identity's
-previous one proved, so another identity on a reused session, or the same identity signing in again, inherits nothing.
+A sign-in is the run of a session between signing in to an application and signing out, named by the session id its
+proofs are bound to. With a guard that fires Laravel's `Login` and `Logout` events, such as the session guard, nothing
+needs doing: `Login` begins a new sign-in for the identity on the guard's application, and `Logout` or
+`CurrentDeviceLogout` forgets it. Beginning a sign-in forgets everything the identity's previous one there proved, so
+another identity on a reused session, or the same identity signing in again, inherits nothing.
+
+Each application keeps its own sign-in. With two session guards over the same users, such as `web` and `admin`,
+signing in to or out of one leaves the other's sign-in and proofs alone. A guard's application is the one a bound
+`Contracts\ApplicationResolver` names for the request, or the guard's name.
 
 A guard that sets the user without firing `Login` leaves no sign-in, so a verification still succeeds but records
 nothing, and the `mfa` middleware keeps requiring one. That includes Laravel's `actingAs()` in tests: sign the user in
@@ -52,7 +57,8 @@ with `Auth::login()` when a test needs proofs recorded.
 ## Custom guards
 
 A guard that fires neither event calls the hooks in `Proofs\GuardHooks` instead: `signedIn()` once it has signed the
-identity in, with the proof of the first factor it used, and `signedOut()` once it has signed them out.
+identity in, with the proof of the first factor it used, and `signedOut()` with the application once it has signed
+them out.
 
 ```php
 use Carbon\CarbonImmutable;
@@ -77,28 +83,29 @@ GuardHooks::signedIn($user, new Proof(
     generation: VerificationGeneration::current($user),
 ));
 
-GuardHooks::signedOut($user);
+GuardHooks::signedOut($user, 'web');
 ```
 
 The proof must be a first factor bound to the identity and made under its current verification generation; anything
-else is refused with an `InvalidArgumentException`, as it would never count. Its session id names the sign-in, and the
-proofs that follow are bound to it. A guard that calls neither hook leaves no proof to rely on.
+else is refused with an `InvalidArgumentException`, as it would never count. Its application and session id name the
+sign-in, and the proofs that follow are bound to it. A guard that calls neither hook leaves no proof to rely on, even
+when the identity holds a sign-in on another application.
 
 ## Stateless guards
 
-The default store, `Proofs\SessionProofStore`, keeps each identity's sign-in and its proofs in the Laravel session under
-`mfa.proofs`, at most 50 proofs per sign-in (the earliest recorded is forgotten first, never the first factor). A guard
-with no session (tokens, JWTs) binds its own `Contracts\ProofStore`, keyed by an id that names one sign-in, not merely a
-device:
+The default store, `Proofs\SessionProofStore`, keeps each identity's sign-ins and their proofs in the Laravel session
+under `mfa.proofs`, at most 50 proofs per sign-in (the earliest recorded is forgotten first, never the latest first
+factor). A guard with no session (tokens, JWTs) binds its own `Contracts\ProofStore`, keyed by the identity, the
+application and an id that names one sign-in, not merely a device:
 
-| Method                               | Does                                                                              |
-|--------------------------------------|-----------------------------------------------------------------------------------|
-| `begin($identity, $sessionId)`       | Begins a sign-in named by the session id, forgetting the previous one's proofs    |
-| `currentSession($identity)`          | The current sign-in's session id, or `null` without one                           |
-| `record($proof)`                     | Keeps a proof bound to its identity's current sign-in, refusing any other         |
-| `proofs($identity, $application)`    | The current sign-in's proofs on the application that still count, oldest first    |
-| `forgetFactor($identity, $factorId)` | Stops counting the proofs made with the factor                                    |
-| `forget($identity)`                  | Forgets the current sign-in and its proofs                                        |
+| Method                                       | Does                                                                           |
+|----------------------------------------------|--------------------------------------------------------------------------------|
+| `begin($identity, $application, $sessionId)` | Begins a sign-in on the application, forgetting the previous one's proofs      |
+| `currentSession($identity, $application)`    | The current sign-in's session id on the application, or `null` without one     |
+| `record($proof)`                             | Keeps a proof bound to its identity's current sign-in, refusing any other      |
+| `proofs($identity, $application)`            | The current sign-in's proofs on the application that still count, oldest first |
+| `forgetFactor($identity, $factorId)`         | Stops counting the proofs made with the factor, on every application           |
+| `forget($identity, $application)`            | Forgets the current sign-in on the application and its proofs                  |
 
 A store refuses a proof it cannot keep by throwing `Exceptions\ProofRefusedException`, and fails closed when it reads:
 no record, a proof in the future, another generation, identity, application or sign-in all mean not verified.
@@ -112,7 +119,9 @@ $this->app->bind(ProofStore::class, TokenProofStore::class);
 ## Invalidating proofs
 
 Disabling a factor (`Mfa::disable()`) stops every proof made with it counting on the current session. The session store
-cannot reach the identity's other sessions; to make them verify again, advance the identity's verification generation:
+cannot reach the identity's other sessions, and no shipped flow advances the verification generation yet, so those
+sessions keep counting the removed factor's proofs. To make them verify again, advance the identity's verification
+generation yourself:
 
 ```php
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
@@ -123,6 +132,11 @@ VerificationGeneration::advance($user);
 The generation is a durable counter on the identity's row in the identity states table, stamped on every proof. Once
 it moves on, every proof recorded under an earlier generation stops counting, on every session, at its next read.
 Called inside the identity's factor state transaction, the advance commits or rolls back with the change it belongs to.
+
+Laravel saves the whole session when a request ends and does not serialise a session's requests unless the route asks
+(`Route::block()`), so a request that started before a factor was disabled can save its older copy afterwards and put
+the forgotten proofs back on the current session. Serialise the route that disables a factor, or advance the
+generation, when that matters.
 
 ## The middleware
 

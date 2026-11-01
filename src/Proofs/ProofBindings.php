@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Proofs;
 
+use Illuminate\Auth\Events\CurrentDeviceLogout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -14,7 +15,8 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 /**
  * Registers the proof service, the default `ProofStore`, which keeps each
  * sign-in's proofs in the Laravel session, and the listeners that begin a
- * sign-in on Laravel's `Login` event and forget it on `Logout`.
+ * sign-in on Laravel's `Login` event and forget it on `Logout` and
+ * `CurrentDeviceLogout`.
  *
  * The store is built on every resolution, from the session of the request at
  * hand, so no singleton holds one request's session into the next. An
@@ -55,5 +57,6 @@ final class ProofBindings
 
         $events->listen(Login::class, BeginSignInOnLogin::class);
         $events->listen(Logout::class, ForgetSignInOnLogout::class);
+        $events->listen(CurrentDeviceLogout::class, ForgetSignInOnLogout::class);
     }
 }

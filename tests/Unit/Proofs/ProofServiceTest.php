@@ -7,6 +7,7 @@ namespace Tests\Unit\Proofs;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
@@ -130,21 +131,79 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * An identity has a sign-in once one begins, and not before.
+     * A guard names its own application without a resolver, and the bound
+     * resolver's application with one.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testHasASignInOnceOneBegins(): void
+    public function testAGuardsApplicationIsItsNameUnlessAResolverNamesOne(): void
     {
-        $user = $this->user();
+        self::assertSame('admin', $this->service()->applicationFor('admin'));
 
-        self::assertFalse($this->service()->hasSignIn($user));
+        $resolver = \Mockery::mock(ApplicationResolver::class);
+        $resolver->shouldReceive('resolve')->once()->andReturn('mobile');
 
-        $this->container()->make(ProofStore::class)->begin($user, 'sign-in-1');
+        $this->container()->instance(ApplicationResolver::class, $resolver);
 
-        self::assertTrue($this->service()->hasSignIn($user));
+        self::assertSame('mobile', $this->service()->applicationFor('admin'));
+    }
+
+    /**
+     * Beginning a sign-in for a guard begins it on the guard's application
+     * under a fresh id, and ending it forgets only that application's.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBeginsAndEndsASignInOnTheGuardsApplication(): void
+    {
+        $user  = $this->user();
+        $store = $this->container()->make(ProofStore::class);
+
+        $this->service()->beginSignIn($user, 'web');
+        $this->service()->beginSignIn($user, 'admin');
+
+        $web = $store->currentSession($user, 'web');
+
+        self::assertIsString($web);
+        self::assertIsString($store->currentSession($user, 'admin'));
+        self::assertNotSame($web, $store->currentSession($user, 'admin'));
+
+        $this->service()->endSignIn($user, 'admin');
+
+        self::assertSame($web, $store->currentSession($user, 'web'));
+        self::assertNull($store->currentSession($user, 'admin'));
+    }
+
+    /**
+     * The generation a proof would be stamped with is the identity's current
+     * one once it has a sign-in on the current application, and `null` before,
+     * without reading the generation.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheGenerationToStampNeedsASignInOnTheCurrentApplication(): void
+    {
+        $user  = $this->user();
+        $store = $this->container()->make(ProofStore::class);
+
+        VerificationGeneration::advance($user);
+
+        $store->begin($user, 'admin', 'sign-in-1');
+
+        DB::connection()->enableQueryLog();
+
+        self::assertNull($this->service()->generationFor($user));
+        self::assertSame([], DB::connection()->getQueryLog());
+
+        $store->begin($user, 'web', 'sign-in-2');
+
+        self::assertSame(1, $this->service()->generationFor($user));
     }
 
     /**
@@ -159,20 +218,20 @@ final class ProofServiceTest extends TestCase
         $user = $this->user();
 
         $store = \Mockery::mock(ProofStore::class);
-        $store->shouldReceive('currentSession')->once()->with($user)->andReturnNull();
+        $store->shouldReceive('currentSession')->once()->with($user, 'web')->andReturnNull();
         $store->shouldNotReceive('record');
 
         $this->container()->instance(ProofStore::class, $store);
 
-        self::assertNull($this->service()->record($user, ProofKind::RECOVERY_CODE, 'backup_code', null, null, Purpose::STEP_UP));
+        self::assertNull($this->service()->record($user, 0, ProofKind::RECOVERY_CODE, 'backup_code', null, null, Purpose::STEP_UP));
 
         $store->shouldNotHaveReceived('record');
     }
 
     /**
      * A recorded proof is bound to the identity, the current application, its
-     * current sign-in and the given purpose, made now under its current
-     * generation, observing nothing, and the store keeps it.
+     * current sign-in and the given purpose, made now under the generation it
+     * was given, observing nothing, and the store keeps it.
      *
      * @return void
      *
@@ -186,11 +245,11 @@ final class ProofServiceTest extends TestCase
         $store   = $this->container()->make(ProofStore::class);
         $channel = new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-1');
 
-        $store->begin($user, 'sign-in-1');
+        $store->begin($user, 'web', 'sign-in-1');
 
         VerificationGeneration::advance($user);
 
-        $proof = $this->service()->record($user, ProofKind::ADDITIONAL_FACTOR, 'totp', $channel, 'factor-1', Purpose::STEP_UP);
+        $proof = $this->service()->record($user, 1, ProofKind::ADDITIONAL_FACTOR, 'totp', $channel, 'factor-1', Purpose::STEP_UP);
 
         self::assertNotNull($proof);
         self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proof->kind);

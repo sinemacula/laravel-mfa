@@ -4,15 +4,17 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Proofs;
 
+use Illuminate\Auth\Events\CurrentDeviceLogout;
 use Illuminate\Auth\Events\Logout;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 
 /**
- * Forgets the identity's sign-in, and every proof of it, whenever Laravel's
- * `Logout` event fires for an identity that can hold factors, so whoever signs
- * in next on the same session inherits nothing.
+ * Forgets the identity's sign-in, and every proof of it, on the application the
+ * event's guard acts for whenever Laravel's `Logout` or `CurrentDeviceLogout`
+ * event fires for an identity that can hold factors, so whoever signs in next
+ * on the same session inherits nothing. Its sign-ins on other applications are
+ * left alone.
  *
  * An identity whose key cannot name a record holds no proofs, so it is left
  * alone rather than failing the sign-out.
@@ -27,28 +29,30 @@ final readonly class ForgetSignInOnLogout
     /**
      * Constructor.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
      */
     public function __construct(
 
-        /** The bound proof store. */
-        private ProofStore $store,
+        /** The proof service the sign-in is ended through. */
+        private ProofService $proofs,
     ) {}
 
     /**
-     * Handle the `Logout` event.
+     * Handle the `Logout` or `CurrentDeviceLogout` event.
      *
-     * @param  \Illuminate\Auth\Events\Logout  $event
+     * @param  \Illuminate\Auth\Events\CurrentDeviceLogout|\Illuminate\Auth\Events\Logout  $event
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function __invoke(Logout $event): void
+    public function __invoke(CurrentDeviceLogout|Logout $event): void
     {
         if (!$event->user instanceof MultiFactorAuthenticatable) {
             return;
         }
 
         try {
-            $this->store->forget($event->user);
+            $this->proofs->endSignIn($event->user, $event->guard);
         } catch (UnsupportedIdentifierException) {
             return;
         }

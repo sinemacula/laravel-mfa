@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Proofs;
 
+use Illuminate\Auth\Events\CurrentDeviceLogout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -57,7 +58,8 @@ final class ProofBindingsTest extends TestCase
     }
 
     /**
-     * Laravel's `Login` event begins a sign-in, and `Logout` forgets it.
+     * Laravel's `Login` event begins a sign-in, and `Logout` and
+     * `CurrentDeviceLogout` forget it.
      *
      * @return void
      *
@@ -72,10 +74,15 @@ final class ProofBindingsTest extends TestCase
 
         $events->dispatch(new Login('web', $user, false));
 
-        self::assertNotNull($this->container()->make(ProofStore::class)->currentSession($user));
+        self::assertNotNull($this->container()->make(ProofStore::class)->currentSession($user, 'web'));
 
         $events->dispatch(new Logout('web', $user));
 
-        self::assertNull($this->container()->make(ProofStore::class)->currentSession($user));
+        self::assertNull($this->container()->make(ProofStore::class)->currentSession($user, 'web'));
+
+        $events->dispatch(new Login('web', $user, false));
+        $events->dispatch(new CurrentDeviceLogout('web', $user));
+
+        self::assertNull($this->container()->make(ProofStore::class)->currentSession($user, 'web'));
     }
 }

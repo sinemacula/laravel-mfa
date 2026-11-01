@@ -223,7 +223,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
         Auth::login($user);
 
         $store   = $this->container()->make(ProofStore::class);
-        $session = $store->currentSession($user);
+        $session = $store->currentSession($user, 'web');
 
         self::assertIsString($session);
 

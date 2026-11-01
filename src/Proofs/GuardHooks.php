@@ -13,14 +13,15 @@ use SineMacula\Laravel\Mfa\Enums\ProofKind;
  * The lifecycle hooks a guard calls when it fires neither of Laravel's `Login`
  * and `Logout` events, as a custom or stateless guard may not: `signedIn()`
  * once it has signed an identity in, with the proof of the first factor it
- * signed them in with, and `signedOut()` once it has signed them out. Both act
- * on the bound proof store.
+ * signed them in with, and `signedOut()` once it has signed them out of an
+ * application. Both act on the bound proof store.
  *
- * Signing in begins a new sign-in, named by the session id the first factor's
- * proof is bound to, forgetting every proof the identity's previous sign-in
- * left, and records the first factor. A guard that calls neither hook and fires
- * neither event leaves no sign-in, so nothing is recorded for it and no proof
- * counts: it never inherits a verification.
+ * Signing in begins a new sign-in on the application the first factor's proof
+ * is bound to, named by the session id it is bound to, forgetting every proof
+ * the identity's previous sign-in there left, and records the first factor. A
+ * guard that calls neither hook and fires neither event leaves no sign-in, so
+ * nothing is recorded for it and no proof counts: it never inherits a
+ * verification.
  *
  * @api
  *
@@ -57,21 +58,25 @@ final class GuardHooks
 
         $store = self::store();
 
-        $store->begin($identity, $firstFactor->binding->sessionId);
+        $store->begin($identity, $firstFactor->binding->application, $firstFactor->binding->sessionId);
         $store->record($firstFactor);
     }
 
     /**
-     * End the identity's sign-in, forgetting every proof of it.
+     * End the identity's sign-in on the application, forgetting every proof of
+     * it. The application is the one its first factor's proof was bound to: the
+     * guard's name, unless a bound `ApplicationResolver` names another.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public static function signedOut(MultiFactorAuthenticatable $identity): void
+    public static function signedOut(MultiFactorAuthenticatable $identity, string $application): void
     {
-        self::store()->forget($identity);
+        self::store()->forget($identity, $application);
     }
 
     /**

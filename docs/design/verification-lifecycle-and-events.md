@@ -77,7 +77,7 @@ whose events carry summaries and a scalar context and are dispatched after the c
 - `src/Enrollment/EnrollmentService.php`: `enroll()`. `src/Lifecycle/LifecycleService.php`: `disable()`.
 - `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`, `rotateBackupCodeBatch()`.
 - `src/Drivers/DriverResolver.php`: `resolve()`, `assertMatchesFactor()`. `src/Factors/FactorOwnership.php`:
-  `assert()`. `src/Factors/FactorStateCache.php`: `clear()`.
+  `assert()`.
 - `src/Events/MfaChallengeIssued.php`, `src/Events/MfaVerified.php`, `src/Events/MfaVerificationFailed.php`,
   `src/Events/MfaFactorEnrolled.php`, `src/Events/MfaFactorDisabled.php`.
 - `src/Enums/FailureReason.php`: the failure reasons, shared with the rest of the package.
@@ -102,11 +102,13 @@ whose events carry summaries and a scalar context and are dispatched after the c
 - `tests/Unit/MfaManagerLifecycleTest.php`
   `testEnrollDispatchesEnrolledEvent`
 - `tests/Unit/MfaManagerLifecycleTest.php`
-  `testEnrollInvalidatesIsSetupCache`
+  `testEnrollIsSeenByIsSetupAtOnce`
 - `tests/Unit/MfaManagerLifecycleTest.php`
   `testDisableDispatchesDisabledEvent`
 - `tests/Unit/MfaManagerLifecycleTest.php`
-  `testDisableInvalidatesIsSetupCache`
+  `testDisableIsSeenByIsSetupAtOnce`
+- `tests/Unit/MfaManagerLifecycleTest.php`
+  `testDisableStopsTheFactorsProofsCounting`
 - `tests/Unit/MfaManagerClassifyFailureTest.php`
   `testClassifyFailureReturnsNotConfirmedForTotpShapedFactorWithoutSecret`
 - `tests/Unit/MfaManagerClassifyFailureTest.php`

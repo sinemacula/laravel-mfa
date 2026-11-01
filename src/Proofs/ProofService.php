@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
@@ -20,7 +21,9 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 /**
  * Records and reads the current identity's proofs through the bound
  * `ProofStore`, on the application of the current request: the one a bound
- * `ApplicationResolver` names, or the default guard's name without one.
+ * `ApplicationResolver` names, or the default guard's name without one. It also
+ * begins and ends an identity's sign-in on the application a guard signs it in
+ * to.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -61,26 +64,69 @@ final readonly class ProofService
     }
 
     /**
-     * Whether the identity has a sign-in the store knows of, so a proof it
-     * makes now can be recorded.
+     * Begin a new sign-in for the identity on the application the guard signed
+     * it in to, named by a fresh random id, so nothing the identity proved
+     * before there carries over.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @return bool
+     * @param  string  $guard
+     * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function hasSignIn(MultiFactorAuthenticatable $identity): bool
+    public function beginSignIn(MultiFactorAuthenticatable $identity, string $guard): void
     {
-        return $this->store()->currentSession($identity) !== null;
+        $this->store()->begin($identity, $this->applicationFor($guard), Str::lower((string) Str::ulid()));
+    }
+
+    /**
+     * Forget the identity's sign-in on the application the guard signed it out
+     * of, and every proof of it.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $guard
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function endSignIn(MultiFactorAuthenticatable $identity, string $guard): void
+    {
+        $this->store()->forget($identity, $this->applicationFor($guard));
+    }
+
+    /**
+     * The verification generation a proof the identity is about to make would
+     * be stamped with, read before the proof is checked so a generation
+     * advanced while it is checked leaves the proof behind; `null` when the
+     * identity has no sign-in on the current application the store knows of, so
+     * nothing would be recorded.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @return ?int
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function generationFor(MultiFactorAuthenticatable $identity): ?int
+    {
+        if ($this->store()->currentSession($identity, $this->application()) === null) {
+            return null;
+        }
+
+        return VerificationGeneration::current($identity);
     }
 
     /**
      * Record a proof the identity has just made on the current application,
-     * bound to its current sign-in and verification generation, observing
-     * nothing beyond the proof itself, and return it; `null` when the identity
-     * has no sign-in the store knows of, so nothing is recorded.
+     * bound to its current sign-in and stamped with the verification generation
+     * read before the proof was checked, observing nothing beyond the proof
+     * itself, and return it; `null` when the identity has no sign-in the store
+     * knows of, so nothing is recorded.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  int  $generation
      * @param  \SineMacula\Laravel\Mfa\Enums\ProofKind  $kind
      * @param  string  $method
      * @param  ?\SineMacula\Laravel\Mfa\Assurance\Channel  $channel
@@ -93,10 +139,11 @@ final readonly class ProofService
      * @throws \SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function record(MultiFactorAuthenticatable $identity, ProofKind $kind, string $method, ?Channel $channel, ?string $reference, Purpose $purpose): ?Proof
+    public function record(MultiFactorAuthenticatable $identity, int $generation, ProofKind $kind, string $method, ?Channel $channel, ?string $reference, Purpose $purpose): ?Proof
     {
-        $store   = $this->store();
-        $session = $store->currentSession($identity);
+        $store       = $this->store();
+        $application = $this->application();
+        $session     = $store->currentSession($identity, $application);
 
         if ($session === null) {
             return null;
@@ -111,8 +158,8 @@ final readonly class ProofService
             $reference,
             ObservedProperties::none(),
             CarbonImmutable::now(),
-            new ProofBinding($owner->type, $owner->key, $this->application(), $session, $purpose),
-            VerificationGeneration::current($identity),
+            new ProofBinding($owner->type, $owner->key, $application, $session, $purpose),
+            $generation,
         );
 
         $store->record($proof);
@@ -144,13 +191,27 @@ final readonly class ProofService
      */
     public function application(): string
     {
+        return $this->applicationFor(Auth::getDefaultDriver());
+    }
+
+    /**
+     * The application a guard acts for on the current request: the one a bound
+     * `ApplicationResolver` names for the request, or the guard's name.
+     *
+     * @param  string  $guard
+     * @return string
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function applicationFor(string $guard): string
+    {
         $request = $this->container->bound('request') ? $this->container->make('request') : null;
 
         if ($request instanceof Request && $this->container->bound(ApplicationResolver::class)) {
             return $this->container->make(ApplicationResolver::class)->resolve($request);
         }
 
-        return Auth::getDefaultDriver();
+        return $guard;
     }
 
     /**
