@@ -39,6 +39,9 @@ whatever UI you like.
   shipped `authenticatable_type` / `authenticatable_id` morph.
 - **Encrypted at rest**: factor `secret` and `code` columns are `encrypted`-cast; backup codes hash to SHA-256
   before persistence.
+- **Secrets shown once**: secrets are returned in a value that refuses to be serialised, cast or dumped, sent by a
+  response helper and an `mfa.no-store` middleware that no cache keeps, and redacted from logs and exception traces
+  (see [Secrets](docs/guides/secrets.md)).
 - **Per-factor lockouts**: `attempts.factor_limit` failures in a row lock a factor of any type for
   `attempts.lockout_seconds`.
 - **Zero ecosystem coupling**: depends only on Laravel and the standard `Authenticatable` contract.
@@ -103,9 +106,10 @@ application blocks, among others, are checked but no flow reads them, so listing
 nothing for now. See [Configuration](docs/guides/configuration.md) for every key, its default, its bounds and whether it
 is applied yet.
 
-> **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so a key rotation
-> must use `php artisan key:rotate` rather than simply swapping `APP_KEY` in `.env` — a naive swap leaves
-> existing factor rows un-decryptable.
+> **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so when you rotate
+> `APP_KEY`, list the old key in `APP_PREVIOUS_KEYS` for as long as factors enrolled under it exist: a plain swap
+> leaves existing factor rows undecryptable. See
+> [Rotating the application key](docs/guides/secrets.md#rotating-the-application-key).
 
 Every package table lives on one database connection, `storage.connection` (`MFA_STORAGE_CONNECTION`, the default
 connection when `null`), which the shipped models and migrations both use; a factor model on another connection is

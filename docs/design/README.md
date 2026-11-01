@@ -42,6 +42,9 @@ The current note set is:
   implementation, the `mfa:N` step-up route-parameter contract, and the fail-closed rules inside `hasExpired()`.
 - `factor-payload-hygiene.md`: encryption at rest for `secret` / `code`, the `FactorSummary` projection used on
   exception payloads, and the destination-masking rules.
+- `secrets-in-responses-and-logs.md`: the value secrets are returned in and what it refuses, the response helper and
+  `mfa.no-store` middleware that send them uncached, the redaction of secrets, codes and destinations from logs and
+  exception traces, and TOTP secrets surviving a key rotation.
 
 These documents are secondary to the code and tests, not a replacement for them. If a note and a cited test disagree,
 the test should be treated as authoritative until the mismatch is resolved.
