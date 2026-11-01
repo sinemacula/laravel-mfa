@@ -64,7 +64,7 @@ final readonly class ApplicationBlock
             throw new \InvalidArgumentException(sprintf('%s must be an array.', $this->key()));
         }
 
-        $unknown = array_diff(array_map(strval(...), array_keys($settings)), array_keys(self::KEYS));
+        $unknown = array_diff(array_keys($settings), array_keys(self::KEYS));
 
         if ($unknown !== []) {
             throw new \InvalidArgumentException(sprintf('%s holds keys it does not know: %s.', $this->key(), implode(', ', $unknown)));
@@ -90,7 +90,7 @@ final readonly class ApplicationBlock
             throw new \InvalidArgumentException(sprintf('%s must be an array.', $this->key($name)));
         }
 
-        $unknown = array_diff(array_map(strval(...), array_keys($block)), self::KEYS[$name] ?? []);
+        $unknown = array_diff(array_keys($block), self::KEYS[$name] ?? []);
 
         if ($unknown !== []) {
             throw new \InvalidArgumentException(sprintf('%s holds keys it does not know: %s.', $this->key($name), implode(', ', $unknown)));

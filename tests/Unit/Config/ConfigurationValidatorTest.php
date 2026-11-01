@@ -230,7 +230,7 @@ final class ConfigurationValidatorTest extends TestCase
 
     /**
      * An application that enables `email` with no mailer that resolves is
-     * refused.
+     * refused; one that does not enable it needs none.
      *
      * @return void
      *
@@ -243,6 +243,10 @@ final class ConfigurationValidatorTest extends TestCase
         $this->container()->offsetUnset('mailer');
 
         self::assertSame(['The application enables email, but no mailer is bound to ' . Mailer::class . '.'], $this->validator()->report()['applications.web']);
+
+        $this->configureApplication(['types' => ['totp'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        self::assertSame([], $this->validator()->report()['applications.web']);
     }
 
     /**

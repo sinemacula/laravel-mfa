@@ -138,7 +138,7 @@ final class ApplicationSettingsTest extends TestCase
             'types'          => ['totp', 'sms'],
             'requirement'    => 'always',
             'recovery_codes' => ['enabled' => true, 'level' => 'aal3'],
-            'bootstrap'      => ['enabled' => true, 'types' => ['totp']],
+            'bootstrap'      => ['enabled' => true, 'types' => ['totp', 'sms']],
             'limits'         => ['confirmed_per_type' => 2, 'confirmed' => 3, 'pending' => '4'],
             'totp_window'    => '0',
             'freshness'      => ['mfa.remove_factor' => 60, 'billing.change_plan' => '300'],
@@ -152,7 +152,7 @@ final class ApplicationSettingsTest extends TestCase
         self::assertTrue($settings->acceptsRecoveryCodes());
         self::assertSame(AssuranceLevel::AAL3, $settings->recoveryCodeLevel());
         self::assertTrue($settings->allowsBootstrap());
-        self::assertSame(['totp'], $settings->bootstrapTypes());
+        self::assertSame(['totp', 'sms'], $settings->bootstrapTypes());
         self::assertSame(2, $settings->confirmedPerTypeLimit());
         self::assertSame(3, $settings->confirmedLimit());
         self::assertSame(4, $settings->pendingLimit());

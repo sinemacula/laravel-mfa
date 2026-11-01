@@ -44,8 +44,6 @@ final class CheckConfigurationCommand extends Command
      *
      * @param  \SineMacula\Laravel\Mfa\Config\ConfigurationValidator  $validator
      * @return int
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function handle(ConfigurationValidator $validator): int
     {

@@ -6,6 +6,8 @@ namespace Tests\Unit\Drivers;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
+use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
+use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
 use Tests\TestCase;
 use Tests\Unit\Concerns\InteractsWithAbstractOtpDriver;
 
@@ -52,5 +54,31 @@ final class AbstractOtpDriverTest extends TestCase
 
         self::assertSame(8, $driver->getCodeLength());
         self::assertSame(15, $driver->getExpiry());
+    }
+
+    /**
+     * A code is drawn from every number of the configured length, zero
+     * included, through the randomness seam, and zero-padded to that length.
+     *
+     * @return void
+     */
+    public function testACodeIsDrawnFromEveryNumberOfItsLength(): void
+    {
+        $draws   = [];
+        $gateway = new FakeSmsGateway;
+        $driver  = new SmsDriver(
+            gateway   : $gateway,
+            codeLength: 7,
+            randomInt : static function (int $least, int $most) use (&$draws): int {
+                $draws[] = [$least, $most];
+
+                return 42;
+            },
+        );
+
+        $driver->issueChallenge($this->createEloquentFactor());
+
+        self::assertSame([[0, 9999999]], $draws);
+        self::assertSame('Your verification code is: 0000042', $gateway->sentTo(self::OTP_RECIPIENT)[0]['message']);
     }
 }
