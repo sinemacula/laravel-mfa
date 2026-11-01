@@ -5,8 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Secrets;
 
 /**
- * Replaces the secrets, codes and full destinations in a set of values, such
- * as a log record's context, with `[redacted]`.
+ * Replaces the secrets, codes and full destinations in a set of values, such as
+ * a log record's context, with `[redacted]`.
  *
  * A value is redacted when it is a `RevealedSecret` or a
  * `\SensitiveParameterValue`, or when its key names a secret, a code or a
@@ -49,8 +49,8 @@ final class Redactor
     private function __construct() {}
 
     /**
-     * The values with every secret, code and full destination in them
-     * redacted, at any depth.
+     * The values with every secret, code and full destination in them redacted,
+     * at any depth.
      *
      * @param  array<array-key, mixed>  $values
      * @return array<array-key, mixed>

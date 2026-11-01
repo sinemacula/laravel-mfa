@@ -12,8 +12,8 @@ use Symfony\Component\HttpFoundation\Response;
  * placed on with `Cache-Control: no-store` and `Pragma: no-cache`, replacing
  * whatever caching the route allowed.
  *
- * Place it on the routes that start an enrolment or generate recovery codes,
- * so the one response that shows a secret is never stored, however the route
+ * Place it on the routes that start an enrolment or generate recovery codes, so
+ * the one response that shows a secret is never stored, however the route
  * builds it.
  *
  * @api

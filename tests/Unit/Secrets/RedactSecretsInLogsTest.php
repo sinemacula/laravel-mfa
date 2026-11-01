@@ -14,8 +14,8 @@ use SineMacula\Laravel\Mfa\Secrets\RedactSecrets;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecretsInLogs;
 
 /**
- * Tests for the `RedactSecretsInLogs` tap: the processor is pushed once onto
- * a Monolog logger, and any other logger is left as it is.
+ * Tests for the `RedactSecretsInLogs` tap: the processor is pushed once onto a
+ * Monolog logger, and any other logger is left as it is.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,6 +37,22 @@ final class RedactSecretsInLogsTest extends TestCase
         (new RedactSecretsInLogs)(new Logger($monolog));
 
         self::assertCount(1, $monolog->getProcessors());
+        self::assertInstanceOf(RedactSecrets::class, $monolog->getProcessors()[0]);
+    }
+
+    /**
+     * The processor is pushed onto a logger that has other processors.
+     *
+     * @return void
+     */
+    public function testPushesTheProcessorBesideOtherProcessors(): void
+    {
+        $other   = static fn (LogRecord $record): LogRecord => $record;
+        $monolog = new Monolog('mfa', [], [$other]);
+
+        (new RedactSecretsInLogs)(new Logger($monolog));
+
+        self::assertCount(2, $monolog->getProcessors());
         self::assertInstanceOf(RedactSecrets::class, $monolog->getProcessors()[0]);
     }
 

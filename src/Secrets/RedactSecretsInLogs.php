@@ -13,9 +13,9 @@ use Monolog\Logger as Monolog;
  * stack built from tapped channels, is not given it again. A channel whose
  * logger is not a Monolog logger is left as it is.
  *
- * The package adds it to the `tap` list of every channel in
- * `logging.channels` when it boots, unless `mfa.secrets.redact` is off; list it
- * in a channel's `tap` yourself to cover a channel configured later.
+ * The package adds it to the `tap` list of every channel in `logging.channels`
+ * when it boots, unless `mfa.secrets.redact` is off; list it in a channel's
+ * `tap` yourself to cover a channel configured later.
  *
  * @api
  *

@@ -34,8 +34,8 @@ final readonly class SecretSettings
     ) {}
 
     /**
-     * Whether secrets are redacted from logs and reported exceptions: on
-     * unless the setting reads as false.
+     * Whether secrets are redacted from logs and reported exceptions: on unless
+     * the setting reads as false.
      *
      * @return bool
      */

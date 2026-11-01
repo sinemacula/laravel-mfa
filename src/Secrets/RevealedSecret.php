@@ -72,8 +72,7 @@ final readonly class RevealedSecret implements \JsonSerializable, \Stringable
     }
 
     /**
-     * Refuse to be unserialised, so no secret is rebuilt from a stored
-     * payload.
+     * Refuse to be unserialised, so no secret is rebuilt from a stored payload.
      *
      * @param  array<string, mixed>  $data
      * @return void

@@ -27,8 +27,8 @@ final class RedactorTest extends TestCase
     private const string SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
 
     /**
-     * Keys naming secrets, codes and destinations, spelt as code and logs
-     * spell them.
+     * Keys naming secrets, codes and destinations, spelt as code and logs spell
+     * them.
      *
      * @return iterable<string, array{string}>
      */
@@ -52,8 +52,8 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A value under a key naming a secret, a code or a destination is
-     * redacted, whatever it is.
+     * A value under a key naming a secret, a code or a destination is redacted,
+     * whatever it is.
      *
      * @param  string  $key
      * @return void
@@ -106,8 +106,8 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A secret value is redacted under any key, and so is a sensitive
-     * parameter value.
+     * A secret value is redacted under any key, and so is a sensitive parameter
+     * value.
      *
      * @return void
      */

@@ -12,8 +12,8 @@ use Illuminate\Routing\Router;
 
 /**
  * Wires the handling of secrets into the application when the package boots:
- * the `mfa.no-store` middleware alias, and, unless `mfa.secrets.redact` is
- * off, the `RedactSecretsInLogs` tap on every configured log channel and the
+ * the `mfa.no-store` middleware alias, and, unless `mfa.secrets.redact` is off,
+ * the `RedactSecretsInLogs` tap on every configured log channel and the
  * scrubbing of every exception the exception handler reports.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -29,8 +29,8 @@ final class SecretBindings
     private function __construct() {}
 
     /**
-     * Alias the middleware and, while redaction is on, redact secrets from
-     * logs and reported exceptions.
+     * Alias the middleware and, while redaction is on, redact secrets from logs
+     * and reported exceptions.
      *
      * @param  \Illuminate\Contracts\Container\Container  $app
      * @return void
@@ -44,7 +44,6 @@ final class SecretBindings
 
         $router->aliasMiddleware('mfa.no-store', NoStore::class);
 
-        /** @var \Illuminate\Contracts\Config\Repository $config */
         $config = $app->make(Repository::class);
 
         if (!(new SecretSettings($config))->redacts()) {
@@ -56,8 +55,8 @@ final class SecretBindings
     }
 
     /**
-     * Add the redacting tap to every configured log channel that does not
-     * list it yet. A channel whose `tap` is not a list is left as it is.
+     * Add the redacting tap to every configured log channel that does not list
+     * it yet. A channel whose `tap` is not a list is left as it is.
      *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return void
@@ -90,8 +89,8 @@ final class SecretBindings
     }
 
     /**
-     * Scrub every exception the exception handler reports before it is
-     * logged, whether the handler is built already or later.
+     * Scrub every exception the exception handler reports before it is logged,
+     * whether the handler is built already or later.
      *
      * @param  \Illuminate\Contracts\Container\Container  $app
      * @return void

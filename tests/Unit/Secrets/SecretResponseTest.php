@@ -51,6 +51,7 @@ final class SecretResponseTest extends TestCase
             'recovery_codes' => ['ABCD-EFGH-JKLM', 'NPQR-STUV-WXYZ'],
             'expires_in'     => 900,
         ], json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR));
+        self::assertSame(200, $response->getStatusCode());
     }
 
     /**

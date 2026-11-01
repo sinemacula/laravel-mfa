@@ -21,8 +21,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Tests\Fixtures\Secrets\ForgedTrace;
 
 /**
- * Tests for `SecretBindings`: the middleware is aliased, and while redaction
- * is on every log channel is tapped and every reported exception scrubbed.
+ * Tests for `SecretBindings`: the middleware is aliased, and while redaction is
+ * on every log channel is tapped and every reported exception scrubbed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -115,6 +115,30 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
+     * A channel listed after one that is skipped is still tapped.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTapsTheChannelsAfterASkippedOne(): void
+    {
+        $container = $this->container(true, [
+            'named'  => 'single',
+            'tapped' => ['driver' => 'single', 'tap' => [RedactSecretsInLogs::class]],
+            'daily'  => ['driver' => 'daily'],
+        ]);
+
+        SecretBindings::boot($container);
+
+        self::assertSame([
+            'named'  => 'single',
+            'tapped' => ['driver' => 'single', 'tap' => [RedactSecretsInLogs::class]],
+            'daily'  => ['driver' => 'daily', 'tap' => [RedactSecretsInLogs::class]],
+        ], $this->config($container)->get('logging.channels'));
+    }
+
+    /**
      * Without log channels, the logging configuration is left as it is.
      *
      * @return void
@@ -149,8 +173,8 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * An exception handler built after the package boots scrubs every
-     * exception it reports before its later reporters see it.
+     * An exception handler built after the package boots scrubs every exception
+     * it reports before its later reporters see it.
      *
      * @return void
      *
@@ -278,7 +302,7 @@ final class SecretBindingsTest extends TestCase
 
         SecretBindings::boot($container);
 
-        self::assertSame($handler, $container->make(ExceptionHandler::class));
+        self::assertSame($handler, $this->handler($container));
         self::assertSame(0, $handler->reported);
     }
 
@@ -314,8 +338,20 @@ final class SecretBindingsTest extends TestCase
      */
     private function config(Container $container): Repository
     {
-        /** @var \Illuminate\Contracts\Config\Repository */
         return $container->make(Repository::class);
+    }
+
+    /**
+     * The exception handler the container resolves.
+     *
+     * @param  \Illuminate\Container\Container  $container
+     * @return mixed
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function handler(Container $container): mixed
+    {
+        return $container->make(ExceptionHandler::class);
     }
 
     /**
@@ -330,9 +366,8 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * Report an exception whose trace holds a code passed into the package,
-     * and return its trace as a reporter registered after the package's sees
-     * it.
+     * Report an exception whose trace holds a code passed into the package, and
+     * return its trace as a reporter registered after the package's sees it.
      *
      * @param  \Illuminate\Container\Container  $container
      * @return string
@@ -342,7 +377,7 @@ final class SecretBindingsTest extends TestCase
      */
     private function reportedTrace(Container $container): string
     {
-        $handler = $container->make(ExceptionHandler::class);
+        $handler = $this->handler($container);
 
         self::assertInstanceOf(Handler::class, $handler);
 

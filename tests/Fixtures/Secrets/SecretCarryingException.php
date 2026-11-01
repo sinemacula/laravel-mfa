@@ -5,8 +5,8 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Secrets;
 
 /**
- * An exception whose context, as Laravel's exception handler logs it, carries
- * a secret and a code.
+ * An exception whose context, as Laravel's exception handler logs it, carries a
+ * secret and a code.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

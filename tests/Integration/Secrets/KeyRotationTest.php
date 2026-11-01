@@ -14,9 +14,9 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests that a TOTP secret survives a rotation of the application key: a
- * secret encrypted under a key that is now listed in `APP_PREVIOUS_KEYS`
- * decrypts and verifies, and one under a key that is dropped does not.
+ * Tests that a TOTP secret survives a rotation of the application key: a secret
+ * encrypted under a key that is now listed in `APP_PREVIOUS_KEYS` decrypts and
+ * verifies, and one under a key that is dropped does not.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,8 +35,8 @@ final class KeyRotationTest extends TestCase
     private const string BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
     /**
-     * A secret encrypted under a key that is now a previous key decrypts, and
-     * a code from it verifies.
+     * A secret encrypted under a key that is now a previous key decrypts, and a
+     * code from it verifies.
      *
      * @return void
      *
@@ -155,8 +155,8 @@ final class KeyRotationTest extends TestCase
     }
 
     /**
-     * The RFC 6238 code of the secret at the time, with SHA-1, six digits and
-     * a 30 second period.
+     * The RFC 6238 code of the secret at the time, with SHA-1, six digits and a
+     * 30 second period.
      *
      * @param  string  $secret
      * @param  int  $time
@@ -188,12 +188,11 @@ final class KeyRotationTest extends TestCase
             $bits .= str_pad(decbin((int) strpos(self::BASE32, $character)), 5, '0', STR_PAD_LEFT);
         }
 
+        $bits  = substr($bits, 0, intdiv(strlen($bits), 8) * 8);
         $bytes = '';
 
         foreach (str_split($bits, 8) as $byte) {
-            if (strlen($byte) === 8) {
-                $bytes .= chr((int) bindec($byte));
-            }
+            $bytes .= chr((int) bindec($byte));
         }
 
         return $bytes;

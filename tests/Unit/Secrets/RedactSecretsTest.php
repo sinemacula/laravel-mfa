@@ -12,8 +12,8 @@ use SineMacula\Laravel\Mfa\Secrets\RedactSecrets;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * Tests for the `RedactSecrets` Monolog processor: the message, the context
- * and the extra data of a record are redacted, and nothing else changes.
+ * Tests for the `RedactSecrets` Monolog processor: the message, the context and
+ * the extra data of a record are redacted, and nothing else changes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

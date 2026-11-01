@@ -10,13 +10,13 @@ namespace SineMacula\Laravel\Mfa\Secrets;
  * or a rendered error page.
  *
  * A trace records every argument of every call unless PHP runs with
- * `zend.exception_ignore_args` on, and its string form shows the start of
- * each string. A frame cannot say which of its arguments is a code, so every
- * argument of a frame that touches this package is replaced with
- * `[redacted]`: a call into one of its classes, and a call made from one of
- * its files. Arguments of other frames are kept, with the secrets in them
- * redacted as `Redactor` redacts a log context. The exception and every
- * previous one are scrubbed in place.
+ * `zend.exception_ignore_args` on, and its string form shows the start of each
+ * string. A frame cannot say which of its arguments is a code, so every
+ * argument of a frame that touches this package is replaced with `[redacted]`:
+ * a call into one of its classes, and a call made from one of its files.
+ * Arguments of other frames are kept, with the secrets in them redacted as
+ * `Redactor` redacts a log context. The exception and every previous one are
+ * scrubbed in place.
  *
  * The package scrubs every exception the application's exception handler
  * reports, and every exception in a log record's context, unless
@@ -66,12 +66,14 @@ final class TraceScrubber
      */
     private static function scrubTrace(\Throwable $throwable): void
     {
+        // The trace is a private property of `\Exception` and `\Error` with no
+        // setter, so it can only be rewritten in place through reflection.
         $property = new \ReflectionProperty($throwable instanceof \Exception ? \Exception::class : \Error::class, 'trace');
 
         /** @var list<array<string, mixed>> $trace */
-        $trace = $property->getValue($throwable);
+        $trace = $property->getValue($throwable); // NOSONAR
 
-        $property->setValue($throwable, array_map(self::scrubFrame(...), $trace));
+        $property->setValue($throwable, array_map(static fn (array $frame): array => self::scrubFrame($frame), $trace)); // NOSONAR
     }
 
     /**

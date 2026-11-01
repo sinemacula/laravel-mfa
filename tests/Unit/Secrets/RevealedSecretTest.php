@@ -136,7 +136,7 @@ final class RevealedSecretTest extends TestCase
     {
         ob_start();
 
-        var_dump(new RevealedSecret(self::SECRET));
+        var_dump(new RevealedSecret(self::SECRET)); // phpcs:ignore SineMaculaLaravel.Debug.DisallowDebugStatements.Found
 
         $output = (string) ob_get_clean();
 

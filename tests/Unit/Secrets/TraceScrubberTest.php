@@ -12,9 +12,9 @@ use SineMacula\Laravel\Mfa\Secrets\TraceScrubber;
 use Tests\Fixtures\Secrets\ForgedTrace;
 
 /**
- * Tests for `TraceScrubber`: every argument of a frame that touches the
- * package is redacted, other frames keep theirs with the secrets in them
- * redacted, and every exception in the chain is scrubbed.
+ * Tests for `TraceScrubber`: every argument of a frame that touches the package
+ * is redacted, other frames keep theirs with the secrets in them redacted, and
+ * every exception in the chain is scrubbed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,8 +34,8 @@ final class TraceScrubberTest extends TestCase
     private const string APPLICATION_FILE = '/app/Http/Controllers/VerifyController.php';
 
     /**
-     * Every argument of a call into one of the package's classes is
-     * redacted, and its string form shows none of them.
+     * Every argument of a call into one of the package's classes is redacted,
+     * and its string form shows none of them.
      *
      * @return void
      */
@@ -70,8 +70,8 @@ final class TraceScrubberTest extends TestCase
     }
 
     /**
-     * Arguments of a frame that does not touch the package are kept, apart
-     * from the secrets in them.
+     * Arguments of a frame that does not touch the package are kept, apart from
+     * the secrets in them.
      *
      * @return void
      */
@@ -93,8 +93,8 @@ final class TraceScrubberTest extends TestCase
     }
 
     /**
-     * A file beside the package's source directory, whose path only starts
-     * like it, is not the package's.
+     * A file beside the package's source directory, whose path only starts like
+     * it, is not the package's.
      *
      * @return void
      */
@@ -152,8 +152,7 @@ final class TraceScrubberTest extends TestCase
     }
 
     /**
-     * Every previous exception in the chain is scrubbed too, an error
-     * included.
+     * Every previous exception in the chain is scrubbed too, an error included.
      *
      * @return void
      */

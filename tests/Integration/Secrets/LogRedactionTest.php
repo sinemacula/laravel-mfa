@@ -22,9 +22,9 @@ use Tests\Fixtures\Secrets\SecretCarryingException;
 use Tests\TestCase;
 
 /**
- * Tests that secrets, codes and full destinations never reach a log through
- * the application's own channels: in a log's context, in Laravel's shared
- * context, in a reported exception's context, and in a trace's arguments.
+ * Tests that secrets, codes and full destinations never reach a log through the
+ * application's own channels: in a log's context, in Laravel's shared context,
+ * in a reported exception's context, and in a trace's arguments.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,8 +46,8 @@ final class LogRedactionTest extends TestCase
     private const string DESTINATION = '+447700900123';
 
     /**
-     * Secrets, codes and destinations in a log's context are redacted, and
-     * the rest of the context is kept.
+     * Secrets, codes and destinations in a log's context are redacted, and the
+     * rest of the context is kept.
      *
      * @return void
      */
@@ -81,8 +81,7 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A code in Laravel's shared context, which every log carries, is
-     * redacted.
+     * A code in Laravel's shared context, which every log carries, is redacted.
      *
      * @return void
      */
@@ -129,8 +128,8 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A code recorded in the trace of an exception logged directly is
-     * scrubbed too.
+     * A code recorded in the trace of an exception logged directly is scrubbed
+     * too.
      *
      * @return void
      */
