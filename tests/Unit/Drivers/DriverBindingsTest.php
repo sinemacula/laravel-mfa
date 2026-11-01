@@ -72,9 +72,8 @@ final class DriverBindingsTest extends TestCase
      */
     public function testExtendRegistersDriversThatReadTheConfig(): void
     {
-        config()->set('mfa.drivers.totp.window', 2);
-        config()->set('mfa.drivers.email.code_length', 7);
-        config()->set('mfa.drivers.sms.code_length', 9);
+        config()->set('mfa.totp.window', 2);
+        config()->set('mfa.codes.length', 7);
 
         $manager = new MfaManager($this->app());
 
@@ -87,7 +86,7 @@ final class DriverBindingsTest extends TestCase
         self::assertInstanceOf(EmailDriver::class, $email);
         self::assertSame(7, $email->getCodeLength());
         self::assertInstanceOf(SmsDriver::class, $sms);
-        self::assertSame(9, $sms->getCodeLength());
+        self::assertSame(7, $sms->getCodeLength());
     }
 
     /**
@@ -101,7 +100,7 @@ final class DriverBindingsTest extends TestCase
     public function testTotpFactoryReadsTheWindow(): void
     {
         self::assertSame(1, $this->window(DriverBindings::totp(new Repository)));
-        self::assertSame(3, $this->window(DriverBindings::totp(new Repository(['mfa' => ['drivers' => ['totp' => ['window' => 3]]]]))));
+        self::assertSame(3, $this->window(DriverBindings::totp(new Repository(['mfa' => ['totp' => ['window' => 3]]]))));
     }
 
     /**
@@ -118,8 +117,6 @@ final class DriverBindingsTest extends TestCase
         self::assertSame(MfaCodeMessage::class, $driver->getMailable());
         self::assertSame(6, $driver->getCodeLength());
         self::assertSame(10, $driver->getExpiry());
-        self::assertSame(3, $driver->getMaxAttempts());
-        self::assertNull($driver->getAlphabet());
     }
 
     /**
@@ -131,19 +128,15 @@ final class DriverBindingsTest extends TestCase
      */
     public function testEmailFactoryReadsTheConfig(): void
     {
-        $driver = DriverBindings::email($this->app(), new Repository(['mfa' => ['drivers' => ['email' => [
-            'mailable'     => CustomMfaCodeMessage::class,
-            'code_length'  => 8,
-            'expiry'       => 5,
-            'max_attempts' => 4,
-            'alphabet'     => 'ABCDEF',
-        ]]]]));
+        $driver = DriverBindings::email($this->app(), new Repository(['mfa' => ['codes' => [
+            'mailable'    => CustomMfaCodeMessage::class,
+            'length'      => 8,
+            'ttl_minutes' => 5,
+        ]]]));
 
         self::assertSame(CustomMfaCodeMessage::class, $driver->getMailable());
         self::assertSame(8, $driver->getCodeLength());
         self::assertSame(5, $driver->getExpiry());
-        self::assertSame(4, $driver->getMaxAttempts());
-        self::assertSame('ABCDEF', $driver->getAlphabet());
     }
 
     /**
@@ -160,8 +153,6 @@ final class DriverBindingsTest extends TestCase
         self::assertSame('Your verification code is: :code', $driver->getMessageTemplate());
         self::assertSame(6, $driver->getCodeLength());
         self::assertSame(10, $driver->getExpiry());
-        self::assertSame(3, $driver->getMaxAttempts());
-        self::assertNull($driver->getAlphabet());
     }
 
     /**
@@ -178,19 +169,15 @@ final class DriverBindingsTest extends TestCase
 
         $this->container()->instance(SmsGateway::class, $gateway);
 
-        $driver = DriverBindings::sms($this->app(), new Repository(['mfa' => ['drivers' => ['sms' => [
-            'message_template' => 'Code :code',
-            'code_length'      => 8,
-            'expiry'           => 5,
-            'max_attempts'     => 4,
-            'alphabet'         => 'ABCDEF',
-        ]]]]));
+        $driver = DriverBindings::sms($this->app(), new Repository(['mfa' => ['codes' => [
+            'sms_message' => 'Code :code',
+            'length'      => 8,
+            'ttl_minutes' => 5,
+        ]]]));
 
         self::assertSame('Code :code', $driver->getMessageTemplate());
         self::assertSame(8, $driver->getCodeLength());
         self::assertSame(5, $driver->getExpiry());
-        self::assertSame(4, $driver->getMaxAttempts());
-        self::assertSame('ABCDEF', $driver->getAlphabet());
     }
 
     /**

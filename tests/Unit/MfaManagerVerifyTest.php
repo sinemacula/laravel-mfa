@@ -160,8 +160,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $config = app(Repository::class);
-        $config->set('mfa.drivers.email.max_attempts', 3);
-        $config->set('mfa.lockout_minutes', 7);
+        $config->set('mfa.attempts.factor_limit', 3);
+        $config->set('mfa.attempts.lockout_seconds', 420);
 
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
@@ -190,96 +190,18 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
     }
 
     /**
-     * Configuring `max_attempts` to zero should disable lockout entirely, no
-     * matter how many failed attempts have accrued.
+     * A malformed attempt limit fails closed with an exception naming the key,
+     * rather than skipping the lockout.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testVerifyFailureSkipsLockoutWhenMaxAttemptsIsZero(): void
-    {
-        $user = TestUser::query()->create(['email' => 'v6@example.com']);
-
-        $this->actingAs($user);
-
-        $config = app(Repository::class);
-        $config->set('mfa.drivers.totp.max_attempts', 0);
-
-        $factor = Factor::query()->create([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
-            'secret'               => 'JBSWY3DPEHPK3PXP',
-            'attempts'             => 99,
-        ]);
-
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldReceive('verify')->once()->andReturnFalse();
-
-        $this->stubDriver('totp', $driver);
-
-        self::assertFalse($this->manager()->verify('totp', $factor, self::WRONG_CODE));
-
-        $factor->refresh();
-        self::assertNull($factor->getLockedUntil());
-    }
-
-    /**
-     * A non-int `mfa.lockout_minutes` config value should fall back to the
-     * manager's safe default rather than break lockout.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testVerifyFailureUsesFallbackLockoutMinutesWhenConfigIsNonInt(): void
-    {
-        $user = TestUser::query()->create(['email' => 'v7@example.com']);
-
-        $this->actingAs($user);
-
-        $config = app(Repository::class);
-        $config->set('mfa.drivers.email.max_attempts', 2);
-        $config->set('mfa.lockout_minutes', 'not-an-int');
-
-        $factor = Factor::query()->create([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'email',
-            'recipient'            => 'v7@example.com',
-            'code'                 => '999999',
-            'expires_at'           => Carbon::now()->addMinutes(10),
-            'attempts'             => 1,
-        ]);
-
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldReceive('verify')->once()->andReturnFalse();
-
-        $this->stubDriver('email', $driver);
-
-        self::assertFalse($this->manager()->verify('email', $factor, self::WRONG_CODE));
-
-        $factor->refresh();
-        self::assertNotNull($factor->getLockedUntil());
-    }
-
-    /**
-     * A non-int `max_attempts` config value should be coerced to zero — i.e.
-     * lockout disabled.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testVerifyFailureTreatsNonIntMaxAttemptsAsZero(): void
+    public function testVerifyFailureRefusesAMalformedAttemptLimit(): void
     {
         $user = TestUser::query()->create(['email' => 'v8@example.com']);
 
         $this->actingAs($user);
-
-        $config = app(Repository::class);
-        $config->set('mfa.drivers.totp.max_attempts', 'not-an-int');
 
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
@@ -294,10 +216,12 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
 
         $this->stubDriver('totp', $driver);
 
-        self::assertFalse($this->manager()->verify('totp', $factor, self::WRONG_CODE));
+        app(Repository::class)->set('mfa.attempts.factor_limit', 'not-an-int');
 
-        $factor->refresh();
-        self::assertNull($factor->getLockedUntil());
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('mfa.attempts.factor_limit must be an integer from 1 to 20.');
+
+        $this->manager()->verify('totp', $factor, self::WRONG_CODE);
     }
 
     /**

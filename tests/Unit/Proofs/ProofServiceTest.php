@@ -150,7 +150,7 @@ final class ProofServiceTest extends TestCase
     {
         Carbon::setTestNow('2026-10-31 12:00:00');
 
-        config()->set('mfa.default_expiry', 30);
+        config()->set('mfa.proofs.max_age_minutes', 30);
 
         $this->signIn();
         $this->storeAnswering(Carbon::now()->subMinutes($minutesAgo));
@@ -175,7 +175,7 @@ final class ProofServiceTest extends TestCase
 
         self::assertIsArray($mfa);
 
-        unset($mfa['default_expiry']);
+        unset($mfa['proofs']);
         $config->set('mfa', $mfa);
 
         $this->signIn();
@@ -188,22 +188,26 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * A malformed window fails closed: every verification is expired.
+     * A malformed window fails closed with an exception naming the key, rather
+     * than granting any window.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAMalformedWindowExpiresEveryVerification(): void
+    public function testAMalformedWindowIsRefused(): void
     {
         Carbon::setTestNow('2026-10-31 12:00:00');
 
-        config()->set('mfa.default_expiry', 'forever');
+        config()->set('mfa.proofs.max_age_minutes', 'forever');
 
         $this->signIn();
         $this->storeAnswering(Carbon::now());
 
-        self::assertTrue($this->service()->hasExpired());
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('mfa.proofs.max_age_minutes must be an integer from 0 to 525600.');
+
+        $this->service()->hasExpired();
     }
 
     /**

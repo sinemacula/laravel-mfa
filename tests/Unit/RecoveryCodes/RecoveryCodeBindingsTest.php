@@ -62,7 +62,7 @@ final class RecoveryCodeBindingsTest extends TestCase
      */
     public function testExtendRegistersADriverThatReadsTheConfig(): void
     {
-        config()->set('mfa.drivers.backup_code.code_count', 4);
+        config()->set('mfa.recovery_codes.count', 4);
 
         $manager = new MfaManager($this->container());
 
@@ -83,7 +83,7 @@ final class RecoveryCodeBindingsTest extends TestCase
     {
         $driver = RecoveryCodeBindings::backupCodes(new Repository);
 
-        self::assertSame(10, $driver->getCodeLength());
+        self::assertSame(12, $driver->getCodeLength());
         self::assertSame('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', $driver->getAlphabet());
         self::assertSame(10, $driver->getCodeCount());
     }
@@ -95,13 +95,13 @@ final class RecoveryCodeBindingsTest extends TestCase
      */
     public function testFactoryReadsTheConfig(): void
     {
-        $driver = RecoveryCodeBindings::backupCodes(new Repository(['mfa' => ['drivers' => ['backup_code' => [
-            'code_length' => 12,
-            'alphabet'    => 'ABCDEFGH',
-            'code_count'  => 5,
-        ]]]]));
+        $driver = RecoveryCodeBindings::backupCodes(new Repository(['mfa' => ['recovery_codes' => [
+            'length'   => 14,
+            'alphabet' => 'ABCDEFGH',
+            'count'    => 5,
+        ]]]));
 
-        self::assertSame(12, $driver->getCodeLength());
+        self::assertSame(14, $driver->getCodeLength());
         self::assertSame('ABCDEFGH', $driver->getAlphabet());
         self::assertSame(5, $driver->getCodeCount());
     }

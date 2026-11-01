@@ -67,7 +67,7 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
 
     /**
      * Omitting the explicit expiry argument should fall back to the configured
-     * `mfa.default_expiry` value.
+     * `mfa.proofs.max_age_minutes` value.
      *
      * @return void
      *
@@ -80,7 +80,7 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $config = app(Repository::class);
-        $config->set('mfa.default_expiry', 60);
+        $config->set('mfa.proofs.max_age_minutes', 60);
 
         $this->container()->instance(
             MfaVerificationStore::class,
@@ -264,36 +264,37 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
     }
 
     /**
-     * A non-numeric `mfa.default_expiry` config value should be coerced to
-     * zero, expiring any prior verification.
+     * A non-numeric `mfa.proofs.max_age_minutes` config value fails closed with
+     * an exception naming the key, rather than granting any window.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testHasExpiredDefaultsToFallbackExpiryWhenConfigIsNonNumeric(): void
+    public function testHasExpiredRefusesANonNumericMaxAge(): void
     {
         $user = TestUser::query()->create(['email' => 'n@example.com']);
 
         $this->actingAs($user);
 
-        $config = app(Repository::class);
-        $config->set('mfa.default_expiry', 'not-a-number');
+        $manager = $this->manager();
+
+        app(Repository::class)->set('mfa.proofs.max_age_minutes', 'not-a-number');
 
         $this->container()->instance(
             MfaVerificationStore::class,
             $this->fixedStore(Carbon::now()->subMinute()),
         );
 
-        // A non-numeric config falls back to 0 via the `IntegerSetting::read()`
-        // defence (with `malformedFallback: 0`), meaning any prior verification
-        // is treated as expired.
-        self::assertTrue($this->manager()->hasExpired());
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('mfa.proofs.max_age_minutes must be an integer from 0 to 525600.');
+
+        $manager->hasExpired();
     }
 
     /**
-     * A numeric-string `mfa.default_expiry` config value should be coerced to
-     * an int and respected.
+     * A numeric-string `mfa.proofs.max_age_minutes` config value should be
+     * coerced to an int and respected.
      *
      * @return void
      *
@@ -306,7 +307,7 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $config = app(Repository::class);
-        $config->set('mfa.default_expiry', '60');
+        $config->set('mfa.proofs.max_age_minutes', '60');
 
         $this->container()->instance(
             MfaVerificationStore::class,

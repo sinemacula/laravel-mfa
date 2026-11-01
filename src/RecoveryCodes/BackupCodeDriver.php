@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
@@ -42,12 +41,9 @@ final class BackupCodeDriver implements FactorDriver
     /**
      * Constructor.
      *
-     * `$codeLength` and `$alphabet` are validated at construction time so a
-     * misconfiguration surfaces at boot rather than as a silently-insecure
-     * backup-code batch. `$codeLength` must be at least 1 (a zero length would
-     * mint empty-string codes); `$alphabet` must contain at least two distinct
-     * characters (a single-character alphabet yields zero-entropy codes; an
-     * empty alphabet raises a raw `ValueError` from `random_int()`).
+     * The length, alphabet and count are taken as given: the shipped driver is
+     * built from `mfa.recovery_codes`, whose bounds and least entropy the
+     * package checks when it boots (see `RecoveryCodes\RecoveryCodeSettings`).
      *
      * `$randomInt` is the injectable randomness seam — defaults to PHP's
      * built-in `random_int(...)` (CSPRNG-backed). Tests substitute a
@@ -58,13 +54,11 @@ final class BackupCodeDriver implements FactorDriver
      * @param  string  $alphabet
      * @param  int  $codeCount
      * @param  ?callable(int, int): int  $randomInt
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
      */
     public function __construct(
 
         /** Length of each minted backup code, in characters. */
-        private readonly int $codeLength = 10,
+        private readonly int $codeLength = 12,
 
         /** Character set codes are drawn from. */
         private readonly string $alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
@@ -75,9 +69,6 @@ final class BackupCodeDriver implements FactorDriver
         // Randomness seam — `null` binds to PHP's CSPRNG `random_int`.
         ?callable $randomInt = null,
     ) {
-        $this->assertValidCodeLength($codeLength);
-        $this->assertValidAlphabet($alphabet);
-
         $this->randomInt = $randomInt === null ? random_int(...) : $randomInt(...);
     }
 
@@ -172,7 +163,7 @@ final class BackupCodeDriver implements FactorDriver
      * @param  ?int  $count
      * @return list<string>
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     * @throws \InvalidArgumentException
      */
     public function generateSet(?int $count = null): array
     {
@@ -228,39 +219,6 @@ final class BackupCodeDriver implements FactorDriver
     public function getCodeCount(): int
     {
         return $this->codeCount;
-    }
-
-    /**
-     * Reject code lengths below 1 — a zero length would mint empty-string
-     * codes.
-     *
-     * @param  int  $codeLength
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
-     */
-    private function assertValidCodeLength(int $codeLength): void
-    {
-        if ($codeLength < 1) {
-            throw InvalidDriverConfigurationException::codeLengthTooSmall('Backup-code length', $codeLength);
-        }
-    }
-
-    /**
-     * Reject alphabets with fewer than two characters — a single-character
-     * alphabet mints zero-entropy codes; an empty alphabet explodes inside
-     * `random_int(0, -1)`.
-     *
-     * @param  string  $alphabet
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
-     */
-    private function assertValidAlphabet(string $alphabet): void
-    {
-        if (strlen($alphabet) < 2) {
-            throw InvalidDriverConfigurationException::alphabetTooShort('Backup-code alphabet', $alphabet);
-        }
     }
 
     /**
@@ -349,12 +307,12 @@ final class BackupCodeDriver implements FactorDriver
      * @param  int  $count
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     * @throws \InvalidArgumentException
      */
     private function assertValidBatchCount(int $count): void
     {
         if ($count < 1) {
-            throw InvalidDriverConfigurationException::batchCountTooSmall('Backup-code count', $count);
+            throw new \InvalidArgumentException(sprintf('Backup-code count must be at least 1; got [%d].', $count));
         }
     }
 
@@ -368,7 +326,7 @@ final class BackupCodeDriver implements FactorDriver
      * @param  int  $count
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
+     * @throws \InvalidArgumentException
      */
     private function assertCodeSpaceAccommodates(int $count): void
     {
@@ -383,6 +341,8 @@ final class BackupCodeDriver implements FactorDriver
             }
         }
 
-        throw InvalidDriverConfigurationException::codeSpaceSmallerThanBatch('Backup-code code space', $alphabetLength, $this->codeLength, $capacity, $count);
+        $detail = sprintf('alphabet=%d, length=%d, capacity=%d', $alphabetLength, $this->codeLength, $capacity);
+
+        throw new \InvalidArgumentException(sprintf('Backup-code code space (%s) is smaller than the batch size %d.', $detail, $count));
     }
 }

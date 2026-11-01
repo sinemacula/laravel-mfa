@@ -30,8 +30,6 @@ final class EmailDriver extends AbstractOtpDriver
      * @param  class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>  $mailable
      * @param  int  $codeLength
      * @param  int  $expiry
-     * @param  int  $maxAttempts
-     * @param  ?string  $alphabet
      * @param  ?callable(int, int): int  $randomInt
      */
     public function __construct(
@@ -48,16 +46,10 @@ final class EmailDriver extends AbstractOtpDriver
         // Code lifetime in minutes; passthrough to `AbstractOtpDriver`.
         int $expiry = 10,
 
-        // Lockout threshold; passthrough to `AbstractOtpDriver`.
-        int $maxAttempts = 3,
-
-        // Optional code alphabet; passthrough to `AbstractOtpDriver`.
-        ?string $alphabet = null,
-
         // Randomness seam; passthrough to `AbstractOtpDriver`.
         ?callable $randomInt = null,
     ) {
-        parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet, $randomInt);
+        parent::__construct($codeLength, $expiry, $randomInt);
     }
 
     /**

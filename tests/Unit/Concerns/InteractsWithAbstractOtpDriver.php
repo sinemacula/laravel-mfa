@@ -17,8 +17,8 @@ use Tests\Fixtures\Identities\TestUser;
 /**
  * Shared scaffolding for the `AbstractOtpDriver` test family.
  *
- * Centralises the driver / factor builders used by the issuance, verification,
- * and alphabet-config tests so each file stays under the project's
+ * Centralises the driver / factor builders used by the issuance and
+ * verification tests so each file stays under the project's
  * max-methods-per-class threshold without duplicating the stub surface across
  * test classes.
  *
@@ -40,29 +40,23 @@ trait InteractsWithAbstractOtpDriver
      *
      * @param  int  $codeLength
      * @param  int  $expiry
-     * @param  int  $maxAttempts
      * @param  bool  $throwOnDispatch
-     * @param  ?string  $alphabet
      * @param  array<int, string>  $orderTracker
      * @return \Tests\Fixtures\Drivers\DispatchTrackingOtpDriver
      */
     protected function makeDriver(
         int $codeLength = 6,
         int $expiry = 10,
-        int $maxAttempts = 3,
         bool $throwOnDispatch = false,
-        ?string $alphabet = null,
         array &$orderTracker = [],
     ): DispatchTrackingOtpDriver {
-        $driver = new class ($codeLength, $expiry, $maxAttempts, $alphabet, $throwOnDispatch) extends DispatchTrackingOtpDriver {
+        $driver = new class ($codeLength, $expiry, $throwOnDispatch) extends DispatchTrackingOtpDriver {
             /**
              * Wire the configured driver state and the dispatch behaviour
              * switch.
              *
              * @param  int  $codeLength
              * @param  int  $expiry
-             * @param  int  $maxAttempts
-             * @param  ?string  $alphabet
              * @param  bool  $throwOnDispatch
              * @return void
              */
@@ -74,16 +68,10 @@ trait InteractsWithAbstractOtpDriver
                 // Code lifetime in minutes; passthrough to `AbstractOtpDriver`.
                 int $expiry,
 
-                // Lockout threshold; passthrough to `AbstractOtpDriver`.
-                int $maxAttempts,
-
-                // Optional code alphabet; passthrough to `AbstractOtpDriver`.
-                ?string $alphabet,
-
                 /** Whether `dispatch()` should throw to simulate failure. */
                 private readonly bool $throwOnDispatch,
             ) {
-                parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet);
+                parent::__construct($codeLength, $expiry);
             }
 
             /**

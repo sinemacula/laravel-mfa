@@ -2,27 +2,41 @@
 
 declare(strict_types = 1);
 
+use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 return [
 
     /*
     |---------------------------------------------------------------------------
-    | Factor model
+    | Applications
     |---------------------------------------------------------------------------
     |
-    | Configures the package's default Eloquent factor adapter. The `model` key
-    | must resolve to a class implementing the package's `Factor` contract; the
-    | shipped default uses a ULID primary key and a polymorphic
-    | `authenticatable` relation. Consumers may subclass the shipped model or
-    | swap it entirely via this binding.
+    | Each application's settings, keyed by its name: the guard's name, unless
+    | an application resolver says otherwise. Factors, recovery codes and
+    | attempt state belong to the identity and are the same in every
+    | application; an application only chooses what it accepts and offers.
+    |
+    | An application enables no factor type and requires no factor until it
+    | says so, and one that is not listed here enables nothing. Every
+    | configured application declares the first factor its guard signs people
+    | in with, unless a first factor resolver is bound. See the configuration
+    | guide for every key, its default and its bounds:
+    |
+    | 'web' => [
+    |     'types'          => ['totp'],
+    |     'requirement'    => 'enrolled',        // never, enrolled or always
+    |     'recovery_codes' => ['enabled' => true, 'level' => 'aal2'],
+    |     'bootstrap'      => ['enabled' => false, 'types' => []],
+    |     'limits'         => ['confirmed_per_type' => 5, 'confirmed' => 10, 'pending' => 2],
+    |     'totp_window'    => 1,
+    |     'freshness'      => ['mfa.remove_factor' => 900],
+    |     'first_factor'   => ['method' => 'password', 'channel' => 'password'],
+    | ],
     |
     */
 
-    'factor' => [
-        'model' => env('MFA_FACTOR_MODEL', Factor::class),
-        'table' => env('MFA_FACTOR_TABLE', 'mfa_factors'),
-    ],
+    'applications' => [],
 
     /*
     |---------------------------------------------------------------------------
@@ -45,6 +59,23 @@ return [
 
     /*
     |---------------------------------------------------------------------------
+    | Factor model
+    |---------------------------------------------------------------------------
+    |
+    | The factor model and its table. The model must extend Eloquent's model
+    | and implement the package's `EloquentFactor` contract; the shipped one
+    | uses a ULID primary key and a polymorphic owner relation, and may be
+    | subclassed or replaced.
+    |
+    */
+
+    'factor' => [
+        'model' => env('MFA_FACTOR_MODEL', Factor::class),
+        'table' => env('MFA_FACTOR_TABLE', 'mfa_factors'),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
     | Identity state
     |---------------------------------------------------------------------------
     |
@@ -61,99 +92,128 @@ return [
 
     /*
     |---------------------------------------------------------------------------
-    | Default expiry
+    | TOTP
     |---------------------------------------------------------------------------
     |
-    | The number of minutes an MFA verification remains valid before the user
-    | must re-verify. Individual drivers may override this value via their own
-    | `expiry` setting. Setting this to `0` makes every prior verification
-    | "expired" — the route-level `RequireMfa` middleware will reject every
-    | request, so use the step-up middleware variant when you need to require
-    | re-verification for a specific action without locking the user out
-    | globally.
+    | The algorithm (sha1, sha256 or sha512), digits (6 to 8) and period (15 to
+    | 120 seconds) new enrolments use, and the window (0 to 3 steps either side
+    | of the current one) of an application that sets no window of its own.
     |
     */
 
-    'default_expiry' => (int) env('MFA_DEFAULT_EXPIRY_MINUTES', 20160),
-
-    /*
-    |---------------------------------------------------------------------------
-    | Cache prefix
-    |---------------------------------------------------------------------------
-    |
-    | Prefix used for the runtime request-scoped MFA state cache. This is an
-    | in-memory cache that avoids redundant database queries within a single
-    | request lifecycle.
-    |
-    */
-
-    'cache_prefix' => env('MFA_CACHE_PREFIX', 'mfa:'),
-
-    /*
-    |---------------------------------------------------------------------------
-    | Drivers
-    |---------------------------------------------------------------------------
-    |
-    | Per-driver configuration. Each key corresponds to a driver name
-    | registered with the MFA manager.
-    |
-    */
-
-    'drivers' => [
-
-        'totp' => [
-            'window' => (int) env('MFA_TOTP_WINDOW', 1),
-        ],
-
-        'email' => [
-            'code_length'  => (int) env('MFA_EMAIL_CODE_LENGTH', 6),
-            'expiry'       => (int) env('MFA_EMAIL_EXPIRY_MINUTES', 10),
-            'max_attempts' => (int) env('MFA_EMAIL_MAX_ATTEMPTS', 3),
-
-            // Optional alphabet override. `null` keeps the default numeric
-            // code; supply a non-empty string of two or more characters to draw
-            // from a custom set (Crockford base32, hex, alphabetic for voice
-            // delivery, etc.).
-            'alphabet' => env('MFA_EMAIL_ALPHABET'),
-        ],
-
-        'sms' => [
-            'code_length'      => (int) env('MFA_SMS_CODE_LENGTH', 6),
-            'expiry'           => (int) env('MFA_SMS_EXPIRY_MINUTES', 10),
-            'max_attempts'     => (int) env('MFA_SMS_MAX_ATTEMPTS', 3),
-            'message_template' => env(
-                'MFA_SMS_MESSAGE_TEMPLATE',
-                'Your verification code is: :code',
-            ),
-
-            // See email.alphabet above. SMS deliveries often benefit from an
-            // unambiguous Crockford-base32 set, e.g.
-            // '0123456789ABCDEFGHJKMNPQRSTVWXYZ'.
-            'alphabet' => env('MFA_SMS_ALPHABET'),
-        ],
-
-        'backup_code' => [
-            'code_length' => (int) env('MFA_BACKUP_CODE_LENGTH', 10),
-            'alphabet'    => env(
-                'MFA_BACKUP_CODE_ALPHABET',
-                '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
-            ),
-            'code_count' => (int) env('MFA_BACKUP_CODE_COUNT', 10),
-        ],
-
+    'totp' => [
+        'algorithm' => env('MFA_TOTP_ALGORITHM', 'sha1'),
+        'digits'    => env('MFA_TOTP_DIGITS', 6),
+        'period'    => env('MFA_TOTP_PERIOD', 30),
+        'window'    => env('MFA_TOTP_WINDOW', 1),
     ],
 
     /*
     |---------------------------------------------------------------------------
-    | Lockout
+    | Delivered codes
     |---------------------------------------------------------------------------
     |
-    | How long, in minutes, a factor is locked from further verification
-    | attempts after reaching its per-driver `max_attempts` threshold. The
-    | lockout clears automatically once the window passes; administrative
-    | unlocks are a consumer-side concern.
+    | Codes sent by SMS or email: their digits (6 to 10), lifetime (1 to 10
+    | minutes), the cooldown before another is sent (up to the lifetime), the
+    | caps on how many one factor and one identity are sent within the send
+    | window, the SMS message (which must carry `:code`) and the email message
+    | class (`MfaCodeMessage` or a subclass).
     |
     */
 
-    'lockout_minutes' => (int) env('MFA_LOCKOUT_MINUTES', 15),
+    'codes' => [
+        'length'                  => env('MFA_CODES_LENGTH', 6),
+        'ttl_minutes'             => env('MFA_CODES_TTL_MINUTES', 10),
+        'resend_cooldown_seconds' => env('MFA_CODES_RESEND_COOLDOWN_SECONDS', 60),
+        'factor_send_limit'       => env('MFA_CODES_FACTOR_SEND_LIMIT', 5),
+        'identity_send_limit'     => env('MFA_CODES_IDENTITY_SEND_LIMIT', 10),
+        'send_window_minutes'     => env('MFA_CODES_SEND_WINDOW_MINUTES', 60),
+        'sms_message'             => env('MFA_CODES_SMS_MESSAGE', 'Your verification code is: :code'),
+        'mailable'                => MfaCodeMessage::class,
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Recovery codes
+    |---------------------------------------------------------------------------
+    |
+    | How many codes a set holds (1 to 50), each code's length (1 to 64) and
+    | alphabet, which together must give at least 40 bits of entropy once a
+    | code is normalised (case folded, spaces and hyphens removed), and how few
+    | unused codes count as running low (0 to the set's size).
+    |
+    */
+
+    'recovery_codes' => [
+        'count'     => env('MFA_RECOVERY_CODES_COUNT', 10),
+        'length'    => env('MFA_RECOVERY_CODES_LENGTH', 12),
+        'alphabet'  => env('MFA_RECOVERY_CODES_ALPHABET', '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'),
+        'low_count' => env('MFA_RECOVERY_CODES_LOW_COUNT', 3),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Attempts
+    |---------------------------------------------------------------------------
+    |
+    | How many failed attempts in a row lock a factor (1 to 20), how many
+    | across an identity (1 to 100) and from one IP address (1 to 10000) within
+    | the window (60 to 86400 seconds) lock or throttle them, how long a
+    | lockout lasts (60 to 86400 seconds), and how many consecutive failures
+    | disable a factor (1 to 100).
+    |
+    */
+
+    'attempts' => [
+        'factor_limit'    => env('MFA_ATTEMPTS_FACTOR_LIMIT', 5),
+        'identity_limit'  => env('MFA_ATTEMPTS_IDENTITY_LIMIT', 20),
+        'ip_limit'        => env('MFA_ATTEMPTS_IP_LIMIT', 100),
+        'window_seconds'  => env('MFA_ATTEMPTS_WINDOW_SECONDS', 900),
+        'lockout_seconds' => env('MFA_ATTEMPTS_LOCKOUT_SECONDS', 900),
+        'failure_ceiling' => env('MFA_ATTEMPTS_FAILURE_CEILING', 100),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Enrolment
+    |---------------------------------------------------------------------------
+    |
+    | How long a pending factor can be confirmed after its enrolment starts (1
+    | to 60 minutes).
+    |
+    */
+
+    'enrollment' => [
+        'ttl_minutes' => env('MFA_ENROLLMENT_TTL_MINUTES', 15),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Proofs
+    |---------------------------------------------------------------------------
+    |
+    | How long a recorded verification counts before the person must verify
+    | again (0 to 525600 minutes). With 0 none counts, so the `mfa` middleware
+    | refuses every request: use its step-up parameter to require a fresh
+    | verification for one route group instead.
+    |
+    */
+
+    'proofs' => [
+        'max_age_minutes' => env('MFA_PROOFS_MAX_AGE_MINUTES', 20160),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Lifecycle
+    |---------------------------------------------------------------------------
+    |
+    | How many days pruning keeps abandoned enrolments, expired codes and used
+    | or replaced recovery codes (1 to 3650).
+    |
+    */
+
+    'lifecycle' => [
+        'prune_after_days' => env('MFA_LIFECYCLE_PRUNE_AFTER_DAYS', 30),
+    ],
 ];

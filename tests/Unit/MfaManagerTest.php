@@ -118,14 +118,17 @@ final class MfaManagerTest extends TestCase
         mixed $result,
         bool $withRegistry = false,
     ): void {
-        $expected = $withRegistry ? [$this->manager(), ...$arguments] : $arguments;
+        // Resolved before the double is bound: resolving the manager checks the
+        // configuration, which reads the factor model through the service.
+        $manager  = $this->manager();
+        $expected = $withRegistry ? [$manager, ...$arguments] : $arguments;
 
         $double = \Mockery::mock($this->container()->make($service));
         $double->shouldReceive($serviceMethod)->once()->with(...$expected)->andReturn($result);
 
         $this->container()->instance($service, $double);
 
-        $call = [$this->manager(), $method];
+        $call = [$manager, $method];
 
         self::assertIsCallable($call);
 

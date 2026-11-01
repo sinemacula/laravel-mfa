@@ -405,7 +405,7 @@ final class TotpLifecycleTest extends TestCase
     {
         [, $factor] = $this->enrollTotp();
 
-        config()->set('mfa.drivers.totp.max_attempts', 3);
+        config()->set('mfa.attempts.factor_limit', 3);
 
         Mfa::verify('totp', $factor, self::WRONG_CODE);
         Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);

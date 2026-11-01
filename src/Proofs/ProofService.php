@@ -6,7 +6,6 @@ namespace SineMacula\Laravel\Mfa\Proofs;
 
 use Carbon\Carbon;
 use Illuminate\Contracts\Container\Container;
-use SineMacula\Laravel\Mfa\Config\IntegerSetting;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
@@ -54,12 +53,14 @@ final readonly class ProofService
     /**
      * Determine whether the current identity's MFA verification has expired.
      * Returns true when no prior verification exists OR the recorded
-     * verification is older than the configured expiry window.
+     * verification is older than `$expiresAfter` minutes, or than
+     * `mfa.proofs.max_age_minutes` when none is given.
      *
      * @param  ?int  $expiresAfter
      * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
      */
     public function hasExpired(?int $expiresAfter = null): bool
     {
@@ -70,12 +71,7 @@ final readonly class ProofService
         }
 
         $verifiedAt = $this->store()->lastVerifiedAt($identity);
-        $window     = $expiresAfter ?? IntegerSetting::read(
-            $this->container->make('config'),
-            'mfa.default_expiry',
-            default          : 20160,
-            malformedFallback: 0,
-        );
+        $window     = $expiresAfter ?? (new ProofSettings($this->container->make('config')))->maxAgeMinutes();
 
         // `verifiedAt === null` means no prior verification exists.
         // `window <= 0` is the documented "require verification on every

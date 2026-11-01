@@ -4,9 +4,9 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
+use SineMacula\Laravel\Mfa\Codes\CodeSettings;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
-use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
 
 /**
@@ -22,33 +22,28 @@ use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
  */
 final class SmsDriver extends AbstractOtpDriver
 {
-    /** @var string Placeholder the message template MUST carry; replaced with the issued code at dispatch. */
-    private const string CODE_PLACEHOLDER = ':code';
+    /** @var string Placeholder in the message template, replaced with the issued code at dispatch. */
+    private const string CODE_PLACEHOLDER = CodeSettings::CODE_PLACEHOLDER;
 
     /**
      * Constructor.
      *
-     * Validates at construction that the message template contains the
-     * `CODE_PLACEHOLDER` — without it, the rendered SMS would ship the literal
-     * placeholder string to users. Fail loudly at boot rather than silently
-     * leaking a broken message on every challenge.
+     * The message template is taken as given: the shipped driver is built from
+     * `mfa.codes.sms_message`, which the package checks carries the
+     * `CODE_PLACEHOLDER` when it boots (see `Codes\CodeSettings`).
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SmsGateway  $gateway
      * @param  string  $messageTemplate
      * @param  int  $codeLength
      * @param  int  $expiry
-     * @param  int  $maxAttempts
-     * @param  ?string  $alphabet
      * @param  ?callable(int, int): int  $randomInt
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
      */
     public function __construct(
 
         /** SMS gateway implementation that delivers the rendered message. */
         private readonly SmsGateway $gateway,
 
-        /** Message template; MUST contain the `CODE_PLACEHOLDER` constant. */
+        /** Message template; the code replaces its `CODE_PLACEHOLDER`. */
         private readonly string $messageTemplate = 'Your verification code is: ' . self::CODE_PLACEHOLDER,
 
         // Generated code length; passthrough to `AbstractOtpDriver`.
@@ -57,18 +52,10 @@ final class SmsDriver extends AbstractOtpDriver
         // Code lifetime in minutes; passthrough to `AbstractOtpDriver`.
         int $expiry = 10,
 
-        // Lockout threshold; passthrough to `AbstractOtpDriver`.
-        int $maxAttempts = 3,
-
-        // Optional code alphabet; passthrough to `AbstractOtpDriver`.
-        ?string $alphabet = null,
-
         // Randomness seam; passthrough to `AbstractOtpDriver`.
         ?callable $randomInt = null,
     ) {
-        self::assertValidMessageTemplate($messageTemplate);
-
-        parent::__construct($codeLength, $expiry, $maxAttempts, $alphabet, $randomInt);
+        parent::__construct($codeLength, $expiry, $randomInt);
     }
 
     /**
@@ -103,25 +90,5 @@ final class SmsDriver extends AbstractOtpDriver
         $message = str_replace(self::CODE_PLACEHOLDER, $code, $this->messageTemplate);
 
         $this->gateway->send($recipient, $message);
-    }
-
-    /**
-     * Reject message templates missing the `CODE_PLACEHOLDER` — without it, the
-     * rendered SMS would ship the literal template string to users on every
-     * challenge.
-     *
-     * Static so the check runs before `parent::__construct()` has initialised
-     * readonly properties on `$this`.
-     *
-     * @param  string  $template
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
-     */
-    private static function assertValidMessageTemplate(string $template): void
-    {
-        if (!str_contains($template, self::CODE_PLACEHOLDER)) {
-            throw InvalidDriverConfigurationException::templateMissingPlaceholder('SmsDriver message template', $template, self::CODE_PLACEHOLDER);
-        }
     }
 }

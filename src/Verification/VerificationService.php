@@ -8,7 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Manager;
-use SineMacula\Laravel\Mfa\Config\IntegerSetting;
+use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
@@ -156,7 +156,7 @@ final readonly class VerificationService
         $valid = $this->drivers->resolve($registry, $driver)->verify($factor, $code);
 
         if ($factor instanceof EloquentFactor) {
-            $this->applyVerificationOutcome($factor, $driver, $valid);
+            $this->applyVerificationOutcome($factor, $valid);
         }
 
         $this->finalizeVerification($identity, $factor, $driver, $valid, $events);
@@ -168,19 +168,19 @@ final readonly class VerificationService
      * Persist the post-driver verification outcome on the factor row.
      *
      * Successful verification stamps `verified_at`, resets attempts, and clears
-     * any pending OTP code; failure increments the attempt counter and applies
-     * a per-driver lockout once the configured threshold is crossed.
-     * Non-Eloquent factors carry no row to mutate and skip both branches before
-     * this method is even called.
+     * any pending OTP code; failure increments the attempt counter and, once it
+     * reaches `mfa.attempts.factor_limit`, locks the factor for
+     * `mfa.attempts.lockout_seconds`. Non-Eloquent factors carry no row to
+     * mutate and skip both branches before this method is even called.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
-     * @param  string  $driver
      * @param  bool  $valid
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
      */
-    private function applyVerificationOutcome(EloquentFactor $factor, string $driver, bool $valid): void
+    private function applyVerificationOutcome(EloquentFactor $factor, bool $valid): void
     {
         if ($valid) {
             $factor->recordVerification();
@@ -191,13 +191,10 @@ final readonly class VerificationService
 
         $factor->recordAttempt();
 
-        $config      = $this->container->make('config');
-        $maxAttempts = IntegerSetting::read($config, 'mfa.drivers.' . $driver . '.max_attempts', 0);
+        $attempts = new AttemptSettings($this->container->make('config'));
 
-        if ($maxAttempts > 0 && $factor->getAttempts() >= $maxAttempts) {
-            $factor->applyLockout(
-                Carbon::now()->addMinutes(IntegerSetting::read($config, 'mfa.lockout_minutes', 15)),
-            );
+        if ($factor->getAttempts() >= $attempts->factorLimit()) {
+            $factor->applyLockout(Carbon::now()->addSeconds($attempts->lockoutSeconds()));
         }
 
         $factor->persist();

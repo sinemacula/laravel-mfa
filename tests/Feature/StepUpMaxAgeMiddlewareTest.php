@@ -103,7 +103,7 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
 
     /**
      * Step-up middleware: an explicit `mfa:N` parameter must override a shorter
-     * `default_expiry` config so the per-route window wins.
+     * `mfa.proofs.max_age_minutes` so the per-route window wins.
      *
      * @return void
      *
@@ -117,7 +117,7 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
         // The default config expiry is 14 days; force it to 1 minute so we can
         // prove that an explicit `mfa:60` parameter wins by letting a
         // verification 30 minutes old still pass.
-        config()->set('mfa.default_expiry', 1);
+        config()->set('mfa.proofs.max_age_minutes', 1);
 
         [, $factor, $code] = $this->enrollTotp();
 
