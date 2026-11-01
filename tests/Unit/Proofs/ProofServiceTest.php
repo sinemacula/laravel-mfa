@@ -223,7 +223,7 @@ final class ProofServiceTest extends TestCase
 
         $this->container()->instance(ProofStore::class, $store);
 
-        self::assertNull($this->service()->record($user, 0, ProofKind::RECOVERY_CODE, 'backup_code', null, null, Purpose::STEP_UP));
+        self::assertNull($this->service()->record($user, 0, ProofKind::RECOVERY_CODE, 'recovery_code', null, null, Purpose::STEP_UP));
 
         $store->shouldNotHaveReceived('record');
     }
@@ -287,7 +287,7 @@ final class ProofServiceTest extends TestCase
 
         DB::beginTransaction();
 
-        self::assertNotNull($this->service()->record($user, 0, ProofKind::RECOVERY_CODE, 'backup_code', null, null, Purpose::STEP_UP));
+        self::assertNotNull($this->service()->record($user, 0, ProofKind::RECOVERY_CODE, 'recovery_code', null, null, Purpose::STEP_UP));
         self::assertCount(0, $store->proofs($user, 'web'));
 
         DB::commit();
@@ -312,7 +312,7 @@ final class ProofServiceTest extends TestCase
 
         DB::beginTransaction();
 
-        $this->service()->record($user, 0, ProofKind::RECOVERY_CODE, 'backup_code', null, null, Purpose::STEP_UP);
+        $this->service()->record($user, 0, ProofKind::RECOVERY_CODE, 'recovery_code', null, null, Purpose::STEP_UP);
 
         DB::rollBack();
 

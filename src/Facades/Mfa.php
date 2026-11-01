@@ -30,7 +30,9 @@ use Illuminate\Support\Facades\Facade;
  * @method static bool verify(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor, string $code, \SineMacula\Laravel\Mfa\Enums\Purpose $purpose = \SineMacula\Laravel\Mfa\Enums\Purpose::SIGN_IN)
  * @method static void enroll(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
  * @method static void disable(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
- * @method static list<string> issueBackupCodes(?int $count = null)
+ * @method static list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret> generateRecoveryCodes()
+ * @method static bool redeemRecoveryCode(string $code, \SineMacula\Laravel\Mfa\Enums\Purpose $purpose = \SineMacula\Laravel\Mfa\Enums\Purpose::SIGN_IN)
+ * @method static ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus recoveryCodes()
  *
  * @phpcs:enable Generic.Files.LineLength.TooLong
  *

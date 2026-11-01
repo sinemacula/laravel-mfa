@@ -13,14 +13,14 @@ whose events carry summaries and a scalar context and are dispatched after the c
 
 ## Invariants
 
-- Events are dispatched by the package's services (verification, enrolment, lifecycle, backup codes), never by driver
+- Events are dispatched by the package's services (verification, enrolment, lifecycle), never by driver
   implementations. Drivers receive `issueChallenge()` and `verify()` calls, or, for a driver that delivers codes, the
   code service sends and checks its codes (see [Delivered Codes](delivered-codes.md)); the verification service wraps
   each call with the corresponding event emission. Consumers who register custom drivers via `Mfa::extend(...)`
   automatically participate in the same event contract.
 - `MfaChallengeIssued` fires after the challenge is issued without throwing. For a driver that delivers codes the code
   has already been drawn, stored and handed to the sender, and the event does not fire when the send was refused; for
-  TOTP and backup codes the driver is a no-op and the event is purely a lifecycle signal.
+  TOTP the driver is a no-op and the event is purely a lifecycle signal.
 - On successful verification, `MfaVerified` fires after the proof is recorded on the identity's sign-in. A listener
   that reads `Mfa::proofs()` inside `MfaVerified` observes the new proof — there is no "event fires, state catches up"
   window.
@@ -37,7 +37,7 @@ whose events carry summaries and a scalar context and are dispatched after the c
 - Ownership is enforced before any lifecycle event fires. A factor belonging to a different identity raises
   `FactorOwnershipMismatchException` from `challenge()`, `verify()`, `enroll()`, and `disable()`; no event is
   dispatched on the mismatch path.
-- `challenge()`, `enroll()`, `disable()`, and `issueBackupCodes()` are no-ops when no MFA-capable identity resolves.
+- `challenge()`, `enroll()` and `disable()` are no-ops when no MFA-capable identity resolves.
   They dispatch nothing in that branch — consumers can call them unconditionally in bootstrap code.
 
 ## Success Path
@@ -54,10 +54,12 @@ whose events carry summaries and a scalar context and are dispatched after the c
   `MfaVerified` or `MfaVerificationFailed` last.
 - `enroll()` resolves the identity, stamps ownership onto brand-new Eloquent rows (or asserts ownership on pre-existing
   rows), persists, then dispatches `MfaFactorEnrolled($identity, $factor, $driver)`.
-- `disable()` resolves the identity, asserts ownership, deletes the row for Eloquent factors, forgets the factor's
-  proofs on the current session, then dispatches `MfaFactorDisabled($identity, $factor, $driver)`.
-- `issueBackupCodes()` rotates the identity's `backup_code` batch atomically in the identity's factor state transaction
-  and dispatches one `MfaFactorEnrolled` per freshly-minted code.
+- `disable()` resolves the identity, asserts ownership and deletes the factor's row: an `EloquentFactor` as stored under
+  the identity's factor state lock, in its transaction, with the identity's recovery codes when no confirmed factor
+  remains (see [Recovery Codes](recovery-codes.md)); any other Eloquent model on its own. It then forgets the factor's
+  proofs on the current session and dispatches `MfaFactorDisabled($identity, $factor, $driver)`.
+- Recovery codes are not a factor and dispatch none of these events: their redemption dispatches the catalogue's
+  `VerificationPassed` or `VerificationFailed` and recovery code events (see [Recovery Codes](recovery-codes.md)).
 
 ## Failure / Edge Cases
 
@@ -72,19 +74,17 @@ whose events carry summaries and a scalar context and are dispatched after the c
 - Unsupported identities short-circuit to `false` without dispatching `MfaVerificationFailed`. Unresolved drivers throw
   from `DriverResolver::resolve()` before any event is dispatched. Those branches are deliberately outside the event
   taxonomy.
+- A deletion a model event cancels makes `disable()` throw `WriteCancelledException`: the factor, its proofs and the
+  recovery codes are kept, and nothing is dispatched.
 - Non-Eloquent factors participate in the lifecycle events but carry no row to mutate: they keep no failures in a row,
   lockout or ceiling of their own, and their attempts are counted against the identity and the IP address, whose
   failure ceiling refuses them.
-- Backup-code rotation inside `issueBackupCodes()` runs in the identity's factor state transaction on the storage
-  connection, so the "atomic replace + N events" guarantee holds wherever `mfa.storage.connection` puts the tables, and
-  a listener that throws rolls the whole rotation back.
 
 ## Implementation Anchors
 
 - `src/Verification/VerificationService.php`: `challenge()`, `verify()`, `finalizeVerification()`.
 - `src/Attempts/AttemptService.php`: `attempt()`, which refuses a locked attempt and counts the outcome.
 - `src/Enrollment/EnrollmentService.php`: `enroll()`. `src/Lifecycle/LifecycleService.php`: `disable()`.
-- `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`, `rotateBackupCodeBatch()`.
 - `src/Drivers/DriverResolver.php`: `resolve()`, `assertMatchesFactor()`. `src/Factors/FactorOwnership.php`:
   `assert()`.
 - `src/Events/MfaChallengeIssued.php`, `src/Events/MfaVerified.php`, `src/Events/MfaVerificationFailed.php`,
@@ -140,4 +140,3 @@ Update this note when any of the following change:
   failure
 - whether enrolment and disable still finish their change before dispatching
 - whether ownership mismatches continue to fail before any event is emitted
-- whether backup-code rotation continues to emit one `MfaFactorEnrolled` per code

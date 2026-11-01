@@ -22,12 +22,12 @@ return [
     | says so, and one that is not listed here enables nothing. Every
     | configured application declares the first factor its guard signs people
     | in with, unless a first factor resolver is bound. Every key is checked
-    | when the package boots; `requirement`, `totp_window` and `freshness` are
-    | applied so far. `freshness` maps each operation's name to the seconds
-    | within which an additional verification must have been made, or to a
-    | requirement whose every part has a `max_age`. See the configuration
-    | guide for every key, its default, its bounds and whether it is applied
-    | yet:
+    | when the package boots; `requirement`, `totp_window`,
+    | `recovery_codes.enabled` and `freshness` are applied so far. `freshness`
+    | maps each operation's name to the seconds within which an additional
+    | verification must have been made, or to a requirement whose every part has
+    | a `max_age`. See the configuration guide for every key, its default, its
+    | bounds and whether it is applied yet:
     |
     | 'web' => [
     |     'types'          => ['totp'],
@@ -162,7 +162,9 @@ return [
     | spaces and hyphens removed), and how few unused codes count as running
     | low (0 to the set's size). The model and its table: the model must
     | extend Eloquent's model and implement the package's `RecoveryCode`
-    | contract, and may subclass or replace the shipped one.
+    | contract, and may subclass or replace the shipped one. A redemption
+    | that leaves the set at or below the low count reports it, so the
+    | application can prompt for a new set.
     |
     */
 

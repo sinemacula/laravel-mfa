@@ -33,7 +33,9 @@ capabilities; until each flow ships, its events are declared but not yet dispatc
 described in [the lifecycle events design note](../design/verification-lifecycle-and-events.md), are dispatched instead.
 `CodeSent` is dispatched already, once for every code the package sends, resends included, with the id of the code's
 challenge (see [Delivered Codes](../design/delivered-codes.md)). `LockoutApplied`, `LockoutLifted` and
-`FactorDisabled` are dispatched already, by the attempt caps (see [Attempts and lockouts](attempts.md)).
+`FactorDisabled` are dispatched already, by the attempt caps (see [Attempts and lockouts](attempts.md)). The recovery
+code events are dispatched already too, and so are `VerificationPassed` and `VerificationFailed` for a recovery code,
+once per redemption: a check against the whole set is one attempt (see [Recovery codes](recovery-codes.md)).
 
 The names of the events and of their fields are stable. `factor` is a `Factors\FactorSummary` (id, type, label, masked
 destination, status, preferred, last use), `previous` another; `purpose` is an `Enums\Purpose` (`sign_in`, `step_up`,

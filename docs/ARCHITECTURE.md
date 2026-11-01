@@ -59,19 +59,19 @@ Historical record of the architectural calls made during the 1.0 cycle.
 - **D3 — Challenge split between manager and driver.** The verification service behind
   `MfaManager::challenge()` orchestrates (events, rate-limiting hooks, logging).
   `FactorDriver::issueChallenge(Factor): void` implements per-factor-type transport (no-op for TOTP,
-  mail dispatch for email, gateway dispatch for SMS, no-op for backup codes since they are
-  pre-issued). Since superseded for email and SMS: their codes are bound to a session and purpose
-  the factor alone does not carry, so the package sends and checks them itself and the driver only
-  delivers each one (see [Delivered Codes](design/delivered-codes.md)).
+  mail dispatch for email, gateway dispatch for SMS). Since superseded for email and SMS: their
+  codes are bound to a session and purpose the factor alone does not carry, so the package sends
+  and checks them itself and the driver only delivers each one (see
+  [Delivered Codes](design/delivered-codes.md)).
 - **D4 — Per-device verification is the default.** A session's proofs are its own. In paired
   mode they live in the authentication package's session record, through a rebound `ProofStore`;
   in standalone mode they live in the Laravel session, through `SessionProofStore` (which is
   already per-device). The step-up middleware (`mfa:N`) is the escape hatch for "re-verify before
   this specific action regardless of device state".
-- **D5 — Built-in driver factories live in the capability bindings.** The four shipped drivers
-  (TOTP, email, SMS, backup codes) are registered against the manager via the standard
-  `Mfa::extend(...)` API from `Drivers\DriverBindings` and `RecoveryCodes\RecoveryCodeBindings`,
-  inside the `mfa` singleton's factory and so before any container extender or resolving callback.
+- **D5 — Built-in driver factories live in the capability bindings.** The three shipped drivers
+  (TOTP, email, SMS) are registered against the manager via the standard `Mfa::extend(...)` API
+  from `Drivers\DriverBindings`, inside the `mfa` singleton's factory and so before any
+  container extender or resolving callback.
   Built-in drivers are indistinguishable from consumer-registered ones, which is what the three-mode
   story needs. Consumer overrides via `Mfa::extend()` work because Laravel's `Manager` resolves the
   most-recent registration. Pinned by
@@ -83,7 +83,7 @@ Historical record of the architectural calls made during the 1.0 cycle.
   cooperation. Five lifecycle events in total: `MfaChallengeIssued`, `MfaVerified`,
   `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`.
 - **D7 — Both `Factor::$secret` and `Factor::$code` are encrypted at rest.** The `secret`
-  column carries long-lived material (TOTP keys, hashed backup codes); the `code` column holds
+  column carries long-lived material (TOTP keys); the `code` column holds
   live OTPs during their expiry window. Encrypting both closes the read-only-DB-replay attack
   surface. Migration uses `text` for both so the encrypted ciphertext fits regardless of the
   configured OTP length. Since superseded for `code`: delivered codes left the factor row for a

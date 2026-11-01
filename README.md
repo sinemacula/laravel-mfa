@@ -14,8 +14,8 @@
 
 </div>
 
-Driver-based multi-factor authentication for Laravel. Ships **TOTP**, **email codes**, **SMS codes**, and **backup
-codes** out of the box, with a pluggable driver API for custom factor types.
+Driver-based multi-factor authentication for Laravel. Ships **TOTP**, **email codes** and **SMS codes** out of the box,
+with **recovery codes** as a fallback and a pluggable driver API for custom factor types.
 
 Composes with any authentication stack — SessionGuard, Sanctum, Passport, a custom guard, or
 `sinemacula/laravel-authentication`. No runtime coupling to the auth layer: depends only on Laravel's standard
@@ -24,7 +24,9 @@ whatever UI you like.
 
 ## Features
 
-- **Four built-in factor drivers**: TOTP, email code, SMS code, backup codes.
+- **Three built-in factor drivers**: TOTP, email code, SMS code.
+- **Recovery codes**: a set of single-use codes shown once, stored as salted hashes, replaced atomically, and redeemed
+  as one attempt against the whole unused set. See [Recovery codes](docs/guides/recovery-codes.md).
 - **Pluggable driver API**: register custom factor drivers via the Laravel-style `Mfa::extend()` method.
 - **Route enforcement middleware**: `mfa` gates a route, `mfa.skip` exempts the verification endpoints.
 - **Step-up lever**: `mfa:N` overrides the global expiry per route group to require a recent verification for
@@ -37,14 +39,14 @@ whatever UI you like.
   change commits (see [Events](docs/guides/events.md)).
 - **Polymorphic identity support**: works with any Eloquent identity type (`User`, `Admin`, ...) via the
   shipped `authenticatable_type` / `authenticatable_id` morph.
-- **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; backup codes hash to SHA-256 before
-  persistence; email and SMS codes are stored only as keyed hashes bound to their factor, session, application and
-  purpose, and the package's email code message encrypts its payload whenever it is queued.
-- **Secrets shown once**: a value that refuses to be serialised, cast or dumped, which the planned enrolment flow will
-  return secrets in (until then the TOTP driver returns plain strings the caller must not log, dump or serialise), a
-  response helper and an `mfa.no-store` middleware that no cache keeps, and the redaction of secrets, codes and full
-  destinations from logs, exception messages and traces, delivery failures included (see
-  [Secrets](docs/guides/secrets.md)).
+- **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; recovery codes are stored only as salted
+  hashes made with the application's hasher; email and SMS codes are stored only as keyed hashes bound to their factor,
+  session, application and purpose, and the package's email code message encrypts its payload whenever it is queued.
+- **Secrets shown once**: a value that refuses to be serialised, cast or dumped, which recovery codes are returned in
+  and the planned enrolment flow will return secrets in (until then the TOTP driver returns plain strings the caller
+  must not log, dump or serialise), a response helper and an `mfa.no-store` middleware that no cache keeps, and the
+  redaction of secrets, codes and full destinations from logs, exception messages and traces, delivery failures
+  included (see [Secrets](docs/guides/secrets.md)).
 - **Attempt caps and lockouts**: failures are counted per factor, per identity and per IP address in the database, with
   no cache; too many lock the factor, the identity or the address out before the driver is called, and a factor that
   reaches the failure ceiling is disabled. See [Attempts and lockouts](docs/guides/attempts.md).
@@ -150,8 +152,10 @@ Mfa::getFactors();                      // Collection|null
 Mfa::challenge($driver, $factor);       // MfaChallengeIssued; a SendResult for email and SMS
 Mfa::verify($driver, $factor, $code);   // MfaVerified | MfaVerificationFailed
 Mfa::enroll($factor);                   // MfaFactorEnrolled
-Mfa::disable($factor);                  // MfaFactorDisabled
-Mfa::issueBackupCodes();                // atomic rotation — returns plaintext once
+Mfa::disable($factor);                  // MfaFactorDisabled; the recovery codes go with the last factor
+Mfa::generateRecoveryCodes();           // list<RevealedSecret>, returned once
+Mfa::redeemRecoveryCode($code);         // bool; one attempt against the whole unused set
+Mfa::recoveryCodes();                   // RecoveryCodeStatus|null: remaining, generation, generatedAt
 ```
 
 Ownership is stamped by the package, never trusted from the caller — `verify()`, `challenge()`, and `disable()`
@@ -236,22 +240,22 @@ application's `totp_window` steps either side of now (`mfa.totp.window` when it 
 accepted once per factor, also when two requests race with the same code. See
 [Configuration](docs/guides/configuration.md#totp) and [the TOTP design note](docs/design/totp.md).
 
-### Backup codes
+### Recovery codes
 
-`Mfa::issueBackupCodes()` atomically replaces any prior batch (no overlap window where both old and new codes
-would verify), persists each code as its own `Factor` row with the SHA-256 hash on `secret`, dispatches one
-`MfaFactorEnrolled` event per code, and returns the plaintext set **exactly once**:
+Recovery codes are a fallback for lost factors, not a factor. An application accepts them once its block enables them
+(`'recovery_codes' => ['enabled' => true]`), and only an identity with a confirmed factor can have a set.
+`Mfa::generateRecoveryCodes()` replaces any earlier set atomically, keeps only a salted hash of each code, and returns
+the codes **exactly once**, as `RevealedSecret` values for a response no cache keeps:
 
 ```php
-$codes = Mfa::issueBackupCodes();
+use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
 
-// Render `$codes` to the user — this is the only chance. Subsequent
-// reads return the hashed `secret` column (not recoverable).
-return view('mfa.backup-codes', ['codes' => $codes]);
+return SecretResponse::json(['recovery_codes' => Mfa::generateRecoveryCodes()]);
 ```
 
-Pass an explicit `$count` argument to override the configured default batch size for that single call:
-`Mfa::issueBackupCodes(20)`.
+`Mfa::redeemRecoveryCode($code)` ignores case, spaces and hyphens, checks the code against every unused code of the
+set as one attempt, uses it up and records a recovery code proof on the current sign-in. See
+[Recovery codes](docs/guides/recovery-codes.md).
 
 ### SMS and email senders
 

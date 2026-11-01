@@ -44,10 +44,10 @@ final class MfaFactorEnrolledTest extends TestCase
         $identity = self::createStub(Authenticatable::class);
         $factor   = self::createStub(Factor::class);
 
-        $event = new MfaFactorEnrolled($identity, $factor, 'backup_code');
+        $event = new MfaFactorEnrolled($identity, $factor, 'sms');
 
         self::assertSame($identity, $event->identity);
         self::assertSame($factor, $event->factor);
-        self::assertSame('backup_code', $event->driver);
+        self::assertSame('sms', $event->driver);
     }
 }

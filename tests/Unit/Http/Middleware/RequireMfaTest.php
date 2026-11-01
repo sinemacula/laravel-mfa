@@ -285,7 +285,7 @@ final class RequireMfaTest extends TestCase
     {
         self::assertTrue($this->runWith([self::proof([
             'kind'      => ProofKind::RECOVERY_CODE,
-            'method'    => 'backup_code',
+            'method'    => 'recovery_code',
             'channel'   => null,
             'reference' => null,
             'provedAt'  => CarbonImmutable::now()->subMinute(),

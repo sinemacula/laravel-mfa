@@ -11,7 +11,6 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
-use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Drivers\RecordingFactorDriver;
@@ -239,26 +238,6 @@ final class CustomDriverExtensionTest extends TestCase
         $this->manager()->challenge('totp', $factor);
 
         self::assertSame(1, $own->issueCalls);
-    }
-
-    /**
-     * A manager built apart from the `mfa` singleton issues backup codes
-     * through its own backup-code driver.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testASeparateManagerIssuesBackupCodesThroughItsOwnDriver(): void
-    {
-        $this->signIn();
-
-        $separate = new MfaManager($this->container());
-
-        $separate->extend(BackupCodeDriver::NAME, fn (): BackupCodeDriver => new BackupCodeDriver(codeLength: 10, alphabet: 'ABCDEFGH', codeCount: 3));
-
-        self::assertCount(3, $separate->issueBackupCodes());
-        self::assertCount(10, $this->manager()->issueBackupCodes());
     }
 
     /**

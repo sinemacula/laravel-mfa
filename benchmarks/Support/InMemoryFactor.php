@@ -35,7 +35,7 @@ final class InMemoryFactor implements Factor
      */
     public function __construct(
 
-        /** The factor type (e.g. `'totp'`, `'backup_code'`). */
+        /** The factor type (e.g. `'totp'`, `'sms'`). */
         private string $type,
 
         /** Factor identifier returned by `getFactorIdentifier()`. */

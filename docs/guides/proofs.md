@@ -16,7 +16,7 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 
 foreach (Mfa::proofs() as $proof) {
     $proof->kind;        // ProofKind::ADDITIONAL_FACTOR, ProofKind::RECOVERY_CODE, ...
-    $proof->method;      // 'totp', 'email', 'sms', 'backup_code', ...
+    $proof->method;      // 'totp', 'email', 'sms', 'recovery_code', ...
     $proof->reference;   // the factor it was made with
     $proof->provedAt;    // CarbonImmutable
 }
@@ -34,11 +34,11 @@ A recorded proof stops counting, and is left out, when:
 - the factor it was made with has been disabled on this session;
 - it cannot be read back.
 
-A successful `Mfa::verify()` records an additional factor proof of the factor on the driver's channel, or a recovery
-code proof for a backup code, bound to the purpose the verification was made for (`sign_in` unless you pass another).
-A driver whose channel cannot carry a factor (`ChannelKind::carriesFactor()`) proves nothing. A recovery code cannot
-confirm an enrolment, so a backup code verified for one is refused with `not_accepted` before anything is checked: the
-code is not used up, the attempt is not counted and `MfaVerified` is not dispatched.
+A successful `Mfa::verify()` records an additional factor proof of the factor on the driver's channel, bound to the
+purpose the verification was made for (`sign_in` unless you pass another). A driver whose channel cannot carry a factor
+(`ChannelKind::carriesFactor()`) proves nothing. A successful `Mfa::redeemRecoveryCode()` records a recovery code proof,
+method `recovery_code`, on no channel; a recovery code cannot confirm an enrolment, so one redeemed for it is refused
+with `not_accepted` before anything is checked (see [Recovery codes](recovery-codes.md)).
 
 ## Sign-ins
 

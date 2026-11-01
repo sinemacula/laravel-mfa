@@ -56,8 +56,9 @@ cannot interleave.
 - Calls to another package that must be atomic with the change (revoking sessions, reporting a challenge's outcome, a
   passkey change gate) run inside the callback. An adapter whose own storage is on another connection cannot be atomic
   with it and must say so.
-- Backup codes already run on it: `issueBackupCodes()` replaces the batch inside the transaction, and the backup-code
-  driver consumes a code inside the owner's transaction, comparing it again as stored under the lock.
+- Recovery codes run on it: a new set replaces the old one inside the transaction, a redemption uses its code inside
+  the attempt's transaction, and the set is removed inside the transaction that removes the last confirmed factor (see
+  [Recovery Codes](recovery-codes.md)).
 - Every verification runs on it too: `Attempts\AttemptService::attempt()` reads the lockouts, runs the driver and counts
   the outcome in the identity's transaction, so a driver's own transaction nests in it (see
   [Attempts and Lockout](attempts-and-lockout.md)).
@@ -93,13 +94,12 @@ cannot interleave.
 - `src/Support/FactorStateTransaction.php`: `forIdentity()`, `forFactor()`, the lock order in `run()`;
   `src/Support/FactorOwnerColumns.php`: `of()`.
 - The constructor of every model under `src/Models/`; `getConnection()` in every migration under `database/migrations/`.
-- `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`; `src/RecoveryCodes/BackupCodeDriver.php`:
-  `consumeAtomic()`.
+- `src/RecoveryCodes/RecoveryCodeService.php`: `generate()`, `redeem()`, `removeSet()`.
 
 ## Authoritative Tests
 
 - `tests/Integration/Database/FactorStateLockTest.php`
-- `tests/Integration/Database/StorageConnectionRotationTest.php`
+- `tests/Integration/Database/StorageConnectionRecoveryCodesTest.php`
 - `tests/Integration/Database/IdentityOffStorageConnectionTest.php`
 - `tests/Integration/Database/WriteConnectionReadTest.php`
 - `tests/Unit/Database/WriteConnectionTest.php`
