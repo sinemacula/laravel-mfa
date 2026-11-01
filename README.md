@@ -40,7 +40,7 @@ whatever UI you like.
 - **Encrypted at rest**: factor `secret` and `code` columns are `encrypted`-cast; backup codes hash to SHA-256
   before persistence.
 - **Secrets shown once**: secrets are returned in a value that refuses to be serialised, cast or dumped, sent by a
-  response helper and an `mfa.no-store` middleware that no cache keeps, and redacted from logs and exception traces
+  response helper and an `mfa.no-store` middleware that no cache keeps, and redacted from logs, exception messages and traces
   (see [Secrets](docs/guides/secrets.md)).
 - **Per-factor lockouts**: `attempts.factor_limit` failures in a row lock a factor of any type for
   `attempts.lockout_seconds`.

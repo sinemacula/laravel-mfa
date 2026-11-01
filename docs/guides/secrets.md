@@ -59,35 +59,50 @@ While `secrets.redact` is on (it is by default, see [Secrets](configuration.md#s
 codes and full destinations out of the application's logs and error reports:
 
 - **Log records.** When it boots, the package adds the `Secrets\RedactSecretsInLogs` tap to every channel in
-  `logging.channels`. The tap pushes the `Secrets\RedactSecrets` Monolog processor onto the channel once, which runs
-  after Laravel's shared context is added and before any handler writes the record. It redacts:
+  `logging.channels`, and applies it straight away to any channel the application resolved before then. The tap makes
+  the `Secrets\RedactSecrets` Monolog processor the last processor the channel runs, after Laravel's shared context
+  and the channel's own `processors`, so it sees everything they add, and before any handler writes the record. It
+  redacts:
   - a `RevealedSecret` or a `\SensitiveParameterValue`, anywhere in the context or the extra data;
   - the value of any key naming a secret, a code or a destination: `secret`, `totp_secret`, `code`, `codes`, `otp`,
     `one_time_code`, `recovery_code`, `recovery_codes`, `destination`, `provisioning_uri` and `otpauth_uri`, compared
     without case, underscores, hyphens or spaces, so `recoveryCodes` counts, at any depth;
   - an `otpauth://` provisioning URI anywhere in the message or in a string value;
-  - the arguments recorded in the trace of an exception in the context, as below.
+  - the secrets held in an object, which is logged as what Monolog would make of it, keyed by its class: a
+    collection's or model's array form, a `JsonSerializable`'s JSON form, a `Stringable`'s string, or a plain
+    object's public properties, each redacted as above;
+  - the message and the trace arguments of an exception in the context, as below.
 
-  A masked destination, such as a `FactorSummary`'s, is kept. A channel added to the configuration after the package
-  boots is not tapped: list `RedactSecretsInLogs::class` in its `tap`, or `RedactSecrets::class` in a `monolog`
-  channel's `processors`. Listeners of Laravel's `MessageLogged` event, such as `Log::listen()` callbacks, are handed
-  the context before any processor runs, so they see it unredacted.
+  A masked destination, such as a `FactorSummary`'s, is kept. The walk stops ten levels deep and after the first
+  thousand entries of an array, marking what it left out `[truncated]`, so a recursive context cannot exhaust memory.
+  A channel added to the configuration after the package boots is not tapped: list `RedactSecretsInLogs::class` in
+  its `tap`, or `RedactSecrets::class` last in a `monolog` channel's `processors`. Listeners of Laravel's
+  `MessageLogged` event, such as `Log::listen()` callbacks, are handed the context before any processor runs, so they
+  see it unredacted.
 - **Exception traces.** A trace records the arguments of every call unless PHP runs with
   `zend.exception_ignore_args` on, and its string form shows the start of each string, so a code passed down the
   stack would reach the log. The package registers a `report` callback on Laravel's exception handler that scrubs
-  every reported exception and every previous one with `Secrets\TraceScrubber`: every argument of a call into one of
-  the package's classes, or made from one of its files, becomes `[redacted]`, because a frame cannot say which of its
-  arguments is a code; other frames keep their arguments, with the secrets in them redacted as in a log record. The
-  context an exception's `context()` method gives is redacted as a log record's is.
+  every reported exception and every previous one with `Secrets\ExceptionScrubber`:
+  - every argument of a call into one of the package's classes, or made from one of its files, becomes `[redacted]`,
+    because a frame cannot say which of its arguments is a code;
+  - every string those calls received, and every value any call marks with `#[\SensitiveParameter]`, is redacted
+    wherever it reappears in another frame: the facade's own frame, which records `Mfa::verify()` as
+    `Facade::__callStatic('verify', [..., $code])`, and the frames of the hasher, encrypter or driver the package
+    hands it to. A string equal to one becomes `[redacted]`, and so does a string containing one of six characters
+    or more;
+  - other arguments are kept, with the secrets in them redacted as in a log record;
+  - an `otpauth://` provisioning URI in the exception's message becomes `[redacted]`.
+
+  The context an exception's `context()` method gives is redacted as a log record's is.
 
 An error reporter registered on the exception handler before the package booted, such as one added in
 `bootstrap/app.php`, sees an exception before it is scrubbed. Scrub it first in the same place:
 
 ```php
-use SineMacula\Laravel\Mfa\Secrets\TraceScrubber;
+use SineMacula\Laravel\Mfa\Secrets\ExceptionScrubber;
 
 ->withExceptions(function (Exceptions $exceptions) {
-    $exceptions->report(fn (Throwable $e) => TraceScrubber::scrub($e));
+    $exceptions->report(fn (Throwable $e) => ExceptionScrubber::scrub($e));
     // the error reporter's own registration follows
 })
 ```

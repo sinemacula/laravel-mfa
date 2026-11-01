@@ -4,9 +4,9 @@
 
 This note records how the secrets the package returns once (TOTP secrets, provisioning URIs and recovery codes) reach
 the person and nothing else: the value they are returned in, the response that sends them without a cache keeping it,
-the redaction that keeps them, codes and full destinations out of logs and exception traces, and the key rotation TOTP
-secrets survive. It follows the rule `sinemacula/laravel-authentication` follows for secrets in responses, so a
-middleware placed on a route covers any secret the route sends, whichever package returned it.
+the redaction that keeps them, codes and full destinations out of logs, exception messages and traces, and the key
+rotation TOTP secrets survive. It follows the rule `sinemacula/laravel-authentication` follows for secrets in
+responses, so a middleware placed on a route covers any secret the route sends, whichever package returned it.
 
 ## Invariants
 
@@ -22,17 +22,36 @@ middleware placed on a route covers any secret the route sends, whichever packag
   replacing every caching directive it had (`public`, `max-age` and the rest), and returns the same response. The
   `mfa.no-store` middleware, `Secrets\NoStore`, applies it to every response of the routes it is placed on.
 - While `mfa.secrets.redact` is on, every channel in `logging.channels` lists `Secrets\RedactSecretsInLogs` in its
-  `tap`, added once, after the channel's own taps, when the package boots. The tap pushes one `Secrets\RedactSecrets`
-  processor onto a Monolog logger that has none, so a stack built from tapped channels holds one.
+  `tap`, added once, after the channel's own taps, when the package boots, and every channel the log manager resolved
+  before then is given the tap at once, since the manager keeps a resolved channel and never taps it again.
+- The tap leaves a Monolog logger with exactly one `Secrets\RedactSecrets` processor, the last it runs: Monolog runs
+  the processor pushed last first, so the tap takes every processor off, pushes one `RedactSecrets`, and pushes the
+  others back in their order. The processors listed in a channel's `processors`, and Laravel's shared context
+  processor, pushed after the tap, all run before it, so it sees everything they add. A stack built from tapped
+  channels holds one. Processors of a handler run after it.
 - `RedactSecrets` redacts the message, the context and the extra data of a record through `Secrets\Redactor`: a
   `RevealedSecret` or `\SensitiveParameterValue` anywhere; the whole value of a string key that names a secret, a code
   or a destination (compared without case, underscores, hyphens or spaces); every `otpauth://` or
-  `otpauth-migration://` URI in a string. Integer keys are never read as names. Arrays are walked at any depth.
-  Everything else is kept, masked destinations included.
-- `Secrets\TraceScrubber::scrub()` rewrites the recorded trace of an exception and of every previous one in place.
-  Every argument of a frame that touches the package (its `class` in the package's namespace, or its `file` under the
-  package's source directory) becomes `[redacted]`; other frames keep their arguments, redacted as `Redactor` redacts
-  a context. Frames without arguments are kept as they are. Scrubbing is idempotent.
+  `otpauth-migration://` URI in a string. Integer keys are never read as names. Everything else is kept, masked
+  destinations included.
+- An object in a record is turned into what Monolog would log for it, keyed by its class, and that is redacted: an
+  `Arrayable`'s array form (so a collection holding a `RevealedSecret` is redacted rather than refusing to encode),
+  a `JsonSerializable`'s JSON form, a `Stringable`'s string form, or any other object's public properties. An
+  exception is scrubbed in place and kept; a date or an enum is kept.
+- The walk is bounded: an array or object deeper than ten levels becomes `[truncated]`, and an array keeps its first
+  thousand entries, the rest replaced by one `...` entry of `[truncated]`, so a recursive or very large context ends.
+- `Secrets\ExceptionScrubber::scrub()` rewrites the recorded trace and the message of an exception and of every
+  previous one in place. Every argument of a frame that touches the package (its `class` in the package's namespace,
+  or its `file` under the package's source directory) becomes `[redacted]`.
+- What a frame passed on is redacted from every other frame of every exception in the chain: every string among the
+  arguments of a frame that touches the package, and every value any frame marks as sensitive (the value of a
+  `\SensitiveParameterValue`, the plaintext of a `RevealedSecret`), at any depth up to ten levels. In another frame,
+  a string equal to one of them, or containing one of six characters or more, becomes `[redacted]`, at any depth. This
+  covers the facade's own frame, which PHP records as `Facade::__callStatic('verify', [..., $code])`, and every frame
+  below the package, such as a hasher's or an encrypter's. Empty strings and `[redacted]` are never collected.
+- Other arguments of other frames are kept, redacted as `Redactor` redacts a context but with objects kept as they
+  are. Frames without arguments are kept as they are. Every `otpauth://` URI in a message becomes `[redacted]`; the
+  rest of the message is kept. Scrubbing is idempotent.
 - While `mfa.secrets.redact` is on, Laravel's exception handler scrubs every exception it reports through a `report`
   callback the package registers on it, whether the handler was built before the package booted or is built after; an
   exception in a log record's context is scrubbed by the processor as well.
@@ -48,12 +67,13 @@ middleware placed on a route covers any secret the route sends, whichever packag
 - An enrolment starts and returns the TOTP secret and provisioning URI as `RevealedSecret` values. The application's
   controller returns `SecretResponse::json([...])`; the body carries the plaintext, the response carries `no-store`,
   and the route's `mfa.no-store` middleware sets the same headers again on the way out.
-- A log call anywhere in the application writes `['code' => $code]`, or Laravel's shared context holds a code; the
-  channel's `RedactSecrets` processor runs after Laravel's context processor and before any handler, and the record
-  written holds `[redacted]`.
+- A log call anywhere in the application writes `['code' => $code]`, or Laravel's shared context holds a code, or a
+  channel's own processor adds one; the channel's `RedactSecrets` processor runs after every other processor of the
+  logger and before any handler, and the record written holds `[redacted]`.
 - An exception thrown below a call such as `Mfa::verify($driver, $factor, $code)` is reported. The package's `report`
-  callback scrubs its trace before the handler logs it, so the trace's string form shows `'[redacted]'` where it would
-  show the start of the code, and the context the exception's `context()` gives is redacted by the processor.
+  callback scrubs it before the handler logs it: the frames inside the package lose every argument, and the facade's
+  frame and every frame below the package lose the code, so the trace's string form shows `'[redacted]'` where it
+  would show the start of the code. The context the exception's `context()` gives is redacted by the processor.
 
 ## Failure / Edge Cases
 
@@ -62,15 +82,23 @@ middleware placed on a route covers any secret the route sends, whichever packag
   placed in a log context without the processor (redaction off, or a channel added after boot) also throws when
   Monolog normalises it, since it refuses JSON encoding.
 - A channel configured after the package boots, and the emergency logger Laravel builds when a channel fails, are not
-  tapped. A channel whose `tap` is not a list, and a channel that is not an array, are left as they are. Laravel fires
-  `MessageLogged` with the context it was given before Monolog runs any processor, so its listeners see the context
-  unredacted.
+  tapped. A processor pushed onto a channel's logger after the tap runs before it, so is covered too. A channel whose
+  `tap` is not a list, and a channel that is not an array, are left as they are. Laravel fires `MessageLogged` with
+  the context it was given before Monolog runs any processor, so its listeners see the context unredacted.
 - A reporter registered on the exception handler before the package's callback, typically from `bootstrap/app.php`,
-  sees the exception before it is scrubbed; the guide shows calling `TraceScrubber::scrub()` first there. An exception
-  handler other than Laravel's is left as it is.
+  sees the exception before it is scrubbed; the guide shows calling `ExceptionScrubber::scrub()` first there. An
+  exception handler other than Laravel's is left as it is.
 - A key whose name merely contains a sensitive word (`status_code`, `masked_destination`) is kept, and a secret placed
   under an ordinary key as a plain string is kept unless it is a provisioning URI: the redaction is by type, by key and
-  by URI shape, not by guessing which strings are secret.
+  by URI shape, not by guessing which strings are secret. Traces are the exception: there, what the package passed
+  on is known, so it is redacted wherever it reappears.
+- Propagation over-redacts rather than under-redacts: a string the package passed on that is not secret, such as a
+  factor type, is redacted from the other frames too, and every string containing one of six characters or more. An
+  argument an exception was thrown with before it reached the package, such as a code passed to a facade whose root
+  failed to resolve, is not known to be the package's and is kept.
+- An object in a trace's arguments is kept as it is: its string form is its class name, and turning it into its array
+  form while an exception is handled could run code with side effects. An error tracker that reads an object's
+  properties from a trace should run with `zend.exception_ignore_args` on.
 - A key dropped from both `APP_KEY` and `APP_PREVIOUS_KEYS` leaves the secrets encrypted under it undecryptable:
   reading one throws `DecryptException`, which surfaces as a server error rather than a wrong code.
 
@@ -79,10 +107,13 @@ middleware placed on a route covers any secret the route sends, whichever packag
 - `src/Secrets/RevealedSecret.php`: the value, `reveal()`, and the refusing magic methods.
 - `src/Secrets/SecretResponse.php`: `json()`, `withoutStoring()`, and the recursive reveal.
 - `src/Secrets/NoStore.php`: the `mfa.no-store` middleware.
-- `src/Secrets/Redactor.php`: the redacted keys, the provisioning URI pattern, and the walk over values.
-- `src/Secrets/TraceScrubber.php`: the walk over the exception chain and the package frame test.
+- `src/Secrets/Redactor.php`: the redacted keys, the provisioning URI pattern, the bounded walk over values and
+  objects, and the redaction of values passed on.
+- `src/Secrets/ExceptionScrubber.php`: the walk over the exception chain, the package frame test, the values
+  collected for propagation, and the message.
 - `src/Secrets/RedactSecrets.php` and `src/Secrets/RedactSecretsInLogs.php`: the Monolog processor and the tap.
-- `src/Secrets/SecretBindings.php`: the middleware alias, the tap added to every channel, and the `report` callback.
+- `src/Secrets/SecretBindings.php`: the middleware alias, the tap added to every channel and applied to every resolved
+  one, and the `report` callback.
 - `src/Secrets/SecretSettings.php`: the fail-safe reading of `mfa.secrets.redact`.
 - `src/Exceptions/SecretNotRevealedException.php`: the refusal.
 - `src/Models/Factor.php`: the `encrypted` cast on `secret`.
@@ -96,13 +127,16 @@ middleware placed on a route covers any secret the route sends, whichever packag
 - `tests/Feature/Secrets/NoStoreMiddlewareTest.php`
   the header on every response of a route with the middleware, and none without it
 - `tests/Unit/Secrets/RedactorTest.php`
-  the redacted keys, the kept keys, values, provisioning URIs and exceptions
-- `tests/Unit/Secrets/TraceScrubberTest.php`
-  package frames, other frames, the exception chain and idempotence
+  the redacted keys, the kept keys, values, objects, provisioning URIs, exceptions, the bounds and trace arguments
+- `tests/Unit/Secrets/ExceptionScrubberTest.php`
+  package frames, propagation to other frames in forged and real traces, messages, the exception chain and idempotence
+- `tests/Unit/Secrets/RedactSecretsInLogsTest.php`
+  `testRunsTheProcessorLast`, `testRedactsWhatOtherProcessorsAdd`, `testKeepsOneProcessorRunningLast`
 - `tests/Unit/Secrets/SecretBindingsTest.php`
   the taps, the fail-safe switch, and the `report` callback on a handler built before and after boot
 - `tests/Integration/Secrets/LogRedactionTest.php`
-  a secret in a log's context, the shared context, a reported exception's context and a trace argument
+  a secret in a log's context and its objects, the shared context, a channel's own processors, a channel resolved
+  before boot, a reported exception's context and message, and a code passed through the facade in a real trace
 - `tests/Integration/Secrets/KeyRotationTest.php`
   `testASecretEncryptedUnderAPreviousKeyVerifies`, `testASecretUnderADroppedKeyDoesNotDecrypt`
 
@@ -112,7 +146,7 @@ Update this note when any of the following change:
 
 - how a `RevealedSecret` holds or refuses to give up its plaintext
 - the headers `SecretResponse` and `mfa.no-store` set
-- the keys, values or string shapes `Redactor` redacts
-- which trace frames `TraceScrubber` treats as the package's
+- the keys, values, objects or string shapes `Redactor` redacts, or its bounds
+- which trace frames `ExceptionScrubber` treats as the package's, or which values it carries to other frames
 - how the tap and the `report` callback are attached, or what `mfa.secrets.redact` turns off
 - the encryption of TOTP secrets, or how a rotated key is honoured

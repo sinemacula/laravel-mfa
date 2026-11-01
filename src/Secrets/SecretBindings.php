@@ -8,13 +8,15 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Exceptions\Handler;
+use Illuminate\Log\Logger;
 use Illuminate\Routing\Router;
 
 /**
  * Wires the handling of secrets into the application when the package boots:
  * the `mfa.no-store` middleware alias, and, unless `mfa.secrets.redact` is off,
- * the `RedactSecretsInLogs` tap on every configured log channel and the
- * scrubbing of every exception the exception handler reports.
+ * the `RedactSecretsInLogs` tap on every configured log channel and every
+ * channel resolved already, and the scrubbing of every exception the exception
+ * handler reports.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -51,6 +53,7 @@ final class SecretBindings
         }
 
         self::tapLogChannels($config);
+        self::tapResolvedChannels($app);
         self::scrubReportedExceptions($app);
     }
 
@@ -89,6 +92,33 @@ final class SecretBindings
     }
 
     /**
+     * Apply the redacting tap to every channel the log manager resolved before
+     * the package booted, which it keeps and never taps again.
+     *
+     * @param  \Illuminate\Contracts\Container\Container  $app
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private static function tapResolvedChannels(Container $app): void
+    {
+        if (!$app->resolved('log')) {
+            return;
+        }
+
+        /** @var \Illuminate\Log\LogManager $log */
+        $log = $app->make('log');
+
+        foreach ($log->getChannels() as $channel) {
+            if (!$channel instanceof Logger) {
+                continue;
+            }
+
+            (new RedactSecretsInLogs)($channel);
+        }
+    }
+
+    /**
      * Scrub every exception the exception handler reports before it is logged,
      * whether the handler is built already or later.
      *
@@ -123,7 +153,7 @@ final class SecretBindings
         }
 
         $handler->reportable(static function (\Throwable $throwable): void {
-            TraceScrubber::scrub($throwable);
+            ExceptionScrubber::scrub($throwable);
         });
     }
 }

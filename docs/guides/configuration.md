@@ -336,7 +336,7 @@ codes after they stop being usable. It is checked but not applied yet: the packa
 ```
 
 While `redact` is on, the package redacts secrets, codes and full destinations from every channel in
-`logging.channels` and from the traces of the exceptions the exception handler reports (see
+`logging.channels` and from the messages and traces of the exceptions the exception handler reports (see
 [Logs and exceptions](secrets.md#logs-and-exceptions)). It fails safe: only a value that reads as false (`false`, `0`,
 `off`, `no`) turns it off, and anything else, a missing or malformed value included, leaves it on, so it is not one of
 the subjects the configuration check reports. The `mfa.no-store` middleware is aliased either way.

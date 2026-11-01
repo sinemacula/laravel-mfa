@@ -253,9 +253,9 @@ return [
     |---------------------------------------------------------------------------
     |
     | Whether the package redacts secrets, codes and full destinations from
-    | every configured log channel and from the traces of the exceptions the
-    | exception handler reports. Only a value that reads as false turns it
-    | off; anything else leaves it on.
+    | every configured log channel and from the messages and traces of the
+    | exceptions the exception handler reports. Only a value that reads as
+    | false turns it off; anything else leaves it on.
     |
     */
 

@@ -10,11 +10,17 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Exceptions\Handler;
+use Illuminate\Log\Logger;
+use Illuminate\Log\LogManager;
 use Illuminate\Routing\Router;
+use Monolog\Logger as Monolog;
+use Monolog\LogRecord;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SineMacula\Laravel\Mfa\Facades\Mfa;
+use Psr\Log\NullLogger;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Secrets\NoStore;
+use SineMacula\Laravel\Mfa\Secrets\RedactSecrets;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecretsInLogs;
 use SineMacula\Laravel\Mfa\Secrets\SecretBindings;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,7 +28,8 @@ use Tests\Fixtures\Secrets\ForgedTrace;
 
 /**
  * Tests for `SecretBindings`: the middleware is aliased, and while redaction is
- * on every log channel is tapped and every reported exception scrubbed.
+ * on every log channel, configured or resolved already, is tapped and every
+ * reported exception scrubbed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -170,6 +177,38 @@ final class SecretBindingsTest extends TestCase
 
         self::assertSame(['single' => ['driver' => 'single']], $this->config($container)->get('logging.channels'));
         self::assertArrayHasKey('mfa.no-store', $container->make(Router::class)->getMiddleware());
+    }
+
+    /**
+     * A channel the log manager resolved before the package boots, which it
+     * keeps and never taps again, is tapped as the package boots, and a logger
+     * that is not a channel is left as it is.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTapsTheChannelsResolvedAlready(): void
+    {
+        $container = $this->container(true);
+        $log       = new LogManager($container);
+        $context   = static fn (LogRecord $record): LogRecord => $record;
+        $monolog   = new Monolog('early', [], [$context]);
+
+        (new \ReflectionProperty(LogManager::class, 'channels'))->setValue($log, [
+            'early' => new Logger($monolog, new Dispatcher($container)),
+            'other' => new NullLogger,
+        ]);
+
+        $container->instance('log', $log);
+
+        SecretBindings::boot($container);
+
+        $processors = $monolog->getProcessors();
+
+        self::assertCount(2, $processors);
+        self::assertSame($context, $processors[0]);
+        self::assertInstanceOf(RedactSecrets::class, $processors[1]);
     }
 
     /**
@@ -390,7 +429,7 @@ final class SecretBindingsTest extends TestCase
         });
 
         $handler->report(ForgedTrace::onto(new \RuntimeException('Verification failed.'), [
-            ['file' => '/app/Http/Controllers/VerifyController.php', 'line' => 12, 'class' => Mfa::class, 'type' => '::', 'function' => 'verify', 'args' => [self::CODE]],
+            ['file' => '/app/Http/Controllers/VerifyController.php', 'line' => 12, 'class' => MfaManager::class, 'type' => '::', 'function' => 'verify', 'args' => [self::CODE]],
         ]));
 
         return $trace;

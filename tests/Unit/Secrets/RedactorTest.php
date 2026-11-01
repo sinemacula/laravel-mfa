@@ -4,9 +4,11 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Secrets;
 
+use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Secrets\Redactor;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use Tests\Fixtures\Secrets\ForgedTrace;
@@ -24,7 +26,7 @@ use Tests\Fixtures\Secrets\ForgedTrace;
 final class RedactorTest extends TestCase
 {
     /** @var string A TOTP secret. */
-    private const string SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+    public const string SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
 
     /**
      * Keys naming secrets, codes and destinations, spelt as code and logs spell
@@ -148,17 +150,139 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * Values of any other kind are kept as they are, and a list's numeric keys
-     * are never read as names.
+     * Scalars are kept as they are, and a list's numeric keys are never read as
+     * names.
      *
      * @return void
      */
-    public function testKeepsOtherValues(): void
+    public function testKeepsScalars(): void
     {
-        $object = new \stdClass;
+        self::assertSame([12, 1.5, true, null, 'Phone'], Redactor::redact([12, 1.5, true, null, 'Phone']));
+    }
 
-        self::assertSame([12, 1.5, true, null, $object], Redactor::redact([12, 1.5, true, null, $object]));
-        self::assertSame($object, Redactor::value($object));
+    /**
+     * A plain object in a log's values becomes its public properties, keyed by
+     * its class, with the secrets in them redacted.
+     *
+     * @return void
+     */
+    public function testRedactsThePublicPropertiesOfAnObject(): void
+    {
+        $factor = (object) ['type' => 'sms', 'destination' => '+447700900123', 'secret' => self::SECRET];
+
+        self::assertSame(
+            ['factor' => [\stdClass::class => ['type' => 'sms', 'destination' => '[redacted]', 'secret' => '[redacted]']]],
+            Redactor::redact(['factor' => $factor]),
+        );
+    }
+
+    /**
+     * A collection becomes its array form, so a secret value in it is redacted
+     * rather than refusing to be encoded.
+     *
+     * @return void
+     */
+    public function testRedactsTheArrayFormOfACollection(): void
+    {
+        $codes = new Collection([new RevealedSecret(self::SECRET), 'kept']);
+
+        self::assertSame([Collection::class => ['[redacted]', 'kept']], Redactor::value($codes));
+    }
+
+    /**
+     * An object that encodes itself as JSON becomes its JSON form, and a string
+     * object its string form, each with the secrets in it redacted.
+     *
+     * @return void
+     */
+    public function testRedactsTheJsonAndStringFormsOfAnObject(): void
+    {
+        $json = new class implements \JsonSerializable {
+            /**
+             * The JSON form.
+             *
+             * @return array<string, string>
+             */
+            #[\Override]
+            public function jsonSerialize(): array
+            {
+                return ['code' => '482915', 'label' => 'Phone'];
+            }
+        };
+
+        $string = new class implements \Stringable {
+            /**
+             * The string form.
+             *
+             * @return string
+             */
+            #[\Override]
+            public function __toString(): string
+            {
+                return 'Scan otpauth://totp/Acme?secret=' . RedactorTest::SECRET;
+            }
+        };
+
+        self::assertSame([get_debug_type($json) => ['code' => '[redacted]', 'label' => 'Phone']], Redactor::value($json));
+        self::assertSame([get_debug_type($string) => 'Scan [redacted]'], Redactor::value($string));
+    }
+
+    /**
+     * Dates and enums are kept as they are.
+     *
+     * @return void
+     */
+    public function testKeepsDatesAndEnums(): void
+    {
+        $date = new \DateTimeImmutable('2026-11-01T09:00:00Z');
+
+        self::assertSame(['at' => $date, 'case' => FailureReason::LOCKED], Redactor::redact(['at' => $date, 'case' => FailureReason::LOCKED]));
+    }
+
+    /**
+     * Arrays and objects deeper than the walk reaches are truncated, so a
+     * recursive value ends, and a string at that depth is still redacted.
+     *
+     * @return void
+     */
+    public function testTruncatesBelowTheDeepestLevel(): void
+    {
+        $recursive         = ['label' => 'Phone'];
+        $recursive['self'] = &$recursive;
+
+        $redacted = Redactor::redact(['context' => $recursive]);
+
+        $current = $redacted['context'];
+
+        for ($level = 1; $level < Redactor::MAX_DEPTH; $level++) {
+            self::assertIsArray($current);
+            self::assertSame('Phone', $current['label']);
+
+            $current = $current['self'];
+        }
+
+        self::assertSame(['label' => 'Phone', 'self' => '[truncated]'], $current);
+
+        self::assertSame($this->nested('[truncated]', 11), Redactor::redact($this->nested([], 11)));
+        self::assertSame($this->nested([], 10), Redactor::redact($this->nested([], 10)));
+        self::assertSame($this->nested('[truncated]', 11), Redactor::redact($this->nested(new \stdClass, 11)));
+        self::assertSame($this->nested([\stdClass::class => '[truncated]'], 10), Redactor::redact($this->nested(new \stdClass, 10)));
+        self::assertSame($this->nested('[redacted]', 11), Redactor::redact($this->nested('otpauth://totp/Acme?secret=' . self::SECRET, 11)));
+    }
+
+    /**
+     * Only the first thousand entries of an array are kept.
+     *
+     * @return void
+     */
+    public function testKeepsTheFirstThousandEntries(): void
+    {
+        $redacted = Redactor::redact(range(1, 1001));
+
+        self::assertCount(1001, $redacted);
+        self::assertSame(1000, $redacted[999]);
+        self::assertSame('[truncated]', $redacted['...']);
+        self::assertCount(1000, Redactor::redact(range(1, 1000)));
     }
 
     /**
@@ -176,5 +300,42 @@ final class RedactorTest extends TestCase
 
         self::assertSame($exception, $redacted['exception']);
         self::assertSame(['[redacted]'], $exception->getTrace()[0]['args'] ?? null);
+    }
+
+    /**
+     * A trace's arguments keep their objects, and lose every string that is a
+     * value passed on, or contains one of six characters or more.
+     *
+     * @return void
+     */
+    public function testRedactsTheValuesPassedOnFromATracesArguments(): void
+    {
+        $object    = (object) ['secret' => self::SECRET];
+        $arguments = [$object, '482915', 'code 482915 sent', 'sms gateway', 'sms', 'harmless', ['secret' => 'x', 'note' => 'otpauth://totp/A?secret=B']];
+
+        self::assertSame(
+            [$object, '[redacted]', '[redacted]', 'sms gateway', '[redacted]', 'harmless', ['secret' => '[redacted]', 'note' => '[redacted]']],
+            Redactor::arguments($arguments, ['482915', 'sms']),
+        );
+
+        self::assertSame(['482915'], Redactor::arguments(['482915']));
+    }
+
+    /**
+     * The value, nested in as many lists.
+     *
+     * @param  mixed  $value
+     * @param  int  $levels
+     * @return array<int, mixed>
+     */
+    private function nested(mixed $value, int $levels): array
+    {
+        $nested = [$value];
+
+        for ($level = 1; $level < $levels; $level++) {
+            $nested = [$nested];
+        }
+
+        return $nested;
     }
 }

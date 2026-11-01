@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Secrets;
 
 use Illuminate\Log\Logger;
+use Monolog\Handler\TestHandler;
 use Monolog\Logger as Monolog;
 use Monolog\LogRecord;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -12,10 +13,11 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecrets;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecretsInLogs;
+use Tests\Fixtures\Secrets\AddsCodeToExtra;
 
 /**
- * Tests for the `RedactSecretsInLogs` tap: the processor is pushed once onto a
- * Monolog logger, and any other logger is left as it is.
+ * Tests for the `RedactSecretsInLogs` tap: one processor runs last on a Monolog
+ * logger, after every other processor, and any other logger is left as it is.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -41,36 +43,63 @@ final class RedactSecretsInLogsTest extends TestCase
     }
 
     /**
-     * The processor is pushed onto a logger that has other processors.
+     * The processor runs after every processor the logger has, which keep their
+     * order.
      *
      * @return void
      */
-    public function testPushesTheProcessorBesideOtherProcessors(): void
+    public function testRunsTheProcessorLast(): void
     {
-        $other   = static fn (LogRecord $record): LogRecord => $record;
-        $monolog = new Monolog('mfa', [], [$other]);
+        $first   = static fn (LogRecord $record): LogRecord => $record;
+        $second  = static fn (LogRecord $record): LogRecord => $record;
+        $monolog = new Monolog('mfa', [], [$first, $second]);
 
         (new RedactSecretsInLogs)(new Logger($monolog));
 
-        self::assertCount(2, $monolog->getProcessors());
-        self::assertInstanceOf(RedactSecrets::class, $monolog->getProcessors()[0]);
+        $processors = $monolog->getProcessors();
+
+        self::assertCount(3, $processors);
+        self::assertSame([$first, $second], array_slice($processors, 0, 2));
+        self::assertInstanceOf(RedactSecrets::class, $processors[2]);
     }
 
     /**
-     * A logger that has the processor already is not given it again, whatever
-     * other processors it has.
+     * What a processor adds to a record is redacted, since the redaction runs
+     * after it.
      *
      * @return void
      */
-    public function testPushesTheProcessorOnce(): void
+    public function testRedactsWhatOtherProcessorsAdd(): void
+    {
+        $handler = new TestHandler;
+        $monolog = new Monolog('mfa', [$handler], [new AddsCodeToExtra]);
+
+        (new RedactSecretsInLogs)(new Logger($monolog));
+
+        $monolog->info('Code checked.');
+
+        self::assertSame('[redacted]', $handler->getRecords()[0]->extra['code'] ?? null);
+    }
+
+    /**
+     * A logger that has the processor already keeps one, moved to run last,
+     * however many it had and however often it is tapped.
+     *
+     * @return void
+     */
+    public function testKeepsOneProcessorRunningLast(): void
     {
         $other   = static fn (LogRecord $record): LogRecord => $record;
-        $monolog = new Monolog('mfa', [], [$other, new RedactSecrets]);
+        $monolog = new Monolog('mfa', [], [new RedactSecrets, $other, new RedactSecrets]);
 
         (new RedactSecretsInLogs)(new Logger($monolog));
         (new RedactSecretsInLogs)(new Logger($monolog));
 
-        self::assertCount(2, $monolog->getProcessors());
+        $processors = $monolog->getProcessors();
+
+        self::assertCount(2, $processors);
+        self::assertSame($other, $processors[0]);
+        self::assertInstanceOf(RedactSecrets::class, $processors[1]);
     }
 
     /**
