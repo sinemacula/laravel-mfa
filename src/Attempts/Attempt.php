@@ -12,11 +12,10 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
  * One attempt to prove a factor or a recovery code, and what it is counted
  * against: the factor, the identity and the IP address.
  *
- * The identity is the one whose own pending or active session made the
- * attempt, as the caller validated it, and it is charged for the attempt: an
- * attempt made without such a session is never built, so nobody can lock an
- * identity out with requests of their own. The factor must be one of the
- * identity's own.
+ * The identity is the one whose own pending or active session made the attempt,
+ * as the caller validated it, and it is charged for the attempt: an attempt
+ * made without such a session is never built, so nobody can lock an identity
+ * out with requests of their own. The factor must be one of the identity's own.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

@@ -194,7 +194,9 @@ final class AttemptServiceTest extends TestCase
 
         $outcome = $this->service()->attempt(
             new Attempt($user, $factor, Purpose::SIGN_IN, self::IP),
-            static fn (): bool => throw new MidRotationFailureException('The verification must not run.'),
+            static function (): bool {
+                throw new MidRotationFailureException('The verification must not run.');
+            },
         );
 
         self::assertTrue($outcome->isRefused());
@@ -260,7 +262,7 @@ final class AttemptServiceTest extends TestCase
 
         self::assertTrue($refused->isRefused());
         self::assertSame(AttemptScope::IDENTITY, $refused->lockout?->scope);
-        self::assertEquals(CarbonImmutable::now()->addSeconds(900), $refused->lockout?->until);
+        self::assertEquals(CarbonImmutable::now()->addSeconds(900), $refused->lockout->until);
         self::assertTrue($this->attempt($user, null, true)->isRefused());
         self::assertSame(3, $this->state($user)?->consecutive_failures);
         Event::assertDispatched(
@@ -319,7 +321,7 @@ final class AttemptServiceTest extends TestCase
 
         self::assertTrue($refused->isRefused());
         self::assertSame(AttemptScope::IP, $refused->lockout?->scope);
-        self::assertEquals(CarbonImmutable::now()->addSeconds(900), $refused->lockout?->until);
+        self::assertEquals(CarbonImmutable::now()->addSeconds(900), $refused->lockout->until);
         self::assertNull($this->state($third));
         self::assertSame(AttemptScope::IP, $this->service()->lockout($third, null, self::IP)?->scope);
         self::assertTrue($this->attempt($third, null, true, '198.51.100.7')->passed);
@@ -365,7 +367,8 @@ final class AttemptServiceTest extends TestCase
 
     /**
      * The failure that reaches the failure ceiling disables the factor, reports
-     * it, and from then on the factor is refused as disabled.
+     * it, and from then on the factor is refused as disabled; past the factor
+     * limit, it disables the factor rather than locking it.
      *
      * @return void
      *
@@ -373,6 +376,7 @@ final class AttemptServiceTest extends TestCase
      */
     public function testTheFailureCeilingDisablesTheFactor(): void
     {
+        config()->set('mfa.attempts.factor_limit', 1);
         config()->set('mfa.attempts.failure_ceiling', 3);
 
         Event::fake([FactorDisabled::class, LockoutApplied::class]);
@@ -396,29 +400,34 @@ final class AttemptServiceTest extends TestCase
             static fn (FactorDisabled $event): bool => $event->factor->id === $factor->id && $event->purpose === Purpose::SIGN_IN,
         );
         Event::assertNotDispatched(LockoutApplied::class);
+        self::assertSame(0, $this->hits($this->keys()->factor($factor->id)));
     }
 
     /**
-     * Proving another factor enables the identity's factors the failure ceiling
-     * disabled, with their failures in a row cleared.
+     * Proving another factor enables every one of the identity's factors the
+     * failure ceiling disabled, with their failures in a row cleared.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testProvingAnotherFactorEnablesADisabledOne(): void
+    public function testProvingAnotherFactorEnablesEveryDisabledOne(): void
     {
         $user     = $this->user();
         $disabled = $this->factor($user, failures: 100, disabled: true);
         $proved   = $this->factor($user);
+        $later    = $this->factor($user, failures: 100, disabled: true);
 
         $this->attempt($user, $proved, true);
 
         $disabled = $this->fresh($disabled);
+        $later    = $this->fresh($later);
 
         self::assertNull($disabled->getDisabledAt());
         self::assertSame(0, $disabled->getConsecutiveFailures());
         self::assertNull($this->service()->lockout($user, $disabled));
+        self::assertNull($later->getDisabledAt());
+        self::assertSame(0, $later->getConsecutiveFailures());
     }
 
     /**
@@ -566,7 +575,9 @@ final class AttemptServiceTest extends TestCase
         $factor = $this->factor($user);
 
         try {
-            $this->service()->attempt(new Attempt($user, $factor, Purpose::SIGN_IN, self::IP), static fn (): bool => throw new MidRotationFailureException('verification failed'));
+            $this->service()->attempt(new Attempt($user, $factor, Purpose::SIGN_IN, self::IP), static function (): bool {
+                throw new MidRotationFailureException('verification failed');
+            });
 
             self::fail('The verification\'s exception must propagate.');
         } catch (MidRotationFailureException $exception) {

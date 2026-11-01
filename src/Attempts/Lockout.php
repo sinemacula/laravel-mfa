@@ -9,10 +9,10 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 
 /**
  * Why an attempt is refused before it reaches the driver: a factor locked by
- * its failures in a row, the identity locked by its failures within the
- * window, or the IP address throttled by its own, each until a time; or a
- * factor disabled at the failure ceiling, which has no time to end at, since
- * only proving another factor, rebinding it or a reset enables it again.
+ * its failures in a row, the identity locked by its failures within the window,
+ * or the IP address throttled by its own, each until a time; or a factor
+ * disabled at the failure ceiling, which has no time to end at, since only
+ * proving another factor, rebinding it or a reset enables it again.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -47,6 +47,19 @@ final readonly class Lockout
     }
 
     /**
+     * A lockout of the scope that ends at the given Unix time, read in the
+     * application's timezone.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
+     * @param  int  $timestamp
+     * @return self
+     */
+    public static function endingAtTimestamp(AttemptScope $scope, int $timestamp): self
+    {
+        return new self($scope, CarbonImmutable::createFromTimestamp($timestamp, date_default_timezone_get()));
+    }
+
+    /**
      * A factor disabled at the failure ceiling.
      *
      * @return self
@@ -68,18 +81,20 @@ final readonly class Lockout
         $strictest = null;
         $latest    = null;
 
-        foreach ($lockouts as $lockout) {
+        foreach (array_filter($lockouts) as $lockout) {
 
-            $until = $lockout?->until;
+            $until = $lockout->until;
 
-            if ($lockout !== null && $until === null) {
+            if ($until === null) {
                 return $lockout;
             }
 
-            if ($until !== null && ($latest === null || $until->greaterThan($latest))) {
-                $strictest = $lockout;
-                $latest    = $until;
+            if ($latest !== null && $until->lessThanOrEqualTo($latest)) {
+                continue;
             }
+
+            $strictest = $lockout;
+            $latest    = $until;
         }
 
         return $strictest;

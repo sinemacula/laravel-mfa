@@ -108,8 +108,8 @@ final class ParallelAttemptsTest extends TestCase
 
     /**
      * A parallel guess from the same address for another identity finds the
-     * slot the first guess took, so with a limit of one it is throttled
-     * without reaching its driver or waiting for the first.
+     * slot the first guess took, so with a limit of one it is throttled without
+     * reaching its driver or waiting for the first.
      *
      * @return void
      *
@@ -176,7 +176,9 @@ final class ParallelAttemptsTest extends TestCase
         try {
             return $this->service()->attempt(
                 new Attempt($user, Factor::query()->findOrFail($factorId), Purpose::SIGN_IN, $ip),
-                static fn (): bool => throw new MidRotationFailureException('A parallel guess must not reach its driver.'),
+                static function (): bool {
+                    throw new MidRotationFailureException('A parallel guess must not reach its driver.');
+                },
             );
         } finally {
             config()->set('mfa.storage.connection', null);

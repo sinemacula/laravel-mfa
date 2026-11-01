@@ -36,10 +36,10 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  *   failure ceiling it is disabled until another factor is proved, it is
  *   rebound or the identity is reset;
  * - the identity, across all its factors and recovery codes: its failures
- *   within the window (a throttle row) lock it for the lockout period when
- *   they reach the identity limit (`locked_until` on its state row), and its
- *   durable run of failures (`consecutive_failures` on its state row) is reset
- *   only by a success;
+ *   within the window (a throttle row) lock it for the lockout period when they
+ *   reach the identity limit (`locked_until` on its state row), and its durable
+ *   run of failures (`consecutive_failures` on its state row) is reset only by
+ *   a success;
  * - the IP address, within the window, refused until the window ends once it
  *   reaches the IP limit.
  *
@@ -50,9 +50,8 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * one after the other and cannot overrun a cap. The IP address's slot is taken
  * before, in one statement, and given back unless the attempt fails, so
  * parallel guesses from one address cannot overrun its cap either. A refused
- * attempt is counted nowhere and so extends nothing; a success lifts no
- * lockout and resets no other factor's count, and sending a code resets
- * nothing.
+ * attempt is counted nowhere and so extends nothing; a success lifts no lockout
+ * and resets no other factor's count, and sending a code resets nothing.
  *
  * Events are dispatched once the transaction commits.
  *
@@ -69,6 +68,7 @@ final readonly class AttemptService
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptStore  $store
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptKeys  $keys
+     * @param  \SineMacula\Laravel\Mfa\Attempts\IpThrottle  $ipThrottle
      * @param  \SineMacula\Laravel\Mfa\Events\EventDispatcher  $events
      */
     public function __construct(
@@ -82,14 +82,17 @@ final readonly class AttemptService
         /** The keys the throttle rows are stored under. */
         private AttemptKeys $keys,
 
+        /** The throttle on the IP address an attempt came from. */
+        private IpThrottle $ipThrottle,
+
         /** The dispatcher of the lockout and failure ceiling events. */
         private EventDispatcher $events,
     ) {}
 
     /**
      * Make the attempt: refuse it while a lockout applies, otherwise run the
-     * verification and count its outcome, all under the identity's factor
-     * state lock.
+     * verification and count its outcome, all under the identity's factor state
+     * lock.
      *
      * The verification runs inside the transaction, so a driver that changes
      * the factor's state (a TOTP step, a consumed code) commits it with the
@@ -106,7 +109,7 @@ final readonly class AttemptService
     public function attempt(Attempt $attempt, \Closure $verify): AttemptOutcome
     {
         $settings = new AttemptSettings($this->config);
-        $slot     = $this->takeIpSlot($attempt->ip, $settings);
+        $slot     = $this->ipThrottle->take($attempt->ip, $settings);
 
         if ($slot instanceof Lockout) {
             return AttemptOutcome::refuse($slot);
@@ -120,13 +123,13 @@ final readonly class AttemptService
             );
         } catch (\Throwable $exception) {
 
-            $this->giveBack($slot);
+            $this->ipThrottle->giveBack($slot);
 
             throw $exception;
         }
 
         if (!$outcome->isFailed()) {
-            $this->giveBack($slot);
+            $this->ipThrottle->giveBack($slot);
         }
 
         return $outcome;
@@ -145,6 +148,8 @@ final readonly class AttemptService
      *
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     *
+     * @phpstan-impure
      */
     public function lockout(MultiFactorAuthenticatable $identity, ?Factor $factor = null, ?string $ip = null): ?Lockout
     {
@@ -153,7 +158,7 @@ final readonly class AttemptService
         return Lockout::strictest(
             $this->identityLockout($this->identityState($this->subject($identity)), $now),
             $this->factorLockout($this->storedFactor($factor), $now),
-            $this->ipLockout($ip, new AttemptSettings($this->config), $now),
+            $this->ipThrottle->lockout($ip, new AttemptSettings($this->config), $now),
         );
     }
 
@@ -172,6 +177,8 @@ final readonly class AttemptService
      * @return bool
      *
      * @throws \Throwable
+     *
+     * @imperative
      */
     public function liftLockout(MultiFactorAuthenticatable $identity, ?Factor $factor = null, ?Actor $actor = null, ?string $application = null): bool
     {
@@ -220,6 +227,8 @@ final readonly class AttemptService
      * @return bool
      *
      * @throws \Throwable
+     *
+     * @imperative
      */
     public function enableFactor(EloquentFactor&Model $factor): bool
     {
@@ -357,18 +366,20 @@ final readonly class AttemptService
 
         $state->consecutive_failures++;
 
-        $locks = ($this->store->read([$key])[$key]['hits'] ?? 0) >= $settings->identityLimit();
+        if (($this->store->read([$key])[$key]['hits'] ?? 0) < $settings->identityLimit()) {
+
+            $state->save();
+
+            return;
+        }
+
         $until = $now->addSeconds($settings->lockoutSeconds());
 
-        if ($locks) {
-            $state->locked_until = $until;
-        }
+        $state->locked_until = $until;
 
         $state->save();
 
-        if ($locks) {
-            $this->events->dispatch(new LockoutApplied($this->events->context($attempt->identity, $attempt->application), null, $until, $attempt->purpose));
-        }
+        $this->events->dispatch(new LockoutApplied($this->events->context($attempt->identity, $attempt->application), null, $until, $attempt->purpose));
     }
 
     /**
@@ -413,7 +424,9 @@ final readonly class AttemptService
 
         $this->store->hold($key, AttemptScope::FACTOR, $run, $until->getTimestamp());
 
-        $this->events->dispatch(new LockoutApplied($this->events->context($attempt->identity, $attempt->application), FactorSummary::fromFactor($factor), $until, $attempt->purpose));
+        $context = $this->events->context($attempt->identity, $attempt->application);
+
+        $this->events->dispatch(new LockoutApplied($context, FactorSummary::fromFactor($factor), $until, $attempt->purpose));
     }
 
     /**
@@ -436,6 +449,8 @@ final readonly class AttemptService
      *
      * @param  array{0: string, 1: string}  $subject
      * @return bool
+     *
+     * @imperative
      */
     private function unlockIdentity(array $subject): bool
     {
@@ -451,47 +466,6 @@ final readonly class AttemptService
         $state->save();
 
         return $until->isFuture();
-    }
-
-    /**
-     * Take a slot of the IP address's window: the address and the window the
-     * slot came from, to give it back with, or the lockout when the window is
-     * full. Nothing is taken without an address.
-     *
-     * @param  ?string  $ip
-     * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptSettings  $settings
-     * @return array{0: string, 1: string}|\SineMacula\Laravel\Mfa\Attempts\Lockout|null
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function takeIpSlot(?string $ip, AttemptSettings $settings): array|Lockout|null
-    {
-        if ($ip === null || $ip === '') {
-            return null;
-        }
-
-        $key    = $this->keys->ip($ip);
-        $now    = CarbonImmutable::now()->getTimestamp();
-        $window = $this->store->take($key, AttemptScope::IP, $settings->ipLimit(), $now, $now + $settings->windowSeconds());
-
-        return is_int($window) ? Lockout::endingAt(AttemptScope::IP, self::time($window)) : [$key, $window];
-    }
-
-    /**
-     * Give back the IP address's slot, if one was taken.
-     *
-     * @param  array{0: string, 1: string}|null  $slot
-     * @return void
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function giveBack(?array $slot): void
-    {
-        if ($slot === null) {
-            return;
-        }
-
-        $this->store->giveBack($slot[0], $slot[1]);
     }
 
     /**
@@ -533,31 +507,7 @@ final readonly class AttemptService
         $key  = $this->factorKey($factor);
         $ends = $key === null ? null : ($this->store->read([$key])[$key]['ends'] ?? null);
 
-        return $ends !== null && $ends > $now->getTimestamp() ? Lockout::endingAt(AttemptScope::FACTOR, self::time($ends)) : null;
-    }
-
-    /**
-     * The IP address's throttle, while its window is live and full.
-     *
-     * @param  ?string  $ip
-     * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptSettings  $settings
-     * @param  \Carbon\CarbonImmutable  $now
-     * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function ipLockout(?string $ip, AttemptSettings $settings, CarbonImmutable $now): ?Lockout
-    {
-        if ($ip === null || $ip === '') {
-            return null;
-        }
-
-        $key = $this->keys->ip($ip);
-        $row = $this->store->read([$key])[$key] ?? null;
-
-        return $row !== null && $row['ends'] > $now->getTimestamp() && $row['hits'] >= $settings->ipLimit()
-            ? Lockout::endingAt(AttemptScope::IP, self::time($row['ends']))
-            : null;
+        return $ends !== null && $ends > $now->getTimestamp() ? Lockout::endingAtTimestamp(AttemptScope::FACTOR, $ends) : null;
     }
 
     /**
@@ -683,16 +633,5 @@ final readonly class AttemptService
         $id = $factor->getFactorIdentifier();
 
         return (is_string($id) && $id !== '') || is_int($id) ? (string) $id : null;
-    }
-
-    /**
-     * A Unix time as a time in the application's timezone.
-     *
-     * @param  int  $timestamp
-     * @return \Carbon\CarbonImmutable
-     */
-    private static function time(int $timestamp): CarbonImmutable
-    {
-        return CarbonImmutable::createFromTimestamp($timestamp, date_default_timezone_get());
     }
 }

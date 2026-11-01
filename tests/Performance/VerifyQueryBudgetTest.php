@@ -82,8 +82,8 @@ final class VerifyQueryBudgetTest extends TestCase
 
     /**
      * Rejecting a verify against a locked factor reads the lockout under the
-     * identity's lock, from the write connection, and writes nothing but the
-     * IP address's slot, which it gives back.
+     * identity's lock, from the write connection, and writes nothing but the IP
+     * address's slot, which it gives back.
      *
      * @return void
      *

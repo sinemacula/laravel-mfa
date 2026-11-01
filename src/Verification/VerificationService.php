@@ -105,10 +105,10 @@ final readonly class VerificationService
      * Verify a submitted code against the given factor through the named
      * driver.
      *
-     * - The attempt is made through the attempt service, charged to the
-     *   current identity, the factor and the request's IP address: refused
-     *   without reaching the driver while a lockout applies, otherwise counted
-     *   with its outcome under the identity's factor state lock.
+     * - The attempt is made through the attempt service, charged to the current
+     *   identity, the factor and the request's IP address: refused without
+     *   reaching the driver while a lockout applies, otherwise counted with its
+     *   outcome under the identity's factor state lock.
      * - On success: stamps the factor's verified-at, clears any pending code,
      *   records the identity-level verification through the bound store,
      *   dispatches `MfaVerified`.
@@ -149,9 +149,9 @@ final readonly class VerificationService
         $events   = $this->container->make(Dispatcher::class);
         $resolved = $this->drivers->resolve($registry, $driver);
 
-        // The current identity's own session makes the attempt, so the
-        // identity is charged for it. This entry point takes no purpose of its
-        // own, so its attempts are counted as sign-in.
+        // The current identity's own session makes the attempt, so the identity
+        // is charged for it. This entry point takes no purpose of its own, so
+        // its attempts are counted as sign-in.
         $outcome = $this->container->make(AttemptService::class)->attempt(
             new Attempt($identity, $factor, Purpose::SIGN_IN, $this->ip()),
             static fn (): bool => $resolved->verify($factor, $code),

@@ -34,8 +34,8 @@ use Tests\TestCase;
 /**
  * Tests for `VerificationService`: challenges and verification run only for the
  * current identity's own factor through its own driver, count the outcome
- * through the attempt service, which locks the factor at the configured
- * attempt limit, and report each outcome with its event.
+ * through the attempt service, which locks the factor at the configured attempt
+ * limit, and report each outcome with its event.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -264,6 +264,7 @@ final class VerificationServiceTest extends TestCase
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testAnAttemptOnAnotherIdentitysFactorChargesNobody(): void
     {
@@ -288,9 +289,8 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
-     * A failure is counted against the request's address, so past its limit
-     * the address is throttled whatever the factor, without reaching the
-     * driver.
+     * A failure is counted against the request's address, so past its limit the
+     * address is throttled whatever the factor, without reaching the driver.
      *
      * @return void
      *
@@ -319,8 +319,8 @@ final class VerificationServiceTest extends TestCase
 
     /**
      * A valid code verifies an Eloquent factor: its failures in a row reset,
-     * its verification is stamped and persisted, the identity's verification
-     * is recorded, its cached factors cleared, and the success reported.
+     * its verification is stamped and persisted, the identity's verification is
+     * recorded, its cached factors cleared, and the success reported.
      *
      * @return void
      *

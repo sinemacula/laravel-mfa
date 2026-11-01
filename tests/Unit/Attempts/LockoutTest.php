@@ -40,6 +40,22 @@ final class LockoutTest extends TestCase
     }
 
     /**
+     * A lockout can end at a Unix time, read in the application's timezone.
+     *
+     * @return void
+     */
+    public function testALockoutEndsAtAUnixTime(): void
+    {
+        $until   = CarbonImmutable::parse('2026-11-01 12:15:00');
+        $lockout = Lockout::endingAtTimestamp(AttemptScope::IP, $until->getTimestamp());
+
+        self::assertSame(AttemptScope::IP, $lockout->scope);
+        self::assertSame($until->getTimestamp(), $lockout->until?->getTimestamp());
+        self::assertSame(date_default_timezone_get(), $lockout->until->getTimezone()->getName());
+        self::assertFalse($lockout->isDisabled());
+    }
+
+    /**
      * A factor disabled at the failure ceiling has no end.
      *
      * @return void
@@ -93,8 +109,8 @@ final class LockoutTest extends TestCase
     }
 
     /**
-     * The strictest of lockouts that end is the one that ends last, wherever
-     * it is given.
+     * The strictest of lockouts that end is the one that ends last, wherever it
+     * is given.
      *
      * @return void
      */
@@ -108,6 +124,10 @@ final class LockoutTest extends TestCase
         self::assertSame($late, Lockout::strictest($late, $early));
         self::assertSame($late, Lockout::strictest($late, $same));
         self::assertSame($early, Lockout::strictest(null, $early));
+
+        $latest = Lockout::endingAt(AttemptScope::FACTOR, CarbonImmutable::parse('2026-11-01 12:30:00'));
+
+        self::assertSame($latest, Lockout::strictest($late, $early, $latest));
     }
 
     /**

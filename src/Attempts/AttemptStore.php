@@ -63,9 +63,8 @@ final readonly class AttemptStore
     }
 
     /**
-     * Count one failure in the row's window, however many it already has: a
-     * row whose window has ended starts the window that ends at `$end` with
-     * it.
+     * Count one failure in the row's window, however many it already has: a row
+     * whose window has ended starts the window that ends at `$end` with it.
      *
      * @param  string  $key
      * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
@@ -165,12 +164,12 @@ final readonly class AttemptStore
     }
 
     /**
-     * Read the row the statements could not take a slot from, and take one
-     * from its stored window when that is live, does not end at the computed
-     * end, and has room. Returns that window as stored, or the Unix time the
-     * attempt may be made again: the stored window's end, and never earlier
-     * than a second from now (a row that ended or went in the meantime is worth
-     * one more try).
+     * Read the row the statements could not take a slot from, and take one from
+     * its stored window when that is live, does not end at the computed end,
+     * and has room. Returns that window as stored, or the Unix time the attempt
+     * may be made again: the stored window's end, and never earlier than a
+     * second from now (a row that ended or went in the meantime is worth one
+     * more try).
      *
      * @param  string  $key
      * @param  int  $max
@@ -208,6 +207,8 @@ final readonly class AttemptStore
      * @throws \InvalidArgumentException
      *
      * @phpstan-impure
+     *
+     * @imperative
      */
     private function countIn(string $key, string $window, int $max): bool
     {

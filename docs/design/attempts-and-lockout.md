@@ -53,10 +53,10 @@ and enabling a disabled factor are separate operations, and both are described h
 
 ## Success Path
 
-- The address's slot is taken first, in single statements of `Attempts\AttemptStore::take()`: one `UPDATE` adds the
-  attempt to a live window with room or restarts an ended one, an `insertOrIgnore` creates a missing row, and a live
-  window ending elsewhere (after a change of `window_seconds`) is counted in as stored. A full window answers its end,
-  and the attempt is refused without opening a transaction.
+- The address's slot is taken first, by `Attempts\IpThrottle::take()`, in single statements of
+  `Attempts\AttemptStore::take()`: one `UPDATE` adds the attempt to a live window with room or restarts an ended one, an
+  `insertOrIgnore` creates a missing row, and a live window ending elsewhere (after a change of `window_seconds`) is
+  counted in as stored. A full window answers its end, and the attempt is refused without opening a transaction.
 - `FactorStateTransaction::forIdentity()` then opens the transaction on the storage connection, locks the identity's
   state row and its factors in that order (see [Storage and Transactions](storage-and-transactions.md)), and hands over
   the factors as stored under the lock. The service reads the identity's state, finds the attempted factor among the
@@ -92,6 +92,8 @@ and enabling a disabled factor are separate operations, and both are described h
 - `src/Attempts/AttemptStore.php`: the single-statement window counts (`take()`, `record()`, `giveBack()`) and the
   lockout rows (`hold()`, `forget()`, `read()`).
 - `src/Attempts/AttemptKeys.php`: the keyed digests and the canonical address.
+- `src/Attempts/IpThrottle.php`: the address's slot taken and given back (`take()`, `giveBack()`) and its throttle
+  (`lockout()`).
 - `src/Attempts/Attempt.php`, `src/Attempts/AttemptOutcome.php`, `src/Attempts/Lockout.php`,
   `src/Enums/AttemptScope.php`.
 - `src/Attempts/AttemptSettings.php`: `mfa.attempts.*` and their bounds.
@@ -103,6 +105,7 @@ and enabling a disabled factor are separate operations, and both are described h
 - `tests/Unit/Attempts/AttemptServiceTest.php`
 - `tests/Unit/Attempts/AttemptStoreTest.php`
 - `tests/Unit/Attempts/AttemptKeysTest.php`
+- `tests/Unit/Attempts/IpThrottleTest.php`
 - `tests/Unit/Attempts/LockoutTest.php`
 - `tests/Unit/Attempts/AttemptSettingsTest.php`
 - `tests/Integration/Database/ParallelAttemptsTest.php` (MySQL and PostgreSQL)

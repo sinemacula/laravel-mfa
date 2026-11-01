@@ -8,8 +8,8 @@ use Illuminate\Contracts\Config\Repository;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 
 /**
- * The keys the attempts table stores its rows under: HMAC-SHA256 digests of
- * the scope and the subject it counts, keyed with a key derived from the
+ * The keys the attempts table stores its rows under: HMAC-SHA256 digests of the
+ * scope and the subject it counts, keyed with a key derived from the
  * application key (`app.key`).
  *
  * What a row counts (a factor id, an identity's key, an IP address) is usually
@@ -20,11 +20,11 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
  * application key starts every throttle afresh; the durable counts on the
  * factor and identity state rows are kept.
  *
- * An IP address is counted by the client it stands for: an IPv4 address, or
- * the IPv4 address an IPv6 address carries (IPv4-mapped, or translated through
- * the NAT64 well-known prefix), in dotted decimal; any other IPv6 address as
- * the /64 network it belongs to, since a single client is usually given a whole
- * /64 and could otherwise count each of its addresses separately.
+ * An IP address is counted by the client it stands for: an IPv4 address, or the
+ * IPv4 address an IPv6 address carries (IPv4-mapped, or translated through the
+ * NAT64 well-known prefix), in dotted decimal; any other IPv6 address as the
+ * /64 network it belongs to, since a single client is usually given a whole /64
+ * and could otherwise count each of its addresses separately.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -92,10 +92,9 @@ final readonly class AttemptKeys
     }
 
     /**
-     * The canonical form of an IP address: an IPv4 address, or the IPv4
-     * address an IPv6 address carries, in dotted decimal; any other IPv6
-     * address as its /64 network. Anything that is not an IP address is
-     * counted as given.
+     * The canonical form of an IP address: an IPv4 address, or the IPv4 address
+     * an IPv6 address carries, in dotted decimal; any other IPv6 address as its
+     * /64 network. Anything that is not an IP address is counted as given.
      *
      * @param  string  $ip
      * @return string

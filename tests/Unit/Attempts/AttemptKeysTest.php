@@ -48,7 +48,7 @@ final class AttemptKeysTest extends TestCase
 
     /**
      * The same subject in different scopes, or with a different identity type,
-     * counts in different rows.
+     * and different subjects in the same scope count in different rows.
      *
      * @return void
      */
@@ -61,7 +61,10 @@ final class AttemptKeysTest extends TestCase
             $keys->identity('App\Models\User', '1'),
             $keys->identity('App\Models\Admin', '1'),
             $keys->identity('App\Models\User', '2'),
+            $keys->factor('2'),
             $keys->ip('1'),
+            $keys->ip('192.0.2.1'),
+            $keys->ip('198.51.100.7'),
         ];
 
         self::assertSame($digests, array_values(array_unique($digests)));

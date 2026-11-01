@@ -166,7 +166,8 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * Only the rows asked for are read, and a missing one is left out.
+     * Only the rows asked for are read, every one of them, and a missing one is
+     * left out.
      *
      * @return void
      */
@@ -176,8 +177,16 @@ final class AttemptStoreTest extends TestCase
 
         $store->hold('first', AttemptScope::FACTOR, 1, self::NOW + 60);
         $store->hold('second', AttemptScope::FACTOR, 2, self::NOW + 120);
+        $store->hold('third', AttemptScope::FACTOR, 3, self::NOW + 180);
 
-        self::assertSame(['second' => ['hits' => 2, 'ends' => self::NOW + 120]], $store->read(['second', 'missing']));
+        $rows = $store->read(['second', 'missing', 'third']);
+
+        ksort($rows);
+
+        self::assertSame([
+            'second' => ['hits' => 2, 'ends' => self::NOW + 120],
+            'third'  => ['hits' => 3, 'ends' => self::NOW + 180],
+        ], $rows);
     }
 
     /**
