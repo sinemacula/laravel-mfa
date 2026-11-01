@@ -40,8 +40,8 @@ final class DefaultsTest extends TestCase
     use MockeryPHPUnitIntegration;
 
     /**
-     * `AbstractOtpDriver`'s constructor defaults — code length 6, 10-minute
-     * expiry, 3 attempts, no custom alphabet — must be preserved.
+     * `AbstractOtpDriver`'s constructor defaults — code length 6 and a
+     * 10-minute expiry — must be preserved.
      *
      * @return void
      */
@@ -65,14 +65,11 @@ final class DefaultsTest extends TestCase
 
         self::assertSame(6, $driver->getCodeLength());
         self::assertSame(10, $driver->getExpiry());
-        self::assertSame(3, $driver->getMaxAttempts());
-        self::assertNull($driver->getAlphabet());
     }
 
     /**
-     * `EmailDriver`'s constructor defaults — code length 6, 10-minute expiry, 3
-     * attempts, default `MfaCodeMessage` Mailable, no custom alphabet — must be
-     * preserved.
+     * `EmailDriver`'s constructor defaults — code length 6, 10-minute expiry
+     * and the default `MfaCodeMessage` Mailable — must be preserved.
      *
      * @return void
      */
@@ -85,15 +82,12 @@ final class DefaultsTest extends TestCase
 
         self::assertSame(6, $driver->getCodeLength());
         self::assertSame(10, $driver->getExpiry());
-        self::assertSame(3, $driver->getMaxAttempts());
         self::assertSame(MfaCodeMessage::class, $driver->getMailable());
-        self::assertNull($driver->getAlphabet());
     }
 
     /**
-     * `SmsDriver`'s constructor defaults — code length 6, 10-minute expiry, 3
-     * attempts, the shipped message template, no custom alphabet — must be
-     * preserved.
+     * `SmsDriver`'s constructor defaults — code length 6, 10-minute expiry and
+     * the shipped message template — must be preserved.
      *
      * @return void
      */
@@ -103,16 +97,14 @@ final class DefaultsTest extends TestCase
 
         self::assertSame(6, $driver->getCodeLength());
         self::assertSame(10, $driver->getExpiry());
-        self::assertSame(3, $driver->getMaxAttempts());
         self::assertSame(
             'Your verification code is: :code',
             $driver->getMessageTemplate(),
         );
-        self::assertNull($driver->getAlphabet());
     }
 
     /**
-     * `BackupCodeDriver`'s constructor defaults — 10-character codes, the
+     * `BackupCodeDriver`'s constructor defaults — 12-character codes, the
      * shipped Crockford-style alphabet, and a set size of 10 — must be
      * preserved.
      *
@@ -122,7 +114,7 @@ final class DefaultsTest extends TestCase
     {
         $driver = new BackupCodeDriver;
 
-        self::assertSame(10, $driver->getCodeLength());
+        self::assertSame(12, $driver->getCodeLength());
         self::assertSame('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', $driver->getAlphabet());
         self::assertSame(10, $driver->getCodeCount());
     }

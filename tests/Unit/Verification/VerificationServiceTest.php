@@ -319,7 +319,7 @@ final class VerificationServiceTest extends TestCase
      */
     public function testAnInvalidCodeCountsAnAttempt(): void
     {
-        config()->set('mfa.drivers.totp.max_attempts', 3);
+        config()->set('mfa.attempts.factor_limit', 3);
 
         $user   = $this->signIn();
         $factor = $this->eloquentFactor($user, attempts: 1);
@@ -351,42 +351,39 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
-     * Attempt limits, configured lockouts and the lockout each applies.
+     * Attempt limits, configured lockouts and the lockout each applies, in
+     * seconds.
      *
-     * @return iterable<string, array{int, ?int, int}>
+     * @return iterable<string, array{?int, ?int, int}>
      */
     public static function lockouts(): iterable
     {
-        yield 'a limit of one, the default lockout' => [1, null, 15];
-        yield 'a limit of three, a configured lockout' => [3, 5, 5];
+        yield 'the default limit and lockout' => [null, null, 900];
+        yield 'a limit of one, the default lockout' => [1, null, 900];
+        yield 'a limit of three, a configured lockout' => [3, 300, 300];
     }
 
     /**
-     * The attempt that reaches the driver's limit locks the factor for the
-     * configured lockout.
+     * The attempt that reaches the factor limit locks the factor for the
+     * configured lockout, whatever the driver.
      *
-     * @param  int  $maxAttempts
-     * @param  ?int  $lockoutMinutes
-     * @param  int  $expectedMinutes
+     * @param  ?int  $limit
+     * @param  ?int  $lockoutSeconds
+     * @param  int  $expectedSeconds
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     #[DataProvider('lockouts')]
-    public function testTheAttemptReachingTheLimitLocksTheFactor(int $maxAttempts, ?int $lockoutMinutes, int $expectedMinutes): void
+    public function testTheAttemptReachingTheLimitLocksTheFactor(?int $limit, ?int $lockoutSeconds, int $expectedSeconds): void
     {
         Carbon::setTestNow('2026-10-31 12:00:00');
 
-        config()->set('mfa.drivers.totp.max_attempts', $maxAttempts);
+        config()->set('mfa.attempts', array_filter(['factor_limit' => $limit, 'lockout_seconds' => $lockoutSeconds], static fn (?int $value): bool => $value !== null));
 
-        if ($lockoutMinutes !== null) {
-            config()->set('mfa.lockout_minutes', $lockoutMinutes);
-        } else {
-            config()->offsetUnset('mfa.lockout_minutes');
-        }
-
-        $user   = $this->signIn();
-        $factor = $this->eloquentFactor($user, attempts: $maxAttempts - 1);
+        $attempts = $limit ?? 5;
+        $user     = $this->signIn();
+        $factor   = $this->eloquentFactor($user, attempts: $attempts - 1);
 
         $this->stubDriver($this->driverAnswering(false));
 
@@ -394,37 +391,24 @@ final class VerificationServiceTest extends TestCase
 
         $factor->refresh();
 
-        self::assertSame($maxAttempts, $factor->getAttempts());
-        self::assertTrue(Carbon::now()->addMinutes($expectedMinutes)->equalTo($factor->getLockedUntil()));
+        self::assertSame($attempts, $factor->getAttempts());
+        self::assertTrue(Carbon::now()->addSeconds($expectedSeconds)->equalTo($factor->getLockedUntil()));
     }
 
     /**
-     * Attempt limits that never lock.
+     * A failure that leaves the count below the default limit of five does not
+     * lock the factor.
      *
-     * @return iterable<string, array{mixed}>
-     */
-    public static function unlimitedAttempts(): iterable
-    {
-        yield 'no limit configured' => [null];
-        yield 'a limit of zero' => [0];
-        yield 'a malformed limit' => ['many'];
-    }
-
-    /**
-     * Without a positive attempt limit the factor is never locked.
-     *
-     * @param  mixed  $maxAttempts
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    #[DataProvider('unlimitedAttempts')]
-    public function testWithoutALimitTheFactorIsNeverLocked(mixed $maxAttempts): void
+    public function testAFailureBelowTheDefaultLimitDoesNotLock(): void
     {
-        config()->set('mfa.drivers.totp', $maxAttempts === null ? [] : ['max_attempts' => $maxAttempts]);
+        config()->set('mfa.attempts', []);
 
         $user   = $this->signIn();
-        $factor = $this->eloquentFactor($user, attempts: 5);
+        $factor = $this->eloquentFactor($user, attempts: 3);
 
         $this->stubDriver($this->driverAnswering(false));
 
@@ -432,7 +416,7 @@ final class VerificationServiceTest extends TestCase
 
         $factor->refresh();
 
-        self::assertSame(6, $factor->getAttempts());
+        self::assertSame(4, $factor->getAttempts());
         self::assertNull($factor->getLockedUntil());
     }
 

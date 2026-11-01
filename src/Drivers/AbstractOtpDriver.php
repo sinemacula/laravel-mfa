@@ -8,7 +8,6 @@ use Carbon\Carbon;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 
 /**
@@ -35,16 +34,9 @@ abstract class AbstractOtpDriver implements FactorDriver
     /**
      * Constructor.
      *
-     * `$codeLength`, `$expiry`, and `$maxAttempts` are validated at
-     * construction time so deployment-time misconfigurations surface in the
-     * stack trace rather than as a broken user flow. `$codeLength` and
-     * `$expiry` must be at least 1; `$maxAttempts` must be non-negative (0 is
-     * the documented "lockout disabled" value).
-     *
-     * `$alphabet` controls the `generateCode()` character set: `null` keeps
-     * numeric zero-padded codes; a non-null string picks uniformly from it.
-     * Empty / single-character alphabets are rejected so misconfigurations fail
-     * fast.
+     * The code length and lifetime are taken as given: the shipped drivers are
+     * built from `mfa.codes`, whose bounds the package checks when it boots
+     * (see `Codes\CodeSettings`).
      *
      * `$randomInt` is the injectable randomness seam — defaults to PHP's
      * built-in `random_int(...)` (CSPRNG-backed); tests substitute a
@@ -52,34 +44,19 @@ abstract class AbstractOtpDriver implements FactorDriver
      *
      * @param  int  $codeLength
      * @param  int  $expiry
-     * @param  int  $maxAttempts
-     * @param  ?string  $alphabet
      * @param  ?callable(int, int): int  $randomInt
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
      */
     public function __construct(
 
-        /** Length of the one-time code minted by `generateCode()`. */
+        /** Number of digits in the one-time code minted by `generateCode()`. */
         protected readonly int $codeLength = 6,
 
         /** Minutes before an issued code is considered expired. */
         protected readonly int $expiry = 10,
 
-        /** Per-factor attempt ceiling before the manager applies a lockout. */
-        protected readonly int $maxAttempts = 3,
-
-        /** Optional character set for `generateCode()`; `null` uses numeric zero-padded codes. */
-        protected readonly ?string $alphabet = null,
-
         // Randomness seam — `null` binds to PHP's built-in CSPRNG `random_int`.
         ?callable $randomInt = null,
     ) {
-        $this->assertValidCodeLength($codeLength);
-        $this->assertValidExpiry($expiry);
-        $this->assertValidMaxAttempts($maxAttempts);
-        $this->assertValidAlphabet($alphabet);
-
         $this->randomInt = $randomInt === null ? random_int(...) : $randomInt(...);
     }
 
@@ -179,33 +156,9 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
-     * Get the configured maximum attempts.
-     *
-     * @return int
-     */
-    public function getMaxAttempts(): int
-    {
-        return $this->maxAttempts;
-    }
-
-    /**
-     * Get the configured code alphabet, or null when codes are drawn from the
-     * default numeric set.
-     *
-     * @return ?string
-     */
-    public function getAlphabet(): ?string
-    {
-        return $this->alphabet;
-    }
-
-    /**
-     * Generate a one-time code of the configured length. Uses `random_int` for
-     * cryptographic suitability (vs `mt_rand` / `rand`).
-     *
-     * Defaults to a numeric, zero-padded code so the historical contract holds
-     * when no alphabet is configured. When an alphabet is supplied, each
-     * character is drawn uniformly from it via `random_int`.
+     * Generate a numeric, zero-padded one-time code of the configured length,
+     * drawn with `random_int` for cryptographic suitability (vs `mt_rand` /
+     * `rand`).
      *
      * @return string
      */
@@ -213,23 +166,7 @@ abstract class AbstractOtpDriver implements FactorDriver
     {
         $randomInt = $this->randomInt;
 
-        if ($this->alphabet === null) {
-            return str_pad(
-                (string) $randomInt(0, (10 ** $this->codeLength) - 1),
-                $this->codeLength,
-                '0',
-                STR_PAD_LEFT,
-            );
-        }
-
-        $alphabetLength = strlen($this->alphabet);
-        $code           = '';
-
-        for ($i = 0; $i < $this->codeLength; $i++) {
-            $code .= $this->alphabet[$randomInt(0, $alphabetLength - 1)];
-        }
-
-        return $code;
+        return str_pad((string) $randomInt(0, (10 ** $this->codeLength) - 1), $this->codeLength, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -241,70 +178,4 @@ abstract class AbstractOtpDriver implements FactorDriver
      * @return void
      */
     abstract protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void;
-
-    /**
-     * Reject code lengths below 1 — the numeric path would otherwise mint a
-     * one-character `"0"` code and the alphabet path an empty string.
-     *
-     * @param  int  $codeLength
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
-     */
-    private function assertValidCodeLength(int $codeLength): void
-    {
-        if ($codeLength < 1) {
-            throw InvalidDriverConfigurationException::codeLengthTooSmall('OTP code length', $codeLength);
-        }
-    }
-
-    /**
-     * Reject expiry windows below 1 minute — any issued code would otherwise be
-     * "expired" on arrival.
-     *
-     * @param  int  $expiry
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
-     */
-    private function assertValidExpiry(int $expiry): void
-    {
-        if ($expiry < 1) {
-            throw InvalidDriverConfigurationException::expiryTooSmall('OTP expiry', $expiry);
-        }
-    }
-
-    /**
-     * Reject negative `maxAttempts` — the manager's `>=` lockout threshold
-     * would never match, silently disabling the lockout.
-     *
-     * @param  int  $maxAttempts
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
-     */
-    private function assertValidMaxAttempts(int $maxAttempts): void
-    {
-        if ($maxAttempts < 0) {
-            throw InvalidDriverConfigurationException::negativeMaxAttempts('OTP max attempts', $maxAttempts);
-        }
-    }
-
-    /**
-     * Reject alphabets with fewer than two characters — a single-character
-     * alphabet mints zero-entropy codes; an empty alphabet explodes inside
-     * `random_int(0, -1)`. `null` is the documented "use the default numeric
-     * set" signal and bypasses the check.
-     *
-     * @param  ?string  $alphabet
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException
-     */
-    private function assertValidAlphabet(?string $alphabet): void
-    {
-        if ($alphabet !== null && strlen($alphabet) < 2) {
-            throw InvalidDriverConfigurationException::alphabetTooShort('OTP alphabet', $alphabet);
-        }
-    }
 }

@@ -164,12 +164,12 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * A configured alphabet (e.g. hex) must be honoured by the issued code so
-     * consumers can override the default zero-padded numeric.
+     * A configured code length must be honoured by the issued code, which stays
+     * numeric.
      *
      * @return void
      */
-    public function testDispatchUsesConfiguredAlphabet(): void
+    public function testDispatchUsesConfiguredCodeLength(): void
     {
         Mail::fake();
 
@@ -178,16 +178,15 @@ final class EmailDriverTest extends TestCase
         $driver = new EmailDriver(
             mailer: $mailer,
             codeLength: 8,
-            alphabet: '0123456789ABCDEF',
         );
-        $factor = $this->makeFactor(recipient: 'alphabet@example.com');
+        $factor = $this->makeFactor(recipient: 'length@example.com');
 
         $driver->issueChallenge($factor);
 
         Mail::assertSent(
             MfaCodeMessage::class,
-            static fn (MfaCodeMessage $mail): bool => $mail->hasTo('alphabet@example.com')
-                    && preg_match('/^[0-9A-F]{8}$/', $mail->code) === 1,
+            static fn (MfaCodeMessage $mail): bool => $mail->hasTo('length@example.com')
+                    && preg_match('/^\d{8}$/', $mail->code) === 1,
         );
     }
 

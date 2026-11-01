@@ -70,7 +70,7 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
 - `src/Http/Middleware/RequireMfa.php`: `resolveFactorSummaries()` — the single choke point where factors are projected
   through the summary before an exception is thrown.
 - `database/migrations/2026_04_15_000000_create_mfa_factors_table.php`: `secret` and `code` defined as `text`
-  columns to accommodate ciphertext regardless of the configured alphabet / length.
+  columns to accommodate ciphertext regardless of the configured code length.
 
 ## Authoritative Tests
 

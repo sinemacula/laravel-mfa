@@ -18,9 +18,9 @@ concurrent requests, not just sequential ones.
 - The transaction runs on the storage connection (`mfa.storage.connection`), where every package table lives; a
   factor model on another connection is refused when the package boots and before the transaction opens (see
   [Storage and transactions](storage-and-transactions.md)).
-- Hashing is SHA-256 rather than a slow password hash. Backup codes are already high-entropy random strings drawn
-  uniformly from the configured alphabet via `random_int`; a password hash would add latency without meaningful extra
-  security against credential stuffing.
+- Each code is stored as its SHA-256 digest. Backup codes are random strings, `mfa.recovery_codes.length` long, each
+  character drawn uniformly from `mfa.recovery_codes.alphabet` via `random_int`; the package checks when it boots that
+  the length and alphabet give at least 40 bits measured after normalisation.
 - Verification of the candidate code against the stored hash uses `hash_equals` — constant-time comparison, closing
   the timing-oracle primitive.
 - Enrolment is an atomic replace, not an append. `issueBackupCodes()` runs in the identity's factor state transaction,

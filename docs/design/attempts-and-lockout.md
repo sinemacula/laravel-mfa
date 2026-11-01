@@ -12,12 +12,10 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
   `attempts` to zero and clears `locked_until`.
 - Lockout is per-factor, not per-identity. A locked TOTP factor does not prevent the user from verifying through a
   registered email or SMS factor.
-- Lockout threshold is configured per-driver as `mfa.drivers.<driver>.max_attempts`. A threshold of zero (or any
-  non-integer) means "no automatic lockout" — the counter still increments but the verification service never calls
-  `applyLockout()`.
-- When a driver has a non-zero threshold and `attempts >= max_attempts` after the increment, the verification service
-  applies a lockout expiring `mfa.lockout_minutes` minutes in the future. The default fallback for that config key is
-  15.
+- The lockout threshold is `mfa.attempts.factor_limit` (default 5, from 1 to 20), the same for every driver: there is
+  no setting that turns the lockout off.
+- When `attempts >= factor_limit` after the increment, the verification service applies a lockout expiring
+  `mfa.attempts.lockout_seconds` seconds in the future (default 900, from 60 to 86400).
 - A locked factor short-circuits `verify()` before the driver is called. The attempt counter is NOT incremented on
   that branch — the attempt never reached the driver. A `MfaVerificationFailed` event still fires with reason
   `locked`.
@@ -37,21 +35,19 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
   calls `resetAttempts()` (zeroes `attempts`, nulls `locked_until`), and clears any pending code via `consumeCode()`,
   then `persist()` commits.
 - On driver failure, the verification service calls `$factor->recordAttempt()` (increments `attempts`, stamps
-  `last_attempted_at`). If the post-increment count is at or above the configured per-driver threshold, it then calls
-  `$factor->applyLockout(now()->addMinutes(mfa.lockout_minutes))`. Either way, `persist()` commits the mutation.
+  `last_attempted_at`). If the post-increment count is at or above `mfa.attempts.factor_limit`, it then calls
+  `$factor->applyLockout(now()->addSeconds(mfa.attempts.lockout_seconds))`. Either way, `persist()` commits the
+  mutation.
 - OTP-issuing drivers (email, SMS) reset the attempt counter from inside `issueChallenge()` as part of minting a fresh
   code. That reset is paired with a fresh secret, so it cannot be used to wipe a lockout without rotating the live
   credential.
 
 ## Failure / Edge Cases
 
-- `max_attempts = 0` disables automatic lockout for that driver. The counter still counts; admin tooling can inspect
-  `attempts` for throttling heuristics.
-- `max_attempts` resolved as a non-integer string coerces to `0`. That is deliberately failure-closed on the "no
-  lockout" side rather than throwing, since a misconfigured string would otherwise take the enforcement path down on
-  every request.
-- `lockout_minutes` resolved as a non-integer falls back to the hardcoded default of 15. The consumer's bad config
-  does not disable the lockout entirely.
+- A limit or lockout that is not an integer within its bounds fails closed with an `InvalidArgumentException` naming
+  the key, rather than disabling or shortening the lockout. The package checks both when it boots (see the
+  application configuration design note), so a malformed value stops the deployment rather than the first failed
+  verification.
 - TOTP's `issueChallenge()` is a no-op — it does not reset attempts. A consumer cannot use "ask for a new TOTP
   challenge" to clear a lockout. Lockouts on TOTP are cleared only by a successful verification or by the lockout
   window expiring.
@@ -69,7 +65,7 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
 - `src/Concerns/ActsAsFactor.php`: `recordAttempt()`, `resetAttempts()`, `applyLockout()`, `isLocked()`,
   `recordVerification()`, `consumeCode()`.
 - `src/Verification/VerificationService.php`: lock-check short-circuit in `verify()`, `applyVerificationOutcome()`
-  and its `IntegerSetting::read()` calls for `mfa.drivers.<driver>.max_attempts` and `mfa.lockout_minutes`.
+  and its `Attempts\AttemptSettings` reads of `factorLimit()` and `lockoutSeconds()`.
 - `src/Drivers/EmailDriver.php`, `src/Drivers/SmsDriver.php` (and `src/Drivers/AbstractOtpDriver.php`):
   attempt-counter reset inside `issueChallenge()` paired with code rotation.
 - `src/Models/Factor.php`: `attempts` / `locked_until` / `last_attempted_at` casts.
@@ -84,17 +80,14 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
 - `tests/Unit/MfaManagerVerifyTest.php`
   `testVerifyFailureAppliesLockoutAtMaxAttemptsThreshold`
 - `tests/Unit/MfaManagerVerifyTest.php`
-  `testVerifyFailureSkipsLockoutWhenMaxAttemptsIsZero`
-- `tests/Unit/MfaManagerVerifyTest.php`
-  `testVerifyFailureUsesFallbackLockoutMinutesWhenConfigIsNonInt`
-- `tests/Unit/MfaManagerVerifyTest.php`
-  `testVerifyFailureTreatsNonIntMaxAttemptsAsZero`
+  `testVerifyFailureRefusesAMalformedAttemptLimit`
 - `tests/Unit/MfaManagerVerifyTest.php`
   `testVerifyFailureOnNonEloquentFactorSkipsStateMutation`
 - `tests/Unit/Verification/VerificationServiceTest.php`
   `testTheAttemptReachingTheLimitLocksTheFactor`
 - `tests/Unit/Verification/VerificationServiceTest.php`
-  `testWithoutALimitTheFactorIsNeverLocked`
+  `testAFailureBelowTheDefaultLimitDoesNotLock`
+- `tests/Unit/Attempts/AttemptSettingsTest.php`
 - `tests/Unit/MfaManagerVerifySuccessTest.php`
   `testVerifySuccessResetsAttemptCounter`
 
@@ -105,7 +98,7 @@ Update this note when any of the following change:
 - the rule that a locked factor short-circuits `verify()` before the driver runs and without incrementing the counter
 - the reset-on-success contract (`verified_at` stamped, `attempts` zeroed, `locked_until` nulled, pending code
   cleared)
-- the `mfa.drivers.<driver>.max_attempts` / `mfa.lockout_minutes` config keys or their coercion behaviour
+- the `mfa.attempts.factor_limit` / `mfa.attempts.lockout_seconds` config keys or their bounds
 - the decision that OTP drivers reset attempts from inside `issueChallenge()` paired with a fresh code
 - whether lockouts remain per-factor rather than per-identity
 - whether `isLocked()` remains a live `isFuture()` check versus any eager cleanup of stale stamps

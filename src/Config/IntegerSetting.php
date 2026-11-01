@@ -7,13 +7,11 @@ namespace SineMacula\Laravel\Mfa\Config;
 use Illuminate\Contracts\Config\Repository;
 
 /**
- * Reads an integer package setting.
- *
- * Two fallback values are accepted so callers can distinguish "absent" (key
- * missing: use a sensible default) from "malformed" (key present but not
- * numeric: fail safe by using `$malformedFallback`, typically 0). The asymmetry
- * is deliberate: a misconfigured expiry value should not silently grant a long
- * valid window.
+ * Reads a numeric package setting the one way every settings class reads one:
+ * an integer, or the canonical decimal string `env()` returns for one (no plus
+ * sign, padding, whitespace, exponent or fraction, and nothing past the integer
+ * range), within its range. Anything else fails closed with an
+ * `InvalidArgumentException` naming the key and the range.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,30 +26,61 @@ final class IntegerSetting
     private function __construct() {}
 
     /**
-     * The setting under the key as an integer: the default when the key is not
-     * set, and the malformed fallback (or the default, when none is given) when
-     * the value is not numeric.
+     * The setting under the key, or the default when it is not set, as an
+     * integer from its least to its greatest value.
      *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  string  $key
      * @param  int  $default
-     * @param  ?int  $malformedFallback
+     * @param  int  $least
+     * @param  int  $most
      * @return int
+     *
+     * @throws \InvalidArgumentException
      */
-    public static function read(Repository $config, string $key, int $default, ?int $malformedFallback = null): int
+    public static function read(Repository $config, string $key, int $default, int $least, int $most): int
     {
-        if (!$config->has($key)) {
-            return $default;
+        return self::from($key, $config->get($key, $default), $least, $most);
+    }
+
+    /**
+     * The value already read for the key, as an integer from its least to its
+     * greatest value.
+     *
+     * @param  string  $key
+     * @param  mixed  $value
+     * @param  int  $least
+     * @param  int  $most
+     * @return int
+     *
+     * @throws \InvalidArgumentException
+     */
+    public static function from(string $key, mixed $value, int $least, int $most): int
+    {
+        $integer = self::parse($value);
+
+        if ($integer === null || $integer < $least || $integer > $most) {
+            throw new \InvalidArgumentException(sprintf('%s must be an integer from %d to %d.', $key, $least, $most));
         }
 
-        /** @var mixed $value */
-        $value = $config->get($key);
+        return $integer;
+    }
 
-        // `is_numeric` is true for ints AND numeric-strings; the subsequent
-        // `(int)` cast is identity for ints, so a single arm covers both shapes
-        // without a redundant `is_int` branch.
-        return is_numeric($value)
-            ? (int) $value
-            : ($malformedFallback ?? $default);
+    /**
+     * The integer the value names, or `null` when it names none. A string must
+     * be exactly the decimal form of the integer it casts to, so one that
+     * overflows the integer range is refused rather than saturated. A negative
+     * value reads as negative, which every package range rejects.
+     *
+     * @param  mixed  $value
+     * @return ?int
+     */
+    public static function parse(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        return is_string($value) && (string) (int) $value === $value ? (int) $value : null;
     }
 }

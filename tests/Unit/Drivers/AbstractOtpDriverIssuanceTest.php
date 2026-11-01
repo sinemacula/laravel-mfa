@@ -166,8 +166,7 @@ final class AbstractOtpDriverIssuanceTest extends TestCase
     }
 
     /**
-     * With no alphabet configured the generated code must be zero-padded
-     * numeric of the configured length.
+     * The generated code must be zero-padded numeric of the configured length.
      *
      * @return void
      */
@@ -183,44 +182,5 @@ final class AbstractOtpDriverIssuanceTest extends TestCase
         self::assertIsString($code);
         self::assertSame(8, strlen($code));
         self::assertMatchesRegularExpression('/^\d{8}$/', $code);
-    }
-
-    /**
-     * A two-character alphabet must produce codes whose every character is
-     * drawn from that alphabet.
-     *
-     * @return void
-     */
-    public function testGeneratedCodeDrawsFromTwoCharacterAlphabet(): void
-    {
-        $driver = $this->makeDriver(codeLength: 20, alphabet: 'AB');
-        $factor = $this->createEloquentFactor();
-
-        $driver->issueChallenge($factor);
-
-        $code = $driver->dispatched[0]['code'];
-
-        self::assertIsString($code);
-        self::assertSame(20, strlen($code));
-        self::assertMatchesRegularExpression('/^[AB]{20}$/', $code);
-    }
-
-    /**
-     * A hex alphabet must produce codes whose every character is a valid hex
-     * digit.
-     *
-     * @return void
-     */
-    public function testGeneratedCodeDrawsFromHexAlphabet(): void
-    {
-        $driver = $this->makeDriver(codeLength: 10, alphabet: '0123456789ABCDEF');
-        $factor = $this->createEloquentFactor();
-
-        $driver->issueChallenge($factor);
-
-        $code = $driver->dispatched[0]['code'];
-
-        self::assertIsString($code);
-        self::assertMatchesRegularExpression('/^[0-9A-F]{10}$/', $code);
     }
 }

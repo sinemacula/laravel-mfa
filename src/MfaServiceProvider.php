@@ -7,7 +7,8 @@ namespace SineMacula\Laravel\Mfa;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use SineMacula\Laravel\Mfa\Codes\CodeBindings;
-use SineMacula\Laravel\Mfa\Database\StorageBindings;
+use SineMacula\Laravel\Mfa\Config\ConfigurationBindings;
+use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
 use SineMacula\Laravel\Mfa\Drivers\DriverBindings;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentBindings;
 use SineMacula\Laravel\Mfa\Factors\FactorBindings;
@@ -25,9 +26,11 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
  * capability's container wiring to that capability's `*Bindings` class: its
  * service and its defaults for the seams consumers rebind (policy, verification
  * store, SMS gateway). The shipped drivers are registered against the manager
- * by their capability's `*Bindings` class from inside the singleton's factory.
- * Boots the check that every configured model lives on the storage connection,
- * the middleware aliases and config and migration publishing.
+ * by their capability's `*Bindings` class from inside the singleton's factory,
+ * once the configuration is checked. Boots the middleware aliases, config and
+ * migration publishing, the `mfa:check` command, and the configuration check
+ * that runs once the application has booted, which also refuses a factor model
+ * off the storage connection.
  *
  * Consumers with their own enforcement policy, stateless verification store, or
  * real SMS gateway rebind the matching contracts in their own service provider;
@@ -65,21 +68,19 @@ final class MfaServiceProvider extends ServiceProvider
      * Bootstrap any application services.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\ModelOffStorageConnectionException
      */
     public function boot(): void
     {
         $this->offerPublishing();
+        $this->registerCommands();
 
-        StorageBindings::boot($this->app);
         HttpBindings::boot($this->app);
+        ConfigurationBindings::boot($this->app);
     }
 
     /**
-     * Register the MFA manager singleton with the shipped drivers.
+     * Register the MFA manager singleton with the shipped drivers, checking the
+     * configuration before building it.
      *
      * The shipped drivers are registered inside the factory, through the same
      * `extend()` API a consumer uses, so they exist before the container runs
@@ -92,6 +93,9 @@ final class MfaServiceProvider extends ServiceProvider
     protected function registerManager(): void
     {
         $this->app->singleton('mfa', static function (Application $app): MfaManager {
+
+            ConfigurationBindings::validate($app);
+
             $manager = new MfaManager($app);
 
             DriverBindings::extend($manager, $app);
@@ -99,6 +103,20 @@ final class MfaServiceProvider extends ServiceProvider
 
             return $manager;
         });
+    }
+
+    /**
+     * Register the package's console commands when running in the console.
+     *
+     * @return void
+     */
+    protected function registerCommands(): void
+    {
+        if (!$this->app->runningInConsole()) {
+            return;
+        }
+
+        $this->commands([CheckConfigurationCommand::class]);
     }
 
     /**

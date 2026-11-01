@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Factors;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -94,6 +95,31 @@ final class FactorStateCacheTest extends TestCase
 
         self::assertSame('user', $this->read($cache, $this->user(1), 'setup', 'user'));
         self::assertSame('secondary', $this->read($cache, $secondary, 'setup', 'secondary'));
+    }
+
+    /**
+     * The type and identifier are kept apart, so a type that ends where
+     * another's identifier begins cannot share a slot with it.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testKeepsTheTypeApartFromTheIdentifier(): void
+    {
+        Relation::morphMap(['user' => TestUser::class, 'user1' => SecondaryUser::class]);
+
+        try {
+            $cache     = $this->cache();
+            $secondary = new SecondaryUser;
+
+            $secondary->setAttribute('id', 2);
+
+            self::assertSame('user-12', $this->read($cache, $this->user(12), 'setup', 'user-12'));
+            self::assertSame('user1-2', $this->read($cache, $secondary, 'setup', 'user1-2'));
+        } finally {
+            Relation::morphMap([], false);
+        }
     }
 
     /**
@@ -211,8 +237,6 @@ final class FactorStateCacheTest extends TestCase
      * @param  string  $key
      * @param  string  $value
      * @return mixed
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     private function read(FactorStateCache $cache, Authenticatable $identity, string $key, string $value): mixed
     {

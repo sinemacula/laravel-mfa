@@ -246,6 +246,21 @@ final class BackupCodeDriverTest extends TestCase
     }
 
     /**
+     * Without arguments the driver mints sets of 10 codes of 12 characters from
+     * the unambiguous alphabet, the shipped recovery code defaults.
+     *
+     * @return void
+     */
+    public function testDefaultsToTheShippedRecoveryCodeSettings(): void
+    {
+        $driver = new BackupCodeDriver;
+
+        self::assertSame(12, $driver->getCodeLength());
+        self::assertSame('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', $driver->getAlphabet());
+        self::assertSame(10, $driver->getCodeCount());
+    }
+
+    /**
      * The driver getters must return the values supplied to the constructor
      * verbatim.
      *

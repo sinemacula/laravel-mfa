@@ -7,7 +7,6 @@ namespace Tests\Unit\Drivers;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
-use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
@@ -179,41 +178,17 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * The constructor must reject a message template missing the `:code`
-     * placeholder — without it, the rendered SMS would ship the literal
-     * template string and never the verification code.
+     * A configured code length must be honoured by the issued code, which stays
+     * numeric.
      *
      * @return void
      */
-    public function testConstructorRejectsTemplateMissingCodePlaceholder(): void
-    {
-        $this->expectException(InvalidDriverConfigurationException::class);
-        $this->expectExceptionMessage(':code placeholder');
-
-        // Hand the constructor call to a callable so the instantiation is
-        // observably consumed inside the `expectException` scope — satisfies
-        // php:S1848 without an unreachable post-call assertion (php-tst-009).
-        $construct = static fn (): SmsDriver => new SmsDriver(
-            gateway        : new FakeSmsGateway,
-            messageTemplate: 'Your verification code is missing the placeholder',
-        );
-
-        $construct();
-    }
-
-    /**
-     * A configured alphabet (e.g. hex) must be honoured by the issued code so
-     * consumers can override the default zero-padded numeric.
-     *
-     * @return void
-     */
-    public function testDispatchUsesConfiguredAlphabet(): void
+    public function testDispatchUsesConfiguredCodeLength(): void
     {
         $gateway = new FakeSmsGateway;
         $driver  = new SmsDriver(
             gateway   : $gateway,
             codeLength: 8,
-            alphabet  : '0123456789ABCDEF',
         );
         $factor = $this->makeFactor(recipient: '+442222222222');
 
@@ -223,7 +198,7 @@ final class SmsDriverTest extends TestCase
         $message = $sent[0]['message'];
 
         self::assertMatchesRegularExpression(
-            '/^Your verification code is: [0-9A-F]{8}$/',
+            '/^Your verification code is: \d{8}$/',
             $message,
         );
     }

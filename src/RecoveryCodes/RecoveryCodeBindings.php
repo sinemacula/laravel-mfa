@@ -54,26 +54,21 @@ final class RecoveryCodeBindings
     }
 
     /**
-     * Build the backup-code driver from `mfa.drivers.backup_code` config.
+     * Build the backup-code driver with the settings in `mfa.recovery_codes`.
      *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver
+     *
+     * @throws \InvalidArgumentException
      */
     public static function backupCodes(Repository $config): BackupCodeDriver
     {
-        /**
-         * @var array{
-         *     code_length?: int,
-         *     alphabet?: string,
-         *     code_count?: int
-         * } $driverConfig
-         */
-        $driverConfig = $config->get('mfa.drivers.backup_code', []);
+        $settings = new RecoveryCodeSettings($config);
 
         return new BackupCodeDriver(
-            codeLength: $driverConfig['code_length'] ?? 10,
-            alphabet  : $driverConfig['alphabet']    ?? '23456789ABCDEFGHJKLMNPQRSTUVWXYZ',
-            codeCount : $driverConfig['code_count']  ?? 10,
+            codeLength: $settings->length(),
+            alphabet  : $settings->alphabet(),
+            codeCount : $settings->count(),
         );
     }
 }

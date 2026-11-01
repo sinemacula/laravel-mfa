@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
+use Tests\Fixtures\Codes\CustomMfaCodeMessage;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
@@ -29,7 +30,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
 {
     /**
      * Resolving the TOTP driver should honour the configured verification
-     * window from `config('mfa.drivers.totp.window')`.
+     * window from `config('mfa.totp.window')`.
      *
      * @return void
      *
@@ -39,7 +40,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     public function testTotpDriverBuildsWithConfiguredWindow(): void
     {
         $config = app(Repository::class);
-        $config->set('mfa.drivers.totp.window', 3);
+        $config->set('mfa.totp.window', 3);
 
         $driver = $this->manager()->driver('totp');
 
@@ -66,7 +67,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     public function testTotpDriverDefaultsWindowToOneWhenUnset(): void
     {
         $config = app(Repository::class);
-        $config->set('mfa.drivers.totp', []);
+        $config->set('mfa.totp', []);
 
         $driver = $this->manager()->driver('totp');
 
@@ -92,7 +93,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     public function testEmailDriverBuildsWithDefaults(): void
     {
         $config = app(Repository::class);
-        $config->set('mfa.drivers.email', []);
+        $config->set('mfa.codes', []);
 
         /** @var \SineMacula\Laravel\Mfa\Drivers\EmailDriver $driver */
         $driver = $this->manager()->driver('email');
@@ -100,13 +101,12 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertInstanceOf(EmailDriver::class, $driver);
         self::assertSame(6, $driver->getCodeLength());
         self::assertSame(10, $driver->getExpiry());
-        self::assertSame(3, $driver->getMaxAttempts());
-        self::assertNull($driver->getAlphabet());
+        self::assertSame(MfaCodeMessage::class, $driver->getMailable());
     }
 
     /**
-     * Resolving the email driver should apply every override in the config
-     * slice — code length, expiry, attempts, alphabet, and mailable.
+     * Resolving the email driver should apply every override in the code
+     * settings — code length, lifetime and mailable.
      *
      * @return void
      *
@@ -115,21 +115,18 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     public function testEmailDriverBuildsWithConfiguredOverrides(): void
     {
         $config = app(Repository::class);
-        $config->set('mfa.drivers.email', [
-            'code_length'  => 8,
-            'expiry'       => 20,
-            'max_attempts' => 7,
-            'alphabet'     => '0123456789ABCDEF',
-            'mailable'     => MfaCodeMessage::class,
+        $config->set('mfa.codes', [
+            'length'      => 8,
+            'ttl_minutes' => 5,
+            'mailable'    => CustomMfaCodeMessage::class,
         ]);
 
         /** @var \SineMacula\Laravel\Mfa\Drivers\EmailDriver $driver */
         $driver = $this->manager()->driver('email');
 
         self::assertSame(8, $driver->getCodeLength());
-        self::assertSame(20, $driver->getExpiry());
-        self::assertSame(7, $driver->getMaxAttempts());
-        self::assertSame('0123456789ABCDEF', $driver->getAlphabet());
+        self::assertSame(5, $driver->getExpiry());
+        self::assertSame(CustomMfaCodeMessage::class, $driver->getMailable());
     }
 
     /**
@@ -143,7 +140,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     public function testSmsDriverBuildsWithDefaults(): void
     {
         $config = app(Repository::class);
-        $config->set('mfa.drivers.sms', []);
+        $config->set('mfa.codes', []);
 
         /** @var \SineMacula\Laravel\Mfa\Drivers\SmsDriver $driver */
         $driver = $this->manager()->driver('sms');
@@ -152,13 +149,11 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         self::assertSame('Your verification code is: :code', $driver->getMessageTemplate());
         self::assertSame(6, $driver->getCodeLength());
         self::assertSame(10, $driver->getExpiry());
-        self::assertSame(3, $driver->getMaxAttempts());
-        self::assertNull($driver->getAlphabet());
     }
 
     /**
-     * Resolving the SMS driver should apply every override in the config slice
-     * — code length, expiry, attempts, alphabet, and message template.
+     * Resolving the SMS driver should apply every override in the code settings
+     * — code length, lifetime and message.
      *
      * @return void
      *
@@ -167,22 +162,18 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     public function testSmsDriverBuildsWithConfiguredOverrides(): void
     {
         $config = app(Repository::class);
-        $config->set('mfa.drivers.sms', [
-            'code_length'      => 4,
-            'expiry'           => 5,
-            'max_attempts'     => 2,
-            'alphabet'         => 'ABCDEF',
-            'message_template' => 'Code: :code',
+        $config->set('mfa.codes', [
+            'length'      => 7,
+            'ttl_minutes' => 5,
+            'sms_message' => 'Code: :code',
         ]);
 
         /** @var \SineMacula\Laravel\Mfa\Drivers\SmsDriver $driver */
         $driver = $this->manager()->driver('sms');
 
         self::assertSame('Code: :code', $driver->getMessageTemplate());
-        self::assertSame(4, $driver->getCodeLength());
+        self::assertSame(7, $driver->getCodeLength());
         self::assertSame(5, $driver->getExpiry());
-        self::assertSame(2, $driver->getMaxAttempts());
-        self::assertSame('ABCDEF', $driver->getAlphabet());
     }
 
     /**
@@ -196,20 +187,20 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     public function testBackupCodeDriverBuildsWithDefaults(): void
     {
         $config = app(Repository::class);
-        $config->set('mfa.drivers.backup_code', []);
+        $config->set('mfa.recovery_codes', []);
 
         /** @var \SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver $driver */
         $driver = $this->manager()->driver('backup_code');
 
         self::assertInstanceOf(BackupCodeDriver::class, $driver);
-        self::assertSame(10, $driver->getCodeLength());
+        self::assertSame(12, $driver->getCodeLength());
         self::assertSame('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', $driver->getAlphabet());
         self::assertSame(10, $driver->getCodeCount());
     }
 
     /**
      * Resolving the backup-code driver should apply every override in the
-     * config slice — code length, alphabet, and code count.
+     * recovery code settings — length, alphabet and count.
      *
      * @return void
      *
@@ -218,17 +209,17 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     public function testBackupCodeDriverBuildsWithConfiguredOverrides(): void
     {
         $config = app(Repository::class);
-        $config->set('mfa.drivers.backup_code', [
-            'code_length' => 12,
-            'alphabet'    => 'ABCDEF',
-            'code_count'  => 5,
+        $config->set('mfa.recovery_codes', [
+            'length'   => 14,
+            'alphabet' => 'ABCDEFGH',
+            'count'    => 5,
         ]);
 
         /** @var \SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver $driver */
         $driver = $this->manager()->driver('backup_code');
 
-        self::assertSame(12, $driver->getCodeLength());
-        self::assertSame('ABCDEF', $driver->getAlphabet());
+        self::assertSame(14, $driver->getCodeLength());
+        self::assertSame('ABCDEFGH', $driver->getAlphabet());
         self::assertSame(5, $driver->getCodeCount());
     }
 

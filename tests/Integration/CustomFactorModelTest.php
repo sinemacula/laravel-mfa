@@ -33,6 +33,21 @@ final class CustomFactorModelTest extends TestCase
     use RefreshDatabase;
 
     /**
+     * Resolve the manager while the configuration is still valid: resolving it
+     * checks the configuration, which would refuse a misconfigured model before
+     * the accessor under test could.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Mfa::getFacadeRoot();
+    }
+
+    /**
      * With no config override, `Mfa::factorModel()` returns the shipped
      * `Factor` model so consumers without a custom subclass keep the existing
      * default behaviour.

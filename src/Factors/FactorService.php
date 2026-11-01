@@ -50,8 +50,6 @@ final readonly class FactorService
      * authentication factor.
      *
      * @return bool
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function isSetup(): bool
     {
@@ -78,8 +76,6 @@ final readonly class FactorService
      * @return ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
      *
      * @formatter:on
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function getFactors(): ?Collection
     {

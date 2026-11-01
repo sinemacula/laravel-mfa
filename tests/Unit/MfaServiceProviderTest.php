@@ -5,12 +5,15 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Illuminate\Config\Repository;
+use Illuminate\Console\Application as ConsoleApplication;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Application;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Codes\NullSmsGateway;
+use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
@@ -19,7 +22,7 @@ use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
-use SineMacula\Laravel\Mfa\Exceptions\ModelOffStorageConnectionException;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
@@ -150,7 +153,8 @@ final class MfaServiceProviderTest extends TestCase
 
     /**
      * Booting checks that the configured factor model lives on the storage
-     * connection, refusing one on another connection before anything is served.
+     * connection, refusing one on another connection before anything is served,
+     * as one of the configuration's problems.
      *
      * @return void
      *
@@ -160,7 +164,8 @@ final class MfaServiceProviderTest extends TestCase
     {
         $this->container()->make(Repository::class)->set('mfa.factor.model', SecondaryConnectionFactor::class);
 
-        $this->expectException(ModelOffStorageConnectionException::class);
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('[factor] mfa.factor.model class [' . SecondaryConnectionFactor::class . '] must be on the storage connection');
 
         (new MfaServiceProvider($this->container()))->boot();
     }
@@ -279,6 +284,9 @@ final class MfaServiceProviderTest extends TestCase
         /** @var array<string, mixed> $before */
         $before = ServiceProvider::$publishes[$providerClass] ?? [];
 
+        $bootstrappers = new \ReflectionProperty(ConsoleApplication::class, 'bootstrappers');
+        $starting      = $bootstrappers->getValue();
+
         $provider = new MfaServiceProvider($app);
 
         $provider->boot();
@@ -291,5 +299,55 @@ final class MfaServiceProviderTest extends TestCase
             $after,
             'offerPublishing() must not register publishes under a non-console kernel',
         );
+
+        self::assertSame($starting, $bootstrappers->getValue(), 'registerCommands() must not register commands under a non-console kernel');
+    }
+
+    /**
+     * The `mfa:check` command is registered in the console.
+     *
+     * @return void
+     */
+    public function testRegistersTheCheckCommand(): void
+    {
+        self::assertInstanceOf(CheckConfigurationCommand::class, Artisan::all()['mfa:check'] ?? null);
+    }
+
+    /**
+     * Booting checks the configuration, refusing one out of range before
+     * anything is served.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBootRefusesAnInvalidConfiguration(): void
+    {
+        $this->container()->make(Repository::class)->set('mfa.recovery_codes.count', 0);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('[recovery_codes] mfa.recovery_codes.count must be an integer from 1 to 50.');
+
+        (new MfaServiceProvider($this->container()))->boot();
+    }
+
+    /**
+     * Resolving the manager checks the configuration first, so a setting
+     * changed after boot fails there rather than at a person's first
+     * verification.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testResolvingTheManagerRefusesAnInvalidConfiguration(): void
+    {
+        $this->container()->forgetInstance('mfa');
+        $this->container()->make(Repository::class)->set('mfa.attempts.lockout_seconds', 30);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('[attempts] mfa.attempts.lockout_seconds must be an integer from 60 to 86400.');
+
+        $this->container()->make('mfa');
     }
 }

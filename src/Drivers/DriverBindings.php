@@ -7,7 +7,7 @@ namespace SineMacula\Laravel\Mfa\Drivers;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Mail\Mailer;
-use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
+use SineMacula\Laravel\Mfa\Codes\CodeSettings;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\MfaManager;
 
@@ -20,8 +20,9 @@ use SineMacula\Laravel\Mfa\MfaManager;
  * from a consumer's own: a consumer replaces one by calling
  * `Mfa::extend('totp', ...)` from their own service provider, or from a
  * container extender or resolving callback on `mfa`, since Laravel's `Manager`
- * resolves the most recent registration. Each factory consumes only the slice
- * of config its driver needs.
+ * resolves the most recent registration. Each factory reads only the settings
+ * its driver needs: the TOTP window from `mfa.totp`, and the code length,
+ * lifetime and message from `mfa.codes`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -68,80 +69,59 @@ final class DriverBindings
     }
 
     /**
-     * Build the TOTP driver from `mfa.drivers.totp` config.
+     * Build the TOTP driver with the window in `mfa.totp`.
      *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
+     *
+     * @throws \InvalidArgumentException
      */
     public static function totp(Repository $config): TotpDriver
     {
-        /** @var array{window?: int} $driverConfig */
-        $driverConfig = $config->get('mfa.drivers.totp', []);
-
-        return new TotpDriver(window: $driverConfig['window'] ?? 1);
+        return new TotpDriver(window: (new TotpSettings($config))->window());
     }
 
     /**
-     * Build the email driver from `mfa.drivers.email` config.
+     * Build the email driver with the code settings in `mfa.codes`.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\EmailDriver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
      */
     public static function email(Application $app, Repository $config): EmailDriver
     {
-        /**
-         * @var array{
-         *     code_length?: int,
-         *     expiry?: int,
-         *     max_attempts?: int,
-         *     alphabet?: ?string,
-         *     mailable?: class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>
-         * } $driverConfig
-         */
-        $driverConfig = $config->get('mfa.drivers.email', []);
+        $codes = new CodeSettings($config);
 
         return new EmailDriver(
-            mailer     : $app->make(Mailer::class),
-            mailable   : $driverConfig['mailable']     ?? MfaCodeMessage::class,
-            codeLength : $driverConfig['code_length']  ?? 6,
-            expiry     : $driverConfig['expiry']       ?? 10,
-            maxAttempts: $driverConfig['max_attempts'] ?? 3,
-            alphabet   : $driverConfig['alphabet']     ?? null,
+            mailer    : $app->make(Mailer::class),
+            mailable  : $codes->mailable(),
+            codeLength: $codes->length(),
+            expiry    : $codes->ttlMinutes(),
         );
     }
 
     /**
-     * Build the SMS driver from `mfa.drivers.sms` config.
+     * Build the SMS driver with the code settings in `mfa.codes`.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\SmsDriver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
      */
     public static function sms(Application $app, Repository $config): SmsDriver
     {
-        /**
-         * @var array{
-         *     code_length?: int,
-         *     expiry?: int,
-         *     max_attempts?: int,
-         *     alphabet?: ?string,
-         *     message_template?: string
-         * } $driverConfig
-         */
-        $driverConfig = $config->get('mfa.drivers.sms', []);
+        $codes = new CodeSettings($config);
 
         return new SmsDriver(
             gateway        : $app->make(SmsGateway::class),
-            messageTemplate: $driverConfig['message_template'] ?? 'Your verification code is: :code',
-            codeLength     : $driverConfig['code_length']      ?? 6,
-            expiry         : $driverConfig['expiry']           ?? 10,
-            maxAttempts    : $driverConfig['max_attempts']     ?? 3,
-            alphabet       : $driverConfig['alphabet']         ?? null,
+            messageTemplate: $codes->smsMessage(),
+            codeLength     : $codes->length(),
+            expiry         : $codes->ttlMinutes(),
         );
     }
 }
