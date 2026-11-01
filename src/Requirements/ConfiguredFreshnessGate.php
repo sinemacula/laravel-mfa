@@ -32,8 +32,8 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  * recorded; only when it holds none is a bound `FirstFactorResolver` asked, and
  * its answer counts only when it is a first factor of the identity on the
  * application, bound to the current sign-in, made under the identity's current
- * verification generation and not after now. Only a proof's own time counts,
- * so refreshing or regenerating the session never renews freshness.
+ * verification generation and not after now. Only a proof's own time counts, so
+ * refreshing or regenerating the session never renews freshness.
  *
  * Stateless: the configuration, the store and every collaborator are resolved
  * on every call.

@@ -97,8 +97,7 @@ final class OperationRequirementsTest extends TestCase
 
     /**
      * A caller's requirement with a part that carries no maximum age, or one
-     * longer than a day, is refused, for a name that is not an operation's
-     * too.
+     * longer than a day, is refused, for a name that is not an operation's too.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $caller
      * @param  string  $part
@@ -113,7 +112,9 @@ final class OperationRequirementsTest extends TestCase
                 self::requirements()->effective(self::APPLICATION, $operation, $caller);
                 self::fail('Expected the caller\'s requirement to be refused.');
             } catch (\InvalidArgumentException $exception) {
-                self::assertSame(sprintf('A caller\'s requirement must give every part a max_age from 1 to 86400 seconds, which its [%s] part does not.', $part), $exception->getMessage());
+                $expected = 'A caller\'s requirement must give every part a max_age from 1 to 86400 seconds, which its [%s] part does not.';
+
+                self::assertSame(sprintf($expected, $part), $exception->getMessage());
             }
         }
     }

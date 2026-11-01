@@ -28,9 +28,9 @@ use Tests\TestCase;
 /**
  * Tests for `RequirementService`: the composition table of a sign-in's
  * requirement (every application mode, crossed with the identity's own
- * requirement, its re-enrolment obligation and an active tenant's
- * requirement), the requirement of the current identity, and the step-up
- * freshness asked of the bound gate with this package's own setting.
+ * requirement, its re-enrolment obligation and an active tenant's requirement),
+ * the requirement of the current identity, and the step-up freshness asked of
+ * the bound gate with this package's own setting.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -57,9 +57,9 @@ final class RequirementServiceTest extends TestCase
     /**
      * Every row of the composition table: the application's mode (or none for
      * an application nobody configured) and whether the identity has a
-     * confirmed factor, whether it requires something of its own, whether it
-     * is obliged to enrol again, whether a tenant requiring a level is active,
-     * and the composed requirement, serialised.
+     * confirmed factor, whether it requires something of its own, whether it is
+     * obliged to enrol again, whether a tenant requiring a level is active, and
+     * the composed requirement, serialised.
      *
      * @return iterable<string, array{?string, bool, bool, bool, bool, array<string, array<string, int|string|null>>}>
      */
@@ -75,13 +75,7 @@ final class RequirementServiceTest extends TestCase
 
         foreach ($modes as $label => [$mode, $enabled, $applicationRequires]) {
             foreach (self::switches() as [$own, $obliged, $tenant]) {
-                $name = sprintf(
-                    '%s, %s, %s, %s',
-                    $label,
-                    $own ? 'an identity requirement' : 'no identity requirement',
-                    $obliged ? 'obliged to enrol again' : 'no obligation',
-                    $tenant ? 'a tenant' : 'no tenant',
-                );
+                $name = self::rowName($label, $own, $obliged, $tenant);
 
                 yield $name => [$mode, $enabled, $own, $obliged, $tenant, self::expected($applicationRequires || $obliged, $own, $tenant)];
             }
@@ -294,8 +288,8 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * A name that is not an operation's is never fresh, whatever the gate
-     * would answer, and the gate is not asked.
+     * A name that is not an operation's is never fresh, whatever the gate would
+     * answer, and the gate is not asked.
      *
      * @return void
      *
@@ -330,7 +324,9 @@ final class RequirementServiceTest extends TestCase
             $this->service()->isFresh('mfa.add_factor', Requirement::none()->withAdditionalVerification());
             self::fail('Expected the caller\'s requirement to be refused.');
         } catch (\InvalidArgumentException $exception) {
-            self::assertSame('A caller\'s requirement must give every part a max_age from 1 to 86400 seconds, which its [additional_verification] part does not.', $exception->getMessage());
+            $expected = 'A caller\'s requirement must give every part a max_age from 1 to 86400 seconds, which its [additional_verification] part does not.';
+
+            self::assertSame($expected, $exception->getMessage());
         }
 
         self::assertSame([], $asked);
@@ -348,8 +344,8 @@ final class RequirementServiceTest extends TestCase
 
     /**
      * Every setting of the three other sources: whether the identity requires
-     * something of its own, whether it is obliged to enrol again, and whether
-     * a tenant is active.
+     * something of its own, whether it is obliged to enrol again, and whether a
+     * tenant is active.
      *
      * @return list<array{bool, bool, bool}>
      */
@@ -365,6 +361,27 @@ final class RequirementServiceTest extends TestCase
             [true, true, false],
             [true, true, true],
         ];
+    }
+
+    /**
+     * The name of a row of the table: the application's mode, then each other
+     * source's setting.
+     *
+     * @param  string  $label
+     * @param  bool  $own
+     * @param  bool  $obliged
+     * @param  bool  $tenant
+     * @return string
+     */
+    private static function rowName(string $label, bool $own, bool $obliged, bool $tenant): string
+    {
+        return sprintf(
+            '%s, %s, %s, %s',
+            $label,
+            $own ? 'an identity requirement' : 'no identity requirement',
+            $obliged ? 'obliged to enrol again' : 'no obligation',
+            $tenant ? 'a tenant' : 'no tenant',
+        );
     }
 
     /**

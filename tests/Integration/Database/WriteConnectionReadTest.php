@@ -167,8 +167,6 @@ final class WriteConnectionReadTest extends TestCase
      * verification.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testAnObligationNotYetOnTheReaderStillObliges(): void
     {

@@ -37,11 +37,16 @@ final class ConfiguredRequirementPolicyTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Rows of the application's mode, the identity's own requirement, the
-     * first factor as the sign-in made it, and the requirement the sign-in
-     * must still meet, serialised.
+     * Rows of the application's mode, the identity's own requirement, the first
+     * factor as the sign-in made it, and the requirement the sign-in must still
+     * meet, serialised.
      *
-     * @return iterable<string, array{string, ?\SineMacula\Laravel\Mfa\Requirements\Requirement, \Closure(\Tests\Fixtures\Requirements\SignInProofs): \SineMacula\Laravel\Mfa\Proofs\Proof, array<string, array<string, int|string|null>>}>
+     * @return iterable<string, array{
+     *     string,
+     *     ?\SineMacula\Laravel\Mfa\Requirements\Requirement,
+     *     \Closure(\Tests\Fixtures\Requirements\SignInProofs): \SineMacula\Laravel\Mfa\Proofs\Proof,
+     *     array<string, array<string, int|string|null>>,
+     * }>
      */
     public static function signIns(): iterable
     {

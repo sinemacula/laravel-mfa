@@ -85,9 +85,9 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
 
     /**
      * Whether the current session is fresh enough for the named operation: the
-     * stricter of the requirement the application configures for it and the
-     * one given applies, either alone when the other is absent, and an
-     * operation with neither is never fresh.
+     * stricter of the requirement the application configures for it and the one
+     * given applies, either alone when the other is absent, and an operation
+     * with neither is never fresh.
      *
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement

@@ -176,7 +176,9 @@ final readonly class SignInProofs
      */
     public function externalReauthentication(int $secondsAgo = 0): Proof
     {
-        return $this->proof(ProofKind::FIRST_FACTOR_REAUTHENTICATION, 'oidc', new Channel(ChannelKind::EXTERNAL_PROVIDER, 'provider-1'), null, ObservedProperties::none(), $secondsAgo);
+        $channel = new Channel(ChannelKind::EXTERNAL_PROVIDER, 'provider-1');
+
+        return $this->proof(ProofKind::FIRST_FACTOR_REAUTHENTICATION, 'oidc', $channel, null, ObservedProperties::none(), $secondsAgo);
     }
 
     /**
@@ -198,7 +200,9 @@ final readonly class SignInProofs
      */
     public function totp(int $secondsAgo = 0): Proof
     {
-        return $this->proof(ProofKind::ADDITIONAL_FACTOR, 'totp', new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'), 'factor-totp', ObservedProperties::none(), $secondsAgo);
+        $channel = new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp');
+
+        return $this->proof(ProofKind::ADDITIONAL_FACTOR, 'totp', $channel, 'factor-totp', ObservedProperties::none(), $secondsAgo);
     }
 
     /**

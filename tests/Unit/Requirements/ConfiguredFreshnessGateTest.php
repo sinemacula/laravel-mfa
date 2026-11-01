@@ -314,6 +314,24 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
+     * A resolved first factor is judged together with every proof the store
+     * holds, not only the oldest, so a fresh factor recorded after a stale one
+     * still counts.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAResolvedFirstFactorIsJudgedWithEveryRecordedProof(): void
+    {
+        $user = $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->email(self::TWO_HOURS), $signIn->totp()]);
+
+        $this->container()->instance(FirstFactorResolver::class, new FixedFirstFactorResolver(SignInProofs::of($user)->password(self::TWO_HOURS)));
+
+        self::assertTrue($this->gate()->isFresh('mfa.add_factor'));
+    }
+
+    /**
      * Rows of a first factor a resolver reports that may not count for the
      * current sign-in, as the sign-in's proofs would make it.
      *
@@ -322,12 +340,12 @@ final class ConfiguredFreshnessGateTest extends TestCase
     public static function untrustedFirstFactors(): iterable
     {
         yield 'none' => [static fn (SignInProofs $signIn): ?Proof => null];
-        yield 'a reauthentication' => [static fn (SignInProofs $signIn): ?Proof => $signIn->reauthentication(self::TWO_HOURS)];
-        yield 'another identity\'s' => [static fn (SignInProofs $signIn): ?Proof => $signIn->ofIdentity('999')->password(self::TWO_HOURS)];
-        yield 'another application\'s' => [static fn (SignInProofs $signIn): ?Proof => $signIn->onApplication('admin')->password(self::TWO_HOURS)];
-        yield 'another sign-in\'s' => [static fn (SignInProofs $signIn): ?Proof => $signIn->inSession('sign-in-2')->password(self::TWO_HOURS)];
-        yield 'an older generation\'s' => [static fn (SignInProofs $signIn): ?Proof => $signIn->underGeneration(1)->password(self::TWO_HOURS)];
-        yield 'one made after now' => [static fn (SignInProofs $signIn): ?Proof => $signIn->password(-60)];
+        yield 'a reauthentication' => [static fn (SignInProofs $signIn): Proof => $signIn->reauthentication(self::TWO_HOURS)];
+        yield 'another identity\'s' => [static fn (SignInProofs $signIn): Proof => $signIn->ofIdentity('999')->password(self::TWO_HOURS)];
+        yield 'another application\'s' => [static fn (SignInProofs $signIn): Proof => $signIn->onApplication('admin')->password(self::TWO_HOURS)];
+        yield 'another sign-in\'s' => [static fn (SignInProofs $signIn): Proof => $signIn->inSession('sign-in-2')->password(self::TWO_HOURS)];
+        yield 'an older generation\'s' => [static fn (SignInProofs $signIn): Proof => $signIn->underGeneration(1)->password(self::TWO_HOURS)];
+        yield 'one made after now' => [static fn (SignInProofs $signIn): Proof => $signIn->password(-60)];
     }
 
     /**

@@ -237,7 +237,9 @@ final class ApplicationSettingsTest extends TestCase
         self::assertSame([50, 50, 10, 3], [$most->confirmedPerTypeLimit(), $most->confirmedLimit(), $most->pendingLimit(), $most->totpWindow()]);
         self::assertSame(1, self::settings(['freshness' => ['mfa.add_factor' => 1]])->freshnessFor('mfa.add_factor')?->maxAge(RequirementPart::ADDITIONAL_VERIFICATION));
         self::assertSame(86400, self::settings(['freshness' => ['mfa.add_factor' => 86400]])->freshnessFor('mfa.add_factor')?->maxAge(RequirementPart::ADDITIONAL_VERIFICATION));
-        self::assertSame(86400, self::settings(['freshness' => ['mfa.add_factor' => ['multifactor' => ['max_age' => 86400]]]])->freshnessFor('mfa.add_factor')?->maxAge(RequirementPart::MULTIFACTOR));
+        $multifactor = self::settings(['freshness' => ['mfa.add_factor' => ['multifactor' => ['max_age' => 86400]]]]);
+
+        self::assertSame(86400, $multifactor->freshnessFor('mfa.add_factor')?->maxAge(RequirementPart::MULTIFACTOR));
     }
 
     /**

@@ -69,7 +69,12 @@ final class ProofRequirementCheckTest extends TestCase
      * Rows of a requirement, the session's proofs as made by the sign-in, and
      * the parts met and unmet.
      *
-     * @return iterable<string, array{\SineMacula\Laravel\Mfa\Requirements\Requirement, \Closure(\Tests\Fixtures\Requirements\SignInProofs): list<\SineMacula\Laravel\Mfa\Proofs\Proof>, list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>, list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>}>
+     * @return iterable<string, array{
+     *     \SineMacula\Laravel\Mfa\Requirements\Requirement,
+     *     \Closure(\Tests\Fixtures\Requirements\SignInProofs): list<\SineMacula\Laravel\Mfa\Proofs\Proof>,
+     *     list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>,
+     *     list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>,
+     * }>
      */
     public static function judgments(): iterable
     {
@@ -180,8 +185,8 @@ final class ProofRequirementCheckTest extends TestCase
 
     /**
      * Only the proofs bound to the first factor's sign-in reach the bound
-     * combination policy, in the order given; none reach it without exactly
-     * one first factor.
+     * combination policy, in the order given; none reach it without exactly one
+     * first factor.
      *
      * @return void
      *

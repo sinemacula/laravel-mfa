@@ -18,8 +18,7 @@ use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 final class NoTenantRequirement implements TenantRequirement
 {
     /**
-     * The requirement of the identity's active tenant on the application:
-     * none.
+     * The requirement of the identity's active tenant on the application: none.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

@@ -271,16 +271,15 @@ final readonly class ApplicationSettings
 
     /**
      * The requirement each operation's step-up must meet: the package's own
-     * operations ask for an additional verification within
-     * `FRESHNESS_SECONDS` unless the application sets them, and any operation
-     * of the application's own it names has the requirement it sets. An entry
-     * is either a number of seconds, 1 to 86400, for an additional
-     * verification within that age, or a serialised requirement (see
-     * `Requirement::fromArray()`) asking for at least one part, each with a
-     * `max_age` of 1 to 86400 seconds. An entry replaces the package's default
-     * for its operation whole. Names are the block's keys, read whole, never as
-     * a dotted path, and must be in the form an operation's name takes (see
-     * `Operation::isName()`).
+     * operations ask for an additional verification within `FRESHNESS_SECONDS`
+     * unless the application sets them, and any operation of the application's
+     * own it names has the requirement it sets. An entry is either a number of
+     * seconds, 1 to 86400, for an additional verification within that age, or a
+     * serialised requirement (see `Requirement::fromArray()`) asking for at
+     * least one part, each with a `max_age` of 1 to 86400 seconds. An entry
+     * replaces the package's default for its operation whole. Names are the
+     * block's keys, read whole, never as a dotted path, and must be in the form
+     * an operation's name takes (see `Operation::isName()`).
      *
      * @return array<string, \SineMacula\Laravel\Mfa\Requirements\Requirement>
      *

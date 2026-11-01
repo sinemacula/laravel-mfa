@@ -20,8 +20,8 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  * Where the caller passes a requirement of its own, the stricter of it and the
  * gate's own setting for the operation applies, either alone when the other is
  * absent. An operation with neither, a name that is not an operation's
- * (lower-case segments of letters, digits and underscores, each starting with
- * a letter, separated by dots), or a session with no record, is not fresh. A
+ * (lower-case segments of letters, digits and underscores, each starting with a
+ * letter, separated by dots), or a session with no record, is not fresh. A
  * caller's requirement that asks for nothing adds nothing; one with a part that
  * carries no maximum age, or one longer than 86400 seconds, is refused with an
  * `InvalidArgumentException`.
