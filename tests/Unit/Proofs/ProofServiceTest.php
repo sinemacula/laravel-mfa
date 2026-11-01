@@ -4,18 +4,30 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Proofs;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\Assurance\Channel;
+use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
+use Tests\Unit\Concerns\BuildsProofs;
 
 /**
- * Tests for `ProofService`: the current identity's verification is recorded,
- * forgotten and read through the bound store, and judged expired against the
- * window, failing closed.
+ * Tests for `ProofService`: the current identity's proofs are read through the
+ * bound store on the current application, and a proof is recorded bound to the
+ * identity's current sign-in and verification generation, or not at all without
+ * a sign-in.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,193 +37,262 @@ use Tests\TestCase;
 #[CoversClass(ProofService::class)]
 final class ProofServiceTest extends TestCase
 {
+    use BuildsProofs, RefreshDatabase;
+
     /**
-     * Release the frozen clock and the Mockery expectations.
+     * Tear down Mockery expectations between test cases.
      *
      * @return void
      */
     #[\Override]
     protected function tearDown(): void
     {
-        Carbon::setTestNow();
         \Mockery::close();
 
         parent::tearDown();
     }
 
     /**
-     * A guest has never verified, is always expired, and records and forgets
-     * nothing.
+     * A guest has no proofs, and the store is not asked.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAGuestHasNoVerification(): void
+    public function testAGuestHasNoProofs(): void
     {
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldNotReceive('lastVerifiedAt', 'markVerified', 'forget');
+        $store = \Mockery::mock(ProofStore::class);
+        $store->shouldNotReceive('proofs');
 
-        $this->container()->instance(MfaVerificationStore::class, $store);
+        $this->container()->instance(ProofStore::class, $store);
 
-        self::assertFalse($this->service()->hasEverVerified());
-        self::assertTrue($this->service()->hasExpired());
+        self::assertSame([], $this->service()->proofs());
 
-        $this->service()->markVerified();
-        $this->service()->forgetVerification();
+        $store->shouldNotHaveReceived('proofs');
     }
 
     /**
-     * The identity has verified once the store records a verification.
+     * The current identity's proofs are the store's, on the current
+     * application.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testHasEverVerifiedReadsTheStore(): void
+    public function testReadsTheCurrentIdentitysProofsOnTheCurrentApplication(): void
     {
-        $this->signIn();
-        $this->storeAnswering(null);
+        $user  = $this->user();
+        $proof = self::proof();
 
-        self::assertFalse($this->service()->hasEverVerified());
+        $this->actingAs($user);
 
-        $this->storeAnswering(Carbon::now());
+        $store = \Mockery::mock(ProofStore::class);
+        $store->shouldReceive('proofs')->once()->with($user, 'web')->andReturn([$proof]);
 
-        self::assertTrue($this->service()->hasEverVerified());
+        $this->container()->instance(ProofStore::class, $store);
+
+        self::assertSame([$proof], $this->service()->proofs());
     }
 
     /**
-     * Recording and forgetting a verification write through to the store for
-     * the identity.
+     * Without an application resolver, the application is the default guard's
+     * name.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testMarkingAndForgettingWriteThroughToTheStore(): void
+    public function testTheApplicationIsTheDefaultGuardsName(): void
     {
-        $user = $this->signIn();
+        self::assertSame('web', $this->service()->application());
 
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('markVerified')->once()->with($user);
-        $store->shouldReceive('forget')->once()->with($user);
+        config()->set('auth.defaults.guard', 'admin');
 
-        $this->container()->instance(MfaVerificationStore::class, $store);
-
-        $this->service()->markVerified();
-        $this->service()->forgetVerification();
+        self::assertSame('admin', $this->service()->application());
     }
 
     /**
-     * Without a recorded verification the identity is expired.
+     * A bound application resolver names the application for the request.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testWithoutAVerificationTheIdentityIsExpired(): void
+    public function testABoundResolverNamesTheApplication(): void
     {
-        $this->signIn();
-        $this->storeAnswering(null);
+        $request = $this->container()->make(Request::class);
 
-        self::assertTrue($this->service()->hasExpired(60));
+        $resolver = \Mockery::mock(ApplicationResolver::class);
+        $resolver->shouldReceive('resolve')->once()->with($request)->andReturn('mobile');
+
+        $this->container()->instance(ApplicationResolver::class, $resolver);
+
+        self::assertSame('mobile', $this->service()->application());
     }
 
     /**
-     * Ages of a verification, windows, and whether it is expired.
-     *
-     * @return iterable<string, array{int, ?int, bool}>
-     */
-    public static function windows(): iterable
-    {
-        yield 'just now' => [0, 60, false];
-        yield 'at the window' => [60, 60, false];
-        yield 'past the window' => [61, 60, true];
-        yield 'in the future' => [-5, 60, true];
-        yield 'a zero window' => [0, 0, true];
-        yield 'a negative window' => [0, -1, true];
-        yield 'at the configured window' => [30, null, false];
-        yield 'past the configured window' => [31, null, true];
-    }
-
-    /**
-     * A verification is expired once more minutes than the window have passed,
-     * or when it is dated in the future.
-     *
-     * @param  int  $minutesAgo
-     * @param  ?int  $window
-     * @param  bool  $expired
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    #[DataProvider('windows')]
-    public function testExpiryAgainstAGivenWindow(int $minutesAgo, ?int $window, bool $expired): void
-    {
-        Carbon::setTestNow('2026-10-31 12:00:00');
-
-        config()->set('mfa.proofs.max_age_minutes', 30);
-
-        $this->signIn();
-        $this->storeAnswering(Carbon::now()->subMinutes($minutesAgo));
-
-        self::assertSame($expired, $this->service()->hasExpired($window));
-    }
-
-    /**
-     * Without a configured window, a verification lasts the default fourteen
-     * days.
+     * A guard names its own application without a resolver, and the bound
+     * resolver's application with one.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testTheDefaultWindowIsFourteenDays(): void
+    public function testAGuardsApplicationIsItsNameUnlessAResolverNamesOne(): void
     {
-        Carbon::setTestNow('2026-10-31 12:00:00');
+        self::assertSame('admin', $this->service()->applicationFor('admin'));
 
-        $config = $this->container()->make('config');
-        $mfa    = $config->get('mfa');
+        $resolver = \Mockery::mock(ApplicationResolver::class);
+        $resolver->shouldReceive('resolve')->once()->andReturn('mobile');
 
-        self::assertIsArray($mfa);
+        $this->container()->instance(ApplicationResolver::class, $resolver);
 
-        unset($mfa['proofs']);
-        $config->set('mfa', $mfa);
-
-        $this->signIn();
-
-        $this->storeAnswering(Carbon::now()->subMinutes(20160));
-        self::assertFalse($this->service()->hasExpired());
-
-        $this->storeAnswering(Carbon::now()->subMinutes(20161));
-        self::assertTrue($this->service()->hasExpired());
+        self::assertSame('mobile', $this->service()->applicationFor('admin'));
     }
 
     /**
-     * A malformed window fails closed with an exception naming the key, rather
-     * than granting any window.
+     * Beginning a sign-in for a guard begins it on the guard's application
+     * under a fresh id, and ending it forgets only that application's.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAMalformedWindowIsRefused(): void
+    public function testBeginsAndEndsASignInOnTheGuardsApplication(): void
     {
-        Carbon::setTestNow('2026-10-31 12:00:00');
+        $user  = $this->user();
+        $store = $this->container()->make(ProofStore::class);
 
-        config()->set('mfa.proofs.max_age_minutes', 'forever');
+        $this->service()->beginSignIn($user, 'web');
+        $this->service()->beginSignIn($user, 'admin');
 
-        $this->signIn();
-        $this->storeAnswering(Carbon::now());
+        $web = $store->currentSession($user, 'web');
 
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('mfa.proofs.max_age_minutes must be an integer from 0 to 525600.');
+        self::assertIsString($web);
+        self::assertIsString($store->currentSession($user, 'admin'));
+        self::assertNotSame($web, $store->currentSession($user, 'admin'));
 
-        $this->service()->hasExpired();
+        $this->service()->endSignIn($user, 'admin');
+
+        self::assertSame($web, $store->currentSession($user, 'web'));
+        self::assertNull($store->currentSession($user, 'admin'));
     }
 
     /**
-     * Resolve the proof service.
+     * The generation a proof would be stamped with is the identity's current
+     * one once it has a sign-in on the current application, and `null` before,
+     * without reading the generation.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheGenerationToStampNeedsASignInOnTheCurrentApplication(): void
+    {
+        $user  = $this->user();
+        $store = $this->container()->make(ProofStore::class);
+
+        VerificationGeneration::advance($user);
+
+        $store->begin($user, 'admin', 'sign-in-1');
+
+        DB::connection()->enableQueryLog();
+
+        self::assertNull($this->service()->generationFor($user));
+        self::assertSame([], DB::connection()->getQueryLog());
+
+        $store->begin($user, 'web', 'sign-in-2');
+
+        self::assertSame(1, $this->service()->generationFor($user));
+    }
+
+    /**
+     * An identity with no sign-in records nothing.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRecordsNothingWithoutASignIn(): void
+    {
+        $user = $this->user();
+
+        $store = \Mockery::mock(ProofStore::class);
+        $store->shouldReceive('currentSession')->once()->with($user, 'web')->andReturnNull();
+        $store->shouldNotReceive('record');
+
+        $this->container()->instance(ProofStore::class, $store);
+
+        self::assertNull($this->service()->record($user, 0, ProofKind::RECOVERY_CODE, 'backup_code', null, null, Purpose::STEP_UP));
+
+        $store->shouldNotHaveReceived('record');
+    }
+
+    /**
+     * A recorded proof is bound to the identity, the current application, its
+     * current sign-in and the given purpose, made now under the generation it
+     * was given, observing nothing, and the store keeps it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRecordsAProofBoundToTheCurrentSignIn(): void
+    {
+        CarbonImmutable::setTestNow('2026-11-01T10:00:00.000000+00:00');
+
+        $user    = $this->user();
+        $store   = $this->container()->make(ProofStore::class);
+        $channel = new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-1');
+
+        $store->begin($user, 'web', 'sign-in-1');
+
+        VerificationGeneration::advance($user);
+
+        $proof = $this->service()->record($user, 1, ProofKind::ADDITIONAL_FACTOR, 'totp', $channel, 'factor-1', Purpose::STEP_UP);
+
+        self::assertNotNull($proof);
+        self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proof->kind);
+        self::assertSame('totp', $proof->method);
+        self::assertSame($channel, $proof->channel);
+        self::assertSame('factor-1', $proof->reference);
+        self::assertEquals(ObservedProperties::none(), $proof->properties);
+        self::assertTrue(CarbonImmutable::now()->equalTo($proof->provedAt));
+        self::assertSame([
+            'identity_type' => TestUser::class,
+            'identity_key'  => '7',
+            'application'   => 'web',
+            'session_id'    => 'sign-in-1',
+            'purpose'       => 'step_up',
+        ], $proof->binding->toArray());
+        self::assertSame(1, $proof->generation);
+        self::assertNull($proof->challengeId);
+        self::assertSame([$proof->toArray()], array_map(static fn (Proof $kept): array => $kept->toArray(), $store->proofs($user, 'web')));
+    }
+
+    /**
+     * Forgetting a factor stops its proofs counting through the store.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testForgetFactorDelegatesToTheStore(): void
+    {
+        $user = $this->user();
+
+        $store = \Mockery::mock(ProofStore::class);
+        $store->shouldReceive('forgetFactor')->once()->with($user, 'factor-1');
+
+        $this->container()->instance(ProofStore::class, $store);
+
+        $this->service()->forgetFactor($user, 'factor-1');
+
+        $store->shouldHaveReceived('forgetFactor')->once();
+    }
+
+    /**
+     * Resolve the proof service from the container.
      *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofService
      *
@@ -223,30 +304,15 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * Bind a store whose last verification is the given time.
-     *
-     * @param  ?\Carbon\Carbon  $at
-     * @return void
-     */
-    private function storeAnswering(?Carbon $at): void
-    {
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('lastVerifiedAt')->andReturn($at);
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
-    }
-
-    /**
-     * Create a test user and authenticate as them.
+     * A test user, never saved.
      *
      * @return \Tests\Fixtures\Identities\TestUser
      */
-    private function signIn(): TestUser
+    private function user(): TestUser
     {
-        /** @var \Tests\Fixtures\Identities\TestUser $user */
-        $user = TestUser::query()->create(['email' => 'proof@example.com']);
+        $user = new TestUser;
 
-        $this->actingAs($user);
+        $user->setAttribute('id', 7);
 
         return $user;
     }

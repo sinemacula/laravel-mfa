@@ -48,11 +48,10 @@ interface MultiFactorAuthenticatable extends Authenticatable
      * factors on the factor's status column (`getStatusName()`) holding
      * `FactorStatus::CONFIRMED`, read from the write connection.
      *
-     * Per-request verification freshness lives separately, on
-     * `Mfa::hasExpired()` and the verification store, so implementations should
-     * not fold "has ever verified" into this predicate: that would collapse two
-     * separate concepts. The shipped `Mfa::isSetup()` caches and reports
-     * whatever this method returns.
+     * What the current sign-in has proved lives separately, in the proof store
+     * (`Mfa::proofs()`), so implementations should not fold "has verified" into
+     * this predicate: that would collapse two separate concepts. The shipped
+     * `Mfa::isSetup()` reports whatever this method returns.
      *
      * @return bool
      */

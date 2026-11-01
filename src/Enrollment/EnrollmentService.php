@@ -11,7 +11,6 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
-use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
@@ -28,15 +27,11 @@ final readonly class EnrollmentService
      * Constructor.
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
-     * @param  \SineMacula\Laravel\Mfa\Factors\FactorStateCache  $cache
      */
     public function __construct(
 
         /** The container the event dispatcher is read from. */
         private Container $container,
-
-        /** The per-request cache of the identity's factor state. */
-        private FactorStateCache $cache,
     ) {}
 
     /**
@@ -44,8 +39,8 @@ final readonly class EnrollmentService
      *
      * The consumer constructs the factor (with secret/destination/hash already
      * populated); this method stamps ownership onto the current identity, marks
-     * a new factor confirmed, persists via `EloquentFactor::persist()`,
-     * invalidates the setup-state cache, and dispatches `MfaFactorEnrolled`.
+     * a new factor confirmed, persists via `EloquentFactor::persist()`, and
+     * dispatches `MfaFactorEnrolled`.
      *
      * Ownership is stamped, never trusted: caller-supplied morph columns on an
      * Eloquent factor are overwritten so a consumer cannot enrol a factor
@@ -53,8 +48,7 @@ final readonly class EnrollmentService
      * already report the current identity through `getAuthenticatable()`;
      * mismatches throw `FactorOwnershipMismatchException`.
      *
-     * No-op when no MFA-capable identity is resolvable, matching the
-     * `markVerified()` / `forgetVerification()` shape so consumers can call
+     * No-op when no MFA-capable identity is resolvable, so consumers can call
      * this unconditionally.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -95,8 +89,6 @@ final readonly class EnrollmentService
         } else {
             FactorOwnership::assert($factor, $identity);
         }
-
-        $this->cache->clear($identity);
 
         $events = $this->container->make(Dispatcher::class);
         $events->dispatch(new MfaFactorEnrolled($identity, $factor, $factor->getType()));

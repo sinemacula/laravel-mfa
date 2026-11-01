@@ -19,7 +19,7 @@ use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
@@ -29,14 +29,13 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
-use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
-use SineMacula\Laravel\Mfa\Proofs\SessionMfaVerificationStore;
+use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\NullMfaPolicy;
@@ -85,17 +84,17 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test binds mfa verification store to session store.
+     * Test binds the proof store to the session store.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBindsMfaVerificationStoreToSessionStore(): void
+    public function testBindsProofStoreToSessionStore(): void
     {
         self::assertInstanceOf(
-            SessionMfaVerificationStore::class,
-            $this->container()->make(MfaVerificationStore::class),
+            SessionProofStore::class,
+            $this->container()->make(ProofStore::class),
         );
     }
 
@@ -123,14 +122,12 @@ final class MfaServiceProviderTest extends TestCase
             EventContextResolver::class,
             EventDispatcher::class,
             FactorService::class,
-            FactorStateCache::class,
             DriverResolver::class,
             SmsSender::class,
             EmailSender::class,
             CodeService::class,
             MfaPolicy::class,
             RequirementService::class,
-            MfaVerificationStore::class,
             ProofService::class,
             VerificationService::class,
             EnrollmentService::class,

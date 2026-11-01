@@ -6,6 +6,7 @@ namespace Tests\Unit\Verification;
 
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -16,9 +17,10 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Attempts\Lockout;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
@@ -26,11 +28,13 @@ use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
-use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
+use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
+use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
@@ -44,7 +48,8 @@ use Tests\TestCase;
  * current identity's own factor through its own driver, send and check a
  * delivered code bound to this session, application and purpose, count the
  * outcome through the attempt service, which locks the factor at the configured
- * attempt limit, and report each outcome with its event.
+ * attempt limit, record a success's proof on the identity's sign-in, and report
+ * each outcome with its event.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -315,7 +320,7 @@ final class VerificationServiceTest extends TestCase
 
         self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
         self::assertSame('Replaced', $factor->getLabel());
-        self::assertNotNull($factor->getVerifiedAt());
+        self::assertNotNull($factor->getLastUsedAt());
         self::assertFalse($factor->isDirty());
     }
 
@@ -356,7 +361,7 @@ final class VerificationServiceTest extends TestCase
         $stored = Factor::query()->findOrFail($factor->id);
 
         self::assertNull(Code::query()->sole()->consumed_at);
-        self::assertNull($stored->getVerifiedAt());
+        self::assertNull($stored->getLastUsedAt());
         self::assertSame(1, $stored->getConsecutiveFailures());
 
         IdentityState::flushEventListeners();
@@ -425,9 +430,10 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
-     * A valid code verifies an Eloquent factor: its failures in a row reset,
-     * its verification is stamped and persisted, the identity's verification is
-     * recorded, its cached factors cleared, and the success reported.
+     * A valid code verifies an Eloquent factor on a signed-in session: its
+     * failures in a row reset, its last use is stamped and persisted, an
+     * additional factor proof of it is recorded on the sign-in for the purpose,
+     * and the success reported.
      *
      * @return void
      *
@@ -439,28 +445,31 @@ final class VerificationServiceTest extends TestCase
 
         $user   = $this->signIn();
         $factor = $this->eloquentFactor($user, failures: 2);
+        $driver = \Mockery::mock(FactorDriver::class);
 
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('markVerified')->once()->with($user);
+        $driver->shouldReceive('verify')->once()->andReturnTrue();
+        $driver->shouldReceive('channelKind')->andReturn(ChannelKind::AUTHENTICATOR_APP);
 
-        $this->container()->instance(MfaVerificationStore::class, $store);
-        $this->stubDriver($this->driverAnswering(true));
+        Auth::login($user);
 
-        $factors = $this->container()->make(FactorService::class);
-
-        self::assertCount(1, $factors->getFactors() ?? collect());
-
-        $this->eloquentFactor($user);
+        $this->stubDriver($driver);
 
         Event::fake();
 
-        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
+        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456', Purpose::STEP_UP));
 
         $factor->refresh();
 
+        $proofs = $this->container()->make(ProofService::class)->proofs();
+
         self::assertSame(0, $factor->getConsecutiveFailures());
-        self::assertTrue(Carbon::now()->equalTo($factor->getVerifiedAt()));
-        self::assertCount(2, $factors->getFactors() ?? collect());
+        self::assertTrue(Carbon::now()->equalTo($factor->getLastUsedAt()));
+        self::assertCount(1, $proofs);
+        self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proofs[0]->kind);
+        self::assertSame('totp', $proofs[0]->method);
+        self::assertSame($factor->getKey(), $proofs[0]->reference);
+        self::assertSame(Purpose::STEP_UP, $proofs[0]->binding->purpose);
+        self::assertSame(['kind' => 'authenticator_app', 'reference' => $factor->getKey()], $proofs[0]->channel?->toArray());
         Event::assertDispatched(
             MfaVerified::class,
             static fn (MfaVerified $event): bool => $event->identity === $user
@@ -505,10 +514,8 @@ final class VerificationServiceTest extends TestCase
         $user   = $this->signIn();
         $factor = $this->eloquentFactor($user, failures: 1);
 
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldNotReceive('markVerified');
+        Auth::login($user);
 
-        $this->container()->instance(MfaVerificationStore::class, $store);
         $this->stubDriver($this->driverAnswering(false));
 
         Event::fake();
@@ -519,7 +526,8 @@ final class VerificationServiceTest extends TestCase
 
         self::assertSame(2, $factor->getConsecutiveFailures());
         self::assertNull($this->lockoutOf($user, $factor));
-        self::assertNull($factor->getVerifiedAt());
+        self::assertNull($factor->getLastUsedAt());
+        self::assertSame([], $this->container()->make(ProofService::class)->proofs());
         Event::assertNotDispatched(MfaVerified::class);
         Event::assertDispatched(
             MfaVerificationFailed::class,
@@ -872,6 +880,213 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
+     * A valid backup code on a signed-in session records a recovery code proof,
+     * which travels on no channel and names no factor.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAValidBackupCodeRecordsARecoveryCodeProof(): void
+    {
+        $user   = $this->signIn();
+        $factor = $this->backupCodeFactor($user);
+
+        Auth::login($user);
+
+        self::assertTrue($this->service()->verify($this->manager(), BackupCodeDriver::NAME, $factor, 'PLAIN12345', Purpose::STEP_UP));
+
+        $proofs = $this->container()->make(ProofService::class)->proofs();
+
+        self::assertCount(1, $proofs);
+        self::assertSame(ProofKind::RECOVERY_CODE, $proofs[0]->kind);
+        self::assertSame(BackupCodeDriver::NAME, $proofs[0]->method);
+        self::assertSame(Purpose::STEP_UP, $proofs[0]->binding->purpose);
+        self::assertNull($proofs[0]->channel);
+        self::assertNull($proofs[0]->reference);
+    }
+
+    /**
+     * A backup code verified for an enrolment is refused before the attempt,
+     * since a recovery code cannot confirm an enrolment: the code is not used
+     * up, nothing is counted, nothing is proved and nothing is reported as
+     * verified.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testABackupCodeVerifiedForAnEnrollmentIsRefused(): void
+    {
+        $user   = $this->signIn();
+        $factor = $this->backupCodeFactor($user);
+
+        Auth::login($user);
+
+        Event::fake([MfaVerified::class, MfaVerificationFailed::class]);
+
+        self::assertFalse($this->service()->verify($this->manager(), BackupCodeDriver::NAME, $factor, 'PLAIN12345', Purpose::ENROLLMENT));
+        self::assertSame(hash('sha256', 'PLAIN12345'), $factor->refresh()->getSecret());
+        self::assertSame([], $this->container()->make(ProofService::class)->proofs());
+        self::assertSame(0, DB::table('mfa_attempts')->count());
+
+        Event::assertNotDispatched(MfaVerified::class);
+        Event::assertDispatched(
+            MfaVerificationFailed::class,
+            static fn (MfaVerificationFailed $event): bool => $event->identity === $user
+                && $event->factor                                              === $factor
+                && $event->driver                                              === BackupCodeDriver::NAME
+                && $event->reason                                              === FailureReason::NOT_ACCEPTED
+                && $event->detail                                              === 'A recovery code cannot confirm an enrolment.',
+        );
+    }
+
+    /**
+     * A proof is stamped with the verification generation read before the
+     * driver checked the code, so a generation advanced while it is checked
+     * leaves the proof behind rather than letting it count.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAGenerationAdvancedWhileTheCodeIsCheckedLeavesTheProofBehind(): void
+    {
+        $user   = $this->signIn();
+        $factor = $this->eloquentFactor($user);
+        $driver = \Mockery::mock(FactorDriver::class);
+
+        $driver->shouldReceive('verify')->once()->andReturnUsing(static fn (): bool => VerificationGeneration::advance($user) > 0);
+        $driver->shouldReceive('channelKind')->andReturn(ChannelKind::AUTHENTICATOR_APP);
+
+        Auth::login($user);
+
+        $this->stubDriver($driver);
+
+        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
+        self::assertSame(1, VerificationGeneration::current($user));
+        self::assertSame([], $this->container()->make(ProofService::class)->proofs());
+    }
+
+    /**
+     * A valid code for a factor whose identifier cannot name it records no
+     * proof, even on a signed-in session.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAFactorWhoseIdentifierCannotNameItRecordsNothing(): void
+    {
+        $user   = $this->signIn();
+        $factor = new InMemoryFactor(secret: 'secret', identifier: null, authenticatable: $user);
+        $driver = \Mockery::mock(FactorDriver::class);
+
+        $driver->shouldReceive('verify')->once()->andReturnTrue();
+        $driver->shouldReceive('channelKind')->andReturn(ChannelKind::AUTHENTICATOR_APP);
+
+        Auth::login($user);
+
+        $this->stubDriver($driver);
+
+        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
+        self::assertSame([], $this->container()->make(ProofService::class)->proofs());
+    }
+
+    /**
+     * A factor with an integer identifier is named by it as a string, and with
+     * no destination its channel is named by the factor too.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAnIntegerIdentifierNamesTheFactorAsAString(): void
+    {
+        $user   = $this->signIn();
+        $factor = new InMemoryFactor(secret: 'secret', identifier: 7, authenticatable: $user);
+        $driver = \Mockery::mock(FactorDriver::class);
+
+        $driver->shouldReceive('verify')->once()->andReturnTrue();
+        $driver->shouldReceive('channelKind')->andReturn(ChannelKind::AUTHENTICATOR_APP);
+
+        Auth::login($user);
+
+        $this->stubDriver($driver);
+
+        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
+
+        $proofs = $this->container()->make(ProofService::class)->proofs();
+
+        self::assertCount(1, $proofs);
+        self::assertSame('7', $proofs[0]->reference);
+        self::assertSame(['kind' => 'authenticator_app', 'reference' => '7'], $proofs[0]->channel?->toArray());
+    }
+
+    /**
+     * A delivered code verified on a signed-in session records its proof on the
+     * code's channel, named by the factor's destination, for the purpose the
+     * code was sent and checked for, and an attempt a lockout refuses records
+     * none.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function testADeliveredCodeRecordsItsProofForThePurpose(): void
+    {
+        $sender = FakeEmailSender::fake($this->container());
+        $user   = $this->signIn();
+        $factor = $this->emailFactor($user);
+
+        Auth::login($user);
+
+        $this->service()->challenge($this->manager(), 'email', $factor, Purpose::STEP_UP);
+
+        $code = $sender->lastCodeTo(self::ADDRESS);
+
+        self::assertNotNull($code);
+        self::assertTrue($this->service()->verify($this->manager(), 'email', $factor, $code, Purpose::STEP_UP));
+
+        $proofs = $this->container()->make(ProofService::class)->proofs();
+
+        self::assertCount(1, $proofs);
+        self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proofs[0]->kind);
+        self::assertSame(Purpose::STEP_UP, $proofs[0]->binding->purpose);
+        self::assertSame(['kind' => 'email', 'reference' => self::ADDRESS], $proofs[0]->channel?->toArray());
+    }
+
+    /**
+     * An attempt a lockout refuses never checks the code and records no proof,
+     * even on a signed-in session.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    public function testARefusedAttemptRecordsNoProof(): void
+    {
+        $user   = $this->signIn();
+        $factor = $this->eloquentFactor($user);
+
+        $this->container()->make(AttemptStore::class)->hold(
+            $this->container()->make(AttemptKeys::class)->factor($factor->id),
+            AttemptScope::FACTOR,
+            5,
+            now()->addHour()->getTimestamp(),
+        );
+
+        Auth::login($user);
+
+        $this->stubDriver($this->driverAnswering(null));
+
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
+        self::assertSame([], $this->container()->make(ProofService::class)->proofs());
+    }
+
+    /**
      * Assert one failure was reported, with the given reason and detail.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
@@ -1008,6 +1223,23 @@ final class VerificationServiceTest extends TestCase
             'authenticatable_id'   => $identity->getAuthIdentifier(),
             'type'                 => 'email',
             'destination'          => self::ADDRESS,
+        ]);
+    }
+
+    /**
+     * Create a backup code factor for the user, holding the hash of
+     * `PLAIN12345`.
+     *
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function backupCodeFactor(TestUser $user): Factor
+    {
+        return Factor::query()->create([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => BackupCodeDriver::NAME,
+            'secret'               => hash('sha256', 'PLAIN12345'),
         ]);
     }
 

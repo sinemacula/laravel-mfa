@@ -106,7 +106,8 @@ before anything relies on it.
   `validate()`; `src/MfaServiceProvider.php`: `boot()`, `registerManager()`.
 - `src/Console/CheckConfigurationCommand.php`; `src/Exceptions/InvalidConfigurationException.php`.
 - The readers: `src/Drivers/DriverBindings.php`, `src/RecoveryCodes/RecoveryCodeBindings.php`,
-  `src/Attempts/AttemptService.php` (`attempt()`, `lockout()`), `src/Proofs/ProofService.php` (`hasExpired()`).
+  `src/Attempts/AttemptService.php` (`attempt()`, `lockout()`), `src/Http/Middleware/RequireMfa.php`
+  (`configuredMaxAgeMinutes()`).
 
 ## Authoritative Tests
 

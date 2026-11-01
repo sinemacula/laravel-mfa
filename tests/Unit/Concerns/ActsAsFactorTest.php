@@ -116,16 +116,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test verified_at column name accessor.
-     *
-     * @return void
-     */
-    public function testGetVerifiedAtNameReturnsVerifiedAtColumn(): void
-    {
-        self::assertSame('verified_at', (new Factor)->getVerifiedAtName());
-    }
-
-    /**
      * Test get factor identifier returns model key.
      *
      * @return void
@@ -227,52 +217,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get verified at returns carbon when set.
-     *
-     * @return void
-     */
-    public function testGetVerifiedAtReturnsCarbonWhenSet(): void
-    {
-        $at     = Carbon::now();
-        $factor = new Factor(['verified_at' => $at]);
-
-        self::assertNotNull($factor->getVerifiedAt());
-        self::assertSame($at->getTimestamp(), $factor->getVerifiedAt()->getTimestamp());
-    }
-
-    /**
-     * Test get verified at returns null when unset.
-     *
-     * @return void
-     */
-    public function testGetVerifiedAtReturnsNullWhenUnset(): void
-    {
-        self::assertNull((new Factor)->getVerifiedAt());
-    }
-
-    /**
-     * Test is verified is false when verified_at is absent.
-     *
-     * @return void
-     */
-    public function testIsVerifiedIsFalseWhenVerifiedAtIsAbsent(): void
-    {
-        self::assertFalse((new Factor)->isVerified());
-    }
-
-    /**
-     * Test is verified is true when verified_at is present.
-     *
-     * @return void
-     */
-    public function testIsVerifiedIsTrueWhenVerifiedAtIsPresent(): void
-    {
-        $factor = new Factor(['verified_at' => Carbon::now()]);
-
-        self::assertTrue($factor->isVerified());
-    }
-
-    /**
      * Test get authenticatable returns null when relation not loaded.
      *
      * @return void
@@ -338,19 +282,16 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test record verification stamps the verified_at timestamp, and the last
-     * use with it.
+     * Test record verification stamps the last use.
      *
      * @return void
      */
-    public function testRecordVerificationStampsVerifiedAtTimestamp(): void
+    public function testRecordVerificationStampsLastUse(): void
     {
         $factor = $this->makeFullyPopulatedFactor();
 
         $factor->recordVerification();
 
-        self::assertNotNull($factor->getVerifiedAt());
-        self::assertSame(Carbon::now()->getTimestamp(), $factor->getVerifiedAt()->getTimestamp());
         self::assertSame(Carbon::now()->getTimestamp(), $factor->getLastUsedAt()?->getTimestamp());
     }
 
@@ -381,8 +322,8 @@ final class ActsAsFactorTest extends TestCase
 
         $factor->recordVerification($at);
 
-        self::assertNotNull($factor->getVerifiedAt());
-        self::assertSame($at->getTimestamp(), $factor->getVerifiedAt()->getTimestamp());
+        self::assertNotNull($factor->getLastUsedAt());
+        self::assertSame($at->getTimestamp(), $factor->getLastUsedAt()->getTimestamp());
     }
 
     /**

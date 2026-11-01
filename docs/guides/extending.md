@@ -12,7 +12,7 @@ models and the `Codes\MfaCodeMessage` mailable. Extension is through **compositi
 | Custom identity model      | Implement `Contracts\MultiFactorAuthenticatable` and use `Concerns\HasFactors`         |
 | Event context              | Implement `Contracts\EventContextResolver` and bind it in the container                |
 | Enforcement policy         | Implement `Contracts\MfaPolicy` and bind it in the container                           |
-| Verification store         | Implement `Contracts\MfaVerificationStore` and bind it in the container                |
+| Proof store                | Implement `Contracts\ProofStore` and bind it in the container                          |
 | SMS delivery               | Implement `Contracts\SmsSender` and bind it in the container                           |
 | Email delivery             | Implement `Contracts\EmailSender`, or use `Codes\MailEmailSender`, and bind it         |
 | Email code message         | Extend `Codes\MfaCodeMessage` and set `mfa.codes.mailable`                             |
@@ -104,11 +104,11 @@ registers it with the container, and the classes only it uses:
 
 | Namespace       | Holds                                                                                               |
 |-----------------|-----------------------------------------------------------------------------------------------------|
-| `Factors`       | Factor reads, their cache, ownership, `FactorSummary` and `OperationGuard`                          |
+| `Factors`       | Factor reads, ownership, `FactorSummary` and `OperationGuard`                                       |
 | `Drivers`       | The TOTP, email and SMS drivers, the resolver the services run drivers through, `TotpSettings`      |
 | `Codes`         | Delivered codes: `CodeService`, the senders' defaults, `MailEmailSender`, `MfaCodeMessage`          |
 | `Requirements`  | Whether MFA applies (`shouldUse()`), the default `NullMfaPolicy`, `Requirement`                     |
-| `Proofs`        | The recorded verification (`hasExpired()`), `SessionMfaVerificationStore`, `Proof`, `ProofSettings` |
+| `Proofs`        | The sign-in's proofs (`proofs()`), `SessionProofStore`, `GuardHooks`, `Proof`, `ProofSettings`      |
 | `Verification`  | `challenge()`, `verify()` and `VerificationResult`                                                  |
 | `Assurance`     | `Channel`, `ObservedProperties` and `Evaluation`                                                    |
 | `Context`       | `PendingContext` and the default event context resolver                                             |
@@ -130,8 +130,9 @@ and `Config`, `Database` and `Support` the internal helpers the capabilities sha
 `Database\StorageConnection` and `Support\FactorStateTransaction` (see [Storage](configuration.md#storage)). Each
 capability reads its own block of `config/mfa.php` through its `*Settings` class, on every call.
 `Contracts` also declares the seams the requirement, verification, enrolment and lifecycle flows are built against,
-listed in [the seam contracts design note](../design/seam-contracts.md); no shipped flow calls them yet, so none is
-bound by default, and binding one changes nothing until its flow does. The `Mfa` facade and `MfaManager`
+listed in [the seam contracts design note](../design/seam-contracts.md). Apart from `ProofStore` (see
+[Recorded proofs](proofs.md)) and `EventContextResolver`, no shipped flow calls them yet, so none is bound by default,
+and binding one changes nothing until its flow does. The `Mfa` facade and `MfaManager`
 stay the entry point: each manager method hands its call to the service of its capability, so nothing you call changes
 with the layout. The services and `*Bindings` classes are internal; extend the package through the points in the table
 above. How the layout works is described in [the capability services design note](../design/capability-services.md).

@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
@@ -16,6 +17,7 @@ use SineMacula\Laravel\Mfa\Attempts\Lockout;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
@@ -30,10 +32,10 @@ use Tests\TestCase;
  * End-to-end TOTP lifecycle feature tests.
  *
  * Exercises the full enrolment → challenge → verify flow against a real Factor
- * row, the shipped TOTP driver, and the default session-backed verification
- * store. Assertions cover the events fired, the factor state transitions, the
- * store updates, and the single use of each time step. Time is frozen in the
- * middle of a step, so no assertion straddles a step boundary.
+ * row, the shipped TOTP driver, and the default session-backed proof store.
+ * Assertions cover the events fired, the factor state transitions, the proofs
+ * recorded, and the single use of each time step. Time is frozen in the middle
+ * of a step, so no assertion straddles a step boundary.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -166,26 +168,32 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test successful TOTP verification marks the verification store.
+     * Test successful TOTP verification on a signed-in session records an
+     * additional factor proof of the factor.
      *
      * @return void
      */
-    public function testSuccessfulVerificationMarksVerificationStore(): void
+    public function testSuccessfulVerificationRecordsAProof(): void
     {
-        [, $factor, $code] = $this->enrollTotp();
+        [$user, $factor, $code] = $this->enrollTotp();
+
+        Auth::login($user);
 
         Mfa::verify('totp', $factor, $code);
 
-        self::assertTrue(Mfa::hasEverVerified());
-        self::assertFalse(Mfa::hasExpired());
+        $proofs = Mfa::proofs();
+
+        self::assertCount(1, $proofs);
+        self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proofs[0]->kind);
+        self::assertSame($factor->getKey(), $proofs[0]->reference);
     }
 
     /**
-     * Test successful TOTP verification stamps the factor verified_at.
+     * Test successful TOTP verification stamps the factor's last use.
      *
      * @return void
      */
-    public function testSuccessfulVerificationStampsFactorVerifiedAt(): void
+    public function testSuccessfulVerificationStampsFactorLastUse(): void
     {
         [, $factor, $code] = $this->enrollTotp();
 
@@ -193,7 +201,7 @@ final class TotpLifecycleTest extends TestCase
 
         $factor->refresh();
 
-        self::assertNotNull($factor->getVerifiedAt());
+        self::assertNotNull($factor->getLastUsedAt());
         self::assertSame(0, $factor->getConsecutiveFailures());
     }
 
@@ -238,7 +246,7 @@ final class TotpLifecycleTest extends TestCase
 
         $factor->refresh();
         self::assertSame(1, $factor->getConsecutiveFailures());
-        self::assertNull($factor->getVerifiedAt());
+        self::assertNull($factor->getLastUsedAt());
 
         Event::assertDispatched(
             MfaVerificationFailed::class,

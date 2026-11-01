@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Factors;
 
-use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use Tests\Fixtures\Factors\Concerns\ReportsUsableFactorDefaults;
@@ -90,28 +89,6 @@ abstract class AbstractFactorStub implements Factor
      */
     #[\Override]
     public function getSecret(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * Report whether the stub has been verified at least once.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isVerified(): bool
-    {
-        return $this->getVerifiedAt() !== null;
-    }
-
-    /**
-     * Return the stub's default verification timestamp (none).
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getVerifiedAt(): ?CarbonInterface
     {
         return null;
     }

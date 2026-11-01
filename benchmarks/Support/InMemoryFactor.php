@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace Benchmarks\Support;
 
 use Benchmarks\Support\Concerns\ReportsUsableFactorDefaults;
-use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 
@@ -31,7 +30,6 @@ final class InMemoryFactor implements Factor
      * @param  ?string  $label
      * @param  ?string  $destination
      * @param  ?string  $secret
-     * @param  ?\Carbon\CarbonInterface  $verifiedAt
      * @param  ?\Illuminate\Contracts\Auth\Authenticatable  $authenticatable
      * @return void
      */
@@ -51,9 +49,6 @@ final class InMemoryFactor implements Factor
 
         /** Stored secret / hash material the driver verifies against. */
         #[\SensitiveParameter] private ?string $secret = null,
-
-        /** Timestamp of the most recent successful verification. */
-        private ?CarbonInterface $verifiedAt = null,
 
         /** Owning authenticatable, if bound. */
         private ?Authenticatable $authenticatable = null,
@@ -134,27 +129,5 @@ final class InMemoryFactor implements Factor
     public function getSecret(): ?string
     {
         return $this->secret;
-    }
-
-    /**
-     * Return the configured verification timestamp.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getVerifiedAt(): ?CarbonInterface
-    {
-        return $this->verifiedAt;
-    }
-
-    /**
-     * Report whether the factor has been verified at least once.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isVerified(): bool
-    {
-        return $this->verifiedAt !== null;
     }
 }

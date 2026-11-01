@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
@@ -82,10 +83,40 @@ final class OtpLifecycleTest extends TestCase
         Event::assertDispatched(CodeSent::class, static fn (CodeSent $event): bool => $event->challengeId === $result->challengeId);
 
         self::assertTrue(Mfa::verify('email', $factor, $code));
-        self::assertTrue(Mfa::hasEverVerified());
         Event::assertDispatched(MfaVerified::class);
 
         self::assertFalse(Mfa::verify('email', $factor, $code));
+    }
+
+    /**
+     * Verifying an email code on a signed-in session records a proof on the
+     * email channel, named by the factor's destination, for the purpose the
+     * code was sent and checked for.
+     *
+     * @return void
+     */
+    public function testAVerifiedEmailCodeRecordsAProof(): void
+    {
+        $sender = FakeEmailSender::fake($this->container());
+        $factor = $this->enroll('email', self::ADDRESS);
+        $user   = TestUser::query()->sole();
+
+        // Signing in migrates the session, so the code is sent after it.
+        Auth::login($user);
+
+        Mfa::challenge('email', $factor, Purpose::STEP_UP);
+
+        $code = $sender->lastCodeTo(self::ADDRESS);
+
+        self::assertNotNull($code);
+        self::assertTrue(Mfa::verify('email', $factor, $code, Purpose::STEP_UP));
+
+        $proofs = Mfa::proofs();
+
+        self::assertCount(1, $proofs);
+        self::assertSame('email', $proofs[0]->method);
+        self::assertSame(Purpose::STEP_UP, $proofs[0]->binding->purpose);
+        self::assertSame(['kind' => 'email', 'reference' => self::ADDRESS], $proofs[0]->channel?->toArray());
     }
 
     /**

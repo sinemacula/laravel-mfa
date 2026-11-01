@@ -465,51 +465,14 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Determine whether the factor has ever completed a successful
-     * verification.
-     *
-     * @return bool
-     */
-    public function isVerified(): bool
-    {
-        return $this->getVerifiedAt() !== null;
-    }
-
-    /**
-     * Return when the factor was last successfully verified.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getVerifiedAt(): ?CarbonInterface
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getVerifiedAtName());
-
-        return $value instanceof CarbonInterface ? $value : null;
-    }
-
-    /**
-     * Column name holding the last-verified timestamp.
-     *
-     * @return string
-     */
-    public function getVerifiedAtName(): string
-    {
-        return 'verified_at';
-    }
-
-    /**
-     * Stamp a successful verification, as the last use too.
+     * Stamp a successful verification as the factor's last use.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
     public function recordVerification(?CarbonInterface $at = null): void
     {
-        $at ??= Carbon::now();
-
-        $this->setAttribute($this->getVerifiedAtName(), $at);
-        $this->setAttribute($this->getLastUsedAtName(), $at);
+        $this->setAttribute($this->getLastUsedAtName(), $at ?? Carbon::now());
     }
 
     /**

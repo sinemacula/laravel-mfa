@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace Benchmarks\Support;
 
 use Benchmarks\Support\Concerns\ReportsUsableFactorDefaults;
-use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 
@@ -133,27 +132,5 @@ final readonly class TotpFactor implements Factor
     public function getSecret(): string
     {
         return $this->secret;
-    }
-
-    /**
-     * Never verified.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getVerifiedAt(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
-     * Never verified.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isVerified(): bool
-    {
-        return $this->getVerifiedAt() !== null;
     }
 }

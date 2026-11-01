@@ -88,9 +88,6 @@ return new class extends Migration {
             $blueprint->timestamp('confirmed_at')->nullable();
             $blueprint->timestamp('last_used_at')->nullable();
 
-            // When verification last passed, until the proof store replaces it.
-            $blueprint->timestamp('verified_at')->nullable();
-
             $blueprint->timestamps();
         });
     }

@@ -11,7 +11,6 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
-use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
@@ -31,7 +30,6 @@ final readonly class RecoveryCodeService
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Drivers\DriverResolver  $drivers
      * @param  \SineMacula\Laravel\Mfa\Factors\FactorService  $factors
-     * @param  \SineMacula\Laravel\Mfa\Factors\FactorStateCache  $cache
      */
     public function __construct(
 
@@ -43,9 +41,6 @@ final readonly class RecoveryCodeService
 
         /** The resolver of the configured factor model. */
         private FactorService $factors,
-
-        /** The per-request cache of the identity's factor state. */
-        private FactorStateCache $cache,
     ) {}
 
     /**
@@ -59,8 +54,8 @@ final readonly class RecoveryCodeService
      * method returns.
      *
      * Each code is stored as a confirmed factor, usable as soon as it is
-     * issued, and dispatches `MfaFactorEnrolled`; the setup-state cache is
-     * invalidated so `isSetup()` reflects the new batch immediately.
+     * issued, and dispatches `MfaFactorEnrolled`; `isSetup()` reads the new
+     * batch at once.
      *
      * No-op (returns `[]`) when no MFA-capable identity is resolvable.
      *
@@ -97,8 +92,6 @@ final readonly class RecoveryCodeService
         FactorStateTransaction::forIdentity($identity, new $modelClass, function () use ($identity, $driver, $codes, $modelClass): void {
             $this->rotateBackupCodeBatch($identity, $driver, $codes, $modelClass);
         });
-
-        $this->cache->clear($identity);
 
         return $codes;
     }

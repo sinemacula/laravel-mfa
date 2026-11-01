@@ -23,7 +23,7 @@ The current note set is:
   forms, and the enums whose values are stable names.
 - `verification-lifecycle-and-events.md`: the five lifecycle events (`MfaChallengeIssued`, `MfaVerified`,
   `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`), who dispatches them, and the exact ordering
-  against driver calls and store writes.
+  against driver calls and proof writes.
 - `application-configuration.md`: the shape of the configuration (one block per application, one per capability),
   the settings classes that read and check each block on every call, the bounds they enforce, and the check of the
   whole configuration and the bindings it needs at boot, at manager resolution and from `mfa:check`.
@@ -44,8 +44,9 @@ The current note set is:
 - `delivered-codes.md`: the email and SMS codes the package sends and checks on its own: what a code is bound to, its
   keyed hash, resends, the cooldown, the attempt budget and the delivery caps, the sender contracts, and the encrypted
   queued message.
-- `per-device-verification-and-step-up.md`: the `MfaVerificationStore` seam, the default session-scoped
-  implementation, the `mfa:N` step-up route-parameter contract, and the fail-closed rules inside `hasExpired()`.
+- `proof-store.md`: the `ProofStore` seam and its session-backed default, how a sign-in begins and ends (Laravel's
+  events or the guard hooks), what makes a recorded proof stop counting, the verification generation, and how the
+  `mfa` middleware and its `mfa:N` step-up window read the proofs.
 - `factor-payload-hygiene.md`: encryption at rest for `secret`, the `FactorSummary` projection used on
   exception payloads, and the destination-masking rules.
 

@@ -18,8 +18,8 @@ factors starts with.
   `totp_algorithm`, `totp_digits` and `totp_period` stored with the factor, `last_accepted_step`, `status` (`pending`
   until confirmed, by the table's default and the model's), `preferred`, the durable `consecutive_failures` and
   `disabled_at` of the failure ceiling, the `application` it was enrolled through, `confirmed_at` and `last_used_at`.
-  `verified_at` stays until the proof store replaces its readers. A delivered code is never on the factor: it lives in
-  `mfa_codes`.
+  A delivered code is never on the factor: it lives in `mfa_codes`. A successful verification is recorded as a proof
+  on the session (see the proof store note), not on the factor.
 - `mfa_identity_states`, one row per owner and the lock of every serialised change: `verification_generation`,
   `reenrollment_required`, the identity's `consecutive_failures` and `locked_until`, and `recovery_codes_generation`
   and `recovery_codes_generated_at`.

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Performance;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
@@ -37,10 +38,11 @@ final class VerifyQueryBudgetTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * A successful TOTP verify must stay within the documented nine-query
-     * budget: the IP address's slot taken and given back, the identity's state
-     * lock and its factors, the identity's state and the factor's lockout read
-     * under the lock, the accepted step's compare-and-set and the factor-row
+     * A successful TOTP verify on a signed-in session must stay within the
+     * documented ten-query budget: the IP address's slot taken and given back,
+     * the identity's state lock and its factors, the identity's state and the
+     * factor's lockout read under the lock, the verification generation its
+     * proof carries, the accepted step's compare-and-set and the factor-row
      * update.
      *
      * @return void
@@ -63,13 +65,14 @@ final class VerifyQueryBudgetTest extends TestCase
 
         // Budget: the IP slot (an update, and an insert for its first window),
         // the identity state lock and the factors locked under it, the identity
-        // state and the factor lockout read under the lock, the slot given
-        // back, one conditional update recording the accepted time step, and
-        // one update on the factor row for recordVerification. The verification
-        // store is session-backed in the default binding, so its write goes
-        // through the session driver, not the database.
+        // state and the factor lockout read under the lock, one read of the
+        // identity's verification generation, taken before the code is checked
+        // and carried by the proof, one conditional update recording the
+        // accepted time step, one update on the factor row for
+        // recordVerification, and the slot given back. The proof itself is
+        // written to the session, not the database.
         self::assertLessThanOrEqual(
-            9,
+            10,
             $count,
             sprintf('TOTP verify hit exceeded query budget: %d queries', $count),
         );
@@ -109,7 +112,8 @@ final class VerifyQueryBudgetTest extends TestCase
 
         // Locked factor: the IP slot taken and given back, the identity state
         // lock and its factors, and the identity state and factor lockout
-        // reads; the driver never runs and nothing is counted.
+        // reads; the code is never checked, so the verification generation is
+        // never read, and nothing is counted or proved.
         self::assertLessThanOrEqual(
             7,
             $count,
@@ -118,10 +122,11 @@ final class VerifyQueryBudgetTest extends TestCase
     }
 
     /**
-     * A failed TOTP verify must stay within ten queries: the reads and locks of
-     * a hit, the identity's failure counted in its window and its state row,
-     * and the factor's failure in a row, with no step recorded and no
-     * verification store write.
+     * A failed TOTP verify on a signed-in session must stay within eleven
+     * queries: the reads and locks of a hit, including the verification
+     * generation read before the code is checked, the identity's failure
+     * counted in its window and its state row, and the factor's failure in a
+     * row, with no step recorded and no proof.
      *
      * @return void
      */
@@ -139,21 +144,21 @@ final class VerifyQueryBudgetTest extends TestCase
             static fn () => Mfa::verify('totp', $factor, '000000'),
         );
 
-        // The six reads and locks of a hit before the driver, the identity's
-        // window counted in one upsert and read back, its state row and the
-        // factor row updated. No code matches, so no step is recorded, and the
-        // IP slot is kept, not given back. No verification store write on
+        // The seven reads and locks of a hit before the code is checked, the
+        // identity's window counted in one upsert and read back, its state row
+        // and the factor row updated. No code matches, so no step is recorded,
+        // and the IP slot is kept, not given back. No proof is recorded on
         // failure.
         self::assertLessThanOrEqual(
-            10,
+            11,
             $count,
             sprintf('TOTP verify miss exceeded query budget: %d queries', $count),
         );
     }
 
     /**
-     * Create a fresh MFA-enrolled test user and authenticate as them for the
-     * rest of the scenario.
+     * Create a fresh MFA-enrolled test user and sign them in for the rest of
+     * the scenario, so a verification has a sign-in to record its proof on.
      *
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -164,7 +169,7 @@ final class VerifyQueryBudgetTest extends TestCase
             'mfa_enabled' => true,
         ]);
 
-        $this->actingAs($user);
+        Auth::login($user);
 
         return $user;
     }

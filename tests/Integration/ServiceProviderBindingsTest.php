@@ -10,13 +10,13 @@ use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
 use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
-use SineMacula\Laravel\Mfa\Proofs\SessionMfaVerificationStore;
+use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\Requirements\NullMfaPolicy;
 use Tests\TestCase;
 
@@ -67,18 +67,18 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `MfaVerificationStore` contract must
-     * resolve to the session-backed default.
+     * Without a consumer override the `ProofStore` contract must resolve to the
+     * session-backed default.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testDefaultVerificationStoreIsSessionBacked(): void
+    public function testDefaultProofStoreIsSessionBacked(): void
     {
-        $store = $this->container()->make(MfaVerificationStore::class);
+        $store = $this->container()->make(ProofStore::class);
 
-        self::assertInstanceOf(SessionMfaVerificationStore::class, $store);
+        self::assertInstanceOf(SessionProofStore::class, $store);
     }
 
     /**

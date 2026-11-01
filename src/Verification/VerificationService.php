@@ -4,35 +4,35 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Verification;
 
-use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Manager;
+use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
-use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
-use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
@@ -46,7 +46,9 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  * name, and the Laravel session the request runs in. Every other factor goes
  * through its driver. Every verification is an attempt made through
  * `Attempts\AttemptService`, so it is counted, and refused while a lockout
- * applies, whichever way its code is checked.
+ * applies, whichever way its code is checked. A verification that passes
+ * records its proof on the identity's current sign-in through
+ * `Proofs\ProofService`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -60,18 +62,18 @@ final readonly class VerificationService
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Drivers\DriverResolver  $drivers
-     * @param  \SineMacula\Laravel\Mfa\Factors\FactorStateCache  $cache
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
      */
     public function __construct(
 
-        /** The container the store, dispatcher and config are read from. */
+        /** The container the services, dispatcher and session are read from. */
         private Container $container,
 
         /** The resolver of the factor drivers. */
         private DriverResolver $drivers,
 
-        /** The per-request cache of the identity's factor state. */
-        private FactorStateCache $cache,
+        /** The recorder of the proofs a verification makes. */
+        private ProofService $proofs,
     ) {}
 
     /**
@@ -153,15 +155,24 @@ final readonly class VerificationService
      * - So a secret replaced in the meantime is the one checked, and a factor
      *   removed in the meantime is reported as not found without checking
      *   anything.
+     * - Just before the code is checked, under that lock, the identity's
+     *   verification generation is read, when it has a sign-in a proof can be
+     *   recorded on, so a generation advanced while the code is checked leaves
+     *   the proof behind.
      * - On success, inside the same transaction: a delivered code is used up
-     *   and the factor's verified-at stamped, so they commit with the count and
+     *   and the factor's last use stamped, so they commit with the count and
      *   two requests with the same code cannot both pass.
      * - Once the code is checked, the instance passed in is brought up to date
-     *   with the stored factor. On success the identity-level verification is
-     *   recorded through the bound store and `MfaVerified` dispatched; on
-     *   failure `MfaVerificationFailed` is dispatched with a machine-readable
-     *   reason, `locked` for an attempt a lockout refused and `not_found` for a
-     *   factor removed in the meantime.
+     *   with the stored factor. On success the proof is recorded on the
+     *   identity's current sign-in through the bound proof store, for the
+     *   purpose, and `MfaVerified` dispatched; on failure
+     *   `MfaVerificationFailed` is dispatched with a machine-readable reason,
+     *   `locked` for an attempt a lockout refused and `not_found` for a factor
+     *   removed in the meantime.
+     *
+     * A backup code verified for an enrolment is refused before the attempt,
+     * with `not_accepted`, since a recovery code cannot confirm an enrolment:
+     * the code is not used up and nothing is counted.
      *
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account MFA-bypass
@@ -197,17 +208,59 @@ final readonly class VerificationService
 
         $events   = $this->container->make(Dispatcher::class);
         $resolved = $this->drivers->resolve($registry, $driver);
-        $binding  = $resolved instanceof CodeDeliveryDriver ? $this->binding($identity, $purpose) : null;
-        $verified = $factor;
-        $check    = null;
+
+        // A recovery code cannot confirm an enrolment, so it is refused before
+        // the attempt is made: the single-use code is not spent, nothing is
+        // counted and nothing is reported as verified.
+        if ($resolved instanceof BackupCodeDriver && $purpose === Purpose::ENROLLMENT) {
+            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, FailureReason::NOT_ACCEPTED, 'A recovery code cannot confirm an enrolment.'));
+
+            return false;
+        }
+
+        return $this->makeAttempt($identity, $factor, $driver, $resolved, $code, $purpose, $events);
+    }
+
+    /**
+     * Make the attempt to verify the code against the factor through the
+     * resolved driver, for the purpose given, and apply what it found: bring
+     * the factor up to date, record the proof on success, and dispatch the
+     * outcome.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $driver
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $resolved
+     * @param  string  $code
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @param  \Illuminate\Contracts\Events\Dispatcher  $events
+     * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    private function makeAttempt(
+        MultiFactorAuthenticatable $identity,
+        Factor $factor,
+        string $driver,
+        FactorDriver $resolved,
+        #[\SensitiveParameter] string $code,
+        Purpose $purpose,
+        Dispatcher $events,
+    ): bool {
+        $binding    = $resolved instanceof CodeDeliveryDriver ? $this->binding($identity, $purpose) : null;
+        $verified   = $factor;
+        $check      = null;
+        $generation = null;
 
         // The current identity's own session makes the attempt, so the identity
         // is charged for it.
         $outcome = $this->container->make(AttemptService::class)->attempt(
             new Attempt($identity, $factor, $purpose, $this->ip()),
-            function (?Factor $stored) use ($resolved, $binding, $code, &$verified, &$check): bool {
+            function (?Factor $stored) use ($identity, $resolved, $binding, $code, &$verified, &$check, &$generation): bool {
 
-                $verified = $stored ?? $verified;
+                $verified   = $stored ?? $verified;
+                $generation = $this->proofs->generationFor($identity);
 
                 return $this->isAccepted($resolved, $binding, $verified, $code, $check);
             },
@@ -226,6 +279,10 @@ final readonly class VerificationService
 
         if ($factor instanceof Model && $verified instanceof Model && $verified !== $factor) {
             $factor->setRawAttributes($verified->getAttributes(), true);
+        }
+
+        if ($outcome->passed && $generation !== null) {
+            $this->recordProof($identity, $generation, $factor, $driver, $resolved, $purpose);
         }
 
         $this->finalizeVerification($identity, $factor, $driver, $outcome->passed, $check, $events);
@@ -282,8 +339,49 @@ final readonly class VerificationService
     }
 
     /**
-     * Apply the post-verify side effects: stamp the identity-level verification
-     * through the bound store and dispatch `MfaVerified` on success, or
+     * Record the proof a successful verification made on the identity's current
+     * sign-in, for the purpose it was made for, stamped with the verification
+     * generation read before the code was checked: a recovery code proof for a
+     * backup code, which travels on no channel, and an additional factor proof
+     * on the factor's channel otherwise, named by the factor's destination when
+     * it has one and by the factor itself when not. A driver whose channel
+     * cannot carry a factor proves nothing, and neither does a factor whose
+     * identifier cannot name it. A recovery code never reaches here for an
+     * enrolment, which `verify()` refuses before the attempt.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  int  $generation
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $driver
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $resolved
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function recordProof(MultiFactorAuthenticatable $identity, int $generation, Factor $factor, string $driver, FactorDriver $resolved, Purpose $purpose): void
+    {
+        if ($resolved instanceof BackupCodeDriver) {
+            $this->proofs->record($identity, $generation, ProofKind::RECOVERY_CODE, $driver, null, null, $purpose);
+
+            return;
+        }
+
+        $identifier = $factor->getFactorIdentifier();
+        $kind       = $resolved->channelKind();
+
+        if (!$kind->carriesFactor() || (!is_string($identifier) && !is_int($identifier))) {
+            return;
+        }
+
+        $reference = (string) $identifier;
+        $channel   = new Channel($kind, $factor->getDestination() ?? $reference);
+
+        $this->proofs->record($identity, $generation, ProofKind::ADDITIONAL_FACTOR, $driver, $channel, $reference, $purpose);
+    }
+
+    /**
+     * Apply the post-verify side effects: dispatch `MfaVerified` on success, or
      * classify the failure and dispatch `MfaVerificationFailed` with a
      * machine-readable reason on failure.
      *
@@ -294,17 +392,10 @@ final readonly class VerificationService
      * @param  ?\SineMacula\Laravel\Mfa\Enums\CodeCheck  $check
      * @param  \Illuminate\Contracts\Events\Dispatcher  $events
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     private function finalizeVerification(MultiFactorAuthenticatable $identity, Factor $factor, string $driver, bool $valid, ?CodeCheck $check, Dispatcher $events): void
     {
         if ($valid) {
-            /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
-            $store = $this->container->make(MfaVerificationStore::class);
-            $store->markVerified($identity);
-            $this->cache->clear($identity);
-
             $events->dispatch(new MfaVerified($identity, $factor, $driver));
 
             return;
@@ -339,7 +430,7 @@ final readonly class VerificationService
         return new ProofBinding(
             CurrentIdentity::typeOf($identity),
             self::identityKey($identity),
-            $this->application(),
+            $this->proofs->application(),
             $this->container->make(Session::class)->getId(),
             $purpose,
         );
@@ -362,22 +453,5 @@ final readonly class VerificationService
         }
 
         return (string) $key;
-    }
-
-    /**
-     * The application the request is for: the one a bound `ApplicationResolver`
-     * names, otherwise the default guard's name.
-     *
-     * @return string
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    private function application(): string
-    {
-        if ($this->container->bound(ApplicationResolver::class) && $this->container->bound('request')) {
-            return $this->container->make(ApplicationResolver::class)->resolve($this->container->make('request'));
-        }
-
-        return $this->container->make(AuthManager::class)->getDefaultDriver();
     }
 }

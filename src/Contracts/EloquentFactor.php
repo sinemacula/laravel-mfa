@@ -168,13 +168,6 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
     public function getSecretName(): string;
 
     /**
-     * Column name holding the last-verified timestamp.
-     *
-     * @return string
-     */
-    public function getVerifiedAtName(): string;
-
-    /**
      * Mark the factor confirmed, and so usable, at the given time or now. Does
      * not persist: callers invoke `persist()` once the change is complete.
      *
@@ -184,9 +177,9 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
     public function confirm(?CarbonInterface $at = null): void;
 
     /**
-     * Record a successful verification. Stamps the verified-at and last-used
-     * timestamps. Does NOT persist — callers invoke `persist()` once the full
-     * orchestration step is complete.
+     * Record a successful verification. Stamps the last-used timestamp. Does
+     * NOT persist — callers invoke `persist()` once the full orchestration step
+     * is complete.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void

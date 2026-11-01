@@ -4,14 +4,26 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Proofs;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Container\Container;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use SineMacula\Laravel\Mfa\Assurance\Channel;
+use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
+use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
- * Records and reads the current identity's verification through the bound
- * `MfaVerificationStore`.
+ * Records and reads the current identity's proofs through the bound
+ * `ProofStore`, on the application of the current request: the one a bound
+ * `ApplicationResolver` names, or the default guard's name without one. It also
+ * begins and ends an identity's sign-in on the application a guard signs it in
+ * to.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,114 +39,190 @@ final readonly class ProofService
      */
     public function __construct(
 
-        /** The container the store and config are read from. */
+        /** The container the store, the request and the application resolver are read from. */
         private Container $container,
     ) {}
 
     /**
-     * Determine whether the current identity has ever completed a successful
-     * MFA verification (on any device tracked by the bound verification store).
+     * The proofs of the current identity's sign-in on the current application
+     * that still count, oldest first: none without an MFA-capable identity or a
+     * sign-in.
      *
-     * @return bool
+     * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function hasEverVerified(): bool
+    public function proofs(): array
     {
         $identity = CurrentIdentity::resolve();
 
         if ($identity === null) {
-            return false;
+            return [];
         }
 
-        return $this->store()->lastVerifiedAt($identity) !== null;
+        return $this->store()->proofs($identity, $this->application());
     }
 
     /**
-     * Determine whether the current identity's MFA verification has expired.
-     * Returns true when no prior verification exists OR the recorded
-     * verification is older than `$expiresAfter` minutes, or than
-     * `mfa.proofs.max_age_minutes` when none is given.
+     * Begin a new sign-in for the identity on the application the guard signed
+     * it in to, named by a fresh random id, so nothing the identity proved
+     * before there carries over.
      *
-     * @param  ?int  $expiresAfter
-     * @return bool
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $guard
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function beginSignIn(MultiFactorAuthenticatable $identity, string $guard): void
+    {
+        $this->store()->begin($identity, $this->applicationFor($guard), Str::lower((string) Str::ulid()));
+    }
+
+    /**
+     * Forget the identity's sign-in on the application the guard signed it out
+     * of, and every proof of it.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $guard
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function endSignIn(MultiFactorAuthenticatable $identity, string $guard): void
+    {
+        $this->store()->forget($identity, $this->applicationFor($guard));
+    }
+
+    /**
+     * The verification generation a proof the identity is about to make would
+     * be stamped with, read before the proof is checked so a generation
+     * advanced while it is checked leaves the proof behind; `null` when the
+     * identity has no sign-in on the current application the store knows of, so
+     * nothing would be recorded.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @return ?int
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function generationFor(MultiFactorAuthenticatable $identity): ?int
+    {
+        if ($this->store()->currentSession($identity, $this->application()) === null) {
+            return null;
+        }
+
+        return VerificationGeneration::current($identity);
+    }
+
+    /**
+     * Record a proof the identity has just made on the current application,
+     * bound to its current sign-in and stamped with the verification generation
+     * read before the proof was checked, observing nothing beyond the proof
+     * itself, and return it; `null` when the identity has no sign-in the store
+     * knows of, so nothing is recorded.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  int  $generation
+     * @param  \SineMacula\Laravel\Mfa\Enums\ProofKind  $kind
+     * @param  string  $method
+     * @param  ?\SineMacula\Laravel\Mfa\Assurance\Channel  $channel
+     * @param  ?string  $reference
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function hasExpired(?int $expiresAfter = null): bool
+    public function record(MultiFactorAuthenticatable $identity, int $generation, ProofKind $kind, string $method, ?Channel $channel, ?string $reference, Purpose $purpose): ?Proof
     {
-        $identity = CurrentIdentity::resolve();
+        $store       = $this->store();
+        $application = $this->application();
+        $session     = $store->currentSession($identity, $application);
 
-        if ($identity === null) {
-            return true;
+        if ($session === null) {
+            return null;
         }
 
-        $verifiedAt = $this->store()->lastVerifiedAt($identity);
-        $window     = $expiresAfter ?? (new ProofSettings($this->container->make('config')))->maxAgeMinutes();
+        $owner = ProofOwner::of($identity);
 
-        // `verifiedAt === null` means no prior verification exists.
-        // `window <= 0` is the documented "require verification on every
-        // request" setting and treats any prior verification as expired.
-        if ($verifiedAt === null || $window <= 0) {
-            return true;
-        }
+        $proof = new Proof(
+            $kind,
+            $method,
+            $channel,
+            $reference,
+            ObservedProperties::none(),
+            CarbonImmutable::now(),
+            new ProofBinding($owner->type, $owner->key, $application, $session, $purpose),
+            $generation,
+        );
 
-        // A negative `elapsed` means `verifiedAt` is in the future (clock skew
-        // or a malicious store write): treat as expired rather than trusting a
-        // future-dated verification.
-        $elapsed = $verifiedAt->diffInMinutes(Carbon::now(), false);
+        $store->record($proof);
 
-        return $elapsed < 0 || $elapsed > $window;
+        return $proof;
     }
 
     /**
-     * Record that the current identity has completed a successful MFA
-     * verification. Writes through to the bound verification store.
+     * Stop counting every proof the identity made with the factor.
      *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $factorId
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function markVerified(): void
+    public function forgetFactor(MultiFactorAuthenticatable $identity, string $factorId): void
     {
-        $identity = CurrentIdentity::resolve();
-
-        if ($identity === null) {
-            return;
-        }
-
-        $this->store()->markVerified($identity);
+        $this->store()->forgetFactor($identity, $factorId);
     }
 
     /**
-     * Clear any stored verification timestamp for the current identity.
+     * The application of the current request: the one a bound
+     * `ApplicationResolver` names for it, or the default guard's name.
      *
-     * @return void
+     * @return string
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function forgetVerification(): void
+    public function application(): string
     {
-        $identity = CurrentIdentity::resolve();
-
-        if ($identity === null) {
-            return;
-        }
-
-        $this->store()->forget($identity);
+        return $this->applicationFor(Auth::getDefaultDriver());
     }
 
     /**
-     * Resolve the bound verification store.
+     * The application a guard acts for on the current request: the one a bound
+     * `ApplicationResolver` names for the request, or the guard's name.
      *
-     * @return \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore
+     * @param  string  $guard
+     * @return string
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function store(): MfaVerificationStore
+    public function applicationFor(string $guard): string
     {
-        /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore */
-        return $this->container->make(MfaVerificationStore::class);
+        $request = $this->container->bound('request') ? $this->container->make('request') : null;
+
+        if ($request instanceof Request && $this->container->bound(ApplicationResolver::class)) {
+            return $this->container->make(ApplicationResolver::class)->resolve($request);
+        }
+
+        return $guard;
+    }
+
+    /**
+     * Resolve the bound proof store.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function store(): ProofStore
+    {
+        return $this->container->make(ProofStore::class);
     }
 }

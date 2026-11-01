@@ -82,8 +82,8 @@ are described here.
   the factors as stored under the lock. The service reads the identity's state, finds the attempted factor among the
   locked ones, reads the factor's lockout row, and refuses the attempt while a lockout applies.
 - Otherwise it runs the verification inside the transaction, so a driver's own change (a TOTP step) and the verification
-  service's record of a success (the delivered code used up, `verified_at`, `last_used_at`) commit with the count, and
-  counts the outcome on the locked rows: a success resets as above; a failure records the identity's window, in one
+  service's record of a success (the delivered code used up, `last_used_at`) commit with the count, and counts the
+  outcome on the locked rows: a success resets as above; a failure records the identity's window, in one
   upsert, and its run, then the factor's failures in a row, its lockout or its disablement.
 - The identity's state row is read `FOR UPDATE`, a lock the transaction already holds, so a lockout committed while the
   attempt waited is never answered from an older snapshot. The throttle rows are read with plain reads: a locking read

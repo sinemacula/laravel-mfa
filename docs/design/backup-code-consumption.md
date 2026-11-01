@@ -40,9 +40,9 @@ concurrent requests, not just sequential ones.
   the lock, compares the candidate's hash with the stored one again, writes `null` to the secret column, commits.
 - The driver runs inside the attempt's transaction (see [Attempts and Lockout](attempts-and-lockout.md)), so its own
   factor state transaction nests in it; the attempt service then resets the factor's failures in a row. The
-  verification service runs `recordVerification()` on the factor (stamps `verified_at`) and persists;
-  `finalizeVerification()` writes the identity-level verification through the bound store and dispatches
-  `MfaVerified`.
+  verification service runs `recordVerification()` on the factor (stamps `last_used_at`) and persists;
+  `recordProof()` records a recovery code proof on the identity's sign-in through the bound proof store, and
+  `finalizeVerification()` dispatches `MfaVerified`.
 - A fresh batch via `issueBackupCodes()` deletes old rows, inserts new rows (each with the SHA-256 digest on
   `secret`, stored confirmed since a code is usable as soon as it is issued), dispatches `MfaFactorEnrolled` once per
   new code, and returns the plaintext list to the caller. Being confirmed, the rows count towards `isMfaEnabled()` as

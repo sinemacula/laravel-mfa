@@ -18,13 +18,12 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
  * Coverage for the FQCN-fallback paths behind the manager.
  *
  * `Support\CurrentIdentity::typeOf()`, which
- * `Factors\FactorOwnership::assert()`, the `Factors\FactorStateCache` key
- * prefix and backup-code issuing all use, branches on whether the identity is a
- * `Model` — Eloquent identities use `getMorphClass()`, non-Eloquent identities
- * fall back to a strict FQCN comparison. The shipped test identities
- * (`TestUser`, `SecondaryUser`, `NonScalarIdentifierUser`) are all Eloquent, so
- * a dedicated non-Eloquent fixture is needed to drive the FQCN branches and
- * keep coverage at 100%.
+ * `Factors\FactorOwnership::assert()`, the proof store and backup-code issuing
+ * all use, branches on whether the identity is a `Model` — Eloquent identities
+ * use `getMorphClass()`, non-Eloquent identities fall back to a strict FQCN
+ * comparison. The shipped test identities (`TestUser`, `SecondaryUser`,
+ * `NonScalarIdentifierUser`) are all Eloquent, so a dedicated non-Eloquent
+ * fixture is needed to drive the FQCN branches and keep coverage at 100%.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

@@ -4,24 +4,31 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Http\Middleware;
 
+use Carbon\CarbonImmutable;
+use Illuminate\Container\Container;
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
+use SineMacula\Laravel\Mfa\Proofs\ProofSettings;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Require MFA middleware.
  *
- * Gates incoming requests behind a valid MFA verification. Throws one of two
- * structured exceptions depending on the identity's state, so the consuming
- * application can render different UIs for each case:
+ * Gates incoming requests behind a valid MFA verification: a proof of an
+ * additional factor or a recovery code recorded on the identity's current
+ * sign-in, read through `Mfa::proofs()`. Throws one of two structured
+ * exceptions depending on the identity's state, so the consuming application
+ * can render different UIs for each case:
  *
- * - No factors set up OR factors exist but the identity has never verified →
- *   `MfaRequiredException`
- * - Prior verification exists but has aged past the configured expiry window →
- *   `MfaExpiredException`
+ * - No factors set up OR factors exist but the current sign-in holds no such
+ *   proof → `MfaRequiredException`
+ * - The newest such proof has aged past the configured window, or is dated in
+ *   the future → `MfaExpiredException`
  *
  * Both exceptions carry a list of `FactorSummary` records with masked delivery
  * destinations so they are safe to ship through JSON response bodies and log
@@ -76,15 +83,74 @@ final class RequireMfa
             throw new MfaRequiredException($summaries);
         }
 
-        if (!Mfa::hasEverVerified()) {
+        $verifiedAt = $this->lastVerifiedAt();
+
+        if ($verifiedAt === null) {
             throw new MfaRequiredException($summaries);
         }
 
-        if (Mfa::hasExpired($expiresAfter)) {
+        if ($this->hasExpired($verifiedAt, $expiresAfter ?? $this->configuredMaxAgeMinutes())) {
             throw new MfaExpiredException($summaries);
         }
 
         return $next($request);
+    }
+
+    /**
+     * When the newest proof of an additional factor or a recovery code on the
+     * identity's current sign-in was made, or `null` when it holds none.
+     *
+     * @return ?\Carbon\CarbonImmutable
+     */
+    private function lastVerifiedAt(): ?CarbonImmutable
+    {
+        $verifiedAt = null;
+
+        foreach (Mfa::proofs() as $proof) {
+
+            $verifies = $proof->kind === ProofKind::ADDITIONAL_FACTOR || $proof->kind === ProofKind::RECOVERY_CODE;
+
+            if (!$verifies || ($verifiedAt !== null && !$proof->provedAt->greaterThan($verifiedAt))) {
+                continue;
+            }
+
+            $verifiedAt = $proof->provedAt;
+        }
+
+        return $verifiedAt;
+    }
+
+    /**
+     * Whether a verification made at the given time is too old for the window:
+     * a window of zero or less treats every verification as expired, and one
+     * dated in the future (clock skew or a tampered store) is never trusted.
+     *
+     * @param  \Carbon\CarbonImmutable  $verifiedAt
+     * @param  int  $maxAgeMinutes
+     * @return bool
+     */
+    private function hasExpired(CarbonImmutable $verifiedAt, int $maxAgeMinutes): bool
+    {
+        if ($maxAgeMinutes <= 0) {
+            return true;
+        }
+
+        $elapsed = $verifiedAt->diffInMinutes(CarbonImmutable::now(), false);
+
+        return $elapsed < 0 || $elapsed > $maxAgeMinutes;
+    }
+
+    /**
+     * The window `mfa.proofs.max_age_minutes` configures, in minutes.
+     *
+     * @return int
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    private function configuredMaxAgeMinutes(): int
+    {
+        return (new ProofSettings(Container::getInstance()->make(Repository::class)))->maxAgeMinutes();
     }
 
     /**

@@ -288,7 +288,6 @@ final class FactorTest extends TestCase
             'application',
             'confirmed_at',
             'last_used_at',
-            'verified_at',
         ], (new Factor)->getFillable());
     }
 
