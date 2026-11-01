@@ -32,7 +32,6 @@ final class StorageBindings
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\ModelOffStorageConnectionException
      */

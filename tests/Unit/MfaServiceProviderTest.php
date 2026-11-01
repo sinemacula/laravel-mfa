@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Exceptions\ModelOffStorageConnectionException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
@@ -33,6 +34,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\NullMfaPolicy;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
+use Tests\Fixtures\Factors\SecondaryConnectionFactor;
 use Tests\TestCase;
 
 /**
@@ -144,6 +146,23 @@ final class MfaServiceProviderTest extends TestCase
         self::assertInstanceOf(EmailDriver::class, $manager->driver('email'));
         self::assertInstanceOf(SmsDriver::class, $manager->driver('sms'));
         self::assertInstanceOf(BackupCodeDriver::class, $manager->driver('backup_code'));
+    }
+
+    /**
+     * Booting checks that the configured factor model lives on the storage
+     * connection, refusing one on another connection before anything is served.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBootRefusesAFactorModelOffTheStorageConnection(): void
+    {
+        $this->container()->make(Repository::class)->set('mfa.factor.model', SecondaryConnectionFactor::class);
+
+        $this->expectException(ModelOffStorageConnectionException::class);
+
+        (new MfaServiceProvider($this->container()))->boot();
     }
 
     /**

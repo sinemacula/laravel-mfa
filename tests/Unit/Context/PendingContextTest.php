@@ -97,7 +97,7 @@ final class PendingContextTest extends TestCase
         $bound = 'The first factor of a pending session must be bound to its identity, application and session.';
 
         yield 'blank application' => [['application' => ' '], 'The application of a pending session must not be blank.'];
-        yield 'blank session id' => [['sessionId' => ''], 'The session id of a pending session must not be blank.'];
+        yield 'blank session id' => [['sessionId' => ' '], 'The session id of a pending session must not be blank.'];
         yield 'not a first factor' => [
             ['firstFactor' => self::proof(['binding' => self::binding(Purpose::STEP_UP)])],
             'The first factor of a pending session must be a proof of kind [first_factor].',
