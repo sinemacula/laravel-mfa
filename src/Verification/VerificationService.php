@@ -147,11 +147,12 @@ final readonly class VerificationService
      *   refused without checking the code while a lockout applies, otherwise
      *   counted with its outcome under the identity's factor state lock.
      * - The code is checked against the factor as stored under that lock, not
-     *   the instance passed in, so a secret replaced in the meantime is the one
-     *   checked, and a factor removed in the meantime is reported as not found
-     *   without checking anything: through the code service, against the code
+     *   the instance passed in: through the code service, against the code
      *   sent for this session and the purpose, for a driver that delivers
      *   codes; through the driver's verification logic otherwise.
+     * - So a secret replaced in the meantime is the one checked, and a factor
+     *   removed in the meantime is reported as not found without checking
+     *   anything.
      * - On success, inside the same transaction: a delivered code is used up
      *   and the factor's verified-at stamped, so they commit with the count and
      *   two requests with the same code cannot both pass.

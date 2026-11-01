@@ -74,7 +74,10 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   for the commit; `MfaChallengeIssued`; a `Codes\SendResult` with the challenge's id and expiry.
 - `Mfa::verify('email', $factor, $code)` with the same purpose, in the same session: `CodeService::check()`: the
   read, the counting `UPDATE`, the comparison and the using `UPDATE`; then the factor's verification is recorded as
-  for any type.
+  for any type. The check runs inside the attempt the attempt service makes (see
+  [Attempts and Lockout](attempts-and-lockout.md)), so a lockout refuses it before the challenge is read, spending none
+  of its attempts, and its outcome is counted against the factor, the identity and the address in the same transaction
+  as the code's own attempt and use.
 
 ## Failure / Edge Cases
 
@@ -101,6 +104,7 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   `src/Codes/NullEmailSender.php`, `src/Codes/MailEmailSender.php`, `src/Codes/MfaCodeMessage.php`.
 - `src/Testing/FakeSmsSender.php`, `src/Testing/FakeEmailSender.php`, `src/Testing/FakeSenderBinding.php`.
 - `src/Verification/VerificationService.php`: the binding of a request and the routing of delivered codes.
+- `src/Attempts/AttemptService.php`: the attempt a check runs inside, and the lockouts that refuse it.
 
 ## Authoritative Tests
 
