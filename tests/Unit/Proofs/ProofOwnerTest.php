@@ -123,6 +123,22 @@ final class ProofOwnerTest extends TestCase
     }
 
     /**
+     * The owner holds a sign-in only through a binding that names it, the
+     * application and the sign-in's session id.
+     *
+     * @return void
+     */
+    public function testOwnsASignInOnlyThroughABindingNamingItsApplicationAndSession(): void
+    {
+        $owner = new ProofOwner('user', '7');
+
+        self::assertTrue($owner->ownsSignIn(new ProofBinding('user', '7', 'web', 'sign-in-1', Purpose::STEP_UP), 'web', 'sign-in-1'));
+        self::assertFalse($owner->ownsSignIn(new ProofBinding('user', '8', 'web', 'sign-in-1', Purpose::STEP_UP), 'web', 'sign-in-1'));
+        self::assertFalse($owner->ownsSignIn(new ProofBinding('user', '7', 'api', 'sign-in-1', Purpose::STEP_UP), 'web', 'sign-in-1'));
+        self::assertFalse($owner->ownsSignIn(new ProofBinding('user', '7', 'web', 'sign-in-2', Purpose::STEP_UP), 'web', 'sign-in-1'));
+    }
+
+    /**
      * The slot carries the type's length, so a separator inside the type or the
      * key never makes two owners share one.
      *

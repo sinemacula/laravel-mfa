@@ -79,6 +79,20 @@ final readonly class ProofOwner
     }
 
     /**
+     * Whether the binding names this owner in the given sign-in on the given
+     * application.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  string  $application
+     * @param  string  $session
+     * @return bool
+     */
+    public function ownsSignIn(ProofBinding $binding, string $application, string $session): bool
+    {
+        return $this->owns($binding) && $binding->application === $application && $binding->sessionId === $session;
+    }
+
+    /**
      * The owner as one string no other owner shares: the type's length, the
      * type and the key, so a separator inside either cannot make two owners
      * meet.

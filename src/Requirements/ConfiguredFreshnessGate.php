@@ -148,12 +148,8 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
      */
     private static function isTrusted(Proof $firstFactor, MultiFactorAuthenticatable $identity, string $application, string $session): bool
     {
-        $binding = $firstFactor->binding;
-
         return $firstFactor->kind === ProofKind::FIRST_FACTOR
-            && ProofOwner::of($identity)->owns($binding)
-            && $binding->application    === $application
-            && $binding->sessionId      === $session
+            && ProofOwner::of($identity)->ownsSignIn($firstFactor->binding, $application, $session)
             && $firstFactor->generation === VerificationGeneration::current($identity)
             && $firstFactor->provedAt->lessThanOrEqualTo(CarbonImmutable::now());
     }
