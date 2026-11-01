@@ -147,8 +147,24 @@ final readonly class TotpParameters
      */
     private static function allows(string $algorithm, int $digits, int $period): bool
     {
-        return in_array($algorithm, self::ALGORITHMS, true)
-            && $digits >= self::MIN_DIGITS && $digits <= self::MAX_DIGITS
-            && $period >= self::MIN_PERIOD && $period <= self::MAX_PERIOD;
+        if (!in_array($algorithm, self::ALGORITHMS, true)) {
+            return false;
+        }
+
+        return self::isWithin($digits, self::MIN_DIGITS, self::MAX_DIGITS)
+            && self::isWithin($period, self::MIN_PERIOD, self::MAX_PERIOD);
+    }
+
+    /**
+     * Whether the value lies between the bounds, inclusive.
+     *
+     * @param  int  $value
+     * @param  int  $min
+     * @param  int  $max
+     * @return bool
+     */
+    private static function isWithin(int $value, int $min, int $max): bool
+    {
+        return $value >= $min && $value <= $max;
     }
 }
