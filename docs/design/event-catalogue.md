@@ -8,7 +8,8 @@ event carries is built, and why every event is dispatched only after the change 
 ## Invariants
 
 - Every event is a final readonly class in `Events` extending `Events\ContextEvent`, which implements
-  `Contracts\MfaEvent`, so one listener takes them all; the enrolment events extend it through `Events\EnrollmentEvent`.
+  `Contracts\MfaEvent`, so one listener takes them all; the enrolment events extend it through `Events\EnrollmentEvent`,
+  and the two recovery code redemption events through `Events\RecoveryCodeRedemptionEvent`.
   The catalogue is listed in [Events](../guides/events.md); its class and field names are stable.
 - Every event says what it was for through `MfaEvent::purpose()`: an `Enums\Purpose` field where it varies (codes sent,
   verification, the failure ceiling, lockouts, recovery code use and a low set), `enrollment` for the enrolment events,
