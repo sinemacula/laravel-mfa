@@ -134,8 +134,8 @@ class AppUser extends User implements MultiFactorAuthenticatable
 The trait gives the identity its factors (of the configured factor model), counts it as enabled once it has a
 confirmed factor, treats it as an active person who requires nothing of their own sign-ins until the model says
 otherwise, and deletes everything the package holds for it once the model is deleted (a soft delete keeps it). See
-[Identity models](docs/guides/identity-models.md). Per-request verification freshness lives separately on
-`Mfa::hasExpired()` / the verification store, so keep the two predicates orthogonal.
+[Identity models](docs/guides/identity-models.md). What the current sign-in has proved lives separately, in the proof
+store (`Mfa::proofs()`), so keep the two predicates orthogonal.
 
 ## Usage
 
@@ -147,8 +147,7 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 
 Mfa::shouldUse();                       // bool
 Mfa::isSetup();                         // bool
-Mfa::hasEverVerified();                 // bool
-Mfa::hasExpired();                      // bool
+Mfa::proofs();                          // list<Proof> of the current sign-in
 Mfa::getFactors();                      // Collection|null
 
 Mfa::challenge($driver, $factor);       // MfaChallengeIssued
@@ -183,7 +182,8 @@ Route::middleware('mfa:5')->delete('/account', AccountController::class);   // r
 Route::middleware('mfa:0')->post('/admin/danger', DangerController::class); // every request
 ```
 
-When MFA is required, `MfaRequiredException` is thrown; when a prior verification has expired,
+The middleware judges the newest factor or recovery code proof the current sign-in recorded. When MFA is required
+(no factor, or no such proof), `MfaRequiredException` is thrown; when that proof is older than the window,
 `MfaExpiredException`. Both carry a masked `FactorSummary` list safe to ship through JSON bodies and log
 sinks:
 
@@ -324,12 +324,13 @@ Route::post('/mfa/verify', VerifyController::class)
 Apply the throttle **only** to the verify endpoint — state-read routes (`Mfa::shouldUse()`, `Mfa::isSetup()`,
 etc.) are called on every request and would exhaust the bucket without representing an attack signal.
 
-### Verification store
+### Proof store
 
-The default `SessionMfaVerificationStore` assumes consumers regenerate the session on auth state change —
-Laravel's default on login / logout. Apps that disable session regeneration on login must call
-`Mfa::forgetVerification()` themselves on auth state change, so a new identity cannot inherit the prior
-identity's verification timestamp from a reused session.
+Each verification on a signed-in session records a proof, kept by the default `SessionProofStore` in the Laravel
+session for the identity's current sign-in. Laravel's `Login` event begins a sign-in and `Logout` ends it, so a new
+identity on a reused session inherits nothing. A guard that fires neither event calls `Proofs\GuardHooks::signedIn()`
+and `signedOut()` instead; one that does neither leaves no proof to rely on. A stateless guard rebinds
+`Contracts\ProofStore`. See [Recorded proofs](docs/guides/proofs.md).
 
 ## Extensibility
 
@@ -341,7 +342,7 @@ All concrete classes in this package are `final` unless explicitly designed for 
 | Custom factor driver       | Implement `FactorDriver`, register via `Mfa::extend()`         |
 | Custom identity model      | Implement `MultiFactorAuthenticatable` and use `HasFactors`    |
 | Organisation enforcement   | Implement `MfaPolicy` and bind it via the container            |
-| Custom verification store  | Implement `MfaVerificationStore` and bind it via the container |
+| Custom proof store         | Implement `ProofStore` and bind it via the container           |
 | Custom factor model        | Set `config('mfa.factor.model')` to your subclass              |
 | Custom recovery code model | Set `config('mfa.recovery_codes.model')` to your subclass      |
 | Event context              | Implement `EventContextResolver` and bind it via the container |

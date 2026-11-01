@@ -20,8 +20,8 @@ whose events carry summaries and a scalar context and are dispatched after the c
 - `MfaChallengeIssued` fires after the driver's `issueChallenge()` returns without throwing. For OTP drivers the
   code has already been minted, persisted, and handed to the transport; for TOTP and backup codes the driver is a
   no-op and the event is purely a lifecycle signal.
-- On successful verification, `MfaVerified` fires after the verification-store write. A listener that reads
-  `Mfa::hasExpired()` inside `MfaVerified` observes the fresh timestamp — there is no "event fires, state catches up"
+- On successful verification, `MfaVerified` fires after the proof is recorded on the identity's sign-in. A listener
+  that reads `Mfa::proofs()` inside `MfaVerified` observes the new proof — there is no "event fires, state catches up"
   window.
 - `MfaVerificationFailed` always carries a `FailureReason` and an internal `detail`. The verification service emits
   four of the reasons: `locked`, `invalid_code`, `expired` and `not_confirmed`. The detail tells apart failures that
@@ -30,8 +30,8 @@ whose events carry summaries and a scalar context and are dispatched after the c
   factors). Non-Eloquent factors still dispatch the event; the consumer owns their storage.
 - `MfaFactorDisabled` fires after the row has been deleted for Eloquent factors. Non-Eloquent factors still dispatch
   the event and the consumer owns the discard.
-- Enrolment and disable both invalidate the identity's setup-state cache before dispatching their event, so a listener
-  that reads `Mfa::isSetup()` inside the handler observes the post-change state.
+- Enrolment and disable both finish their change before dispatching their event, and `Mfa::isSetup()` reads the
+  factors on every call, so a listener that reads it inside the handler observes the post-change state.
 - Ownership is enforced before any lifecycle event fires. A factor belonging to a different identity raises
   `FactorOwnershipMismatchException` from `challenge()`, `verify()`, `enroll()`, and `disable()`; no event is
   dispatched on the mismatch path.
@@ -44,12 +44,12 @@ whose events carry summaries and a scalar context and are dispatched after the c
   dispatches `MfaChallengeIssued($identity, $factor, $driver)`.
 - `verify()` resolves the identity, asserts ownership, rejects if `$factor->isLocked()` with a `locked`
   failure, calls `FactorDriver::verify($factor, $code)`, persists the success/failure side effects on the factor row,
-  writes through `MfaVerificationStore::markVerified()` on success, then dispatches either `MfaVerified` or
+  records the proof through the bound `ProofStore` on success, then dispatches either `MfaVerified` or
   `MfaVerificationFailed` last.
 - `enroll()` resolves the identity, stamps ownership onto brand-new Eloquent rows (or asserts ownership on pre-existing
-  rows), persists, invalidates the setup cache, then dispatches `MfaFactorEnrolled($identity, $factor, $driver)`.
-- `disable()` resolves the identity, asserts ownership, deletes the row for Eloquent factors, invalidates the setup
-  cache, then dispatches `MfaFactorDisabled($identity, $factor, $driver)`.
+  rows), persists, then dispatches `MfaFactorEnrolled($identity, $factor, $driver)`.
+- `disable()` resolves the identity, asserts ownership, deletes the row for Eloquent factors, forgets the factor's
+  proofs on the current session, then dispatches `MfaFactorDisabled($identity, $factor, $driver)`.
 - `issueBackupCodes()` rotates the identity's `backup_code` batch atomically in the identity's factor state transaction
   and dispatches one `MfaFactorEnrolled` per freshly-minted code.
 
@@ -124,9 +124,9 @@ Update this note when any of the following change:
 
 - the set of five events or the payload shape of any of them
 - the rule that the package's services dispatch events and drivers do not
-- the ordering rule that `MfaVerified` fires after the verification-store write
+- the ordering rule that `MfaVerified` fires after the proof is recorded
 - the failure reasons the verification service emits, their details, or the priority order used to classify a driver
   failure
-- whether enrolment and disable still invalidate the setup cache before dispatching
+- whether enrolment and disable still finish their change before dispatching
 - whether ownership mismatches continue to fail before any event is emitted
 - whether backup-code rotation continues to emit one `MfaFactorEnrolled` per code

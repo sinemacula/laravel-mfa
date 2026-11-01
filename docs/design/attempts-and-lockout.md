@@ -31,7 +31,7 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
 - `verify()` reads `$factor->isLocked()`. If the factor is locked, the verification service dispatches a `locked`
   failure and returns `false` without touching the counter or the driver.
 - Otherwise the verification service calls `FactorDriver::verify($factor, $code)`.
-- On driver success, the verification service calls `$factor->recordVerification()`. The trait stamps `verified_at`,
+- On driver success, the verification service calls `$factor->recordVerification()`. The trait stamps `last_used_at`,
   calls `resetAttempts()` (zeroes `attempts`, nulls `locked_until`), and clears any pending code via `consumeCode()`,
   then `persist()` commits.
 - On driver failure, the verification service calls `$factor->recordAttempt()` (increments `attempts`, stamps
@@ -96,7 +96,7 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
 Update this note when any of the following change:
 
 - the rule that a locked factor short-circuits `verify()` before the driver runs and without incrementing the counter
-- the reset-on-success contract (`verified_at` stamped, `attempts` zeroed, `locked_until` nulled, pending code
+- the reset-on-success contract (`last_used_at` stamped, `attempts` zeroed, `locked_until` nulled, pending code
   cleared)
 - the `mfa.attempts.factor_limit` / `mfa.attempts.lockout_seconds` config keys or their bounds
 - the decision that OTP drivers reset attempts from inside `issueChallenge()` paired with a fresh code

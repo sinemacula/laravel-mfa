@@ -39,8 +39,9 @@ concurrent requests, not just sequential ones.
   `FactorStateTransaction::forFactor()` for the factor's owner, finds the factor among the owner's factors read under
   the lock, compares the candidate's hash with the stored one again, writes `null` to the secret column, commits.
 - The verification service's `applyVerificationOutcome()` then runs `recordVerification()` on the factor (stamps
-  `verified_at`, resets attempts, clears any pending code) and persists; `finalizeVerification()` writes the
-  identity-level verification through the bound store and dispatches `MfaVerified`.
+  `last_used_at`, resets attempts, clears any pending code) and persists; `recordProof()` records a recovery code
+  proof on the identity's sign-in through the bound proof store, and `finalizeVerification()` dispatches
+  `MfaVerified`.
 - A fresh batch via `issueBackupCodes()` deletes old rows, inserts new rows (each with the SHA-256 digest on
   `secret`, stored confirmed since a code is usable as soon as it is issued), dispatches `MfaFactorEnrolled` once per
   new code, and returns the plaintext list to the caller. Being confirmed, the rows count towards `isMfaEnabled()` as

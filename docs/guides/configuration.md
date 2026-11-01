@@ -312,8 +312,9 @@ that. It is checked but not applied yet.
 ```
 
 `max_age_minutes` is how long a recorded verification counts before the person must verify again, 14 days by default
-and at most a year. With `0` none counts, so the `mfa` middleware refuses every request; use its step-up parameter to
-require a fresh verification for one route group instead.
+and at most a year: the `mfa` middleware's window when the route gives none, judged on the newest factor or recovery
+code proof of the current sign-in (see [Recorded proofs](proofs.md)). With `0` none counts, so the `mfa` middleware
+refuses every request; use its step-up parameter to require a fresh verification for one route group instead.
 
 ## Lifecycle
 
