@@ -25,15 +25,15 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  *
  * A session's proofs are evaluated as the combinations they form: the first
  * factor, and each reauthentication with it, on its own; and the first factor
- * followed by each further proof it accepts. The session is accepted as an
+ * followed by each further proof it accepts. Only a proof made between the
+ * first factor and the current time counts. The session is accepted as an
  * additional verification when any further proof is accepted, is multifactor
  * when any combination is, reaches the highest level any combination supports,
  * and is restricted when every combination at that level relies on a restricted
- * authenticator. A requirement part is met when one combination provides it
- * with its completing proof within the part's maximum age, so a fresh further
- * proof refreshes an old first factor, a fresh first factor never stands in for
- * an additional factor, and an old multi-factor first factor does not meet a
- * part that asks for a fresh proof.
+ * authenticator. A requirement part is met when one combination provides it on
+ * evidence within the part's maximum age: a fresh further proof refreshes what
+ * it completes or gives on its own, never what an old first factor gives on its
+ * own, and a fresh first factor never stands in for an additional factor.
  *
  * The proofs must hold exactly one first factor, on a known channel: without
  * one, or with more, nothing is accepted and no level is established. A proof
@@ -88,14 +88,15 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     #[\Override]
     public function evaluate(Requirement $requirement, Proof ...$proofs): Evaluation
     {
+        $now          = CarbonImmutable::now();
         $firstFactor  = self::firstFactor($proofs);
-        $combinations = $firstFactor === null ? [] : $this->combinations($firstFactor, $proofs);
+        $combinations = $firstFactor === null ? [] : $this->combinations($firstFactor, $proofs, $now);
 
         $accepted    = self::hasCombinationWhere($combinations, static fn (Combination $combination): bool => $combination->accepted);
         $multifactor = self::hasCombinationWhere($combinations, static fn (Combination $combination): bool => $combination->isMultifactor());
         $level       = self::highestLevel($combinations);
 
-        [$met, $unmet] = self::judge($requirement, $combinations, CarbonImmutable::now());
+        [$met, $unmet] = self::judge($requirement, $combinations, $now);
 
         return new Evaluation(
             accepted: $accepted,
@@ -165,18 +166,21 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * The combinations the session's proofs form after the first factor.
+     * The combinations the session's proofs form after the first factor, from
+     * the proofs bound alike and made between it and the given time.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  array<array-key, \SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
+     * @param  \Carbon\CarbonImmutable  $now
      * @return list<\SineMacula\Laravel\Mfa\Assurance\Combination>
      */
-    private function combinations(Proof $firstFactor, array $proofs): array
+    private function combinations(Proof $firstFactor, array $proofs, CarbonImmutable $now): array
     {
         $combinations = [];
 
         foreach ($proofs as $proof) {
-            $combination = self::isBoundAlike($firstFactor, $proof) ? $this->combinationOf($firstFactor, $proof) : null;
+            $counts      = self::isBoundAlike($firstFactor, $proof) && self::isMadeBetween($firstFactor, $proof, $now);
+            $combination = $counts ? $this->combinationOf($firstFactor, $proof) : null;
 
             if ($combination === null) {
                 continue;
@@ -227,6 +231,21 @@ final class DefaultCombinationPolicy implements CombinationPolicy
         return $first->identityType === $other->identityType
             && $first->identityKey  === $other->identityKey
             && $first->application  === $other->application;
+    }
+
+    /**
+     * Whether a proof was made no earlier than the first factor and no later
+     * than the given time: one made before it is left from an earlier sign-in,
+     * and one dated after the current time cannot be trusted.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+     * @param  \Carbon\CarbonImmutable  $now
+     * @return bool
+     */
+    private static function isMadeBetween(Proof $firstFactor, Proof $proof, CarbonImmutable $now): bool
+    {
+        return $proof->provedAt->greaterThanOrEqualTo($firstFactor->provedAt) && $proof->provedAt->lessThanOrEqualTo($now);
     }
 
     /**
@@ -349,8 +368,8 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Whether one combination provides the part with its completing proof
-     * within the part's maximum age.
+     * Whether one combination provides the part on evidence within the part's
+     * maximum age.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Enums\RequirementPart  $part
@@ -360,8 +379,11 @@ final class DefaultCombinationPolicy implements CombinationPolicy
      */
     private static function isMet(Requirement $requirement, RequirementPart $part, array $combinations, CarbonImmutable $now): bool
     {
+        $maxAge   = $requirement->maxAge($part);
+        $provides = static fn (Combination $combination): bool => self::provides($combination, $part, $requirement->minimumLevel);
+
         foreach ($combinations as $combination) {
-            if ($combination->isWithin($requirement->maxAge($part), $now) && self::provides($combination, $part, $requirement->minimumLevel)) {
+            if ($combination->holdsWithin($provides, $maxAge, $now)) {
                 return true;
             }
         }

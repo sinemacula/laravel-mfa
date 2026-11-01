@@ -216,17 +216,22 @@ that is not. An external provider's own methods are not repeated: an application
 
 Each part of the requirement is judged on its own. The session's proofs form combinations: the first factor alone,
 each reauthentication with it alone, and the first factor followed by each further proof it accepts. A part is met when
-one combination provides it and the proof that completes that combination (the further proof, or the first factor or
-reauthentication on its own) is no older than the part's maximum age:
+one combination provides it on evidence no older than the part's maximum age:
 
 - `additional_verification` is met by an accepted combination, or by a multi-factor first factor on its own;
 - `multifactor`, `minimum_level` and `phishing_resistance` by a combination that is multifactor, reaches the level, or
   is phishing-resistant.
 
-So a fresh TOTP code after a password made hours ago meets a fifteen-minute `multifactor` part, while a fresh password
-reauthentication never stands in for an additional factor made hours ago, and a passkey sign-in made hours ago no
-longer meets a part that asks for a fresh proof, though what it established is still reported. A proof dated after the
-current time is within no maximum age.
+The evidence is the proof that completes the combination (the further proof, or the first factor or reauthentication
+on its own), unless the first factor provides the part on its own and the further proof does not: the part then rests
+on the first factor, and its age is the first factor's. A fresh weaker proof never refreshes an old stronger one.
+
+So a fresh TOTP code after a password made hours ago meets a fifteen-minute `multifactor` part, since only the two
+together are multifactor. A fresh TOTP or email code after a passkey sign-in made hours ago meets a fifteen-minute
+`additional_verification` part, but not a fifteen-minute `multifactor`, `minimum_level` or `phishing_resistance` part,
+which only the passkey provides. A fresh password reauthentication never stands in for an additional factor made hours
+ago, and a passkey sign-in made hours ago no longer meets a part that asks for a fresh proof, though what it established
+is still reported.
 
 ```php
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
@@ -244,7 +249,8 @@ $evaluation->meetsRequirement();
 
 Nothing is accepted and no level is established when the proofs hold no first factor, more than one, or one whose
 channel is unknown: the session cannot satisfy a requirement until its first factor is known. A proof bound to another
-identity or application than the first factor counts for nothing.
+identity or application than the first factor counts for nothing, and so does a proof made before the first factor,
+which an earlier sign-in left, or dated after the current time.
 
 ### Rebinding the policy
 
@@ -257,6 +263,7 @@ use SineMacula\Laravel\Mfa\Assurance\DefaultCombinationPolicy;
 use SineMacula\Laravel\Mfa\Assurance\Evaluation;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
@@ -275,16 +282,26 @@ final class NoSmsAfterPhoneCode implements CombinationPolicy
 
     public function evaluate(Requirement $requirement, Proof ...$proofs): Evaluation
     {
-        return $this->default->evaluate($requirement, ...$proofs);
+        $firstFactors = array_filter($proofs, fn (Proof $proof): bool => $proof->kind === ProofKind::FIRST_FACTOR);
+        $firstFactor  = count($firstFactors) === 1 ? reset($firstFactors) : null;
+
+        $counted = array_filter($proofs, fn (Proof $proof): bool => $firstFactor === null
+            || $proof->kind !== ProofKind::ADDITIONAL_FACTOR
+            || $proof->channel === null
+            || $this->accepts($firstFactor, $proof->channel));
+
+        return $this->default->evaluate($requirement, ...$counted);
     }
 }
 
 $this->app->singleton(CombinationPolicy::class, NoSmsAfterPhoneCode::class);
 ```
 
-A factor the policy does not accept is never offered or verified, so no proof of it reaches `evaluate()`. Whatever
-policy is bound, an `Evaluation` refuses to report more than its own answers allow (see [Evaluations](#evaluations)).
-How the default reaches its answers is described in
+A stricter `accepts()` must be applied in `evaluate()` too, as above: the default's `evaluate()` asks its own
+`accepts()`, so without the filter a proof the stricter policy refuses, recorded before it was bound or passed in by an
+adapter, would still count. The flows never offer or verify a factor the policy does not accept, so the filter guards
+only against proofs that reached the session another way. Whatever policy is bound, an `Evaluation` refuses to report
+more than its own answers allow (see [Evaluations](#evaluations)). How the default reaches its answers is described in
 [the combination policy design note](../design/combination-policy.md).
 
 ## Verification results

@@ -95,9 +95,10 @@ and `Config`, `Database` and `Support` the internal helpers the capabilities sha
 `Database\StorageConnection` and `Support\FactorStateTransaction` (see [Storage](configuration.md#storage)). Each
 capability reads its own block of `config/mfa.php` through its `*Settings` class, on every call.
 `Contracts` also declares the seams the requirement, verification, enrolment and lifecycle flows are built against,
-listed in [the seam contracts design note](../design/seam-contracts.md). `CombinationPolicy` is bound to
-`Assurance\DefaultCombinationPolicy` (see [Combination policy](assurance.md#combination-policy)); no shipped flow calls
-the others yet, so none of them is bound by default, and binding one changes nothing until its flow does. The `Mfa`
+listed in [the seam contracts design note](../design/seam-contracts.md). No shipped flow calls them yet, and binding
+one changes nothing until its flow does. Only `CombinationPolicy` is bound by default, to
+`Assurance\DefaultCombinationPolicy` (see [Combination policy](assurance.md#combination-policy)), ahead of the flows
+that will use it; the others are not bound until their flows are in place. The `Mfa`
 facade and `MfaManager` stay the entry point: each manager method hands its call to the service of its capability, so
 nothing you call changes with the layout. The services and `*Bindings` classes are internal; extend the package through
 the points in the table above. How the layout works is described in

@@ -15,7 +15,7 @@ use Tests\Fixtures\Assurance\SessionProofs;
 /**
  * Tests for `Combination`: the level, multifactor answer and restriction of a
  * first factor alone or followed by a further proof, its `amr` values, and
- * whether its completing proof is within a maximum age.
+ * whether an answer it gives rests on evidence within a maximum age.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -102,7 +102,8 @@ final class CombinationTest extends TestCase
     }
 
     /**
-     * Rows of a proof's age, a maximum age, and whether the proof is within it.
+     * Rows of a proof's age, a maximum age, and whether an answer it gives
+     * holds within it.
      *
      * @return iterable<string, array{int, ?int, bool}>
      */
@@ -112,13 +113,11 @@ final class CombinationTest extends TestCase
         yield 'made now' => [0, 60, true];
         yield 'made at the maximum age' => [60, 60, true];
         yield 'made past the maximum age' => [61, 60, false];
-        yield 'made in the future' => [-1, 60, false];
-        yield 'made in the future with any age allowed' => [-1, null, true];
     }
 
     /**
-     * A combination is within a maximum age when its completing proof is no
-     * older than it and was not made in the future.
+     * An answer holds within a maximum age when the proof it rests on is no
+     * older than it.
      *
      * @param  int  $secondsAgo
      * @param  ?int  $maxAge
@@ -126,10 +125,63 @@ final class CombinationTest extends TestCase
      * @return void
      */
     #[DataProvider('provideAges')]
-    public function testIsWithinAMaximumAge(int $secondsAgo, ?int $maxAge, bool $within): void
+    public function testHoldsWithinAMaximumAge(int $secondsAgo, ?int $maxAge, bool $within): void
     {
         $combination = Combination::alone(SessionProofs::password($secondsAgo));
+        $atAal1      = static fn (Combination $combination): bool => $combination->level() === AssuranceLevel::AAL1;
 
-        self::assertSame($within, $combination->isWithin($maxAge, SessionProofs::now()));
+        self::assertSame($within, $combination->holdsWithin($atAal1, $maxAge, SessionProofs::now()));
+    }
+
+    /**
+     * An answer that does not hold is not within any maximum age.
+     *
+     * @return void
+     */
+    public function testAnAnswerThatDoesNotHoldIsWithinNone(): void
+    {
+        $combination = Combination::alone(SessionProofs::password());
+
+        self::assertFalse($combination->holdsWithin(static fn (Combination $combination): bool => $combination->isMultifactor(), null, SessionProofs::now()));
+    }
+
+    /**
+     * Rows of a combination completed by a fresh proof after a first factor
+     * made two hours ago, an answer, and whether it holds within fifteen
+     * minutes.
+     *
+     * @return iterable<string, array{\SineMacula\Laravel\Mfa\Assurance\Combination, \Closure(\SineMacula\Laravel\Mfa\Assurance\Combination): bool, bool}>
+     */
+    public static function provideEvidence(): iterable
+    {
+        $oldPasskey        = SessionProofs::passkeySignIn(SessionProofs::verified(), 7200);
+        $accepted          = static fn (Combination $combination): bool => $combination->accepted;
+        $multifactor       = static fn (Combination $combination): bool => $combination->isMultifactor();
+        $phishingResistant = static fn (Combination $combination): bool => $combination->isPhishingResistant();
+
+        yield 'an old passkey, then an email code, is a fresh acceptance' => [Combination::after($oldPasskey, SessionProofs::email()), $accepted, true];
+        yield 'an old passkey, then an email code, is old multifactor' => [Combination::after($oldPasskey, SessionProofs::email()), $multifactor, false];
+        yield 'an old passkey, then an email code, is old phishing resistance' => [Combination::after($oldPasskey, SessionProofs::email()), $phishingResistant, false];
+        yield 'an old passkey, then another verified passkey, is fresh multifactor' => [
+            Combination::after($oldPasskey, SessionProofs::passkey(SessionProofs::verified())),
+            $multifactor,
+            true,
+        ];
+        yield 'an old password, then TOTP, is fresh multifactor' => [Combination::after(SessionProofs::password(7200), SessionProofs::totp()), $multifactor, true];
+    }
+
+    /**
+     * An answer the first factor gives on its own, and the further proof does
+     * not, rests on the first factor, which the further proof does not refresh.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Assurance\Combination  $combination
+     * @param  \Closure(\SineMacula\Laravel\Mfa\Assurance\Combination): bool  $answer
+     * @param  bool  $fresh
+     * @return void
+     */
+    #[DataProvider('provideEvidence')]
+    public function testAnAnswerIsAsFreshAsItsEvidence(Combination $combination, \Closure $answer, bool $fresh): void
+    {
+        self::assertSame($fresh, $combination->holdsWithin($answer, 900, SessionProofs::now()));
     }
 }

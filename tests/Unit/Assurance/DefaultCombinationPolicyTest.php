@@ -417,24 +417,70 @@ final class DefaultCombinationPolicyTest extends TestCase
 
     /**
      * An old multi-factor first factor does not meet a requirement for a fresh
-     * proof, while what it established stays reported; a fresh further proof
-     * then meets it.
+     * proof, while what it established stays reported.
      *
      * @return void
      */
     public function testAnOldMultiFactorFirstFactorIsNotFreshForAnOperation(): void
     {
         $requirement = Requirement::none()->withAdditionalVerification(self::FRESH)->withMultifactor(self::FRESH)->withMinimumLevel(AssuranceLevel::AAL2, self::FRESH);
-        $firstFactor = SessionProofs::passkeySignIn(SessionProofs::verified(), self::TWO_HOURS);
 
-        $old   = $this->evaluate($requirement, $firstFactor);
-        $fresh = $this->evaluate($requirement, $firstFactor, SessionProofs::totp());
+        $evaluation = $this->evaluate($requirement, SessionProofs::passkeySignIn(SessionProofs::verified(), self::TWO_HOURS));
 
-        self::assertTrue($old->multifactor);
-        self::assertSame(AssuranceLevel::AAL2, $old->level);
-        self::assertSame([], $old->met);
-        self::assertSame($requirement->parts(), $old->unmet);
-        self::assertSame($requirement->parts(), $fresh->met);
+        self::assertTrue($evaluation->multifactor);
+        self::assertSame(AssuranceLevel::AAL2, $evaluation->level);
+        self::assertSame([], $evaluation->met);
+        self::assertSame($requirement->parts(), $evaluation->unmet);
+    }
+
+    /**
+     * Rows of a fresh further proof after a verified passkey sign-in made two
+     * hours ago, then the parts of a fresh requirement it meets and does not
+     * meet.
+     *
+     * @return iterable<string, array{
+     *     \SineMacula\Laravel\Mfa\Proofs\Proof,
+     *     list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>,
+     *     list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>,
+     * }>
+     */
+    public static function provideFreshProofsAfterAnOldPasskey(): iterable
+    {
+        $weaker = [RequirementPart::MULTIFACTOR, RequirementPart::MINIMUM_LEVEL, RequirementPart::PHISHING_RESISTANCE];
+
+        yield 'TOTP' => [SessionProofs::totp(), [RequirementPart::ADDITIONAL_VERIFICATION], $weaker];
+        yield 'an email code' => [SessionProofs::email(), [RequirementPart::ADDITIONAL_VERIFICATION], $weaker];
+        yield 'another verified passkey' => [
+            SessionProofs::passkey(SessionProofs::verified()),
+            [RequirementPart::ADDITIONAL_VERIFICATION, ...$weaker],
+            [],
+        ];
+    }
+
+    /**
+     * A fresh further proof after an old multi-factor first factor is a fresh
+     * additional verification, but refreshes only what it gives itself: a fresh
+     * weaker proof never refreshes the old passkey's multifactor
+     * authentication, level or phishing resistance.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $further
+     * @param  list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>  $met
+     * @param  list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>  $unmet
+     * @return void
+     */
+    #[DataProvider('provideFreshProofsAfterAnOldPasskey')]
+    public function testAFreshWeakerProofNeverRefreshesAnOldStrongerOne(Proof $further, array $met, array $unmet): void
+    {
+        $requirement = Requirement::none()
+            ->withAdditionalVerification(self::FRESH)
+            ->withMultifactor(self::FRESH)
+            ->withMinimumLevel(AssuranceLevel::AAL2, self::FRESH)
+            ->withPhishingResistance(self::FRESH);
+
+        $evaluation = $this->evaluate($requirement, SessionProofs::passkeySignIn(SessionProofs::verified(), self::TWO_HOURS), $further);
+
+        self::assertSame($met, $evaluation->met);
+        self::assertSame($unmet, $evaluation->unmet);
     }
 
     /**
@@ -590,6 +636,24 @@ final class DefaultCombinationPolicyTest extends TestCase
             [],
             $all,
         ];
+        yield 'TOTP made before the first factor counts for nothing' => [
+            [SessionProofs::password(), SessionProofs::totp(60)],
+            Requirement::none()->withAdditionalVerification()->withMinimumLevel(AssuranceLevel::AAL1),
+            [RequirementPart::MINIMUM_LEVEL],
+            [RequirementPart::ADDITIONAL_VERIFICATION],
+        ];
+        yield 'TOTP made in the future counts for nothing' => [
+            [SessionProofs::password(), SessionProofs::totp(-1)],
+            Requirement::none()->withMultifactor(),
+            [],
+            [RequirementPart::MULTIFACTOR],
+        ];
+        yield 'a first factor made in the future meets nothing' => [
+            [SessionProofs::password(-1), SessionProofs::totp(-1)],
+            Requirement::none()->withAdditionalVerification()->withMinimumLevel(AssuranceLevel::AAL1),
+            [],
+            [RequirementPart::ADDITIONAL_VERIFICATION, RequirementPart::MINIMUM_LEVEL],
+        ];
         yield 'two first factors meet nothing' => [
             [SessionProofs::password(), SessionProofs::passkeySignIn(SessionProofs::verified()), SessionProofs::totp()],
             $everything,
@@ -646,6 +710,37 @@ final class DefaultCombinationPolicyTest extends TestCase
         self::assertSame(AssuranceLevel::AAL1, $evaluation->level);
         self::assertSame(['pwd'], $evaluation->amr);
         self::assertSame([RequirementPart::ADDITIONAL_VERIFICATION], $evaluation->unmet);
+    }
+
+    /**
+     * Rows of a further proof made before the first factor or after the current
+     * time.
+     *
+     * @return iterable<string, array{\SineMacula\Laravel\Mfa\Proofs\Proof}>
+     */
+    public static function provideProofsOutOfTime(): iterable
+    {
+        yield 'TOTP made before the first factor' => [SessionProofs::totp(60)];
+        yield 'TOTP made in the future' => [SessionProofs::totp(-1)];
+    }
+
+    /**
+     * A further proof made before the first factor, which an earlier sign-in
+     * left, or dated after the current time counts for nothing: the session
+     * stays at the first factor's own classification.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $further
+     * @return void
+     */
+    #[DataProvider('provideProofsOutOfTime')]
+    public function testAProofMadeOutOfTimeCountsForNothing(Proof $further): void
+    {
+        $evaluation = $this->evaluate(Requirement::none(), SessionProofs::password(), $further);
+
+        self::assertFalse($evaluation->accepted);
+        self::assertFalse($evaluation->multifactor);
+        self::assertSame(AssuranceLevel::AAL1, $evaluation->level);
+        self::assertSame(['pwd'], $evaluation->amr);
     }
 
     /**

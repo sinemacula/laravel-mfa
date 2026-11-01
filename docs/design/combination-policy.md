@@ -21,7 +21,8 @@ values they report, and which parts of a requirement they meet within each part'
 - `evaluate()` needs exactly one first factor among the proofs, on a known channel. With none, with more than one, or
   with an unknown one, nothing is accepted, nothing is multifactor, the level is unclassified, no `amr` value is
   reported and every part of the requirement is unmet.
-- A proof bound to another identity (type or key) or another application than the first factor counts for nothing.
+- A proof bound to another identity (type or key) or another application than the first factor counts for nothing, and
+  so does a proof made before the first factor or after the current time.
 - Each proof is classified as an authenticator (`Assurance\Authenticator`): a password is something known; an SMS
   code, a TOTP code, a recovery code and a passkey are something had; a passkey whose assertion observed user
   verification is a multi-factor authenticator; an email code and an external provider's first factor are neither and
@@ -39,11 +40,13 @@ values they report, and which parts of a requirement they meet within each part'
   passkey), `user` for observed user presence, `hwk` or `swk` for observed key protection, each once in the order first
   reported, the first factor's first; then `mfa` when multifactor, or `mca` when accepted and not multifactor. An
   external provider's first factor adds no value.
-- A requirement part is met when one combination provides it and the proof that completes that combination (the
-  further proof, or the lone first factor or reauthentication) is within the part's maximum age at the current time:
-  `additional_verification` by an accepted or multifactor combination, `multifactor` by a multifactor one,
+- A requirement part is met when one combination provides it on evidence within the part's maximum age at the current
+  time: `additional_verification` by an accepted or multifactor combination, `multifactor` by a multifactor one,
   `minimum_level` by one at or above the level, and `phishing_resistance` by a phishing-resistant one. A maximum age is
-  inclusive, and a proof dated after the current time is within none.
+  inclusive.
+- The evidence for a part is the proof that completes the combination (the further proof, or the lone first factor or
+  reauthentication), unless the first factor provides the part on its own and the further proof does not; the part then
+  rests on the first factor and is as old as it. A fresh weaker proof never refreshes an old stronger one.
 
 ## Success Path
 
@@ -63,9 +66,15 @@ values they report, and which parts of a requirement they meet within each part'
   independence cannot be shown.
 - A passkey sign-in with observed user verification meets `additional_verification` and `multifactor` on its own, but
   not once it is older than a part's maximum age; the evaluation still reports it multifactor at AAL2.
+- A fresh TOTP or email code after a passkey sign-in older than a part's maximum age meets a fresh
+  `additional_verification`, but not a fresh `multifactor`, `minimum_level` or `phishing_resistance`, which rest on the
+  passkey alone. A fresh verified passkey of another credential meets them all.
 - A fresh reauthentication with the first factor meets a fresh `minimum_level` it reaches on its own, never a fresh
   `additional_verification`: it is not an additional factor.
-- A fresh further proof after an old first factor meets a fresh part, as a step-up does.
+- A fresh further proof after an old first factor meets a fresh part that the two give together or the further proof
+  gives on its own, as a step-up does: a fresh TOTP code after an old password meets a fresh `multifactor`.
+- A further proof made before the first factor, which an earlier sign-in left behind, counts for nothing, as does one
+  dated after the current time. A first factor dated after the current time leaves nothing to count.
 - An email code after an external provider is accepted, at no level, and reports `otp` and `mca`.
 - A rebound policy is checked by `Evaluation` itself, which refuses a part met that its own answers rule out, `mfa`
   without multifactor and `mca` without an accepted combination that is not multifactor.
@@ -73,9 +82,10 @@ values they report, and which parts of a requirement they meet within each part'
 ## Implementation Anchors
 
 - `src/Assurance/DefaultCombinationPolicy.php`: `accepts()`, `evaluate()`, `isSameChannel()`, `firstFactor()`,
-  `combinationOf()`, `restrictedAt()`, `amr()`, `isMet()`.
+  `combinations()`, `isMadeBetween()`, `combinationOf()`, `restrictedAt()`, `amr()`, `isMet()`.
 - `src/Assurance/Authenticator.php`: the classification of one proof and its `amr` values.
-- `src/Assurance/Combination.php`: the level, multifactor answer, restriction and maximum age of one combination.
+- `src/Assurance/Combination.php`: the level, multifactor answer and restriction of one combination, and the evidence
+  each answer rests on (`holdsWithin()`, `evidenceFor()`).
 - `src/Assurance/AssuranceBindings.php`: the default binding.
 - `src/Contracts/CombinationPolicy.php`: the contract.
 
@@ -88,7 +98,11 @@ values they report, and which parts of a requirement they meet within each part'
 - `tests/Unit/Assurance/DefaultCombinationPolicyTest.php`
   `testAnOldMultiFactorFirstFactorIsNotFreshForAnOperation`
 - `tests/Unit/Assurance/DefaultCombinationPolicyTest.php`
+  `testAFreshWeakerProofNeverRefreshesAnOldStrongerOne`
+- `tests/Unit/Assurance/DefaultCombinationPolicyTest.php`
   `testAFreshFirstFactorNeverStandsInForAnAdditionalFactor`
+- `tests/Unit/Assurance/DefaultCombinationPolicyTest.php`
+  `testAProofMadeOutOfTimeCountsForNothing`
 - `tests/Unit/Assurance/DefaultCombinationPolicyTest.php`
   `testJudgesEachPartOfTheRequirement`
 - `tests/Unit/Assurance/DefaultCombinationPolicyTest.php`
@@ -98,7 +112,9 @@ values they report, and which parts of a requirement they meet within each part'
 - `tests/Unit/Assurance/AuthenticatorTest.php`
   `testClassifiesTheProof`
 - `tests/Unit/Assurance/CombinationTest.php`
-  `testIsWithinAMaximumAge`
+  `testHoldsWithinAMaximumAge`
+- `tests/Unit/Assurance/CombinationTest.php`
+  `testAnAnswerIsAsFreshAsItsEvidence`
 - `tests/Unit/Assurance/AssuranceBindingsTest.php`
   `testBindsTheDefaultPolicyAsASingleton`
 
@@ -110,5 +126,6 @@ Update this note when any of the following change:
 - how a proof is classified as an authenticator, or which authenticators are restricted
 - how combinations are formed, or how a combination's level, multifactor answer or restriction is reached
 - the `amr` values reported, or their order
-- how a requirement part and its maximum age are judged
+- how a requirement part and its maximum age are judged, or which proof a part's evidence is
+- which proofs count by their time
 - the default binding of `CombinationPolicy`

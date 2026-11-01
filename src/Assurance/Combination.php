@@ -20,9 +20,11 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  * restricted when it relies on a restricted authenticator, which a multi-factor
  * authenticator makes unnecessary.
  *
- * Its time is that of the proof that completes it: a further proof refreshes
- * the combination it completes, and a first factor made again never stands in
- * for one.
+ * Its time is that of the proof that completes it, and an answer is as fresh as
+ * the evidence it rests on: a further proof refreshes what the combination
+ * gives only with it, or what the further proof gives on its own, but never
+ * what the first factor gives on its own, so a fresh weaker proof does not
+ * refresh an old stronger one.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,6 +39,7 @@ final readonly class Combination
      * @param  bool  $accepted
      * @param  non-empty-list<\SineMacula\Laravel\Mfa\Assurance\Authenticator>  $authenticators
      * @param  \Carbon\CarbonImmutable  $provedAt
+     * @param  ?array{self, self}  $proofsAlone
      */
     private function __construct(
 
@@ -48,6 +51,9 @@ final readonly class Combination
 
         /** When the proof that completes the combination was made. */
         public CarbonImmutable $provedAt,
+
+        /** The first factor and the further proof, each on its own, when a further proof completes the combination. */
+        private ?array $proofsAlone = null,
     ) {}
 
     /**
@@ -72,7 +78,10 @@ final readonly class Combination
      */
     public static function after(Proof $firstFactor, Proof $proof): self
     {
-        return new self(true, [Authenticator::of($firstFactor), Authenticator::of($proof)], $proof->provedAt);
+        $first   = self::alone($firstFactor);
+        $further = new self(true, [Authenticator::of($proof)], $proof->provedAt);
+
+        return new self(true, [$first->authenticators[0], $further->authenticators[0]], $proof->provedAt, [$first, $further]);
     }
 
     /**
@@ -150,21 +159,41 @@ final readonly class Combination
     }
 
     /**
-     * Whether the proof that completes the combination is no older than the
-     * given maximum age in seconds at the given time, where `null` allows any
-     * age. A proof made after the given time is not within any maximum age.
+     * Whether the given answer holds for the combination on evidence no older
+     * than the given maximum age in seconds at the given time, where `null`
+     * allows any age.
      *
+     * @param  \Closure(self): bool  $answer
      * @param  ?int  $maxAge
      * @param  \Carbon\CarbonImmutable  $now
      * @return bool
      */
-    public function isWithin(?int $maxAge, CarbonImmutable $now): bool
+    public function holdsWithin(\Closure $answer, ?int $maxAge, CarbonImmutable $now): bool
     {
-        if ($maxAge === null) {
-            return true;
+        if (!$answer($this)) {
+            return false;
         }
 
-        return $this->provedAt->lessThanOrEqualTo($now) && $this->provedAt->greaterThanOrEqualTo($now->subSeconds($maxAge));
+        return $maxAge === null || $this->evidenceFor($answer)->greaterThanOrEqualTo($now->subSeconds($maxAge));
+    }
+
+    /**
+     * When the evidence for the given answer was made: the first factor's time
+     * when it gives the answer on its own and the further proof does not, and
+     * otherwise the time of the proof that completes the combination.
+     *
+     * @param  \Closure(self): bool  $answer
+     * @return \Carbon\CarbonImmutable
+     */
+    private function evidenceFor(\Closure $answer): CarbonImmutable
+    {
+        if ($this->proofsAlone === null) {
+            return $this->provedAt;
+        }
+
+        [$firstFactor, $furtherProof] = $this->proofsAlone;
+
+        return $answer($firstFactor) && !$answer($furtherProof) ? $firstFactor->provedAt : $this->provedAt;
     }
 
     /**

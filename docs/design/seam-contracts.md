@@ -20,12 +20,13 @@ call them, so the flows can be built against one fixed set.
   back the factor state change the call runs in.
 - Results cross the seams as structured values, never reduced to `amr`.
 - A contract that no shipped flow calls yet has no default binding. The package resolves none of them until the flow
-  that calls it is in place, with its default.
+  that calls it is in place, with its default, except where noted below.
 - `EventContextResolver` is the exception: the event dispatcher calls it, so it is bound by default to
   `Context\DefaultEventContextResolver`, which gives the identity, the application and the request (see
   [Event Catalogue](event-catalogue.md)).
-- `CombinationPolicy` is bound by default to `Assurance\DefaultCombinationPolicy`, which the requirement and
-  verification flows are built on (see [Combination Policy](combination-policy.md)).
+- `CombinationPolicy` is the other exception: it is bound by default to `Assurance\DefaultCombinationPolicy` ahead of
+  the requirement and verification flows that will call it, since they will use its default (see
+  [Combination Policy](combination-policy.md)). No shipped flow calls it yet.
 
 | Contract                 | Answers                                                                                       |
 |--------------------------|-----------------------------------------------------------------------------------------------|
