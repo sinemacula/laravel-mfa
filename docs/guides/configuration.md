@@ -43,11 +43,11 @@ between requests.
 | `recovery_codes.alphabet`       | `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` | see [Recovery codes](#recovery-codes)  | `MFA_RECOVERY_CODES_ALPHABET`       | yes     |
 | `recovery_codes.low_count`      | `3`                                | 0 to the set's size                    | `MFA_RECOVERY_CODES_LOW_COUNT`      | not yet |
 | `attempts.factor_limit`         | `5`                                | 1 to 20                                | `MFA_ATTEMPTS_FACTOR_LIMIT`         | yes     |
-| `attempts.identity_limit`       | `20`                               | 1 to 100                               | `MFA_ATTEMPTS_IDENTITY_LIMIT`       | not yet |
-| `attempts.ip_limit`             | `100`                              | 1 to 10000                             | `MFA_ATTEMPTS_IP_LIMIT`             | not yet |
-| `attempts.window_seconds`       | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_WINDOW_SECONDS`       | not yet |
+| `attempts.identity_limit`       | `20`                               | 1 to 100                               | `MFA_ATTEMPTS_IDENTITY_LIMIT`       | yes     |
+| `attempts.ip_limit`             | `100`                              | 1 to 10000                             | `MFA_ATTEMPTS_IP_LIMIT`             | yes     |
+| `attempts.window_seconds`       | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_WINDOW_SECONDS`       | yes     |
 | `attempts.lockout_seconds`      | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_LOCKOUT_SECONDS`      | yes     |
-| `attempts.failure_ceiling`      | `100`                              | 1 to 100                               | `MFA_ATTEMPTS_FAILURE_CEILING`      | not yet |
+| `attempts.failure_ceiling`      | `100`                              | 1 to 100                               | `MFA_ATTEMPTS_FAILURE_CEILING`      | yes     |
 | `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        | not yet |
 | `proofs.max_age_minutes`        | `20160`                            | 0 to 525600 minutes                    | `MFA_PROOFS_MAX_AGE_MINUTES`        | yes     |
 | `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    | not yet |
@@ -285,12 +285,14 @@ is 3, or the set's size when that is smaller. It is checked but not applied yet.
 ],
 ```
 
-`factor_limit` failed attempts in a row lock a factor, of any type, for `lockout_seconds`. These two are applied today.
-`identity_limit` failed attempts across an identity's factors and recovery codes, and `ip_limit` from one IP address,
-within `window_seconds`, are to lock the identity and throttle the address, and `failure_ceiling` consecutive failures
-are to disable a factor until the person proves another, it is rebound or the identity is reset; it is at most 100, the
-most NIST SP 800-63B-4 allows. These four are checked but not applied yet: until they are, only the per-factor lockout
-limits guessing.
+`factor_limit` failed attempts in a row lock a factor, of any type, for `lockout_seconds`. The count is durable: only a
+success of that factor resets it, so once it has reached the limit every further failure locks the factor again.
+`identity_limit` failed attempts across an identity's factors and recovery codes within `window_seconds` lock the
+identity for `lockout_seconds`, and `ip_limit` from one IP address within `window_seconds` throttle the address until
+its window ends. `failure_ceiling` consecutive failures of one factor disable it until the person proves another factor,
+it is rebound or the identity is reset; it is at most 100, the most NIST SP 800-63B-4 allows. A refused attempt counts
+nowhere, so it never extends a lockout or a throttle, and sending a code resets nothing. Every counter, what resets it
+and when it expires is set out in [Attempts and lockouts](attempts.md).
 
 ## Enrolment
 

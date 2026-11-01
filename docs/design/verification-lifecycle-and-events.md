@@ -55,8 +55,9 @@ whose events carry summaries and a scalar context and are dispatched after the c
 
 ## Failure / Edge Cases
 
-- `verify()` on a locked factor emits `MfaVerificationFailed` with `locked` and returns `false` without
-  calling the driver. The attempt counter is not incremented because the attempt never reached the driver.
+- `verify()` refused by a lockout (the factor's, the identity's or the IP address's, or a factor disabled at the
+  failure ceiling) emits `MfaVerificationFailed` with `locked` and returns `false` without calling the driver. Nothing
+  is counted because the attempt never reached the driver (see [Attempts and Lockout](attempts-and-lockout.md)).
 - On driver-level verification failure, the verification service classifies the reason from the factor's post-verify
   state in priority order: `not_confirmed` when there is neither a pending code nor a secret, `expired` when the code's
   expiry has passed, `expired` again when a pending code has no expiry stamp (a driver-persistence bug, not a user
@@ -64,16 +65,16 @@ whose events carry summaries and a scalar context and are dispatched after the c
 - Unsupported identities short-circuit to `false` without dispatching `MfaVerificationFailed`. Unresolved drivers throw
   from `DriverResolver::resolve()` before any event is dispatched. Those branches are deliberately outside the event
   taxonomy.
-- Non-Eloquent factors participate in the lifecycle events but carry no row to mutate. `applyVerificationOutcome()`
-  is skipped for them; attempt counters and lockouts only exist on factors whose implementation persists them.
+- Non-Eloquent factors participate in the lifecycle events but carry no row to mutate: they keep no failures in a row,
+  lockout or ceiling of their own, and their attempts are counted against the identity and the IP address only.
 - Backup-code rotation inside `issueBackupCodes()` runs in the identity's factor state transaction on the storage
   connection, so the "atomic replace + N events" guarantee holds wherever `mfa.storage.connection` puts the tables, and
   a listener that throws rolls the whole rotation back.
 
 ## Implementation Anchors
 
-- `src/Verification/VerificationService.php`: `challenge()`, `verify()`, `applyVerificationOutcome()`,
-  `finalizeVerification()`.
+- `src/Verification/VerificationService.php`: `challenge()`, `verify()`, `finalizeVerification()`.
+- `src/Attempts/AttemptService.php`: `attempt()`, which refuses a locked attempt and counts the outcome.
 - `src/Enrollment/EnrollmentService.php`: `enroll()`. `src/Lifecycle/LifecycleService.php`: `disable()`.
 - `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`, `rotateBackupCodeBatch()`.
 - `src/Drivers/DriverResolver.php`: `resolve()`, `assertMatchesFactor()`. `src/Factors/FactorOwnership.php`:

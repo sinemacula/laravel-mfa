@@ -31,6 +31,8 @@ The flows that dispatch them are built over the package's enrolment, verificatio
 capabilities; until each flow ships, its events are declared but not yet dispatched, and the earlier
 `MfaChallengeIssued`, `MfaVerified`, `MfaVerificationFailed`, `MfaFactorEnrolled` and `MfaFactorDisabled` events,
 described in [the lifecycle events design note](../design/verification-lifecycle-and-events.md), are dispatched instead.
+`LockoutApplied`, `LockoutLifted` and `FactorDisabled` are dispatched already, by the attempt caps (see
+[Attempts and lockouts](attempts.md)).
 
 The names of the events and of their fields are stable. `factor` is a `Factors\FactorSummary` (id, type, label, masked
 destination, status, preferred, last use), `previous` another; `purpose` is an `Enums\Purpose` (`sign_in`, `step_up`,

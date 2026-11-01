@@ -39,8 +39,9 @@ whatever UI you like.
   shipped `authenticatable_type` / `authenticatable_id` morph.
 - **Encrypted at rest**: factor `secret` and `code` columns are `encrypted`-cast; backup codes hash to SHA-256
   before persistence.
-- **Per-factor lockouts**: `attempts.factor_limit` failures in a row lock a factor of any type for
-  `attempts.lockout_seconds`.
+- **Attempt caps and lockouts**: failures are counted per factor, per identity and per IP address in the database, with
+  no cache; too many lock the factor, the identity or the address out before the driver is called, and a factor that
+  reaches the failure ceiling is disabled. See [Attempts and lockouts](docs/guides/attempts.md).
 - **Zero ecosystem coupling**: depends only on Laravel and the standard `Authenticatable` contract.
 
 ## Installation
@@ -299,9 +300,9 @@ provider's `register()` / `boot()` rather than mid-request.
 
 ### Rate limiting
 
-The per-factor lockout (`attempts.factor_limit` + `attempts.lockout_seconds`) protects an individual factor from runaway
-attempts on the same code, but does not by itself defend against distributed brute force across many factors
-or DoS against the lockout window. Layer Laravel's built-in `RateLimiter` on the verify endpoint:
+The package counts failures per factor, per identity and per IP address and locks each out past its cap (see
+[Attempts and lockouts](docs/guides/attempts.md)). Those caps bound guessing at a factor; they do not bound load on the
+endpoint itself. Layer Laravel's built-in `RateLimiter` on the verify endpoint as well:
 
 ```php
 use Illuminate\Cache\RateLimiting\Limit;

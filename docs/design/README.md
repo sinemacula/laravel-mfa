@@ -36,8 +36,9 @@ The current note set is:
   each answers and what a fail-closed answer is, and the pending session and passkey assertion values they carry.
 - `backup-code-consumption.md`: how backup codes are stored hashed, why consumption and rotation run under the owner's
   factor state lock, and the atomic-replace guarantee on rotation.
-- `attempts-and-lockout.md`: the per-factor rate-limit state machine on `attempts` / `locked_until` /
-  `last_attempted_at`, including how OTP drivers reset attempts paired with a fresh code.
+- `attempts-and-lockout.md`: the durable failure counts on the factor and identity rows, the temporary throttles of
+  the identity and the address, when each locks and what resets it, the failure ceiling, and why parallel guesses
+  cannot overrun a cap.
 - `per-device-verification-and-step-up.md`: the `MfaVerificationStore` seam, the default session-scoped
   implementation, the `mfa:N` step-up route-parameter contract, and the fail-closed rules inside `hasExpired()`.
 - `factor-payload-hygiene.md`: encryption at rest for `secret` / `code`, the `FactorSummary` projection used on
