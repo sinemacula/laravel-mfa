@@ -152,17 +152,7 @@ final readonly class SessionProofStore implements ProofStore
 
             $proof = self::restore($stored);
 
-            if ($proof === null) {
-                continue;
-            }
-
-            $counts = $owner->owns($proof->binding)
-                && $proof->binding->application === $application
-                && $proof->binding->sessionId   === $record['session']
-                && $proof->generation           === $generation
-                && $proof->provedAt->lessThanOrEqualTo($now);
-
-            if (!$counts) {
+            if ($proof === null || !self::counts($proof, $owner, $application, $record['session'], $generation, $now)) {
                 continue;
             }
 
@@ -303,6 +293,30 @@ final readonly class SessionProofStore implements ProofStore
         }
 
         return array_values($proofs);
+    }
+
+    /**
+     * Whether a stored proof still counts: bound to the owner, the application
+     * and the current sign-in, made in the identity's current verification
+     * generation, and not dated in the future.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
+     * @param  string  $application
+     * @param  string  $session
+     * @param  int  $generation
+     * @param  \Carbon\CarbonImmutable  $now
+     * @return bool
+     */
+    private static function counts(Proof $proof, ProofOwner $owner, string $application, string $session, int $generation, CarbonImmutable $now): bool
+    {
+        $binding = $proof->binding;
+
+        if (!$owner->owns($binding) || $binding->application !== $application || $binding->sessionId !== $session) {
+            return false;
+        }
+
+        return $proof->generation === $generation && $proof->provedAt->lessThanOrEqualTo($now);
     }
 
     /**
