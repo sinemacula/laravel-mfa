@@ -57,14 +57,6 @@ php artisan vendor:publish --tag=mfa-migrations
 php artisan migrate
 ```
 
-For TOTP support, install the suggested dependency:
-
-```bash
-composer require pragmarx/google2fa
-```
-
-The TOTP driver checks for this package at runtime and raises a clear error if it is missing.
-
 ## Configuration
 
 The published `mfa.php` config holds one block per application, for what it accepts and offers, and one block per
@@ -200,32 +192,44 @@ $this->renderable(function (MfaRequiredException $e) {
 
 ### TOTP enrolment
 
-Generate a shared secret and a provisioning URI, render the URI as a QR code, then hand a fresh `Factor` to
-`Mfa::enroll()`:
+Start the enrolment on a fresh `Factor`, which stamps the TOTP parameters it will keep (`mfa.totp`'s algorithm,
+digits and period) and returns a new secret. Store the secret on the factor, render its provisioning URI as a QR code,
+confirm the first code the person's authenticator app shows, then hand the factor to `Mfa::enroll()`:
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
-$driver = Mfa::driver('totp');
-$secret = $driver->startEnrollment(new Factor);
-$uri    = $driver->provisioningUri(
+$factor        = new Factor;
+$factor->type  = 'totp';
+$factor->label = 'Authenticator app';
+
+$driver         = Mfa::driver('totp');
+$factor->secret = $driver->startEnrollment($factor);
+
+$uri = $driver->provisioningUri(
+    factor: $factor,
     issuer: config('app.name'),
     accountName: $user->email,
-    secret: $secret,
+    secret: $factor->secret,
 );
 
-// Render $uri as a QR code with your library of choice.
-
-$factor         = new Factor;
-$factor->type   = 'totp';
-$factor->label  = 'Authenticator app';
-$factor->secret = $secret;
+// Render $uri as a QR code with your library of choice, then check the
+// first code the app shows. Its time step is recorded, so the same code
+// cannot be used again.
+if (! $driver->confirm($factor, $request->input('code'))) {
+    // Ask for the code again.
+}
 
 // `Mfa::enroll()` stamps the identity's morph columns itself —
 // callers do not (and should not) populate them.
 Mfa::enroll($factor);
 ```
+
+The package computes TOTP codes itself (RFC 6238) and needs no other dependency. Each code is checked against
+`mfa.totp.window` steps either side of now, and each time step is accepted once per factor, also when two requests race
+with the same code. See [Configuration](docs/guides/configuration.md#totp) and
+[the TOTP design note](docs/design/totp.md).
 
 ### Backup codes
 

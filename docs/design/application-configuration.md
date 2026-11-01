@@ -18,10 +18,10 @@ before anything relies on it.
   `factor` and `identity_state`.
 - Not every setting is applied yet. No flow reads an application block, so nothing is enforced per application: the
   shipped drivers verify any type, the TOTP driver takes the package-wide `totp.window`, and the limits, freshness and
-  requirement mode are not applied. Of the package-wide blocks, the TOTP algorithm, digits and period, the code resend
-  cooldown and send caps, the recovery code low-count threshold, the identity and IP attempt caps with their window,
-  the failure ceiling, the enrolment lifetime and the pruning retention are checked only. The configuration guide marks
-  each setting as applied or not, and a flow that starts reading one updates it.
+  requirement mode are not applied. Of the package-wide blocks, the code resend cooldown and send caps, the recovery
+  code low-count threshold, the identity and IP attempt caps with their window, the failure ceiling, the enrolment
+  lifetime and the pruning retention are checked only. The configuration guide marks each setting as applied or not,
+  and a flow that starts reading one updates it.
 - Every setting is read through one class that owns its block: `Applications\ApplicationSettings` (with
   `Applications\ApplicationBlock` reading the raw block), `Drivers\TotpSettings`, `Codes\CodeSettings`,
   `RecoveryCodes\RecoveryCodeSettings`, `Attempts\AttemptSettings`, `Enrollment\EnrollmentSettings`,

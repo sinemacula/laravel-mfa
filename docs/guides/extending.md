@@ -28,6 +28,13 @@ A custom factor or recovery code model lives on the storage connection with the 
 [Storage](configuration.md#storage)): one on another connection is refused when the package boots. The recovery code
 model is set with `mfa.recovery_codes.model`. Identity models are described in [Identity models](identity-models.md).
 
+A custom factor model that implements `Contracts\EloquentFactor` itself, rather than through `Concerns\ActsAsFactor`,
+must make `acceptStep()` a compare-and-set on its stored row: record the TOTP time step only when it is later than the
+stored one, in one atomic statement, and report whether it did. The TOTP driver accepts a code only when the step is
+recorded, so each time step is used once per factor however many requests race with it (see
+[the TOTP design note](../design/totp.md)). A factor implementing only `Contracts\Factor` has nowhere to record a step,
+so the TOTP driver accepts no code for it.
+
 ## Factor drivers
 
 A driver is one factor type behind `Contracts\FactorDriver`, registered under the type's name:
