@@ -36,7 +36,7 @@ concurrent requests, not just sequential ones.
   connection, re-reads the row under `lockForUpdate()`, rehashes the candidate against the locked row, writes `null`
   to the secret column, commits.
 - The verification service's `applyVerificationOutcome()` then runs `recordVerification()` on the factor (stamps
-  `verified_at`, resets attempts, clears any pending code) and persists; `finaliseVerification()` writes the
+  `verified_at`, resets attempts, clears any pending code) and persists; `finalizeVerification()` writes the
   identity-level verification through the bound store and dispatches `MfaVerified`.
 - A fresh batch via `issueBackupCodes()` deletes old rows, inserts new rows (each with the SHA-256 digest on
   `secret`), dispatches `MfaFactorEnrolled` once per new code, and returns the plaintext list to the caller.
