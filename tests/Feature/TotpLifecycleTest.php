@@ -81,7 +81,8 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * The same code is refused at a second verification, as an invalid code.
+     * The same code is refused at a second verification, as an invalid code,
+     * and counted as a failed attempt.
      *
      * @return void
      */
@@ -94,6 +95,7 @@ final class TotpLifecycleTest extends TestCase
         Event::fake([MfaVerificationFailed::class]);
 
         self::assertFalse(Mfa::verify('totp', $factor->refresh(), $code));
+        self::assertSame(1, $factor->refresh()->getConsecutiveFailures());
 
         Event::assertDispatched(
             MfaVerificationFailed::class,

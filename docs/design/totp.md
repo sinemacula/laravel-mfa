@@ -126,6 +126,8 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - `tests/Integration/Database/TotpReplayRaceTest.php`
   `testOfTwoOverlappingRequestsWithTheSameCodeOnlyOnePasses`
 - `tests/Feature/TotpLifecycleTest.php`
+  `testTheSameCodeIsRefusedAtTheSecondVerification`
+- `tests/Feature/TotpLifecycleTest.php`
   `testTheConfirmingCodeIsRefusedAtTheNextVerification`
 
 ## Change Triggers
