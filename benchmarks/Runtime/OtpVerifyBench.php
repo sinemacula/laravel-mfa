@@ -11,7 +11,7 @@ use PhpBench\Attributes\Iterations;
 use PhpBench\Attributes\Revs;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
-use SineMacula\Laravel\Mfa\Gateways\FakeSmsGateway;
+use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
 
 /**
  * Hot-path benchmarks for the OTP-delivery driver verification path.

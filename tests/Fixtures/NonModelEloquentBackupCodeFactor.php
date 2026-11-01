@@ -4,7 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures;
 
-use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
+use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 
 /**
  * `EloquentFactor` fixture that is NOT an Eloquent Model — exercises the

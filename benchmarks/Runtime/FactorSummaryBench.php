@@ -7,7 +7,7 @@ namespace Benchmarks\Runtime;
 use Benchmarks\Support\InMemoryFactor;
 use PhpBench\Attributes\Iterations;
 use PhpBench\Attributes\Revs;
-use SineMacula\Laravel\Mfa\Support\FactorSummary;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
  * Benchmarks for `FactorSummary::fromFactor()` and its JSON serialisation.

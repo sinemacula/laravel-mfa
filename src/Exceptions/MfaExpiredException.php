@@ -16,7 +16,7 @@ final class MfaExpiredException extends AbstractMfaHttpException
     /**
      * Constructor.
      *
-     * @param  list<\SineMacula\Laravel\Mfa\Support\FactorSummary>  $factors
+     * @param  list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>  $factors
      * @param  string  $message
      */
     public function __construct(

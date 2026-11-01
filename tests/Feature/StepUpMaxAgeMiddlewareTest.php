@@ -9,7 +9,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
-use SineMacula\Laravel\Mfa\Middleware\RequireMfa;
+use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use Tests\Feature\Concerns\InteractsWithRequireMfaMiddleware;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;

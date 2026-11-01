@@ -22,7 +22,7 @@ abstract class AbstractMfaHttpException extends HttpException
     /**
      * Constructor.
      *
-     * @param  list<\SineMacula\Laravel\Mfa\Support\FactorSummary>  $factors
+     * @param  list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>  $factors
      * @param  string  $message
      */
     public function __construct(
@@ -39,7 +39,7 @@ abstract class AbstractMfaHttpException extends HttpException
     /**
      * Return the factor summaries available to the current identity.
      *
-     * @return list<\SineMacula\Laravel\Mfa\Support\FactorSummary>
+     * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
      */
     public function getFactors(): array
     {

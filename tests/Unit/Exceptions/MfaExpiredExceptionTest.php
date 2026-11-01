@@ -8,7 +8,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Exceptions\AbstractMfaHttpException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
-use SineMacula\Laravel\Mfa\Support\FactorSummary;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
