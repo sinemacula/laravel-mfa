@@ -122,7 +122,7 @@ final class RequireMfaMiddlewareTest extends TestCase
             $factors = $e->getFactors();
             self::assertCount(1, $factors);
             self::assertInstanceOf(FactorSummary::class, $factors[0]);
-            self::assertSame('totp', $factors[0]->driver);
+            self::assertSame('totp', $factors[0]->type);
         }
 
         unset($factor);

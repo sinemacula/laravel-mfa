@@ -52,15 +52,15 @@ final class PolymorphicIdentityTest extends TestCase
         Factor::create([
             'authenticatable_type' => $primary::class,
             'authenticatable_id'   => (string) $primary->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 
         Factor::create([
             'authenticatable_type' => $secondary::class,
             'authenticatable_id'   => (string) $secondary->id,
-            'driver'               => 'email',
-            'recipient'            => $secondary->email,
+            'type'                 => 'email',
+            'destination'          => $secondary->email,
         ]);
 
         // No manual `Mfa::clearCache()` between identity switches — the
@@ -76,7 +76,7 @@ final class PolymorphicIdentityTest extends TestCase
         self::assertCount(1, $primaryFactors);
         $primaryFactor = $primaryFactors->first();
         self::assertNotNull($primaryFactor);
-        self::assertSame('totp', $primaryFactor->getDriver());
+        self::assertSame('totp', $primaryFactor->getType());
 
         $this->actingAs($secondary);
         self::assertTrue(Mfa::shouldUse());
@@ -87,7 +87,7 @@ final class PolymorphicIdentityTest extends TestCase
         self::assertCount(1, $secondaryFactors);
         $secondaryFactor = $secondaryFactors->first();
         self::assertNotNull($secondaryFactor);
-        self::assertSame('email', $secondaryFactor->getDriver());
+        self::assertSame('email', $secondaryFactor->getType());
     }
 
     /**
@@ -120,7 +120,7 @@ final class PolymorphicIdentityTest extends TestCase
         Factor::create([
             'authenticatable_type' => $primary::class,
             'authenticatable_id'   => (string) $primary->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 

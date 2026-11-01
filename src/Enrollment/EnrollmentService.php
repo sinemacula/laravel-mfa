@@ -42,10 +42,10 @@ final readonly class EnrollmentService
     /**
      * Enrol a freshly-built factor against the current identity.
      *
-     * The consumer constructs the factor (with secret/recipient/hash already
-     * populated); this method stamps ownership onto the current identity,
-     * persists via `EloquentFactor::persist()`, invalidates the setup-state
-     * cache, and dispatches `MfaFactorEnrolled`.
+     * The consumer constructs the factor (with secret/destination/hash already
+     * populated); this method stamps ownership onto the current identity, marks
+     * a new factor confirmed, persists via `EloquentFactor::persist()`,
+     * invalidates the setup-state cache, and dispatches `MfaFactorEnrolled`.
      *
      * Ownership is stamped, never trusted: caller-supplied morph columns on an
      * Eloquent factor are overwritten so a consumer cannot enrol a factor
@@ -86,6 +86,9 @@ final readonly class EnrollmentService
 
                 $factor->setAttribute($relation->getMorphType(), CurrentIdentity::typeOf($identity));
                 $factor->setAttribute($relation->getForeignKeyName(), $identity->getAuthIdentifier());
+
+                // The factor arrives ready to use, so it is stored confirmed.
+                $factor->confirm();
             }
 
             $factor->persist();
@@ -96,6 +99,6 @@ final readonly class EnrollmentService
         $this->cache->clear($identity);
 
         $events = $this->container->make(Dispatcher::class);
-        $events->dispatch(new MfaFactorEnrolled($identity, $factor, $factor->getDriver()));
+        $events->dispatch(new MfaFactorEnrolled($identity, $factor, $factor->getType()));
     }
 }

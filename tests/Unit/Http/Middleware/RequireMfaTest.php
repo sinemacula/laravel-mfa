@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Facade;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
@@ -118,10 +119,11 @@ final class RequireMfaTest extends TestCase
     {
         $factor = self::createStub(Factor::class);
         $factor->method('getFactorIdentifier')->willReturn('id-1');
-        $factor->method('getDriver')->willReturn('email');
+        $factor->method('getType')->willReturn('email');
         $factor->method('getLabel')->willReturn(null);
-        $factor->method('getRecipient')->willReturn('user@example.com');
-        $factor->method('getVerifiedAt')->willReturn(null);
+        $factor->method('getDestination')->willReturn('user@example.com');
+        $factor->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
+        $factor->method('getLastUsedAt')->willReturn(null);
 
         $manager            = new FakeMfaManager;
         $manager->shouldUse = true;
@@ -181,10 +183,11 @@ final class RequireMfaTest extends TestCase
     {
         $factor = self::createStub(Factor::class);
         $factor->method('getFactorIdentifier')->willReturn('id-2');
-        $factor->method('getDriver')->willReturn('totp');
+        $factor->method('getType')->willReturn('totp');
         $factor->method('getLabel')->willReturn('Authenticator');
-        $factor->method('getRecipient')->willReturn(null);
-        $factor->method('getVerifiedAt')->willReturn(null);
+        $factor->method('getDestination')->willReturn(null);
+        $factor->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
+        $factor->method('getLastUsedAt')->willReturn(null);
 
         $manager                  = new FakeMfaManager;
         $manager->shouldUse       = true;

@@ -7,7 +7,8 @@ namespace SineMacula\Laravel\Mfa\Drivers;
 use SineMacula\Laravel\Mfa\Codes\CodeSettings;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
-use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 
 /**
  * SMS factor driver.
@@ -59,6 +60,28 @@ final class SmsDriver extends AbstractOtpDriver
     }
 
     /**
+     * A code sent by SMS to the factor's phone number.
+     *
+     * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
+     */
+    #[\Override]
+    public function channelKind(): ChannelKind
+    {
+        return ChannelKind::SMS;
+    }
+
+    /**
+     * The `amr` value of a code sent by SMS: `sms`.
+     *
+     * @return list<string>
+     */
+    #[\Override]
+    public function amr(): array
+    {
+        return ['sms'];
+    }
+
+    /**
      * Get the configured message template.
      *
      * @return string
@@ -69,26 +92,26 @@ final class SmsDriver extends AbstractOtpDriver
     }
 
     /**
-     * Dispatch the code to the factor's recipient phone number via the bound
+     * Dispatch the code to the factor's destination phone number via the bound
      * SMS gateway.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $code
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException
      */
     #[\Override]
     protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void
     {
-        $recipient = $factor->getRecipient();
+        $destination = $factor->getDestination();
 
-        if ($recipient === null || $recipient === '') {
-            throw new MissingRecipientException('SMS factor has no recipient configured; cannot deliver code.');
+        if ($destination === null || $destination === '') {
+            throw new MissingDestinationException('SMS factor has no destination configured; cannot deliver code.');
         }
 
         $message = str_replace(self::CODE_PLACEHOLDER, $code, $this->messageTemplate);
 
-        $this->gateway->send($recipient, $message);
+        $this->gateway->send($destination, $message);
     }
 }

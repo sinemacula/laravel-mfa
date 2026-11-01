@@ -164,7 +164,7 @@ final class BackupCodeDriverTest extends TestCase
         $factor = FactorModel::query()->create([
             'authenticatable_type' => NonEloquentIdentity::class,
             'authenticatable_id'   => 'plain-1',
-            'driver'               => BackupCodeDriver::NAME,
+            'type'                 => BackupCodeDriver::NAME,
             'secret'               => $driver->hash($plain),
         ]);
 
@@ -318,7 +318,7 @@ final class BackupCodeDriverTest extends TestCase
              * @return string
              */
             #[\Override]
-            public function getDriver(): string
+            public function getType(): string
             {
                 return BackupCodeDriver::NAME;
             }
@@ -351,7 +351,7 @@ final class BackupCodeDriverTest extends TestCase
         ]);
 
         $factor                       = new FactorModel;
-        $factor->driver               = BackupCodeDriver::NAME;
+        $factor->type                 = BackupCodeDriver::NAME;
         $factor->secret               = $secretHash;
         $factor->authenticatable_type = $user->getMorphClass();
         $factor->authenticatable_id   = (string) $user->id;

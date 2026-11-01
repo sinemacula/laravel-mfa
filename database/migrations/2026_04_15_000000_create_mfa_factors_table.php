@@ -4,13 +4,15 @@ declare(strict_types = 1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
+use SineMacula\Laravel\Mfa\Database\IndexName;
 use SineMacula\Laravel\Mfa\Database\MigrationCollisionGuard;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * Create the MFA factors table.
+ * Create the MFA factors table: one row per factor an identity has enrolled or
+ * is enrolling.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,13 +28,12 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        $table = Config::string('mfa.factor.table', 'mfa_factors') ?: 'mfa_factors';
-
+        $table  = TableNames::of(TableNames::FACTORS);
         $schema = Schema::connection($this->getConnection());
 
-        (new MigrationCollisionGuard($schema))->ensureNotExists($table, 'factor.table');
+        (new MigrationCollisionGuard($schema))->ensureNotExists($table, TableNames::FACTORS . '.table');
 
-        $schema->create($table, static function (Blueprint $blueprint): void {
+        $schema->create($table, static function (Blueprint $blueprint) use ($table): void {
             $blueprint->ulid('id')->primary();
 
             // Plain string polymorphic columns so the table works against
@@ -40,49 +41,64 @@ return new class extends Migration {
             // to unsignedBigInteger and break non-integer keys.
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
-            $blueprint->index(['authenticatable_type', 'authenticatable_id']);
+            $blueprint->index(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_index'));
 
-            // Driver name this factor is registered against (e.g. 'totp',
-            // 'email', 'sms', 'backup_code'). Indexed because a single identity
-            // may have multiple factors and lookups typically filter by driver.
-            $blueprint->string('driver')->index();
+            // The name the factor's driver is registered under (`totp`,
+            // `email`, `sms`, `passkey` or an application's own).
+            $blueprint->string('type', 64);
 
-            // Optional human-readable label (e.g. "Work phone", "Authy").
-            // Surfaced in the structured exception payload and UI flows to
-            // disambiguate between multiple factors of the same driver.
+            // The label the person chose, such as "Work phone".
             $blueprint->string('label')->nullable();
 
-            // Delivery destination for OTP-delivery drivers. Stores the phone
-            // number for SMS factors (E.164-formatted), email address for email
-            // factors, and is null for factors that don't deliver to the
-            // identity over the network (TOTP, backup codes). Captured at
-            // enrolment time — intentionally not resolved live from the
-            // identity so a silent address change cannot redirect codes.
-            $blueprint->string('recipient')->nullable();
+            // The phone number (E.164) or email address an SMS or email factor
+            // delivers to, captured when it is enrolled and never resolved live
+            // from the identity, so a changed address cannot redirect codes.
+            $blueprint->string('destination')->nullable();
 
-            // Persistent secret for drivers that use one (TOTP). Encrypted at
-            // rest via the model's `encrypted` cast.
+            // The credential a passkey factor is associated with. Text, since a
+            // WebAuthn credential id reaches 1023 bytes.
+            $blueprint->text('credential_reference')->nullable();
+
+            // The TOTP shared secret, encrypted at rest by the model's cast,
+            // and the parameters the factor was enrolled with, so it keeps
+            // working the same way after the configuration changes.
             $blueprint->text('secret')->nullable();
+            $blueprint->string('totp_algorithm', 16)->nullable();
+            $blueprint->unsignedTinyInteger('totp_digits')->nullable();
+            $blueprint->unsignedSmallInteger('totp_period')->nullable();
 
-            // Currently issued one-time code (email, SMS) and its expiry.
-            // Cleared after successful verification or when the next challenge
-            // is issued. Encrypted at rest via the model's `encrypted` cast —
-            // `text` rather than a fixed length so the encrypted ciphertext
-            // fits regardless of the configured OTP alphabet / length.
+            // The last time step a TOTP code was accepted for: the same or an
+            // earlier step is refused.
+            $blueprint->unsignedBigInteger('last_accepted_step')->nullable();
+
+            // Pending until a first valid code or assertion confirms it; only a
+            // confirmed factor is usable.
+            $blueprint->string('status', 16)->default('pending');
+            $blueprint->boolean('preferred')->default(false);
+
+            // The durable consecutive-failure count, reset only by a success of
+            // this factor, and when the failure ceiling disabled the factor.
+            $blueprint->unsignedInteger('consecutive_failures')->default(0);
+            $blueprint->timestamp('disabled_at')->nullable();
+
+            // The application the factor was enrolled through: an application's
+            // limits on new enrolments count only its own.
+            $blueprint->string('application')->nullable();
+
+            $blueprint->timestamp('confirmed_at')->nullable();
+            $blueprint->timestamp('last_used_at')->nullable();
+
+            // The delivered code and its expiry, encrypted at rest by the
+            // model's cast, until delivered codes have a table of their own.
             $blueprint->text('code')->nullable();
             $blueprint->timestamp('expires_at')->nullable();
 
-            // Rate-limiting state. `attempts` is reset on successful
-            // verification or new challenge issuance. `locked_until` is set
-            // when the configured max-attempts threshold is reached and cleared
-            // on unlock. `last_attempted_at` is set on every verify call
-            // regardless of outcome.
+            // The per-factor attempt counter and lockout, until the attempt
+            // throttles replace them, and when verification was last attempted
+            // and passed.
             $blueprint->unsignedInteger('attempts')->default(0);
             $blueprint->timestamp('locked_until')->nullable();
             $blueprint->timestamp('last_attempted_at')->nullable();
-
-            // When the factor last completed a successful verification. `null`
-            // means the factor has never been verified (new enrolment).
             $blueprint->timestamp('verified_at')->nullable();
 
             $blueprint->timestamps();
@@ -96,9 +112,7 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        $table = Config::string('mfa.factor.table', 'mfa_factors') ?: 'mfa_factors';
-
-        Schema::connection($this->getConnection())->dropIfExists($table);
+        Schema::connection($this->getConnection())->dropIfExists(TableNames::of(TableNames::FACTORS));
     }
 
     /**

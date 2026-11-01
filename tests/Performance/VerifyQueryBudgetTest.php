@@ -51,7 +51,7 @@ final class VerifyQueryBudgetTest extends TestCase
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => $secret,
         ]);
 
@@ -88,7 +88,7 @@ final class VerifyQueryBudgetTest extends TestCase
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
             'locked_until'         => now()->addHour(),
         ]);
@@ -118,7 +118,7 @@ final class VerifyQueryBudgetTest extends TestCase
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 

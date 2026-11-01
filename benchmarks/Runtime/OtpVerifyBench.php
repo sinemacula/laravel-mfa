@@ -48,8 +48,8 @@ final class OtpVerifyBench
     {
         $this->driver = new SmsDriver(gateway: new FakeSmsGateway);
 
-        $this->factorHit     = new InMemoryFactor(driver: 'sms');
-        $this->factorExpired = new InMemoryFactor(driver: 'sms');
+        $this->factorHit     = new InMemoryFactor(type: 'sms');
+        $this->factorExpired = new InMemoryFactor(type: 'sms');
     }
 
     /**

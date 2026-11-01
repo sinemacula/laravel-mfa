@@ -49,7 +49,7 @@ final class FakeSmsGateway implements SmsGateway
     }
 
     /**
-     * Return only the messages sent to the given recipient.
+     * Return only the messages sent to the given destination.
      *
      * @param  string  $to
      * @return list<array{to: string, message: string}>

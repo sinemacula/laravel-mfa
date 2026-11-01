@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 
 return [
 
@@ -67,7 +68,8 @@ return [
     | The factor model and its table. The model must extend Eloquent's model
     | and implement the package's `EloquentFactor` contract; the shipped one
     | uses a ULID primary key and a polymorphic owner relation, and may be
-    | subclassed or replaced.
+    | subclassed or replaced. Every table the package creates is named in its
+    | block and defaults to a name prefixed `mfa_`; no two may share one.
     |
     */
 
@@ -81,10 +83,12 @@ return [
     | Identity state
     |---------------------------------------------------------------------------
     |
-    | The table holding one row per identity that owns factors. Every change
-    | that depends on the identity's whole factor state locks its row first,
-    | then the identity's factors, so two such changes for one identity run one
-    | after the other.
+    | The table holding one row per identity that owns factors: its
+    | verification generation, re-enrolment obligation, failures across every
+    | factor and recovery code set generation. Every change that depends on
+    | the identity's whole factor state locks its row first, then the
+    | identity's factors, so two such changes for one identity run one after
+    | the other.
     |
     */
 
@@ -119,11 +123,13 @@ return [
     | minutes), the cooldown before another is sent (up to the lifetime), the
     | caps on how many one factor and one identity are sent within the send
     | window, the SMS message (which must carry `:code`) and the email message
-    | class (`MfaCodeMessage` or a subclass).
+    | class (`MfaCodeMessage` or a subclass), and the table the codes are
+    | stored in, hashed.
     |
     */
 
     'codes' => [
+        'table'                   => env('MFA_CODES_TABLE', 'mfa_codes'),
         'length'                  => env('MFA_CODES_LENGTH', 6),
         'ttl_minutes'             => env('MFA_CODES_TTL_MINUTES', 10),
         'resend_cooldown_seconds' => env('MFA_CODES_RESEND_COOLDOWN_SECONDS', 60),
@@ -143,11 +149,15 @@ return [
     | alphabet (no character repeated, ignoring case), which together must
     | give at least 40 bits of entropy once a code is normalised (case folded,
     | spaces and hyphens removed), and how few unused codes count as running
-    | low (0 to the set's size).
+    | low (0 to the set's size). The model and its table: the model must
+    | extend Eloquent's model and implement the package's `RecoveryCode`
+    | contract, and may subclass or replace the shipped one.
     |
     */
 
     'recovery_codes' => [
+        'model'     => env('MFA_RECOVERY_CODES_MODEL', RecoveryCode::class),
+        'table'     => env('MFA_RECOVERY_CODES_TABLE', 'mfa_recovery_codes'),
         'count'     => env('MFA_RECOVERY_CODES_COUNT', 10),
         'length'    => env('MFA_RECOVERY_CODES_LENGTH', 12),
         'alphabet'  => env('MFA_RECOVERY_CODES_ALPHABET', '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'),
@@ -163,11 +173,13 @@ return [
     | across an identity (1 to 100) and from one IP address (1 to 10000) within
     | the window (60 to 86400 seconds) lock or throttle them, how long a
     | lockout lasts (60 to 86400 seconds), and how many consecutive failures
-    | disable a factor (1 to 100).
+    | disable a factor (1 to 100), and the table the temporary throttles are
+    | counted in.
     |
     */
 
     'attempts' => [
+        'table'           => env('MFA_ATTEMPTS_TABLE', 'mfa_attempts'),
         'factor_limit'    => env('MFA_ATTEMPTS_FACTOR_LIMIT', 5),
         'identity_limit'  => env('MFA_ATTEMPTS_IDENTITY_LIMIT', 20),
         'ip_limit'        => env('MFA_ATTEMPTS_IP_LIMIT', 100),
@@ -182,12 +194,27 @@ return [
     |---------------------------------------------------------------------------
     |
     | How long a pending factor can be confirmed after its enrolment starts (1
-    | to 60 minutes).
+    | to 60 minutes), and the table each enrolment in progress is held in.
     |
     */
 
     'enrollment' => [
+        'table'       => env('MFA_ENROLLMENT_TABLE', 'mfa_enrollments'),
         'ttl_minutes' => env('MFA_ENROLLMENT_TTL_MINUTES', 15),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Passkeys
+    |---------------------------------------------------------------------------
+    |
+    | The table recording which passkeys are associated with an identity as
+    | factors. The credentials themselves belong to the authentication layer.
+    |
+    */
+
+    'passkeys' => [
+        'table' => env('MFA_PASSKEYS_TABLE', 'mfa_passkey_associations'),
     ],
 
     /*

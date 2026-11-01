@@ -6,6 +6,7 @@ namespace Tests\Fixtures\Drivers;
 
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 
 /**
  * No-op `FactorDriver` used by tests that need to register an extension whose
@@ -24,6 +25,8 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
  */
 final class NoopFactorDriver implements FactorDriver
 {
+    use DescribesNoChannel;
+
     /**
      * No-op — fixture exists only to register a driver name.
      *
@@ -48,16 +51,5 @@ final class NoopFactorDriver implements FactorDriver
     public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
     {
         return false;
-    }
-
-    /**
-     * Return a null secret — the fixture does not mint credentials.
-     *
-     * @return ?string
-     */
-    #[\Override]
-    public function generateSecret(): ?string
-    {
-        return null;
     }
 }

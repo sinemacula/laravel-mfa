@@ -13,11 +13,13 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Config\ConfigurationValidator;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
+use SineMacula\Laravel\Mfa\Contracts\RecoveryCode;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
 use Tests\Fixtures\Factors\SecondaryConnectionFactor;
+use Tests\Fixtures\RecoveryCodes\SecondaryConnectionRecoveryCode;
 use Tests\TestCase;
 
 /**
@@ -43,6 +45,7 @@ final class ConfigurationValidatorTest extends TestCase
         'recovery_codes' => [],
         'attempts'       => [],
         'enrollment'     => [],
+        'passkeys'       => [],
         'proofs'         => [],
         'lifecycle'      => [],
         'applications'   => [],
@@ -104,6 +107,33 @@ final class ConfigurationValidatorTest extends TestCase
         yield 'a blank factor table' => ['mfa.factor.table', ' ', 'factor', 'mfa.factor.table must be a table name.'];
         yield 'a factor table that is not a string' => ['mfa.factor.table', ['mfa_factors'], 'factor', 'mfa.factor.table must be a table name.'];
         yield 'a blank identity state table' => ['mfa.identity_state.table', '', 'identity_state', 'mfa.identity_state.table must be a table name.'];
+        yield 'a blank enrolment table' => ['mfa.enrollment.table', ' ', 'enrollment', 'mfa.enrollment.table must be a table name.'];
+        yield 'a blank code table' => ['mfa.codes.table', '', 'codes', 'mfa.codes.table must be a table name.'];
+        yield 'a recovery code table that is not a string' => ['mfa.recovery_codes.table', 5, 'recovery_codes', 'mfa.recovery_codes.table must be a table name.'];
+        yield 'a blank attempt table' => ['mfa.attempts.table', ' ', 'attempts', 'mfa.attempts.table must be a table name.'];
+        yield 'a blank passkey association table' => ['mfa.passkeys.table', ' ', 'passkeys', 'mfa.passkeys.table must be a table name.'];
+        yield 'two tables sharing a name' => [
+            'mfa.codes.table',
+            'mfa_factors',
+            'storage',
+            'Each of the package\'s tables needs a name of its own: mfa.factor.table, mfa.codes.table share one.',
+        ];
+        yield 'a recovery code model that is not one' => [
+            'mfa.recovery_codes.model',
+            \stdClass::class,
+            'recovery_codes',
+            sprintf('mfa.recovery_codes.model class [stdClass] must extend %s and implement %s.', Model::class, RecoveryCode::class),
+        ];
+        yield 'a recovery code model off the storage connection' => [
+            'mfa.recovery_codes.model',
+            SecondaryConnectionRecoveryCode::class,
+            'recovery_codes',
+            sprintf(
+                'mfa.recovery_codes.model class [%s] must be on the storage connection (`mfa.storage.connection`): %s',
+                SecondaryConnectionRecoveryCode::class,
+                'the model is on [secondary], the package\'s tables on [testing].',
+            ),
+        ];
         yield 'a TOTP setting' => ['mfa.totp.window', 4, 'totp', 'mfa.totp.window must be an integer from 0 to 3.'];
         yield 'a code setting' => ['mfa.codes.length', 5, 'codes', 'mfa.codes.length must be an integer from 6 to 10.'];
         yield 'a recovery code setting' => [
@@ -147,10 +177,11 @@ final class ConfigurationValidatorTest extends TestCase
 
         $expected = [...self::SHIPPED, $subject => [$problem]];
 
-        // The factor model's check reads the storage connection too, so a
-        // connection that is not a name is reported there as well.
+        // The model checks read the storage connection too, so a connection
+        // that is not a name is reported under each model's subject as well.
         if ($subject === 'storage' && !is_string($value)) {
-            $expected['factor'] = [$problem];
+            $expected['factor']         = [$problem];
+            $expected['recovery_codes'] = [$problem];
         }
 
         self::assertSame($expected, $report);

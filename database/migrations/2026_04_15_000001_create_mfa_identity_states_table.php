@@ -4,14 +4,16 @@ declare(strict_types = 1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
+use SineMacula\Laravel\Mfa\Database\IndexName;
 use SineMacula\Laravel\Mfa\Database\MigrationCollisionGuard;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
  * Create the MFA identity states table: one row per identity that owns factors,
- * the row every change to the identity's whole factor state locks first.
+ * holding its factor state as a whole, and the row every change to that state
+ * locks first.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,15 +30,12 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        $table = Config::string('mfa.identity_state.table', 'mfa_identity_states') ?: 'mfa_identity_states';
-
+        $table  = TableNames::of(TableNames::IDENTITY_STATES);
         $schema = Schema::connection($this->getConnection());
 
-        (new MigrationCollisionGuard($schema))->ensureNotExists($table, 'identity_state.table');
+        (new MigrationCollisionGuard($schema))->ensureNotExists($table, TableNames::IDENTITY_STATES . '.table');
 
-        $index = $this->ownerIndex($table);
-
-        $schema->create($table, static function (Blueprint $blueprint) use ($index): void {
+        $schema->create($table, static function (Blueprint $blueprint) use ($table): void {
             $blueprint->ulid('id')->primary();
 
             // Plain string polymorphic columns, as on the factors table, so any
@@ -45,7 +44,25 @@ return new class extends Migration {
             // this row, which the unique index makes a single row per owner.
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
-            $blueprint->unique(['authenticatable_type', 'authenticatable_id'], $index);
+            $blueprint->unique(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_unique'));
+
+            // Advanced to invalidate every proof recorded under an earlier
+            // generation, so other sessions must verify again.
+            $blueprint->unsignedBigInteger('verification_generation')->default(0);
+
+            // Whether a reset obliges the identity to enrol again at its next
+            // sign-in, until a factor is confirmed.
+            $blueprint->boolean('reenrollment_required')->default(false);
+
+            // The identity's consecutive failures across all its factors, and
+            // the lockout they applied.
+            $blueprint->unsignedInteger('consecutive_failures')->default(0);
+            $blueprint->timestamp('locked_until')->nullable();
+
+            // The generation of the identity's current recovery code set and
+            // when it was generated.
+            $blueprint->unsignedInteger('recovery_codes_generation')->default(0);
+            $blueprint->timestamp('recovery_codes_generated_at')->nullable();
 
             $blueprint->timestamps();
         });
@@ -60,9 +77,7 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        $table = Config::string('mfa.identity_state.table', 'mfa_identity_states') ?: 'mfa_identity_states';
-
-        Schema::connection($this->getConnection())->dropIfExists($table);
+        Schema::connection($this->getConnection())->dropIfExists(TableNames::of(TableNames::IDENTITY_STATES));
     }
 
     /**
@@ -77,28 +92,5 @@ return new class extends Migration {
     public function getConnection(): ?string
     {
         return StorageConnection::name();
-    }
-
-    /**
-     * The name of the one-row-per-owner index: the table's name with a suffix,
-     * or, when that would pass the 63 characters PostgreSQL keeps (MySQL keeps
-     * 64), the start of the table's name and a hash of the whole, so a long
-     * configured name still gives one index name, the same on every run.
-     *
-     * @param  string  $table
-     * @return string
-     */
-    private function ownerIndex(string $table): string
-    {
-        $suffix = '_owner_unique';
-        $index  = $table . $suffix;
-
-        if (strlen($index) <= 63) {
-            return $index;
-        }
-
-        $hash = substr(hash('sha256', $table), 0, 8);
-
-        return substr($table, 0, 63 - strlen($suffix) - strlen($hash) - 1) . '_' . $hash . $suffix;
     }
 };

@@ -7,7 +7,7 @@ namespace Tests\Integration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
-use SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -106,7 +106,7 @@ final class CustomFactorModelTest extends TestCase
     {
         config()->set('mfa.factor.model', 123);
 
-        $this->expectException(InvalidFactorModelException::class);
+        $this->expectException(InvalidModelException::class);
         $this->expectExceptionMessage('must be a class string');
 
         Mfa::factorModel();
@@ -122,7 +122,7 @@ final class CustomFactorModelTest extends TestCase
     {
         config()->set('mfa.factor.model', '');
 
-        $this->expectException(InvalidFactorModelException::class);
+        $this->expectException(InvalidModelException::class);
         $this->expectExceptionMessage('must be a class string');
 
         Mfa::factorModel();
@@ -139,7 +139,7 @@ final class CustomFactorModelTest extends TestCase
     {
         config()->set('mfa.factor.model', 'App\DoesNotExistFactor');
 
-        $this->expectException(InvalidFactorModelException::class);
+        $this->expectException(InvalidModelException::class);
         $this->expectExceptionMessage('App\DoesNotExistFactor');
 
         Mfa::factorModel();
@@ -157,7 +157,7 @@ final class CustomFactorModelTest extends TestCase
     {
         config()->set('mfa.factor.model', \stdClass::class);
 
-        $this->expectException(InvalidFactorModelException::class);
+        $this->expectException(InvalidModelException::class);
         $this->expectExceptionMessage('must extend');
 
         Mfa::factorModel();

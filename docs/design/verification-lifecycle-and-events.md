@@ -7,7 +7,9 @@ matters because audit-log sinks, SIEM integrations, and consumer listeners attac
 ordering and payload on every release.
 
 The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\Events`: `MfaChallengeIssued`,
-`MfaVerified`, `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`.
+`MfaVerified`, `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`. They are dispatched until the
+enrolment, verification and lifecycle flows move to the catalogue described in [Event Catalogue](event-catalogue.md),
+whose events carry summaries and a scalar context and are dispatched after the commit.
 
 ## Invariants
 

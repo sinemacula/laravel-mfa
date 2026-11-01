@@ -7,6 +7,7 @@ namespace Tests\Fixtures\Identities;
 use Illuminate\Database\Eloquent\Builder;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
@@ -35,6 +36,9 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      *
      * @param  mixed  $identifier
      * @param  bool  $mfaEnabled
+     * @param  bool  $person
+     * @param  bool  $active
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @return void
      */
     public function __construct(
@@ -44,7 +48,49 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
 
         /** Whether the fixture reports MFA as enabled. */
         private readonly bool $mfaEnabled = false,
+
+        /** Whether the fixture is a person, who may hold factors. */
+        private readonly bool $person = true,
+
+        /** Whether the fixture is active. */
+        private readonly bool $active = true,
+
+        /** What the fixture requires of its own sign-ins. */
+        private readonly ?Requirement $requirement = null,
     ) {}
+
+    /**
+     * Report whether the fixture is a person.
+     *
+     * @return bool
+     */
+    #[\Override]
+    public function canHoldFactors(): bool
+    {
+        return $this->person;
+    }
+
+    /**
+     * Report whether the fixture is active.
+     *
+     * @return bool
+     */
+    #[\Override]
+    public function isMfaActive(): bool
+    {
+        return $this->active;
+    }
+
+    /**
+     * Report what the fixture requires of its own sign-ins.
+     *
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
+     */
+    #[\Override]
+    public function requiresAdditionalFactor(): ?Requirement
+    {
+        return $this->requirement;
+    }
 
     /**
      * Return the fixture's seeded auth identifier.

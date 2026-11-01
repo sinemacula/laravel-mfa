@@ -82,7 +82,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 
         Auth::shouldReceive('user')->andReturn($identity);
 
-        $factor = new InMemoryFactor(driver: 'totp', authenticatable: $identity);
+        $factor = new InMemoryFactor(type: 'totp', authenticatable: $identity);
 
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldNotReceive('verify');
@@ -123,7 +123,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
             Factor::query()
                 ->where('authenticatable_type', NonEloquentIdentity::class)
                 ->where('authenticatable_id', 'plain-issue')
-                ->where('driver', 'backup_code')
+                ->where('type', 'backup_code')
                 ->get(),
         );
     }
@@ -144,7 +144,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 
         Auth::shouldReceive('user')->andReturn($identity);
 
-        $factor = new InMemoryFactor(driver: 'broken', authenticatable: $identity);
+        $factor = new InMemoryFactor(type: 'broken', authenticatable: $identity);
 
         $manager = $this->manager();
         $manager->extend('broken', fn (): \stdClass => new \stdClass);

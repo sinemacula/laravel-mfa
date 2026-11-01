@@ -124,15 +124,43 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
-     * OTP drivers do not use persistent secrets; their secret material is the
-     * per-challenge code, generated on demand by `issueChallenge()`.
+     * The `amr` value of a code sent to the factor: `otp`.
      *
+     * @return list<string>
+     */
+    #[\Override]
+    public function amr(): array
+    {
+        return ['otp'];
+    }
+
+    /**
+     * Delivered codes keep no persistent secret: each is drawn when it is sent
+     * by `issueChallenge()`, so starting an enrolment returns none.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return null
      */
     #[\Override]
-    public function generateSecret(): ?string
+    public function startEnrollment(Factor $factor): ?string
     {
         return null;
+    }
+
+    /**
+     * Confirm the pending factor with the code sent to it, checked as any
+     * other.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $code
+     * @return bool
+     *
+     * @imperative
+     */
+    #[\Override]
+    public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool
+    {
+        return $this->verify($factor, $code);
     }
 
     /**
@@ -170,7 +198,7 @@ abstract class AbstractOtpDriver implements FactorDriver
     }
 
     /**
-     * Deliver the issued code to the factor's recipient via the subclass's
+     * Deliver the issued code to the factor's destination via the subclass's
      * chosen transport.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor

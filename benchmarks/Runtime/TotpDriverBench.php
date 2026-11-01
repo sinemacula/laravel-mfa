@@ -42,7 +42,7 @@ final class TotpDriverBench
     public function __construct()
     {
         $this->driver = new TotpDriver(window: 1);
-        $this->factor = new InMemoryFactor(driver: 'totp');
+        $this->factor = new InMemoryFactor(type: 'totp');
     }
 
     /**

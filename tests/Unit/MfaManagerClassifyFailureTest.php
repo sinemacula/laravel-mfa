@@ -66,7 +66,7 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        $factor = new InMemoryFactor(driver: 'totp', authenticatable: $user);
+        $factor = new InMemoryFactor(type: 'totp', authenticatable: $user);
 
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldReceive('verify')->once()->andReturnFalse();
@@ -97,7 +97,7 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver         : 'email',
+            type         : 'email',
             code           : self::VALID_CODE,
             expiresAt      : Carbon::now()->subMinute(),
             authenticatable: $user,
@@ -134,7 +134,7 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver         : 'totp',
+            type         : 'totp',
             secret         : 'JBSWY3DPEHPK3PXP',
             authenticatable: $user,
         );
@@ -169,7 +169,7 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver         : 'email',
+            type         : 'email',
             code           : self::VALID_CODE,
             authenticatable: $user,
         );
@@ -205,7 +205,7 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver         : 'email',
+            type         : 'email',
             code           : self::VALID_CODE,
             expiresAt      : Carbon::now()->addMinutes(5),
             authenticatable: $user,

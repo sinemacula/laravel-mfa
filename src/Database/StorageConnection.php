@@ -78,6 +78,21 @@ final class StorageConnection
     }
 
     /**
+     * The connection a shipped model is built on: the storage connection by
+     * name, the default one included, since Eloquent gives a related model that
+     * names none its parent's connection; `null` (the default connection) while
+     * the configuration is not yet bootstrapped.
+     *
+     * @return ?string
+     *
+     * @throws \InvalidArgumentException
+     */
+    public static function forModel(): ?string
+    {
+        return Config::getFacadeRoot() === null ? null : self::resolvedName();
+    }
+
+    /**
      * The name of the model's connection: its own, or the default one.
      *
      * @param  \Illuminate\Database\Eloquent\Model  $model

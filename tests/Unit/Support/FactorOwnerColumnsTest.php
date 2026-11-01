@@ -43,7 +43,7 @@ final class FactorOwnerColumnsTest extends TestCase
         $factor = new Factor([
             'authenticatable_type' => NonEloquentIdentity::class,
             'authenticatable_id'   => 'plain-1',
-            'driver'               => 'totp',
+            'type'                 => 'totp',
         ]);
 
         self::assertSame(['authenticatable_type', 'authenticatable_id'], FactorOwnerColumns::of($factor));

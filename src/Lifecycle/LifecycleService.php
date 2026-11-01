@@ -73,6 +73,6 @@ final readonly class LifecycleService
         $this->cache->clear($identity);
 
         $events = $this->container->make(Dispatcher::class);
-        $events->dispatch(new MfaFactorDisabled($identity, $factor, $factor->getDriver()));
+        $events->dispatch(new MfaFactorDisabled($identity, $factor, $factor->getType()));
     }
 }

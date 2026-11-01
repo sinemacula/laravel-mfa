@@ -253,7 +253,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         // returns something that is not a FactorDriver, not a cross-account
         // rejection or a driver/factor identity mismatch.
         $factor                       = new Factor;
-        $factor->driver               = 'not-a-driver';
+        $factor->type                 = 'not-a-driver';
         $factor->authenticatable_type = $user::class;
         $factor->authenticatable_id   = (string) $user->id;
 

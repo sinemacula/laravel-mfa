@@ -6,18 +6,18 @@ namespace Tests\Unit\Exceptions;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
+use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 
 /**
- * Unit tests for the `MissingRecipientException` exception.
+ * Unit tests for the `MissingDestinationException` exception.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
-#[CoversClass(MissingRecipientException::class)]
-final class MissingRecipientExceptionTest extends TestCase
+#[CoversClass(MissingDestinationException::class)]
+final class MissingDestinationExceptionTest extends TestCase
 {
     /**
      * Test is final.
@@ -26,7 +26,7 @@ final class MissingRecipientExceptionTest extends TestCase
      */
     public function testIsFinal(): void
     {
-        $reflection = new \ReflectionClass(MissingRecipientException::class);
+        $reflection = new \ReflectionClass(MissingDestinationException::class);
 
         self::assertTrue($reflection->isFinal());
     }
@@ -40,7 +40,7 @@ final class MissingRecipientExceptionTest extends TestCase
     {
         self::assertInstanceOf(
             \RuntimeException::class,
-            new MissingRecipientException('missing recipient'),
+            new MissingDestinationException('missing destination'),
         );
     }
 
@@ -51,8 +51,8 @@ final class MissingRecipientExceptionTest extends TestCase
      */
     public function testPreservesMessage(): void
     {
-        $exception = new MissingRecipientException('Recipient required.');
+        $exception = new MissingDestinationException('Destination required.');
 
-        self::assertSame('Recipient required.', $exception->getMessage());
+        self::assertSame('Destination required.', $exception->getMessage());
     }
 }

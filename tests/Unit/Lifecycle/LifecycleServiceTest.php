@@ -111,7 +111,7 @@ final class LifecycleServiceTest extends TestCase
 
         Event::fake([MfaFactorDisabled::class]);
 
-        $this->service()->disable(new InMemoryFactor(driver: 'sms', authenticatable: $user));
+        $this->service()->disable(new InMemoryFactor(type: 'sms', authenticatable: $user));
 
         Event::assertDispatched(MfaFactorDisabled::class, static fn (MfaFactorDisabled $event): bool => $event->driver === 'sms');
     }
@@ -175,7 +175,7 @@ final class LifecycleServiceTest extends TestCase
         return Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
     }

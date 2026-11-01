@@ -32,7 +32,7 @@ final class MyDriverFactor extends AbstractFactorStub
      * @return string
      */
     #[\Override]
-    public function getDriver(): string
+    public function getType(): string
     {
         return 'my_driver';
     }

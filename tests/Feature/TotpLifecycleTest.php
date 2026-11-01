@@ -343,7 +343,7 @@ final class TotpLifecycleTest extends TestCase
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'backup_code',
+            'type'                 => 'backup_code',
             'secret'               => hash('sha256', 'PLAIN12345'),
             'attempts'             => 5,
             'locked_until'         => Carbon::now()->addMinutes(15),
@@ -385,7 +385,7 @@ final class TotpLifecycleTest extends TestCase
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => $secret,
         ]);
 

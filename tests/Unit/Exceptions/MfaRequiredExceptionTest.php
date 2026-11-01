@@ -6,6 +6,7 @@ namespace Tests\Unit\Exceptions;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Exceptions\AbstractMfaHttpException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
@@ -80,10 +81,12 @@ final class MfaRequiredExceptionTest extends TestCase
     {
         $summary = new FactorSummary(
             id             : '01HABCDEF',
-            driver         : 'totp',
+            type         : 'totp',
             label          : 'Phone',
-            maskedRecipient: null,
-            verifiedAt     : null,
+            maskedDestination: null,
+            status     : FactorStatus::CONFIRMED,
+            preferred: false,
+            lastUsedAt: null,
         );
 
         $exception = new MfaRequiredException([$summary]);

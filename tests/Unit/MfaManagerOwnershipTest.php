@@ -215,7 +215,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        $factor = new InMemoryFactor(driver: 'totp');
+        $factor = new InMemoryFactor(type: 'totp');
 
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldNotReceive('verify');
@@ -242,7 +242,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        $factor = new InMemoryFactor(driver: 'totp', authenticatable: $foe);
+        $factor = new InMemoryFactor(type: 'totp', authenticatable: $foe);
 
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldNotReceive('verify');
@@ -317,7 +317,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
 
         Event::fake([MfaFactorEnrolled::class]);
 
-        $factor = new InMemoryFactor(driver: 'totp', authenticatable: $foe);
+        $factor = new InMemoryFactor(type: 'totp', authenticatable: $foe);
 
         $this->expectException(FactorOwnershipMismatchException::class);
 
@@ -348,7 +348,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
 
         Event::fake([MfaFactorEnrolled::class]);
 
-        $factor = new InMemoryFactor(driver: 'totp', authenticatable: $user);
+        $factor = new InMemoryFactor(type: 'totp', authenticatable: $user);
 
         $this->manager()->enroll($factor);
 
@@ -377,7 +377,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
 
         $this->actingAs($primary);
 
-        $factor = new InMemoryFactor(driver: 'totp', authenticatable: $secondary);
+        $factor = new InMemoryFactor(type: 'totp', authenticatable: $secondary);
 
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldNotReceive('verify');
@@ -412,7 +412,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
         $victimsFactor = Factor::query()->create([
             'authenticatable_type' => $victim::class,
             'authenticatable_id'   => (string) $victim->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 
@@ -469,7 +469,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
         $this->actingAs($attacker);
 
         $factor                       = new Factor;
-        $factor->driver               = 'totp';
+        $factor->type                 = 'totp';
         $factor->secret               = 'JBSWY3DPEHPK3PXP';
         $factor->authenticatable_type = $victim::class;
         $factor->authenticatable_id   = (string) $victim->id;

@@ -72,7 +72,7 @@ trait InteractsWithMfaManagerState
         Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 

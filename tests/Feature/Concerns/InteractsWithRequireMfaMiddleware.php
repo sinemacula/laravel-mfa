@@ -79,7 +79,7 @@ trait InteractsWithRequireMfaMiddleware
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => $secret,
         ]);
 

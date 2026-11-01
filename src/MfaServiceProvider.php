@@ -11,6 +11,7 @@ use SineMacula\Laravel\Mfa\Config\ConfigurationBindings;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
 use SineMacula\Laravel\Mfa\Drivers\DriverBindings;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentBindings;
+use SineMacula\Laravel\Mfa\Events\EventBindings;
 use SineMacula\Laravel\Mfa\Factors\FactorBindings;
 use SineMacula\Laravel\Mfa\Http\HttpBindings;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleBindings;
@@ -25,12 +26,12 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
  * Registers the configuration and the `mfa` manager singleton, then hands each
  * capability's container wiring to that capability's `*Bindings` class: its
  * service and its defaults for the seams consumers rebind (policy, verification
- * store, SMS gateway). The shipped drivers are registered against the manager
- * by their capability's `*Bindings` class from inside the singleton's factory,
- * once the configuration is checked. Boots the middleware aliases, config and
- * migration publishing, the `mfa:check` command, and the configuration check
- * that runs once the application has booted, which also refuses a factor model
- * off the storage connection.
+ * store, SMS gateway, event context). The shipped drivers are registered
+ * against the manager by their capability's `*Bindings` class from inside the
+ * singleton's factory, once the configuration is checked. Boots the middleware
+ * aliases, config and migration publishing, the `mfa:check` command, and the
+ * configuration check that runs once the application has booted, which also
+ * refuses a factor model off the storage connection.
  *
  * Consumers with their own enforcement policy, stateless verification store, or
  * real SMS gateway rebind the matching contracts in their own service provider;
@@ -53,6 +54,7 @@ final class MfaServiceProvider extends ServiceProvider
 
         $this->registerManager();
 
+        EventBindings::register($this->app);
         FactorBindings::register($this->app);
         DriverBindings::register($this->app);
         CodeBindings::register($this->app);

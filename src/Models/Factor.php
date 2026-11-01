@@ -6,10 +6,10 @@ namespace SineMacula\Laravel\Mfa\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Config;
 use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
  * Default shipped Factor Eloquent model.
@@ -27,10 +27,22 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
  * @property string $id
  * @property string $authenticatable_type
  * @property string $authenticatable_id
- * @property string $driver
+ * @property string $type
  * @property ?string $label
- * @property ?string $recipient
+ * @property ?string $destination
+ * @property ?string $credential_reference
  * @property ?string $secret
+ * @property ?string $totp_algorithm
+ * @property ?int $totp_digits
+ * @property ?int $totp_period
+ * @property ?int $last_accepted_step
+ * @property string $status
+ * @property bool $preferred
+ * @property int $consecutive_failures
+ * @property ?\Carbon\CarbonInterface $disabled_at
+ * @property ?string $application
+ * @property ?\Carbon\CarbonInterface $confirmed_at
+ * @property ?\Carbon\CarbonInterface $last_used_at
  * @property ?string $code
  * @property ?\Carbon\CarbonInterface $expires_at
  * @property ?\Carbon\CarbonInterface $verified_at
@@ -48,10 +60,22 @@ class Factor extends Model implements EloquentFactor
     protected $fillable = [
         'authenticatable_type',
         'authenticatable_id',
-        'driver',
+        'type',
         'label',
-        'recipient',
+        'destination',
+        'credential_reference',
         'secret',
+        'totp_algorithm',
+        'totp_digits',
+        'totp_period',
+        'last_accepted_step',
+        'status',
+        'preferred',
+        'consecutive_failures',
+        'disabled_at',
+        'application',
+        'confirmed_at',
+        'last_used_at',
         'code',
         'expires_at',
         'verified_at',
@@ -64,6 +88,15 @@ class Factor extends Model implements EloquentFactor
     protected $hidden = [
         'secret',
         'code',
+        'destination',
+        'credential_reference',
+    ];
+
+    /** @var array<string, mixed> The attributes' values before anything is set: a new factor is pending, not preferred and has not failed. */
+    protected $attributes = [
+        'status'               => 'pending',
+        'preferred'            => false,
+        'consecutive_failures' => 0,
     ];
 
     /**
@@ -84,9 +117,9 @@ class Factor extends Model implements EloquentFactor
      */
     public function __construct(array $attributes = [])
     {
-        $this->setTable($this->resolveConfiguredTable());
+        $this->setTable(TableNames::of(TableNames::FACTORS));
 
-        $this->connection ??= $this->resolveStorageConnection();
+        $this->connection ??= StorageConnection::forModel();
 
         parent::__construct($attributes);
     }
@@ -113,10 +146,22 @@ class Factor extends Model implements EloquentFactor
         return [
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',
-            'driver'               => 'string',
+            'type'                 => 'string',
             'label'                => 'string',
-            'recipient'            => 'string',
+            'destination'          => 'string',
+            'credential_reference' => 'string',
             'secret'               => 'encrypted',
+            'totp_algorithm'       => 'string',
+            'totp_digits'          => 'integer',
+            'totp_period'          => 'integer',
+            'last_accepted_step'   => 'integer',
+            'status'               => 'string',
+            'preferred'            => 'boolean',
+            'consecutive_failures' => 'integer',
+            'disabled_at'          => 'datetime',
+            'application'          => 'string',
+            'confirmed_at'         => 'datetime',
+            'last_used_at'         => 'datetime',
             'code'                 => 'encrypted',
             'expires_at'           => 'datetime',
             'verified_at'          => 'datetime',
@@ -124,35 +169,5 @@ class Factor extends Model implements EloquentFactor
             'last_attempted_at'    => 'datetime',
             'attempts'             => 'integer',
         ];
-    }
-
-    /**
-     * Read the name of the storage connection, or `null` (the default
-     * connection) while the Config facade is not yet bootstrapped.
-     *
-     * @return ?string
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function resolveStorageConnection(): ?string
-    {
-        return Config::getFacadeRoot() === null ? null : StorageConnection::resolvedName();
-    }
-
-    /**
-     * Read the configured factor table, falling back to `'mfa_factors'` when
-     * the key is absent or the Config facade is not yet bootstrapped.
-     *
-     * @return string
-     */
-    private function resolveConfiguredTable(): string
-    {
-        try {
-            $table = Config::string('mfa.factor.table', 'mfa_factors');
-        } catch (\Throwable) {
-            return 'mfa_factors';
-        }
-
-        return $table === '' ? 'mfa_factors' : $table;
     }
 }

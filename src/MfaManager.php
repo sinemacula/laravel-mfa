@@ -258,7 +258,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @return class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function factorModel(): string
     {

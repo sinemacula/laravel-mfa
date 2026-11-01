@@ -20,6 +20,12 @@ between requests.
 | `factor.model`                  | `Models\Factor`                    | an Eloquent `EloquentFactor` model     | `MFA_FACTOR_MODEL`                  | yes     |
 | `factor.table`                  | `mfa_factors`                      | a table name                           | `MFA_FACTOR_TABLE`                  | yes     |
 | `identity_state.table`          | `mfa_identity_states`              | a table name                           | `MFA_IDENTITY_STATE_TABLE`          | yes     |
+| `enrollment.table`              | `mfa_enrollments`                  | a table name                           | `MFA_ENROLLMENT_TABLE`              | yes     |
+| `codes.table`                   | `mfa_codes`                        | a table name                           | `MFA_CODES_TABLE`                   | yes     |
+| `recovery_codes.model`          | `Models\RecoveryCode`              | an Eloquent `RecoveryCode` model       | `MFA_RECOVERY_CODES_MODEL`          | yes     |
+| `recovery_codes.table`          | `mfa_recovery_codes`               | a table name                           | `MFA_RECOVERY_CODES_TABLE`          | yes     |
+| `attempts.table`                | `mfa_attempts`                     | a table name                           | `MFA_ATTEMPTS_TABLE`                | yes     |
+| `passkeys.table`                | `mfa_passkey_associations`         | a table name                           | `MFA_PASSKEYS_TABLE`                | yes     |
 | `totp.algorithm`                | `sha1`                             | `sha1`, `sha256`, `sha512`             | `MFA_TOTP_ALGORITHM`                | not yet |
 | `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   | not yet |
 | `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   | not yet |
@@ -132,8 +138,9 @@ container cannot build, such as a gateway bound to a class that does not exist, 
 ],
 ```
 
-Every table the package ships lives on `storage.connection`, the default connection when `null`: the factors and the
-identity states. The shipped models read and write them there, and the published migrations create them there: each
+Every table the package ships lives on `storage.connection`, the default connection when `null`: the factors, the
+identity states, the enrolments in progress, the delivered codes, the recovery codes, the attempt throttles and the
+passkey associations. The shipped models read and write them there, and the published migrations create them there: each
 names the storage connection as its own, so `php artisan migrate` creates every table where the package uses it,
 whichever connection the migrator runs on. With `null`, the migrations follow the migrator, as any migration that names
 no connection does, while the models use the default connection, so run them on the default connection. Laravel keeps
@@ -143,8 +150,8 @@ The tables share one connection because the changes that depend on an identity's
 recovery codes, removing a factor, a reset, a verification racing one of them) write several of them in one
 transaction, which two connections cannot commit as one. Each such change locks the identity's row in the identity
 states table first and its factors second, so two changes for one identity run one after the other. The factor model
-must therefore live there too: the shipped `Models\Factor` takes the storage connection unless a subclass names a
-connection of its own, and a factor model, shipped or custom, on any other connection fails the configuration check
+must therefore live there too: the shipped models take the storage connection unless a subclass names a connection of
+its own, and a factor or recovery code model, shipped or custom, on any other connection fails the configuration check
 when the package boots, and with a `ModelOffStorageConnectionException` before any such change opens its transaction,
 rather than splitting a change across two transactions.
 Connections are compared by name, a model's own or the default one, so two names for one database count as two
@@ -173,15 +180,37 @@ your own that moves them and a restart of every worker.
 'identity_state' => [
     'table' => env('MFA_IDENTITY_STATE_TABLE', 'mfa_identity_states'),
 ],
+
+'recovery_codes' => [
+    'model' => env('MFA_RECOVERY_CODES_MODEL', RecoveryCode::class),
+    'table' => env('MFA_RECOVERY_CODES_TABLE', 'mfa_recovery_codes'),
+    // ...
+],
 ```
 
-`factor.table` names the factors table and `identity_state.table` the identity states table, which holds one row per
-identity that owns factors. A long identity states table name is fine: its one-row-per-owner index is named after the
-start of the table's name and a hash of the whole when the full name would pass the length an index name may have. Set
-them before running the migrations: a migration whose table already exists on the storage connection stops with a
-`TableAlreadyExistsException` naming the setting to change, before it changes anything. `factor.model` names the factor
-model; see [Extending](extending.md). A table name that is not a non-blank string, and a factor model that is not an
-Eloquent model implementing `Contracts\EloquentFactor`, fail the configuration check.
+Every table the package creates is named in its capability's block and defaults to a name prefixed `mfa_`:
+
+| Setting                | Default                    | Holds                                                                                |
+|------------------------|----------------------------|--------------------------------------------------------------------------------------|
+| `factor.table`         | `mfa_factors`              | One row per factor, pending or confirmed                                             |
+| `identity_state.table` | `mfa_identity_states`      | One row per identity that owns factors: its generation, obligation and failures      |
+| `enrollment.table`     | `mfa_enrollments`          | One row per enrolment in progress: its pending factor and the hash of its grant      |
+| `codes.table`          | `mfa_codes`                | The codes sent by SMS or email, as keyed hashes bound to factor, purpose and session |
+| `recovery_codes.table` | `mfa_recovery_codes`       | Each identity's recovery codes, as salted hashes                                     |
+| `attempts.table`       | `mfa_attempts`             | The temporary attempt throttles, one counter per scope and subject                   |
+| `passkeys.table`       | `mfa_passkey_associations` | Which passkeys are associated with an identity as factors                            |
+
+[Schema and models](../design/schema-and-models.md) describes every column. Long names are fine: an index is named
+after the start of its table's name and a hash of the whole when the full name would pass the length an index name may
+have. Set the names before running the migrations: a migration whose table already exists on the storage connection
+stops with a `TableAlreadyExistsException` naming the setting to change, before it changes anything. A table name that
+is not a non-blank string, or two tables sharing a name, fail the configuration check.
+
+`factor.model` and `recovery_codes.model` name the factor and recovery code models, which an application may replace
+with a subclass of the shipped one or its own Eloquent model implementing `Contracts\EloquentFactor` or
+`Contracts\RecoveryCode` (the `ActsAsFactor` and `ActsAsRecoveryCode` traits do); see [Extending](extending.md). A model
+that is not one fails the configuration check. The package's other records use models of its own, which are not
+replaced.
 
 ## TOTP
 

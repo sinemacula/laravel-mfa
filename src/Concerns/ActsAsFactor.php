@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 
 /**
  * Default implementation of the `Factor` contract for Eloquent models.
@@ -52,26 +53,26 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the driver name this factor is registered against.
+     * Return the factor's type: the name its driver is registered under.
      *
      * @return string
      */
-    public function getDriver(): string
+    public function getType(): string
     {
         /** @var mixed $value */
-        $value = $this->getAttribute($this->getDriverName());
+        $value = $this->getAttribute($this->getTypeName());
 
         return is_string($value) ? $value : '';
     }
 
     /**
-     * Column name holding the driver identifier.
+     * Column name holding the factor's type.
      *
      * @return string
      */
-    public function getDriverName(): string
+    public function getTypeName(): string
     {
-        return 'driver';
+        return 'type';
     }
 
     /**
@@ -98,14 +99,14 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the factor's delivery destination (phone number / email).
+     * Return the factor's destination (phone number or email address).
      *
      * @return ?string
      */
-    public function getRecipient(): ?string
+    public function getDestination(): ?string
     {
         /** @var mixed $value */
-        $value = $this->getAttribute($this->getRecipientName());
+        $value = $this->getAttribute($this->getDestinationName());
 
         return is_string($value) ? $value : null;
     }
@@ -115,9 +116,268 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
      *
      * @return string
      */
-    public function getRecipientName(): string
+    public function getDestinationName(): string
     {
-        return 'recipient';
+        return 'destination';
+    }
+
+    /**
+     * Return the reference of the credential a passkey factor is associated
+     * with.
+     *
+     * @return ?string
+     */
+    public function getCredentialReference(): ?string
+    {
+        return $this->readFactorString($this->getCredentialReferenceName());
+    }
+
+    /**
+     * Column name holding a passkey factor's credential reference.
+     *
+     * @return string
+     */
+    public function getCredentialReferenceName(): string
+    {
+        return 'credential_reference';
+    }
+
+    /**
+     * Return a TOTP factor's HMAC algorithm.
+     *
+     * @return ?string
+     */
+    public function getTotpAlgorithm(): ?string
+    {
+        return $this->readFactorString($this->getTotpAlgorithmName());
+    }
+
+    /**
+     * Column name holding a TOTP factor's HMAC algorithm.
+     *
+     * @return string
+     */
+    public function getTotpAlgorithmName(): string
+    {
+        return 'totp_algorithm';
+    }
+
+    /**
+     * Return the number of digits of a TOTP factor's codes.
+     *
+     * @return ?int
+     */
+    public function getTotpDigits(): ?int
+    {
+        return $this->readFactorInteger($this->getTotpDigitsName());
+    }
+
+    /**
+     * Column name holding a TOTP factor's number of digits.
+     *
+     * @return string
+     */
+    public function getTotpDigitsName(): string
+    {
+        return 'totp_digits';
+    }
+
+    /**
+     * Return the period of a TOTP factor's time steps in seconds.
+     *
+     * @return ?int
+     */
+    public function getTotpPeriod(): ?int
+    {
+        return $this->readFactorInteger($this->getTotpPeriodName());
+    }
+
+    /**
+     * Column name holding a TOTP factor's period in seconds.
+     *
+     * @return string
+     */
+    public function getTotpPeriodName(): string
+    {
+        return 'totp_period';
+    }
+
+    /**
+     * Return the last TOTP time step a code was accepted for.
+     *
+     * @return ?int
+     */
+    public function getLastAcceptedStep(): ?int
+    {
+        return $this->readFactorInteger($this->getLastAcceptedStepName());
+    }
+
+    /**
+     * Column name holding the last accepted TOTP time step.
+     *
+     * @return string
+     */
+    public function getLastAcceptedStepName(): string
+    {
+        return 'last_accepted_step';
+    }
+
+    /**
+     * Return where the factor is in its enrolment: pending unless the stored
+     * status says confirmed, so a missing or unknown value is never usable.
+     *
+     * @return \SineMacula\Laravel\Mfa\Enums\FactorStatus
+     */
+    public function getStatus(): FactorStatus
+    {
+        /** @var mixed $value */
+        $value = $this->getAttribute($this->getStatusName());
+
+        if ($value instanceof FactorStatus) {
+            return $value;
+        }
+
+        return $value === FactorStatus::CONFIRMED->value ? FactorStatus::CONFIRMED : FactorStatus::PENDING;
+    }
+
+    /**
+     * Column name holding the factor's status.
+     *
+     * @return string
+     */
+    public function getStatusName(): string
+    {
+        return 'status';
+    }
+
+    /**
+     * Determine whether the factor is confirmed, and so usable.
+     *
+     * @return bool
+     */
+    public function isConfirmed(): bool
+    {
+        return $this->getStatus() === FactorStatus::CONFIRMED;
+    }
+
+    /**
+     * Determine whether the factor is the identity's preferred one.
+     *
+     * @return bool
+     */
+    public function isPreferred(): bool
+    {
+        return $this->getAttribute($this->getPreferredName()) === true;
+    }
+
+    /**
+     * Column name holding whether the factor is the preferred one.
+     *
+     * @return string
+     */
+    public function getPreferredName(): string
+    {
+        return 'preferred';
+    }
+
+    /**
+     * Return the factor's count of consecutive failed verifications.
+     *
+     * @return int
+     */
+    public function getConsecutiveFailures(): int
+    {
+        return $this->readFactorInteger($this->getConsecutiveFailuresName()) ?? 0;
+    }
+
+    /**
+     * Column name holding the count of consecutive failed verifications.
+     *
+     * @return string
+     */
+    public function getConsecutiveFailuresName(): string
+    {
+        return 'consecutive_failures';
+    }
+
+    /**
+     * Return when the factor was disabled at the failure ceiling.
+     *
+     * @return ?\Carbon\CarbonInterface
+     */
+    public function getDisabledAt(): ?CarbonInterface
+    {
+        return $this->readFactorTime($this->getDisabledAtName());
+    }
+
+    /**
+     * Column name holding when the factor was disabled at the failure ceiling.
+     *
+     * @return string
+     */
+    public function getDisabledAtName(): string
+    {
+        return 'disabled_at';
+    }
+
+    /**
+     * Return the application the factor was enrolled through.
+     *
+     * @return ?string
+     */
+    public function getApplication(): ?string
+    {
+        return $this->readFactorString($this->getApplicationName());
+    }
+
+    /**
+     * Column name holding the application the factor was enrolled through.
+     *
+     * @return string
+     */
+    public function getApplicationName(): string
+    {
+        return 'application';
+    }
+
+    /**
+     * Return when the factor was confirmed.
+     *
+     * @return ?\Carbon\CarbonInterface
+     */
+    public function getConfirmedAt(): ?CarbonInterface
+    {
+        return $this->readFactorTime($this->getConfirmedAtName());
+    }
+
+    /**
+     * Column name holding when the factor was confirmed.
+     *
+     * @return string
+     */
+    public function getConfirmedAtName(): string
+    {
+        return 'confirmed_at';
+    }
+
+    /**
+     * Return when the factor was last used to verify.
+     *
+     * @return ?\Carbon\CarbonInterface
+     */
+    public function getLastUsedAt(): ?CarbonInterface
+    {
+        return $this->readFactorTime($this->getLastUsedAtName());
+    }
+
+    /**
+     * Column name holding when the factor was last used.
+     *
+     * @return string
+     */
+    public function getLastUsedAtName(): string
+    {
+        return 'last_used_at';
     }
 
     /**
@@ -354,19 +614,32 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Stamp a successful verification and reset the attempt state.
+     * Stamp a successful verification, as the last use too, and reset the
+     * attempt state.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
     public function recordVerification(?CarbonInterface $at = null): void
     {
-        $this->setAttribute(
-            $this->getVerifiedAtName(),
-            $at ?? Carbon::now(),
-        );
+        $at ??= Carbon::now();
+
+        $this->setAttribute($this->getVerifiedAtName(), $at);
+        $this->setAttribute($this->getLastUsedAtName(), $at);
         $this->resetAttempts();
         $this->consumeCode();
+    }
+
+    /**
+     * Mark the factor confirmed at the given time or now.
+     *
+     * @param  ?\Carbon\CarbonInterface  $at
+     * @return void
+     */
+    public function confirm(?CarbonInterface $at = null): void
+    {
+        $this->setAttribute($this->getStatusName(), FactorStatus::CONFIRMED->value);
+        $this->setAttribute($this->getConfirmedAtName(), $at ?? Carbon::now());
     }
 
     /**
@@ -412,5 +685,47 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     public function persist(): void
     {
         $this->save();
+    }
+
+    /**
+     * Read a string column, `null` for anything else.
+     *
+     * @param  string  $column
+     * @return ?string
+     */
+    private function readFactorString(string $column): ?string
+    {
+        /** @var mixed $value */
+        $value = $this->getAttribute($column);
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * Read an integer column, `null` for anything else.
+     *
+     * @param  string  $column
+     * @return ?int
+     */
+    private function readFactorInteger(string $column): ?int
+    {
+        /** @var mixed $value */
+        $value = $this->getAttribute($column);
+
+        return is_int($value) ? $value : null;
+    }
+
+    /**
+     * Read a time column, `null` for anything else.
+     *
+     * @param  string  $column
+     * @return ?\Carbon\CarbonInterface
+     */
+    private function readFactorTime(string $column): ?CarbonInterface
+    {
+        /** @var mixed $value */
+        $value = $this->getAttribute($column);
+
+        return $value instanceof CarbonInterface ? $value : null;
     }
 }

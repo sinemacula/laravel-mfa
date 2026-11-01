@@ -50,14 +50,14 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional driver column name.
+     * Return the conventional type column name.
      *
      * @return string
      */
     #[\Override]
-    public function getDriverName(): string
+    public function getTypeName(): string
     {
-        return 'driver';
+        return 'type';
     }
 
     /**
@@ -72,14 +72,146 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional recipient column name.
+     * Return the conventional destination column name.
      *
      * @return string
      */
     #[\Override]
-    public function getRecipientName(): string
+    public function getDestinationName(): string
     {
-        return 'recipient';
+        return 'destination';
+    }
+
+    /**
+     * Return the conventional credential reference column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getCredentialReferenceName(): string
+    {
+        return 'credential_reference';
+    }
+
+    /**
+     * Return the conventional TOTP algorithm column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getTotpAlgorithmName(): string
+    {
+        return 'totp_algorithm';
+    }
+
+    /**
+     * Return the conventional TOTP digits column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getTotpDigitsName(): string
+    {
+        return 'totp_digits';
+    }
+
+    /**
+     * Return the conventional TOTP period column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getTotpPeriodName(): string
+    {
+        return 'totp_period';
+    }
+
+    /**
+     * Return the conventional last accepted step column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getLastAcceptedStepName(): string
+    {
+        return 'last_accepted_step';
+    }
+
+    /**
+     * Return the conventional status column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getStatusName(): string
+    {
+        return 'status';
+    }
+
+    /**
+     * Return the conventional preferred column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getPreferredName(): string
+    {
+        return 'preferred';
+    }
+
+    /**
+     * Return the conventional consecutive failures column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getConsecutiveFailuresName(): string
+    {
+        return 'consecutive_failures';
+    }
+
+    /**
+     * Return the conventional disabled-at column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getDisabledAtName(): string
+    {
+        return 'disabled_at';
+    }
+
+    /**
+     * Return the conventional application column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getApplicationName(): string
+    {
+        return 'application';
+    }
+
+    /**
+     * Return the conventional confirmed-at column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getConfirmedAtName(): string
+    {
+        return 'confirmed_at';
+    }
+
+    /**
+     * Return the conventional last-used-at column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getLastUsedAtName(): string
+    {
+        return 'last_used_at';
     }
 
     /**
@@ -202,6 +334,18 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      */
     #[\Override]
     public function recordVerification(?CarbonInterface $at = null): void
+    {
+        // Intentionally empty — see method docblock.
+    }
+
+    /**
+     * No-op — the fixture does not track confirmation.
+     *
+     * @param  ?\Carbon\CarbonInterface  $at
+     * @return void
+     */
+    #[\Override]
+    public function confirm(?CarbonInterface $at = null): void
     {
         // Intentionally empty — see method docblock.
     }

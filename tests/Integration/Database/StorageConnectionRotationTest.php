@@ -119,7 +119,7 @@ final class StorageConnectionRotationTest extends TestCase
         $prior = Factor::query()->create([
             'authenticatable_type' => $user->getMorphClass(),
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => BackupCodeDriver::NAME,
+            'type'                 => BackupCodeDriver::NAME,
             'secret'               => 'prior-hash',
         ]);
 
@@ -144,7 +144,7 @@ final class StorageConnectionRotationTest extends TestCase
 
         $remaining = Factor::query()
             ->where('authenticatable_id', (string) $user->id)
-            ->where('driver', BackupCodeDriver::NAME)
+            ->where('type', BackupCodeDriver::NAME)
             ->pluck('id')
             ->all();
 
@@ -228,7 +228,7 @@ final class StorageConnectionRotationTest extends TestCase
     {
         return DB::connection('secondary')->table('mfa_factors')
             ->where('authenticatable_id', $identifier)
-            ->where('driver', BackupCodeDriver::NAME)
+            ->where('type', BackupCodeDriver::NAME)
             ->count();
     }
 }

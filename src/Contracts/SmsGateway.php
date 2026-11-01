@@ -7,7 +7,7 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 /**
  * SMS gateway contract.
  *
- * Single-method contract for dispatching outbound SMS messages to a recipient
+ * Single-method contract for dispatching outbound SMS messages to a destination
  * phone number. Implemented by consumers against their chosen SMS provider
  * (Twilio, Vonage, AWS SNS, in-house gateway, etc.) and bound against this
  * interface in a service provider. The package ships a `NullSmsGateway` default

@@ -121,7 +121,7 @@ final class FactorStateLockTest extends TestCase
                 Factor::query()->create([
                     'authenticatable_type' => NonEloquentIdentity::class,
                     'authenticatable_id'   => self::IDENTITY_KEY,
-                    'driver'               => 'totp',
+                    'type'                 => 'totp',
                 ]);
 
                 $this->assertObserverIsLockedOut();

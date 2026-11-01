@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
 
@@ -48,6 +49,17 @@ final class DefaultsTest extends TestCase
     public function testAbstractOtpDriverDefaults(): void
     {
         $driver = new class extends AbstractOtpDriver {
+            /**
+             * The channel kind is irrelevant to the defaults.
+             *
+             * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
+             */
+            #[\Override]
+            public function channelKind(): ChannelKind
+            {
+                return ChannelKind::EMAIL;
+            }
+
             /**
              * No-op dispatch — the test only asserts the constructor defaults
              * exposed via the getters.

@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
+use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Drivers\RecordingFactorDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
@@ -85,6 +86,8 @@ final class CustomDriverExtensionTest extends TestCase
     public function testConsumerCanOverrideBuiltInTotpDriver(): void
     {
         $marker = new class implements FactorDriver {
+            use DescribesNoChannel;
+
             /**
              * No-op — the override is never asked to issue a challenge.
              *
@@ -110,17 +113,6 @@ final class CustomDriverExtensionTest extends TestCase
                 // Marker driver — return true so the caller can observe that
                 // the override fired without setting up a factor.
                 return true;
-            }
-
-            /**
-             * Return a fixed marker secret.
-             *
-             * @return string
-             */
-            #[\Override]
-            public function generateSecret(): string
-            {
-                return 'fake-marker-secret';
             }
         };
 

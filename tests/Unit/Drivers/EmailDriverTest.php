@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
-use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
+use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
 use Tests\Fixtures\Codes\CustomMfaCodeMessage;
 use Tests\Fixtures\Identities\TestUser;
@@ -19,7 +19,7 @@ use Tests\TestCase;
  * Unit tests for `EmailDriver`.
  *
  * Exercises the Laravel mailer dispatch path (via `Mail::fake()`), the
- * missing-recipient guard, the Mailable class override, and the end-to-end
+ * missing-destination guard, the Mailable class override, and the end-to-end
  * challenge-issuance happy path persisting a real `Factor` row.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -31,56 +31,56 @@ use Tests\TestCase;
 final class EmailDriverTest extends TestCase
 {
     /**
-     * `dispatch()` must reject a null recipient with a clear
-     * `MissingRecipientException` rather than silently dropping the outbound
+     * `dispatch()` must reject a null destination with a clear
+     * `MissingDestinationException` rather than silently dropping the outbound
      * mail.
      *
      * @return void
      */
-    public function testDispatchThrowsWhenRecipientIsNull(): void
+    public function testDispatchThrowsWhenDestinationIsNull(): void
     {
         Mail::fake();
 
         $driver = $this->makeDriver();
-        $factor = $this->makeFactor(recipient: null);
+        $factor = $this->makeFactor(destination: null);
 
-        $this->expectException(MissingRecipientException::class);
-        $this->expectExceptionMessage('Email factor has no recipient configured');
+        $this->expectException(MissingDestinationException::class);
+        $this->expectExceptionMessage('Email factor has no destination configured');
 
         $driver->issueChallenge($factor);
     }
 
     /**
-     * `dispatch()` must reject an empty-string recipient identically to a null
-     * one.
+     * `dispatch()` must reject an empty-string destination identically to a
+     * null one.
      *
      * @return void
      */
-    public function testDispatchThrowsWhenRecipientIsEmptyString(): void
+    public function testDispatchThrowsWhenDestinationIsEmptyString(): void
     {
         Mail::fake();
 
         $driver = $this->makeDriver();
-        $factor = $this->makeFactor(recipient: '');
+        $factor = $this->makeFactor(destination: '');
 
-        $this->expectException(MissingRecipientException::class);
+        $this->expectException(MissingDestinationException::class);
 
         $driver->issueChallenge($factor);
     }
 
     /**
-     * Issuing a challenge with a configured recipient should send the default
+     * Issuing a challenge with a configured destination should send the default
      * `MfaCodeMessage` Mailable to that address with a fresh 6-digit numeric
      * code and the configured 10-minute expiry.
      *
      * @return void
      */
-    public function testDispatchSendsDefaultMailableToRecipient(): void
+    public function testDispatchSendsDefaultMailableToDestination(): void
     {
         Mail::fake();
 
         $driver = $this->makeDriver();
-        $factor = $this->makeFactor(recipient: 'user@example.com');
+        $factor = $this->makeFactor(destination: 'user@example.com');
 
         $driver->issueChallenge($factor);
 
@@ -103,7 +103,7 @@ final class EmailDriverTest extends TestCase
         Mail::fake();
 
         $driver = $this->makeDriver(mailable: CustomMfaCodeMessage::class);
-        $factor = $this->makeFactor(recipient: 'brand@example.com');
+        $factor = $this->makeFactor(destination: 'brand@example.com');
 
         $driver->issueChallenge($factor);
 
@@ -149,7 +149,7 @@ final class EmailDriverTest extends TestCase
         Mail::fake();
 
         $driver = $this->makeDriver();
-        $factor = $this->makeFactor(recipient: 'persist@example.com');
+        $factor = $this->makeFactor(destination: 'persist@example.com');
 
         $driver->issueChallenge($factor);
         $factor->refresh();
@@ -179,7 +179,7 @@ final class EmailDriverTest extends TestCase
             mailer: $mailer,
             codeLength: 8,
         );
-        $factor = $this->makeFactor(recipient: 'length@example.com');
+        $factor = $this->makeFactor(destination: 'length@example.com');
 
         $driver->issueChallenge($factor);
 
@@ -211,10 +211,10 @@ final class EmailDriverTest extends TestCase
      * Persist and return a fresh email factor owned by a freshly inserted test
      * user.
      *
-     * @param  ?string  $recipient
+     * @param  ?string  $destination
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
-    private function makeFactor(?string $recipient): FactorModel
+    private function makeFactor(?string $destination): FactorModel
     {
         $user = TestUser::query()->create([
             'email'       => 'owner@example.com',
@@ -222,8 +222,8 @@ final class EmailDriverTest extends TestCase
         ]);
 
         $factor                       = new FactorModel;
-        $factor->driver               = 'email';
-        $factor->recipient            = $recipient;
+        $factor->type                 = 'email';
+        $factor->destination          = $destination;
         $factor->authenticatable_type = $user->getMorphClass();
         $factor->authenticatable_id   = (string) $user->id;
         $factor->save();

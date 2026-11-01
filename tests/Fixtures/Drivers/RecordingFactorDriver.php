@@ -6,6 +6,7 @@ namespace Tests\Fixtures\Drivers;
 
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 
 /**
  * Custom `FactorDriver` fixture that records issue / verify calls and accepts
@@ -18,6 +19,8 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
  */
 final class RecordingFactorDriver implements FactorDriver
 {
+    use DescribesNoChannel;
+
     /** @var int Issuance call counter for the test assertions. */
     public int $issueCalls = 0;
 
@@ -50,16 +53,5 @@ final class RecordingFactorDriver implements FactorDriver
         $this->verifyCalls++;
 
         return $code === 'correct';
-    }
-
-    /**
-     * Custom driver does not use a persistent secret.
-     *
-     * @return ?string
-     */
-    #[\Override]
-    public function generateSecret(): ?string
-    {
-        return null;
     }
 }

@@ -28,6 +28,7 @@ return new class extends Migration {
             $blueprint->string('password')->nullable();
             $blueprint->string('remember_token', 100)->nullable();
             $blueprint->timestamps();
+            $blueprint->softDeletes();
         });
     }
 

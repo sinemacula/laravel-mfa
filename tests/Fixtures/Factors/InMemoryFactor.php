@@ -7,6 +7,7 @@ namespace Tests\Fixtures\Factors;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use Tests\Fixtures\Factors\Concerns\ReportsUsableFactorDefaults;
 
 /**
  * Minimal in-memory Factor implementation used by MfaManager tests that need to
@@ -25,6 +26,8 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  */
 final class InMemoryFactor implements Factor
 {
+    use ReportsUsableFactorDefaults;
+
     /**
      * Build an in-memory factor double with the provided immutable state. The
      * optional `$authenticatable` argument lets the fixture report ownership to
@@ -32,14 +35,14 @@ final class InMemoryFactor implements Factor
      * "owner unknown" shape and trips the `FactorOwnershipMismatchException`
      * path.
      *
-     * @param  string  $driver
+     * @param  string  $type
      * @param  ?string  $secret
      * @param  ?string  $code
      * @param  ?\Carbon\CarbonInterface  $expiresAt
      * @param  int  $attempts
      * @param  ?\Carbon\CarbonInterface  $lockedUntil
      * @param  ?\Carbon\CarbonInterface  $verifiedAt
-     * @param  ?string  $recipient
+     * @param  ?string  $destination
      * @param  ?string  $label
      * @param  mixed  $identifier
      * @param  ?\Illuminate\Contracts\Auth\Authenticatable  $authenticatable
@@ -47,8 +50,8 @@ final class InMemoryFactor implements Factor
      */
     public function __construct(
 
-        /** Driver name reported by the factor. */
-        private readonly string $driver = 'totp',
+        /** Type reported by the factor. */
+        private readonly string $type = 'totp',
 
         /** Stored secret value. */
         private readonly ?string $secret = null,
@@ -68,8 +71,8 @@ final class InMemoryFactor implements Factor
         /** Last successful verification timestamp. */
         private readonly ?CarbonInterface $verifiedAt = null,
 
-        /** Delivery recipient (email address, phone number, etc). */
-        private readonly ?string $recipient = null,
+        /** Delivery destination (email address, phone number, etc). */
+        private readonly ?string $destination = null,
 
         /** Human-readable factor label. */
         private readonly ?string $label = null,
@@ -93,14 +96,14 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the driver name this in-memory factor reports against.
+     * Return the type this in-memory factor reports.
      *
      * @return string
      */
     #[\Override]
-    public function getDriver(): string
+    public function getType(): string
     {
-        return $this->driver;
+        return $this->type;
     }
 
     /**
@@ -115,14 +118,14 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the optional delivery recipient.
+     * Return the optional delivery destination.
      *
      * @return ?string
      */
     #[\Override]
-    public function getRecipient(): ?string
+    public function getDestination(): ?string
     {
-        return $this->recipient;
+        return $this->destination;
     }
 
     /**

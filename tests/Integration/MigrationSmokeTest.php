@@ -6,15 +6,18 @@ namespace Tests\Integration;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Exceptions\TableAlreadyExistsException;
 use Tests\TestCase;
 
 /**
  * Engine-agnostic migration smoke test.
  *
- * Asserts that the shipped `mfa_factors` and `mfa_identity_states` tables exist
- * with every expected column and index after the package migrations run
+ * Asserts that every table the package ships exists with every expected column
+ * and index, and the safe defaults, after the package migrations run
  * end-to-end. Catches engine-specific schema bugs that would otherwise ship
  * behind a green badge — e.g. a column type MySQL accepts but PostgreSQL
  * rejects, or an index name that collides with a reserved identifier on one
@@ -34,39 +37,140 @@ final class MigrationSmokeTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Every column the manager + drivers read or write must exist on the
-     * freshly migrated `mfa_factors` table — this is the schema contract the
-     * rest of the test suite implicitly assumes.
+     * Rows of each table the package creates and every column it must have.
+     *
+     * @return iterable<string, array{string, list<string>}>
+     */
+    public static function tables(): iterable
+    {
+        $owner = ['authenticatable_type', 'authenticatable_id'];
+
+        yield 'mfa_factors' => ['mfa_factors', [
+            'id', ...$owner, 'type', 'label', 'destination', 'credential_reference', 'secret', 'totp_algorithm', 'totp_digits',
+            'totp_period', 'last_accepted_step', 'status', 'preferred', 'consecutive_failures', 'disabled_at', 'application',
+            'confirmed_at', 'last_used_at', 'code', 'expires_at', 'attempts', 'locked_until', 'last_attempted_at', 'verified_at',
+            'created_at', 'updated_at',
+        ]];
+        yield 'mfa_identity_states' => ['mfa_identity_states', [
+            'id', ...$owner, 'verification_generation', 'reenrollment_required', 'consecutive_failures', 'locked_until',
+            'recovery_codes_generation', 'recovery_codes_generated_at', 'created_at', 'updated_at',
+        ]];
+        yield 'mfa_enrollments' => ['mfa_enrollments', [
+            'id', 'factor_id', ...$owner, 'grant_hash', 'application', 'session_id', 'expires_at', 'attempts', 'created_at', 'updated_at',
+        ]];
+        yield 'mfa_codes' => ['mfa_codes', [
+            'id', 'factor_id', ...$owner, 'purpose', 'application', 'session_id', 'code_hash', 'attempts', 'sends', 'sent_at',
+            'expires_at', 'consumed_at', 'created_at', 'updated_at',
+        ]];
+        yield 'mfa_recovery_codes' => ['mfa_recovery_codes', [
+            'id', ...$owner, 'code_hash', 'generation', 'used_at', 'replaced_at', 'created_at', 'updated_at',
+        ]];
+        yield 'mfa_attempts' => ['mfa_attempts', ['key', 'scope', 'hits', 'window_ends_at']];
+        yield 'mfa_passkey_associations' => ['mfa_passkey_associations', [
+            'id', 'factor_id', ...$owner, 'credential_id_hash', 'credential_id', 'created_at', 'updated_at',
+        ]];
+    }
+
+    /**
+     * Every table exists with every column the package reads or writes: the
+     * schema contract the rest of the suite assumes.
+     *
+     * @param  string  $table
+     * @param  list<string>  $columns
+     * @return void
+     */
+    #[DataProvider('tables')]
+    public function testEveryTableHasEveryRequiredColumn(string $table, array $columns): void
+    {
+        self::assertTrue(Schema::hasTable($table));
+        self::assertSame([], array_values(array_diff($columns, Schema::getColumnListing($table))), sprintf('Missing columns on %s after migration.', $table));
+    }
+
+    /**
+     * Rows of a table and the columns of each unique index it must have.
+     *
+     * @return iterable<string, array{string, list<string>}>
+     */
+    public static function uniqueIndexes(): iterable
+    {
+        yield 'one enrolment per factor' => ['mfa_enrollments', ['factor_id']];
+        yield 'one enrolment per grant' => ['mfa_enrollments', ['grant_hash']];
+        yield 'one association per factor' => ['mfa_passkey_associations', ['factor_id']];
+        yield 'one association per credential and owner' => ['mfa_passkey_associations', ['authenticatable_type', 'authenticatable_id', 'credential_id_hash']];
+        yield 'one counter per key' => ['mfa_attempts', ['key']];
+    }
+
+    /**
+     * The unique indexes the package relies on exist on every engine.
+     *
+     * @param  string  $table
+     * @param  list<string>  $columns
+     * @return void
+     */
+    #[DataProvider('uniqueIndexes')]
+    public function testTheUniqueIndexesExist(string $table, array $columns): void
+    {
+        $unique = array_filter(
+            Schema::getIndexes($table),
+            static fn (array $index): bool => $index['unique'] && $index['columns'] === $columns,
+        );
+
+        self::assertCount(1, $unique, sprintf('Expected a unique index on %s (%s).', $table, implode(', ', $columns)));
+    }
+
+    /**
+     * A new factor is pending, not preferred and has not failed, by the table's
+     * own defaults; so are a new identity state's counts.
      *
      * @return void
      */
-    public function testFactorsTableHasEveryRequiredColumn(): void
+    public function testNewRowsTakeTheSafeDefaults(): void
     {
-        self::assertTrue(Schema::hasTable('mfa_factors'));
+        DB::table('mfa_factors')->insert(['id' => '01JFACTOR00000000000000000', 'authenticatable_type' => 'user', 'authenticatable_id' => '1', 'type' => 'totp']);
+        DB::table('mfa_identity_states')->insert(['id' => '01JSTATE000000000000000000', 'authenticatable_type' => 'user', 'authenticatable_id' => '1']);
 
-        $expected = [
-            'id',
-            'authenticatable_type',
-            'authenticatable_id',
-            'driver',
-            'label',
-            'recipient',
-            'secret',
-            'code',
-            'expires_at',
-            'attempts',
-            'locked_until',
-            'last_attempted_at',
-            'verified_at',
-            'created_at',
-            'updated_at',
-        ];
+        $factor = (array) DB::table('mfa_factors')->first();
+        $state  = (array) DB::table('mfa_identity_states')->first();
 
-        foreach ($expected as $column) {
-            self::assertTrue(
-                Schema::hasColumn('mfa_factors', $column),
-                sprintf('Missing column [%s] on mfa_factors after migration.', $column),
-            );
+        self::assertSame(['pending', 0, 0], [$factor['status'], (int) $factor['preferred'], (int) $factor['consecutive_failures']]);
+        self::assertSame(
+            [0, 0, 0, 0],
+            [(int) $state['verification_generation'], (int) $state['reenrollment_required'], (int) $state['consecutive_failures'], (int) $state['recovery_codes_generation']],
+        );
+    }
+
+    /**
+     * Every table's name is its setting's, and a table that already exists is
+     * named in the refusal by that setting.
+     *
+     * @return void
+     */
+    public function testEachTableTakesItsConfiguredName(): void
+    {
+        Config::set('mfa.codes.table', 'delivered_codes');
+
+        $migration = require __DIR__ . '/../../database/migrations/2026_04_15_000003_create_mfa_codes_table.php';
+
+        self::assertIsObject($migration);
+        self::assertTrue(method_exists($migration, 'up') && method_exists($migration, 'down'));
+
+        $migration->up();
+
+        try {
+            self::assertTrue(Schema::hasTable('delivered_codes'));
+            self::assertSame(['delivered_codes_owner_index', 'delivered_codes_binding_index', 'delivered_codes_expiry_index'], array_values(array_intersect(
+                ['delivered_codes_owner_index', 'delivered_codes_binding_index', 'delivered_codes_expiry_index'],
+                array_column(Schema::getIndexes('delivered_codes'), 'name'),
+            )));
+
+            $this->expectException(TableAlreadyExistsException::class);
+            $this->expectExceptionMessage('Set `codes.table` in config/mfa.php');
+
+            $migration->up();
+        } finally {
+            $migration->down();
+
+            self::assertFalse(Schema::hasTable('delivered_codes'));
         }
     }
 

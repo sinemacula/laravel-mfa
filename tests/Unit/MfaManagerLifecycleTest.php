@@ -372,7 +372,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     private function makeUnpersistedTotpFactor(?TestUser $user = null): Factor
     {
         $factor         = new Factor;
-        $factor->driver = 'totp';
+        $factor->type   = 'totp';
         $factor->secret = 'JBSWY3DPEHPK3PXP';
 
         if ($user !== null) {
@@ -412,7 +412,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
         return Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
     }

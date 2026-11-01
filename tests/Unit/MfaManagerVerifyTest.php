@@ -82,7 +82,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver         : 'totp',
+            type         : 'totp',
             secret         : 'JBSWY3DPEHPK3PXP',
             lockedUntil    : Carbon::now()->addMinutes(5),
             authenticatable: $user,
@@ -121,7 +121,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
             'attempts'             => 0,
         ]);
@@ -166,8 +166,8 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'email',
-            'recipient'            => 'v5@example.com',
+            'type'                 => 'email',
+            'destination'          => 'v5@example.com',
             'code'                 => '999999',
             'expires_at'           => Carbon::now()->addMinutes(10),
             'attempts'             => 2,
@@ -206,7 +206,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
             'attempts'             => 5,
         ]);
@@ -239,7 +239,7 @@ final class MfaManagerVerifyTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $factor = new InMemoryFactor(
-            driver         : 'totp',
+            type         : 'totp',
             secret         : 'JBSWY3DPEHPK3PXP',
             attempts       : 0,
             authenticatable: $user,

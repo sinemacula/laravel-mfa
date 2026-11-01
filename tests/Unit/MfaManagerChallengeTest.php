@@ -62,8 +62,8 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'email',
-            'recipient'            => 'c1@example.com',
+            'type'                 => 'email',
+            'destination'          => 'c1@example.com',
             'attempts'             => 4,
         ]);
 
@@ -105,7 +105,7 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        $factor = new InMemoryFactor(driver: 'totp', authenticatable: $user);
+        $factor = new InMemoryFactor(type: 'totp', authenticatable: $user);
 
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldReceive('issueChallenge')
@@ -133,7 +133,7 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
      */
     public function testChallengeIsNoopWhenNoIdentity(): void
     {
-        $factor = new InMemoryFactor(driver: 'totp');
+        $factor = new InMemoryFactor(type: 'totp');
 
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldNotReceive('issueChallenge');

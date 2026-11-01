@@ -29,6 +29,9 @@ The current note set is:
   whole configuration and the bindings it needs at boot, at manager resolution and from `mfa:check`.
 - `storage-and-transactions.md`: the storage connection every table and shipped model uses, the refusal of a model on
   another connection, and the one transaction and lock order of every change to an identity's whole factor state.
+- `schema-and-models.md`: every table and column, the models and the two an application may replace, the identity
+  contract and its trait, forgetting a deleted identity, and the guard every operation on a factor starts with.
+- `event-catalogue.md`: the events the flows dispatch, their payloads and context, and their dispatch after the commit.
 - `seam-contracts.md`: the contracts declared for the seams with an authentication layer and the application, what
   each answers and what a fail-closed answer is, and the pending session and passkey assertion values they carry.
 - `backup-code-consumption.md`: how backup codes are stored hashed, why consumption and rotation run under the owner's
@@ -38,7 +41,7 @@ The current note set is:
 - `per-device-verification-and-step-up.md`: the `MfaVerificationStore` seam, the default session-scoped
   implementation, the `mfa:N` step-up route-parameter contract, and the fail-closed rules inside `hasExpired()`.
 - `factor-payload-hygiene.md`: encryption at rest for `secret` / `code`, the `FactorSummary` projection used on
-  exception payloads, and the recipient-masking rules.
+  exception payloads, and the destination-masking rules.
 
 These documents are secondary to the code and tests, not a replacement for them. If a note and a cited test disagree,
 the test should be treated as authoritative until the mismatch is resolved.

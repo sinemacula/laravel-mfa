@@ -32,7 +32,9 @@ whatever UI you like.
 - **Structured exceptions**: `MfaRequiredException` and `MfaExpiredException` carry a masked `FactorSummary`
   list suitable for rendering a factor-picker UI.
 - **Lifecycle events**: `MfaChallengeIssued`, `MfaVerified`, `MfaVerificationFailed`, `MfaFactorEnrolled`,
-  `MfaFactorDisabled` dispatched by the manager, not by consumer code.
+  `MfaFactorDisabled` dispatched by the manager, not by consumer code, and a catalogue of events for the enrolment,
+  verification, recovery code and lifecycle flows, each carrying a scalar context and no secret, dispatched once its
+  change commits (see [Events](docs/guides/events.md)).
 - **Polymorphic identity support**: works with any Eloquent identity type (`User`, `Admin`, ...) via the
   shipped `authenticatable_type` / `authenticatable_id` morph.
 - **Encrypted at rest**: factor `secret` and `code` columns are `encrypted`-cast; backup codes hash to SHA-256
@@ -111,61 +113,29 @@ refused when the package boots. See [Storage](docs/guides/configuration.md#stora
 
 ## Identity Model
 
-Implement `MultiFactorAuthenticatable` on the identity the authentication stack hands back:
+Implement `MultiFactorAuthenticatable` on the identity the authentication stack hands back, and use `HasFactors`:
 
 ```php
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User;
+use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Facades\Mfa;
 
 class AppUser extends User implements MultiFactorAuthenticatable
 {
+    use HasFactors;
+
     public function shouldUseMultiFactor(): bool
     {
         return true;
     }
-
-    public function isMfaEnabled(): bool
-    {
-        return $this->authFactors()->exists();
-    }
-
-    public function authFactors(): Builder
-    {
-        return $this->factors()->getQuery();
-    }
-
-    public function factors(): MorphMany
-    {
-        // Resolves through `Mfa::factorModel()` so consumers swapping the
-        // shipped model via `config('mfa.factor.model')` get their subclass
-        // back without any further wiring.
-        return $this->morphMany(Mfa::factorModel(), 'authenticatable');
-    }
 }
 ```
 
-Canonical rule: `isMfaEnabled()` means "has at least one enrolled factor". Per-request verification freshness
-lives separately on `Mfa::hasExpired()` / the verification store, so keep the two predicates orthogonal.
-
-> **Consumed backup codes.** A spent backup-code row keeps its `Factor` record — only the `secret` is
-> nulled — so an audit trail survives. If backup codes are the only factor type a user might hold, filter
-> spent rows out of `isMfaEnabled()` so a user who has consumed every recovery code does not read as
-> "enabled" despite holding no usable credential:
->
-> ```php
-> public function isMfaEnabled(): bool
-> {
->     return $this->authFactors()
->         ->where(function ($query) {
->             $query->where('driver', '!=', 'backup_code')
->                 ->orWhereNotNull('secret');
->         })
->         ->exists();
-> }
-> ```
+The trait gives the identity its factors (of the configured factor model), counts it as enabled once it has a
+confirmed factor, treats it as an active person who requires nothing of their own sign-ins until the model says
+otherwise, and deletes everything the package holds for it once the model is deleted (a soft delete keeps it). See
+[Identity models](docs/guides/identity-models.md). Per-request verification freshness lives separately on
+`Mfa::hasExpired()` / the verification store, so keep the two predicates orthogonal.
 
 ## Usage
 
@@ -238,7 +208,7 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 $driver = Mfa::driver('totp');
-$secret = $driver->generateSecret();
+$secret = $driver->startEnrollment(new Factor);
 $uri    = $driver->provisioningUri(
     issuer: config('app.name'),
     accountName: $user->email,
@@ -248,7 +218,7 @@ $uri    = $driver->provisioningUri(
 // Render $uri as a QR code with your library of choice.
 
 $factor         = new Factor;
-$factor->driver = 'totp';
+$factor->type   = 'totp';
 $factor->label  = 'Authenticator app';
 $factor->secret = $secret;
 
@@ -310,7 +280,7 @@ $this->app->singleton(SmsGateway::class, static fn ($app): TwilioSmsGateway => n
 ));
 ```
 
-The contract exposes only the recipient and rendered message — the package owns code generation, template
+The contract exposes only the destination and rendered message — the package owns code generation, template
 substitution, lockouts, and verification state — so the adapter stays thin.
 
 ### Custom factor drivers
@@ -319,7 +289,8 @@ substitution, lockouts, and verification state — so the adapter stays thin.
 Mfa::extend('webauthn', fn ($app) => new WebAuthnDriver(/* ... */));
 ```
 
-Custom drivers must implement `SineMacula\Laravel\Mfa\Contracts\FactorDriver`. Register the driver **before**
+Custom drivers must implement `SineMacula\Laravel\Mfa\Contracts\FactorDriver`, which also states the type's channel
+kind and `amr` values (see [Factor drivers](docs/guides/extending.md#factor-drivers)). Register the driver **before**
 any request code calls `Mfa::driver(...)`: Laravel's manager caches resolved drivers per request, so an
 `extend()` call made after the driver is already resolved silently has no effect. Bind in a service
 provider's `register()` / `boot()` rather than mid-request.
@@ -365,14 +336,16 @@ identity's verification timestamp from a reused session.
 All concrete classes in this package are `final` unless explicitly designed for extension. Extension is through
 **composition and DI**, not inheritance:
 
-| Extension point           | How                                                            |
-|---------------------------|----------------------------------------------------------------|
-| Custom factor driver      | Implement `FactorDriver`, register via `Mfa::extend()`         |
-| Custom identity model     | Implement `MultiFactorAuthenticatable` on your Eloquent model  |
-| Organisation enforcement  | Implement `MfaPolicy` and bind it via the container            |
-| Custom verification store | Implement `MfaVerificationStore` and bind it via the container |
-| Custom factor model       | Set `config('mfa.factor.model')` to your subclass              |
-| Custom SMS gateway        | Implement `SmsGateway` and bind it via the container           |
+| Extension point            | How                                                            |
+|----------------------------|----------------------------------------------------------------|
+| Custom factor driver       | Implement `FactorDriver`, register via `Mfa::extend()`         |
+| Custom identity model      | Implement `MultiFactorAuthenticatable` and use `HasFactors`    |
+| Organisation enforcement   | Implement `MfaPolicy` and bind it via the container            |
+| Custom verification store  | Implement `MfaVerificationStore` and bind it via the container |
+| Custom factor model        | Set `config('mfa.factor.model')` to your subclass              |
+| Custom recovery code model | Set `config('mfa.recovery_codes.model')` to your subclass      |
+| Event context              | Implement `EventContextResolver` and bind it via the container |
+| Custom SMS gateway         | Implement `SmsGateway` and bind it via the container           |
 
 The security and lifecycle contracts behind the package, for maintainers and reviewers, are in
 [docs/design](docs/design/README.md).
