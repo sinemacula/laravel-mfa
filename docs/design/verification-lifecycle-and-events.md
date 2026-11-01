@@ -2,17 +2,19 @@
 
 ## Purpose
 
-This note records the event contract dispatched by `MfaManager`. That contract matters because audit-log sinks, SIEM
-integrations, and consumer listeners attach to these events and expect the same ordering and payload on every release.
+This note records the event contract dispatched behind `MfaManager` by the package's capability services. That contract
+matters because audit-log sinks, SIEM integrations, and consumer listeners attach to these events and expect the same
+ordering and payload on every release.
 
 The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\Events`: `MfaChallengeIssued`,
 `MfaVerified`, `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`.
 
 ## Invariants
 
-- Events are dispatched by `MfaManager`, never by driver implementations. Drivers receive `issueChallenge()` and
-  `verify()` calls; the manager wraps each call with the corresponding event emission. Consumers who register custom
-  drivers via `Mfa::extend(...)` automatically participate in the same event contract.
+- Events are dispatched by the package's services (verification, enrolment, lifecycle, backup codes), never by driver
+  implementations. Drivers receive `issueChallenge()` and `verify()` calls; the verification service wraps each call
+  with the corresponding event emission. Consumers who register custom drivers via `Mfa::extend(...)` automatically
+  participate in the same event contract.
 - `MfaChallengeIssued` fires after the driver's `issueChallenge()` returns without throwing. For OTP drivers the
   code has already been minted, persisted, and handed to the transport; for TOTP and backup codes the driver is a
   no-op and the event is purely a lifecycle signal.
@@ -20,7 +22,8 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
   `Mfa::hasExpired()` inside `MfaVerified` observes the fresh timestamp — there is no "event fires, state catches up"
   window.
 - `MfaVerificationFailed` always carries a `MfaVerificationFailureReason`. The enum is narrowed to the cases the
-  manager actually emits: `FACTOR_LOCKED`, `CODE_INVALID`, `CODE_EXPIRED`, `CODE_MISSING`, `SECRET_MISSING`.
+  verification service actually emits: `FACTOR_LOCKED`, `CODE_INVALID`, `CODE_EXPIRED`, `CODE_MISSING`,
+  `SECRET_MISSING`.
 - `MfaFactorEnrolled` fires after the factor row has been persisted (`EloquentFactor::persist()` for Eloquent
   factors). Non-Eloquent factors still dispatch the event; the consumer owns their storage.
 - `MfaFactorDisabled` fires after the row has been deleted for Eloquent factors. Non-Eloquent factors still dispatch
@@ -52,12 +55,12 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
 
 - `verify()` on a locked factor emits `MfaVerificationFailed` with `FACTOR_LOCKED` and returns `false` without
   calling the driver. The attempt counter is not incremented because the attempt never reached the driver.
-- On driver-level verification failure, the manager classifies the reason from the factor's post-verify state using the
-  priority order `SECRET_MISSING > CODE_EXPIRED > CODE_MISSING > CODE_INVALID`. `CODE_INVALID` is the default —
-  `CODE_MISSING` only fires when a pending code exists but has no expiry stamp (a driver-persistence bug, not a user
-  error).
-- Unsupported identities short-circuit to `false` without dispatching `MfaVerificationFailed`. Unresolved drivers
-  throw from `resolveDriver()` before any event is dispatched. Those branches are deliberately outside the event
+- On driver-level verification failure, the verification service classifies the reason from the factor's post-verify
+  state using the priority order `SECRET_MISSING > CODE_EXPIRED > CODE_MISSING > CODE_INVALID`. `CODE_INVALID` is the
+  default — `CODE_MISSING` only fires when a pending code exists but has no expiry stamp (a driver-persistence bug, not
+  a user error).
+- Unsupported identities short-circuit to `false` without dispatching `MfaVerificationFailed`. Unresolved drivers throw
+  from `DriverResolver::resolve()` before any event is dispatched. Those branches are deliberately outside the event
   taxonomy — the enum does not advertise a case for them.
 - Non-Eloquent factors participate in the lifecycle events but carry no row to mutate. `applyVerificationOutcome()`
   is skipped for them; attempt counters and lockouts only exist on factors whose implementation persists them.
@@ -67,13 +70,17 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
 
 ## Implementation Anchors
 
-- `src/MfaManager.php`: `challenge()`, `verify()`, `enrol()`, `disable()`, `issueBackupCodes()`,
-  `applyVerificationOutcome()`, `finaliseVerification()`, `rotateBackupCodeBatch()`, `resolveDriver()`,
-  `assertFactorOwnership()`, `clearCache()`.
+- `src/Verification/VerificationService.php`: `challenge()`, `verify()`, `applyVerificationOutcome()`,
+  `finaliseVerification()`.
+- `src/Enrolment/EnrolmentService.php`: `enrol()`. `src/Lifecycle/LifecycleService.php`: `disable()`.
+- `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`, `rotateBackupCodeBatch()`.
+- `src/Drivers/DriverResolver.php`: `resolve()`, `assertMatchesFactor()`. `src/Factors/FactorOwnership.php`:
+  `assert()`. `src/Factors/FactorStateCache.php`: `clear()`.
 - `src/Events/MfaChallengeIssued.php`, `src/Events/MfaVerified.php`, `src/Events/MfaVerificationFailed.php`,
   `src/Events/MfaFactorEnrolled.php`, `src/Events/MfaFactorDisabled.php`.
 - `src/Enums/MfaVerificationFailureReason.php`: the narrowed failure taxonomy.
-- `src/Contracts/FactorDriver.php`: the driver-side `issueChallenge()` / `verify()` contract the manager wraps.
+- `src/Contracts/FactorDriver.php`: the driver-side `issueChallenge()` / `verify()` contract the verification service
+  wraps.
 - `src/Exceptions/FactorOwnershipMismatchException.php`: the pre-event rejection path.
 
 ## Authoritative Tests
@@ -106,13 +113,15 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
   `testClassifyFailureReturnsCodeMissingWhenPendingCodeHasNoExpiry`
 - `tests/Unit/MfaManagerClassifyFailureTest.php`
   `testClassifyFailureReturnsCodeInvalidForTotpSecretMismatch`
+- `tests/Unit/Verification/VerificationServiceTest.php`
+  `testAFailureIsReportedWithItsReason`
 
 ## Change Triggers
 
 Update this note when any of the following change:
 
 - the set of five events or the payload shape of any of them
-- the rule that the manager dispatches events and drivers do not
+- the rule that the package's services dispatch events and drivers do not
 - the ordering rule that `MfaVerified` fires after the verification-store write
 - the failure-reason taxonomy on `MfaVerificationFailureReason` or the priority order used to classify a driver
   failure

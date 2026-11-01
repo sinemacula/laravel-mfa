@@ -5,7 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\Factor;
-use SineMacula\Laravel\Mfa\Support\FactorSummary;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
  * Shared FactorSummary builders for the FactorSummary test family.
@@ -24,7 +24,7 @@ trait BuildsFactorSummaries
     /**
      * Build a minimal summary for contract tests.
      *
-     * @return \SineMacula\Laravel\Mfa\Support\FactorSummary
+     * @return \SineMacula\Laravel\Mfa\Factors\FactorSummary
      */
     protected function buildMinimalSummary(): FactorSummary
     {
@@ -41,7 +41,7 @@ trait BuildsFactorSummaries
      * Build a FactorSummary via `fromFactor()` for the given recipient.
      *
      * @param  string  $recipient
-     * @return \SineMacula\Laravel\Mfa\Support\FactorSummary
+     * @return \SineMacula\Laravel\Mfa\Factors\FactorSummary
      *
      * @throws \PHPUnit\Framework\MockObject\Exception
      */

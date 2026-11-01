@@ -8,14 +8,14 @@ use Illuminate\Contracts\Mail\Mailer;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
-use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
-use SineMacula\Laravel\Mfa\Gateways\FakeSmsGateway;
-use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
+use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
+use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
 
 /**
  * Assertions against each driver's constructor default values.

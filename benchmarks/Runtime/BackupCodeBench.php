@@ -8,7 +8,7 @@ use Benchmarks\Support\InMemoryFactor;
 use PhpBench\Attributes\BeforeMethods;
 use PhpBench\Attributes\Iterations;
 use PhpBench\Attributes\Revs;
-use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
+use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 
 /**
  * Hot-path benchmarks for backup-code verification.
@@ -22,7 +22,7 @@ use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 #[BeforeMethods('setUp')]
 final class BackupCodeBench
 {
-    /** @var \SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver */
+    /** @var \SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver */
     private BackupCodeDriver $driver;
 
     /** @var \Benchmarks\Support\InMemoryFactor */

@@ -8,7 +8,7 @@ by a single swappable seam — the `MfaVerificationStore` contract — plus the 
 
 ## Invariants
 
-- Verification state lives behind `MfaVerificationStore`. The manager never writes timestamps to a fixed backend —
+- Verification state lives behind `MfaVerificationStore`. The package never writes timestamps to a fixed backend —
   every read and write goes through the bound implementation.
 - The shipped default binding is `SessionMfaVerificationStore`, which persists the verification timestamp in the
   session. Session state is naturally per-device on any stateful auth stack (SessionGuard, Sanctum, any guard that
@@ -21,9 +21,9 @@ by a single swappable seam — the `MfaVerificationStore` contract — plus the 
 - `markVerified()` accepts an optional explicit `$at`. Passing one lets a paired-mode store stamp the persistence
   layer atomically with the verification event instead of trusting a subsequent `Carbon::now()` read. The shipped
   session store defaults to `now()` when `$at` is omitted.
-- `MfaManager::hasExpired()` is the single source of truth for "does this request need fresh verification?". It
-  treats `verifiedAt === null`, `window <= 0`, or a future-dated `verifiedAt` (clock skew, malicious write) as
-  expired. It is deliberately fail-closed.
+- `MfaManager::hasExpired()` (answered by `Proofs\ProofService`) is the single source of truth for "does this
+  request need fresh verification?". It treats `verifiedAt === null`, `window <= 0`, or a future-dated `verifiedAt`
+  (clock skew, malicious write) as expired. It is deliberately fail-closed.
 - The `RequireMfa` middleware is the gate. It throws `MfaRequiredException` when the identity has no factors or has
   never verified, and `MfaExpiredException` when a prior verification has aged past the window. Both exceptions
   carry `FactorSummary` payloads suitable for rendering a factor-picker UI.
@@ -35,9 +35,9 @@ by a single swappable seam — the `MfaVerificationStore` contract — plus the 
 
 ## Success Path
 
-- A user completes a verification. `MfaManager::verify()` calls `store->markVerified($identity)` through the bound
-  implementation before dispatching `MfaVerified`. The default session store stamps the current Unix timestamp under
-  `mfa.verified_at.<class>.<identifier>`.
+- A user completes a verification. `MfaManager::verify()` (answered by `Verification\VerificationService`) calls
+  `store->markVerified($identity)` through the bound implementation before dispatching `MfaVerified`. The default
+  session store stamps the current Unix timestamp under `mfa.verified_at.<class>.<identifier>`.
 - A subsequent request routes through `RequireMfa`. The middleware calls `Mfa::shouldUse()` (consumer-bound policy),
   `Mfa::isSetup()`, `Mfa::hasEverVerified()`, then `Mfa::hasExpired($maxAgeMinutes)`.
 - `hasExpired()` resolves the bound store, reads `lastVerifiedAt($identity)`, and compares the elapsed time to
@@ -72,30 +72,31 @@ by a single swappable seam — the `MfaVerificationStore` contract — plus the 
 
 - `src/Contracts/MfaVerificationStore.php`: `markVerified($identity, ?$at)`, `lastVerifiedAt($identity)`,
   `forget($identity)`.
-- `src/Stores/SessionMfaVerificationStore.php`: shipped default implementation, including the identity-class-scoped
+- `src/Proofs/SessionMfaVerificationStore.php`: shipped default implementation, including the identity-class-scoped
   `key()` helper.
-- `src/MfaManager.php`: `hasExpired()`, `markVerified()`, `forgetVerification()`, `finaliseVerification()` (writes
-  through the store on successful verify).
-- `src/Middleware/RequireMfa.php`: `handle()`, `parseMaxAgeMinutes()`, `resolveFactorSummaries()`.
-- `src/Middleware/SkipMfa.php`: sets the `skip_mfa` request attribute for the verification endpoints.
+- `src/Proofs/ProofService.php`: `hasExpired()`, `markVerified()`, `forgetVerification()`.
+- `src/Verification/VerificationService.php`: `finaliseVerification()` (writes through the store on successful
+  verify).
+- `src/Http/Middleware/RequireMfa.php`: `handle()`, `parseMaxAgeMinutes()`, `resolveFactorSummaries()`.
+- `src/Http/Middleware/SkipMfa.php`: sets the `skip_mfa` request attribute for the verification endpoints.
 - `src/Exceptions/MfaRequiredException.php`, `src/Exceptions/MfaExpiredException.php`.
 - `config/mfa.php`: `default_expiry` (minutes).
 
 ## Authoritative Tests
 
-- `tests/Unit/Stores/SessionMfaVerificationStoreTest.php`
+- `tests/Unit/Proofs/SessionMfaVerificationStoreTest.php`
   `testImplementsMfaVerificationStoreContract`
-- `tests/Unit/Stores/SessionMfaVerificationStoreTest.php`
+- `tests/Unit/Proofs/SessionMfaVerificationStoreTest.php`
   `testMarkVerifiedWithoutTimestampStampsNow`
-- `tests/Unit/Stores/SessionMfaVerificationStoreTest.php`
+- `tests/Unit/Proofs/SessionMfaVerificationStoreTest.php`
   `testMarkVerifiedWithExplicitTimestampStampsGivenTimestamp`
-- `tests/Unit/Stores/SessionMfaVerificationStoreTest.php`
+- `tests/Unit/Proofs/SessionMfaVerificationStoreTest.php`
   `testKeysAreScopedByIdentityClass`
-- `tests/Unit/Stores/SessionMfaVerificationStoreTest.php`
+- `tests/Unit/Proofs/SessionMfaVerificationStoreTest.php`
   `testKeysAreScopedPerIdentity`
-- `tests/Unit/Stores/SessionMfaVerificationStoreTest.php`
+- `tests/Unit/Proofs/SessionMfaVerificationStoreTest.php`
   `testMarkVerifiedThrowsWhenIdentifierIsNotScalar`
-- `tests/Unit/Stores/SessionMfaVerificationStoreTest.php`
+- `tests/Unit/Proofs/SessionMfaVerificationStoreTest.php`
   `testLastVerifiedAtReturnsNullWhenStoredValueIsNotInt`
 - `tests/Unit/MfaManagerExpiryTest.php`
   `testHasExpiredReturnsTrueWhenNoIdentity`
@@ -111,13 +112,13 @@ by a single swappable seam — the `MfaVerificationStore` contract — plus the 
   `testHasExpiredReturnsFalseAtExactWindowBoundary`
 - `tests/Unit/MfaManagerExpiryTest.php`
   `testHasExpiredReturnsTrueOneMinuteAfterWindowBoundary`
-- `tests/Unit/Middleware/RequireMfaTest.php`
+- `tests/Unit/Http/Middleware/RequireMfaTest.php`
   `testThrowsMfaRequiredWhenNotSetup`
-- `tests/Unit/Middleware/RequireMfaTest.php`
+- `tests/Unit/Http/Middleware/RequireMfaTest.php`
   `testThrowsMfaRequiredWhenNeverVerified`
-- `tests/Unit/Middleware/RequireMfaTest.php`
+- `tests/Unit/Http/Middleware/RequireMfaTest.php`
   `testThrowsMfaExpiredWhenVerificationExpired`
-- `tests/Unit/Middleware/RequireMfaTest.php`
+- `tests/Unit/Http/Middleware/RequireMfaTest.php`
   `testPassesThroughWhenSkipMfaAttributeSet`
 
 ## Change Triggers

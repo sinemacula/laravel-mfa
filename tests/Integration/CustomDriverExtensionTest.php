@@ -8,10 +8,15 @@ use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
+use Tests\Fixtures\InMemoryFactor;
 use Tests\Fixtures\MyDriverFactor;
+use Tests\Fixtures\NoopFactorDriver;
 use Tests\Fixtures\RecordingFactorDriver;
+use Tests\Fixtures\TestUser;
 use Tests\TestCase;
 
 /**
@@ -20,7 +25,11 @@ use Tests\TestCase;
  *
  * A custom driver registered via the Manager's `extend()` API must resolve to
  * the registered instance when requested by name, and its verify /
- * issueChallenge surface must be exercised identically to built-in drivers.
+ * issueChallenge surface must be exercised identically to built-in drivers. A
+ * consumer's registration of a shipped driver's name wins however it is made:
+ * through the facade, a container extender or a resolving callback on `mfa`. A
+ * manager built apart from the `mfa` singleton runs factors through its own
+ * drivers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -63,11 +72,11 @@ final class CustomDriverExtensionTest extends TestCase
 
     /**
      * `Mfa::extend('totp', ...)` must override the built-in TOTP driver
-     * registered by `MfaServiceProvider::registerBuiltInDrivers()`. Pins the
-     * override invariant — both built-ins and consumer overrides go through the
-     * same `Mfa::extend()` registry, so a future Laravel `Manager` upgrade that
-     * changed override-precedence semantics would silently break consumer
-     * overrides without this guard.
+     * registered by `DriverBindings::extend()`. Pins the override invariant —
+     * both built-ins and consumer overrides go through the same `Mfa::extend()`
+     * registry, so a future Laravel `Manager` upgrade that changed
+     * override-precedence semantics would silently break consumer overrides
+     * without this guard.
      *
      * @return void
      *
@@ -136,5 +145,158 @@ final class CustomDriverExtensionTest extends TestCase
             Mfa::driver('totp'),
             'Mfa::extend(\'totp\', ...) must override the built-in TOTP driver',
         );
+    }
+
+    /**
+     * A container extender on `mfa` that registers its own TOTP driver wins
+     * over the shipped one, which is registered before extenders run.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testContainerExtenderOverrideOfTotpWins(): void
+    {
+        $marker = new NoopFactorDriver;
+
+        $this->container()->forgetInstance('mfa');
+        $this->container()->extend('mfa', static fn (MfaManager $manager): MfaManager => $manager->extend('totp', fn (): FactorDriver => $marker));
+
+        self::assertSame($marker, $this->manager()->driver('totp'));
+    }
+
+    /**
+     * A resolving callback on `mfa` that registers its own TOTP driver wins
+     * over the shipped one, which is registered before callbacks run.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testResolvingCallbackOverrideOfTotpWins(): void
+    {
+        $marker = new NoopFactorDriver;
+
+        $this->container()->forgetInstance('mfa');
+        $this->container()->resolving('mfa', static function (MfaManager $manager) use ($marker): void {
+            $manager->extend('totp', fn (): FactorDriver => $marker);
+        });
+
+        self::assertSame($marker, $this->manager()->driver('totp'));
+    }
+
+    /**
+     * A resolving callback on `mfa` can already use the shipped drivers.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testResolvingCallbackSeesTheShippedDrivers(): void
+    {
+        $seen = null;
+
+        $this->container()->forgetInstance('mfa');
+        $this->container()->resolving('mfa', static function (MfaManager $manager) use (&$seen): void {
+            $seen = $manager->driver('totp');
+        });
+
+        $this->manager();
+
+        self::assertInstanceOf(TotpDriver::class, $seen);
+    }
+
+    /**
+     * A manager built apart from the `mfa` singleton verifies through its own
+     * driver, and the singleton through its own.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testASeparateManagerVerifiesThroughItsOwnDriver(): void
+    {
+        $factor   = new InMemoryFactor(authenticatable: $this->signIn());
+        $own      = new RecordingFactorDriver;
+        $separate = new MfaManager($this->container());
+
+        $separate->extend('totp', fn (): FactorDriver => $own);
+
+        self::assertTrue($separate->verify('totp', $factor, 'correct'));
+        self::assertFalse($this->manager()->verify('totp', $factor, 'correct'));
+        self::assertSame(1, $own->verifyCalls);
+    }
+
+    /**
+     * A manager built apart from the `mfa` singleton issues challenges through
+     * its own driver.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testASeparateManagerChallengesThroughItsOwnDriver(): void
+    {
+        $factor   = new InMemoryFactor(authenticatable: $this->signIn());
+        $own      = new RecordingFactorDriver;
+        $separate = new MfaManager($this->container());
+
+        $separate->extend('totp', fn (): FactorDriver => $own);
+
+        $separate->challenge('totp', $factor);
+        $this->manager()->challenge('totp', $factor);
+
+        self::assertSame(1, $own->issueCalls);
+    }
+
+    /**
+     * A manager built apart from the `mfa` singleton issues backup codes
+     * through its own backup-code driver.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testASeparateManagerIssuesBackupCodesThroughItsOwnDriver(): void
+    {
+        $this->signIn();
+
+        $separate = new MfaManager($this->container());
+
+        $separate->extend(BackupCodeDriver::NAME, fn (): BackupCodeDriver => new BackupCodeDriver(codeLength: 10, alphabet: 'ABCDEFGH', codeCount: 3));
+
+        self::assertCount(3, $separate->issueBackupCodes());
+        self::assertCount(10, $this->manager()->issueBackupCodes());
+    }
+
+    /**
+     * Resolve the package's MFA manager from the container.
+     *
+     * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function manager(): MfaManager
+    {
+        $manager = $this->container()->make('mfa');
+
+        Assert::assertInstanceOf(MfaManager::class, $manager);
+
+        return $manager;
+    }
+
+    /**
+     * Create a test user and authenticate as them.
+     *
+     * @return \Tests\Fixtures\TestUser
+     */
+    private function signIn(): TestUser
+    {
+        /** @var \Tests\Fixtures\TestUser $user */
+        $user = TestUser::query()->create(['email' => 'extension@example.com']);
+
+        $this->actingAs($user);
+
+        return $user;
     }
 }

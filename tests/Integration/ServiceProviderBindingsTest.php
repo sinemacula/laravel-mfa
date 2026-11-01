@@ -6,16 +6,16 @@ namespace Tests\Integration;
 
 use Illuminate\Routing\Router;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Codes\NullSmsGateway;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
-use SineMacula\Laravel\Mfa\Gateways\NullSmsGateway;
+use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
+use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
-use SineMacula\Laravel\Mfa\Middleware\RequireMfa;
-use SineMacula\Laravel\Mfa\Middleware\SkipMfa;
-use SineMacula\Laravel\Mfa\Policies\NullMfaPolicy;
-use SineMacula\Laravel\Mfa\Stores\SessionMfaVerificationStore;
+use SineMacula\Laravel\Mfa\Proofs\SessionMfaVerificationStore;
+use SineMacula\Laravel\Mfa\Requirements\NullMfaPolicy;
 use Tests\TestCase;
 
 /**

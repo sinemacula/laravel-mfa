@@ -4,7 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures;
 
-use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
+use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 
 /**
  * Custom Mailable subclass used to verify the constructor-configurable

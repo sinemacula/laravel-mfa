@@ -50,23 +50,25 @@ Historical record of the architectural calls made during the 1.0 cycle.
 - **D2 — Single `mfa_factors` table.** Columns include `attempts`, `locked_until`,
   `last_attempted_at`, `verified_at`. No separate `mfa_attempts` log — audit goes through events,
   owned by `laravel-audit-log`.
-- **D3 — Challenge split between manager and driver.** `MfaManager::challenge()` orchestrates
-  (events, rate-limiting hooks, logging). `FactorDriver::issueChallenge(Factor): void` implements
-  per-factor-type transport (no-op for TOTP, mail dispatch for email, gateway dispatch for SMS,
-  no-op for backup codes since they are pre-issued).
+- **D3 — Challenge split between manager and driver.** The verification service behind
+  `MfaManager::challenge()` orchestrates (events, rate-limiting hooks, logging).
+  `FactorDriver::issueChallenge(Factor): void` implements per-factor-type transport (no-op for TOTP,
+  mail dispatch for email, gateway dispatch for SMS, no-op for backup codes since they are
+  pre-issued).
 - **D4 — Per-device verification is the default.** In paired mode the verification timestamp
   lives on the `Device` record; in standalone mode it lives on the session (which is already
   per-device). The step-up middleware (`mfa:N`) is the escape hatch for "re-verify before this
   specific action regardless of device state".
-- **D5 — Built-in driver factories live in the service provider.** The four shipped drivers
+- **D5 — Built-in driver factories live in the capability bindings.** The four shipped drivers
   (TOTP, email, SMS, backup codes) are registered against the manager via the standard
-  `Mfa::extend(...)` API from `MfaServiceProvider::registerBuiltInDrivers()`. Built-in drivers
-  are indistinguishable from consumer-registered ones, which is what the three-mode story needs.
-  Consumer overrides via `Mfa::extend()` work because Laravel's `Manager` resolves the most-
-  recent registration. Pinned by
+  `Mfa::extend(...)` API from `Drivers\DriverBindings` and `RecoveryCodes\RecoveryCodeBindings`,
+  inside the `mfa` singleton's factory and so before any container extender or resolving callback.
+  Built-in drivers are indistinguishable from consumer-registered ones, which is what the three-mode
+  story needs. Consumer overrides via `Mfa::extend()` work because Laravel's `Manager` resolves the
+  most-recent registration. Pinned by
   `tests/Integration/CustomDriverExtensionTest::testConsumerCanOverrideBuiltInTotpDriver`.
-- **D6 — Lifecycle events are dispatched by the manager, not by consumer code.** Factor
-  enrolment goes through `Mfa::enrol(Factor)`; factor removal goes through
+- **D6 — Lifecycle events are dispatched by the package's services behind the manager, not by
+  consumer code.** Factor enrolment goes through `Mfa::enrol(Factor)`; factor removal goes through
   `Mfa::disable(Factor)`. Both invalidate the identity's setup-state cache and dispatch
   `MfaFactorEnrolled` / `MfaFactorDisabled` so audit subscribers do not have to rely on consumer
   cooperation. Five lifecycle events in total: `MfaChallengeIssued`, `MfaVerified`,

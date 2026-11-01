@@ -7,13 +7,13 @@ namespace Tests\Unit;
 use Illuminate\Config\Repository;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
+use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
-use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use Tests\Fixtures\TestUser;
 
 /**
@@ -198,7 +198,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $config = app(Repository::class);
         $config->set('mfa.drivers.backup_code', []);
 
-        /** @var \SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver $driver */
+        /** @var \SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver $driver */
         $driver = $this->manager()->driver('backup_code');
 
         self::assertInstanceOf(BackupCodeDriver::class, $driver);
@@ -224,7 +224,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
             'code_count'  => 5,
         ]);
 
-        /** @var \SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver $driver */
+        /** @var \SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver $driver */
         $driver = $this->manager()->driver('backup_code');
 
         self::assertSame(12, $driver->getCodeLength());

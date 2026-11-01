@@ -7,9 +7,9 @@ namespace Tests\Unit\Drivers;
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
-use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
 use Tests\Fixtures\CustomMfaCodeMessage;
 use Tests\Fixtures\TestUser;
@@ -195,7 +195,7 @@ final class EmailDriverTest extends TestCase
      * Build an `EmailDriver` with the container's mailer and an optional
      * Mailable override.
      *
-     * @param  class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>  $mailable
+     * @param  class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>  $mailable
      * @return \SineMacula\Laravel\Mfa\Drivers\EmailDriver
      */
     private function makeDriver(string $mailable = MfaCodeMessage::class): EmailDriver

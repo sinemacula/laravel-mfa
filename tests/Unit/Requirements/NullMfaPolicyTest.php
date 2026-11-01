@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types = 1);
+
+namespace Tests\Unit\Requirements;
+
+use Illuminate\Contracts\Auth\Authenticatable;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\TestCase;
+use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
+use SineMacula\Laravel\Mfa\Requirements\NullMfaPolicy;
+
+/**
+ * Unit tests for the `NullMfaPolicy` default policy implementation.
+ *
+ * @author      Ben Carey <bdmc@sinemacula.co.uk>
+ * @copyright   2026 Sine Macula Limited
+ *
+ * @internal
+ */
+#[CoversClass(NullMfaPolicy::class)]
+final class NullMfaPolicyTest extends TestCase
+{
+    /**
+     * Test should enforce always returns false.
+     *
+     * @return void
+     */
+    public function testShouldEnforceAlwaysReturnsFalse(): void
+    {
+        $policy   = new NullMfaPolicy;
+        $identity = self::createStub(Authenticatable::class);
+
+        self::assertFalse($policy->shouldEnforce($identity));
+    }
+
+    /**
+     * Test implements mfa policy contract.
+     *
+     * @return void
+     */
+    public function testImplementsMfaPolicyContract(): void
+    {
+        self::assertInstanceOf(MfaPolicy::class, new NullMfaPolicy);
+    }
+}

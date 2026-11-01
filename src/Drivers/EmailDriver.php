@@ -5,9 +5,9 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Drivers;
 
 use Illuminate\Contracts\Mail\Mailer;
+use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
-use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
 
 /**
  * Email factor driver.
@@ -27,7 +27,7 @@ final class EmailDriver extends AbstractOtpDriver
      * Constructor.
      *
      * @param  \Illuminate\Contracts\Mail\Mailer  $mailer
-     * @param  class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>  $mailable
+     * @param  class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>  $mailable
      * @param  int  $codeLength
      * @param  int  $expiry
      * @param  int  $maxAttempts
@@ -63,7 +63,7 @@ final class EmailDriver extends AbstractOtpDriver
     /**
      * Get the configured Mailable class.
      *
-     * @return class-string<\SineMacula\Laravel\Mfa\Mail\MfaCodeMessage>
+     * @return class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>
      */
     public function getMailable(): string
     {
@@ -88,7 +88,7 @@ final class EmailDriver extends AbstractOtpDriver
             throw new MissingRecipientException('Email factor has no recipient configured; cannot deliver code.');
         }
 
-        /** @var \SineMacula\Laravel\Mfa\Mail\MfaCodeMessage $message */
+        /** @var \SineMacula\Laravel\Mfa\Codes\MfaCodeMessage $message */
         $message = new ($this->mailable)($code, $this->getExpiry());
 
         $this->mailer->to($recipient)->send($message);

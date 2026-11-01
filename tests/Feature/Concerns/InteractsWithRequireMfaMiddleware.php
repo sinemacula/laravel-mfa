@@ -6,7 +6,7 @@ namespace Tests\Feature\Concerns;
 
 use Illuminate\Http\Request;
 use PragmaRX\Google2FA\Google2FA;
-use SineMacula\Laravel\Mfa\Middleware\RequireMfa;
+use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\Fixtures\TestUser;
