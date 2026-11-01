@@ -11,20 +11,21 @@ cannot interleave.
 - One resolver decides the connection, `Database\StorageConnection`: `name()` is `mfa.storage.connection`, `null` or
   empty for the default connection. A value that is neither a name nor `null` or empty fails closed with an
   `InvalidArgumentException` naming the key, rather than putting a table on another connection than the one meant.
-- The shipped `Models\Factor` takes the storage connection when it is built, unless its class names a connection of its
-  own, and always by name, the default connection included: Eloquent gives a related model that names no connection its
-  parent's, so an identity on another connection would otherwise read and write its factors there, and the first
-  serialised change for it would be refused. Every shipped migration's `getConnection()` returns the same value, and its
-  collision guard, `create()` and `dropIfExists()` run on `Schema::connection($this->getConnection())`, so `php artisan
-  migrate` puts each table where its model reads and writes it. With `null` the migrations name no connection and follow
-  the migrator's.
-- Every package table lives on the storage connection: `mfa_factors` and `mfa_identity_states`, and every table added
-  later. A change that depends on the identity's whole factor state writes several of them in one transaction, which
-  two connections cannot commit as one, so a configured model on another connection is refused by the configuration
-  check (`Config\ConfigurationValidator`, under its `factor` subject) when the package boots and when the manager is
-  resolved, and again (`ModelOffStorageConnectionException`) before any such change. Connections are compared by name,
-  a model's own or `database.default`, so no connection is opened, and two names for one database count as two
-  connections.
+- Every shipped model takes the storage connection when it is built (`StorageConnection::forModel()`), unless its class
+  names a connection of its own, and always by name, the default connection included: Eloquent gives a related model
+  that names no connection its parent's, so an identity on another connection would otherwise read and write its factors
+  there, and the first serialised change for it would be refused. Every shipped migration's `getConnection()` returns
+  the same value, and its collision guard, `create()` and `dropIfExists()` run on
+  `Schema::connection($this->getConnection())`, so `php artisan migrate` puts each table where its model reads and
+  writes it. With `null` the migrations name no connection and follow the migrator's.
+- Every package table lives on the storage connection: the factors, identity states, enrolments, codes, recovery codes,
+  attempts and passkey associations (see [Schema and models](schema-and-models.md)), each named through
+  `Database\TableNames`. A change that depends on the identity's whole factor state writes several of them in one
+  transaction, which two connections cannot commit as one, so a configured model on another connection is refused by the
+  configuration check (`Config\ConfigurationValidator`, under its `factor` or `recovery_codes` subject) when the package
+  boots and when the manager is resolved, and again (`ModelOffStorageConnectionException`) before any such change.
+  Connections are compared by name, a model's own or `database.default`, so no connection is opened, and two names for
+  one database count as two connections.
 - `Support\FactorStateTransaction` is the one transaction of those changes: confirming an identity's first additional
   factor, replacing its recovery codes, removing a factor, a reset, and a verification racing any of them. It opens a
   transaction on the storage connection, locks the identity's row in `mfa_identity_states` first, then the identity's
@@ -41,9 +42,10 @@ cannot interleave.
   cannot answer them: the identity's factors as `FactorService::getFactors()` reads them, and every read inside
   `FactorStateTransaction`, which locks its rows and so reads from the writer anyway. A factor the application loads
   itself and hands in is read wherever the application read it.
-- The identity states table's one-row-per-owner index is named `{table}_owner_unique`, or, when that would pass 63
-  characters (PostgreSQL's limit; MySQL's is 64), the start of the table's name, a hash of the whole and the same
-  suffix, so a long configured table name still migrates and the name is the same on every run.
+- Every index a shipped migration names (`Database\IndexName`) is the table's name and a suffix, such as
+  `{table}_owner_unique`, or, when that would pass 63 characters (PostgreSQL's limit; MySQL's is 64), the start of the
+  table's name, a hash of the whole and the same suffix, so a long configured table name still migrates and the name is
+  the same on every run.
 - The owner is recorded as on the factors table: its morph class for an Eloquent identity (honouring the morph map), its
   class name otherwise, and its key as a string. Its columns are read from the owner relation of a blank instance of the
   factor's class (`Support\FactorOwnerColumns`), never of a stored factor, on which Eloquent would build the owner: an
@@ -81,11 +83,12 @@ cannot interleave.
 ## Implementation Anchors
 
 - `src/Database/StorageConnection.php`: `name()`, `resolvedName()`, `nameOf()`, `assertHolds()`.
-- `src/Config/ConfigurationValidator.php`: `checkFactorModel()`, `checkStorageConnection()`.
+- `src/Config/ConfigurationValidator.php`: `checkModel()`, `checkStorageConnection()`, `checkDistinctTables()`.
+- `src/Database/TableNames.php`, `src/Database/IndexName.php`.
 - `src/Database/WriteConnection.php`: `query()`; `src/Factors/FactorService.php`: `getFactors()`.
 - `src/Support/FactorStateTransaction.php`: `forIdentity()`, `forFactor()`, the lock order in `run()`;
   `src/Support/FactorOwnerColumns.php`: `of()`.
-- `src/Models/Factor.php`: the constructor; `getConnection()` in every migration under `database/migrations/`.
+- The constructor of every model under `src/Models/`; `getConnection()` in every migration under `database/migrations/`.
 - `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`; `src/RecoveryCodes/BackupCodeDriver.php`:
   `consumeAtomic()`.
 
@@ -103,6 +106,8 @@ cannot interleave.
 - `tests/Unit/Models/FactorTest.php` `testTakesTheStorageConnection`, `testKeepsAConnectionTheClassNames`
 - `tests/Integration/MigrationSmokeTest.php` `testIdentityStatesTableHasOneRowPerOwner`,
   `testALongIdentityStatesTableNameGivesAShortOwnerIndexName`
+- `tests/Unit/Models/StoredRecordModelsTest.php` `testTakesTheStorageConnection`
+- `tests/Unit/Database/TableNamesTest.php`, `tests/Unit/Database/IndexNameTest.php`
 
 ## Change Triggers
 

@@ -63,7 +63,7 @@ concurrent requests, not just sequential ones.
 
 ## Implementation Anchors
 
-- `src/RecoveryCodes/BackupCodeDriver.php`: `verify()`, `consumeAtomic()`, `hash()`, `generateSecret()`,
+- `src/RecoveryCodes/BackupCodeDriver.php`: `verify()`, `consumeAtomic()`, `hash()`, `startEnrollment()`,
   `generatePlaintextCode()`, `generateSet()`, `issueChallenge()` (no-op).
 - `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`, `rotateBackupCodeBatch()`.
 - `src/RecoveryCodes/RecoveryCodeBindings.php`: `backupCodes()`, the driver's construction from config.

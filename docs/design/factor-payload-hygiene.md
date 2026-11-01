@@ -4,7 +4,7 @@
 
 This note records the rule that a `Factor` row never leaves the database with its sensitive fields intact. Secrets and
 live OTP codes are encrypted at rest, excluded from default Eloquent serialisation, and projected through a
-masked-recipient summary before any exception payload, JSON body, or log sink sees them.
+masked-destination summary before any exception payload, JSON body, or log sink sees them.
 
 The contract matters because exception responses are consumed by the browser, rendered into HTML, and frequently
 captured by third-party logging and error-reporting tooling. A leak at this layer is a leak everywhere downstream.
@@ -14,45 +14,49 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
 - `Factor::$secret` and `Factor::$code` columns are both typed `text` and cast `encrypted` on the shipped model.
   `secret` carries long-lived material (TOTP keys, SHA-256 digests of backup codes); `code` carries the live OTP for
   email / SMS factors during its expiry window. Encrypting `code` closes the read-only-DB-replay attack surface.
-- Both columns are listed in the model's `$hidden`, so Eloquent's default array/JSON serialisation omits them. A
-  consumer who accidentally dumps a factor through `toArray()` or `->toJson()` gets a payload with no secret and no
-  code.
-- `MfaRequiredException` and `MfaExpiredException` do not carry `Factor` instances. They carry a
-  `list<FactorSummary>`. `FactorSummary` is final, readonly, and `JsonSerializable`.
-- `FactorSummary` exposes exactly five fields: `id`, `driver`, `label`, `maskedRecipient`, `verifiedAt`. There
-  is no `secret`, no `code`, no `attempts`, and no raw `recipient`.
-- Recipient masking happens inside `FactorSummary::fromFactor()` before the summary is constructed. Consumers cannot
-  accidentally hand an unmasked recipient into the summary — the mask is applied at the boundary, not trusted to
+- Both columns are listed in the model's `$hidden`, with the full `destination` and the `credential_reference`, so
+  Eloquent's default array/JSON serialisation omits them. A consumer who accidentally dumps a factor through
+  `toArray()` or `->toJson()` gets a payload with no secret, no code and no full destination.
+- `MfaRequiredException` and `MfaExpiredException` do not carry `Factor` instances, and neither does any event (see
+  [Event Catalogue](event-catalogue.md)). They carry `FactorSummary` values. `FactorSummary` is final, readonly, and
+  `JsonSerializable`.
+- `FactorSummary` exposes exactly seven fields: `id`, `type`, `label`, `maskedDestination`, `status`, `preferred` and
+  `lastUsedAt`. There is no `secret`, no `code`, no `attempts`, no credential reference and no raw `destination`.
+- Destination masking happens inside `FactorSummary::fromFactor()` before the summary is constructed. Consumers cannot
+  accidentally hand an unmasked destination into the summary — the mask is applied at the boundary, not trusted to
   callers.
 - Email masking keeps the domain intact and masks the local-part except for the leading two characters (or one, for a
   single-character local-part). Phone / opaque addresses keep the last four characters and mask the rest; strings of
   four characters or fewer are fully masked.
-- `jsonSerialize()` emits snake-case keys (`id`, `driver`, `label`, `masked_recipient`, `verified_at`) and
-  renders `verified_at` as ISO-8601, so downstream consumers get a stable wire shape.
+- `jsonSerialize()` emits snake-case keys (`id`, `type`, `label`, `masked_destination`, `status`, `preferred`,
+  `last_used_at`), the status as its value and `last_used_at` as ISO-8601, so downstream consumers get a stable wire
+  shape.
 
 ## Success Path
 
 - A request reaches `RequireMfa`. If MFA is not set up, or has never been verified, or has expired,
   `resolveFactorSummaries()` maps each registered factor through `FactorSummary::fromFactor()`.
 - `fromFactor()` stringifies the raw factor identifier (falling back to an empty string for non-scalar identifiers),
-  copies `driver`, `label`, and `verifiedAt` verbatim, and masks `recipient` through the `mask()` helper.
+  copies the type, label, status, preference and last use verbatim, and masks the destination through the `mask()`
+  helper.
 - The masked summary list is handed to `MfaRequiredException` or `MfaExpiredException`. The consuming application
-  renders the exception payload via its exception handler, and the JSON body ends up carrying only the five safe
+  renders the exception payload via its exception handler, and the JSON body ends up carrying only the seven safe
   fields.
 - If a consumer dumps the full `Factor` record (admin tooling, debug output), the model's `$hidden` list ensures
-  the default array representation omits `secret` and `code` even before the summary layer runs.
+  the default array representation omits `secret`, `code`, `destination` and `credential_reference` even before the
+  summary layer runs.
 
 ## Failure / Edge Cases
 
 - A non-scalar factor identifier (implementation bug, custom factor model) collapses to an empty string in the
   summary. This fails safe — the summary still serialises, the consumer still gets a UI-renderable list, but the broken
   row is identifiable.
-- A `null` or empty recipient is preserved as-is by the mask helper; the mask is applied only to non-empty strings.
-  Factor drivers that have no recipient (TOTP, backup codes) remain `null` in the summary.
-- Email masking uses `explode('@', $recipient, 2)`, so an address with multiple `@` characters is split only
+- A `null` or empty destination is preserved as-is by the mask helper; the mask is applied only to non-empty strings.
+  Factor drivers that have no destination (TOTP, backup codes) remain `null` in the summary.
+- Email masking uses `explode('@', $destination, 2)`, so an address with multiple `@` characters is split only
   once. The domain portion retains any trailing `@` in the local-part region, which is masked.
 - Opaque masking treats anything without an `@` the same way, including phone numbers, passkey labels, and custom
-  recipient shapes. Four-character-or-shorter inputs are fully masked to avoid leaking a full short credential.
+  destination shapes. Four-character-or-shorter inputs are fully masked to avoid leaking a full short credential.
 - `FactorSummary` is final, so consumers cannot subclass it to add unvetted fields that would bypass the masking
   contract. Custom projections must be a different class with their own hygiene rules.
 - The Eloquent `$hidden` list protects default serialisation but not explicit field access. Code that reads
@@ -83,7 +87,7 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
 - `tests/Unit/Factors/FactorSummaryTest.php`
   `testFromFactorCollapsesNonScalarIdentifierToEmptyString`
 - `tests/Unit/Factors/FactorSummaryTest.php`
-  `testMaskingKeepsNullRecipientAsNull`
+  `testMaskingKeepsNullDestinationAsNull`
 - `tests/Unit/Factors/FactorSummaryTest.php`
   `testMaskingEmailWithShortSingleCharLocalPart`
 - `tests/Unit/Factors/FactorSummaryTest.php`
@@ -95,7 +99,7 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
 - `tests/Unit/Factors/FactorSummaryTest.php`
   `testMaskingShortStringsAreFullyMasked`
 - `tests/Unit/Factors/FactorSummaryTest.php`
-  `testJsonSerializeShapeWithVerifiedAt`
+  `testJsonSerializeShapeWithLastUse`
 - `tests/Unit/Factors/FactorSummaryTest.php`
   `testJsonEncodesViaJsonSerializable`
 - `tests/Unit/Models/FactorTest.php`
@@ -116,6 +120,6 @@ Update this note when any of the following change:
 - the `encrypted` cast on `secret` or `code`, or the `text` column types in the migration
 - the `$hidden` list on the shipped `Factor` model
 - the field set on `FactorSummary` or the snake-case JSON shape from `jsonSerialize()`
-- the masking rules for email local-parts or opaque recipients
+- the masking rules for email local-parts or opaque destinations
 - the single-choke-point rule that exceptions only see factors via `FactorSummary::fromFactor()`
 - whether `FactorSummary` remains final and readonly

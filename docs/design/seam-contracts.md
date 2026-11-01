@@ -21,6 +21,9 @@ call them, so the flows can be built against one fixed set.
 - Results cross the seams as structured values, never reduced to `amr`.
 - A contract that no shipped flow calls yet has no default binding. The package resolves none of them until the flow
   that calls it is in place, with its default.
+- `EventContextResolver` is the exception: the event dispatcher calls it, so it is bound by default to
+  `Context\DefaultEventContextResolver`, which gives the identity, the application and the request (see
+  [Event Catalogue](event-catalogue.md)).
 
 | Contract                 | Answers                                                                                       |
 |--------------------------|-----------------------------------------------------------------------------------------------|
