@@ -9,12 +9,9 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 /**
  * Factor subclass bound to the `secondary` database connection.
  *
- * Used by `BackupCodeRotationConnectionTest` to prove the manager opens the
- * backup-code rotation transaction on the factor model's own connection. If the
- * outer `transaction()` call were still taken against the default
- * `ConnectionInterface` binding, the rotation's atomicity guarantee would not
- * extend to a non-default connection — which is exactly the configuration path
- * this fixture exercises.
+ * Stands in for a consumer's factor model that names a connection of its own:
+ * accepted when that connection is the storage connection, refused when the
+ * package boots, and before any factor state change, otherwise.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

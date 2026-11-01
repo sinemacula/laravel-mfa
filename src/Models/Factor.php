@@ -9,12 +9,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
 use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
+use SineMacula\Laravel\Mfa\Database\StorageConnection;
 
 /**
  * Default shipped Factor Eloquent model.
  *
  * Polymorphic factor record bound to an authenticatable identity via the
- * `authenticatable()` morphTo relation. ULID primary key. Swappable via
+ * `authenticatable()` morphTo relation. ULID primary key. Kept on the storage
+ * connection with the package's other tables. Swappable via
  * `config('mfa.factor.model')` / `mfa.factor.table` as the package's default
  * Eloquent adapter. Subclasses MUST continue satisfying the `Factor`
  * persistence boundary.
@@ -65,10 +67,12 @@ class Factor extends Model implements EloquentFactor
     ];
 
     /**
-     * Create a new Factor bound to the package-configured table name. Reads the
-     * table name lazily on each instantiation so runtime config swaps (tests,
-     * tenancy) take effect immediately. It has to be applied here, before
-     * Eloquent reads it, so this is construction rather than model behaviour.
+     * Create a new Factor bound to the package-configured table name and,
+     * unless the class names a connection of its own, the storage connection
+     * (see `Database\StorageConnection`). Reads both lazily on each
+     * instantiation so runtime config swaps (tests, tenancy) take effect
+     * immediately. They have to be applied here, before Eloquent reads them, so
+     * this is construction rather than model behaviour.
      *
      * @param  array<string, mixed>  $attributes
      *
@@ -77,6 +81,8 @@ class Factor extends Model implements EloquentFactor
     public function __construct(array $attributes = [])
     {
         $this->setTable($this->resolveConfiguredTable());
+
+        $this->connection ??= $this->resolveStorageConnection();
 
         parent::__construct($attributes);
     }
@@ -114,6 +120,19 @@ class Factor extends Model implements EloquentFactor
             'last_attempted_at'    => 'datetime',
             'attempts'             => 'integer',
         ];
+    }
+
+    /**
+     * Read the storage connection, or `null` (the default connection) while the
+     * Config facade is not yet bootstrapped.
+     *
+     * @return ?string
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function resolveStorageConnection(): ?string
+    {
+        return Config::getFacadeRoot() === null ? null : StorageConnection::name();
     }
 
     /**

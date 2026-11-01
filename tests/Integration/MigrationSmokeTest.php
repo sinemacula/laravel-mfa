@@ -12,8 +12,8 @@ use Tests\TestCase;
 /**
  * Engine-agnostic migration smoke test.
  *
- * Asserts that the shipped `mfa_factors` table exists with every expected
- * column and the polymorphic-lookup index after the package migration runs
+ * Asserts that the shipped `mfa_factors` and `mfa_identity_states` tables exist
+ * with every expected column and index after the package migrations run
  * end-to-end. Catches engine-specific schema bugs that would otherwise ship
  * behind a green badge — e.g. a column type MySQL accepts but PostgreSQL
  * rejects, or an index name that collides with a reserved identifier on one
@@ -97,5 +97,30 @@ final class MigrationSmokeTest extends TestCase
             $hasMorphIndex,
             'Expected a composite index on (authenticatable_type, authenticatable_id) for polymorphic lookup.',
         );
+    }
+
+    /**
+     * The identity states table holds one row per owner: the unique index the
+     * factor state lock inserts or updates against must exist on every engine.
+     *
+     * @return void
+     */
+    public function testIdentityStatesTableHasOneRowPerOwner(): void
+    {
+        self::assertTrue(Schema::hasTable('mfa_identity_states'));
+
+        foreach (['id', 'authenticatable_type', 'authenticatable_id', 'created_at', 'updated_at'] as $column) {
+            self::assertTrue(
+                Schema::hasColumn('mfa_identity_states', $column),
+                sprintf('Missing column [%s] on mfa_identity_states after migration.', $column),
+            );
+        }
+
+        $unique = array_filter(
+            Schema::getIndexes('mfa_identity_states'),
+            static fn (array $index): bool => $index['unique'] && $index['columns'] === ['authenticatable_type', 'authenticatable_id'],
+        );
+
+        self::assertCount(1, $unique, 'Expected one unique index on (authenticatable_type, authenticatable_id).');
     }
 }

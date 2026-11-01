@@ -5,15 +5,15 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Database;
 
 use Illuminate\Database\Schema\Builder;
-use SineMacula\Laravel\Mfa\Exceptions\FactorTableAlreadyExistsException;
+use SineMacula\Laravel\Mfa\Exceptions\TableAlreadyExistsException;
 
 /**
  * Migration collision guard.
  *
- * Helper for the shipped factors migration. Surfaces a clear error before any
- * schema mutation if the configured factors table already exists. Consumers who
- * run a prior MFA system can avoid the collision by rebinding
- * `mfa.factor.table` before publishing the migration.
+ * Helper for the shipped migrations. Surfaces a clear error before any schema
+ * change if the table a migration is configured to create already exists.
+ * Consumers who run a prior MFA system can avoid the collision by changing the
+ * setting the message names before publishing the migrations.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,19 +27,21 @@ final readonly class MigrationCollisionGuard
      */
     public function __construct(
 
-        /** Schema builder used to inspect the configured connection for an existing factors table. */
+        /** Schema builder used to inspect the migration's connection for an existing table. */
         private Builder $schema,
     ) {}
 
     /**
-     * Throw if the configured factors table already exists.
+     * Throw if the table already exists, naming the setting under `mfa` that
+     * configures its name.
      *
      * @param  string  $table
+     * @param  string  $setting
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorTableAlreadyExistsException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\TableAlreadyExistsException
      */
-    public function ensureNotExists(string $table): void
+    public function ensureNotExists(string $table, string $setting): void
     {
         if (!$this->schema->hasTable($table)) {
             return;
@@ -47,18 +49,9 @@ final readonly class MigrationCollisionGuard
 
         $connection = $this->schema->getConnection()->getName() ?? 'default';
 
-        $message = sprintf(
-            '%s %s %s',
-            sprintf(
-                'Cannot install the laravel-mfa factors migration: a table '
-                . 'named \'%s\' already exists on connection \'%s\'.',
-                $table,
-                $connection,
-            ),
-            'Set `factor.table` in config/mfa.php to a different name',
-            'and re-run the migration.',
-        );
+        $message = 'Cannot install the laravel-mfa migrations: a table named \'%s\' already exists on connection \'%s\'.'
+            . ' Set `%s` in config/mfa.php to a different name and re-run the migration.';
 
-        throw new FactorTableAlreadyExistsException($message);
+        throw new TableAlreadyExistsException(sprintf($message, $table, $connection, $setting));
     }
 }

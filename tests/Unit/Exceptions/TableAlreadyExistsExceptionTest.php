@@ -6,18 +6,18 @@ namespace Tests\Unit\Exceptions;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SineMacula\Laravel\Mfa\Exceptions\FactorTableAlreadyExistsException;
+use SineMacula\Laravel\Mfa\Exceptions\TableAlreadyExistsException;
 
 /**
- * Unit tests for the `FactorTableAlreadyExistsException` exception.
+ * Unit tests for the `TableAlreadyExistsException` exception.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
-#[CoversClass(FactorTableAlreadyExistsException::class)]
-final class FactorTableAlreadyExistsExceptionTest extends TestCase
+#[CoversClass(TableAlreadyExistsException::class)]
+final class TableAlreadyExistsExceptionTest extends TestCase
 {
     /**
      * Test is final.
@@ -26,7 +26,7 @@ final class FactorTableAlreadyExistsExceptionTest extends TestCase
      */
     public function testIsFinal(): void
     {
-        $reflection = new \ReflectionClass(FactorTableAlreadyExistsException::class);
+        $reflection = new \ReflectionClass(TableAlreadyExistsException::class);
 
         self::assertTrue($reflection->isFinal());
     }
@@ -40,7 +40,7 @@ final class FactorTableAlreadyExistsExceptionTest extends TestCase
     {
         self::assertInstanceOf(
             \RuntimeException::class,
-            new FactorTableAlreadyExistsException('boom'),
+            new TableAlreadyExistsException('boom'),
         );
     }
 
@@ -51,7 +51,7 @@ final class FactorTableAlreadyExistsExceptionTest extends TestCase
      */
     public function testPreservesMessage(): void
     {
-        $exception = new FactorTableAlreadyExistsException('table collision detected');
+        $exception = new TableAlreadyExistsException('table collision detected');
 
         self::assertSame('table collision detected', $exception->getMessage());
     }

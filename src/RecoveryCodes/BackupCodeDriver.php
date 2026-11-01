@@ -4,12 +4,13 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\RecoveryCodes;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
+use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
  * Backup code factor driver.
@@ -265,13 +266,15 @@ final class BackupCodeDriver implements FactorDriver
     /**
      * Atomically consume the factor's stored secret.
      *
-     * Uses a pessimistic row lock inside a short transaction to close the
-     * TOCTOU race where two concurrent requests would both match the same hash.
-     * The secret column is cast to `encrypted` on the shipped model, so we
-     * cannot compare encrypted-at-rest values directly in a WHERE clause —
-     * hence the `lockForUpdate()` pattern rather than a conditional UPDATE.
-     * Returns `true` when this request consumed the code, `false` when another
-     * beat us to it.
+     * Runs in the owner's factor state transaction (see
+     * `Support\FactorStateTransaction`), on the storage connection, so the
+     * TOCTOU race where two concurrent requests would both match the same hash
+     * is closed by the owner's lock, and a consumption racing a rotation or a
+     * removal waits for it. The secret column is cast to `encrypted` on the
+     * shipped model, so we cannot compare encrypted-at-rest values directly in
+     * a WHERE clause; the row is compared again as stored under the lock
+     * instead. Returns `true` when this request consumed the code, `false` when
+     * another beat us to it or the row is gone.
      *
      * @imperative
      *
@@ -289,25 +292,19 @@ final class BackupCodeDriver implements FactorDriver
 
         $secretColumn = $factor->getSecretName();
 
-        /** @var bool $result */
-        $result = DB::connection($factor->getConnectionName())->transaction(
-            static function () use ($factor, $secretColumn, $expectedSecret): bool {
+        $result = FactorStateTransaction::forFactor(
+            $factor,
+            static function (Collection $factors) use ($factor, $secretColumn, $expectedSecret): bool {
 
-                // @phpstan-ignore staticMethod.dynamicCall
-                $locked = $factor->newQuery()
-                    ->lockForUpdate()
-                    ->find($factor->getKey());
+                $locked = $factors->first(static fn (Model $candidate): bool => $candidate->is($factor));
 
-                if (!$locked instanceof Model) {
+                if ($locked === null) {
                     return false;
                 }
 
                 $currentSecret = $locked->getSecret();
 
-                if (
-                    $currentSecret === null
-                    || !hash_equals($currentSecret, $expectedSecret)
-                ) {
+                if ($currentSecret === null || !hash_equals($currentSecret, $expectedSecret)) {
                     return false;
                 }
 

@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
+use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
  * Issues the current identity's backup codes.
@@ -50,11 +51,12 @@ final readonly class RecoveryCodeService
     /**
      * Issue a fresh batch of backup codes for the current identity.
      *
-     * Atomically replaces existing `backup_code` factors in a single
-     * transaction: prior rows deleted, a fresh batch minted via
-     * `BackupCodeDriver`, one `Factor` row per code persisted with the hashed
-     * value on `secret`. Returns the plaintext set exactly once: the codes are
-     * NEVER recoverable after this method returns.
+     * Atomically replaces existing `backup_code` factors in the identity's
+     * factor state transaction (see `Support\FactorStateTransaction`): prior
+     * rows deleted, a fresh batch minted via `BackupCodeDriver`, one `Factor`
+     * row per code persisted with the hashed value on `secret`. Returns the
+     * plaintext set exactly once: the codes are NEVER recoverable after this
+     * method returns.
      *
      * Each new factor dispatches `MfaFactorEnrolled`; the setup-state cache is
      * invalidated so `isSetup()` reflects the new batch immediately.
@@ -84,18 +86,14 @@ final readonly class RecoveryCodeService
             throw new \LogicException(sprintf('Driver [%s] must be a %s instance to issue backup codes.', BackupCodeDriver::NAME, BackupCodeDriver::class));
         }
 
-        $codes = $driver->generateSet($count);
-
-        // Transaction runs on the factor model's own connection so the
-        // documented atomic-replace guarantee still holds when a consumer
-        // points `config('mfa.factor.model')` at a model bound to a non-default
-        // database connection. Using the container-default
-        // `ConnectionInterface` would open the transaction on one connection
-        // while the rotation writes land on another.
+        $codes      = $driver->generateSet($count);
         $modelClass = $this->factors->factorModel();
-        $connection = (new $modelClass)->getConnection();
 
-        $connection->transaction(function () use ($identity, $driver, $codes, $modelClass): void {
+        // The rotation is a serialised change to the identity's factor state:
+        // one transaction on the storage connection, holding the identity's
+        // lock, so it commits or rolls back as one and a concurrent change for
+        // the same identity waits for it.
+        FactorStateTransaction::forIdentity($identity, new $modelClass, function () use ($identity, $driver, $codes, $modelClass): void {
             $this->rotateBackupCodeBatch($identity, $driver, $codes, $modelClass);
         });
 
@@ -106,11 +104,9 @@ final readonly class RecoveryCodeService
 
     /**
      * Atomically replace the identity's existing backup-code factors with the
-     * supplied freshly-minted batch. Runs inside a single transaction provided
-     * by the caller: no overlap window where both old and new codes would
-     * verify. The factor-model class is passed in so the rotation uses the
-     * exact same class (and therefore connection) the outer transaction was
-     * opened on.
+     * supplied freshly-minted batch. Runs inside the identity's factor state
+     * transaction, opened by the caller: no overlap window where both old and
+     * new codes would verify.
      *
      * @formatter:off
      *

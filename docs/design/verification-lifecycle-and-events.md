@@ -48,8 +48,8 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
   rows), persists, invalidates the setup cache, then dispatches `MfaFactorEnrolled($identity, $factor, $driver)`.
 - `disable()` resolves the identity, asserts ownership, deletes the row for Eloquent factors, invalidates the setup
   cache, then dispatches `MfaFactorDisabled($identity, $factor, $driver)`.
-- `issueBackupCodes()` rotates the identity's `backup_code` batch atomically on the factor model's own connection and
-  dispatches one `MfaFactorEnrolled` per freshly-minted code.
+- `issueBackupCodes()` rotates the identity's `backup_code` batch atomically in the identity's factor state transaction
+  and dispatches one `MfaFactorEnrolled` per freshly-minted code.
 
 ## Failure / Edge Cases
 
@@ -64,9 +64,9 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
   taxonomy.
 - Non-Eloquent factors participate in the lifecycle events but carry no row to mutate. `applyVerificationOutcome()`
   is skipped for them; attempt counters and lockouts only exist on factors whose implementation persists them.
-- Backup-code rotation inside `issueBackupCodes()` opens its transaction on the factor model's connection, not the
-  container-default connection, so the "atomic replace + N events" guarantee holds even when the consumer rebinds
-  `config('mfa.factor.model')` to a model on a secondary database.
+- Backup-code rotation inside `issueBackupCodes()` runs in the identity's factor state transaction on the storage
+  connection, so the "atomic replace + N events" guarantee holds wherever `mfa.storage.connection` puts the tables, and
+  a listener that throws rolls the whole rotation back.
 
 ## Implementation Anchors
 

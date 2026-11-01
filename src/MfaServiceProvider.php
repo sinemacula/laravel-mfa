@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use SineMacula\Laravel\Mfa\Codes\CodeBindings;
+use SineMacula\Laravel\Mfa\Database\StorageBindings;
 use SineMacula\Laravel\Mfa\Drivers\DriverBindings;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentBindings;
 use SineMacula\Laravel\Mfa\Factors\FactorBindings;
@@ -25,7 +26,8 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
  * service and its defaults for the seams consumers rebind (policy, verification
  * store, SMS gateway). The shipped drivers are registered against the manager
  * by their capability's `*Bindings` class from inside the singleton's factory.
- * Boots the middleware aliases and config and migration publishing.
+ * Boots the check that every configured model lives on the storage connection,
+ * the middleware aliases and config and migration publishing.
  *
  * Consumers with their own enforcement policy, stateless verification store, or
  * real SMS gateway rebind the matching contracts in their own service provider;
@@ -65,11 +67,15 @@ final class MfaServiceProvider extends ServiceProvider
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\ModelOffStorageConnectionException
      */
     public function boot(): void
     {
         $this->offerPublishing();
 
+        StorageBindings::boot($this->app);
         HttpBindings::boot($this->app);
     }
 

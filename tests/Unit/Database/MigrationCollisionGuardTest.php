@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Builder;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Database\MigrationCollisionGuard;
-use SineMacula\Laravel\Mfa\Exceptions\FactorTableAlreadyExistsException;
+use SineMacula\Laravel\Mfa\Exceptions\TableAlreadyExistsException;
 
 /**
  * Unit tests for the `MigrationCollisionGuard`.
@@ -39,7 +39,7 @@ final class MigrationCollisionGuardTest extends TestCase
         // proves the no-op rather than relying on implicit teardown semantics.
         $outcome = (static function () use ($guard): string {
 
-            $guard->ensureNotExists('mfa_factors');
+            $guard->ensureNotExists('mfa_factors', 'factor.table');
 
             return 'no-op';
         })();
@@ -64,12 +64,14 @@ final class MigrationCollisionGuardTest extends TestCase
         $guard = new MigrationCollisionGuard($schema);
 
         try {
-            $guard->ensureNotExists('mfa_factors');
-            self::fail('Expected FactorTableAlreadyExistsException to be thrown.');
-        } catch (FactorTableAlreadyExistsException $exception) {
-            self::assertStringContainsString('mfa_factors', $exception->getMessage());
-            self::assertStringContainsString('primary', $exception->getMessage());
-            self::assertStringContainsString('factor.table', $exception->getMessage());
+            $guard->ensureNotExists('mfa_factors', 'factor.table');
+            self::fail('Expected TableAlreadyExistsException to be thrown.');
+        } catch (TableAlreadyExistsException $exception) {
+            self::assertSame(
+                'Cannot install the laravel-mfa migrations: a table named \'mfa_factors\' already exists on connection'
+                . ' \'primary\'. Set `factor.table` in config/mfa.php to a different name and re-run the migration.',
+                $exception->getMessage(),
+            );
         }
     }
 
@@ -89,9 +91,9 @@ final class MigrationCollisionGuardTest extends TestCase
 
         $guard = new MigrationCollisionGuard($schema);
 
-        $this->expectException(FactorTableAlreadyExistsException::class);
+        $this->expectException(TableAlreadyExistsException::class);
         $this->expectExceptionMessage('\'default\'');
 
-        $guard->ensureNotExists('legacy_factors');
+        $guard->ensureNotExists('legacy_factors', 'factor.table');
     }
 }
