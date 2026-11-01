@@ -22,9 +22,9 @@ use Tests\Unit\Concerns\InteractsWithRecoveryCodes;
 /**
  * Tests for where a recovery code set stands, how it is removed with the last
  * factor, and how used and replaced codes are pruned: the remaining count and
- * the set's time are read without a code, in one statement, of the current
- * set only; removal runs inside the identity's factor state transaction and
- * reports a set that existed; pruning deletes only codes that can no longer be
+ * the set's time are read without a code, in one statement, of the current set
+ * only; removal runs inside the identity's factor state transaction and reports
+ * a set that existed; pruning deletes only codes that can no longer be
  * redeemed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -99,8 +99,8 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * The status is read in one statement, so the count and the generation
-     * are always of the same set.
+     * The status is read in one statement, so the count and the generation are
+     * always of the same set.
      *
      * @return void
      *
@@ -133,6 +133,7 @@ final class RecoveryCodeServiceTest extends TestCase
     public function testAUsedUpSetKeepsItsTime(): void
     {
         config()->set('mfa.recovery_codes.count', 2);
+        config()->set('mfa.recovery_codes.low_count', 1);
 
         $holder = $this->signInHolder();
 
@@ -148,8 +149,8 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * Removing the set deletes every code row, clears the set's time, keeps
-     * its generation, and reports the removal with the actor once it commits.
+     * Removing the set deletes every code row, clears the set's time, keeps its
+     * generation, and reports the removal with the actor once it commits.
      *
      * @return void
      *
@@ -176,8 +177,8 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * A used-up set whose codes were all pruned is still a set, and its
-     * removal is reported; so are code rows left without a set's time.
+     * A used-up set whose codes were all pruned is still a set, and its removal
+     * is reported; so are code rows left without a set's time.
      *
      * @return void
      *

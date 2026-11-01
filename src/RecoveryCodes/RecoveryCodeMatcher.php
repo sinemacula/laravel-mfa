@@ -50,9 +50,11 @@ final class RecoveryCodeMatcher
 
             $matches = $hasher->check($candidate, $hash);
 
-            if ($matches && $found === null) {
-                $found = $key;
+            if (!$matches || $found !== null) {
+                continue;
             }
+
+            $found = $key;
         }
 
         return $normalized === null ? null : $found;

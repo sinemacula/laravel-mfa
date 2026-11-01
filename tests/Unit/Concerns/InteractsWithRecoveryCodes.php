@@ -18,9 +18,9 @@ use Tests\Fixtures\Identities\FactorHolder;
 /**
  * Shared setup for the recovery code service tests: the `web` application
  * accepts recovery codes, bcrypt runs at its cheapest cost so a set hashes
- * quickly, and an identity using the shipped `HasFactors` trait signs in with
- * a factor of the status given, which begins the sign-in a redemption records
- * its proof on.
+ * quickly, and an identity using the shipped `HasFactors` trait signs in with a
+ * factor of the status given, which begins the sign-in a redemption records its
+ * proof on.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

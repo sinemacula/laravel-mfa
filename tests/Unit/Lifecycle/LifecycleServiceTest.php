@@ -22,8 +22,8 @@ use Tests\TestCase;
 
 /**
  * Tests for `LifecycleService`: only the current identity's own factor is
- * disabled, its row deleted, its proofs forgotten and the removal reported,
- * and the identity's recovery codes removed with its last confirmed factor.
+ * disabled, its row deleted, its proofs forgotten and the removal reported, and
+ * the identity's recovery codes removed with its last confirmed factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -227,8 +227,8 @@ final class LifecycleServiceTest extends TestCase
     }
 
     /**
-     * A pending factor left behind does not keep the set: it is not an
-     * enrolled factor.
+     * A pending factor left behind does not keep the set: it is not an enrolled
+     * factor.
      *
      * @return void
      *
@@ -276,8 +276,8 @@ final class LifecycleServiceTest extends TestCase
     }
 
     /**
-     * Without a recovery code set, removing the last factor reports no
-     * removal of one.
+     * Without a recovery code set, removing the last factor reports no removal
+     * of one.
      *
      * @return void
      *

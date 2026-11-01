@@ -7,13 +7,12 @@ namespace SineMacula\Laravel\Mfa\RecoveryCodes;
 /**
  * Puts a submitted recovery code in the form its hash was made from: ASCII
  * whitespace (space, tab, carriage return, line feed, vertical tab and form
- * feed) and hyphens removed, ASCII letters upper-cased. Nothing else is
- * mapped: a Unicode dash or space is left in, so a code containing one never
- * matches.
+ * feed) and hyphens removed, ASCII letters upper-cased. Nothing else is mapped:
+ * a Unicode dash or space is left in, so a code containing one never matches.
  *
- * The result is not checked against the configured length or alphabet, so a
- * set issued before either changed still redeems. Input too long to be a code
- * is malformed: more than `MAXIMUM_INPUT_BYTES` as submitted, or more than
+ * The result is not checked against the configured length or alphabet, so a set
+ * issued before either changed still redeems. Input too long to be a code is
+ * malformed: more than `MAXIMUM_INPUT_BYTES` as submitted, or more than
  * `RecoveryCodeSettings::MAXIMUM_LENGTH` once normalised, the longest a code
  * can be. A malformed code is `null`, and the redemption still checks the whole
  * set, against a placeholder, so it is never rejected sooner than a code that

@@ -97,8 +97,8 @@ final readonly class LifecycleService
 
     /**
      * Delete the factor in the identity's factor state transaction, and the
-     * identity's recovery codes with it when none of the factors left under
-     * the lock is confirmed.
+     * identity's recovery codes with it when none of the factors left under the
+     * lock is confirmed.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -116,9 +116,11 @@ final readonly class LifecycleService
 
             $remains = $factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $removed && $other->isConfirmed());
 
-            if (!$remains) {
-                $this->recoveryCodes->removeSet($identity);
+            if ($remains) {
+                return;
             }
+
+            $this->recoveryCodes->removeSet($identity);
         });
     }
 }

@@ -24,8 +24,7 @@ final class RequestIp
     private function __construct() {}
 
     /**
-     * The IP address of the request being served, or `null` outside a
-     * request.
+     * The IP address of the request being served, or `null` outside a request.
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @return ?string

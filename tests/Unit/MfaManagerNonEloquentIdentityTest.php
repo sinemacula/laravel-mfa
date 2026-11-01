@@ -21,9 +21,9 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
  *
  * `Support\CurrentIdentity::typeOf()`, which
  * `Factors\FactorOwnership::assert()`, the proof store and recovery code
- * generation all use, branches on whether the identity is a `Model` —
- * Eloquent identities use `getMorphClass()`, non-Eloquent identities fall back
- * to a strict FQCN comparison. The shipped test identities (`TestUser`,
+ * generation all use, branches on whether the identity is a `Model` — Eloquent
+ * identities use `getMorphClass()`, non-Eloquent identities fall back to a
+ * strict FQCN comparison. The shipped test identities (`TestUser`,
  * `SecondaryUser`, `NonScalarIdentifierUser`) are all Eloquent, so a dedicated
  * non-Eloquent fixture is needed to drive the FQCN branches and keep coverage
  * at 100%.
@@ -115,6 +115,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 
         $config->set('hashing.bcrypt.rounds', 4);
         $config->set('mfa.recovery_codes.count', 2);
+        $config->set('mfa.recovery_codes.low_count', 1);
         $config->set('mfa.applications.web', ['recovery_codes' => ['enabled' => true], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
         Factor::query()->create([
@@ -128,8 +129,8 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 
         self::assertCount(2, $this->manager()->generateRecoveryCodes());
 
-        // Stored rows must carry the identity's FQCN as the owner type,
-        // proving the `: $identity::class` fallback fired.
+        // Stored rows must carry the identity's FQCN as the owner type, proving
+        // the `: $identity::class` fallback fired.
         self::assertSame(
             2,
             RecoveryCode::query()

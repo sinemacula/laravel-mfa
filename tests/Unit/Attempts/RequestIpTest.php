@@ -11,8 +11,8 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Attempts\RequestIp;
 
 /**
- * Unit tests for `RequestIp`: the address of the request being served, and
- * none outside a request.
+ * Unit tests for `RequestIp`: the address of the request being served, and none
+ * outside a request.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

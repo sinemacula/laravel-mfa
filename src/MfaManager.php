@@ -218,6 +218,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
+     *
+     * @imperative
      */
     public function redeemRecoveryCode(#[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
     {

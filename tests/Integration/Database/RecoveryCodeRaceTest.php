@@ -74,8 +74,8 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * Of two concurrent redemptions of one code, the second waits for the
-     * first to commit, then finds the code used: the code passes once.
+     * Of two concurrent redemptions of one code, the second waits for the first
+     * to commit, then finds the code used: the code passes once.
      *
      * @return void
      *
@@ -204,13 +204,14 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * Run the callback with the package's tables reached through the
-     * observer.
+     * Run the callback with the package's tables reached through the observer.
      *
      * @template TReturn
      *
      * @param  \Closure(): TReturn  $callback
      * @return TReturn
+     *
+     * @param-immediately-invoked-callable $callback
      */
     private function asObserver(\Closure $callback): mixed
     {

@@ -47,19 +47,19 @@ use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Generates, redeems, reports, removes and prunes an identity's recovery
- * codes: a fallback for lost factors, never a factor of their own.
+ * Generates, redeems, reports, removes and prunes an identity's recovery codes:
+ * a fallback for lost factors, never a factor of their own.
  *
  * An identity has one set, shared by every application; each application
- * decides whether it accepts recovery codes. A set is generated for an
- * identity with a confirmed factor only, and replaces any earlier one in the
- * identity's factor state transaction (see `Support\FactorStateTransaction`),
- * so a redemption, which takes the same lock, finds either the old set intact
- * or the new one, never both and never neither. Codes are stored hashed with
- * the application's Laravel hasher, salted, and a redemption checks the
- * submitted code against every unused code of the set as one attempt, with
- * the same work whichever code matches, if any. Every event is dispatched
- * through `Events\EventDispatcher`, once the change it reports has committed.
+ * decides whether it accepts recovery codes. A set is generated for an identity
+ * with a confirmed factor only, and replaces any earlier one in the identity's
+ * factor state transaction (see `Support\FactorStateTransaction`), so a
+ * redemption, which takes the same lock, finds either the old set intact or the
+ * new one, never both and never neither. Codes are stored hashed with the
+ * application's Laravel hasher, salted, and a redemption checks the submitted
+ * code against every unused code of the set as one attempt, with the same work
+ * whichever code matches, if any. Every event is dispatched through
+ * `Events\EventDispatcher`, once the change it reports has committed.
  *
  * The application of every operation is the current request's (see
  * `Proofs\ProofService::application()`), read once per call.
@@ -117,9 +117,9 @@ final readonly class RecoveryCodeService
      * identity, when the application does not accept recovery codes
      * (`type_not_enabled`), and when the identity has no confirmed factor
      * (`no_factor`), checked again under the lock. The codes are drawn and
-     * hashed before the lock is taken; under it, every code of the identity
-     * not yet replaced is marked replaced, the new codes are stored under the
-     * next generation, and the generation and its time are recorded on the
+     * hashed before the lock is taken; under it, every code of the identity not
+     * yet replaced is marked replaced, the new codes are stored under the next
+     * generation, and the generation and its time are recorded on the
      * identity's state row, so all of it commits or none does.
      * `RecoveryCodesGenerated` is dispatched once it has committed. The codes
      * are returned unformatted, in the order they were drawn.
@@ -137,9 +137,7 @@ final readonly class RecoveryCodeService
 
         $this->guardGeneration($identity, $application);
 
-        if (!$identity->isMfaEnabled()) {
-            throw new OperationRefusedException(FailureReason::NO_FACTOR, 'Recovery codes are issued only to an identity with a confirmed factor.');
-        }
+        self::requireConfirmedFactor($identity->isMfaEnabled(), 'Recovery codes are issued only to an identity with a confirmed factor.');
 
         $settings = new RecoveryCodeSettings($this->config);
         $codes    = $this->generator->generate($settings->count(), $settings->length(), $settings->alphabet());
@@ -152,9 +150,9 @@ final readonly class RecoveryCodeService
 
             $this->guardGeneration($identity, $application);
 
-            if (!$factors->contains(static fn (EloquentFactor&Model $factor): bool => $factor->isConfirmed())) {
-                throw new OperationRefusedException(FailureReason::NO_FACTOR, 'The identity no longer has a confirmed factor.');
-            }
+            $confirmed = $factors->contains(static fn (EloquentFactor&Model $factor): bool => $factor->isConfirmed());
+
+            self::requireConfirmedFactor($confirmed, 'The identity no longer has a confirmed factor.');
 
             $generation = $this->replace(ProofOwner::of($identity), $hashes);
 
@@ -169,20 +167,20 @@ final readonly class RecoveryCodeService
      * code of the identity's set.
      *
      * Refused before any attempt, and counted nowhere, for a machine or
-     * inactive identity, for an enrolment (a recovery code cannot confirm
-     * one), when the application does not accept recovery codes, when the
-     * identity has no confirmed factor, and when it has no sign-in to record
-     * the proof on, so a single-use code is never spent for nothing.
+     * inactive identity, for an enrolment (a recovery code cannot confirm one),
+     * when the application does not accept recovery codes, when the identity
+     * has no confirmed factor, and when it has no sign-in to record the proof
+     * on, so a single-use code is never spent for nothing.
      *
      * Otherwise the attempt is made through the attempt service: refused
      * without checking anything while a lockout applies, and counted against
-     * the identity and the IP address otherwise. Under the identity's lock,
-     * the sign-in and a confirmed factor are checked again, then the submitted
-     * code, normalised (see `RecoveryCodeNormalizer`), is checked against
-     * every unused code of the current generation with the hasher, without
-     * stopping at a match, and a match is marked used by a statement that
-     * changes it only while it is still unused. A malformed code is checked
-     * the same way, against a placeholder, and matches nothing.
+     * the identity and the IP address otherwise. Under the identity's lock, the
+     * sign-in and a confirmed factor are checked again, then the submitted
+     * code, normalised (see `RecoveryCodeNormalizer`), is checked against every
+     * unused code of the current generation with the hasher, without stopping
+     * at a match, and a match is marked used by a statement that changes it
+     * only while it is still unused. A malformed code is checked the same way,
+     * against a placeholder, and matches nothing.
      *
      * On success the proof is recorded on the identity's sign-in, stamped with
      * the verification generation read under the lock, then
@@ -269,7 +267,7 @@ final readonly class RecoveryCodeService
 
         return new RecoveryCodeStatus(
             is_numeric($remaining) ? (int) $remaining : 0,
-            $row?->recovery_codes_generation ?? 0,
+            $row->recovery_codes_generation ?? 0,
             $at === null ? null : CarbonImmutable::instance($at),
         );
     }
@@ -297,9 +295,7 @@ final readonly class RecoveryCodeService
      */
     public function removeSet(MultiFactorAuthenticatable $identity, ?Actor $actor = null): bool
     {
-        if (DB::connection(StorageConnection::name())->transactionLevel() === 0) {
-            throw new \LogicException('A recovery code set is removed only inside the identity\'s factor state transaction.');
-        }
+        self::requireTransaction();
 
         $owner   = ProofOwner::of($identity);
         $state   = $this->lockedState($owner);
@@ -320,8 +316,8 @@ final readonly class RecoveryCodeService
 
     /**
      * Delete every code used, or replaced by a newer set, before the given
-     * time, and return how many. A code still usable is never deleted, and
-     * the identity's state row is left as it is. Dispatches nothing.
+     * time, and return how many. A code still usable is never deleted, and the
+     * identity's state row is left as it is. Dispatches nothing.
      *
      * @param  \Carbon\CarbonInterface  $before
      * @return int
@@ -359,6 +355,37 @@ final readonly class RecoveryCodeService
 
         if (!(new ApplicationSettings($this->config, $application))->acceptsRecoveryCodes()) {
             throw new OperationRefusedException(FailureReason::TYPE_NOT_ENABLED, 'The application does not accept recovery codes.');
+        }
+    }
+
+    /**
+     * Refuse generating a set for an identity without a confirmed factor.
+     *
+     * @param  bool  $confirmed
+     * @param  string  $detail
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     */
+    private static function requireConfirmedFactor(bool $confirmed, string $detail): void
+    {
+        if (!$confirmed) {
+            throw new OperationRefusedException(FailureReason::NO_FACTOR, $detail);
+        }
+    }
+
+    /**
+     * Refuse removing a set outside a transaction on the storage connection:
+     * the removal is part of the change that removes the last confirmed factor.
+     *
+     * @return void
+     *
+     * @throws \LogicException
+     */
+    private static function requireTransaction(): void
+    {
+        if (DB::connection(StorageConnection::name())->transactionLevel() === 0) {
+            throw new \LogicException('A recovery code set is removed only inside the identity\'s factor state transaction.');
         }
     }
 
@@ -406,8 +433,8 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Why a redemption is refused before any attempt is made, or `null` when
-     * it may be attempted.
+     * Why a redemption is refused before any attempt is made, or `null` when it
+     * may be attempted.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -424,12 +451,14 @@ final readonly class RecoveryCodeService
             return Redemption::refused($exception->reason, $exception->getMessage());
         }
 
+        $settings = new ApplicationSettings($this->config, $application);
+
         return match (true) {
-            $purpose === Purpose::ENROLLMENT                                                => Redemption::refused(FailureReason::NOT_ACCEPTED, 'A recovery code cannot confirm an enrolment.'),
-            !(new ApplicationSettings($this->config, $application))->acceptsRecoveryCodes() => Redemption::refused(FailureReason::TYPE_NOT_ENABLED, 'The application does not accept recovery codes.'),
-            !$identity->isMfaEnabled()                                                      => Redemption::refused(FailureReason::NO_FACTOR, 'The identity has no confirmed factor.'),
-            $this->proofs->generationFor($identity) === null                                => Redemption::refused(FailureReason::NOT_ACCEPTED, 'The identity has no sign-in to record the proof on.'),
-            default                                                                         => null,
+            $purpose === Purpose::ENROLLMENT                 => Redemption::refused(FailureReason::NOT_ACCEPTED, 'A recovery code cannot confirm an enrolment.'),
+            !$settings->acceptsRecoveryCodes()               => Redemption::refused(FailureReason::TYPE_NOT_ENABLED, 'The application does not accept recovery codes.'),
+            !$identity->isMfaEnabled()                       => Redemption::refused(FailureReason::NO_FACTOR, 'The identity has no confirmed factor.'),
+            $this->proofs->generationFor($identity) === null => Redemption::refused(FailureReason::NOT_ACCEPTED, 'The identity has no sign-in to record the proof on.'),
+            default                                          => null,
         };
     }
 
@@ -467,9 +496,7 @@ final readonly class RecoveryCodeService
             return Redemption::refused(FailureReason::LOCKED, $outcome->lockout->detail(), $outcome->lockout->until);
         }
 
-        if ($checked === null) {
-            throw new \LogicException('An attempt that was not refused checks the code.');
-        }
+        $checked = self::checked($checked);
 
         if (!$checked->passed || $generation === null) {
             return $checked;
@@ -493,14 +520,15 @@ final readonly class RecoveryCodeService
      */
     private function check(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] ?string $normalized, bool $signedIn): Redemption
     {
-        if (!$signedIn) {
-            return Redemption::failed(FailureReason::NOT_ACCEPTED, 'The identity\'s sign-in ended before the code was checked.');
-        }
+        $owner       = ProofOwner::of($identity);
+        $interrupted = match (true) {
+            !$signedIn                         => Redemption::failed(FailureReason::NOT_ACCEPTED, 'The identity\'s sign-in ended before the code was checked.'),
+            !$this->hasConfirmedFactor($owner) => Redemption::failed(FailureReason::NO_FACTOR, 'The identity\'s last confirmed factor went before the code was checked.'),
+            default                            => null,
+        };
 
-        $owner = ProofOwner::of($identity);
-
-        if (!$this->hasConfirmedFactor($owner)) {
-            return Redemption::failed(FailureReason::NO_FACTOR, 'The identity\'s last confirmed factor went before the code was checked.');
+        if ($interrupted !== null) {
+            return $interrupted;
         }
 
         $usable  = $this->usableCodes($owner);
@@ -513,6 +541,20 @@ final readonly class RecoveryCodeService
         }
 
         return Redemption::passed($usable->count() - 1);
+    }
+
+    /**
+     * The redemption the attempt's check made: an attempt no lockout refused
+     * always runs the check, so a missing one is a defect.
+     *
+     * @param  ?\SineMacula\Laravel\Mfa\RecoveryCodes\Redemption  $checked
+     * @return \SineMacula\Laravel\Mfa\RecoveryCodes\Redemption
+     *
+     * @throws \LogicException
+     */
+    private static function checked(?Redemption $checked): Redemption
+    {
+        return $checked ?? throw new \LogicException('An attempt that was not refused checks the code.');
     }
 
     /**
@@ -534,9 +576,9 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * The identity's codes of its current generation that are neither used
-     * nor replaced, read with a locking read so a code used in the meantime is
-     * seen as used.
+     * The identity's codes of its current generation that are neither used nor
+     * replaced, read with a locking read so a code used in the meantime is seen
+     * as used.
      *
      * @formatter:off
      *

@@ -12,8 +12,8 @@ use Illuminate\Contracts\Hashing\Hasher;
  *
  * Given a hasher, it hands every call on to it; without one, it hashes by
  * prefixing the value, which is enough for a test that only compares. A hook,
- * when set, runs before the check it is set for (the first by default), once:
- * a test stands a concurrent request in there, which then runs while the
+ * when set, runs before the check it is set for (the first by default), once: a
+ * test stands a concurrent request in there, which then runs while the
  * redemption it interrupts has read the set and is part-way through checking
  * it.
  *
@@ -73,11 +73,11 @@ final class CountingHasher implements Hasher
     /**
      * Get information about the given hashed value.
      *
-     * @param  string  $hashedValue
+     * @param  mixed  $hashedValue
      * @return array<string, mixed>
      */
     #[\Override]
-    public function info($hashedValue): array
+    public function info(mixed $hashedValue): array
     {
         return $this->inner?->info($hashedValue) ?? ['algo' => null, 'algoName' => 'counted', 'options' => []];
     }
@@ -85,31 +85,31 @@ final class CountingHasher implements Hasher
     /**
      * Hash the given value.
      *
-     * @param  string  $value
-     * @param  array<string, mixed>  $options
+     * @param  mixed  $value
+     * @param  array<mixed>  $options
      * @return string
      */
     #[\Override]
-    public function make(#[\SensitiveParameter] $value, array $options = []): string
+    public function make(#[\SensitiveParameter] mixed $value, array $options = []): string
     {
-        return $this->inner?->make($value, $options) ?? self::PREFIX . $value;
+        return $this->inner?->make($value, $options) ?? self::PREFIX . self::text($value);
     }
 
     /**
      * Count and record the check, run the hook when it is due, and check the
      * value against the hash.
      *
-     * @param  string  $value
-     * @param  string  $hashedValue
-     * @param  array<string, mixed>  $options
+     * @param  mixed  $value
+     * @param  mixed  $hashedValue
+     * @param  array<mixed>  $options
      * @return bool
      *
      * @imperative
      */
     #[\Override]
-    public function check(#[\SensitiveParameter] $value, $hashedValue, array $options = []): bool
+    public function check(#[\SensitiveParameter] mixed $value, mixed $hashedValue, array $options = []): bool
     {
-        $this->checked[] = $value;
+        $this->checked[] = self::text($value);
 
         if ($this->hook !== null && count($this->checked) === $this->hookAt) {
 
@@ -119,19 +119,31 @@ final class CountingHasher implements Hasher
             $hook();
         }
 
-        return $this->inner?->check($value, $hashedValue, $options) ?? $hashedValue === self::PREFIX . $value;
+        return $this->inner?->check($value, $hashedValue, $options) ?? $hashedValue === self::PREFIX . self::text($value);
     }
 
     /**
      * Whether the hash needs rehashing: never.
      *
-     * @param  string  $hashedValue
-     * @param  array<string, mixed>  $options
+     * @param  mixed  $hashedValue
+     * @param  array<mixed>  $options
      * @return bool
      */
     #[\Override]
-    public function needsRehash($hashedValue, array $options = []): bool
+    public function needsRehash(mixed $hashedValue, array $options = []): bool
     {
         return false;
+    }
+
+    /**
+     * The value as text: a hasher is only ever given a string, which the
+     * contract leaves untyped.
+     *
+     * @param  mixed  $value
+     * @return string
+     */
+    private static function text(mixed $value): string
+    {
+        return is_string($value) ? $value : '';
     }
 }

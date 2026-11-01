@@ -28,10 +28,10 @@ use Tests\Unit\Concerns\InteractsWithRecoveryCodes;
 /**
  * Tests for generating a recovery code set: the codes come back once, as
  * secrets, and are stored only as salted hashes made with the application's
- * hasher; a new set replaces the old one atomically, so there is never a
- * moment when both work or neither exists; and generation is refused unless
- * the application accepts recovery codes and the identity, a person who is
- * active, has a confirmed factor.
+ * hasher; a new set replaces the old one atomically, so there is never a moment
+ * when both work or neither exists; and generation is refused unless the
+ * application accepts recovery codes and the identity, a person who is active,
+ * has a confirmed factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -182,7 +182,9 @@ final class RecoveryCodeGenerationTest extends TestCase
         $stored = $this->storedCodes($holder);
 
         self::assertCount(20, $stored);
-        self::assertCount(10, $stored->filter(static fn (RecoveryCode $row): bool => $row->getGeneration() === 1 && $row->getReplacedAt()?->format('Y-m-d H:i:s') === '2026-11-02 10:00:00'));
+        $replacedAt = static fn (RecoveryCode $row): ?string => $row->getReplacedAt()?->format('Y-m-d H:i:s');
+
+        self::assertCount(10, $stored->filter(static fn (RecoveryCode $row): bool => $row->getGeneration() === 1 && $replacedAt($row) === '2026-11-02 10:00:00'));
         self::assertCount(10, $stored->filter(static fn (RecoveryCode $row): bool => $row->getGeneration() === 2 && $row->isUsable()));
         self::assertSame(2, $this->stateOf($holder)->recovery_codes_generation);
 
@@ -281,8 +283,8 @@ final class RecoveryCodeGenerationTest extends TestCase
     /**
      * Inside the replacement, the earlier codes are already replaced when the
      * first new code is stored, and the new codes are stored under the next
-     * generation before it is recorded, so the set a redemption reads under
-     * the same lock is the old one or the new one, never both.
+     * generation before it is recorded, so the set a redemption reads under the
+     * same lock is the old one or the new one, never both.
      *
      * @return void
      *
@@ -306,8 +308,8 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * Generation is refused, and nothing written, when the application does
-     * not accept recovery codes.
+     * Generation is refused, and nothing written, when the application does not
+     * accept recovery codes.
      *
      * @return void
      *
@@ -372,8 +374,6 @@ final class RecoveryCodeGenerationTest extends TestCase
      * A machine identity and an inactive one are refused.
      *
      * @return void
-     *
-     * @throws \Throwable
      */
     public function testRefusedForAMachineOrInactiveIdentity(): void
     {

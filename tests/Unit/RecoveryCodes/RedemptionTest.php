@@ -16,8 +16,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\RecoveryCodes\Redemption;
 
 /**
- * Unit tests for `Redemption`: what a passed, a failed and a refused
- * redemption carry, and the shapes each refuses.
+ * Unit tests for `Redemption`: what a passed, a failed and a refused redemption
+ * carry, and the shapes each refuses.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,8 +28,8 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\Redemption;
 final class RedemptionTest extends TestCase
 {
     /**
-     * A passed redemption is counted and carries the remaining count and,
-     * once added, its proof; nothing about a failure.
+     * A passed redemption is counted and carries the remaining count and, once
+     * added, its proof; nothing about a failure.
      *
      * @return void
      */

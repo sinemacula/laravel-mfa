@@ -316,8 +316,8 @@ final readonly class VerificationService
      * generation read before the code was checked: an additional factor proof
      * on the factor's channel, named by the factor's destination when it has
      * one and by the factor itself when not. A driver whose channel cannot
-     * carry a factor proves nothing, and neither does a factor whose
-     * identifier cannot name it.
+     * carry a factor proves nothing, and neither does a factor whose identifier
+     * cannot name it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  int  $generation

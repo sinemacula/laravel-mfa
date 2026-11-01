@@ -6,6 +6,7 @@ namespace Tests\Unit\RecoveryCodes;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Random\RandomException;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGenerator;
 
 /**
@@ -30,6 +31,8 @@ final class RecoveryCodeGeneratorTest extends TestCase
      * length, from the alphabet only.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testDrawsDistinctCodesFromTheAlphabet(): void
     {
@@ -49,6 +52,8 @@ final class RecoveryCodeGeneratorTest extends TestCase
      * so every character can be drawn.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testEveryCharacterOfTheAlphabetCanBeDrawn(): void
     {
@@ -66,10 +71,12 @@ final class RecoveryCodeGeneratorTest extends TestCase
     }
 
     /**
-     * A code already in the set is drawn again, so the set holds the size
-     * asked for, every code distinct, in the order drawn.
+     * A code already in the set is drawn again, so the set holds the size asked
+     * for, every code distinct, in the order drawn.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testARepeatedCodeIsDrawnAgain(): void
     {
@@ -102,7 +109,7 @@ final class RecoveryCodeGeneratorTest extends TestCase
         try {
             $generator->generate(2, 1, 'AB');
             self::fail('A source that keeps repeating itself was expected to be refused.');
-        } catch (\RuntimeException $exception) {
+        } catch (RandomException $exception) {
             self::assertSame('No set of 2 distinct recovery codes could be drawn: the source of randomness keeps repeating itself.', $exception->getMessage());
         }
 
@@ -113,6 +120,8 @@ final class RecoveryCodeGeneratorTest extends TestCase
      * An empty set draws nothing.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testAnEmptySetDrawsNothing(): void
     {

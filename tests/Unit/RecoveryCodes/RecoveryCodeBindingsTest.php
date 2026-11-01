@@ -11,8 +11,8 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use Tests\TestCase;
 
 /**
- * Tests for `RecoveryCodeBindings`: the recovery code service is shared, and
- * no factor driver is registered for recovery codes, which are not a factor.
+ * Tests for `RecoveryCodeBindings`: the recovery code service is shared, and no
+ * factor driver is registered for recovery codes, which are not a factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

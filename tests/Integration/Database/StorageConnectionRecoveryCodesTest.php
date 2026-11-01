@@ -23,8 +23,8 @@ use Tests\TestCase;
  * Recovery codes on a storage connection other than the default one.
  *
  * With `mfa.storage.connection` naming a `secondary` connection, the shipped
- * migrations create the package's tables there, the shipped recovery code
- * model reads and writes them there, and the replacement's transaction and the
+ * migrations create the package's tables there, the shipped recovery code model
+ * reads and writes them there, and the replacement's transaction and the
  * identity's lock are taken there, so a failure partway through rolls back on
  * the connection the rows live on; a code is redeemed there too. The identity
  * itself stays on the default connection.

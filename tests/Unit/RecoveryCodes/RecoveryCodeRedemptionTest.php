@@ -152,17 +152,19 @@ final class RecoveryCodeRedemptionTest extends TestCase
             self::assertTrue($this->recoveryCodes()->redeem($holder, $code, Purpose::SIGN_IN)->passed);
             self::assertSame(10 - $index, $hasher->checks() - $before, 'Redeeming code ' . $index . ' checked a different number of codes.');
 
-            if ($index === 4) {
-                $before = $hasher->checks();
-
-                self::assertFalse($this->recoveryCodes()->redeem($holder, 'ZZZZZZZZZZZZ', Purpose::SIGN_IN)->passed);
-                self::assertSame(5, $hasher->checks() - $before);
-
-                $before = $hasher->checks();
-
-                self::assertFalse($this->recoveryCodes()->redeem($holder, str_repeat('A', 300), Purpose::SIGN_IN)->passed);
-                self::assertSame(5, $hasher->checks() - $before);
+            if ($index !== 4) {
+                continue;
             }
+
+            $before = $hasher->checks();
+
+            self::assertFalse($this->recoveryCodes()->redeem($holder, 'ZZZZZZZZZZZZ', Purpose::SIGN_IN)->passed);
+            self::assertSame(5, $hasher->checks() - $before);
+
+            $before = $hasher->checks();
+
+            self::assertFalse($this->recoveryCodes()->redeem($holder, str_repeat('A', 300), Purpose::SIGN_IN)->passed);
+            self::assertSame(5, $hasher->checks() - $before);
         }
     }
 
@@ -436,9 +438,9 @@ final class RecoveryCodeRedemptionTest extends TestCase
 
     /**
      * A success dispatches, once the use commits and in this order,
-     * `VerificationPassed`, `RecoveryCodeUsed` with the remaining count and,
-     * at or below the low count, `RecoveryCodesLow`: at the threshold, below
-     * it and at zero.
+     * `VerificationPassed`, `RecoveryCodeUsed` with the remaining count and, at
+     * or below the low count, `RecoveryCodesLow`: at the threshold, below it
+     * and at zero.
      *
      * @return void
      *
@@ -637,8 +639,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A redemption whose identity's sign-in ends while it waits for the lock
-     * is counted as a failure, checking nothing and spending no code.
+     * A redemption whose identity's sign-in ends while it waits for the lock is
+     * counted as a failure, checking nothing and spending no code.
      *
      * @return void
      *
@@ -749,8 +751,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
 
     /**
      * Run the callback once, just after the identity's state lock is taken:
-     * inside the lock, before the attempt's verification runs, as a change
-     * that committed while the redemption waited for the lock.
+     * inside the lock, before the attempt's verification runs, as a change that
+     * committed while the redemption waited for the lock.
      *
      * @param  \Closure(): void  $callback
      * @return void

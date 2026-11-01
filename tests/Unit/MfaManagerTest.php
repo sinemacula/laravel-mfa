@@ -168,8 +168,8 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * The recovery code methods hand the current identity to the recovery
-     * code service with their arguments, and return its answer: the codes, as
+     * The recovery code methods hand the current identity to the recovery code
+     * service with their arguments, and return its answer: the codes, as
      * secrets; whether the redemption passed; the set's status.
      *
      * @return void
@@ -198,9 +198,8 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * Without an MFA-capable identity the recovery code methods answer
-     * nothing without calling the service: no codes, no redemption and no
-     * status.
+     * Without an MFA-capable identity the recovery code methods answer nothing
+     * without calling the service: no codes, no redemption and no status.
      *
      * @return void
      *

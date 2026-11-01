@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\RecoveryCodes;
 
+use Random\RandomException;
+
 /**
  * Draws the codes of a recovery code set.
  *
@@ -51,7 +53,7 @@ final readonly class RecoveryCodeGenerator
      * @param  string  $alphabet
      * @return list<string>
      *
-     * @throws \RuntimeException
+     * @throws \Random\RandomException
      */
     public function generate(int $count, int $length, string $alphabet): array
     {
@@ -61,14 +63,16 @@ final readonly class RecoveryCodeGenerator
         while (count($codes) < $count) {
 
             if (++$draws > $count * self::DRAWS_PER_CODE) {
-                throw new \RuntimeException(sprintf('No set of %d distinct recovery codes could be drawn: the source of randomness keeps repeating itself.', $count));
+                throw new RandomException(sprintf('No set of %d distinct recovery codes could be drawn: the source of randomness keeps repeating itself.', $count));
             }
 
             $code = strtoupper($this->draw($length, $alphabet));
 
-            if (!in_array($code, $codes, true)) {
-                $codes[] = $code;
+            if (in_array($code, $codes, true)) {
+                continue;
             }
+
+            $codes[] = $code;
         }
 
         return $codes;
