@@ -46,8 +46,9 @@ factors starts with.
 - The identity contract, `Contracts\MultiFactorAuthenticatable`, asks whether the identity may hold factors
   (`canHoldFactors()`, people only), whether it is active (`isMfaActive()`) and what it requires of its own sign-ins
   (`requiresAdditionalFactor()`, a `Requirements\Requirement` or `null`). `Concerns\HasFactors` answers a person,
-  active, requiring nothing, gives the factors of the configured model, counts only a confirmed one as enabled, and
-  forgets the identity as the model is deleted.
+  active, requiring nothing, gives the factors of the configured model by the owner columns of its `authenticatable`
+  relation, counts only a confirmed one as enabled (read from the write connection), and forgets the identity on the
+  model's `deleted` event, once its row is gone, unless the delete was soft.
 - `Lifecycle\ForgetIdentity` deletes the identity's codes, enrolments, passkey associations, recovery codes, factors and
   state row in its factor state transaction, by the owner columns of each model (a replaced factor or recovery code
   model's own relation columns). The attempt throttles are left to expire.
@@ -72,8 +73,14 @@ factors starts with.
 - An inactive machine is refused as a machine: the reasons are checked in a fixed order.
 - A model deleted without its events (a query builder `delete()`) is not forgotten by the trait; the application calls
   `ForgetIdentity` itself, as it does for an identity that is not an Eloquent model.
-- Deleting an identity and a change racing it serialise on the identity's state row: the change either commits first
-  or finds nothing left.
+- A delete that a `deleting` listener cancels, or that fails, forgets nothing: the trait listens for `deleted`, so an
+  identity is never left live without its factors. A soft delete forgets nothing; a force delete forgets the identity.
+- The forgetting commits on its own after the delete, unless the delete runs in a transaction on the storage
+  connection, which the forgetting then joins. A failure while forgetting an identity already deleted leaves records
+  owned by an identity that no longer exists.
+- Deleting an identity and a change racing it serialise on the identity's state row: a change already holding it
+  commits first and is deleted with the rest. A change that takes it afterwards finds no factors; a record it then
+  writes is owned by an identity that no longer exists.
 
 ## Implementation Anchors
 

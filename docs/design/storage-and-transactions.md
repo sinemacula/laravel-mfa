@@ -39,7 +39,8 @@ cannot interleave.
   deadlock upgrading it. SQLite serialises its writers, so the insert takes the database's write lock there.
 - Reads that decide a verification, a lockout or who owns a factor go to the storage connection's write host
   (`Database\WriteConnection::query()`), so a replica that lags behind a lockout, a used code or a removed factor
-  cannot answer them: the identity's factors as `FactorService::getFactors()` reads them, and every read inside
+  cannot answer them: the identity's factors as `FactorService::getFactors()` reads them, whether the identity has a
+  confirmed factor as `HasFactors::isMfaEnabled()` reads it (and so `Mfa::isSetup()`), and every read inside
   `FactorStateTransaction`, which locks its rows and so reads from the writer anyway. A factor the application loads
   itself and hands in is read wherever the application read it.
 - Every index a shipped migration names (`Database\IndexName`) is the table's name and a suffix, such as

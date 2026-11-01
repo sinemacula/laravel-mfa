@@ -5,12 +5,18 @@ declare(strict_types = 1);
 namespace Tests\Unit\Concerns;
 
 use Illuminate\Config\Repository;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\CustomFactor;
+use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\FactorHolder;
+use Tests\Fixtures\Identities\SoftDeletingFactorHolder;
 use Tests\TestCase;
 
 /**
@@ -110,6 +116,125 @@ final class HasFactorsTest extends TestCase
         $identity->delete();
 
         self::assertSame([$kept->id], Factor::query()->pluck('id')->all());
+    }
+
+    /**
+     * A delete another `deleting` listener cancels keeps the identity's
+     * factors: the identity is never left without them.
+     *
+     * @return void
+     */
+    public function testACancelledDeleteKeepsTheFactors(): void
+    {
+        $identity = $this->createHolder('one@example.test');
+        $factor   = $this->createFactor($identity, 'confirmed');
+
+        FactorHolder::deleting(static fn (): bool => false);
+
+        self::assertFalse($identity->delete());
+        self::assertTrue(FactorHolder::query()->whereKey($identity->id)->exists());
+        self::assertSame([$factor->id], Factor::query()->pluck('id')->all());
+    }
+
+    /**
+     * A delete the database refuses keeps the identity's factors.
+     *
+     * @return void
+     */
+    public function testAFailedDeleteKeepsTheFactors(): void
+    {
+        $identity = $this->createHolder('one@example.test');
+        $factor   = $this->createFactor($identity, 'confirmed');
+
+        DB::statement('CREATE TRIGGER refuse_user_delete BEFORE DELETE ON test_users BEGIN SELECT RAISE(ABORT, \'refused\'); END');
+
+        try {
+            $identity->delete();
+            self::fail('The delete was expected to fail.');
+        } catch (\Throwable $exception) {
+            self::assertInstanceOf(QueryException::class, $exception);
+            self::assertStringContainsString('refused', $exception->getMessage());
+        }
+
+        self::assertTrue(FactorHolder::query()->whereKey($identity->id)->exists());
+        self::assertSame([$factor->id], Factor::query()->pluck('id')->all());
+    }
+
+    /**
+     * A soft delete keeps the identity's factors, so a restored identity still
+     * has them; a force delete deletes them.
+     *
+     * @return void
+     */
+    public function testASoftDeleteKeepsTheFactorsAndAForceDeleteDeletesThem(): void
+    {
+        $identity = SoftDeletingFactorHolder::query()->create(['email' => 'soft@example.test']);
+        $factor   = Factor::query()->create([
+            'authenticatable_type' => $identity->getMorphClass(),
+            'authenticatable_id'   => (string) $identity->id,
+            'type'                 => 'totp',
+            'status'               => 'confirmed',
+        ]);
+
+        $identity->delete();
+
+        self::assertTrue($identity->trashed());
+        self::assertSame([$factor->id], Factor::query()->pluck('id')->all());
+
+        // @phpstan-ignore staticMethod.dynamicCall
+        $identity->restore();
+
+        self::assertTrue($identity->isMfaEnabled());
+
+        $identity->forceDelete();
+
+        self::assertSame(0, Factor::query()->count());
+    }
+
+    /**
+     * The factors are found by the owner columns the configured model's
+     * relation names, not by the shipped ones.
+     *
+     * @return void
+     */
+    public function testTheFactorsAreFoundByTheModelsOwnerColumns(): void
+    {
+        Schema::table('mfa_factors', static function (Blueprint $blueprint): void {
+            $blueprint->renameColumn('authenticatable_type', 'owner_type');
+            $blueprint->renameColumn('authenticatable_id', 'owner_id');
+        });
+
+        $this->container()->make(Repository::class)->set('mfa.factor.model', RemappedOwnerFactor::class);
+
+        $identity = $this->createHolder('one@example.test');
+        $other    = $this->createHolder('two@example.test');
+
+        $own = $this->createRemappedFactor($identity);
+        $this->createRemappedFactor($other);
+
+        self::assertSame([$own->id], $identity->authFactors()->pluck('id')->all());
+        self::assertTrue($identity->isMfaEnabled());
+    }
+
+    /**
+     * Create a confirmed factor of the identity through the remapped owner
+     * columns.
+     *
+     * @param  \Tests\Fixtures\Identities\FactorHolder  $identity
+     * @return \Tests\Fixtures\Factors\RemappedOwnerFactor
+     */
+    private function createRemappedFactor(FactorHolder $identity): RemappedOwnerFactor
+    {
+        $factor = new RemappedOwnerFactor;
+
+        $factor->forceFill([
+            'owner_type' => $identity->getMorphClass(),
+            'owner_id'   => (string) $identity->id,
+            'type'       => 'totp',
+            'status'     => 'confirmed',
+        ])->save();
+
+        return $factor;
     }
 
     /**

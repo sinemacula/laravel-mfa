@@ -42,26 +42,17 @@ interface MultiFactorAuthenticatable extends Authenticatable
      * this identity.
      *
      * Canonical rule: MFA is enabled once the identity has at least one
-     * enrolled factor. Per-request verification freshness lives separately on
-     * `Mfa::hasExpired()` / the verification store, so implementations should
-     * NOT fold "has ever verified" into this predicate — that would collapse
-     * two orthogonal concepts and leave newly enrolled factors reading as "not
-     * enabled".
+     * confirmed factor. A pending factor, one whose enrolment has started but
+     * not been confirmed, never counts: it can only be confirmed or abandoned.
+     * The `HasFactors` trait implements the rule by filtering the identity's
+     * factors on the factor's status column (`getStatusName()`) holding
+     * `FactorStatus::CONFIRMED`, read from the write connection.
      *
-     * Consumers whose product policy is stricter (e.g. "enabled" means the
-     * factor has completed its first verification) may implement that narrower
-     * rule here; the package does not enforce a single query shape. The shipped
-     * `Mfa::isSetup()` caches and reports whatever this method returns.
-     *
-     * Spent backup-code rows: a consumed backup-code factor is marked spent by
-     * nulling its `secret` column, but the row itself is kept for audit
-     * purposes. Implementations whose product treats backup codes as a
-     * standalone usable factor (rather than strictly a recovery path behind a
-     * stronger primary) SHOULD exclude consumed rows from this predicate —
-     * `authFactors()->where(fn ($q) => $q->whereNotNull('secret')
-     * ->orWhere('type', '!=', 'backup_code'))->exists()` is the canonical
-     * shape. Without that filter a user who has consumed every recovery code
-     * will still read as "enabled" despite holding no usable credential.
+     * Per-request verification freshness lives separately, on
+     * `Mfa::hasExpired()` and the verification store, so implementations should
+     * not fold "has ever verified" into this predicate: that would collapse two
+     * separate concepts. The shipped `Mfa::isSetup()` caches and reports
+     * whatever this method returns.
      *
      * @return bool
      */

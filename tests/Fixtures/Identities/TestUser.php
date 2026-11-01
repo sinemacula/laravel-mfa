@@ -57,9 +57,9 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
     }
 
     /**
-     * Determine whether the user has at least one enrolled factor — matches the
-     * canonical rule documented on the
-     * `MultiFactorAuthenticatable::isMfaEnabled()` contract.
+     * Determine whether the user has any factor at all, whatever its status:
+     * looser than the trait's confirmed-only rule, so the fixture's existing
+     * flows read a freshly created factor as enabled.
      *
      * @return bool
      */

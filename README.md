@@ -133,7 +133,7 @@ class AppUser extends User implements MultiFactorAuthenticatable
 
 The trait gives the identity its factors (of the configured factor model), counts it as enabled once it has a
 confirmed factor, treats it as an active person who requires nothing of their own sign-ins until the model says
-otherwise, and deletes everything the package holds for it when the model is deleted. See
+otherwise, and deletes everything the package holds for it once the model is deleted (a soft delete keeps it). See
 [Identity models](docs/guides/identity-models.md). Per-request verification freshness lives separately on
 `Mfa::hasExpired()` / the verification store, so keep the two predicates orthogonal.
 

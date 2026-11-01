@@ -19,17 +19,18 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Deletes everything the package holds for an identity that is being deleted:
- * its factors, enrolments in progress, delivered codes, recovery codes, passkey
- * associations and factor state.
+ * Deletes everything the package holds for a deleted identity: its factors,
+ * enrolments in progress, delivered codes, recovery codes, passkey associations
+ * and factor state.
  *
- * The `HasFactors` trait calls it as an Eloquent identity is deleted; an
- * application whose identities are not Eloquent models calls it itself. It runs
- * in the identity's factor state transaction (see
- * `Support\FactorStateTransaction`), so a change racing the deletion either
- * finishes first or finds nothing left, and nothing is left half deleted. The
- * temporary throttles are left to expire: they are keyed by a hash and hold
- * nothing that names the identity.
+ * The `HasFactors` trait calls it once an Eloquent identity's row is deleted;
+ * an application whose identities are not Eloquent models calls it itself,
+ * after deleting the identity. It runs in the identity's factor state
+ * transaction (see `Support\FactorStateTransaction`), so nothing is left half
+ * deleted and a change already holding the identity's lock commits first and is
+ * deleted with the rest; called inside a transaction on the storage connection,
+ * it joins it. The temporary throttles are left to expire: they are keyed by a
+ * hash and hold nothing that names the identity.
  *
  * @api
  *

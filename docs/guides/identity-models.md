@@ -82,9 +82,16 @@ public function requiresAdditionalFactor(): ?Requirement
 ## Deleting an identity
 
 Deleting the model deletes everything the package holds for it: its factors, its enrolments in progress, its delivered
-codes, its recovery codes, its passkey associations and its factor state. The trait does it as the model is deleted,
-through `Lifecycle\ForgetIdentity`, in the identity's factor state transaction, so a change racing the deletion either
-finishes first or finds nothing left.
+codes, its recovery codes, its passkey associations and its factor state. The trait does it on the model's `deleted`
+event, once the identity's row is gone, through `Lifecycle\ForgetIdentity`, in the identity's factor state transaction:
+
+- A delete that another `deleting` listener cancels, or that fails, forgets nothing, so the identity never outlives its
+  factors.
+- A soft delete forgets nothing, so a restored identity still has its factors; a force delete forgets it.
+- The forgetting commits on its own after the delete. Run the delete inside a transaction on the storage connection
+  (`mfa.storage.connection`) to make the two one change; an identity stored on another connection cannot be, and a
+  failure while forgetting it leaves records owned by an identity that no longer exists.
+- A change already holding the identity's factor state lock commits first and is deleted with the rest.
 
 An identity that is not an Eloquent model, or a model deleted without its events (a query builder `delete()`), is
 forgotten by calling the helper:
