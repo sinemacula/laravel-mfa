@@ -216,9 +216,9 @@ $uri = $driver->provisioningUri(
 
 // Render $uri as a QR code with your library of choice, then check the
 // first code the app shows. Its time step is recorded, so the same code
-// cannot be used again.
-if (! $driver->confirm($factor, $request->input('code'))) {
-    // Ask for the code again.
+// cannot be used again. Enrol the factor only once the code is confirmed.
+if (! $driver->confirm($factor, $request->string('code')->toString())) {
+    return back()->withErrors(['code' => 'The code is not valid. Try the next one your app shows.']);
 }
 
 // `Mfa::enroll()` stamps the identity's morph columns itself —
@@ -226,10 +226,10 @@ if (! $driver->confirm($factor, $request->input('code'))) {
 Mfa::enroll($factor);
 ```
 
-The package computes TOTP codes itself (RFC 6238) and needs no other dependency. Each code is checked against
-`mfa.totp.window` steps either side of now, and each time step is accepted once per factor, also when two requests race
-with the same code. See [Configuration](docs/guides/configuration.md#totp) and
-[the TOTP design note](docs/design/totp.md).
+The package computes TOTP codes itself (RFC 6238) and needs no other dependency. Each code is checked against the
+application's `totp_window` steps either side of now (`mfa.totp.window` when it sets none), and each time step is
+accepted once per factor, also when two requests race with the same code. See
+[Configuration](docs/guides/configuration.md#totp) and [the TOTP design note](docs/design/totp.md).
 
 ### Backup codes
 

@@ -9,14 +9,17 @@ use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use Tests\Fixtures\Drivers\AuthenticatorApp;
+use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\TestCase;
 
 /**
  * Unit tests for `ActsAsFactor::storeAcceptedStep()`: the compare-and-set of a
  * TOTP factor's last accepted time step, on a stored row and on a factor not
- * yet stored, and that a stale copy of the factor can neither record a step
- * another copy recorded nor write an older one back over it.
+ * yet stored, that a stale copy of the factor can neither record a step another
+ * copy recorded nor write an older one back over it, and that a step recorded
+ * inside a transaction is undone with it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -120,6 +123,39 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
 
         self::assertTrue($factor->storeAcceptedStep(self::STEP));
         self::assertNull($this->storedStep($other));
+    }
+
+    /**
+     * A step recorded inside the factor state transaction is part of it: when
+     * the transaction rolls back, the step is not recorded, and a later request
+     * can record it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAStepRecordedInsideATransactionRollsBackWithIt(): void
+    {
+        $factor = $this->storedFactor();
+
+        $thrown = null;
+
+        try {
+            FactorStateTransaction::forFactor($factor, static function () use ($factor): void {
+
+                self::assertTrue($factor->storeAcceptedStep(self::STEP));
+
+                throw new MidRotationFailureException('rolled back');
+            });
+        } catch (MidRotationFailureException $exception) {
+            $thrown = $exception;
+        }
+
+        self::assertSame('rolled back', $thrown->getMessage());
+
+        self::assertNull($this->storedStep($factor));
+        self::assertTrue(Factor::query()->findOrFail($factor->id)->storeAcceptedStep(self::STEP));
+        self::assertSame(self::STEP, $this->storedStep($factor));
     }
 
     /**

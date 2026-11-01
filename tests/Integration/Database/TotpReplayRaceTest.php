@@ -32,6 +32,13 @@ use Tests\TestCase;
  * whose in-memory test database one connection holds, both requests share that
  * connection, and the first records its step inside the second's transaction.
  *
+ * Two requests also verify the same code at the same time, each in a process
+ * and on a connection of its own: the first records its step without
+ * committing, the second, in a forked worker, issues its own while the first
+ * still holds the row, and the test waits until the database reports the worker
+ * waiting on that row's lock before the first commits. This needs a database
+ * that serves several connections, so it is skipped on SQLite.
+ *
  * The tables are committed rather than wrapped in a transaction of the test's
  * own, so the second connection sees what the first commits; the migrations
  * roll them back after each test.
@@ -50,6 +57,12 @@ final class TotpReplayRaceTest extends TestCase
 
     /** @var int The time step the frozen time falls in. */
     private const int STEP = 60000000;
+
+    /** @var int How long to wait for the worker, in microseconds, between looks. */
+    private const int POLL_INTERVAL = 25000;
+
+    /** @var int How many times to look for the worker waiting on the row. */
+    private const int POLLS = 400;
 
     /** @var string The connection the second request runs on. */
     private string $racer = 'testing';
@@ -109,6 +122,81 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
+     * Of two requests verifying the same code at the same time, the second
+     * waits on the row the first changed but has not committed, then finds the
+     * step recorded and is refused.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testOfTwoOverlappingRequestsWithTheSameCodeOnlyOnePasses(): void
+    {
+        if ($this->racer === 'testing' || !function_exists('pcntl_fork') || !function_exists('posix_kill')) {
+            self::markTestSkipped('Overlapping requests need a database that serves several connections, and a process that can fork.');
+        }
+
+        $factor     = $this->storedFactor();
+        $code       = AuthenticatorApp::code($factor);
+        $driver     = $this->driver();
+        $connection = DB::connection();
+        $sockets    = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+
+        self::assertIsArray($sockets);
+
+        [$parent, $worker] = $sockets;
+
+        $send = static function (string $line) use ($worker): void {
+            fwrite($worker, $line . "\n");
+        };
+
+        $receive = static function () use ($parent): string {
+
+            stream_set_timeout($parent, 30);
+
+            $line = fgets($parent);
+
+            self::assertIsString($line, 'The worker sent nothing.');
+
+            return trim($line);
+        };
+
+        $connection->beginTransaction();
+
+        self::assertTrue($driver->verify(Factor::query()->findOrFail($factor->id), $code));
+
+        $pid = pcntl_fork();
+
+        if ($pid === 0) {
+            fclose($parent);
+            $this->verifyInWorker($driver, $factor->id, $code, $send);
+        }
+
+        fclose($worker);
+
+        try {
+            self::assertGreaterThan(0, $pid, 'The worker could not be forked.');
+
+            $this->awaitLockWait($receive());
+
+            $connection->commit();
+
+            $second = $receive();
+        } finally {
+            if ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+
+            if ($pid > 0) {
+                pcntl_waitpid($pid, $status);
+            }
+        }
+
+        self::assertSame('refused', $second);
+        self::assertSame(self::STEP, $this->storedStep($factor));
+    }
+
+    /**
      * Give the second request a connection of its own to the test database,
      * unless the database is SQLite in memory, which only one connection holds.
      *
@@ -135,6 +223,7 @@ final class TotpReplayRaceTest extends TestCase
         }
 
         $config->set('database.connections.racer', $testing);
+        $config->set('database.connections.observer', $testing);
 
         $this->racer = 'racer';
     }
@@ -153,7 +242,7 @@ final class TotpReplayRaceTest extends TestCase
      */
     private function race(Factor $factor, \Closure $firstCode, ?\Closure $secondCode = null): array
     {
-        $driver = new TotpDriver(new TotpSettings($this->container()->make(Repository::class)));
+        $driver = $this->driver();
         $racer  = DB::connection($this->racer);
 
         $racer->beginTransaction();
@@ -176,6 +265,78 @@ final class TotpReplayRaceTest extends TestCase
         }
 
         return [$firstPassed, $secondPassed];
+    }
+
+    /**
+     * Verify the code as the second request, in the forked worker, on the
+     * racer's connection, which the test never opened, so the worker shares no
+     * connection with the test. The worker reports its connection's id before
+     * it verifies and the outcome after, then kills itself, so nothing the test
+     * process set up is torn down twice.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Drivers\TotpDriver  $driver
+     * @param  string  $id
+     * @param  string  $code
+     * @param  \Closure(string): void  $send
+     * @return never
+     */
+    private function verifyInWorker(TotpDriver $driver, string $id, string $code, \Closure $send): never
+    {
+        try {
+            $connection = DB::connection($this->racer);
+            $copy       = Factor::on($this->racer)->findOrFail($id);
+
+            $backend = $connection->scalar($connection->getDriverName() === 'pgsql' ? 'select pg_backend_pid()' : 'select connection_id()');
+
+            $send(is_scalar($backend) ? (string) $backend : '');
+            $send($driver->verify($copy, $code) ? 'passed' : 'refused');
+        } catch (\Throwable $exception) {
+            $send(sprintf('%s: %s', $exception::class, str_replace("\n", ' ', $exception->getMessage())));
+        }
+
+        posix_kill(getmypid(), SIGKILL);
+
+        exit(1);
+    }
+
+    /**
+     * Wait until the database reports the worker's connection waiting for a row
+     * lock, failing when it never does.
+     *
+     * @param  string  $backend
+     * @return void
+     */
+    private function awaitLockWait(string $backend): void
+    {
+        $observer = DB::connection('observer');
+
+        $query = $observer->getDriverName() === 'pgsql'
+            ? 'select count(*) from pg_stat_activity where pid = ? and wait_event_type = \'Lock\''
+            : 'select count(*) from information_schema.innodb_trx where trx_mysql_thread_id = ? and trx_state = \'LOCK WAIT\'';
+
+        for ($poll = 0; $poll < self::POLLS; $poll++) {
+            $waiting = $observer->scalar($query, [(int) $backend], false);
+
+            if (is_numeric($waiting) && (int) $waiting > 0) {
+                return;
+            }
+
+            usleep(self::POLL_INTERVAL);
+        }
+
+        self::fail(sprintf('The worker never waited on the row; it reported [%s].', $backend));
+    }
+
+    /**
+     * Build the driver over the test's configuration.
+     *
+     * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function driver(): TotpDriver
+    {
+        return new TotpDriver(new TotpSettings($this->container()->make(Repository::class)), $this->container());
     }
 
     /**

@@ -20,18 +20,21 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
   it never falls back to the configured ones.
 - A code is the HOTP value (RFC 4226 §5.3) of the time step, `floor(unix time / period)`: the HMAC of the step as an
   8-byte big-endian counter, dynamically truncated to 31 bits, reduced to the factor's digits and zero-padded.
-- A submitted code is compared with the code of every step of the window, `mfa.totp.window` steps either side of the
-  current one (default 1, at most 3), each with `hash_equals()`. No comparison is skipped when an earlier one matches,
-  and a malformed code is compared like any other, so the work does not depend on which step matches or whether one
-  does. The latest matching step is the one accepted. The window is read from the configuration on every call and
-  nothing widens it, failures included; the package does not resynchronise (RFC 6238 §6).
+- A submitted code is compared with the code of every step of the window, each with `hash_equals()`. The window is the
+  `totp_window` of the application a bound `Contracts\ApplicationResolver` names for the current request, or
+  `mfa.totp.window` when the application sets none, no resolver is bound or there is no request (default 1, at most 3).
+  No comparison is skipped when an earlier one matches, and a malformed code is compared like any other, so the work
+  does not depend on which step matches or whether one does. The latest matching step is the one accepted. The window
+  is read from the configuration and the request on every call, so a driver built once serves each application with
+  its own, and nothing widens it, failures included; the package does not resynchronise (RFC 6238 §6).
 - A time step is single-use per factor (RFC 6238 §5.2). A matching code is accepted only when
   `EloquentFactor::storeAcceptedStep()` records its step, and it records it only when it is later than
   `last_accepted_step`: one compare-and-set, `UPDATE ... SET last_accepted_step = :step WHERE id = :id AND
   (last_accepted_step IS NULL OR last_accepted_step < :step)`, accepted when it changed the row. The database applies
   the condition to the row as committed, under the row's lock, so the check and the record are one atomic step and a
   request whose copy of the factor is stale cannot pass. Inside a transaction on the storage connection, such as
-  `FactorStateTransaction`, it is part of that transaction.
+  `FactorStateTransaction`, it is part of that transaction and is undone with it: a verification flow that records the
+  outcome in the same transaction leaves the step unused when that fails.
 - Confirming a pending factor checks its first code the same way, so the confirming code's step is recorded and the
   code is refused at the next verification.
 - The recorded step is kept as the model attribute's original value, so a later `persist()` of the same copy never
@@ -59,23 +62,27 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - The same code twice, or a code for a step at or before the last accepted one, though still in the window: the
   compare-and-set changes no row and the code is refused. A replay is reported as an invalid code.
 - Two requests with the same code: both match, both issue the compare-and-set, and the database serialises them on the
-  row; the second finds the step recorded and changes nothing. On MySQL this holds although the second request's
-  transaction read the factor from a snapshot taken before the first committed, because an `UPDATE` reads the row as
-  committed.
+  row; the second waits for the first to commit, then finds the step recorded and changes nothing. On MySQL this holds
+  although the second request's transaction read the factor from a snapshot taken before the first committed, because an
+  `UPDATE` reads the row as committed.
 - A factor not yet stored has no row another request can see, so it compares with its own attribute, and the recorded
   step is stored with it.
-- The application's own `totp_window` is checked when the package boots but is not applied yet: every application
-  gets `mfa.totp.window` until the verification flow knows the application.
+- An application that sets no `totp_window`, or one nobody configured, gets `mfa.totp.window`; so does a request when
+  no `ApplicationResolver` is bound, which is the case until an authentication layer or the application binds one.
+- The driver opens no transaction of its own. The compare-and-set needs none to be atomic, and the transaction that
+  also holds the identity's lock and records the outcome belongs to the verification flow, which calls the driver
+  inside it.
 
 ## Implementation Anchors
 
-- `src/Drivers/TotpDriver.php`: `startEnrollment()`, `confirm()`, `verify()`, `matchedStep()`, `parameters()`,
-  `provisioningUri()`.
+- `src/Drivers/TotpDriver.php`: `startEnrollment()`, `confirm()`, `verify()`, `matchedStep()`, `application()`,
+  `parameters()`, `provisioningUri()`.
 - `src/Drivers/TotpParameters.php`: the bounds, `fromFactor()`, `secretLength()`, `stepAt()`, `code()`.
 - `src/Drivers/Base32.php`: `encode()`, `decode()`.
-- `src/Drivers/TotpSettings.php`: `parameters()`, `window()`.
+- `src/Drivers/TotpSettings.php`: `parameters()`, `window()`, `windowFor()`.
+- `src/Applications/ApplicationSettings.php`: `totpWindow()`, the application's own window.
 - `src/Contracts/EloquentFactor.php` and `src/Concerns/ActsAsFactor.php`: `storeAcceptedStep()`.
-- `src/Drivers/DriverBindings.php`: `totp()`, the driver built over `TotpSettings`.
+- `src/Drivers/DriverBindings.php`: `totp()`, the driver built over `TotpSettings` and the container.
 
 ## Authoritative Tests
 
@@ -85,6 +92,10 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
   `testVerifiesTheRfc6238Vector`
 - `tests/Unit/Drivers/TotpDriverTest.php`
   `testTheDefaultWindowAcceptsOneStepEitherSideOnly`
+- `tests/Unit/Drivers/TotpDriverTest.php`
+  `testTheWindowIsTheRequestedApplicationsOwn`
+- `tests/Unit/Drivers/TotpDriverTest.php`
+  `testWithoutARequestThePackageWideWindowApplies`
 - `tests/Unit/Drivers/TotpDriverTest.php`
   `testTheWindowNeverWidensAfterFailures`
 - `tests/Unit/Drivers/TotpDriverTest.php`
@@ -106,8 +117,12 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
   `testAStaleCopyCannotRecordAStepAnotherCopyRecorded`
 - `tests/Unit/Concerns/ActsAsFactorStoreAcceptedStepTest.php`
   `testPersistingAfterwardsKeepsALaterStepAnotherCopyRecorded`
+- `tests/Unit/Concerns/ActsAsFactorStoreAcceptedStepTest.php`
+  `testAStepRecordedInsideATransactionRollsBackWithIt`
 - `tests/Integration/Database/TotpReplayRaceTest.php`
   `testOnlyOneOfTwoRequestsWithTheSameCodePasses`
+- `tests/Integration/Database/TotpReplayRaceTest.php`
+  `testOfTwoOverlappingRequestsWithTheSameCodeOnlyOnePasses`
 - `tests/Feature/TotpLifecycleTest.php`
   `testTheConfirmingCodeIsRefusedAtTheNextVerification`
 

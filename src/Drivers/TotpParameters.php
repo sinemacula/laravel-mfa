@@ -17,10 +17,13 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  * reduced to the number of digits, zero-padded on the left. Values outside the
  * bounds the configuration allows are refused, here as when they are read.
  *
+ * `TotpDriver::parameters()` returns the parameters new enrolments use, for a
+ * factor that is not an Eloquent model to store with its secret.
+ *
+ * @api
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
- *
- * @internal
  */
 final readonly class TotpParameters
 {

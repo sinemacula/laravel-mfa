@@ -5,7 +5,10 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Drivers;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
@@ -19,10 +22,12 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
  * output (20 for SHA-1, 32 for SHA-256, 64 for SHA-512, never under 160 bits)
  * and the algorithm, digits and period `mfa.totp` sets for new enrolments,
  * which the factor keeps. A code is checked against every time step of the
- * window, `mfa.totp.window` steps either side of the current one, each compared
- * with `hash_equals()` and none skipped when an earlier one matches, so the
- * work does not depend on which step matches or whether one does. The window is
- * read from the configuration on every call and never widens.
+ * window, each compared with `hash_equals()` and none skipped when an earlier
+ * one matches, so the work does not depend on which step matches or whether one
+ * does. The window is the `totp_window` of the application a bound
+ * `ApplicationResolver` names for the current request, or `mfa.totp.window`
+ * without one; it is read from the configuration on every call and never
+ * widens.
  *
  * A time step is single-use per factor (RFC 6238 §5.2): a code is accepted only
  * when its step is later than the factor's last accepted one, recorded in the
@@ -41,11 +46,15 @@ final readonly class TotpDriver implements FactorDriver
      * Constructor.
      *
      * @param  \SineMacula\Laravel\Mfa\Drivers\TotpSettings  $settings
+     * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
         /** The parameters of new enrolments and the window, read per call. */
         private TotpSettings $settings,
+
+        /** The container the request and application resolver are read from. */
+        private Container $container,
     ) {}
 
     /**
@@ -69,6 +78,7 @@ final readonly class TotpDriver implements FactorDriver
      * @param  string  $code
      * @return bool
      *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
     #[\Override]
@@ -141,6 +151,7 @@ final readonly class TotpDriver implements FactorDriver
      * @param  string  $code
      * @return bool
      *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      *
      * @imperative
@@ -213,6 +224,7 @@ final readonly class TotpDriver implements FactorDriver
      * @param  string  $code
      * @return ?int
      *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
     private function matchedStep(Factor $factor, #[\SensitiveParameter] string $code): ?int
@@ -224,7 +236,7 @@ final readonly class TotpDriver implements FactorDriver
             return null;
         }
 
-        $window  = $this->settings->window();
+        $window  = $this->settings->windowFor($this->application());
         $current = $parameters->stepAt(CarbonImmutable::now()->getTimestamp());
         $matched = null;
 
@@ -237,5 +249,26 @@ final readonly class TotpDriver implements FactorDriver
         }
 
         return $matched;
+    }
+
+    /**
+     * The application a bound `ApplicationResolver` names for the current
+     * request, or `null` without either, so the package-wide window applies.
+     *
+     * @return ?string
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function application(): ?string
+    {
+        if (!$this->container->bound(ApplicationResolver::class)) {
+            return null;
+        }
+
+        $request = $this->container->bound('request') ? $this->container->make('request') : null;
+
+        return $request instanceof Request
+            ? $this->container->make(ApplicationResolver::class)->resolve($request)
+            : null;
     }
 }

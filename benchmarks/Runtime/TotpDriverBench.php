@@ -7,6 +7,7 @@ namespace Benchmarks\Runtime;
 use Benchmarks\Support\TotpFactor;
 use Carbon\CarbonImmutable;
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use PhpBench\Attributes\BeforeMethods;
 use PhpBench\Attributes\Iterations;
 use PhpBench\Attributes\Revs;
@@ -50,7 +51,7 @@ final class TotpDriverBench
      */
     public function __construct()
     {
-        $this->driver = new TotpDriver(new TotpSettings(new Repository));
+        $this->driver = new TotpDriver(new TotpSettings(new Repository), new Container);
         $this->factor = new TotpFactor(Base32::encode(random_bytes(20)));
     }
 

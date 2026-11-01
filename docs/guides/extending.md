@@ -35,6 +35,12 @@ step is recorded, so each time step is used once per factor however many request
 [the TOTP design note](../design/totp.md)). A factor implementing only `Contracts\Factor` has nowhere to record a step,
 so the TOTP driver accepts no code for it.
 
+`TotpDriver::startEnrollment()` stamps the TOTP parameters on an Eloquent factor itself. A factor of another kind is
+given them by its caller: `TotpDriver::parameters()` returns a `Drivers\TotpParameters` whose public `algorithm`
+(`sha1`, `sha256` or `sha512`), `digits` (6 to 8) and `period` (15 to 120 seconds) are what the factor's
+`getTotpAlgorithm()`, `getTotpDigits()` and `getTotpPeriod()` must return from then on, whatever the configuration
+later says.
+
 ## Factor drivers
 
 A driver is one factor type behind `Contracts\FactorDriver`, registered under the type's name:

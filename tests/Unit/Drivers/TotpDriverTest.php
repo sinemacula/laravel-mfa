@@ -6,22 +6,27 @@ namespace Tests\Unit\Drivers;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
+use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Drivers\Base32;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpParameters;
 use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Drivers\AuthenticatorApp;
+use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\Fixtures\Factors\UnrecordableTotpFactor;
 use Tests\TestCase;
 
 /**
- * Unit tests for `TotpDriver`: the RFC 6238 test vectors, the window, the
- * single use of a time step at verification and confirmation, the secrets and
- * parameters of a new enrolment, and the provisioning URI.
+ * Unit tests for `TotpDriver`: the RFC 6238 test vectors, the window and the
+ * application's own, the single use of a time step at verification and
+ * confirmation, the secrets and parameters of a new enrolment, and the
+ * provisioning URI.
  *
  * Time is frozen in the middle of a step, so no assertion straddles a step
  * boundary. At that moment the authenticator app's secret shows `768147`, and
@@ -178,6 +183,70 @@ final class TotpDriverTest extends TestCase
         self::assertTrue($driver->verify($factor, AuthenticatorApp::code($factor, -3)));
         self::assertTrue($driver->verify($factor, AuthenticatorApp::code($factor, 3)));
         self::assertFalse($driver->verify($this->factor(), AuthenticatorApp::code($factor, 4)));
+    }
+
+    /**
+     * The window is the `totp_window` of the application a bound resolver names
+     * for the current request, read for each request through a driver built
+     * once; an application that sets none, or is not configured, takes the
+     * package-wide window. Confirmation applies the same window.
+     *
+     * @return void
+     */
+    public function testTheWindowIsTheRequestedApplicationsOwn(): void
+    {
+        $this->configuration()->set('mfa.applications', [
+            'strict'  => ['totp_window' => 0],
+            'lenient' => ['totp_window' => 2],
+        ]);
+
+        $this->container()->instance(ApplicationResolver::class, new HeaderApplicationResolver);
+
+        $driver = $this->driver();
+        $factor = $this->factor();
+
+        $this->requestFor('strict');
+
+        self::assertFalse($driver->verify($this->factor(), '385088'));
+        self::assertFalse($driver->confirm($this->factor(), '050219'));
+        self::assertTrue($driver->verify($this->factor(), self::CODE));
+
+        $this->requestFor('lenient');
+
+        self::assertTrue($driver->verify($this->factor(), AuthenticatorApp::code($factor, -2)));
+        self::assertTrue($driver->confirm($this->factor(), AuthenticatorApp::code($factor, 2)));
+        self::assertFalse($driver->verify($this->factor(), AuthenticatorApp::code($factor, -3)));
+
+        $this->requestFor('unconfigured');
+
+        self::assertTrue($driver->verify($this->factor(), '385088'));
+        self::assertFalse($driver->verify($this->factor(), AuthenticatorApp::code($factor, -2)));
+    }
+
+    /**
+     * Without a request, or with something other than an HTTP request bound as
+     * one, no application is named and the package-wide window applies.
+     *
+     * @return void
+     */
+    public function testWithoutARequestThePackageWideWindowApplies(): void
+    {
+        $config = new Repository(['mfa' => ['applications' => ['strict' => ['totp_window' => 0]]]]);
+
+        $container = new Container;
+        $container->instance(ApplicationResolver::class, new HeaderApplicationResolver('strict'));
+
+        $driver = new TotpDriver(new TotpSettings($config), $container);
+
+        self::assertTrue($driver->verify($this->factor(), '385088'));
+
+        $container->instance('request', new \stdClass);
+
+        self::assertTrue($driver->verify($this->factor(), '385088'));
+
+        $container->instance('request', Request::create('/'));
+
+        self::assertFalse($driver->verify($this->factor(), '385088'));
     }
 
     /**
@@ -570,13 +639,24 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
+     * Make the current request one for the named application.
+     *
+     * @param  string  $application
+     * @return void
+     */
+    private function requestFor(string $application): void
+    {
+        $this->container()->instance('request', HeaderApplicationResolver::requestFor($application));
+    }
+
+    /**
      * Build the driver over the application's configuration.
      *
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
      */
     private function driver(): TotpDriver
     {
-        return new TotpDriver(new TotpSettings($this->configuration()));
+        return new TotpDriver(new TotpSettings($this->configuration()), $this->container());
     }
 
     /**

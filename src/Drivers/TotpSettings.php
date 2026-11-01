@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Drivers;
 
 use Illuminate\Contracts\Config\Repository;
+use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Config\IntegerSetting;
 
 /**
@@ -96,6 +97,23 @@ final readonly class TotpSettings
     public function window(): int
     {
         return $this->number('window');
+    }
+
+    /**
+     * How many time steps either side of the current one the named application
+     * accepts: its own `totp_window`, or `window()` when it sets none or no
+     * application is named.
+     *
+     * @param  ?string  $application
+     * @return int
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function windowFor(?string $application): int
+    {
+        return $application === null
+            ? $this->window()
+            : (new ApplicationSettings($this->config, $application))->totpWindow();
     }
 
     /**

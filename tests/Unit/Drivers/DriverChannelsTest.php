@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Drivers;
 
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Mail\Mailer;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
@@ -45,7 +46,7 @@ final class DriverChannelsTest extends TestCase
     public function testEachDriverStatesItsChannelKindAndAmr(): void
     {
         $drivers = [
-            'totp'        => new TotpDriver(new TotpSettings(new Repository)),
+            'totp'        => new TotpDriver(new TotpSettings(new Repository), new Container),
             'sms'         => new SmsDriver(new FakeSmsGateway),
             'email'       => new EmailDriver(self::createStub(Mailer::class)),
             'backup_code' => new BackupCodeDriver,
@@ -69,7 +70,7 @@ final class DriverChannelsTest extends TestCase
      */
     public function testATotpFactorIsConfirmedByItsCurrentCode(): void
     {
-        $driver = new TotpDriver(new TotpSettings(new Repository));
+        $driver = new TotpDriver(new TotpSettings(new Repository), new Container);
         $secret = $driver->startEnrollment(new TotpStubFactor(null));
         $factor = new TotpStubFactor($secret);
         $code   = AuthenticatorApp::code($factor);
