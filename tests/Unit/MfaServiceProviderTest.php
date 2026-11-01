@@ -14,6 +14,7 @@ use Illuminate\Support\ServiceProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Codes\NullSmsGateway;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
+use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
@@ -122,6 +123,7 @@ final class MfaServiceProviderTest extends TestCase
             FactorStateCache::class,
             DriverResolver::class,
             SmsGateway::class,
+            CombinationPolicy::class,
             MfaPolicy::class,
             RequirementService::class,
             MfaVerificationStore::class,
