@@ -96,9 +96,9 @@ final readonly class Authenticator
         return new self(
             knowledge: $kind === ChannelKind::PASSWORD,
             possession: self::isPossession($kind),
-            multiFactor: $kind                                 === ChannelKind::PASSKEY && $properties->userVerification === true,
-            restricted: $kind                                  === ChannelKind::SMS,
-            phishingResistant: $properties->phishingResistance === true,
+            multiFactor: self::isMultiFactor($kind, $properties),
+            restricted: $kind === ChannelKind::SMS,
+            phishingResistant: $properties->phishingResistance ?? false,
             amr: self::amrOf($kind, $properties),
         );
     }
@@ -129,6 +129,20 @@ final readonly class Authenticator
             null    => true,
             default => false,
         };
+    }
+
+    /**
+     * Whether a proof on a channel of the given kind, with what it observed,
+     * is a multi-factor authenticator: a passkey whose assertion verified the
+     * person.
+     *
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
+     * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
+     * @return bool
+     */
+    private static function isMultiFactor(?ChannelKind $kind, ObservedProperties $properties): bool
+    {
+        return $kind === ChannelKind::PASSKEY && $properties->userVerification === true;
     }
 
     /**
