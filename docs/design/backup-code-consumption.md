@@ -42,7 +42,9 @@ concurrent requests, not just sequential ones.
   `verified_at`, resets attempts, clears any pending code) and persists; `finalizeVerification()` writes the
   identity-level verification through the bound store and dispatches `MfaVerified`.
 - A fresh batch via `issueBackupCodes()` deletes old rows, inserts new rows (each with the SHA-256 digest on
-  `secret`), dispatches `MfaFactorEnrolled` once per new code, and returns the plaintext list to the caller.
+  `secret`, stored confirmed since a code is usable as soon as it is issued), dispatches `MfaFactorEnrolled` once per
+  new code, and returns the plaintext list to the caller. Being confirmed, the rows count towards `isMfaEnabled()` as
+  `HasFactors` answers it, and so towards `Mfa::isSetup()`; a consumed row keeps its status, so it still counts.
 
 ## Failure / Edge Cases
 

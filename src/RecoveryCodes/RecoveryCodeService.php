@@ -58,7 +58,8 @@ final readonly class RecoveryCodeService
      * plaintext set exactly once: the codes are NEVER recoverable after this
      * method returns.
      *
-     * Each new factor dispatches `MfaFactorEnrolled`; the setup-state cache is
+     * Each code is stored as a confirmed factor, usable as soon as it is
+     * issued, and dispatches `MfaFactorEnrolled`; the setup-state cache is
      * invalidated so `isSetup()` reflects the new batch immediately.
      *
      * No-op (returns `[]`) when no MFA-capable identity is resolvable.
@@ -140,6 +141,10 @@ final readonly class RecoveryCodeService
             $factor->setAttribute($relation->getForeignKeyName(), $morphId);
             $factor->setAttribute($factor->getTypeName(), BackupCodeDriver::NAME);
             $factor->setAttribute($factor->getSecretName(), $driver->hash($code));
+
+            // The code is usable as soon as it is issued, so it is stored
+            // confirmed, as the verifier treats it.
+            $factor->confirm();
             $factor->save();
 
             $events->dispatch(new MfaFactorEnrolled($identity, $factor, BackupCodeDriver::NAME));

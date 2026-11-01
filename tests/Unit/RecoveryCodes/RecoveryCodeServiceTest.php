@@ -7,6 +7,7 @@ namespace Tests\Unit\RecoveryCodes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -15,6 +16,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
+use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\SecondaryUser;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -185,6 +187,37 @@ final class RecoveryCodeServiceTest extends TestCase
         $this->service()->issueBackupCodes($this->manager(), 2);
 
         self::assertCount(2, $factors->getFactors() ?? collect());
+    }
+
+    /**
+     * Each issued code is stored confirmed, usable as soon as it is issued, so
+     * an identity using the shipped trait that holds only backup codes is set
+     * up.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testIssuedCodesAreConfirmedAndCountAsSetUp(): void
+    {
+        $holder = FactorHolder::query()->create(['email' => 'holder@example.com']);
+
+        $this->actingAs($holder);
+
+        $factors = $this->container()->make(FactorService::class);
+
+        self::assertFalse($factors->isSetup());
+
+        $this->service()->issueBackupCodes($this->manager(), 2);
+
+        $statuses = Factor::query()
+            ->where('authenticatable_id', (string) $holder->id)
+            ->pluck('status')
+            ->all();
+
+        self::assertSame([FactorStatus::CONFIRMED->value, FactorStatus::CONFIRMED->value], $statuses);
+        self::assertTrue($holder->isMfaEnabled());
+        self::assertTrue($factors->isSetup());
     }
 
     /**
