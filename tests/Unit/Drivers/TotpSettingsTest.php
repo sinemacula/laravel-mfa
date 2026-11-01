@@ -119,6 +119,28 @@ final class TotpSettingsTest extends TestCase
     }
 
     /**
+     * The parameters of a new enrolment are the configured algorithm, digits
+     * and period, and fail closed on a value out of bounds.
+     *
+     * @return void
+     */
+    public function testTheParametersOfANewEnrollmentAreTheConfiguredOnes(): void
+    {
+        $defaults = self::settingsWith([])->parameters();
+
+        self::assertSame(['sha1', 6, 30], [$defaults->algorithm, $defaults->digits, $defaults->period]);
+
+        $configured = self::settingsWith(['algorithm' => 'sha512', 'digits' => '8', 'period' => 60])->parameters();
+
+        self::assertSame(['sha512', 8, 60], [$configured->algorithm, $configured->digits, $configured->period]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('mfa.totp.period must be an integer from 15 to 120.');
+
+        self::settingsWith(['period' => 121])->parameters();
+    }
+
+    /**
      * Build the settings over an `mfa.totp` block.
      *
      * @param  array<string, mixed>  $block

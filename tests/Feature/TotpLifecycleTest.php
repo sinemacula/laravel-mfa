@@ -5,10 +5,10 @@ declare(strict_types = 1);
 namespace Tests\Feature;
 
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
@@ -17,6 +17,7 @@ use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -24,9 +25,10 @@ use Tests\TestCase;
  * End-to-end TOTP lifecycle feature tests.
  *
  * Exercises the full enrolment → challenge → verify flow against a real Factor
- * row, a real Google2FA instance, and the default session-backed verification
- * store. Assertions cover the events fired, the factor state transitions, and
- * the store updates.
+ * row, the shipped TOTP driver, and the default session-backed verification
+ * store. Assertions cover the events fired, the factor state transitions, the
+ * store updates, and the single use of each time step. Time is frozen in the
+ * middle of a step, so no assertion straddles a step boundary.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -39,17 +41,115 @@ final class TotpLifecycleTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @var string A code that is astronomically unlikely to match the current TOTP for any freshly generated secret. */
+    /** @var string A code matching no step of the window at the frozen time. */
     private const string WRONG_CODE = '000000';
+
+    /** @var int The frozen time: 15 seconds into time step 60000000. */
+    private const int NOW = 1800000015;
+
+    /**
+     * Freeze time in the middle of a step.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->travelTo(CarbonImmutable::createFromTimestamp(self::NOW));
+    }
+
+    /**
+     * A successful verification records the step of its code on the factor's
+     * row.
+     *
+     * @return void
+     */
+    public function testSuccessfulVerificationRecordsTheAcceptedStep(): void
+    {
+        [, $factor, $code] = $this->enrollTotp();
+
+        Mfa::verify('totp', $factor, $code);
+
+        self::assertSame(60000000, $factor->refresh()->getLastAcceptedStep());
+    }
+
+    /**
+     * The same code is refused at a second verification, as an invalid code.
+     *
+     * @return void
+     */
+    public function testTheSameCodeIsRefusedAtTheSecondVerification(): void
+    {
+        [, $factor, $code] = $this->enrollTotp();
+
+        self::assertTrue(Mfa::verify('totp', $factor, $code));
+
+        Event::fake([MfaVerificationFailed::class]);
+
+        self::assertFalse(Mfa::verify('totp', $factor->refresh(), $code));
+
+        Event::assertDispatched(
+            MfaVerificationFailed::class,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::INVALID_CODE,
+        );
+    }
+
+    /**
+     * Once a code is accepted, a code for an earlier step of the window is
+     * refused, and a later one still passes.
+     *
+     * @return void
+     */
+    public function testACodeForAnEarlierStepIsRefusedAfterALaterOne(): void
+    {
+        [, $factor] = $this->enrollTotp();
+
+        self::assertTrue(Mfa::verify('totp', $factor, AuthenticatorApp::code($factor)));
+        self::assertFalse(Mfa::verify('totp', $factor->refresh(), AuthenticatorApp::code($factor, -1)));
+        self::assertTrue(Mfa::verify('totp', $factor->refresh(), AuthenticatorApp::code($factor, 1)));
+    }
+
+    /**
+     * Two copies of the factor, read before either verifies, cannot both pass
+     * with one code.
+     *
+     * @return void
+     */
+    public function testTwoCopiesOfTheFactorCannotBothPassWithOneCode(): void
+    {
+        [, $factor, $code] = $this->enrollTotp();
+
+        $copy = Factor::query()->findOrFail($factor->id);
+
+        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertFalse(Mfa::verify('totp', $copy, $code));
+    }
+
+    /**
+     * The code that confirmed a pending factor is refused at the factor's next
+     * verification.
+     *
+     * @return void
+     */
+    public function testTheConfirmingCodeIsRefusedAtTheNextVerification(): void
+    {
+        [, $factor, $code] = $this->enrollTotp();
+
+        $driver = Mfa::driver('totp');
+
+        self::assertInstanceOf(TotpDriver::class, $driver);
+        self::assertTrue($driver->confirm($factor, $code));
+        self::assertSame(60000000, $factor->refresh()->getLastAcceptedStep());
+        self::assertFalse(Mfa::verify('totp', $factor, $code));
+        self::assertTrue(Mfa::verify('totp', $factor->refresh(), AuthenticatorApp::code($factor, 1)));
+    }
 
     /**
      * Test successful TOTP verification returns true.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSuccessfulVerificationReturnsTrue(): void
     {
@@ -62,10 +162,6 @@ final class TotpLifecycleTest extends TestCase
      * Test successful TOTP verification marks the verification store.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSuccessfulVerificationMarksVerificationStore(): void
     {
@@ -81,10 +177,6 @@ final class TotpLifecycleTest extends TestCase
      * Test successful TOTP verification stamps the factor verified_at.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSuccessfulVerificationStampsFactorVerifiedAt(): void
     {
@@ -102,10 +194,6 @@ final class TotpLifecycleTest extends TestCase
      * Test successful TOTP verification dispatches MfaVerified event.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSuccessfulVerificationDispatchesVerifiedEvent(): void
     {
@@ -130,10 +218,6 @@ final class TotpLifecycleTest extends TestCase
      * dispatch an `invalid_code` failure event.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testFailedVerificationIncrementsAttemptsAndFiresFailureEvent(): void
     {
@@ -160,10 +244,6 @@ final class TotpLifecycleTest extends TestCase
      * count.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testThresholdCrossingRecordsConfiguredAttemptsCount(): void
     {
@@ -176,10 +256,6 @@ final class TotpLifecycleTest extends TestCase
      * Test crossing `mfa.attempts.factor_limit` stamps a future locked_until.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testThresholdCrossingStampsFutureLockedUntil(): void
     {
@@ -193,10 +269,6 @@ final class TotpLifecycleTest extends TestCase
      * Test verifying after lockout returns false.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testVerifyingAfterLockoutReturnsFalse(): void
     {
@@ -209,10 +281,6 @@ final class TotpLifecycleTest extends TestCase
      * Test verifying after lockout dispatches a locked failure.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testVerifyingAfterLockoutDispatchesLockedFailure(): void
     {
@@ -237,10 +305,6 @@ final class TotpLifecycleTest extends TestCase
      * free unlock against the configured `mfa.attempts.factor_limit` defence.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testChallengePreservesAttemptsAfterLockout(): void
     {
@@ -257,10 +321,6 @@ final class TotpLifecycleTest extends TestCase
      * Test challenge preserves the locked_until timestamp after lockout.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testChallengePreservesLockedUntilTimestampAfterLockout(): void
     {
@@ -285,10 +345,6 @@ final class TotpLifecycleTest extends TestCase
      * Test challenge keeps the factor locked after lockout.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testChallengeKeepsFactorLockedAfterLockout(): void
     {
@@ -305,10 +361,6 @@ final class TotpLifecycleTest extends TestCase
      * Test challenge dispatches MfaChallengeIssued even when locked.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testChallengeDispatchesEventEvenWhenLocked(): void
     {
@@ -364,10 +416,6 @@ final class TotpLifecycleTest extends TestCase
      * factor, current-code] triple.
      *
      * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     private function enrollTotp(): array
     {
@@ -378,18 +426,14 @@ final class TotpLifecycleTest extends TestCase
 
         $this->actingAs($user);
 
-        $google = new Google2FA;
-        $secret = $google->generateSecretKey();
-
         /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
+            ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => $secret,
         ]);
 
-        return [$user, $factor, $google->getCurrentOtp($secret)];
+        return [$user, $factor, AuthenticatorApp::code($factor)];
     }
 
     /**
@@ -397,10 +441,6 @@ final class TotpLifecycleTest extends TestCase
      * factor is in a locked-out state when returned.
      *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     private function enrollAndBurnAttempts(): Factor
     {

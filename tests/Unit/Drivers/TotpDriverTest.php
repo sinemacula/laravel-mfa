@@ -4,23 +4,28 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
+use Carbon\CarbonImmutable;
+use Illuminate\Config\Repository;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PragmaRX\Google2FA\Google2FA;
-use SineMacula\Laravel\Mfa\Contracts\Factor;
+use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Drivers\Base32;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
+use SineMacula\Laravel\Mfa\Drivers\TotpParameters;
+use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
+use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Factors\TotpStubFactor;
+use Tests\Fixtures\Factors\UnrecordableTotpFactor;
 use Tests\TestCase;
 
 /**
- * Unit tests for `TotpDriver`.
+ * Unit tests for `TotpDriver`: the RFC 6238 test vectors, the window, the
+ * single use of a time step at verification and confirmation, the secrets and
+ * parameters of a new enrolment, and the provisioning URI.
  *
- * Exercises the Google2FA-backed verification path, secret generation, and the
- * implicit-challenge (no-op) contract for the TOTP driver.
- *
- * The missing-dependency constructor branch (`Google2FA` class absent) is not
- * exercised here — `pragmarx/google2fa` is installed as a `require-dev`
- * dependency, making it impossible to simulate the absent-class condition from
- * inside the autoloaded test process.
+ * Time is frozen in the middle of a step, so no assertion straddles a step
+ * boundary. At that moment the authenticator app's secret shows `768147`, and
+ * `385088` and `050219` one step before and after.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,282 +35,572 @@ use Tests\TestCase;
 #[CoversClass(TotpDriver::class)]
 final class TotpDriverTest extends TestCase
 {
-    /** @var string Account-name fixture used across the provisioning-URI tests. */
+    /** @var int The frozen time: 15 seconds into time step 60000000. */
+    private const int NOW = 1800000015;
+
+    /** @var int The time step the frozen time falls in. */
+    private const int STEP = 60000000;
+
+    /** @var string The code the authenticator app shows at the frozen time. */
+    private const string CODE = '768147';
+
+    /** @var string The account name used across the provisioning URI tests. */
     private const string ACCOUNT_NAME = 'user@example.com';
 
     /**
-     * `issueChallenge()` must be a no-op for TOTP — the code is generated
-     * client-side from the shared secret.
+     * Freeze time in the middle of a step.
      *
      * @return void
      */
-    public function testIssueChallengeIsNoOp(): void
+    #[\Override]
+    protected function setUp(): void
     {
-        $driver = new TotpDriver;
-        $factor = $this->makeFactor(secret: 'IGNORED');
+        parent::setUp();
 
-        // No return value, no state mutation, no exception — the TOTP challenge
-        // is generated client-side.
-        $driver->issueChallenge($factor);
-
-        self::assertSame('IGNORED', $factor->getSecret());
+        $this->travelTo(CarbonImmutable::createFromTimestamp(self::NOW));
     }
 
     /**
-     * A null stored secret must short-circuit verify to false.
-     *
-     * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
-     */
-    public function testVerifyReturnsFalseWhenSecretIsNull(): void
-    {
-        $driver = new TotpDriver;
-        $factor = $this->makeFactor(secret: null);
-
-        self::assertFalse($driver->verify($factor, '123456'));
-    }
-
-    /**
-     * An empty stored secret must short-circuit verify to false.
-     *
-     * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
-     */
-    public function testVerifyReturnsFalseWhenSecretIsEmptyString(): void
-    {
-        $driver = new TotpDriver;
-        $factor = $this->makeFactor(secret: '');
-
-        self::assertFalse($driver->verify($factor, '123456'));
-    }
-
-    /**
-     * A current TOTP code derived from the stored secret must verify
-     * successfully.
-     *
-     * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
-     */
-    public function testVerifyReturnsTrueForCurrentTotpCode(): void
-    {
-        $google2fa = new Google2FA;
-        $secret    = $google2fa->generateSecretKey();
-        $code      = $google2fa->getCurrentOtp($secret);
-
-        $driver = new TotpDriver;
-        $factor = $this->makeFactor(secret: $secret);
-
-        self::assertTrue($driver->verify($factor, $code));
-    }
-
-    /**
-     * The default window accepts a code from one time step either side of the
-     * current one and refuses one from two steps away.
-     *
-     * The codes are drawn and checked again whenever the time step changes
-     * between drawing and checking them, so the assertions never straddle a
-     * step boundary.
-     *
-     * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
-     */
-    public function testDefaultWindowAcceptsOneStepEitherSideOnly(): void
-    {
-        $google2fa = new Google2FA;
-        $secret    = $google2fa->generateSecretKey();
-
-        $driver = new TotpDriver;
-        $factor = $this->makeFactor(secret: $secret);
-
-        do {
-            $step = $google2fa->getTimestamp();
-
-            $previous = $driver->verify($factor, $google2fa->oathTotp($secret, $step - 1));
-            $next     = $driver->verify($factor, $google2fa->oathTotp($secret, $step + 1));
-            $distant  = $driver->verify($factor, $google2fa->oathTotp($secret, $step - 2));
-        } while ($google2fa->getTimestamp() !== $step);
-
-        self::assertTrue($previous);
-        self::assertTrue($next);
-        self::assertFalse($distant);
-    }
-
-    /**
-     * A code that does not match the current TOTP for the stored secret must
-     * fail verification.
-     *
-     * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
-     */
-    public function testVerifyReturnsFalseForWrongCode(): void
-    {
-        $google2fa = new Google2FA;
-        $secret    = $google2fa->generateSecretKey();
-
-        $driver = new TotpDriver;
-        $factor = $this->makeFactor(secret: $secret);
-
-        // '000000' is astronomically unlikely to be the current TOTP for a
-        // freshly generated secret — the Google2FA algorithm draws from 10^6
-        // candidates across the active window.
-        self::assertFalse($driver->verify($factor, '000000'));
-    }
-
-    /**
-     * `startEnrollment()` must return a non-empty Base32 string ready for
-     * handing to an authenticator app.
-     *
-     * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
-     */
-    public function testStartEnrollmentReturnsANonEmptyBase32Secret(): void
-    {
-        $driver = new TotpDriver;
-        $secret = $driver->startEnrollment(new TotpStubFactor(null));
-
-        self::assertIsString($secret);
-        self::assertNotSame('', $secret);
-        self::assertMatchesRegularExpression('/^[A-Z2-7]+$/', $secret);
-    }
-
-    /**
-     * The provisioning URI must use the `otpauth://totp/` scheme so
-     * authenticator apps can render it as a QR code.
-     *
-     * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
-     */
-    public function testProvisioningUriReturnsOtpauthScheme(): void
-    {
-        $driver = new TotpDriver;
-        $secret = $driver->startEnrollment(new TotpStubFactor(null));
-
-        $uri = $driver->provisioningUri(
-            issuer     : 'Acme',
-            accountName: self::ACCOUNT_NAME,
-            secret     : $secret,
-        );
-
-        self::assertStringStartsWith('otpauth://totp/', $uri);
-    }
-
-    /**
-     * The provisioning URI must carry the issuer, account name, and secret in
-     * both the label and the query parameters.
-     *
-     * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
-     */
-    public function testProvisioningUriIncludesIssuerAndAccountAndSecret(): void
-    {
-        $driver = new TotpDriver;
-        $secret = $driver->startEnrollment(new TotpStubFactor(null));
-
-        $uri = $driver->provisioningUri(
-            issuer     : 'Acme',
-            accountName: self::ACCOUNT_NAME,
-            secret     : $secret,
-        );
-
-        // The label segment is `Issuer:AccountName`, URL-encoded by the
-        // Google2FA library — assert the joined form so the test is not
-        // satisfied by the `issuer=Acme` query parameter alone.
-        self::assertStringContainsString('Acme:user%40example.com', $uri);
-
-        // Both the `secret` and `issuer` query parameters must be present (the
-        // latter is the standard auth-app behaviour for grouping).
-        $query = parse_url($uri, PHP_URL_QUERY);
-        self::assertIsString($query);
-
-        parse_str($query, $params);
-
-        self::assertArrayHasKey('secret', $params);
-        self::assertSame($secret, $params['secret']);
-        self::assertArrayHasKey('issuer', $params);
-        self::assertSame('Acme', $params['issuer']);
-    }
-
-    /**
-     * The provisioning URI must encode an issuer containing whitespace exactly
-     * once — never doubly encoded.
-     *
-     * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
-     */
-    public function testProvisioningUriDoesNotDoubleEncodeIssuer(): void
-    {
-        $driver = new TotpDriver;
-        $secret = $driver->startEnrollment(new TotpStubFactor(null));
-
-        $uri = $driver->provisioningUri(
-            issuer     : 'Acme Co',
-            accountName: self::ACCOUNT_NAME,
-            secret     : $secret,
-        );
-
-        // `Acme Co` should be encoded exactly once. A double-encoded value
-        // would surface as `Acme%2520Co`; the wrapper must trust the library's
-        // single pass.
-        self::assertStringNotContainsString('Acme%2520Co', $uri);
-        self::assertStringContainsString('Acme%20Co', $uri);
-    }
-
-    /**
-     * The `$secret` parameter on `provisioningUri()` must carry the
-     * `#[\SensitiveParameter]` attribute so it never leaks into a stack trace.
+     * Issuing a challenge sends nothing and changes nothing: the app makes the
+     * code.
      *
      * @return void
      */
-    public function testProvisioningUriSecretParameterCarriesSensitiveAttribute(): void
+    public function testIssueChallengeSendsNothing(): void
     {
-        $reflection  = new \ReflectionMethod(TotpDriver::class, 'provisioningUri');
-        $secretParam = $reflection->getParameters()[2] ?? null;
+        $factor = $this->factor();
 
-        self::assertNotNull($secretParam);
-        self::assertSame('secret', $secretParam->getName());
-        self::assertNotEmpty(
-            $secretParam->getAttributes(\SensitiveParameter::class),
-            'The $secret parameter must carry the #[\SensitiveParameter] '
-            . 'attribute so it does not leak into stack traces.',
-        );
+        $this->driver()->issueChallenge($factor);
+
+        self::assertSame(AuthenticatorApp::SECRET, $factor->getSecret());
+        self::assertNull($factor->getLastAcceptedStep());
     }
 
     /**
-     * Build an in-memory `Factor` stub exposing the given stored secret so the
-     * verify branches can be exercised without hitting the database.
+     * The code the app shows now verifies, and its step is recorded.
+     *
+     * @return void
+     */
+    public function testAcceptsTheCurrentCodeAndRecordsItsStep(): void
+    {
+        $factor = $this->factor();
+
+        self::assertTrue($this->driver()->verify($factor, self::CODE));
+        self::assertSame(self::STEP, $factor->getLastAcceptedStep());
+    }
+
+    /**
+     * Rows of `[algorithm, key, time, code]`: RFC 6238 Appendix B, 8 digits.
+     *
+     * @return iterable<string, array{string, string, int, string}>
+     */
+    public static function rfc6238Vectors(): iterable
+    {
+        $keys = [
+            'sha1'   => 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+            'sha256' => 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA',
+            'sha512' => 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNA',
+        ];
+
+        $vectors = [
+            59          => ['94287082', '46119246', '90693936'],
+            1111111109  => ['07081804', '68084774', '25091201'],
+            1111111111  => ['14050471', '67062674', '99943326'],
+            1234567890  => ['89005924', '91819424', '93441116'],
+            2000000000  => ['69279037', '90698825', '38618901'],
+            20000000000 => ['65353130', '77737706', '47863826'],
+        ];
+
+        foreach ($vectors as $time => $codes) {
+            foreach (array_keys($keys) as $index => $algorithm) {
+                yield sprintf('%s at %d', $algorithm, $time) => [$algorithm, $keys[$algorithm], $time, $codes[$index]];
+            }
+        }
+    }
+
+    /**
+     * Each published code verifies at its time against a factor enrolled with
+     * the published key, and only in its own step.
+     *
+     * @param  string  $algorithm
+     * @param  string  $key
+     * @param  int  $time
+     * @param  string  $code
+     * @return void
+     */
+    #[DataProvider('rfc6238Vectors')]
+    public function testVerifiesTheRfc6238Vector(string $algorithm, string $key, int $time, string $code): void
+    {
+        $this->configuration()->set('mfa.totp.window', 0);
+
+        $this->travelTo(CarbonImmutable::createFromTimestamp($time));
+
+        self::assertTrue($this->driver()->verify(new TotpStubFactor($key, $algorithm, 8), $code));
+
+        $this->travelTo(CarbonImmutable::createFromTimestamp($time + 30));
+
+        self::assertFalse($this->driver()->verify(new TotpStubFactor($key, $algorithm, 8), $code));
+    }
+
+    /**
+     * The default window accepts a code from one step either side of the
+     * current one, and refuses one from two steps away.
+     *
+     * @return void
+     */
+    public function testTheDefaultWindowAcceptsOneStepEitherSideOnly(): void
+    {
+        self::assertTrue($this->driver()->verify($this->factor(), '385088'));
+        self::assertTrue($this->driver()->verify($this->factor(), '050219'));
+        self::assertFalse($this->driver()->verify($this->factor(), '168521'));
+        self::assertFalse($this->driver()->verify($this->factor(), '687638'));
+    }
+
+    /**
+     * The window is read from the configuration on every call: a driver built
+     * before it changes applies the new one.
+     *
+     * @return void
+     */
+    public function testTheWindowIsReadOnEveryCall(): void
+    {
+        $driver = $this->driver();
+
+        $this->configuration()->set('mfa.totp.window', 0);
+
+        self::assertFalse($driver->verify($this->factor(), '385088'));
+        self::assertTrue($driver->verify($this->factor(), self::CODE));
+
+        $this->configuration()->set('mfa.totp.window', 3);
+
+        $factor = $this->factor();
+
+        self::assertTrue($driver->verify($factor, AuthenticatorApp::code($factor, -3)));
+        self::assertTrue($driver->verify($factor, AuthenticatorApp::code($factor, 3)));
+        self::assertFalse($driver->verify($this->factor(), AuthenticatorApp::code($factor, 4)));
+    }
+
+    /**
+     * Failures never widen the window.
+     *
+     * @return void
+     */
+    public function testTheWindowNeverWidensAfterFailures(): void
+    {
+        $driver = $this->driver();
+        $factor = $this->factor();
+
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            self::assertFalse($driver->verify($factor, '000000'));
+        }
+
+        self::assertFalse($driver->verify($factor, '687638'));
+        self::assertTrue($driver->verify($factor, self::CODE));
+    }
+
+    /**
+     * The same code, and so the same step, is accepted once.
+     *
+     * @return void
+     */
+    public function testRefusesTheSameStepTwice(): void
+    {
+        $driver = $this->driver();
+        $factor = $this->factor();
+
+        self::assertTrue($driver->verify($factor, self::CODE));
+        self::assertFalse($driver->verify($factor, self::CODE));
+        self::assertSame(self::STEP, $factor->getLastAcceptedStep());
+    }
+
+    /**
+     * Once a code is accepted, a code for an earlier step of the window is
+     * refused, though it is still in the window.
+     *
+     * @return void
+     */
+    public function testRefusesAnEarlierStepOnceALaterOneIsAccepted(): void
+    {
+        $driver = $this->driver();
+        $factor = $this->factor();
+
+        self::assertTrue($driver->verify($factor, '050219'));
+        self::assertFalse($driver->verify($factor, self::CODE));
+        self::assertFalse($driver->verify($factor, '385088'));
+        self::assertSame(self::STEP + 1, $factor->getLastAcceptedStep());
+    }
+
+    /**
+     * Codes for later and later steps are each accepted, and the step each
+     * matched is the one recorded.
+     *
+     * @return void
+     */
+    public function testAcceptsEachLaterStepAndRecordsTheStepItMatched(): void
+    {
+        $driver = $this->driver();
+        $factor = $this->factor();
+
+        self::assertTrue($driver->verify($factor, '385088'));
+        self::assertSame(self::STEP - 1, $factor->getLastAcceptedStep());
+
+        self::assertTrue($driver->verify($factor, self::CODE));
+        self::assertSame(self::STEP, $factor->getLastAcceptedStep());
+
+        self::assertTrue($driver->verify($factor, '050219'));
+        self::assertSame(self::STEP + 1, $factor->getLastAcceptedStep());
+    }
+
+    /**
+     * Confirming records the step as verifying does, so the confirming code is
+     * refused at the next verification, and at a second confirmation.
+     *
+     * @return void
+     */
+    public function testTheConfirmingCodeIsRefusedAtTheNextVerification(): void
+    {
+        $driver = $this->driver();
+        $factor = $this->factor();
+
+        self::assertTrue($driver->confirm($factor, self::CODE));
+        self::assertSame(self::STEP, $factor->getLastAcceptedStep());
+        self::assertFalse($driver->verify($factor, self::CODE));
+        self::assertFalse($driver->confirm($factor, self::CODE));
+    }
+
+    /**
+     * A code matching no step of the window, or of another length, is refused
+     * and records nothing.
+     *
+     * @return void
+     */
+    public function testRefusesAWrongCodeAndRecordsNothing(): void
+    {
+        $driver = $this->driver();
+        $factor = $this->factor();
+
+        foreach (['000000', '76814', '7681470', ' 768147', ''] as $code) {
+            self::assertFalse($driver->verify($factor, $code), $code);
+        }
+
+        self::assertNull($factor->getLastAcceptedStep());
+    }
+
+    /**
+     * Rows of `[secret]` a factor cannot verify with.
+     *
+     * @return iterable<string, array{?string}>
+     */
+    public static function unusableSecrets(): iterable
+    {
+        yield 'no secret' => [null];
+        yield 'an empty secret' => [''];
+        yield 'padding alone' => ['===='];
+        yield 'not Base32' => ['GEZDGNBVGY3TQOJQ!'];
+    }
+
+    /**
+     * A factor without a usable secret verifies nothing.
      *
      * @param  ?string  $secret
-     * @return \SineMacula\Laravel\Mfa\Contracts\Factor
+     * @return void
      */
-    private function makeFactor(#[\SensitiveParameter] ?string $secret): Factor
+    #[DataProvider('unusableSecrets')]
+    public function testRefusesAFactorWithoutAUsableSecret(?string $secret): void
     {
-        return new TotpStubFactor($secret);
+        self::assertFalse($this->driver()->verify(new TotpStubFactor($secret), self::CODE));
+    }
+
+    /**
+     * An empty secret is refused even with the code an empty key makes, which
+     * anyone could compute.
+     *
+     * @return void
+     */
+    public function testRefusesAnEmptySecretEvenWithTheCodeAnEmptyKeyMakes(): void
+    {
+        $parameters = new TotpParameters('sha1', 6, 30);
+
+        self::assertFalse($this->driver()->verify(new TotpStubFactor(''), $parameters->code('', self::STEP)));
+        self::assertFalse($this->driver()->verify(new TotpStubFactor('===='), $parameters->code('', self::STEP)));
+    }
+
+    /**
+     * Rows of `[algorithm, digits, period]` a factor cannot verify with.
+     *
+     * @return iterable<string, array{?string, ?int, ?int}>
+     */
+    public static function unusableParameters(): iterable
+    {
+        yield 'no algorithm' => [null, 6, 30];
+        yield 'no digits' => ['sha1', null, 30];
+        yield 'no period' => ['sha1', 6, null];
+        yield 'an unknown algorithm' => ['md5', 6, 30];
+        yield 'too many digits' => ['sha1', 9, 30];
+    }
+
+    /**
+     * A factor that holds no parameters, or parameters out of bounds,
+     * verifies nothing, rather than taking the configured ones.
+     *
+     * @param  ?string  $algorithm
+     * @param  ?int  $digits
+     * @param  ?int  $period
+     * @return void
+     */
+    #[DataProvider('unusableParameters')]
+    public function testRefusesAFactorWithoutUsableParameters(?string $algorithm, ?int $digits, ?int $period): void
+    {
+        self::assertFalse($this->driver()->verify(new TotpStubFactor(AuthenticatorApp::SECRET, $algorithm, $digits, $period), self::CODE));
+    }
+
+    /**
+     * A factor with nowhere to record an accepted step cannot be held to
+     * single use, so even its current code is refused.
+     *
+     * @return void
+     */
+    public function testRefusesAFactorThatCannotRecordAStep(): void
+    {
+        self::assertFalse($this->driver()->verify(new UnrecordableTotpFactor, self::CODE));
+        self::assertFalse($this->driver()->confirm(new UnrecordableTotpFactor, self::CODE));
+    }
+
+    /**
+     * Rows of `[algorithm, bytes]`: the length of a new secret.
+     *
+     * @return iterable<string, array{string, int}>
+     */
+    public static function secretLengths(): iterable
+    {
+        yield 'sha1' => ['sha1', 20];
+        yield 'sha256' => ['sha256', 32];
+        yield 'sha512' => ['sha512', 64];
+    }
+
+    /**
+     * A new secret is random, in Base32, and as long as the configured
+     * algorithm's output.
+     *
+     * @param  string  $algorithm
+     * @param  int  $bytes
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    #[DataProvider('secretLengths')]
+    public function testANewSecretIsAsLongAsTheAlgorithmOutput(string $algorithm, int $bytes): void
+    {
+        $this->configuration()->set('mfa.totp.algorithm', $algorithm);
+
+        $secret = $this->driver()->startEnrollment(new TotpStubFactor(null));
+        $other  = $this->driver()->startEnrollment(new TotpStubFactor(null));
+
+        self::assertMatchesRegularExpression('/^[A-Z2-7]+$/', $secret);
+        self::assertSame($bytes, strlen((string) Base32::decode($secret)));
+        self::assertNotSame($secret, $other);
+    }
+
+    /**
+     * Starting an enrolment stamps the configured parameters on the factor,
+     * with no step accepted yet.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testStartingAnEnrollmentStampsTheParametersOnTheFactor(): void
+    {
+        $this->configuration()->set('mfa.totp', ['algorithm' => 'sha256', 'digits' => 8, 'period' => 60]);
+
+        $factor = new Factor(['last_accepted_step' => 5]);
+
+        $this->driver()->startEnrollment($factor);
+
+        self::assertSame('sha256', $factor->getTotpAlgorithm());
+        self::assertSame(8, $factor->getTotpDigits());
+        self::assertSame(60, $factor->getTotpPeriod());
+        self::assertNull($factor->getLastAcceptedStep());
+    }
+
+    /**
+     * A factor enrolled with the configured parameters verifies the code its
+     * app makes from the new secret with them, and keeps them after the
+     * configuration changes.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testAnEnrolledFactorKeepsItsParameters(): void
+    {
+        $this->configuration()->set('mfa.totp', ['algorithm' => 'sha512', 'digits' => 8, 'period' => 60]);
+
+        $factor = new Factor;
+
+        $factor->setAttribute('secret', $this->driver()->startEnrollment($factor));
+
+        $this->configuration()->set('mfa.totp', []);
+
+        $code = AuthenticatorApp::code($factor);
+
+        self::assertSame(8, strlen($code));
+        self::assertTrue($this->driver()->confirm($factor, $code));
+        self::assertSame(intdiv(self::NOW, 60), $factor->getLastAcceptedStep());
+    }
+
+    /**
+     * The parameters of a new enrolment are the configured ones.
+     *
+     * @return void
+     */
+    public function testTheParametersAreTheConfiguredOnes(): void
+    {
+        $this->configuration()->set('mfa.totp', ['algorithm' => 'sha256', 'digits' => 7, 'period' => 45]);
+
+        $parameters = $this->driver()->parameters();
+
+        self::assertSame(['sha256', 7, 45], [$parameters->algorithm, $parameters->digits, $parameters->period]);
+    }
+
+    /**
+     * The provisioning URI is in the `otpauth://` key URI format, with the
+     * label, the secret, the issuer and the factor's parameters.
+     *
+     * @return void
+     */
+    public function testTheProvisioningUriCarriesTheLabelSecretAndParameters(): void
+    {
+        $uri = $this->driver()->provisioningUri($this->factor(), 'Acme', self::ACCOUNT_NAME, AuthenticatorApp::SECRET);
+
+        self::assertSame('otpauth://totp/Acme:user%40example.com?secret=' . AuthenticatorApp::SECRET . '&issuer=Acme&algorithm=SHA1&digits=6&period=30', $uri);
+    }
+
+    /**
+     * The provisioning URI carries the factor's own parameters, not the
+     * configured ones.
+     *
+     * @return void
+     */
+    public function testTheProvisioningUriCarriesTheFactorsOwnParameters(): void
+    {
+        $factor = new TotpStubFactor(AuthenticatorApp::SECRET, 'sha256', 8, 60);
+
+        $uri = $this->driver()->provisioningUri($factor, 'Acme', self::ACCOUNT_NAME, AuthenticatorApp::SECRET);
+
+        self::assertStringEndsWith('&algorithm=SHA256&digits=8&period=60', $uri);
+    }
+
+    /**
+     * An issuer holding a space is encoded once, in the label and the query.
+     *
+     * @return void
+     */
+    public function testTheProvisioningUriEncodesTheIssuerOnce(): void
+    {
+        $uri = $this->driver()->provisioningUri($this->factor(), 'Acme Co', self::ACCOUNT_NAME, AuthenticatorApp::SECRET);
+
+        self::assertStringStartsWith('otpauth://totp/Acme%20Co:user%40example.com?', $uri);
+        self::assertStringContainsString('&issuer=Acme%20Co&', $uri);
+        self::assertStringNotContainsString('%2520', $uri);
+    }
+
+    /**
+     * Rows of `[issuer, account name, message]` a provisioning URI refuses.
+     *
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function unusableNames(): iterable
+    {
+        $issuer  = 'The issuer of a provisioning URI must not be empty or hold a colon.';
+        $account = 'The account name of a provisioning URI must not be empty or hold a colon.';
+
+        yield 'an empty issuer' => ['', self::ACCOUNT_NAME, $issuer];
+        yield 'an issuer with a colon' => ['Acme:Co', self::ACCOUNT_NAME, $issuer];
+        yield 'an empty account name' => ['Acme', '', $account];
+        yield 'an account name with colon' => ['Acme', 'user:name', $account];
+    }
+
+    /**
+     * An empty issuer or account name, or one holding the colon that
+     * separates them in the label, is refused.
+     *
+     * @param  string  $issuer
+     * @param  string  $accountName
+     * @param  string  $message
+     * @return void
+     */
+    #[DataProvider('unusableNames')]
+    public function testTheProvisioningUriRefusesAnUnusableName(string $issuer, string $accountName, string $message): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+
+        $this->driver()->provisioningUri($this->factor(), $issuer, $accountName, AuthenticatorApp::SECRET);
+    }
+
+    /**
+     * A factor whose enrolment has not started has no parameters to put in a
+     * provisioning URI.
+     *
+     * @return void
+     */
+    public function testTheProvisioningUriRefusesAFactorWithoutParameters(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The factor holds no TOTP parameters; start its enrolment first.');
+
+        $this->driver()->provisioningUri(new TotpStubFactor(AuthenticatorApp::SECRET, null), 'Acme', self::ACCOUNT_NAME, AuthenticatorApp::SECRET);
+    }
+
+    /**
+     * The secret and code parameters carry `#[\SensitiveParameter]`, so they
+     * never reach a stack trace.
+     *
+     * @return void
+     *
+     * @throws \ReflectionException
+     */
+    public function testSecretsAndCodesAreSensitiveParameters(): void
+    {
+        foreach (['provisioningUri' => 3, 'verify' => 1, 'confirm' => 1] as $method => $position) {
+            $parameter = (new \ReflectionMethod(TotpDriver::class, $method))->getParameters()[$position] ?? null;
+
+            self::assertNotNull($parameter);
+            self::assertNotEmpty($parameter->getAttributes(\SensitiveParameter::class), $method);
+        }
+    }
+
+    /**
+     * Build the driver over the application's configuration.
+     *
+     * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
+     */
+    private function driver(): TotpDriver
+    {
+        return new TotpDriver(new TotpSettings($this->configuration()));
+    }
+
+    /**
+     * Build a factor enrolled in the authenticator app with the default
+     * parameters and no step accepted.
+     *
+     * @return \Tests\Fixtures\Factors\TotpStubFactor
+     */
+    private function factor(): TotpStubFactor
+    {
+        return new TotpStubFactor(AuthenticatorApp::SECRET);
+    }
+
+    /**
+     * The application's configuration.
+     *
+     * @return \Illuminate\Config\Repository
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function configuration(): Repository
+    {
+        return $this->container()->make(Repository::class);
     }
 }

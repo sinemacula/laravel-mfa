@@ -4,19 +4,26 @@ declare(strict_types = 1);
 
 namespace Benchmarks\Runtime;
 
-use Benchmarks\Support\InMemoryFactor;
+use Benchmarks\Support\TotpFactor;
+use Carbon\CarbonImmutable;
+use Illuminate\Config\Repository;
 use PhpBench\Attributes\BeforeMethods;
 use PhpBench\Attributes\Iterations;
 use PhpBench\Attributes\Revs;
-use PragmaRX\Google2FA\Google2FA;
+use SineMacula\Laravel\Mfa\Drivers\Base32;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
+use SineMacula\Laravel\Mfa\Drivers\TotpParameters;
+use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
 
 /**
  * Hot-path benchmarks for the TOTP driver.
  *
- * `verify()` is the most frequent call site — every MFA-gated request that
- * carries a fresh code runs through it — so regressions here are the most
- * visible. `issueChallenge()` is a no-op for TOTP so we don't benchmark it.
+ * `verify()` is the most frequent call site, as every MFA-gated request that
+ * carries a fresh code runs through it, so regressions here are the most
+ * visible. It computes and compares every time step of the window whether or
+ * not one matches, so a matching and a mismatched code should cost the same;
+ * the factor records no step, so the cost of the database's compare-and-set is
+ * not included. `issueChallenge()` is a no-op for TOTP so it is not measured.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,51 +34,46 @@ final class TotpDriverBench
     /** @var \SineMacula\Laravel\Mfa\Drivers\TotpDriver */
     private TotpDriver $driver;
 
-    /** @var \Benchmarks\Support\InMemoryFactor */
-    private InMemoryFactor $factor;
+    /** @var \Benchmarks\Support\TotpFactor */
+    private TotpFactor $factor;
 
     /** @var string */
     private string $code = '';
 
     /**
-     * Build the driver and reusable factor double once per benchmark subject
-     * lifetime.
+     * Build the driver, with the default settings, and a factor with a fresh
+     * secret once per benchmark subject lifetime.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function __construct()
     {
-        $this->driver = new TotpDriver(window: 1);
-        $this->factor = new InMemoryFactor(type: 'totp');
+        $this->driver = new TotpDriver(new TotpSettings(new Repository));
+        $this->factor = new TotpFactor(Base32::encode(random_bytes(20)));
     }
 
     /**
-     * Generate a fresh TOTP secret + current code before each iteration so
-     * verify-hit benches always operate on a valid code.
+     * Compute the factor's current code before each iteration, so the
+     * matching bench always submits a code of the window.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function setUp(): void
     {
-        $google = new Google2FA;
-        $secret = $google->generateSecretKey();
+        $parameters = new TotpParameters('sha1', 6, 30);
 
-        $this->factor->setSecret($secret);
-        $this->code = $google->getCurrentOtp($secret);
+        $this->code = $parameters->code(
+            (string) Base32::decode((string) $this->factor->getSecret()),
+            $parameters->stepAt(CarbonImmutable::now()->getTimestamp()),
+        );
     }
 
     /**
-     * Measure the cost of a successful TOTP verify.
+     * Measure the cost of verifying a code that matches a step of the window.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     #[Iterations(3)]
     #[Revs(1000)]
@@ -84,10 +86,6 @@ final class TotpDriverBench
      * Measure the cost of a mismatched TOTP verify.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     #[Iterations(3)]
     #[Revs(1000)]

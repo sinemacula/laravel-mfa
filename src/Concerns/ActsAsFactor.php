@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Query\Builder;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 
 /**
@@ -220,6 +221,46 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     public function getLastAcceptedStepName(): string
     {
         return 'last_accepted_step';
+    }
+
+    /**
+     * Record the TOTP time step a code was accepted for if it is later than
+     * the stored one: one conditional `UPDATE` of the factor's row, which the
+     * database applies to the row as committed, so a request whose copy of the
+     * factor is stale still cannot record a step another already has. A
+     * factor not yet stored compares with its own attribute, as no other
+     * request can see it.
+     *
+     * The recorded step is kept as the attribute's original value, so a later
+     * `persist()` does not write it again over a later step another request
+     * recorded in the meantime.
+     *
+     * @param  int  $step
+     * @return bool
+     */
+    public function acceptStep(int $step): bool
+    {
+        $column = $this->getLastAcceptedStepName();
+
+        if ($this->exists) {
+            $recorded = $this->newModelQuery()
+                ->whereKey($this->getKey())
+                ->toBase()
+                ->where(static function (Builder $query) use ($column, $step): void {
+                    $query->whereNull($column)->orWhere($column, '<', $step);
+                })
+                ->update([$column => $step]) === 1;
+        } else {
+            $last     = $this->getLastAcceptedStep();
+            $recorded = $last === null || $last < $step;
+        }
+
+        if ($recorded) {
+            $this->setAttribute($column, $step);
+            $this->syncOriginalAttribute($column);
+        }
+
+        return $recorded;
     }
 
     /**

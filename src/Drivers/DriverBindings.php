@@ -21,7 +21,7 @@ use SineMacula\Laravel\Mfa\MfaManager;
  * `Mfa::extend('totp', ...)` from their own service provider, or from a
  * container extender or resolving callback on `mfa`, since Laravel's `Manager`
  * resolves the most recent registration. Each factory reads only the settings
- * its driver needs: the TOTP window from `mfa.totp`, and the code length,
+ * its driver needs: the TOTP settings from `mfa.totp`, and the code length,
  * lifetime and message from `mfa.codes`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -69,16 +69,15 @@ final class DriverBindings
     }
 
     /**
-     * Build the TOTP driver with the window in `mfa.totp`.
+     * Build the TOTP driver over the settings in `mfa.totp`, which it reads on
+     * every call.
      *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
-     *
-     * @throws \InvalidArgumentException
      */
     public static function totp(Repository $config): TotpDriver
     {
-        return new TotpDriver(window: (new TotpSettings($config))->window());
+        return new TotpDriver(new TotpSettings($config));
     }
 
     /**

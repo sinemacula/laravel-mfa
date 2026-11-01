@@ -21,16 +21,13 @@ use SineMacula\Laravel\Mfa\Config\IntegerSetting;
  */
 final readonly class TotpSettings
 {
-    /** @var list<string> The HMAC algorithms a TOTP factor may use, as RFC 6238 names them. */
-    public const array ALGORITHMS = ['sha1', 'sha256', 'sha512'];
-
     /** @var string Prefix of every TOTP setting's key. */
     private const string PREFIX = 'mfa.totp.';
 
     /** @var array<string, array{0: int, 1: int, 2: int}> Default, least and greatest value of each numeric setting. */
     private const array NUMBERS = [
-        'digits' => [6, 6, 8],
-        'period' => [30, 15, 120],
+        'digits' => [6, TotpParameters::MIN_DIGITS, TotpParameters::MAX_DIGITS],
+        'period' => [30, TotpParameters::MIN_PERIOD, TotpParameters::MAX_PERIOD],
         'window' => [1, 0, 3],
     ];
 
@@ -57,8 +54,8 @@ final readonly class TotpSettings
     {
         $algorithm = $this->config->get(self::PREFIX . 'algorithm', 'sha1');
 
-        if (!in_array($algorithm, self::ALGORITHMS, true)) {
-            throw new \InvalidArgumentException(sprintf('%salgorithm must be one of %s.', self::PREFIX, implode(', ', self::ALGORITHMS)));
+        if (!in_array($algorithm, TotpParameters::ALGORITHMS, true)) {
+            throw new \InvalidArgumentException(sprintf('%salgorithm must be one of %s.', self::PREFIX, implode(', ', TotpParameters::ALGORITHMS)));
         }
 
         return $algorithm;
@@ -99,6 +96,19 @@ final readonly class TotpSettings
     public function window(): int
     {
         return $this->number('window');
+    }
+
+    /**
+     * The algorithm, digits and period a new enrolment is made with, stored
+     * with its factor.
+     *
+     * @return \SineMacula\Laravel\Mfa\Drivers\TotpParameters
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function parameters(): TotpParameters
+    {
+        return new TotpParameters($this->algorithm(), $this->digits(), $this->period());
     }
 
     /**

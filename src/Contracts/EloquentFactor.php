@@ -97,6 +97,20 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
     public function getLastAcceptedStepName(): string;
 
     /**
+     * Record the TOTP time step a code was just accepted for, if it is later
+     * than the last one accepted, and return whether it was recorded: a
+     * compare-and-set of the stored step, so of two requests with a code for
+     * the same step only one records it, and a step at or before the stored
+     * one is never recorded. Unlike the other mutators it persists at once, as
+     * the check and the record are one step; inside a transaction on the
+     * storage connection it is part of that transaction.
+     *
+     * @param  int  $step
+     * @return bool
+     */
+    public function acceptStep(int $step): bool;
+
+    /**
      * Column name holding the factor's status.
      *
      * @return string
