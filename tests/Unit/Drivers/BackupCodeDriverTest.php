@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Drivers;
 
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
@@ -21,10 +22,11 @@ use Tests\TestCase;
  * consumption UPDATE, the generation helpers, and the getter surface.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(BackupCodeDriver::class)]
 final class BackupCodeDriverTest extends TestCase
 {
     /**

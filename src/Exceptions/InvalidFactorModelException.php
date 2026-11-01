@@ -14,6 +14,6 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * model is a deployment-time bug, not a runtime one to swallow.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class InvalidFactorModelException extends \RuntimeException {}

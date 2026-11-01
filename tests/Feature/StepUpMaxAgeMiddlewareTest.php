@@ -5,9 +5,11 @@ declare(strict_types = 1);
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Middleware\RequireMfa;
 use Tests\Feature\Concerns\InteractsWithRequireMfaMiddleware;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
@@ -20,10 +22,11 @@ use Tests\TestCase;
  * a focused suite.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(RequireMfa::class)]
 final class StepUpMaxAgeMiddlewareTest extends TestCase
 {
     use InteractsWithRequireMfaMiddleware, RefreshDatabase;

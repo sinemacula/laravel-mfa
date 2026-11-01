@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -25,10 +26,11 @@ use Tests\TestCase;
  * parameter parsing lives in its own dedicated test class.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(RequireMfa::class)]
 final class RequireMfaMiddlewareTest extends TestCase
 {
     use InteractsWithRequireMfaMiddleware, RefreshDatabase;
@@ -41,8 +43,6 @@ final class RequireMfaMiddlewareTest extends TestCase
      * enforcement chain.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testPassesWhenMfaDisabled(): void
     {

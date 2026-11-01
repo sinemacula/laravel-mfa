@@ -8,10 +8,13 @@ use Illuminate\Config\Repository;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Events\Dispatcher;
+use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\SecondaryConnectionFactor;
@@ -30,10 +33,11 @@ use Tests\TestCase;
  * failure mid-rotation would leave the identity with zero backup codes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class BackupCodeRotationConnectionTest extends TestCase
 {
     use RefreshDatabase;
@@ -146,15 +150,18 @@ final class BackupCodeRotationConnectionTest extends TestCase
      * Register a secondary in-memory SQLite connection so the test can bind a
      * custom factor model to a connection other than the default.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param  mixed  $app
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Random\RandomException
      */
     #[\Override]
     protected function defineEnvironment(mixed $app): void
     {
         parent::defineEnvironment($app);
+
+        assert($app instanceof Application);
 
         /** @var \Illuminate\Config\Repository $config */
         $config = $app->make(Repository::class);

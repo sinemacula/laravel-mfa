@@ -5,7 +5,9 @@ declare(strict_types = 1);
 namespace Tests\Integration;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\SecondaryUser;
 use Tests\Fixtures\TestUser;
@@ -19,10 +21,11 @@ use Tests\TestCase;
  * application.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class PolymorphicIdentityTest extends TestCase
 {
     use RefreshDatabase;
@@ -33,8 +36,6 @@ final class PolymorphicIdentityTest extends TestCase
      * `authenticatable_type` correctly.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testFactorsAreScopedToTheirOwningIdentityType(): void
     {
@@ -138,8 +139,6 @@ final class PolymorphicIdentityTest extends TestCase
      * identity classes when neither opts in.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEnforcementWorksAcrossBothIdentityClasses(): void
     {

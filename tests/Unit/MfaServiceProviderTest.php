@@ -9,6 +9,7 @@ use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Application;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
@@ -25,10 +26,11 @@ use Tests\TestCase;
  * Unit tests for the `MfaServiceProvider` container wiring.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaServiceProvider::class)]
 final class MfaServiceProviderTest extends TestCase
 {
     /**

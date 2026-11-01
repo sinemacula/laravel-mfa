@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Events;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
@@ -13,10 +14,11 @@ use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
  * Unit tests for the `MfaChallengeIssued` event DTO.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaChallengeIssued::class)]
 final class MfaChallengeIssuedTest extends TestCase
 {
     /**

@@ -5,6 +5,8 @@ declare(strict_types = 1);
 namespace Tests\Unit\Drivers;
 
 use Carbon\Carbon;
+use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
 use Tests\TestCase;
 use Tests\Unit\Concerns\InteractsWithAbstractOtpDriver;
 
@@ -18,10 +20,11 @@ use Tests\Unit\Concerns\InteractsWithAbstractOtpDriver;
  * lightweight stub factors so no persistence is touched.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(AbstractOtpDriver::class)]
 final class AbstractOtpDriverVerifyTest extends TestCase
 {
     use InteractsWithAbstractOtpDriver;

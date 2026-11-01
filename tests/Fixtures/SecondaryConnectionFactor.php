@@ -17,7 +17,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
  * this fixture exercises.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */

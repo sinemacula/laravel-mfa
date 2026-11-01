@@ -6,6 +6,7 @@ namespace Tests\Unit;
 
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Assert;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -24,10 +25,11 @@ use Tests\Fixtures\NonEloquentIdentity;
  * fixture is needed to drive the FQCN branches and keep coverage at 100%.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 {
     /**

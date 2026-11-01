@@ -18,7 +18,7 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
  * the one that owns it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class FactorOwnershipMismatchException extends \RuntimeException
 {

@@ -36,7 +36,7 @@ use SineMacula\Laravel\Mfa\Stores\SessionMfaVerificationStore;
  * `laravel-iam` ships an opinionated set of bindings for paired-mode use.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class MfaServiceProvider extends ServiceProvider
 {

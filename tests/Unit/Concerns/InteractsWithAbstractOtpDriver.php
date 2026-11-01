@@ -23,7 +23,7 @@ use Tests\Fixtures\TestUser;
  * test classes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
@@ -128,8 +128,8 @@ trait InteractsWithAbstractOtpDriver
             'mfa_enabled' => true,
         ]);
 
-        $factor = new CallOrderTrackingFactor;
-        $factor->bindTracker($tracker);
+        $factor                       = new CallOrderTrackingFactor;
+        $factor->tracker              = &$tracker;
         $factor->driver               = 'email';
         $factor->recipient            = self::OTP_RECIPIENT;
         $factor->authenticatable_type = $user->getMorphClass();

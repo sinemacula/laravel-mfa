@@ -2,10 +2,13 @@
 
 declare(strict_types = 1);
 
-namespace Benchmarks;
+namespace Benchmarks\Runtime;
 
+use Benchmarks\Support\InMemoryFactor;
 use Carbon\Carbon;
-use PhpBench\Attributes as Bench;
+use PhpBench\Attributes\BeforeMethods;
+use PhpBench\Attributes\Iterations;
+use PhpBench\Attributes\Revs;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Gateways\FakeSmsGateway;
@@ -18,9 +21,9 @@ use SineMacula\Laravel\Mfa\Gateways\FakeSmsGateway;
  * covers both transports' verification cost.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
-#[Bench\BeforeMethods('setUp')]
+#[BeforeMethods('setUp')]
 final class OtpVerifyBench
 {
     /** @var string Stable code seeded into both factor doubles each iteration. */
@@ -29,10 +32,10 @@ final class OtpVerifyBench
     /** @var \SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver */
     private AbstractOtpDriver $driver;
 
-    /** @var \Benchmarks\InMemoryFactor */
+    /** @var \Benchmarks\Support\InMemoryFactor */
     private InMemoryFactor $factorHit;
 
-    /** @var \Benchmarks\InMemoryFactor */
+    /** @var \Benchmarks\Support\InMemoryFactor */
     private InMemoryFactor $factorExpired;
 
     /**
@@ -66,8 +69,8 @@ final class OtpVerifyBench
      *
      * @return void
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchVerifyHit(): void
     {
         $this->driver->verify($this->factorHit, self::CODE);
@@ -78,8 +81,8 @@ final class OtpVerifyBench
      *
      * @return void
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchVerifyMiss(): void
     {
         $this->driver->verify($this->factorHit, '000000');
@@ -90,8 +93,8 @@ final class OtpVerifyBench
      *
      * @return void
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchVerifyExpired(): void
     {
         $this->driver->verify($this->factorExpired, self::CODE);

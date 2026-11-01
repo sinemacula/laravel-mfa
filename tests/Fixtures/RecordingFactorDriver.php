@@ -12,7 +12,7 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
  * `'correct'` as the only valid code.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */

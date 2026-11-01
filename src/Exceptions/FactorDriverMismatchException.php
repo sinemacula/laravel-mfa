@@ -22,7 +22,7 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  * errors when they want typed handling.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class FactorDriverMismatchException extends \InvalidArgumentException
 {

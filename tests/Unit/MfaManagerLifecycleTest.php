@@ -6,9 +6,11 @@ namespace Tests\Unit;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Event;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerState;
@@ -21,10 +23,11 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
  * stays under the project's max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class MfaManagerLifecycleTest extends MfaManagerTestCase
 {
     use InteractsWithMfaManagerState;

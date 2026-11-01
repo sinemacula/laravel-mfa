@@ -12,6 +12,6 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * to the developer rather than silently dropping the outbound message.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class SmsGatewayNotConfiguredException extends \RuntimeException {}

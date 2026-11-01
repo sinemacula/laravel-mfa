@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Config\Repository;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Assert;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
@@ -21,10 +22,11 @@ use Tests\Fixtures\TestUser;
  * orchestration pipeline and each outcome of `classifyFailure()`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class MfaManagerVerifyTest extends MfaManagerTestCase
 {
     /** @var string Canonical right-shape OTP fixture used for the success-path assertions. */
