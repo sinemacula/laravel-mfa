@@ -139,6 +139,10 @@ final class HasFactorsTest extends TestCase
     /**
      * A delete the database refuses keeps the identity's factors.
      *
+     * The delete is aimed at a table that does not exist, which every driver
+     * refuses without a schema change, and runs in a transaction of its own so
+     * the refusal leaves the test's transaction usable on PostgreSQL.
+     *
      * @return void
      */
     public function testAFailedDeleteKeepsTheFactors(): void
@@ -146,14 +150,13 @@ final class HasFactorsTest extends TestCase
         $identity = $this->createHolder('one@example.test');
         $factor   = $this->createFactor($identity, 'confirmed');
 
-        DB::statement('CREATE TRIGGER refuse_user_delete BEFORE DELETE ON test_users BEGIN SELECT RAISE(ABORT, \'refused\'); END');
+        $identity->setTable('missing_test_users');
 
         try {
-            $identity->delete();
+            DB::transaction(static fn (): ?bool => $identity->delete());
             self::fail('The delete was expected to fail.');
         } catch (\Throwable $exception) {
             self::assertInstanceOf(QueryException::class, $exception);
-            self::assertStringContainsString('refused', $exception->getMessage());
         }
 
         self::assertTrue(FactorHolder::query()->whereKey($identity->id)->exists());
