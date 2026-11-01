@@ -22,9 +22,12 @@ return [
     | says so, and one that is not listed here enables nothing. Every
     | configured application declares the first factor its guard signs people
     | in with, unless a first factor resolver is bound. Every key is checked
-    | when the package boots, but only `totp_window` is applied yet. See the
-    | configuration guide for every key, its default, its bounds and whether
-    | it is applied yet:
+    | when the package boots; `requirement`, `totp_window` and `freshness` are
+    | applied so far. `freshness` maps each operation's name to the seconds
+    | within which an additional verification must have been made, or to a
+    | requirement whose every part has a `max_age`. See the configuration
+    | guide for every key, its default, its bounds and whether it is applied
+    | yet:
     |
     | 'web' => [
     |     'types'          => ['totp'],
@@ -33,7 +36,10 @@ return [
     |     'bootstrap'      => ['enabled' => false, 'types' => []],
     |     'limits'         => ['confirmed_per_type' => 5, 'confirmed' => 10, 'pending' => 2],
     |     'totp_window'    => 1,
-    |     'freshness'      => ['mfa.remove_factor' => 900],
+    |     'freshness'      => [
+    |         'mfa.remove_factor'   => 900,
+    |         'billing.change_plan' => ['minimum_level' => ['level' => 'aal2', 'max_age' => 600]],
+    |     ],
     |     'first_factor'   => ['method' => 'password', 'channel' => 'password'],
     | ],
     |

@@ -13,15 +13,16 @@ use Laravel\Sanctum\HasApiTokens;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
  * Test user model used across the MFA test suites.
  *
  * Implements `MultiFactorAuthenticatable` and Laravel's standard
- * `Authenticatable` contract. MFA preference is controlled via the
- * `mfa_enabled` boolean column so individual tests can flip it without reaching
- * into mocks or stubs.
+ * `Authenticatable` contract. Whether the user requires an additional
+ * verification of its own sign-ins is controlled via the `mfa_enabled` boolean
+ * column so individual tests can flip it without reaching into mocks or stubs.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,14 +47,15 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
     ];
 
     /**
-     * Determine whether MFA should be applied for this test user.
+     * Require an additional verification of every sign-in while the
+     * `mfa_enabled` column is set, and nothing of the user's own otherwise.
      *
-     * @return bool
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      */
     #[\Override]
-    public function shouldUseMultiFactor(): bool
+    public function requiresAdditionalFactor(): ?Requirement
     {
-        return (bool) $this->getAttribute('mfa_enabled');
+        return (bool) $this->getAttribute('mfa_enabled') ? Requirement::none()->withAdditionalVerification() : null;
     }
 
     /**

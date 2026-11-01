@@ -12,12 +12,14 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  * Multi-factor authenticatable contract.
  *
  * Implemented by identity models that support multi-factor authentication.
- * Provides the hooks needed by the MFA manager to determine whether MFA should
- * be applied and to query the identity's registered authentication factors, and
- * answers three questions every operation asks first: whether the identity is a
- * person who may hold factors, whether it is active, and what it requires of
- * its own sign-ins. The `HasFactors` trait gives an Eloquent identity every
- * answer but `shouldUseMultiFactor()`, with the defaults below.
+ * Provides the hooks the package needs to query the identity's registered
+ * authentication factors, and answers three questions every operation asks
+ * first: whether the identity is a person who may hold factors, whether it is
+ * active, and what it requires of its own sign-ins. Whether a sign-in needs a
+ * further factor is composed from that requirement, the application's
+ * configured mode and a re-enrolment obligation, never answered by the identity
+ * alone. The `HasFactors` trait gives an Eloquent identity every answer, with
+ * the defaults below.
  *
  * @api
  *
@@ -26,17 +28,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  */
 interface MultiFactorAuthenticatable extends Authenticatable
 {
-    /**
-     * Determine whether multi-factor authentication should be used for this
-     * identity.
-     *
-     * This is the primary gate: if it returns false, MFA checks are bypassed
-     * entirely for this identity.
-     *
-     * @return bool
-     */
-    public function shouldUseMultiFactor(): bool;
-
     /**
      * Determine whether multi-factor authentication is currently enabled for
      * this identity.
@@ -78,8 +69,9 @@ interface MultiFactorAuthenticatable extends Authenticatable
 
     /**
      * The additional verification the identity requires of its own sign-ins
-     * (for example, platform staff), composed with the application's, a
-     * tenant's and an operation's; `null`, the default, requires nothing.
+     * (for example, platform staff), in every application whatever its setting,
+     * composed with the application's, a tenant's and an operation's; `null`,
+     * the default, requires nothing.
      *
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      */

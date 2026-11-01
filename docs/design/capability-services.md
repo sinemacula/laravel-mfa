@@ -15,7 +15,7 @@ the provider or another capability.
   service's answer returned unchanged.
 - The manager resolves the service from the container on each call, so a service bound or rebound after the manager
   was resolved is the one used.
-- Services resolve the seams a consumer rebinds (`MfaPolicy`, `ProofStore`, the event dispatcher and the
+- Services resolve the seams a consumer rebinds (`FreshnessGate`, `ProofStore`, the event dispatcher and the
   configuration) from the container when they need them, never at construction, so a rebinding (`Event::fake()`, a
   store bound mid-test, a policy bound by a sibling package) reaches a service that is already resolved.
 - The services act for the current identity: `Support\CurrentIdentity::resolve()`, which is `Auth::user()` on the

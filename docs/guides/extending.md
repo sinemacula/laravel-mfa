@@ -11,7 +11,7 @@ models and the `Codes\MfaCodeMessage` mailable. Extension is through **compositi
 | Replacing a shipped driver | Register yours under the same name with `Mfa::extend()`                                |
 | Custom identity model      | Implement `Contracts\MultiFactorAuthenticatable` and use `Concerns\HasFactors`         |
 | Event context              | Implement `Contracts\EventContextResolver` and bind it in the container                |
-| Enforcement policy         | Implement `Contracts\MfaPolicy` and bind it in the container                           |
+| Requirements and freshness | Implement `Contracts\RequirementPolicy`, `FreshnessGate` and the others; bind them     |
 | Proof store                | Implement `Contracts\ProofStore` and bind it in the container                          |
 | SMS delivery               | Implement `Contracts\SmsSender` and bind it in the container                           |
 | Email delivery             | Implement `Contracts\EmailSender`, or use `Codes\MailEmailSender`, and bind it         |
@@ -107,7 +107,7 @@ registers it with the container, and the classes only it uses:
 | `Factors`       | Factor reads, ownership, `FactorSummary` and `OperationGuard`                                       |
 | `Drivers`       | The TOTP, email and SMS drivers, the resolver the services run drivers through, `TotpSettings`      |
 | `Codes`         | Delivered codes: `CodeService`, the senders' defaults, `MailEmailSender`, `MfaCodeMessage`          |
-| `Requirements`  | Whether MFA applies (`shouldUse()`), the default `NullMfaPolicy`, `Requirement`                     |
+| `Requirements`  | `requirement()`, `isFresh()`, `Requirement` and the requirement seams' defaults                     |
 | `Proofs`        | The sign-in's proofs (`proofs()`), `SessionProofStore`, `GuardHooks`, `Proof`, `ProofSettings`      |
 | `Verification`  | `challenge()`, `verify()` and `VerificationResult`                                                  |
 | `Assurance`     | `Channel`, `ObservedProperties`, `Evaluation` and the default `DefaultCombinationPolicy`            |

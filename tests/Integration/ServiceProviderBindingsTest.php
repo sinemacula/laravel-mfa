@@ -9,15 +9,17 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
 use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
-use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
+use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
-use SineMacula\Laravel\Mfa\Requirements\NullMfaPolicy;
+use SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate;
+use SineMacula\Laravel\Mfa\Requirements\ConfiguredRequirementPolicy;
 use Tests\TestCase;
 
 /**
@@ -52,18 +54,34 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `MfaPolicy` contract must resolve to the
-     * shipped `NullMfaPolicy`.
+     * Without a consumer override the `RequirementPolicy` contract must resolve
+     * to the shipped `ConfiguredRequirementPolicy`, which reads the
+     * application's configured mode.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testDefaultMfaPolicyIsNull(): void
+    public function testDefaultRequirementPolicyIsConfigured(): void
     {
-        $policy = $this->container()->make(MfaPolicy::class);
+        $policy = $this->container()->make(RequirementPolicy::class);
 
-        self::assertInstanceOf(NullMfaPolicy::class, $policy);
+        self::assertInstanceOf(ConfiguredRequirementPolicy::class, $policy);
+    }
+
+    /**
+     * Without a consumer override the `FreshnessGate` contract must resolve to
+     * the shipped `ConfiguredFreshnessGate`, which reads the proof store.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testDefaultFreshnessGateIsConfigured(): void
+    {
+        $gate = $this->container()->make(FreshnessGate::class);
+
+        self::assertInstanceOf(ConfiguredFreshnessGate::class, $gate);
     }
 
     /**

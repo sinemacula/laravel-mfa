@@ -12,15 +12,10 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 class AppUser extends User implements MultiFactorAuthenticatable
 {
     use HasFactors;
-
-    public function shouldUseMultiFactor(): bool
-    {
-        return true;
-    }
 }
 ```
 
-The trait gives the model everything else the contract asks:
+The trait gives the model everything the contract asks:
 
 | Method                       | Default                                                                   |
 |------------------------------|---------------------------------------------------------------------------|
@@ -65,7 +60,8 @@ public function isMfaActive(): bool
 
 An identity may require an additional factor of every sign-in, whatever the application asks, for example platform
 staff. Return a `Requirements\Requirement` from `requiresAdditionalFactor()`; it is composed with the application's, a
-tenant's and an operation's requirement, the strictest of each part applying:
+re-enrolment obligation's, a tenant's and an operation's requirement, the strictest of each part applying (see
+[Requirements and step-up](requirements.md)):
 
 ```php
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;

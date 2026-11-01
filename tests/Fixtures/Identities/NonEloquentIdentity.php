@@ -175,17 +175,6 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Always opt the fixture into MFA enforcement.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function shouldUseMultiFactor(): bool
-    {
-        return true;
-    }
-
-    /**
      * Always reports the configured value — non-Eloquent identities in these
      * tests have no real factor store, so the boolean is held directly to keep
      * the cached `isSetup()` path testable without touching a builder.

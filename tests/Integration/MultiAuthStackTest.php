@@ -55,7 +55,7 @@ final class MultiAuthStackTest extends TestCase
 
         $this->actingAs($user);
 
-        self::assertTrue(Mfa::shouldUse());
+        self::assertFalse(Mfa::requirement()->isEmpty());
         self::assertTrue(Mfa::isSetup());
         self::assertCount(1, Mfa::getFactors() ?? collect());
     }
@@ -83,7 +83,7 @@ final class MultiAuthStackTest extends TestCase
         config()->set('auth.defaults.guard', 'token');
         $this->container()->forgetInstance('mfa');
 
-        self::assertTrue(Mfa::shouldUse());
+        self::assertFalse(Mfa::requirement()->isEmpty());
         self::assertTrue(Mfa::isSetup());
         self::assertCount(1, Mfa::getFactors() ?? collect());
     }
@@ -99,8 +99,8 @@ final class MultiAuthStackTest extends TestCase
     public function testCustomAuthenticatableGuardWithoutEloquentBindsCorrectly(): void
     {
         // Custom guard that hands back a non-Eloquent Authenticatable. The
-        // package should treat it as a non-MFA-capable identity (`shouldUse()`
-        // returns false) — proving the manager does not assume Eloquent
+        // package should treat it as a non-MFA-capable identity (its sign-in
+        // requires nothing) — proving the manager does not assume Eloquent
         // throughout the orchestration surface.
         Auth::extend('custom', static fn (): Guard => new GenericUserGuard);
 
@@ -113,7 +113,7 @@ final class MultiAuthStackTest extends TestCase
 
         // GenericUser does not implement MultiFactorAuthenticatable, so the
         // manager must short-circuit cleanly rather than throw.
-        self::assertFalse(Mfa::shouldUse());
+        self::assertTrue(Mfa::requirement()->isEmpty());
         self::assertFalse(Mfa::isSetup());
         self::assertNull(Mfa::getFactors());
     }
@@ -152,7 +152,7 @@ final class MultiAuthStackTest extends TestCase
         // guard return our MFA-capable identity.
         Sanctum::actingAs($user, ['*']);
 
-        self::assertTrue(Mfa::shouldUse());
+        self::assertFalse(Mfa::requirement()->isEmpty());
         self::assertTrue(Mfa::isSetup());
 
         $factors = Mfa::getFactors();

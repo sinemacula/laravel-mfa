@@ -15,7 +15,7 @@ between requests.
 
 | Key                             | Default                            | Bounds                                 | Env                                 | Applied |
 |---------------------------------|------------------------------------|----------------------------------------|-------------------------------------|---------|
-| `applications`                  | `[]`                               | see [Applications](#applications)      |                                     | not yet |
+| `applications`                  | `[]`                               | see [Applications](#applications)      |                                     | partly  |
 | `storage.connection`            | `null`                             | a configured connection, or `null`     | `MFA_STORAGE_CONNECTION`            | yes     |
 | `factor.model`                  | `Models\Factor`                    | an Eloquent `EloquentFactor` model     | `MFA_FACTOR_MODEL`                  | yes     |
 | `factor.table`                  | `mfa_factors`                      | a table name                           | `MFA_FACTOR_TABLE`                  | yes     |
@@ -85,11 +85,12 @@ name:
 ],
 ```
 
-Every key below is checked, but only `totp_window` is applied yet: the TOTP driver accepts the window of the
-application a bound `Contracts\ApplicationResolver` names for the request, and `totp.window` when none is bound. Until
-the flows that read the other keys ship, the shipped drivers verify a factor of any type whichever application asks, no
-factor is required by this configuration alone, and the limits and freshness are not enforced. Use your own policy
-binding (`Contracts\MfaPolicy`) and routes to decide who must verify.
+Every key below is checked; `requirement`, `totp_window` and `freshness` are applied so far. `requirement` is composed
+into `Mfa::requirement()`, which the `mfa` middleware asks before it enforces anything, and `freshness` is what
+`Mfa::isFresh()` judges a step-up against (see [Requirements and step-up](requirements.md)). The TOTP driver accepts the
+window of the application a bound `Contracts\ApplicationResolver` names for the request, and `totp.window` when none is
+bound. Until the flows that read the other keys ship, the shipped drivers verify a factor of any type whichever
+application asks, and the limits are not enforced.
 
 | Key                         | Default                   | Meaning                                                                                                                                |
 |-----------------------------|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
@@ -103,7 +104,7 @@ binding (`Contracts\MfaPolicy`) and routes to decide who must verify.
 | `limits.confirmed`          | `10`                      | Confirmed factors an identity may enrol through the application in total, 1 to 50                                                      |
 | `limits.pending`            | `2`                       | Enrolments an identity may have pending through the application at once, 1 to 10                                                       |
 | `totp_window`               | `totp.window`             | TOTP time steps accepted either side of the current one, 0 to 3                                                                        |
-| `freshness`                 | 900 seconds per operation | How fresh a proof must be for each named operation, 1 to 86400 seconds                                                                 |
+| `freshness`                 | 900 seconds per operation | The requirement each named operation's step-up must meet: seconds, 1 to 86400, or a requirement (below)                                |
 | `first_factor`              | `null`                    | The first factor the application's guard signs people in with: a `method` and the `channel` kind it proves                             |
 
 An application with no block, and one whose block leaves a key out or sets it to `null`, takes the defaults: no type, no
@@ -117,10 +118,26 @@ refused too.
 application's limits, never this one's, and an application never removes, hides or changes a factor enrolled through
 another.
 
-`freshness` names the maximum age, in seconds, of the proof that satisfies each operation's step-up. The package's own
-operations (`mfa.add_factor`, `mfa.replace_factor`, `mfa.remove_factor` and `mfa.generate_recovery_codes`) default to
-900 seconds; an application overrides them and adds its own operations by name. An operation neither names is never
-fresh.
+`freshness` names the requirement each operation's step-up must meet. An entry is either a number of seconds, 1 to
+86400, for an additional verification made within that age, or a serialised requirement (see
+[Requirements](assurance.md#requirements)) that asks for at least one part, each with a `max_age` of 1 to 86400 seconds:
+
+```php
+'freshness' => [
+    'mfa.remove_factor'   => 300,
+    'billing.change_plan' => [
+        'additional_verification' => ['max_age' => 600],
+        'minimum_level'           => ['level' => 'aal2', 'max_age' => 600],
+    ],
+],
+```
+
+The package's own operations (`mfa.add_factor`, `mfa.replace_factor`, `mfa.remove_factor` and
+`mfa.generate_recovery_codes`) ask for an additional verification within 900 seconds; an application's entry replaces
+that default whole, and the application adds its own operations by name. Names are the block's keys, read whole rather
+than as a dotted path, and must be lower-case segments of letters, digits and underscores, each starting with a letter,
+separated by dots; any other name is refused. An operation neither the package nor the application names is never
+fresh unless the caller asks for a requirement of its own.
 
 `first_factor` is how the package knows, without an authentication layer, what started the sign-in: its `method` (any
 name, such as `password`) and its `channel`, one of the channel kinds (`password`, `sms`, `email`,

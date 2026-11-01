@@ -9,6 +9,7 @@ Each note is intentionally short and follows the same structure:
 - `Invariants`
 - `Success Path`
 - `Failure / Edge Cases`
+- `Seams Left`, where a note has parts with nothing yet behind them
 - `Implementation Anchors`
 - `Authoritative Tests`
 - `Change Triggers`
@@ -37,6 +38,9 @@ The current note set is:
 - `event-catalogue.md`: the events the flows dispatch, their payloads and context, and their dispatch after the commit.
 - `seam-contracts.md`: the contracts declared for the seams with an authentication layer and the application, what
   each answers and what a fail-closed answer is, and the pending session and passkey assertion values they carry.
+- `requirements-and-freshness.md`: how a sign-in's requirement is composed from the application's mode, the identity,
+  a re-enrolment obligation and an active tenant, how a session's proofs are checked against a requirement, and how a
+  named operation's freshness is judged, the stricter of the package's and the caller's setting applying.
 - `totp.md`: how TOTP codes are made and checked, the secret and parameters each factor is enrolled with, the
   window, and the compare-and-set that accepts each time step once per factor, also under concurrency.
 - `backup-code-consumption.md`: how backup codes are stored hashed, why consumption and rotation run under the owner's

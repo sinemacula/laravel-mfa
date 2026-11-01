@@ -35,15 +35,4 @@ final class SoftDeletingFactorHolder extends Model implements Authenticatable, M
     protected $fillable = [
         'email',
     ];
-
-    /**
-     * Always use multi-factor authentication.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function shouldUseMultiFactor(): bool
-    {
-        return true;
-    }
 }

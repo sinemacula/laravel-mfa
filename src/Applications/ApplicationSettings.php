@@ -11,6 +11,8 @@ use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Enums\RequirementMode;
+use SineMacula\Laravel\Mfa\Requirements\FreshnessBounds;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
  * One application's settings in `mfa.applications.{name}`: what it accepts and
@@ -18,8 +20,8 @@ use SineMacula\Laravel\Mfa\Enums\RequirementMode;
  * every application. Factors are stored once per identity; an application only
  * chooses the factor types it enables, when it requires one, whether it accepts
  * recovery codes, whether a pending session may enrol its first factor, its
- * limits on enrolments made through it, its TOTP window, how fresh a proof must
- * be for each operation, and the first factor its guard uses.
+ * limits on enrolments made through it, its TOTP window, the requirement each
+ * operation's step-up must meet, and the first factor its guard uses.
  *
  * Every setting is read from the configuration on every call, so a change
  * applies at once and nothing is cached between requests. A key missing from
@@ -38,7 +40,7 @@ final readonly class ApplicationSettings
     /** @var string The key holding every application's block. */
     public const string APPLICATIONS = 'mfa.applications';
 
-    /** @var int How fresh a proof must be for each of the package's own operations, in seconds, when the application sets nothing. */
+    /** @var int The maximum age, in seconds, of the additional verification each of the package's own operations asks for when the application sets nothing. */
     public const int FRESHNESS_SECONDS = 900;
 
     /** @var \SineMacula\Laravel\Mfa\Applications\ApplicationBlock The application's block, read on every call. */
@@ -268,46 +270,56 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * How fresh a proof must be for each operation, in seconds, 1 to 86400: the
-     * package's own operations at `FRESHNESS_SECONDS` unless the application
-     * sets them, and any operation of the application's own it names.
+     * The requirement each operation's step-up must meet: the package's own
+     * operations ask for an additional verification within
+     * `FRESHNESS_SECONDS` unless the application sets them, and any operation
+     * of the application's own it names has the requirement it sets. An entry
+     * is either a number of seconds, 1 to 86400, for an additional
+     * verification within that age, or a serialised requirement (see
+     * `Requirement::fromArray()`) asking for at least one part, each with a
+     * `max_age` of 1 to 86400 seconds. An entry replaces the package's default
+     * for its operation whole. Names are the block's keys, read whole, never as
+     * a dotted path, and must be in the form an operation's name takes (see
+     * `Operation::isName()`).
      *
-     * @return array<string, int>
+     * @return array<string, \SineMacula\Laravel\Mfa\Requirements\Requirement>
      *
      * @throws \InvalidArgumentException
      */
     public function freshness(): array
     {
         $configured = $this->block->all()['freshness'] ?? [];
+        $malformed  = '%s must map operation names, such as mfa.add_factor, to seconds or requirements.';
 
         if (!is_array($configured)) {
-            throw new \InvalidArgumentException(sprintf('%s must map operation names to seconds.', $this->block->key('freshness')));
+            throw new \InvalidArgumentException(sprintf($malformed, $this->block->key('freshness')));
         }
 
-        $freshness = array_fill_keys(array_column(Operation::cases(), 'value'), self::FRESHNESS_SECONDS);
+        $default   = Requirement::none()->withAdditionalVerification(self::FRESHNESS_SECONDS);
+        $freshness = array_fill_keys(array_column(Operation::cases(), 'value'), $default);
 
-        foreach ($configured as $operation => $seconds) {
+        foreach ($configured as $operation => $entry) {
 
-            if (!is_string($operation) || trim($operation) === '') {
-                throw new \InvalidArgumentException(sprintf('%s must map operation names to seconds.', $this->block->key('freshness')));
+            if (!is_string($operation) || !Operation::isName($operation)) {
+                throw new \InvalidArgumentException(sprintf($malformed, $this->block->key('freshness')));
             }
 
-            $freshness[$operation] = IntegerSetting::from($this->block->key('freshness') . '.' . $operation, $seconds, 1, 86400);
+            $freshness[$operation] = $this->operationRequirement($this->block->key('freshness') . '.' . $operation, $entry);
         }
 
         return $freshness;
     }
 
     /**
-     * How fresh a proof must be for the operation, in seconds, or `null` when
-     * neither the package nor the application names it.
+     * The requirement the operation's step-up must meet, or `null` when neither
+     * the package nor the application names it.
      *
      * @param  string  $operation
-     * @return ?int
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      *
      * @throws \InvalidArgumentException
      */
-    public function freshnessFor(string $operation): ?int
+    public function freshnessFor(string $operation): ?Requirement
     {
         return $this->freshness()[$operation] ?? null;
     }
@@ -357,6 +369,36 @@ final readonly class ApplicationSettings
         $this->totpWindow();
         $this->freshness();
         $this->firstFactor();
+    }
+
+    /**
+     * One entry of the `freshness` block as a requirement: seconds for an
+     * additional verification within that age, or a serialised requirement
+     * asking for at least one part, every part within a day.
+     *
+     * @param  string  $key
+     * @param  mixed  $entry
+     * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function operationRequirement(string $key, mixed $entry): Requirement
+    {
+        if (!is_array($entry)) {
+            return Requirement::none()->withAdditionalVerification(IntegerSetting::from($key, $entry, 1, FreshnessBounds::MOST_SECONDS));
+        }
+
+        try {
+            $requirement = Requirement::fromArray($entry);
+        } catch (\InvalidArgumentException $exception) {
+            throw new \InvalidArgumentException(sprintf('%s must be seconds or a serialised requirement: %s', $key, $exception->getMessage()), 0, $exception);
+        }
+
+        if ($requirement->isEmpty()) {
+            throw new \InvalidArgumentException(sprintf('%s must ask for at least one part.', $key));
+        }
+
+        return FreshnessBounds::assertBounded($requirement, $key);
     }
 
     /**

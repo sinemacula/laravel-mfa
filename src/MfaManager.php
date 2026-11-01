@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 
@@ -25,7 +26,9 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  * a one-line delegation to the service of the capability it belongs to,
  * resolved from the container on each call:
  *
- * - `Requirements\RequirementService`: whether MFA applies (`shouldUse()`).
+ * - `Requirements\RequirementService`: what the current sign-in must prove
+ *   (`requirement()`) and whether it is fresh enough for an operation
+ *   (`isFresh()`).
  * - `Factors\FactorService`: the identity's factors and the factor model.
  * - `Proofs\ProofService`: the proofs the current sign-in has recorded
  *   (`proofs()`).
@@ -64,16 +67,38 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Determine whether the current identity should use multi-factor
-     * authentication.
+     * The requirement the current identity's sign-in on the current application
+     * must meet, composed from the application's configured mode, the
+     * identity's own requirement and its re-enrolment obligation: empty when it
+     * needs nothing further, and without an MFA-capable identity.
      *
+     * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function requirement(): Requirement
+    {
+        return $this->container->make(RequirementService::class)->requirement();
+    }
+
+    /**
+     * Whether the current session is fresh enough for the named operation: the
+     * stricter of the requirement the application configures for it and the
+     * one given applies, either alone when the other is absent, and an
+     * operation with neither is never fresh.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
      */
-    public function shouldUse(): bool
+    public function isFresh(string $operation, ?Requirement $requirement = null): bool
     {
-        return $this->container->make(RequirementService::class)->shouldUse();
+        return $this->container->make(RequirementService::class)->isFresh($operation, $requirement);
     }
 
     /**

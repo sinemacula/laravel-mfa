@@ -13,6 +13,8 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\RequirementMode;
+use SineMacula\Laravel\Mfa\Enums\RequirementPart;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
  * Unit tests for `ApplicationSettings`: the configured application names, the
@@ -34,6 +36,9 @@ final class ApplicationSettingsTest extends TestCase
 
     /** @var string The prefix of every key of the application the tests configure. */
     private const string KEY = 'mfa.applications.web.';
+
+    /** @var array<string, array<string, int>> The serialised requirement each of the package's own operations has by default. */
+    private const array FIFTEEN_MINUTES = ['additional_verification' => ['max_age' => 900]];
 
     /**
      * The configured names are listed in order; none are when the block is
@@ -101,12 +106,12 @@ final class ApplicationSettingsTest extends TestCase
         self::assertSame(2, $settings->pendingLimit());
         self::assertSame(1, $settings->totpWindow());
         self::assertSame([
-            'mfa.add_factor'              => 900,
-            'mfa.replace_factor'          => 900,
-            'mfa.remove_factor'           => 900,
-            'mfa.generate_recovery_codes' => 900,
-        ], $settings->freshness());
-        self::assertSame(900, $settings->freshnessFor('mfa.remove_factor'));
+            'mfa.add_factor'              => self::FIFTEEN_MINUTES,
+            'mfa.replace_factor'          => self::FIFTEEN_MINUTES,
+            'mfa.remove_factor'           => self::FIFTEEN_MINUTES,
+            'mfa.generate_recovery_codes' => self::FIFTEEN_MINUTES,
+        ], array_map(static fn (Requirement $requirement): array => $requirement->toArray(), $settings->freshness()));
+        self::assertSame(self::FIFTEEN_MINUTES, $settings->freshnessFor('mfa.remove_factor')?->toArray());
         self::assertNull($settings->freshnessFor('billing.change_plan'));
         self::assertNull($settings->firstFactor());
 
@@ -180,8 +185,12 @@ final class ApplicationSettingsTest extends TestCase
             'bootstrap'      => ['enabled' => true, 'types' => ['totp', 'sms']],
             'limits'         => ['confirmed_per_type' => 2, 'confirmed' => 3, 'pending' => '4'],
             'totp_window'    => '0',
-            'freshness'      => ['mfa.remove_factor' => 60, 'billing.change_plan' => '300'],
-            'first_factor'   => ['method' => 'password', 'channel' => 'password'],
+            'freshness'      => [
+                'mfa.remove_factor'   => 60,
+                'billing.change_plan' => '300',
+                'reports.export'      => ['multifactor' => ['max_age' => 120], 'minimum_level' => ['level' => 'aal2', 'max_age' => 600]],
+            ],
+            'first_factor' => ['method' => 'password', 'channel' => 'password'],
         ]);
 
         self::assertSame(['totp', 'sms'], $settings->types());
@@ -196,9 +205,13 @@ final class ApplicationSettingsTest extends TestCase
         self::assertSame(3, $settings->confirmedLimit());
         self::assertSame(4, $settings->pendingLimit());
         self::assertSame(0, $settings->totpWindow());
-        self::assertSame(60, $settings->freshnessFor('mfa.remove_factor'));
-        self::assertSame(900, $settings->freshnessFor('mfa.add_factor'));
-        self::assertSame(300, $settings->freshnessFor('billing.change_plan'));
+        self::assertSame(['additional_verification' => ['max_age' => 60]], $settings->freshnessFor('mfa.remove_factor')?->toArray());
+        self::assertSame(self::FIFTEEN_MINUTES, $settings->freshnessFor('mfa.add_factor')?->toArray());
+        self::assertSame(['additional_verification' => ['max_age' => 300]], $settings->freshnessFor('billing.change_plan')?->toArray());
+        self::assertSame(
+            ['multifactor' => ['max_age' => 120], 'minimum_level' => ['level' => 'aal2', 'max_age' => 600]],
+            $settings->freshnessFor('reports.export')?->toArray(),
+        );
 
         $declared = $settings->firstFactor();
 
@@ -222,8 +235,9 @@ final class ApplicationSettingsTest extends TestCase
 
         self::assertSame([1, 1, 1, 0], [$least->confirmedPerTypeLimit(), $least->confirmedLimit(), $least->pendingLimit(), $least->totpWindow()]);
         self::assertSame([50, 50, 10, 3], [$most->confirmedPerTypeLimit(), $most->confirmedLimit(), $most->pendingLimit(), $most->totpWindow()]);
-        self::assertSame(1, self::settings(['freshness' => ['mfa.add_factor' => 1]])->freshnessFor('mfa.add_factor'));
-        self::assertSame(86400, self::settings(['freshness' => ['mfa.add_factor' => 86400]])->freshnessFor('mfa.add_factor'));
+        self::assertSame(1, self::settings(['freshness' => ['mfa.add_factor' => 1]])->freshnessFor('mfa.add_factor')?->maxAge(RequirementPart::ADDITIONAL_VERIFICATION));
+        self::assertSame(86400, self::settings(['freshness' => ['mfa.add_factor' => 86400]])->freshnessFor('mfa.add_factor')?->maxAge(RequirementPart::ADDITIONAL_VERIFICATION));
+        self::assertSame(86400, self::settings(['freshness' => ['mfa.add_factor' => ['multifactor' => ['max_age' => 86400]]]])->freshnessFor('mfa.add_factor')?->maxAge(RequirementPart::MULTIFACTOR));
     }
 
     /**
@@ -276,7 +290,8 @@ final class ApplicationSettingsTest extends TestCase
 
         $typeList  = self::KEY . 'types must be a list of distinct factor type names.';
         $declared  = self::KEY . 'first_factor must be null, or a method and the kind of channel it proves (any channel kind but unknown).';
-        $fresh     = self::KEY . 'freshness must map operation names to seconds.';
+        $fresh     = self::KEY . 'freshness must map operation names, such as mfa.add_factor, to seconds or requirements.';
+        $unbounded = self::KEY . 'freshness.billing.change_plan must give every part a max_age from 1 to 86400 seconds, which its [multifactor] part does not.';
         $bootTypes = self::KEY . 'bootstrap.types must be a list of distinct factor type names.';
 
         yield 'a block that is not an array' => ['on', $types, 'mfa.applications.web must be an array.'];
@@ -336,6 +351,25 @@ final class ApplicationSettingsTest extends TestCase
         yield 'freshness that is not an array' => [['freshness' => 900], $freshness, $fresh];
         yield 'freshness keyed by position' => [['freshness' => [900]], $freshness, $fresh];
         yield 'freshness for a blank operation' => [['freshness' => [' ' => 900]], $freshness, $fresh];
+        yield 'freshness for an operation in capitals' => [['freshness' => ['Billing.Change_Plan' => 900]], $freshness, $fresh];
+        yield 'freshness for an operation with a trailing newline' => [['freshness' => ["billing.change_plan\n" => 900]], $freshness, $fresh];
+        yield 'freshness that is neither seconds nor a requirement' => [
+            ['freshness' => ['billing.change_plan' => true]],
+            $freshness,
+            self::KEY . 'freshness.billing.change_plan must be an integer from 1 to 86400.',
+        ];
+        yield 'freshness of a requirement with an unknown part' => [
+            ['freshness' => ['billing.change_plan' => ['sometimes' => []]]],
+            $freshness,
+            self::KEY . 'freshness.billing.change_plan must be seconds or a serialised requirement: The [sometimes] part of a serialised requirement is not a known part.',
+        ];
+        yield 'freshness of a requirement asking for nothing' => [
+            ['freshness' => ['billing.change_plan' => []]],
+            $freshness,
+            self::KEY . 'freshness.billing.change_plan must ask for at least one part.',
+        ];
+        yield 'freshness of a requirement with no maximum age' => [['freshness' => ['billing.change_plan' => ['multifactor' => []]]], $freshness, $unbounded];
+        yield 'freshness of a requirement past a day' => [['freshness' => ['billing.change_plan' => ['multifactor' => ['max_age' => 86401]]]], $freshness, $unbounded];
         yield 'freshness of no time' => [['freshness' => ['mfa.add_factor' => 0]], $freshness, self::KEY . 'freshness.mfa.add_factor must be an integer from 1 to 86400.'];
         yield 'freshness past a day' => [
             ['freshness' => ['billing.change_plan' => 86401]],

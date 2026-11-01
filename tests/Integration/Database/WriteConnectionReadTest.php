@@ -15,14 +15,16 @@ use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
 use Tests\TestCase;
 
 /**
- * The identity's factors, and whether it has a confirmed one, are read from the
- * write connection when the storage connection splits its reads and writes.
+ * The identity's factors, whether it has a confirmed one, and its re-enrolment
+ * obligation are read from the write connection when the storage connection
+ * splits its reads and writes.
  *
  * The storage connection reads from one SQLite file and writes to another,
  * standing in for a replica that has not yet caught up with the primary: both
@@ -35,6 +37,7 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(FactorService::class)]
+#[CoversClass(ReenrollmentObligation::class)]
 #[CoversTrait(HasFactors::class)]
 final class WriteConnectionReadTest extends TestCase
 {
@@ -156,6 +159,36 @@ final class WriteConnectionReadTest extends TestCase
 
         self::assertFalse($holder->isMfaEnabled());
         self::assertFalse(Mfa::isSetup());
+    }
+
+    /**
+     * A re-enrolment obligation set on the writer and not yet on the reader
+     * still obliges the identity, so its sign-in still requires an additional
+     * verification.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAnObligationNotYetOnTheReaderStillObliges(): void
+    {
+        $holder = FactorHolder::query()->create(['email' => 'obliged@example.test']);
+        $now    = CarbonImmutable::now();
+
+        DB::connection('split')->table('mfa_identity_states')->insert([
+            'id'                    => Str::lower((string) Str::ulid()),
+            'authenticatable_type'  => $holder->getMorphClass(),
+            'authenticatable_id'    => (string) $holder->id,
+            'reenrollment_required' => true,
+            'created_at'            => $now,
+            'updated_at'            => $now,
+        ]);
+
+        $this->actingAs($holder);
+
+        self::assertSame(0, DB::connection('replica')->table('mfa_identity_states')->count());
+        self::assertTrue(ReenrollmentObligation::isRequired($holder));
+        self::assertFalse(Mfa::requirement()->isEmpty());
     }
 
     /**

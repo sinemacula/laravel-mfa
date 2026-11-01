@@ -17,6 +17,7 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Factors\InMemoryFactor;
@@ -68,12 +69,15 @@ final class MfaManagerTest extends TestCase
      */
     public static function delegations(): iterable
     {
-        $factor  = new InMemoryFactor;
-        $models  = new Collection;
-        $refused = SendResult::refused(FailureReason::SENDING_CAPPED, 30);
+        $factor      = new InMemoryFactor;
+        $models      = new Collection;
+        $refused     = SendResult::refused(FailureReason::SENDING_CAPPED, 30);
+        $requirement = Requirement::none()->withAdditionalVerification(300);
 
-        yield 'shouldUse true' => ['shouldUse', RequirementService::class, 'shouldUse', [], true];
-        yield 'shouldUse false' => ['shouldUse', RequirementService::class, 'shouldUse', [], false];
+        yield 'requirement' => ['requirement', RequirementService::class, 'requirement', [], $requirement];
+        yield 'requirement empty' => ['requirement', RequirementService::class, 'requirement', [], Requirement::none()];
+        yield 'isFresh true' => ['isFresh', RequirementService::class, 'isFresh', ['mfa.add_factor', $requirement], true];
+        yield 'isFresh false' => ['isFresh', RequirementService::class, 'isFresh', ['billing.change_plan', null], false];
         yield 'isSetup true' => ['isSetup', FactorService::class, 'isSetup', [], true];
         yield 'isSetup false' => ['isSetup', FactorService::class, 'isSetup', [], false];
         yield 'getFactors' => ['getFactors', FactorService::class, 'getFactors', [], $models];
@@ -151,10 +155,15 @@ final class MfaManagerTest extends TestCase
         $verification->shouldReceive('challenge')->once()->with($this->manager(), 'totp', $factor, Purpose::SIGN_IN)->andReturnNull();
         $verification->shouldReceive('verify')->once()->with($this->manager(), 'totp', $factor, '123456', Purpose::SIGN_IN)->andReturnTrue();
 
+        $requirements = \Mockery::mock($this->container()->make(RequirementService::class));
+        $requirements->shouldReceive('isFresh')->once()->with('mfa.add_factor', null)->andReturnFalse();
+
         $this->container()->instance(RecoveryCodeService::class, $codes);
         $this->container()->instance(VerificationService::class, $verification);
+        $this->container()->instance(RequirementService::class, $requirements);
 
         self::assertSame([], $this->manager()->issueBackupCodes());
+        self::assertFalse($this->manager()->isFresh('mfa.add_factor'));
         self::assertNull($this->manager()->challenge('totp', $factor));
         self::assertTrue($this->manager()->verify('totp', $factor, '123456'));
     }

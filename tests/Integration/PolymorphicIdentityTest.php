@@ -67,7 +67,7 @@ final class PolymorphicIdentityTest extends TestCase
         // the current identity on every call, scoped by morph class as well as
         // identifier.
         $this->actingAs($primary);
-        self::assertTrue(Mfa::shouldUse());
+        self::assertFalse(Mfa::requirement()->isEmpty());
         self::assertTrue(Mfa::isSetup());
 
         $primaryFactors = Mfa::getFactors();
@@ -78,7 +78,7 @@ final class PolymorphicIdentityTest extends TestCase
         self::assertSame('totp', $primaryFactor->getType());
 
         $this->actingAs($secondary);
-        self::assertTrue(Mfa::shouldUse());
+        self::assertFalse(Mfa::requirement()->isEmpty());
         self::assertTrue(Mfa::isSetup());
 
         $secondaryFactors = Mfa::getFactors();
@@ -131,8 +131,8 @@ final class PolymorphicIdentityTest extends TestCase
     }
 
     /**
-     * The `shouldUse()` enforcement check must respond identically across both
-     * identity classes when neither opts in.
+     * The sign-in requirement must be empty for both identity classes alike
+     * when neither requires anything of its own.
      *
      * @return void
      */
@@ -149,9 +149,9 @@ final class PolymorphicIdentityTest extends TestCase
         ]);
 
         $this->actingAs($primary);
-        self::assertFalse(Mfa::shouldUse());
+        self::assertTrue(Mfa::requirement()->isEmpty());
 
         $this->actingAs($secondary);
-        self::assertFalse(Mfa::shouldUse());
+        self::assertTrue(Mfa::requirement()->isEmpty());
     }
 }

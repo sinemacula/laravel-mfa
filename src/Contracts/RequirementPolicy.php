@@ -14,9 +14,12 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  * is chosen, what the sign-in must prove further: given the identity, the
  * application and the first factor's proof (its method, channel, observed
  * properties and time, not the method alone), it answers with a requirement,
- * empty when no further proof is needed. The answer is composed from every
- * source of a requirement (the application, the identity, a re-enrolment
- * obligation and the active tenant), the strictest applying.
+ * empty when no further proof is needed, as when the first factor meets the
+ * whole of it on its own. The answer is composed from the application's
+ * setting, the identity's own requirement and a re-enrolment obligation, the
+ * strictest applying. The active tenant's requirement is not part of it, since
+ * no tenant is chosen yet: it is composed where a tenant becomes active,
+ * through `TenantRequirement` and `RequirementCheck`.
  *
  * @api
  *
