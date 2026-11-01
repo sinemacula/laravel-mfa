@@ -40,7 +40,7 @@ final class BackupCodeBench
     public function __construct()
     {
         $this->driver = new BackupCodeDriver;
-        $this->factor = new InMemoryFactor(driver: 'backup_code');
+        $this->factor = new InMemoryFactor(type: 'backup_code');
     }
 
     /**

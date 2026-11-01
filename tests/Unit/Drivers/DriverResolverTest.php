@@ -95,7 +95,7 @@ final class DriverResolverTest extends TestCase
      */
     public function testAcceptsTheFactorsOwnDriver(): void
     {
-        $this->resolver()->assertMatchesFactor('email', new InMemoryFactor(driver: 'email'));
+        $this->resolver()->assertMatchesFactor('email', new InMemoryFactor(type: 'email'));
 
         // Reaching this line without a mismatch exception is the assertion.
         $this->addToAssertionCount(1);
@@ -112,7 +112,7 @@ final class DriverResolverTest extends TestCase
     {
         $this->expectException(FactorDriverMismatchException::class);
 
-        $this->resolver()->assertMatchesFactor('totp', new InMemoryFactor(driver: 'email'));
+        $this->resolver()->assertMatchesFactor('totp', new InMemoryFactor(type: 'email'));
     }
 
     /**

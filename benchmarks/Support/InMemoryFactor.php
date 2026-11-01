@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Benchmarks\Support;
 
+use Benchmarks\Support\Concerns\ReportsUsableFactorDefaults;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
@@ -21,13 +22,15 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  */
 final class InMemoryFactor implements Factor
 {
+    use ReportsUsableFactorDefaults;
+
     /**
      * Build a benchmark factor double with the supplied mutable state.
      *
-     * @param  string  $driver
+     * @param  string  $type
      * @param  ?string  $id
      * @param  ?string  $label
-     * @param  ?string  $recipient
+     * @param  ?string  $destination
      * @param  ?string  $secret
      * @param  ?string  $code
      * @param  ?\Carbon\CarbonInterface  $expiresAt
@@ -40,8 +43,8 @@ final class InMemoryFactor implements Factor
      */
     public function __construct(
 
-        /** Registered driver name (e.g. `'totp'`, `'backup_code'`). */
-        private string $driver,
+        /** The factor type (e.g. `'totp'`, `'backup_code'`). */
+        private string $type,
 
         /** Factor identifier returned by `getFactorIdentifier()`. */
         private ?string $id = 'bench-factor',
@@ -50,7 +53,7 @@ final class InMemoryFactor implements Factor
         private ?string $label = null,
 
         /** Delivery destination for OTP drivers; null otherwise. */
-        private ?string $recipient = null,
+        private ?string $destination = null,
 
         /** Stored secret / hash material the driver verifies against. */
         #[\SensitiveParameter] private ?string $secret = null,
@@ -113,14 +116,14 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the configured driver name.
+     * Return the configured type.
      *
      * @return string
      */
     #[\Override]
-    public function getDriver(): string
+    public function getType(): string
     {
-        return $this->driver;
+        return $this->type;
     }
 
     /**
@@ -135,14 +138,14 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the configured delivery recipient.
+     * Return the configured delivery destination.
      *
      * @return ?string
      */
     #[\Override]
-    public function getRecipient(): ?string
+    public function getDestination(): ?string
     {
-        return $this->recipient;
+        return $this->destination;
     }
 
     /**

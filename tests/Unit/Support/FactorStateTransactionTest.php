@@ -183,7 +183,7 @@ final class FactorStateTransactionTest extends TestCase
         $factor = Factor::query()->create([
             'authenticatable_type' => NonEloquentIdentity::class,
             'authenticatable_id'   => 'plain-3',
-            'driver'               => 'totp',
+            'type'                 => 'totp',
         ]);
 
         $factors = FactorStateTransaction::forFactor($factor, static fn (Collection $factors): Collection => $factors);
@@ -293,7 +293,7 @@ final class FactorStateTransactionTest extends TestCase
      */
     public function testRefusesAFactorWithoutAnOwnerType(): void
     {
-        $factor = new Factor(['authenticatable_id' => '1', 'driver' => 'totp']);
+        $factor = new Factor(['authenticatable_id' => '1', 'type' => 'totp']);
 
         $this->expectException(UnsupportedIdentifierException::class);
         $this->expectExceptionMessage('The factor names no owner type, so its owner\'s factor state cannot be locked.');
@@ -310,7 +310,7 @@ final class FactorStateTransactionTest extends TestCase
      */
     public function testRefusesAFactorWithAnEmptyOwnerType(): void
     {
-        $factor = new Factor(['authenticatable_type' => '', 'authenticatable_id' => '1', 'driver' => 'totp']);
+        $factor = new Factor(['authenticatable_type' => '', 'authenticatable_id' => '1', 'type' => 'totp']);
 
         $this->expectException(UnsupportedIdentifierException::class);
 
@@ -340,7 +340,7 @@ final class FactorStateTransactionTest extends TestCase
         return Factor::query()->create([
             'authenticatable_type' => $user->getMorphClass(),
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => $driver,
+            'type'                 => $driver,
         ]);
     }
 }

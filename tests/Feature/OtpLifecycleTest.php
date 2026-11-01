@@ -45,11 +45,11 @@ final class OtpLifecycleTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Test email challenge sends the mailable to the recipient.
+     * Test email challenge sends the mailable to the destination.
      *
      * @return void
      */
-    public function testEmailChallengeSendsMailableToRecipient(): void
+    public function testEmailChallengeSendsMailableToDestination(): void
     {
         Mail::fake();
 
@@ -319,8 +319,8 @@ final class OtpLifecycleTest extends TestCase
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'email',
-            'recipient'            => $user->email,
+            'type'                 => 'email',
+            'destination'          => $user->email,
         ]);
 
         return [$user, $factor];
@@ -345,8 +345,8 @@ final class OtpLifecycleTest extends TestCase
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'sms',
-            'recipient'            => $phone,
+            'type'                 => 'sms',
+            'destination'          => $phone,
         ]);
 
         return [$user, $factor];

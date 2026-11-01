@@ -1,0 +1,258 @@
+<?php
+
+declare(strict_types = 1);
+
+namespace Tests\Unit\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Config;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Models\Code;
+use SineMacula\Laravel\Mfa\Models\Enrollment;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
+use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
+use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use Tests\TestCase;
+
+/**
+ * Unit tests for the models of the package's other records (enrolments,
+ * delivered codes, identity states, passkey associations and recovery codes):
+ * each on its configured table and the storage connection, keyed by a ULID,
+ * with what it must never serialise hidden and its columns cast.
+ *
+ * @author      Ben Carey <bdmc@sinemacula.co.uk>
+ * @copyright   2026 Sine Macula Limited
+ *
+ * @internal
+ */
+#[CoversClass(Enrollment::class)]
+#[CoversClass(Code::class)]
+#[CoversClass(IdentityState::class)]
+#[CoversClass(PasskeyAssociation::class)]
+#[CoversClass(RecoveryCode::class)]
+final class StoredRecordModelsTest extends TestCase
+{
+    /**
+     * Rows of a model, its table setting and its default table.
+     *
+     * @return iterable<string, array{class-string<\Illuminate\Database\Eloquent\Model>, string, string}>
+     */
+    public static function tables(): iterable
+    {
+        foreach (self::records() as $name => [$model, $setting, $default]) {
+            yield $name => [$model, $setting, $default];
+        }
+    }
+
+    /**
+     * The model takes its default table, or the configured one.
+     *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @param  string  $setting
+     * @param  string  $default
+     * @return void
+     */
+    #[DataProvider('tables')]
+    public function testTakesTheConfiguredTable(string $model, string $setting, string $default): void
+    {
+        self::assertSame($default, (new $model)->getTable());
+
+        Config::set($setting, 'custom_records');
+
+        try {
+            self::assertSame('custom_records', (new $model)->getTable());
+        } finally {
+            Config::set($setting, null);
+        }
+    }
+
+    /**
+     * Rows of a model.
+     *
+     * @return iterable<string, array{class-string<\Illuminate\Database\Eloquent\Model>}>
+     */
+    public static function models(): iterable
+    {
+        foreach (self::records() as $name => [$model]) {
+            yield $name => [$model];
+        }
+    }
+
+    /**
+     * The model lives on the storage connection, named even when it is the
+     * default one.
+     *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @return void
+     */
+    #[DataProvider('models')]
+    public function testTakesTheStorageConnection(string $model): void
+    {
+        self::assertSame('testing', (new $model)->getConnectionName());
+
+        Config::set('mfa.storage.connection', 'secondary');
+
+        try {
+            self::assertSame('secondary', (new $model)->getConnectionName());
+        } finally {
+            Config::set('mfa.storage.connection', null);
+        }
+    }
+
+    /**
+     * The model is keyed by a ULID it generates.
+     *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @return void
+     */
+    #[DataProvider('models')]
+    public function testIsKeyedByAUlid(string $model): void
+    {
+        $instance = new $model;
+
+        self::assertSame(['id'], $instance->uniqueIds());
+        self::assertFalse($instance->getIncrementing());
+    }
+
+    /**
+     * Rows of a model and what it hides.
+     *
+     * @return iterable<string, array{class-string<\Illuminate\Database\Eloquent\Model>, list<string>}>
+     */
+    public static function hidden(): iterable
+    {
+        foreach (self::records() as $name => [$model, , , $hidden]) {
+            yield $name => [$model, $hidden];
+        }
+    }
+
+    /**
+     * What the model must never serialise is hidden.
+     *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @param  list<string>  $hidden
+     * @return void
+     */
+    #[DataProvider('hidden')]
+    public function testHidesWhatItMustNeverSerialise(string $model, array $hidden): void
+    {
+        self::assertSame($hidden, (new $model)->getHidden());
+    }
+
+    /**
+     * Rows of a model and its casts.
+     *
+     * @return iterable<string, array{class-string<\Illuminate\Database\Eloquent\Model>, array<string, string>}>
+     */
+    public static function casts(): iterable
+    {
+        foreach (self::records() as $name => [$model, , , , $casts]) {
+            yield $name => [$model, $casts];
+        }
+    }
+
+    /**
+     * The model casts its columns.
+     *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @param  array<string, string>  $casts
+     * @return void
+     */
+    #[DataProvider('casts')]
+    public function testCastsItsColumns(string $model, array $casts): void
+    {
+        $instance = new $model;
+
+        foreach ($casts as $column => $cast) {
+            self::assertTrue($instance->hasCast($column, $cast), $column);
+        }
+    }
+
+    /**
+     * Every column but the key and the timestamps is mass assignable.
+     *
+     * @return void
+     */
+    public function testEveryColumnButTheKeyAndTimestampsIsFillable(): void
+    {
+        $owner = ['authenticatable_type', 'authenticatable_id'];
+
+        self::assertSame(['factor_id', ...$owner, 'grant_hash', 'application', 'session_id', 'expires_at', 'attempts'], (new Enrollment)->getFillable());
+        self::assertSame(
+            ['factor_id', ...$owner, 'purpose', 'application', 'session_id', 'code_hash', 'attempts', 'sends', 'sent_at', 'expires_at', 'consumed_at'],
+            (new Code)->getFillable(),
+        );
+        self::assertSame(
+            [...$owner, 'verification_generation', 'reenrollment_required', 'consecutive_failures', 'locked_until', 'recovery_codes_generation', 'recovery_codes_generated_at'],
+            (new IdentityState)->getFillable(),
+        );
+        self::assertSame(['factor_id', ...$owner, 'credential_id_hash', 'credential_id'], (new PasskeyAssociation)->getFillable());
+        self::assertSame([...$owner, 'code_hash', 'generation', 'used_at', 'replaced_at'], (new RecoveryCode)->getFillable());
+    }
+
+    /**
+     * A subclass of the recovery code model that names a connection of its own
+     * keeps it, so a model off the storage connection is refused rather than
+     * silently moved.
+     *
+     * @return void
+     */
+    public function testARecoveryCodeSubclassKeepsItsOwnConnection(): void
+    {
+        $model = new class extends RecoveryCode {
+            /** @var string|\UnitEnum|null */
+            protected $connection = 'secondary';
+        };
+
+        self::assertSame('secondary', $model->getConnectionName());
+        self::assertInstanceOf(Model::class, $model);
+    }
+
+    /**
+     * Each model, its table setting, its default table, what it hides and its
+     * casts.
+     *
+     * @return iterable<string, array{class-string<\Illuminate\Database\Eloquent\Model>, string, string, list<string>, array<string, string>}>
+     */
+    private static function records(): iterable
+    {
+        yield 'enrolment' => [Enrollment::class, 'mfa.enrollment.table', 'mfa_enrollments', ['grant_hash', 'session_id'], [
+            'authenticatable_type' => 'string',
+            'authenticatable_id'   => 'string',
+            'expires_at'           => 'datetime',
+            'attempts'             => 'integer',
+        ]];
+        yield 'code' => [Code::class, 'mfa.codes.table', 'mfa_codes', ['code_hash', 'session_id'], [
+            'authenticatable_type' => 'string',
+            'authenticatable_id'   => 'string',
+            'attempts'             => 'integer',
+            'sends'                => 'integer',
+            'sent_at'              => 'datetime',
+            'expires_at'           => 'datetime',
+            'consumed_at'          => 'datetime',
+        ]];
+        yield 'identity state' => [IdentityState::class, 'mfa.identity_state.table', 'mfa_identity_states', [], [
+            'authenticatable_type'        => 'string',
+            'authenticatable_id'          => 'string',
+            'verification_generation'     => 'integer',
+            'reenrollment_required'       => 'boolean',
+            'consecutive_failures'        => 'integer',
+            'locked_until'                => 'datetime',
+            'recovery_codes_generation'   => 'integer',
+            'recovery_codes_generated_at' => 'datetime',
+        ]];
+        yield 'passkey association' => [PasskeyAssociation::class, 'mfa.passkeys.table', 'mfa_passkey_associations', [], [
+            'authenticatable_type' => 'string',
+            'authenticatable_id'   => 'string',
+        ]];
+        yield 'recovery code' => [RecoveryCode::class, 'mfa.recovery_codes.table', 'mfa_recovery_codes', ['code_hash'], [
+            'authenticatable_type' => 'string',
+            'authenticatable_id'   => 'string',
+            'code_hash'            => 'string',
+            'generation'           => 'integer',
+            'used_at'              => 'datetime',
+            'replaced_at'          => 'datetime',
+        ]];
+    }
+}

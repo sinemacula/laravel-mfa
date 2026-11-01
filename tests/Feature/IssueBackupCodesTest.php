@@ -91,7 +91,7 @@ final class IssueBackupCodesTest extends TestCase
 
         $persisted = Factor::query()
             ->where('authenticatable_id', (string) $user->id)
-            ->where('driver', 'backup_code')
+            ->where('type', 'backup_code')
             ->get();
 
         self::assertCount(10, $persisted);
@@ -113,7 +113,7 @@ final class IssueBackupCodesTest extends TestCase
 
         $persisted = Factor::query()
             ->where('authenticatable_id', (string) $user->id)
-            ->where('driver', 'backup_code')
+            ->where('type', 'backup_code')
             ->get();
 
         $hasher = new BackupCodeDriver;
@@ -170,7 +170,7 @@ final class IssueBackupCodesTest extends TestCase
 
         $firstIds = Factor::query()
             ->where('authenticatable_id', (string) $user->id)
-            ->where('driver', 'backup_code')
+            ->where('type', 'backup_code')
             ->pluck('id')
             ->all();
         self::assertCount(10, $firstIds);
@@ -180,7 +180,7 @@ final class IssueBackupCodesTest extends TestCase
 
         $secondIds = Factor::query()
             ->where('authenticatable_id', (string) $user->id)
-            ->where('driver', 'backup_code')
+            ->where('type', 'backup_code')
             ->pluck('id')
             ->all();
 
@@ -210,7 +210,7 @@ final class IssueBackupCodesTest extends TestCase
         $codes = Mfa::issueBackupCodes(3);
 
         self::assertCount(3, $codes);
-        self::assertCount(3, Factor::query()->where('driver', 'backup_code')->get());
+        self::assertCount(3, Factor::query()->where('type', 'backup_code')->get());
     }
 
     /**
@@ -229,7 +229,7 @@ final class IssueBackupCodesTest extends TestCase
 
         $totp = Factor::query()
             ->where('authenticatable_id', (string) $user->id)
-            ->where('driver', 'totp')
+            ->where('type', 'totp')
             ->get();
 
         self::assertCount(1, $totp, 'rotation must not touch other drivers');
@@ -251,7 +251,7 @@ final class IssueBackupCodesTest extends TestCase
 
         $backup = Factor::query()
             ->where('authenticatable_id', (string) $user->id)
-            ->where('driver', 'backup_code')
+            ->where('type', 'backup_code')
             ->get();
 
         self::assertCount(10, $backup);
@@ -336,7 +336,7 @@ final class IssueBackupCodesTest extends TestCase
         Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 

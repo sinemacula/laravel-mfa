@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Drivers;
 use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Exceptions\MissingDriverDependencyException;
 
 /**
@@ -89,8 +90,32 @@ final readonly class TotpDriver implements FactorDriver
     }
 
     /**
-     * Generate a new TOTP shared secret.
+     * An authenticator app holds the shared secret.
      *
+     * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
+     */
+    #[\Override]
+    public function channelKind(): ChannelKind
+    {
+        return ChannelKind::AUTHENTICATOR_APP;
+    }
+
+    /**
+     * The `amr` value of a TOTP code: `otp`.
+     *
+     * @return list<string>
+     */
+    #[\Override]
+    public function amr(): array
+    {
+        return ['otp'];
+    }
+
+    /**
+     * Start an enrolment with a new shared secret, which the caller stores on
+     * the pending factor and shows the person once.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return string
      *
      * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
@@ -98,10 +123,30 @@ final readonly class TotpDriver implements FactorDriver
      * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     #[\Override]
-    public function generateSecret(): string
+    public function startEnrollment(Factor $factor): string
     {
         /** @var string */
         return $this->google2fa->generateSecretKey();
+    }
+
+    /**
+     * Confirm the pending factor with the first code its authenticator app
+     * shows, checked as any other.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $code
+     * @return bool
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
+     *
+     * @imperative
+     */
+    #[\Override]
+    public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool
+    {
+        return $this->verify($factor, $code);
     }
 
     /**

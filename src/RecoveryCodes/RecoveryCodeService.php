@@ -129,7 +129,7 @@ final readonly class RecoveryCodeService
         $modelClass::query()
             ->where('authenticatable_type', $morphType)
             ->where('authenticatable_id', $morphId)
-            ->where('driver', BackupCodeDriver::NAME)
+            ->where('type', BackupCodeDriver::NAME)
             ->delete();
 
         foreach ($codes as $code) {
@@ -138,7 +138,7 @@ final readonly class RecoveryCodeService
 
             $factor->setAttribute($relation->getMorphType(), $morphType);
             $factor->setAttribute($relation->getForeignKeyName(), $morphId);
-            $factor->setAttribute($factor->getDriverName(), BackupCodeDriver::NAME);
+            $factor->setAttribute($factor->getTypeName(), BackupCodeDriver::NAME);
             $factor->setAttribute($factor->getSecretName(), $driver->hash($code));
             $factor->save();
 

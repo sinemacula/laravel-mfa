@@ -42,7 +42,7 @@ final class FactorDriverMismatchException extends \InvalidArgumentException
             sprintf(
                 'Driver mismatch: requested [%s] but factor is registered against [%s].',
                 $requested,
-                $factor->getDriver(),
+                $factor->getType(),
             ),
         );
     }

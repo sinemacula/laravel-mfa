@@ -37,7 +37,7 @@ final class FactorOwnershipMismatchException extends \RuntimeException
         return new self(
             sprintf(
                 'Factor [%s] does not belong to the current identity [%s].',
-                $factor->getDriver(),
+                $factor->getType(),
                 $identity::class,
             ),
         );

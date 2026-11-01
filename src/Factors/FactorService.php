@@ -5,12 +5,9 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Factors;
 
 use Illuminate\Contracts\Container\Container;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
+use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
-use SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException;
-use SineMacula\Laravel\Mfa\Models\Factor as ShippedFactorModel;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
@@ -90,45 +87,17 @@ final readonly class FactorService
     }
 
     /**
-     * Resolve the configured factor model class.
-     *
-     * Reads `config('mfa.factor.model')`; falls back to the shipped `Factor`
-     * model when unset. Validates the value is a class string implementing
-     * `EloquentFactor`: misconfigured values throw
-     * `InvalidFactorModelException` rather than silently degrading, since a
-     * typo would otherwise be invisible.
+     * Resolve the configured factor model class (see
+     * `Database\ConfiguredModels`): the shipped `Factor` model unless
+     * `mfa.factor.model` names another, which must extend Eloquent's model and
+     * implement `EloquentFactor`.
      *
      * @return class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function factorModel(): string
     {
-        $config = $this->container->make('config');
-
-        /** @var mixed $configured */
-        $configured = $config->get('mfa.factor.model', ShippedFactorModel::class);
-
-        // A null value (consumer cleared the env var, or the config entry is
-        // missing entirely) falls through to the shipped model, matching the
-        // fresh-install contract documented in `config/mfa.php`.
-        if ($configured === null) {
-            return ShippedFactorModel::class;
-        }
-
-        if (!is_string($configured) || $configured === '') {
-            throw new InvalidFactorModelException(sprintf('mfa.factor.model must be a class string; got [%s].', get_debug_type($configured)));
-        }
-
-        if (!class_exists($configured)) {
-            throw new InvalidFactorModelException(sprintf('mfa.factor.model class [%s] does not exist.', $configured));
-        }
-
-        if (!is_subclass_of($configured, EloquentFactor::class) || !is_subclass_of($configured, Model::class)) {
-            throw new InvalidFactorModelException(sprintf('mfa.factor.model class [%s] must extend %s and implement %s.', $configured, Model::class, EloquentFactor::class));
-        }
-
-        /** @var class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $configured */
-        return $configured;
+        return ConfiguredModels::factor($this->container->make('config'));
     }
 }

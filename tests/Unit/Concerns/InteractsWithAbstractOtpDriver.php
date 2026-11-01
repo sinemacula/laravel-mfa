@@ -30,7 +30,7 @@ use Tests\Fixtures\Identities\TestUser;
 trait InteractsWithAbstractOtpDriver
 {
     /** @var string Address fixture reused across the persisted-factor scaffolding helpers. */
-    protected const string OTP_RECIPIENT = 'otp@example.com';
+    protected const string OTP_DESTINATION = 'otp@example.com';
 
     /**
      * Build a concrete subclass of the abstract driver that records every
@@ -112,14 +112,14 @@ trait InteractsWithAbstractOtpDriver
     protected function createTrackingFactor(array &$tracker): FactorModel
     {
         $user = TestUser::query()->create([
-            'email'       => self::OTP_RECIPIENT,
+            'email'       => self::OTP_DESTINATION,
             'mfa_enabled' => true,
         ]);
 
         $factor                       = new CallOrderTrackingFactor;
         $factor->tracker              = &$tracker;
-        $factor->driver               = 'email';
-        $factor->recipient            = self::OTP_RECIPIENT;
+        $factor->type                 = 'email';
+        $factor->destination          = self::OTP_DESTINATION;
         $factor->authenticatable_type = $user->getMorphClass();
         $factor->authenticatable_id   = (string) $user->id;
         $factor->save();
@@ -136,13 +136,13 @@ trait InteractsWithAbstractOtpDriver
     protected function createEloquentFactor(): FactorModel
     {
         $user = TestUser::query()->create([
-            'email'       => self::OTP_RECIPIENT,
+            'email'       => self::OTP_DESTINATION,
             'mfa_enabled' => true,
         ]);
 
         $factor                       = new FactorModel;
-        $factor->driver               = 'email';
-        $factor->recipient            = self::OTP_RECIPIENT;
+        $factor->type                 = 'email';
+        $factor->destination          = self::OTP_DESTINATION;
         $factor->authenticatable_type = $user->getMorphClass();
         $factor->authenticatable_id   = (string) $user->id;
 

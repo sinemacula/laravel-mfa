@@ -6,6 +6,7 @@ namespace Tests\Fixtures\Drivers;
 
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 
 /**
  * Test-only `AbstractOtpDriver` shape that records every `dispatch()` call
@@ -40,6 +41,17 @@ abstract class DispatchTrackingOtpDriver extends AbstractOtpDriver
     public function bindOrderRef(array &$tracker): void
     {
         $this->order = &$tracker;
+    }
+
+    /**
+     * The tracking driver stands for an email driver.
+     *
+     * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
+     */
+    #[\Override]
+    public function channelKind(): ChannelKind
+    {
+        return ChannelKind::EMAIL;
     }
 
     /**

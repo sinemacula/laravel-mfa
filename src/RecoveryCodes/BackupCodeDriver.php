@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
@@ -133,16 +134,57 @@ final class BackupCodeDriver implements FactorDriver
     }
 
     /**
+     * Backup codes travel on no channel of their own: they are a fallback, not
+     * a factor of the combination policy.
+     *
+     * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
+     */
+    #[\Override]
+    public function channelKind(): ChannelKind
+    {
+        return ChannelKind::UNKNOWN;
+    }
+
+    /**
+     * The `amr` value of a backup code: `otp`.
+     *
+     * @return list<string>
+     */
+    #[\Override]
+    public function amr(): array
+    {
+        return ['otp'];
+    }
+
+    /**
      * Backup codes are minted in batches — this single-code entry point returns
      * one freshly generated plaintext code. Enrolment flows typically call
      * `generateSet()` instead to mint the full batch in one go.
      *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return string
      */
     #[\Override]
-    public function generateSecret(): string
+    public function startEnrollment(Factor $factor): string
     {
         return $this->generatePlaintextCode();
+    }
+
+    /**
+     * Confirm with a code of the set, consumed as any other.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $code
+     * @return bool
+     *
+     * @throws \Throwable
+     *
+     * @imperative
+     */
+    #[\Override]
+    public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool
+    {
+        return $this->verify($factor, $code);
     }
 
     /**

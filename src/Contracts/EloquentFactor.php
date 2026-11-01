@@ -19,10 +19,14 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * satisfy `Factor` alone; the shipped `Factor` model and any consumer subclass
  * intended for persistence satisfy `EloquentFactor`.
  *
+ * @api
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
+ *
+ * @SuppressWarnings("php:S1448")
  */
-interface EloquentFactor extends Factor
+interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
     /**
      * Polymorphic relation to the owning authenticatable identity.
@@ -36,11 +40,11 @@ interface EloquentFactor extends Factor
     public function authenticatable(): MorphTo;
 
     /**
-     * Column name holding the driver identifier.
+     * Column name holding the factor's type.
      *
      * @return string
      */
-    public function getDriverName(): string;
+    public function getTypeName(): string;
 
     /**
      * Column name holding the human-readable label.
@@ -50,12 +54,96 @@ interface EloquentFactor extends Factor
     public function getLabelName(): string;
 
     /**
-     * Column name holding the delivery destination (phone number / email) for
-     * drivers that deliver codes to the identity.
+     * Column name holding the destination (phone number or email address) of
+     * the types that deliver codes to the identity.
      *
      * @return string
      */
-    public function getRecipientName(): string;
+    public function getDestinationName(): string;
+
+    /**
+     * Column name holding a passkey factor's credential reference.
+     *
+     * @return string
+     */
+    public function getCredentialReferenceName(): string;
+
+    /**
+     * Column name holding a TOTP factor's HMAC algorithm.
+     *
+     * @return string
+     */
+    public function getTotpAlgorithmName(): string;
+
+    /**
+     * Column name holding a TOTP factor's number of digits.
+     *
+     * @return string
+     */
+    public function getTotpDigitsName(): string;
+
+    /**
+     * Column name holding a TOTP factor's period in seconds.
+     *
+     * @return string
+     */
+    public function getTotpPeriodName(): string;
+
+    /**
+     * Column name holding the last accepted TOTP time step.
+     *
+     * @return string
+     */
+    public function getLastAcceptedStepName(): string;
+
+    /**
+     * Column name holding the factor's status.
+     *
+     * @return string
+     */
+    public function getStatusName(): string;
+
+    /**
+     * Column name holding whether the factor is the preferred one.
+     *
+     * @return string
+     */
+    public function getPreferredName(): string;
+
+    /**
+     * Column name holding the count of consecutive failed verifications.
+     *
+     * @return string
+     */
+    public function getConsecutiveFailuresName(): string;
+
+    /**
+     * Column name holding when the factor was disabled at the failure ceiling.
+     *
+     * @return string
+     */
+    public function getDisabledAtName(): string;
+
+    /**
+     * Column name holding the application the factor was enrolled through.
+     *
+     * @return string
+     */
+    public function getApplicationName(): string;
+
+    /**
+     * Column name holding when the factor was confirmed.
+     *
+     * @return string
+     */
+    public function getConfirmedAtName(): string;
+
+    /**
+     * Column name holding when the factor was last used.
+     *
+     * @return string
+     */
+    public function getLastUsedAtName(): string;
 
     /**
      * Column name holding the persistent secret (encrypted at rest on the
@@ -137,9 +225,19 @@ interface EloquentFactor extends Factor
     public function applyLockout(CarbonInterface $until): void;
 
     /**
-     * Record a successful verification. Stamps the verified-at timestamp,
-     * resets attempts, and clears any pending one-time code. Does NOT persist —
-     * callers invoke `persist()` once the full orchestration step is complete.
+     * Mark the factor confirmed, and so usable, at the given time or now. Does
+     * not persist: callers invoke `persist()` once the change is complete.
+     *
+     * @param  ?\Carbon\CarbonInterface  $at
+     * @return void
+     */
+    public function confirm(?CarbonInterface $at = null): void;
+
+    /**
+     * Record a successful verification. Stamps the verified-at and last-used
+     * timestamps, resets attempts, and clears any pending one-time code. Does
+     * NOT persist — callers invoke `persist()` once the full orchestration step
+     * is complete.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void

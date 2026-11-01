@@ -45,7 +45,7 @@ final class TotpStubFactor extends AbstractFactorStub
      * @return string
      */
     #[\Override]
-    public function getDriver(): string
+    public function getType(): string
     {
         return 'totp';
     }

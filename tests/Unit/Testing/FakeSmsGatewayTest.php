@@ -67,11 +67,11 @@ final class FakeSmsGatewayTest extends TestCase
     }
 
     /**
-     * Test sent to filters by recipient.
+     * Test sent to filters by destination.
      *
      * @return void
      */
-    public function testSentToFiltersByRecipient(): void
+    public function testSentToFiltersByDestination(): void
     {
         $gateway = new FakeSmsGateway;
 

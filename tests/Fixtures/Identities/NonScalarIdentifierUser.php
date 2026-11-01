@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
@@ -22,10 +23,12 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
  * @copyright   2026 Sine Macula Limited
  *
  * @internal
+ *
+ * @phpstan-ignore sineMaculaLaravel.modelBehaviour
  */
 final class NonScalarIdentifierUser extends Model implements Authenticatable, MultiFactorAuthenticatable
 {
-    use AuthenticatableTrait;
+    use AuthenticatableTrait, HasFactors;
 
     /** @var string|null */
     protected $table = 'test_users';

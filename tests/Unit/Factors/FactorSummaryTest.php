@@ -8,14 +8,15 @@ use Carbon\Carbon;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use Tests\Unit\Concerns\BuildsFactorSummaries;
 
 /**
  * Unit tests for the `FactorSummary` projection.
  *
- * Covers construction via `fromFactor()`, recipient masking for email / phone /
- * short strings / empty values, and `jsonSerialize()` shape. Stub-builder
+ * Covers construction via `fromFactor()`, destination masking for email / phone
+ * / short strings / empty values, and `jsonSerialize()` shape. Stub-builder
  * helpers live on the `BuildsFactorSummaries` trait so the consuming class
  * stays focused on its assertions and below the project's max-methods-per-class
  * threshold.
@@ -31,7 +32,7 @@ final class FactorSummaryTest extends TestCase
     use BuildsFactorSummaries;
 
     /** @var string */
-    private const string VERIFIED_AT_ISO = '2026-04-15T12:34:56+00:00';
+    private const string LAST_USED_AT_ISO = '2026-04-15T12:34:56+00:00';
 
     /** @var string */
     private const string SAMPLE_MASKED_EMAIL = 'al***@example.com';
@@ -66,22 +67,26 @@ final class FactorSummaryTest extends TestCase
      */
     public function testFromFactorCapturesAllFields(): void
     {
-        $verifiedAt = Carbon::parse(self::VERIFIED_AT_ISO);
+        $lastUsedAt = Carbon::parse(self::LAST_USED_AT_ISO);
 
         $factor = self::createStub(Factor::class);
         $factor->method('getFactorIdentifier')->willReturn('01HXYZABCDEF');
-        $factor->method('getDriver')->willReturn('email');
+        $factor->method('getType')->willReturn('email');
         $factor->method('getLabel')->willReturn('Work email');
-        $factor->method('getRecipient')->willReturn('alice@example.com');
-        $factor->method('getVerifiedAt')->willReturn($verifiedAt);
+        $factor->method('getDestination')->willReturn('alice@example.com');
+        $factor->method('getStatus')->willReturn(FactorStatus::PENDING);
+        $factor->method('isPreferred')->willReturn(true);
+        $factor->method('getLastUsedAt')->willReturn($lastUsedAt);
 
         $summary = FactorSummary::fromFactor($factor);
 
         self::assertSame('01HXYZABCDEF', $summary->id);
-        self::assertSame('email', $summary->driver);
+        self::assertSame('email', $summary->type);
         self::assertSame('Work email', $summary->label);
-        self::assertSame(self::SAMPLE_MASKED_EMAIL, $summary->maskedRecipient);
-        self::assertSame($verifiedAt, $summary->verifiedAt);
+        self::assertSame(self::SAMPLE_MASKED_EMAIL, $summary->maskedDestination);
+        self::assertSame(FactorStatus::PENDING, $summary->status);
+        self::assertTrue($summary->preferred);
+        self::assertSame($lastUsedAt, $summary->lastUsedAt);
     }
 
     /**
@@ -93,10 +98,11 @@ final class FactorSummaryTest extends TestCase
     {
         $factor = self::createStub(Factor::class);
         $factor->method('getFactorIdentifier')->willReturn(42);
-        $factor->method('getDriver')->willReturn('totp');
+        $factor->method('getType')->willReturn('totp');
         $factor->method('getLabel')->willReturn(null);
-        $factor->method('getRecipient')->willReturn(null);
-        $factor->method('getVerifiedAt')->willReturn(null);
+        $factor->method('getDestination')->willReturn(null);
+        $factor->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
+        $factor->method('getLastUsedAt')->willReturn(null);
 
         $summary = FactorSummary::fromFactor($factor);
 
@@ -112,10 +118,11 @@ final class FactorSummaryTest extends TestCase
     {
         $factor = self::createStub(Factor::class);
         $factor->method('getFactorIdentifier')->willReturn(new \stdClass);
-        $factor->method('getDriver')->willReturn('totp');
+        $factor->method('getType')->willReturn('totp');
         $factor->method('getLabel')->willReturn(null);
-        $factor->method('getRecipient')->willReturn(null);
-        $factor->method('getVerifiedAt')->willReturn(null);
+        $factor->method('getDestination')->willReturn(null);
+        $factor->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
+        $factor->method('getLastUsedAt')->willReturn(null);
 
         $summary = FactorSummary::fromFactor($factor);
 
@@ -123,41 +130,43 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test masking keeps null recipient as null.
+     * Test masking keeps null destination as null.
      *
      * @return void
      */
-    public function testMaskingKeepsNullRecipientAsNull(): void
+    public function testMaskingKeepsNullDestinationAsNull(): void
     {
         $factor = self::createStub(Factor::class);
         $factor->method('getFactorIdentifier')->willReturn('id');
-        $factor->method('getDriver')->willReturn('totp');
+        $factor->method('getType')->willReturn('totp');
         $factor->method('getLabel')->willReturn(null);
-        $factor->method('getRecipient')->willReturn(null);
-        $factor->method('getVerifiedAt')->willReturn(null);
+        $factor->method('getDestination')->willReturn(null);
+        $factor->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
+        $factor->method('getLastUsedAt')->willReturn(null);
 
         $summary = FactorSummary::fromFactor($factor);
 
-        self::assertNull($summary->maskedRecipient);
+        self::assertNull($summary->maskedDestination);
     }
 
     /**
-     * Test masking keeps empty string recipient as empty string.
+     * Test masking keeps empty string destination as empty string.
      *
      * @return void
      */
-    public function testMaskingKeepsEmptyStringRecipientAsEmptyString(): void
+    public function testMaskingKeepsEmptyStringDestinationAsEmptyString(): void
     {
         $factor = self::createStub(Factor::class);
         $factor->method('getFactorIdentifier')->willReturn('id');
-        $factor->method('getDriver')->willReturn('totp');
+        $factor->method('getType')->willReturn('totp');
         $factor->method('getLabel')->willReturn(null);
-        $factor->method('getRecipient')->willReturn('');
-        $factor->method('getVerifiedAt')->willReturn(null);
+        $factor->method('getDestination')->willReturn('');
+        $factor->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
+        $factor->method('getLastUsedAt')->willReturn(null);
 
         $summary = FactorSummary::fromFactor($factor);
 
-        self::assertSame('', $summary->maskedRecipient);
+        self::assertSame('', $summary->maskedDestination);
     }
 
     /**
@@ -167,11 +176,11 @@ final class FactorSummaryTest extends TestCase
      */
     public function testMaskingEmailWithShortSingleCharLocalPart(): void
     {
-        $summary = $this->buildSummaryWithRecipient('a@example.com');
+        $summary = $this->buildSummaryWithDestination('a@example.com');
 
         // Local-part length 1 → keep min(2, max(1, floor(1/2))) = 1 char → `a`
         // + at least one `*` → `a*@example.com`.
-        self::assertSame('a*@example.com', $summary->maskedRecipient);
+        self::assertSame('a*@example.com', $summary->maskedDestination);
     }
 
     /**
@@ -181,11 +190,11 @@ final class FactorSummaryTest extends TestCase
      */
     public function testMaskingEmailWithTwoCharLocalPart(): void
     {
-        $summary = $this->buildSummaryWithRecipient('ab@example.com');
+        $summary = $this->buildSummaryWithDestination('ab@example.com');
 
         // Local-part length 2 → keep min(2, max(1, floor(2/2))) = 1 char → `a`
         // + `*` → `a*@example.com`.
-        self::assertSame('a*@example.com', $summary->maskedRecipient);
+        self::assertSame('a*@example.com', $summary->maskedDestination);
     }
 
     /**
@@ -195,11 +204,11 @@ final class FactorSummaryTest extends TestCase
      */
     public function testMaskingEmailWithFourCharLocalPart(): void
     {
-        $summary = $this->buildSummaryWithRecipient('abcd@example.com');
+        $summary = $this->buildSummaryWithDestination('abcd@example.com');
 
         // Local-part length 4 → keep min(2, max(1, floor(4/2))) = 2 chars →
         // `ab` + `**` → `ab**@example.com`.
-        self::assertSame('ab**@example.com', $summary->maskedRecipient);
+        self::assertSame('ab**@example.com', $summary->maskedDestination);
     }
 
     /**
@@ -212,11 +221,11 @@ final class FactorSummaryTest extends TestCase
      */
     public function testMaskingEmailWithFiveCharLocalPartKeepsTwoCharsViaFloor(): void
     {
-        $summary = $this->buildSummaryWithRecipient('alice@example.com');
+        $summary = $this->buildSummaryWithDestination('alice@example.com');
 
         // Local-part length 5 → keep min(2, max(1, floor(5/2))) = 2 chars →
         // `al` + `***` → `al***@example.com`.
-        self::assertSame('al***@example.com', $summary->maskedRecipient);
+        self::assertSame('al***@example.com', $summary->maskedDestination);
     }
 
     /**
@@ -228,27 +237,27 @@ final class FactorSummaryTest extends TestCase
      */
     public function testMaskingEmailWithSixCharLocalPartKeepsTwoCharsViaMinCap(): void
     {
-        $summary = $this->buildSummaryWithRecipient('foobar@example.com');
+        $summary = $this->buildSummaryWithDestination('foobar@example.com');
 
         // Local-part length 6 → min(2, floor(6/2)) = min(2, 3) = 2 → `fo` +
         // `****` → `fo****@example.com`.
-        self::assertSame('fo****@example.com', $summary->maskedRecipient);
+        self::assertSame('fo****@example.com', $summary->maskedDestination);
     }
 
     /**
-     * A recipient containing more than one `@` exercises the `explode(..., 2)`
-     * limit: only the FIRST `@` may split the local-part from the domain, so a
-     * second `@` belongs in the domain side untouched.
+     * A destination containing more than one `@` exercises the `explode(...,
+     * 2)` limit: only the FIRST `@` may split the local-part from the domain,
+     * so a second `@` belongs in the domain side untouched.
      *
      * @return void
      */
     public function testMaskingEmailHonorsExplodeLimitOnSecondAtSign(): void
     {
-        $summary = $this->buildSummaryWithRecipient('alice@inner@example.com');
+        $summary = $this->buildSummaryWithDestination('alice@inner@example.com');
 
         // explode('@', $r, 2) → ['alice', 'inner@example.com']. Local-part
         // length 5 → keep 2, mask 3 → 'al***'.
-        self::assertSame('al***@inner@example.com', $summary->maskedRecipient);
+        self::assertSame('al***@inner@example.com', $summary->maskedDestination);
     }
 
     /**
@@ -258,9 +267,9 @@ final class FactorSummaryTest extends TestCase
      */
     public function testMaskingEmailPreservesDomain(): void
     {
-        $summary = $this->buildSummaryWithRecipient('alice@sub.example.com');
+        $summary = $this->buildSummaryWithDestination('alice@sub.example.com');
 
-        self::assertStringEndsWith('@sub.example.com', (string) $summary->maskedRecipient);
+        self::assertStringEndsWith('@sub.example.com', (string) $summary->maskedDestination);
     }
 
     /**
@@ -270,9 +279,9 @@ final class FactorSummaryTest extends TestCase
      */
     public function testMaskingPhonePreservesLastFourDigits(): void
     {
-        $summary = $this->buildSummaryWithRecipient('+15551234567');
+        $summary = $this->buildSummaryWithDestination('+15551234567');
 
-        self::assertSame('********4567', $summary->maskedRecipient);
+        self::assertSame('********4567', $summary->maskedDestination);
     }
 
     /**
@@ -282,46 +291,51 @@ final class FactorSummaryTest extends TestCase
      */
     public function testMaskingShortStringsAreFullyMasked(): void
     {
-        $summary = $this->buildSummaryWithRecipient('1234');
+        $summary = $this->buildSummaryWithDestination('1234');
 
-        self::assertSame('****', $summary->maskedRecipient);
+        self::assertSame('****', $summary->maskedDestination);
     }
 
     /**
-     * Test masking single character recipient is fully masked.
+     * Test masking single character destination is fully masked.
      *
      * @return void
      */
-    public function testMaskingSingleCharacterRecipientIsFullyMasked(): void
+    public function testMaskingSingleCharacterDestinationIsFullyMasked(): void
     {
-        $summary = $this->buildSummaryWithRecipient('9');
+        $summary = $this->buildSummaryWithDestination('9');
 
-        self::assertSame('*', $summary->maskedRecipient);
+        self::assertSame('*', $summary->maskedDestination);
     }
 
     /**
-     * Test json serialize shape with verified at.
+     * The JSON shape of a used, preferred factor carries its last use as ISO
+     * 8601.
      *
      * @return void
      */
-    public function testJsonSerializeShapeWithVerifiedAt(): void
+    public function testJsonSerializeShapeWithLastUse(): void
     {
-        $verifiedAt = Carbon::parse(self::VERIFIED_AT_ISO);
+        $lastUsedAt = Carbon::parse(self::LAST_USED_AT_ISO);
 
         $summary = new FactorSummary(
-            id             : '01H',
-            driver         : 'email',
-            label          : 'Primary',
-            maskedRecipient: self::SAMPLE_MASKED_EMAIL,
-            verifiedAt     : $verifiedAt,
+            id: '01H',
+            type: 'email',
+            label: 'Primary',
+            maskedDestination: self::SAMPLE_MASKED_EMAIL,
+            status: FactorStatus::CONFIRMED,
+            preferred: true,
+            lastUsedAt: $lastUsedAt,
         );
 
         self::assertSame([
-            'id'               => '01H',
-            'driver'           => 'email',
-            'label'            => 'Primary',
-            'masked_recipient' => self::SAMPLE_MASKED_EMAIL,
-            'verified_at'      => self::VERIFIED_AT_ISO,
+            'id'                 => '01H',
+            'type'               => 'email',
+            'label'              => 'Primary',
+            'masked_destination' => self::SAMPLE_MASKED_EMAIL,
+            'status'             => 'confirmed',
+            'preferred'          => true,
+            'last_used_at'       => self::LAST_USED_AT_ISO,
         ], $summary->jsonSerialize());
     }
 
@@ -334,18 +348,22 @@ final class FactorSummaryTest extends TestCase
     {
         $summary = new FactorSummary(
             id             : '01H',
-            driver         : 'totp',
+            type         : 'totp',
             label          : null,
-            maskedRecipient: null,
-            verifiedAt     : null,
+            maskedDestination: null,
+            status     : FactorStatus::CONFIRMED,
+            preferred: false,
+            lastUsedAt: null,
         );
 
         self::assertSame([
-            'id'               => '01H',
-            'driver'           => 'totp',
-            'label'            => null,
-            'masked_recipient' => null,
-            'verified_at'      => null,
+            'id'                 => '01H',
+            'type'               => 'totp',
+            'label'              => null,
+            'masked_destination' => null,
+            'status'             => 'confirmed',
+            'preferred'          => false,
+            'last_used_at'       => null,
         ], $summary->jsonSerialize());
     }
 
@@ -358,14 +376,16 @@ final class FactorSummaryTest extends TestCase
     {
         $summary = new FactorSummary(
             id             : '01H',
-            driver         : 'totp',
+            type         : 'totp',
             label          : null,
-            maskedRecipient: null,
-            verifiedAt     : null,
+            maskedDestination: null,
+            status     : FactorStatus::CONFIRMED,
+            preferred: false,
+            lastUsedAt: null,
         );
 
         self::assertJsonStringEqualsJsonString(
-            '{"id":"01H","driver":"totp","label":null,"masked_recipient":null,"verified_at":null}',
+            '{"id":"01H","type":"totp","label":null,"masked_destination":null,"status":"confirmed","preferred":false,"last_used_at":null}',
             (string) json_encode($summary),
         );
     }

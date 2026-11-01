@@ -7,7 +7,7 @@ namespace Tests\Unit\Drivers;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
-use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
+use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
 use Tests\Fixtures\Identities\TestUser;
@@ -16,7 +16,7 @@ use Tests\TestCase;
 /**
  * Unit tests for `SmsDriver`.
  *
- * Exercises the SMS-gateway dispatch path, the missing-recipient guard, the
+ * Exercises the SMS-gateway dispatch path, the missing-destination guard, the
  * message-template substitution, and the end-to-end challenge-issuance path
  * against the in-memory `FakeSmsGateway`.
  *
@@ -29,35 +29,35 @@ use Tests\TestCase;
 final class SmsDriverTest extends TestCase
 {
     /**
-     * `dispatch()` must reject a null recipient with a clear
-     * `MissingRecipientException` rather than silently dropping the outbound
+     * `dispatch()` must reject a null destination with a clear
+     * `MissingDestinationException` rather than silently dropping the outbound
      * message.
      *
      * @return void
      */
-    public function testDispatchThrowsWhenRecipientIsNull(): void
+    public function testDispatchThrowsWhenDestinationIsNull(): void
     {
         $driver = $this->makeDriver();
-        $factor = $this->makeFactor(recipient: null);
+        $factor = $this->makeFactor(destination: null);
 
-        $this->expectException(MissingRecipientException::class);
-        $this->expectExceptionMessage('SMS factor has no recipient configured');
+        $this->expectException(MissingDestinationException::class);
+        $this->expectExceptionMessage('SMS factor has no destination configured');
 
         $driver->issueChallenge($factor);
     }
 
     /**
-     * `dispatch()` must reject an empty-string recipient identically to a null
-     * one.
+     * `dispatch()` must reject an empty-string destination identically to a
+     * null one.
      *
      * @return void
      */
-    public function testDispatchThrowsWhenRecipientIsEmptyString(): void
+    public function testDispatchThrowsWhenDestinationIsEmptyString(): void
     {
         $driver = $this->makeDriver();
-        $factor = $this->makeFactor(recipient: '');
+        $factor = $this->makeFactor(destination: '');
 
-        $this->expectException(MissingRecipientException::class);
+        $this->expectException(MissingDestinationException::class);
 
         $driver->issueChallenge($factor);
     }
@@ -72,7 +72,7 @@ final class SmsDriverTest extends TestCase
     {
         $gateway = new FakeSmsGateway;
         $driver  = new SmsDriver(gateway: $gateway);
-        $factor  = $this->makeFactor(recipient: '+441234567890');
+        $factor  = $this->makeFactor(destination: '+441234567890');
 
         $driver->issueChallenge($factor);
 
@@ -103,7 +103,7 @@ final class SmsDriverTest extends TestCase
             gateway        : $gateway,
             messageTemplate: $template,
         );
-        $factor = $this->makeFactor(recipient: '+441111111111');
+        $factor = $this->makeFactor(destination: '+441111111111');
 
         $driver->issueChallenge($factor);
 
@@ -162,7 +162,7 @@ final class SmsDriverTest extends TestCase
         $this->container()->instance(SmsGateway::class, $gateway);
 
         $driver = new SmsDriver(gateway: $gateway);
-        $factor = $this->makeFactor(recipient: '+447000000000');
+        $factor = $this->makeFactor(destination: '+447000000000');
 
         $driver->issueChallenge($factor);
 
@@ -190,7 +190,7 @@ final class SmsDriverTest extends TestCase
             gateway   : $gateway,
             codeLength: 8,
         );
-        $factor = $this->makeFactor(recipient: '+442222222222');
+        $factor = $this->makeFactor(destination: '+442222222222');
 
         $driver->issueChallenge($factor);
 
@@ -217,10 +217,10 @@ final class SmsDriverTest extends TestCase
      * Persist and return a fresh SMS factor owned by a freshly inserted test
      * user.
      *
-     * @param  ?string  $recipient
+     * @param  ?string  $destination
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
-    private function makeFactor(?string $recipient): FactorModel
+    private function makeFactor(?string $destination): FactorModel
     {
         $user = TestUser::query()->create([
             'email'       => 'owner@example.com',
@@ -228,8 +228,8 @@ final class SmsDriverTest extends TestCase
         ]);
 
         $factor                       = new FactorModel;
-        $factor->driver               = 'sms';
-        $factor->recipient            = $recipient;
+        $factor->type                 = 'sms';
+        $factor->destination          = $destination;
         $factor->authenticatable_type = $user->getMorphClass();
         $factor->authenticatable_id   = (string) $user->id;
         $factor->save();

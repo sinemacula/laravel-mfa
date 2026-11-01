@@ -6,12 +6,13 @@ namespace Tests\Unit\RecoveryCodes;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
+use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 
 /**
  * Generation-side unit tests for `BackupCodeDriver`.
  *
- * Exercises `generateSet()`, `generateSecret()`, and `hash()` — split from
+ * Exercises `generateSet()`, `startEnrollment()`, and `hash()` — split from
  * `BackupCodeDriverTest` so the verify-path subject can stay under the
  * project's max-methods-per-class threshold.
  *
@@ -113,15 +114,15 @@ final class BackupCodeDriverGenerationTest extends TestCase
     }
 
     /**
-     * `generateSecret()` must return a single plaintext code that matches the
+     * `startEnrollment()` must return a single plaintext code that matches the
      * configured alphabet and length.
      *
      * @return void
      */
-    public function testGenerateSecretReturnsSinglePlaintextCode(): void
+    public function testStartEnrollmentReturnsSinglePlaintextCode(): void
     {
         $driver = new BackupCodeDriver(codeLength: 12, alphabet: 'XYZ');
-        $secret = $driver->generateSecret();
+        $secret = $driver->startEnrollment(new InMemoryFactor);
 
         self::assertIsString($secret);
         self::assertSame(12, strlen($secret));

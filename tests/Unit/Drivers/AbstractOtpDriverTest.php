@@ -4,18 +4,20 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
+use Carbon\Carbon;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
+use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 use Tests\Unit\Concerns\InteractsWithAbstractOtpDriver;
 
 /**
  * Configuration-side unit tests for `AbstractOtpDriver`.
  *
- * Covers the getter accessors and the `generateSecret()` no-op. Issuance- and
- * verification-path coverage lives in the sibling
+ * Covers the getter accessors, the `startEnrollment()` no-op and confirmation.
+ * Issuance- and verification-path coverage lives in the sibling
  * `AbstractOtpDriverIssuanceTest` and `AbstractOtpDriverVerifyTest` so each
  * file in the family stays under the project's max-methods-per-class threshold.
  *
@@ -30,16 +32,40 @@ final class AbstractOtpDriverTest extends TestCase
     use InteractsWithAbstractOtpDriver;
 
     /**
-     * OTP drivers do not use a persistent secret — `generateSecret()` must
+     * OTP drivers do not use a persistent secret — `startEnrollment()` must
      * return null.
      *
      * @return void
      */
-    public function testGenerateSecretReturnsNull(): void
+    public function testStartEnrollmentReturnsNoSecret(): void
     {
         $driver = $this->makeDriver();
 
-        self::assertNull($driver->generateSecret());
+        self::assertNull($driver->startEnrollment(new InMemoryFactor));
+    }
+
+    /**
+     * A delivered code is a one-time password: `otp`.
+     *
+     * @return void
+     */
+    public function testTheAmrOfADeliveredCodeIsOtp(): void
+    {
+        self::assertSame(['otp'], $this->makeDriver()->amr());
+    }
+
+    /**
+     * Confirming a pending factor checks its code as verification does.
+     *
+     * @return void
+     */
+    public function testConfirmationChecksTheCodeAsVerificationDoes(): void
+    {
+        $driver = $this->makeDriver();
+        $factor = new InMemoryFactor(type: 'email', code: '123456', expiresAt: Carbon::now()->addMinute());
+
+        self::assertTrue($driver->confirm($factor, '123456'));
+        self::assertFalse($driver->confirm($factor, '654321'));
     }
 
     /**
@@ -79,6 +105,6 @@ final class AbstractOtpDriverTest extends TestCase
         $driver->issueChallenge($this->createEloquentFactor());
 
         self::assertSame([[0, 9999999]], $draws);
-        self::assertSame('Your verification code is: 0000042', $gateway->sentTo(self::OTP_RECIPIENT)[0]['message']);
+        self::assertSame('Your verification code is: 0000042', $gateway->sentTo(self::OTP_DESTINATION)[0]['message']);
     }
 }

@@ -7,6 +7,7 @@ namespace Tests\Fixtures\Factors;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use Tests\Fixtures\Factors\Concerns\ReportsUsableFactorDefaults;
 
 /**
  * Default implementation of the `Factor` contract for test stubs.
@@ -25,6 +26,8 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  */
 abstract class AbstractFactorStub implements Factor
 {
+    use ReportsUsableFactorDefaults;
+
     /**
      * Return the stub's fixed factor identifier.
      *
@@ -42,7 +45,7 @@ abstract class AbstractFactorStub implements Factor
      * @return string
      */
     #[\Override]
-    public function getDriver(): string
+    public function getType(): string
     {
         return 'email';
     }
@@ -59,12 +62,12 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
-     * Return the stub's default recipient (none).
+     * Return the stub's default destination (none).
      *
      * @return ?string
      */
     #[\Override]
-    public function getRecipient(): ?string
+    public function getDestination(): ?string
     {
         return null;
     }

@@ -39,20 +39,20 @@ final class FactorSummaryBench
     public function __construct()
     {
         $this->totpFactor = new InMemoryFactor(
-            driver: 'totp',
+            type: 'totp',
             label : 'Authy',
         );
 
         $this->emailFactor = new InMemoryFactor(
-            driver   : 'email',
+            type   : 'email',
             label    : 'Primary email',
-            recipient: 'somebody@example.com',
+            destination: 'somebody@example.com',
         );
 
         $this->smsFactor = new InMemoryFactor(
-            driver   : 'sms',
+            type   : 'sms',
             label    : 'Work phone',
-            recipient: '+441234567890',
+            destination: '+441234567890',
         );
     }
 

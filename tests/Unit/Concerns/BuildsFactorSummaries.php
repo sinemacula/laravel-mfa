@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
@@ -30,29 +31,32 @@ trait BuildsFactorSummaries
     {
         return new FactorSummary(
             id             : '01H',
-            driver         : 'totp',
+            type         : 'totp',
             label          : null,
-            maskedRecipient: null,
-            verifiedAt     : null,
+            maskedDestination: null,
+            status     : FactorStatus::CONFIRMED,
+            preferred: false,
+            lastUsedAt: null,
         );
     }
 
     /**
-     * Build a FactorSummary via `fromFactor()` for the given recipient.
+     * Build a FactorSummary via `fromFactor()` for the given destination.
      *
-     * @param  string  $recipient
+     * @param  string  $destination
      * @return \SineMacula\Laravel\Mfa\Factors\FactorSummary
      *
      * @throws \PHPUnit\Framework\MockObject\Exception
      */
-    protected function buildSummaryWithRecipient(string $recipient): FactorSummary
+    protected function buildSummaryWithDestination(string $destination): FactorSummary
     {
         $factor = self::createStub(Factor::class);
         $factor->method('getFactorIdentifier')->willReturn('id');
-        $factor->method('getDriver')->willReturn('email');
+        $factor->method('getType')->willReturn('email');
         $factor->method('getLabel')->willReturn(null);
-        $factor->method('getRecipient')->willReturn($recipient);
-        $factor->method('getVerifiedAt')->willReturn(null);
+        $factor->method('getDestination')->willReturn($destination);
+        $factor->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
+        $factor->method('getLastUsedAt')->willReturn(null);
 
         return FactorSummary::fromFactor($factor);
     }

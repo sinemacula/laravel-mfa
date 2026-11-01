@@ -47,7 +47,7 @@ final class NonModelEloquentBackupCodeFactor extends AbstractEloquentFactorStub
      * @return string
      */
     #[\Override]
-    public function getDriver(): string
+    public function getType(): string
     {
         return BackupCodeDriver::NAME;
     }

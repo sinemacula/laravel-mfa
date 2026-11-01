@@ -7,6 +7,7 @@ namespace Tests\Unit\Database;
 use Illuminate\Config\Repository;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Facade;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
@@ -90,6 +91,38 @@ final class StorageConnectionTest extends TestCase
             StorageConnection::name();
         } finally {
             Config::set('mfa.storage.connection', null);
+        }
+    }
+
+    /**
+     * A shipped model is built on the storage connection by name, the default
+     * one included, and on the default connection before the configuration is
+     * bootstrapped.
+     *
+     * @return void
+     */
+    public function testAShippedModelIsBuiltOnTheStorageConnectionByName(): void
+    {
+        self::assertSame('testing', StorageConnection::forModel());
+
+        Config::set('mfa.storage.connection', 'secondary');
+
+        try {
+            self::assertSame('secondary', StorageConnection::forModel());
+        } finally {
+            Config::set('mfa.storage.connection', null);
+        }
+
+        $previous = Facade::getFacadeApplication();
+
+        // @phpstan-ignore argument.type
+        Facade::setFacadeApplication(null);
+        Facade::clearResolvedInstance('config');
+
+        try {
+            self::assertNull(StorageConnection::forModel());
+        } finally {
+            Facade::setFacadeApplication($previous);
         }
     }
 

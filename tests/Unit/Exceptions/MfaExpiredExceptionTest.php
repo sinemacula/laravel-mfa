@@ -6,6 +6,7 @@ namespace Tests\Unit\Exceptions;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Exceptions\AbstractMfaHttpException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
@@ -80,10 +81,12 @@ final class MfaExpiredExceptionTest extends TestCase
     {
         $summary = new FactorSummary(
             id             : '01HABCDEF',
-            driver         : 'email',
+            type         : 'email',
             label          : 'Work email',
-            maskedRecipient: 'al***@example.com',
-            verifiedAt     : null,
+            maskedDestination: 'al***@example.com',
+            status     : FactorStatus::CONFIRMED,
+            preferred: false,
+            lastUsedAt: null,
         );
 
         $exception = new MfaExpiredException([$summary]);

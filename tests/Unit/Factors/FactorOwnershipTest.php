@@ -227,7 +227,7 @@ final class FactorOwnershipTest extends TestCase
     {
         $factor = new Factor;
 
-        $factor->setAttribute('driver', 'totp');
+        $factor->setAttribute('type', 'totp');
         $factor->setAttribute('authenticatable_type', $type);
         $factor->setAttribute('authenticatable_id', $id);
 

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Laravel\Sanctum\HasApiTokens;
+use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
@@ -28,10 +29,12 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
  * @property int $id
  * @property bool $mfa_enabled
  * @property ?string $email
+ *
+ * @phpstan-ignore sineMaculaLaravel.modelBehaviour
  */
 final class TestUser extends Model implements Authenticatable, MultiFactorAuthenticatable
 {
-    use AuthenticatableTrait, HasApiTokens;
+    use AuthenticatableTrait, HasApiTokens, HasFactors;
 
     /** @var string|null */
     protected $table = 'test_users';

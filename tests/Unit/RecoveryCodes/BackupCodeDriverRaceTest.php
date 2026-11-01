@@ -51,7 +51,7 @@ final class BackupCodeDriverRaceTest extends TestCase
         $factor = Factor::create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'backup_code',
+            'type'                 => 'backup_code',
             'secret'               => $driver->hash($code),
         ]);
 

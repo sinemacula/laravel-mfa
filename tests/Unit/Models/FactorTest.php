@@ -165,7 +165,7 @@ final class FactorTest extends TestCase
     {
         $factor = new Factor;
 
-        foreach (['authenticatable_type', 'authenticatable_id', 'driver', 'label', 'recipient'] as $attribute) {
+        foreach (['authenticatable_type', 'authenticatable_id', 'type', 'label', 'destination', 'credential_reference', 'totp_algorithm', 'status', 'application'] as $attribute) {
             self::assertTrue($factor->hasCast($attribute, 'string'), $attribute);
         }
     }
@@ -182,7 +182,7 @@ final class FactorTest extends TestCase
         $factor = new Factor([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => $this->authenticatableId($user),
-            'driver'               => 'email',
+            'type'                 => 'email',
         ]);
         $factor->save();
 
@@ -203,7 +203,7 @@ final class FactorTest extends TestCase
         $factor = new Factor([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => $this->authenticatableId($user),
-            'driver'               => 'totp',
+            'type'                 => 'totp',
         ]);
         $factor->save();
 
@@ -291,7 +291,54 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test secret and code are hidden from serialisation.
+     * A new factor is pending, not preferred, and has not failed, before it is
+     * stored.
+     *
+     * @return void
+     */
+    public function testANewFactorIsPendingNotPreferredAndHasNotFailed(): void
+    {
+        self::assertSame(['status' => 'pending', 'preferred' => false, 'consecutive_failures' => 0], (new Factor)->getAttributes());
+    }
+
+    /**
+     * Every column is mass assignable but the key and the timestamps.
+     *
+     * @return void
+     */
+    public function testEveryColumnButTheKeyAndTimestampsIsFillable(): void
+    {
+        self::assertSame([
+            'authenticatable_type',
+            'authenticatable_id',
+            'type',
+            'label',
+            'destination',
+            'credential_reference',
+            'secret',
+            'totp_algorithm',
+            'totp_digits',
+            'totp_period',
+            'last_accepted_step',
+            'status',
+            'preferred',
+            'consecutive_failures',
+            'disabled_at',
+            'application',
+            'confirmed_at',
+            'last_used_at',
+            'code',
+            'expires_at',
+            'verified_at',
+            'attempts',
+            'locked_until',
+            'last_attempted_at',
+        ], (new Factor)->getFillable());
+    }
+
+    /**
+     * Test secret and code are hidden from serialisation, as are the full
+     * destination and the credential reference.
      *
      * @return void
      */
@@ -302,9 +349,11 @@ final class FactorTest extends TestCase
         $factor = new Factor([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => $this->authenticatableId($user),
-            'driver'               => 'email',
+            'type'                 => 'email',
             'secret'               => 'super-secret',
             'code'                 => '654321',
+            'destination'          => 'alice@example.com',
+            'credential_reference' => 'credential-1',
         ]);
         $factor->save();
 
@@ -312,7 +361,9 @@ final class FactorTest extends TestCase
 
         self::assertArrayNotHasKey('secret', $array);
         self::assertArrayNotHasKey('code', $array);
-        self::assertArrayHasKey('driver', $array);
+        self::assertArrayNotHasKey('destination', $array);
+        self::assertArrayNotHasKey('credential_reference', $array);
+        self::assertArrayHasKey('type', $array);
     }
 
     /**
@@ -342,7 +393,7 @@ final class FactorTest extends TestCase
         $factor = new Factor([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => $this->authenticatableId($user),
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => $secret,
         ]);
         $factor->save();
@@ -363,8 +414,8 @@ final class FactorTest extends TestCase
         $factor = new Factor([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => $this->authenticatableId($user),
-            'driver'               => 'email',
-            'recipient'            => 'verify@example.test',
+            'type'                 => 'email',
+            'destination'          => 'verify@example.test',
             'code'                 => $code,
         ]);
         $factor->save();

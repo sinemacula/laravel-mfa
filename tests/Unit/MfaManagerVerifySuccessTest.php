@@ -200,7 +200,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
         Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 
@@ -228,8 +228,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'email',
-            'recipient'            => 'v2@example.com',
+            'type'                 => 'email',
+            'destination'          => 'v2@example.com',
             'code'                 => self::VALID_CODE,
             'expires_at'           => Carbon::now()->addMinutes(10),
             'attempts'             => 1,
@@ -272,7 +272,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 

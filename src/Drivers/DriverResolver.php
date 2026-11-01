@@ -60,7 +60,7 @@ final readonly class DriverResolver
 
     /**
      * Verify that the requested driver name matches the factor's own
-     * `getDriver()`.
+     * `getType()`.
      *
      * Routing one driver's logic through a factor that was registered against
      * another is a caller bug: it does not bypass ownership (that check still
@@ -76,7 +76,7 @@ final readonly class DriverResolver
      */
     public function assertMatchesFactor(string $driver, Factor $factor): void
     {
-        if ($driver !== $factor->getDriver()) {
+        if ($driver !== $factor->getType()) {
             throw FactorDriverMismatchException::for($driver, $factor);
         }
     }

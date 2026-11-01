@@ -6,7 +6,7 @@ namespace Tests\Unit\Factors;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
-use SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -182,7 +182,7 @@ final class FactorServiceTest extends TestCase
     {
         config()->set('mfa.factor.model', $configured);
 
-        $this->expectException(InvalidFactorModelException::class);
+        $this->expectException(InvalidModelException::class);
         $this->expectExceptionMessage($message);
 
         $this->service()->factorModel();
@@ -227,7 +227,7 @@ final class FactorServiceTest extends TestCase
         return Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
     }

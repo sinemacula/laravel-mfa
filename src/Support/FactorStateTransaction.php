@@ -8,11 +8,11 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 
 /**
@@ -49,12 +49,6 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
  */
 final class FactorStateTransaction
 {
-    /** @var string The setting that names the identity states table. */
-    private const string TABLE_SETTING = 'mfa.identity_state.table';
-
-    /** @var string The identity states table when the setting names none. */
-    private const string DEFAULT_TABLE = 'mfa_identity_states';
-
     /**
      * Disallow instantiation; utility container only.
      */
@@ -174,23 +168,13 @@ final class FactorStateTransaction
     {
         $now = CarbonImmutable::now();
 
-        $connection->table(self::table())->upsert([[
+        $connection->table(TableNames::of(TableNames::IDENTITY_STATES))->upsert([[
             'id'                   => Str::lower((string) Str::ulid()),
             'authenticatable_type' => $type,
             'authenticatable_id'   => $key,
             'created_at'           => $now,
             'updated_at'           => $now,
         ]], ['authenticatable_type', 'authenticatable_id'], ['updated_at']);
-    }
-
-    /**
-     * The identity states table.
-     *
-     * @return string
-     */
-    private static function table(): string
-    {
-        return Config::string(self::TABLE_SETTING, self::DEFAULT_TABLE) ?: self::DEFAULT_TABLE;
     }
 
     /**

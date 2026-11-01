@@ -7,7 +7,8 @@ namespace SineMacula\Laravel\Mfa\Drivers;
 use Illuminate\Contracts\Mail\Mailer;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
-use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 
 /**
  * Email factor driver.
@@ -53,6 +54,17 @@ final class EmailDriver extends AbstractOtpDriver
     }
 
     /**
+     * A code sent by email to the factor's address.
+     *
+     * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
+     */
+    #[\Override]
+    public function channelKind(): ChannelKind
+    {
+        return ChannelKind::EMAIL;
+    }
+
+    /**
      * Get the configured Mailable class.
      *
      * @return class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>
@@ -63,26 +75,26 @@ final class EmailDriver extends AbstractOtpDriver
     }
 
     /**
-     * Dispatch the Mailable to the factor's recipient email.
+     * Dispatch the Mailable to the factor's destination email.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $code
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException
      */
     #[\Override]
     protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void
     {
-        $recipient = $factor->getRecipient();
+        $destination = $factor->getDestination();
 
-        if ($recipient === null || $recipient === '') {
-            throw new MissingRecipientException('Email factor has no recipient configured; cannot deliver code.');
+        if ($destination === null || $destination === '') {
+            throw new MissingDestinationException('Email factor has no destination configured; cannot deliver code.');
         }
 
         /** @var \SineMacula\Laravel\Mfa\Codes\MfaCodeMessage $message */
         $message = new ($this->mailable)($code, $this->getExpiry());
 
-        $this->mailer->to($recipient)->send($message);
+        $this->mailer->to($destination)->send($message);
     }
 }

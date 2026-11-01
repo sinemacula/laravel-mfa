@@ -14,12 +14,13 @@ use SineMacula\Laravel\Mfa\Codes\CodeSettings;
 use SineMacula\Laravel\Mfa\Codes\NullSmsGateway;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentSettings;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
-use SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException;
-use SineMacula\Laravel\Mfa\Factors\FactorService;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleSettings;
 use SineMacula\Laravel\Mfa\Proofs\ProofSettings;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeSettings;
@@ -31,11 +32,14 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeSettings;
  * factor it declares or a bound `FirstFactorResolver` reports.
  *
  * Every check runs, so one run finds every problem. They are grouped by
- * subject: `storage`, `factor`, `identity_state`, one per capability block
- * (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `proofs`,
+ * subject: `storage` (the connection, and a name of its own for every table),
+ * `factor`, `identity_state`, one per capability block (`totp`, `codes`,
+ * `recovery_codes`, `attempts`, `enrollment`, `passkeys`, `proofs`,
  * `lifecycle`), `applications`, and `applications.{name}` for each configured
- * application. The package runs it once the application has booted and again
- * when the `mfa` manager is resolved, throwing an
+ * application. A block that names a table or a model has them checked with it:
+ * a table name must be a non-blank string, and a model must be one, on the
+ * storage connection. The package runs it once the application has booted and
+ * again when the `mfa` manager is resolved, throwing an
  * `InvalidConfigurationException` that lists every problem; `mfa:check` prints
  * them instead. It reads configuration and the container only, and opens no
  * database connection.
@@ -113,17 +117,22 @@ final readonly class ConfigurationValidator
         $config = $this->config;
 
         $checks = [
-            'storage'        => [fn () => $this->checkStorageConnection()],
-            'factor'         => [fn () => $this->checkFactorModel(), static fn () => self::checkTable($config, 'mfa.factor.table')],
-            'identity_state' => [static fn () => self::checkTable($config, 'mfa.identity_state.table')],
+            'storage'        => [fn () => $this->checkStorageConnection(), fn () => $this->checkDistinctTables()],
+            'factor'         => [fn () => $this->checkModel(ConfiguredModels::factor($config), ConfiguredModels::FACTOR), fn () => $this->checkTable(TableNames::FACTORS)],
+            'identity_state' => [fn () => $this->checkTable(TableNames::IDENTITY_STATES)],
             'totp'           => [static fn () => (new TotpSettings($config))->validate()],
-            'codes'          => [static fn () => (new CodeSettings($config))->validate()],
-            'recovery_codes' => [static fn () => (new RecoveryCodeSettings($config))->validate()],
-            'attempts'       => [static fn () => (new AttemptSettings($config))->validate()],
-            'enrollment'     => [static fn () => (new EnrollmentSettings($config))->validate()],
-            'proofs'         => [static fn () => (new ProofSettings($config))->validate()],
-            'lifecycle'      => [static fn () => (new LifecycleSettings($config))->validate()],
-            'applications'   => [static fn () => ApplicationSettings::names($config)],
+            'codes'          => [static fn () => (new CodeSettings($config))->validate(), fn () => $this->checkTable(TableNames::CODES)],
+            'recovery_codes' => [
+                static fn () => (new RecoveryCodeSettings($config))->validate(),
+                fn () => $this->checkModel(ConfiguredModels::recoveryCode($config), ConfiguredModels::RECOVERY_CODE),
+                fn () => $this->checkTable(TableNames::RECOVERY_CODES),
+            ],
+            'attempts'     => [static fn () => (new AttemptSettings($config))->validate(), fn () => $this->checkTable(TableNames::ATTEMPTS)],
+            'enrollment'   => [static fn () => (new EnrollmentSettings($config))->validate(), fn () => $this->checkTable(TableNames::ENROLLMENTS)],
+            'passkeys'     => [fn () => $this->checkTable(TableNames::PASSKEY_ASSOCIATIONS)],
+            'proofs'       => [static fn () => (new ProofSettings($config))->validate()],
+            'lifecycle'    => [static fn () => (new LifecycleSettings($config))->validate()],
+            'applications' => [static fn () => ApplicationSettings::names($config)],
         ];
 
         try {
@@ -166,37 +175,59 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Refuse a factor model that is not one, or that lives on another
-     * connection than the storage one.
+     * Refuse a model that lives on another connection than the storage one.
      *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @param  string  $setting
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\ModelOffStorageConnectionException
      */
-    private function checkFactorModel(): void
+    private function checkModel(string $model, string $setting): void
     {
-        $model = $this->container->make(FactorService::class)->factorModel();
-
-        StorageConnection::assertHolds(new $model, 'mfa.factor.model');
+        StorageConnection::assertHolds(new $model, $setting);
     }
 
     /**
      * Refuse a table name that is not a non-blank string.
      *
-     * @param  \Illuminate\Contracts\Config\Repository  $config
-     * @param  string  $key
+     * @param  string  $block
      * @return void
      *
      * @throws \InvalidArgumentException
      */
-    private static function checkTable(Repository $config, string $key): void
+    private function checkTable(string $block): void
     {
-        $table = $config->get($key);
+        $setting = TableNames::setting($block);
+        $table   = $this->config->get($setting);
 
         if ($table !== null && (!is_string($table) || trim($table) === '')) {
-            throw new \InvalidArgumentException(sprintf('%s must be a table name.', $key));
+            throw new \InvalidArgumentException(sprintf('%s must be a table name.', $setting));
+        }
+    }
+
+    /**
+     * Refuse two of the package's tables configured with the same name, which
+     * the second migration would refuse to create.
+     *
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function checkDistinctTables(): void
+    {
+        $names = [];
+
+        foreach (array_keys(TableNames::DEFAULTS) as $block) {
+            $names[TableNames::setting($block)] = TableNames::of($block);
+        }
+
+        $shared = array_keys(array_filter(array_count_values($names), static fn (int $count): bool => $count > 1));
+
+        if ($shared !== []) {
+            $settings = array_keys(array_filter($names, static fn (string $name): bool => in_array($name, $shared, true)));
+
+            throw new \InvalidArgumentException(sprintf('Each of the package\'s tables needs a name of its own: %s share one.', implode(', ', $settings)));
         }
     }
 
@@ -250,7 +281,7 @@ final readonly class ConfigurationValidator
     {
         try {
             $check();
-        } catch (BindingResolutionException|InvalidFactorModelException|\LogicException $exception) {
+        } catch (BindingResolutionException|InvalidModelException|\LogicException $exception) {
             return $exception->getMessage();
         }
 

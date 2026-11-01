@@ -63,7 +63,7 @@ final readonly class VerificationService
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account
      * factor-tampering primitive. Throws `FactorDriverMismatchException` when
-     * the requested driver name does not match the factor's own `getDriver()`:
+     * the requested driver name does not match the factor's own `getType()`:
      * routing one driver's logic through a factor registered against another is
      * always a caller bug.
      *
@@ -119,7 +119,7 @@ final readonly class VerificationService
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account MFA-bypass
      * primitive. Throws `FactorDriverMismatchException` when the requested
-     * driver name does not match the factor's own `getDriver()`.
+     * driver name does not match the factor's own `getType()`.
      *
      * The driver is resolved from the given registry: the manager the
      * verification was called on.

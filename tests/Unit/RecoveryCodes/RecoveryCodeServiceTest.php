@@ -262,7 +262,7 @@ final class RecoveryCodeServiceTest extends TestCase
         return Factor::query()->create([
             'authenticatable_type' => $type,
             'authenticatable_id'   => (string) $id,
-            'driver'               => $driver,
+            'type'                 => $driver,
             'secret'               => 'secret-' . $driver,
         ]);
     }
@@ -279,7 +279,7 @@ final class RecoveryCodeServiceTest extends TestCase
         return Factor::query()
             ->where('authenticatable_type', $user::class)
             ->where('authenticatable_id', (string) $user->id)
-            ->where('driver', BackupCodeDriver::NAME)
+            ->where('type', BackupCodeDriver::NAME)
             ->get()
             ->toBase();
     }

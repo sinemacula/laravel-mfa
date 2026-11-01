@@ -6,18 +6,19 @@ namespace SineMacula\Laravel\Mfa\Factors;
 
 use Carbon\CarbonInterface;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 
 /**
- * Public-safe projection of a `Factor` for exception payloads and UI
- * disambiguation.
+ * Public-safe projection of a `Factor` for events, exception payloads and the
+ * list of factors a person chooses from.
  *
- * Carries only the fields a consuming application needs to render a
- * factor-picker UI (id, driver, label, verified-at, a masked delivery
- * destination). Never leaks `secret`, `code`, `attempts`, or the raw recipient
- * — consumers that need those fields read from the Factor record directly.
+ * Carries only what an application needs to show a factor: its id, type, label,
+ * a masked destination, its status, whether it is preferred and when it was
+ * last used. Never the factor model, its secret, a code, its credential
+ * reference or the full destination, so it is safe in a queued listener's
+ * payload and in a log.
  *
- * Immutable, JSON-serialisable, safe to ship through exception payloads and log
- * sinks.
+ * @api
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,32 +29,39 @@ final readonly class FactorSummary implements \JsonSerializable
      * Constructor.
      *
      * @param  string  $id
-     * @param  string  $driver
+     * @param  string  $type
      * @param  ?string  $label
-     * @param  ?string  $maskedRecipient
-     * @param  ?\Carbon\CarbonInterface  $verifiedAt
+     * @param  ?string  $maskedDestination
+     * @param  \SineMacula\Laravel\Mfa\Enums\FactorStatus  $status
+     * @param  bool  $preferred
+     * @param  ?\Carbon\CarbonInterface  $lastUsedAt
      */
     public function __construct(
 
-        /** Factor identifier (ULID on the shipped model). */
+        /** Factor identifier (a ULID on the shipped model). */
         public string $id,
 
-        /** Registered driver name (e.g. `'totp'`, `'email'`, `'sms'`). */
-        public string $driver,
+        /** The factor's type (`totp`, `email`, `sms`, `passkey` or an application's own). */
+        public string $type,
 
-        /** Optional human-readable label. */
+        /** The label the person chose, if any. */
         public ?string $label,
 
-        /** Masked delivery destination for OTP drivers; null otherwise. */
-        public ?string $maskedRecipient,
+        /** The destination of an SMS or email factor, masked; null otherwise. */
+        public ?string $maskedDestination,
 
-        /** When the factor was last successfully verified. */
-        public ?CarbonInterface $verifiedAt,
+        /** Where the factor is in its enrolment. */
+        public FactorStatus $status,
+
+        /** Whether the factor is the identity's preferred one. */
+        public bool $preferred,
+
+        /** When the factor was last used to verify. */
+        public ?CarbonInterface $lastUsedAt,
     ) {}
 
     /**
-     * Build a summary from a concrete `Factor` instance, masking the recipient
-     * to defence-in-depth against log leakage.
+     * Build a summary from a factor, masking its destination.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return self
@@ -68,16 +76,18 @@ final readonly class FactorSummary implements \JsonSerializable
 
         return new self(
             id: $id,
-            driver: $factor->getDriver(),
+            type: $factor->getType(),
             label: $factor->getLabel(),
-            maskedRecipient: self::mask($factor->getRecipient()),
-            verifiedAt: $factor->getVerifiedAt(),
+            maskedDestination: self::mask($factor->getDestination()),
+            status: $factor->getStatus(),
+            preferred: $factor->isPreferred(),
+            lastUsedAt: $factor->getLastUsedAt(),
         );
     }
 
     /**
-     * Render the summary as a plain associative array for JSON serialisation.
-     * `verified_at` is emitted as ISO-8601 (or `null`).
+     * Render the summary as a plain associative array for JSON serialisation,
+     * with `last_used_at` as ISO 8601 (or `null`).
      *
      * @return array<string, mixed>
      */
@@ -85,11 +95,13 @@ final readonly class FactorSummary implements \JsonSerializable
     public function jsonSerialize(): array
     {
         return [
-            'id'               => $this->id,
-            'driver'           => $this->driver,
-            'label'            => $this->label,
-            'masked_recipient' => $this->maskedRecipient,
-            'verified_at'      => $this->verifiedAt?->toIso8601String(),
+            'id'                 => $this->id,
+            'type'               => $this->type,
+            'label'              => $this->label,
+            'masked_destination' => $this->maskedDestination,
+            'status'             => $this->status->value,
+            'preferred'          => $this->preferred,
+            'last_used_at'       => $this->lastUsedAt?->toIso8601String(),
         ];
     }
 
@@ -101,18 +113,18 @@ final readonly class FactorSummary implements \JsonSerializable
      * numbers and any other opaque shape: keep the last four characters, mask
      * the rest; inputs of four characters or fewer are fully masked.
      *
-     * @param  ?string  $recipient
+     * @param  ?string  $destination
      * @return ?string
      */
-    private static function mask(?string $recipient): ?string
+    private static function mask(?string $destination): ?string
     {
-        if ($recipient === null || $recipient === '') {
-            return $recipient;
+        if ($destination === null || $destination === '') {
+            return $destination;
         }
 
-        return str_contains($recipient, '@')
-            ? self::maskEmail($recipient)
-            : self::maskOpaque($recipient);
+        return str_contains($destination, '@')
+            ? self::maskEmail($destination)
+            : self::maskOpaque($destination);
     }
 
     /**
@@ -120,12 +132,12 @@ final readonly class FactorSummary implements \JsonSerializable
      * for the leading two characters (or one if the local-part is a single
      * character).
      *
-     * @param  string  $recipient
+     * @param  string  $destination
      * @return string
      */
-    private static function maskEmail(string $recipient): string
+    private static function maskEmail(string $destination): string
     {
-        [$local, $domain] = explode('@', $recipient, 2);
+        [$local, $domain] = explode('@', $destination, 2);
 
         $keep   = min(2, (int) max(1, floor(strlen($local) / 2)));
         $prefix = substr($local, 0, $keep);
@@ -135,20 +147,20 @@ final readonly class FactorSummary implements \JsonSerializable
     }
 
     /**
-     * Mask a phone number / opaque recipient: keep the last four characters,
+     * Mask a phone number / opaque destination: keep the last four characters,
      * mask everything before them. If the input is four or fewer characters,
      * mask all of it.
      *
-     * @param  string  $recipient
+     * @param  string  $destination
      * @return string
      */
-    private static function maskOpaque(string $recipient): string
+    private static function maskOpaque(string $destination): string
     {
         $keep   = 4;
-        $length = strlen($recipient);
+        $length = strlen($destination);
 
         return $length <= $keep
             ? str_repeat('*', $length)
-            : str_repeat('*', $length - $keep) . substr($recipient, -$keep);
+            : str_repeat('*', $length - $keep) . substr($destination, -$keep);
     }
 }

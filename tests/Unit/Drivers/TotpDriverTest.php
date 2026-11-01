@@ -167,7 +167,7 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * `generateSecret()` must return a non-empty Base32 string ready for
+     * `startEnrollment()` must return a non-empty Base32 string ready for
      * handing to an authenticator app.
      *
      * @return void
@@ -176,10 +176,10 @@ final class TotpDriverTest extends TestCase
      * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
      * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
-    public function testGenerateSecretReturnsNonEmptyBase32String(): void
+    public function testStartEnrollmentReturnsANonEmptyBase32Secret(): void
     {
         $driver = new TotpDriver;
-        $secret = $driver->generateSecret();
+        $secret = $driver->startEnrollment(new TotpStubFactor(null));
 
         self::assertIsString($secret);
         self::assertNotSame('', $secret);
@@ -199,7 +199,7 @@ final class TotpDriverTest extends TestCase
     public function testProvisioningUriReturnsOtpauthScheme(): void
     {
         $driver = new TotpDriver;
-        $secret = $driver->generateSecret();
+        $secret = $driver->startEnrollment(new TotpStubFactor(null));
 
         $uri = $driver->provisioningUri(
             issuer     : 'Acme',
@@ -223,7 +223,7 @@ final class TotpDriverTest extends TestCase
     public function testProvisioningUriIncludesIssuerAndAccountAndSecret(): void
     {
         $driver = new TotpDriver;
-        $secret = $driver->generateSecret();
+        $secret = $driver->startEnrollment(new TotpStubFactor(null));
 
         $uri = $driver->provisioningUri(
             issuer     : 'Acme',
@@ -262,7 +262,7 @@ final class TotpDriverTest extends TestCase
     public function testProvisioningUriDoesNotDoubleEncodeIssuer(): void
     {
         $driver = new TotpDriver;
-        $secret = $driver->generateSecret();
+        $secret = $driver->startEnrollment(new TotpStubFactor(null));
 
         $uri = $driver->provisioningUri(
             issuer     : 'Acme Co',

@@ -82,6 +82,7 @@ final class EnrollmentServiceTest extends TestCase
         $this->service()->enroll($factor);
 
         self::assertTrue($factor->exists);
+        self::assertTrue($factor->refresh()->isConfirmed());
         self::assertSame($user::class, $factor->getAttribute('authenticatable_type'));
         self::assertSame((string) $user->id, $factor->authenticatable_id);
         Event::assertDispatched(
@@ -131,6 +132,7 @@ final class EnrollmentServiceTest extends TestCase
         $this->service()->enroll($factor);
 
         self::assertSame('Phone', $factor->fresh()?->getAttribute('label'));
+        self::assertFalse($factor->refresh()->isConfirmed());
         Event::assertDispatched(MfaFactorEnrolled::class);
     }
 
@@ -178,7 +180,7 @@ final class EnrollmentServiceTest extends TestCase
 
         Event::fake([MfaFactorEnrolled::class]);
 
-        $this->service()->enroll(new InMemoryFactor(driver: 'email', authenticatable: $user));
+        $this->service()->enroll(new InMemoryFactor(type: 'email', authenticatable: $user));
 
         Event::assertDispatched(MfaFactorEnrolled::class, static fn (MfaFactorEnrolled $event): bool => $event->driver === 'email');
     }
@@ -255,7 +257,7 @@ final class EnrollmentServiceTest extends TestCase
     {
         $factor = new Factor;
 
-        $factor->setAttribute('driver', 'totp');
+        $factor->setAttribute('type', 'totp');
         $factor->setAttribute('secret', 'JBSWY3DPEHPK3PXP');
 
         return $factor;
@@ -274,7 +276,7 @@ final class EnrollmentServiceTest extends TestCase
         return Factor::query()->create([
             'authenticatable_type' => $type,
             'authenticatable_id'   => (string) $id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
     }

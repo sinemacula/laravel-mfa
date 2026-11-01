@@ -161,7 +161,7 @@ final class MultiAuthStackTest extends TestCase
         $factors = Mfa::getFactors();
         self::assertNotNull($factors);
         self::assertCount(1, $factors);
-        self::assertSame('totp', $factors->first()?->getDriver());
+        self::assertSame('totp', $factors->first()?->getType());
     }
 
     /**
@@ -180,7 +180,7 @@ final class MultiAuthStackTest extends TestCase
         Factor::create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 

@@ -83,9 +83,9 @@ final class ActsAsFactorTest extends TestCase
      *
      * @return void
      */
-    public function testGetDriverNameReturnsDriverColumn(): void
+    public function testGetTypeNameReturnsTypeColumn(): void
     {
-        self::assertSame('driver', (new Factor)->getDriverName());
+        self::assertSame('type', (new Factor)->getTypeName());
     }
 
     /**
@@ -99,13 +99,13 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test recipient column name accessor.
+     * Test destination column name accessor.
      *
      * @return void
      */
-    public function testGetRecipientNameReturnsRecipientColumn(): void
+    public function testGetDestinationNameReturnsDestinationColumn(): void
     {
-        self::assertSame('recipient', (new Factor)->getRecipientName());
+        self::assertSame('destination', (new Factor)->getDestinationName());
     }
 
     /**
@@ -196,11 +196,11 @@ final class ActsAsFactorTest extends TestCase
      *
      * @return void
      */
-    public function testGetDriverReturnsStringValue(): void
+    public function testGetTypeReturnsStringValue(): void
     {
-        $factor = new Factor(['driver' => 'totp']);
+        $factor = new Factor(['type' => 'totp']);
 
-        self::assertSame('totp', $factor->getDriver());
+        self::assertSame('totp', $factor->getType());
     }
 
     /**
@@ -208,9 +208,9 @@ final class ActsAsFactorTest extends TestCase
      *
      * @return void
      */
-    public function testGetDriverReturnsEmptyStringWhenUnset(): void
+    public function testGetTypeReturnsEmptyStringWhenUnset(): void
     {
-        self::assertSame('', (new Factor)->getDriver());
+        self::assertSame('', (new Factor)->getType());
     }
 
     /**
@@ -236,25 +236,25 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get recipient returns string value.
+     * Test get destination returns string value.
      *
      * @return void
      */
-    public function testGetRecipientReturnsStringValue(): void
+    public function testGetDestinationReturnsStringValue(): void
     {
-        $factor = new Factor(['recipient' => 'user@example.com']);
+        $factor = new Factor(['destination' => 'user@example.com']);
 
-        self::assertSame('user@example.com', $factor->getRecipient());
+        self::assertSame('user@example.com', $factor->getDestination());
     }
 
     /**
-     * Test get recipient returns null when unset.
+     * Test get destination returns null when unset.
      *
      * @return void
      */
-    public function testGetRecipientReturnsNullWhenUnset(): void
+    public function testGetDestinationReturnsNullWhenUnset(): void
     {
-        self::assertNull((new Factor)->getRecipient());
+        self::assertNull((new Factor)->getDestination());
     }
 
     /**
@@ -487,7 +487,7 @@ final class ActsAsFactorTest extends TestCase
         $factor = new Factor([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => $this->authenticatableId($user),
-            'driver'               => 'totp',
+            'type'                 => 'totp',
         ]);
         $factor->save();
 
@@ -511,7 +511,7 @@ final class ActsAsFactorTest extends TestCase
         $factor = new Factor([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => $this->authenticatableId($user),
-            'driver'               => 'totp',
+            'type'                 => 'totp',
         ]);
         $factor->save();
 
@@ -740,7 +740,7 @@ final class ActsAsFactorTest extends TestCase
         $factor = new Factor([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => $this->authenticatableId($user),
-            'driver'               => 'totp',
+            'type'                 => 'totp',
         ]);
 
         $factor->persist();

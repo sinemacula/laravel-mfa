@@ -136,7 +136,7 @@ final class VerificationServiceTest extends TestCase
 
         $this->expectException(FactorDriverMismatchException::class);
 
-        $this->service()->challenge($this->manager(), 'totp', new InMemoryFactor(driver: 'email', authenticatable: $user));
+        $this->service()->challenge($this->manager(), 'totp', new InMemoryFactor(type: 'email', authenticatable: $user));
     }
 
     /**
@@ -198,7 +198,7 @@ final class VerificationServiceTest extends TestCase
 
         $this->expectException(FactorDriverMismatchException::class);
 
-        $this->service()->verify($this->manager(), 'totp', new InMemoryFactor(driver: 'email', authenticatable: $user), '123456');
+        $this->service()->verify($this->manager(), 'totp', new InMemoryFactor(type: 'email', authenticatable: $user), '123456');
     }
 
     /**
@@ -595,7 +595,7 @@ final class VerificationServiceTest extends TestCase
         return Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
             'attempts'             => $attempts,
         ]);

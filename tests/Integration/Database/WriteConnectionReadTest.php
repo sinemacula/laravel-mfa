@@ -90,7 +90,7 @@ final class WriteConnectionReadTest extends TestCase
         $factor = Factor::query()->create([
             'authenticatable_type' => $user->getMorphClass(),
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'totp',
+            'type'                 => 'totp',
         ]);
 
         self::assertSame(0, $user->authFactors()->count());

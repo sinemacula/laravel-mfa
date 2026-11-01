@@ -124,7 +124,7 @@ final class MfaManagerDriverMismatchTest extends MfaManagerTestCase
 
     /**
      * Mismatch enforcement must apply to non-Eloquent factors as well — the
-     * manager reads the driver name off `Factor::getDriver()` regardless of
+     * manager reads the driver name off `Factor::getType()` regardless of
      * persistence backing.
      *
      * @return void
@@ -140,7 +140,7 @@ final class MfaManagerDriverMismatchTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        $factor = new InMemoryFactor(driver: 'totp', authenticatable: $user);
+        $factor = new InMemoryFactor(type: 'totp', authenticatable: $user);
 
         $driver = \Mockery::mock(FactorDriver::class);
         $driver->shouldNotReceive('verify');
@@ -171,8 +171,8 @@ final class MfaManagerDriverMismatchTest extends MfaManagerTestCase
         $factor = Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'driver'               => 'email',
-            'recipient'            => 'mismatch-user@example.test',
+            'type'                 => 'email',
+            'destination'          => 'mismatch-user@example.test',
         ]);
 
         return [$user, $factor];
