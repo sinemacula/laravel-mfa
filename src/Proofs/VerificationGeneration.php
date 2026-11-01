@@ -7,9 +7,9 @@ namespace SineMacula\Laravel\Mfa\Proofs;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
@@ -55,7 +55,7 @@ final class VerificationGeneration
     {
         $owner = ProofOwner::of($identity);
 
-        $generation = WriteConnection::query(self::owned(self::connection(), $owner))->value(self::COLUMN);
+        $generation = WriteConnection::query(IdentityStateRow::of($owner))->value(self::COLUMN);
 
         return is_numeric($generation) ? (int) $generation : 0;
     }
@@ -87,9 +87,9 @@ final class VerificationGeneration
                 'updated_at'           => $now,
             ]);
 
-            self::owned($connection, $owner)->increment(self::COLUMN, 1, ['updated_at' => $now]);
+            IdentityStateRow::of($owner, $connection)->increment(self::COLUMN, 1, ['updated_at' => $now]);
 
-            $generation = self::owned($connection, $owner)->value(self::COLUMN);
+            $generation = IdentityStateRow::of($owner, $connection)->value(self::COLUMN);
 
             return is_numeric($generation) ? (int) $generation : 0;
         });
@@ -105,19 +105,5 @@ final class VerificationGeneration
     private static function connection(): ConnectionInterface
     {
         return DB::connection(StorageConnection::name());
-    }
-
-    /**
-     * The owner's row in the identity states table.
-     *
-     * @param  \Illuminate\Database\ConnectionInterface  $connection
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
-     * @return \Illuminate\Database\Query\Builder
-     */
-    private static function owned(ConnectionInterface $connection, ProofOwner $owner): Builder
-    {
-        return $connection->table(TableNames::of(TableNames::IDENTITY_STATES))
-            ->where('authenticatable_type', $owner->type)
-            ->where('authenticatable_id', $owner->key);
     }
 }

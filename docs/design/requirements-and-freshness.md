@@ -43,9 +43,10 @@ nothing is stored in their place.
   match `Operation::NAME_PATTERN`, the pattern authentication's operation names use.
 - The requirement a step-up must meet (`Requirements\OperationRequirements::effective()`) is the strictest of the
   configured one and the caller's, either alone when the other is absent, and none with neither or for a name that does
-  not match the pattern. A caller's requirement that asks for nothing adds nothing; one with a part that carries no
-  maximum age, or one longer than 86400 seconds, is refused with an `InvalidArgumentException` before anything else is
-  read (`Requirements\FreshnessBounds`), so whatever judges the step-up always has a bounded age.
+  not match the pattern. A name that does not match is answered first, whatever the caller asks, so it never throws.
+  Otherwise a caller's requirement that asks for nothing adds nothing; one with a part that carries no maximum age, or
+  one longer than 86400 seconds, is refused with an `InvalidArgumentException` before the configuration is read
+  (`Requirements\FreshnessBounds`), so whatever judges the step-up always has a bounded age.
 - The default `Contracts\FreshnessGate`, `Requirements\ConfiguredFreshnessGate`, answers `false` with no requirement,
   no MFA-capable identity, no sign-in the proof store knows of on the application, or no first factor; otherwise it
   answers whether the bound `RequirementCheck` finds the sign-in's recorded proofs meet the requirement. Freshness adds
@@ -54,8 +55,8 @@ nothing is stored in their place.
   bound, is the resolver asked, and its proof counts only when it is a first factor of the identity on the application,
   bound to the current sign-in, made under the identity's current verification generation and not after now.
 - `Mfa::isFresh($operation, $requirement)` asks the bound gate with the strictest of this package's setting for the
-  operation and the requirement given as the caller's requirement, after refusing an unbounded one and answering
-  `false` for a name that does not match the pattern. A gate an adapter binds over an authentication layer's freshness
+  operation and the requirement given as the caller's requirement, after answering `false` for a name that does not
+  match the pattern and refusing an unbounded one. A gate an adapter binds over an authentication layer's freshness
   check therefore always receives this package's setting and must apply the stricter of it and its own; the default
   gate sees the same setting twice, which changes nothing.
 - Refreshing never renews freshness: only a proof's `provedAt` counts. Regenerating or migrating the Laravel session
@@ -90,6 +91,10 @@ nothing is stored in their place.
   that observed nothing (see [Seam Contracts](seam-contracts.md)), meets no additional verification and no level.
 - A name in capitals, with a hyphen, an empty segment or a trailing newline is not an operation's: it is never fresh,
   and the configuration refuses it as a `freshness` key.
+- A well-formed name nobody configures is judged on the caller's requirement alone, as authentication's per-operation
+  check judges it, so a bound gate is still asked with a name only it configures. A misspelt name therefore loses the
+  setting configured for the name it meant, though never the caller's own requirement; the package's operations are
+  named by `Enums\Operation` for that reason.
 - A caller passing the usual unbounded sign-in requirement to `isFresh()` is refused; it passes a bounded one, or checks
   the sign-in requirement separately.
 - A malformed `freshness` entry fails closed with an `InvalidArgumentException` naming the key when it is read, and the
@@ -104,6 +109,9 @@ nothing is stored in their place.
   once the requirement is not empty; it does not yet check the structured requirement, so it can refuse a passkey that
   verified the person and accept evidence below a requested level.
 - Nothing yet sets or clears the re-enrolment obligation; a reset and the confirmation of a factor will.
+- The package's own enrolment, removal and recovery-code calls do not ask the gate yet, so the defaults for its
+  operations take effect only where an application calls `Mfa::isFresh()` itself; the enrolment and lifecycle flows
+  will ask it.
 - The enrolment grant's lifetime is not bound to the freshness of the proof that authorised it: the gate answers yes or
   no and says nothing of how long the answer holds.
 
@@ -114,6 +122,8 @@ nothing is stored in their place.
 - `src/Requirements/RequirementService.php`, `ConfiguredRequirementPolicy.php`, `IdentityContractRequirement.php`,
   `NoTenantRequirement.php`, `ReenrollmentObligation.php`, `ProofRequirementCheck.php`, `ConfiguredFreshnessGate.php`,
   `OperationRequirements.php`, `FreshnessBounds.php`, `RequirementBindings.php`.
+- `src/Database/IdentityStateRow.php`, the identity's row the obligation is read from, shared with
+  `Proofs\VerificationGeneration`.
 - `src/Applications/ApplicationSettings.php` (`requirement()`, `freshness()`, `freshnessFor()`),
   `src/Enums/Operation.php` (`isName()`).
 - `src/MfaManager.php` (`requirement()`, `isFresh()`), `src/Http/Middleware/RequireMfa.php`.

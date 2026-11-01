@@ -7,6 +7,7 @@ namespace Tests\Unit;
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Enums\RequirementPart;
+use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
@@ -139,6 +140,29 @@ final class MfaManagerStateTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         self::assertTrue($this->manager()->requirement()->isEmpty());
+    }
+
+    /**
+     * The requirement of an identity whose auth identifier is non-scalar is
+     * refused rather than answered as empty, so the `mfa` middleware fails
+     * closed for it, even on an application that never requires a factor.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRequirementIsRefusedForNonScalarAuthIdentifier(): void
+    {
+        config()->set('mfa.applications.web', [
+            'requirement'  => 'never',
+            'first_factor' => ['method' => 'password', 'channel' => 'password'],
+        ]);
+
+        $this->actingAs(new NonScalarIdentifierUser);
+
+        $this->expectException(UnsupportedIdentifierException::class);
+
+        $this->manager()->requirement();
     }
 
     /**

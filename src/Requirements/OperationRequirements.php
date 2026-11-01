@@ -43,7 +43,8 @@ final readonly class OperationRequirements
      * The requirement the operation's step-up must meet on the application: the
      * strictest of the configured one and the caller's, either alone when the
      * other is absent, and `null` with neither or for a name that is not an
-     * operation's. The caller's requirement is checked before anything else.
+     * operation's. Such a name is answered first, whatever the caller asks;
+     * otherwise the caller's requirement is checked before anything is read.
      *
      * @param  string  $application
      * @param  string  $operation
@@ -54,11 +55,11 @@ final readonly class OperationRequirements
      */
     public function effective(string $application, string $operation, ?Requirement $caller = null): ?Requirement
     {
-        $caller = self::callerRequirement($caller);
-
         if (!Operation::isName($operation)) {
             return null;
         }
+
+        $caller = self::callerRequirement($caller);
 
         $configured = (new ApplicationSettings($this->config, $application))->freshnessFor($operation);
 

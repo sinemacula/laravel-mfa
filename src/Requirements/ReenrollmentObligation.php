@@ -5,9 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Requirements;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Support\Facades\DB;
-use SineMacula\Laravel\Mfa\Database\StorageConnection;
-use SineMacula\Laravel\Mfa\Database\TableNames;
+use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
@@ -48,13 +46,8 @@ final class ReenrollmentObligation
      */
     public static function isRequired(Authenticatable $identity): bool
     {
-        $owner = ProofOwner::of($identity);
+        $required = WriteConnection::query(IdentityStateRow::of(ProofOwner::of($identity)))->value(self::COLUMN);
 
-        $query = DB::connection(StorageConnection::name())
-            ->table(TableNames::of(TableNames::IDENTITY_STATES))
-            ->where('authenticatable_type', $owner->type)
-            ->where('authenticatable_id', $owner->key);
-
-        return filter_var(WriteConnection::query($query)->value(self::COLUMN), FILTER_VALIDATE_BOOLEAN);
+        return filter_var($required, FILTER_VALIDATE_BOOLEAN);
     }
 }

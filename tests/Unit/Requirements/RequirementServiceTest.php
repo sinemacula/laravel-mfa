@@ -15,12 +15,14 @@ use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
+use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
 use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Fixtures\Identities\NonScalarIdentifierUser;
 use Tests\Fixtures\Identities\PlainUser;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -255,6 +257,53 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
+     * Every application mode, and an application nobody configured.
+     *
+     * @return iterable<string, array{?string}>
+     */
+    public static function modes(): iterable
+    {
+        yield 'never' => ['never'];
+        yield 'enrolled' => ['enrolled'];
+        yield 'always' => ['always'];
+        yield 'an application nobody configured' => [null];
+    }
+
+    /**
+     * An identity whose key is neither a non-empty string nor an integer cannot
+     * have its obligation read, so its requirement is refused rather than
+     * answered as empty, under every mode, `never` included; the current
+     * identity's is refused alike.
+     *
+     * @param  ?string  $mode
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[DataProvider('modes')]
+    public function testANonScalarIdentifiersRequirementIsRefused(?string $mode): void
+    {
+        if ($mode !== null) {
+            config()->set('mfa.applications.' . self::APPLICATION, ['requirement' => $mode]);
+        }
+
+        $identity = new NonScalarIdentifierUser;
+
+        try {
+            $this->service()->requirementFor($identity, self::APPLICATION);
+            self::fail('Expected the identity\'s requirement to be refused.');
+        } catch (UnsupportedIdentifierException) {
+            // Refused, as expected.
+        }
+
+        $this->actingAs($identity);
+
+        $this->expectException(UnsupportedIdentifierException::class);
+
+        $this->service()->requirement();
+    }
+
+    /**
      * The gate is asked with this package's setting for the operation as the
      * caller's requirement, made stricter by the one given; an operation the
      * package does not name passes only the one given, or none.
@@ -289,7 +338,8 @@ final class RequirementServiceTest extends TestCase
 
     /**
      * A name that is not an operation's is never fresh, whatever the gate would
-     * answer, and the gate is not asked.
+     * answer and whatever the caller asks, so it never throws; the gate is not
+     * asked.
      *
      * @return void
      *
@@ -303,6 +353,7 @@ final class RequirementServiceTest extends TestCase
 
         self::assertFalse($this->service()->isFresh('Mfa.Add_Factor', Requirement::none()->withAdditionalVerification(60)));
         self::assertFalse($this->service()->isFresh("mfa.add_factor\n"));
+        self::assertFalse($this->service()->isFresh('Not An Operation', Requirement::none()->withMultifactor()));
         self::assertSame([], $asked);
     }
 

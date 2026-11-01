@@ -97,7 +97,7 @@ final class OperationRequirementsTest extends TestCase
 
     /**
      * A caller's requirement with a part that carries no maximum age, or one
-     * longer than a day, is refused, for a name that is not an operation's too.
+     * longer than a day, is refused, for an operation nobody configures too.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $caller
      * @param  string  $part
@@ -106,7 +106,7 @@ final class OperationRequirementsTest extends TestCase
     #[DataProvider('unboundedCallers')]
     public function testAnUnboundedCallerRequirementIsRefused(Requirement $caller, string $part): void
     {
-        foreach (['mfa.add_factor', 'Not An Operation'] as $operation) {
+        foreach (['mfa.add_factor', 'reports.export'] as $operation) {
 
             try {
                 self::requirements()->effective(self::APPLICATION, $operation, $caller);
@@ -117,6 +117,21 @@ final class OperationRequirementsTest extends TestCase
                 self::assertSame(sprintf($expected, $part), $exception->getMessage());
             }
         }
+    }
+
+    /**
+     * A name that is not an operation's has no requirement whatever the caller
+     * asks: it is answered before the caller's requirement is checked, so even
+     * an unbounded one is not refused.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $caller
+     * @param  string  $part
+     * @return void
+     */
+    #[DataProvider('unboundedCallers')]
+    public function testANameThatIsNotAnOperationsIsAnsweredBeforeTheCaller(Requirement $caller, string $part): void
+    {
+        self::assertNull(self::requirements()->effective(self::APPLICATION, 'Not An Operation', $caller), $part);
     }
 
     /**

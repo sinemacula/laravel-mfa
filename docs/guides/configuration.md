@@ -137,7 +137,9 @@ The package's own operations (`mfa.add_factor`, `mfa.replace_factor`, `mfa.remov
 that default whole, and the application adds its own operations by name. Names are the block's keys, read whole rather
 than as a dotted path, and must be lower-case segments of letters, digits and underscores, each starting with a letter,
 separated by dots; any other name is refused. An operation neither the package nor the application names is never
-fresh unless the caller asks for a requirement of its own.
+fresh unless the caller asks for a requirement of its own. The package's own operations are not gated by this yet: its
+enrolment, removal and recovery-code calls run without asking, so until the enrolment and lifecycle flows do, an
+application calls `Mfa::isFresh()` itself before calling them.
 
 `first_factor` is how the package knows, without an authentication layer, what started the sign-in: its `method` (any
 name, such as `password`) and its `channel`, one of the channel kinds (`password`, `sms`, `email`,

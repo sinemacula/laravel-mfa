@@ -95,7 +95,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
 
     /**
      * A name that is not an operation's is never fresh, whatever the caller
-     * asks.
+     * asks, and never throws, even for an unbounded caller's requirement.
      *
      * @return void
      *
@@ -110,6 +110,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
         self::assertTrue($this->gate()->isFresh('billing.change_plan', $caller));
         self::assertFalse($this->gate()->isFresh('Billing.Change_Plan', $caller));
         self::assertFalse($this->gate()->isFresh("billing.change_plan\n", $caller));
+        self::assertFalse($this->gate()->isFresh('Billing.Change_Plan', Requirement::none()->withMultifactor()));
     }
 
     /**

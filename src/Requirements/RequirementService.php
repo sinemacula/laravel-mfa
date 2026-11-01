@@ -112,9 +112,9 @@ final readonly class RequirementService
      * Whether the current session is fresh enough for the operation, asked of
      * the bound `FreshnessGate` with the strictest of this package's setting
      * for the operation and the caller's requirement. A name that is not an
-     * operation's is never fresh; a caller's requirement that asks for nothing
-     * adds nothing, and one with a part that carries no maximum age, or one
-     * longer than a day, is refused.
+     * operation's is never fresh, whatever the caller asks, and never throws; a
+     * caller's requirement that asks for nothing adds nothing, and one with a
+     * part that carries no maximum age, or one longer than a day, is refused.
      *
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
@@ -125,12 +125,12 @@ final readonly class RequirementService
      */
     public function isFresh(string $operation, ?Requirement $requirement = null): bool
     {
-        $application = $this->container->make(ProofService::class)->application();
-        $caller      = (new OperationRequirements($this->config()))->effective($application, $operation, $requirement);
-
         if (!Operation::isName($operation)) {
             return false;
         }
+
+        $application = $this->container->make(ProofService::class)->application();
+        $caller      = (new OperationRequirements($this->config()))->effective($application, $operation, $requirement);
 
         return $this->container->make(FreshnessGate::class)->isFresh($operation, $caller);
     }
