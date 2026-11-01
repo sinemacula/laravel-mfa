@@ -4,15 +4,12 @@ declare(strict_types = 1);
 
 namespace Tests\Feature;
 
-use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
-use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Attempts\Lockout;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
@@ -385,50 +382,6 @@ final class TotpLifecycleTest extends TestCase
         Mfa::challenge('totp', $factor);
 
         Event::assertDispatched(MfaChallengeIssued::class);
-    }
-
-    /**
-     * Backup-code factors share the no-rotation property: their secret is
-     * pre-issued at enrolment, so `challenge()` must also preserve any active
-     * lockout. This catches the same bypass shape against the recovery factor.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testChallengePreservesBackupCodeLockoutAcrossInvocations(): void
-    {
-        $user = TestUser::create([
-            'email'       => 'backup-lockout@example.test',
-            'mfa_enabled' => true,
-        ]);
-
-        $this->actingAs($user);
-
-        /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
-        $factor = Factor::create([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'backup_code',
-            'secret'               => hash('sha256', 'PLAIN12345'),
-            'consecutive_failures' => 5,
-        ]);
-
-        $this->container()->make(AttemptStore::class)->hold(
-            $this->container()->make(AttemptKeys::class)->factor($factor->id),
-            AttemptScope::FACTOR,
-            5,
-            Carbon::now()->addMinutes(15)->getTimestamp(),
-        );
-
-        self::assertNotNull($this->lockoutOf($factor));
-
-        Mfa::challenge('backup_code', $factor);
-
-        $factor->refresh();
-
-        self::assertSame(5, $factor->getConsecutiveFailures());
-        self::assertNotNull($this->lockoutOf($factor));
     }
 
     /**

@@ -115,7 +115,7 @@ registers it with the container, and the classes only it uses:
 | `Passkeys`      | `PasskeyAssertion`, what a verified passkey assertion observed                                      |
 | `Enrollment`    | `enroll()` and `EnrollmentSettings`                                                                 |
 | `Lifecycle`     | `disable()`, `ForgetIdentity` and `LifecycleSettings`                                               |
-| `RecoveryCodes` | Backup codes: `issueBackupCodes()`, `BackupCodeDriver` and `RecoveryCodeSettings`                   |
+| `RecoveryCodes` | `generateRecoveryCodes()`, `redeemRecoveryCode()`, `recoveryCodes()` and `RecoveryCodeSettings`     |
 | `Attempts`      | `AttemptService`: attempts counted, lockouts applied and lifted, `AttemptSettings`                  |
 | `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
 | `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction             |

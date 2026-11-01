@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -11,6 +12,7 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 
@@ -18,12 +20,13 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
  * Coverage for the FQCN-fallback paths behind the manager.
  *
  * `Support\CurrentIdentity::typeOf()`, which
- * `Factors\FactorOwnership::assert()`, the proof store and backup-code issuing
- * all use, branches on whether the identity is a `Model` — Eloquent identities
- * use `getMorphClass()`, non-Eloquent identities fall back to a strict FQCN
- * comparison. The shipped test identities (`TestUser`, `SecondaryUser`,
- * `NonScalarIdentifierUser`) are all Eloquent, so a dedicated non-Eloquent
- * fixture is needed to drive the FQCN branches and keep coverage at 100%.
+ * `Factors\FactorOwnership::assert()`, the proof store and recovery code
+ * generation all use, branches on whether the identity is a `Model` —
+ * Eloquent identities use `getMorphClass()`, non-Eloquent identities fall back
+ * to a strict FQCN comparison. The shipped test identities (`TestUser`,
+ * `SecondaryUser`, `NonScalarIdentifierUser`) are all Eloquent, so a dedicated
+ * non-Eloquent fixture is needed to drive the FQCN branches and keep coverage
+ * at 100%.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -96,34 +99,43 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * `issueBackupCodes()` must accept a non-Eloquent identity and persist the
-     * new batch with the identity's FQCN as the morph type — exercising the
-     * FQCN fallback inside the rotation flow.
+     * `generateRecoveryCodes()` must accept a non-Eloquent identity and store
+     * the new set with the identity's FQCN as the owner type, exercising the
+     * FQCN fallback inside the replacement.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function testIssueBackupCodesAcceptsNonEloquentIdentity(): void
+    public function testGenerateRecoveryCodesAcceptsNonEloquentIdentity(): void
     {
-        $identity = new NonEloquentIdentity('plain-issue', mfaEnabled: false);
+        $identity = new NonEloquentIdentity('plain-issue', mfaEnabled: true);
+        $config   = $this->container()->make(Repository::class);
 
-        Auth::shouldReceive('user')->andReturn($identity);
+        $config->set('hashing.bcrypt.rounds', 4);
+        $config->set('mfa.recovery_codes.count', 2);
+        $config->set('mfa.applications.web', ['recovery_codes' => ['enabled' => true], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
-        $codes = $this->manager()->issueBackupCodes(2);
+        Factor::query()->create([
+            'authenticatable_type' => NonEloquentIdentity::class,
+            'authenticatable_id'   => 'plain-issue',
+            'type'                 => 'totp',
+            'status'               => 'confirmed',
+        ]);
 
-        self::assertCount(2, $codes);
+        $this->actingAs($identity);
 
-        // Persisted rows must carry the identity's FQCN as the morph type —
+        self::assertCount(2, $this->manager()->generateRecoveryCodes());
+
+        // Stored rows must carry the identity's FQCN as the owner type,
         // proving the `: $identity::class` fallback fired.
-        self::assertCount(
+        self::assertSame(
             2,
-            Factor::query()
+            RecoveryCode::query()
                 ->where('authenticatable_type', NonEloquentIdentity::class)
                 ->where('authenticatable_id', 'plain-issue')
-                ->where('type', 'backup_code')
-                ->get(),
+                ->count(),
         );
     }
 

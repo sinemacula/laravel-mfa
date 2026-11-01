@@ -8,11 +8,11 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
+use SineMacula\Laravel\Mfa\Attempts\RequestIp;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
@@ -33,7 +33,6 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
-use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
@@ -125,8 +124,8 @@ final readonly class VerificationService
         // A delivered code is sent bound to this session and purpose. Sending a
         // code resets no count and lifts no lockout: only a success of the
         // factor resets its failures in a row, so a resend cannot be used to
-        // wipe a lockout. TOTP and backup codes have no per-challenge secret to
-        // mint, so their `issueChallenge()` is a no-op.
+        // wipe a lockout. A TOTP factor has no per-challenge secret to mint, so
+        // its `issueChallenge()` is a no-op.
         if ($resolved instanceof CodeDeliveryDriver) {
             $result = $this->container->make(CodeService::class)->send($identity, $factor, $this->binding($identity, $purpose), $resolved);
         } else {
@@ -171,10 +170,6 @@ final readonly class VerificationService
      *   `locked` for an attempt a lockout refused and `not_found` for a factor
      *   removed in the meantime.
      *
-     * A backup code verified for an enrolment is refused before the attempt,
-     * with `not_accepted`, since a recovery code cannot confirm an enrolment:
-     * the code is not used up and nothing is counted.
-     *
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account MFA-bypass
      * primitive, before anything is counted. Throws
@@ -209,15 +204,6 @@ final readonly class VerificationService
 
         $events   = $this->container->make(Dispatcher::class);
         $resolved = $this->drivers->resolve($registry, $driver);
-
-        // A recovery code cannot confirm an enrolment, so it is refused before
-        // the attempt is made: the single-use code is not spent, nothing is
-        // counted and nothing is reported as verified.
-        if ($resolved instanceof BackupCodeDriver && $purpose === Purpose::ENROLLMENT) {
-            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, FailureReason::NOT_ACCEPTED, 'A recovery code cannot confirm an enrolment.'));
-
-            return false;
-        }
 
         return $this->makeAttempt($identity, $factor, $driver, $resolved, $code, $purpose, $events);
     }
@@ -257,7 +243,7 @@ final readonly class VerificationService
         // The current identity's own session makes the attempt, so the identity
         // is charged for it.
         $outcome = $this->container->make(AttemptService::class)->attempt(
-            new Attempt($identity, $factor, $purpose, $this->ip()),
+            new Attempt($identity, $factor, $purpose, RequestIp::resolve($this->container)),
             function (?Factor $stored) use ($identity, $resolved, $binding, $code, &$verified, &$check, &$generation): bool {
 
                 $verified   = $stored ?? $verified;
@@ -325,30 +311,13 @@ final readonly class VerificationService
     }
 
     /**
-     * The IP address of the request being served, as resolved through the
-     * application's trusted proxies, or `null` outside a request.
-     *
-     * @return ?string
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    private function ip(): ?string
-    {
-        $request = $this->container->bound('request') ? $this->container->make('request') : null;
-
-        return $request instanceof Request ? $request->ip() : null;
-    }
-
-    /**
      * Record the proof a successful verification made on the identity's current
      * sign-in, for the purpose it was made for, stamped with the verification
-     * generation read before the code was checked: a recovery code proof for a
-     * backup code, which travels on no channel, and an additional factor proof
-     * on the factor's channel otherwise, named by the factor's destination when
-     * it has one and by the factor itself when not. A driver whose channel
-     * cannot carry a factor proves nothing, and neither does a factor whose
-     * identifier cannot name it. A recovery code never reaches here for an
-     * enrolment, which `verify()` refuses before the attempt.
+     * generation read before the code was checked: an additional factor proof
+     * on the factor's channel, named by the factor's destination when it has
+     * one and by the factor itself when not. A driver whose channel cannot
+     * carry a factor proves nothing, and neither does a factor whose
+     * identifier cannot name it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  int  $generation
@@ -362,12 +331,6 @@ final readonly class VerificationService
      */
     private function recordProof(MultiFactorAuthenticatable $identity, int $generation, Factor $factor, string $driver, FactorDriver $resolved, Purpose $purpose): void
     {
-        if ($resolved instanceof BackupCodeDriver) {
-            $this->proofs->record($identity, $generation, ProofKind::RECOVERY_CODE, $driver, null, null, $purpose);
-
-            return;
-        }
-
         $identifier = $factor->getFactorIdentifier();
         $kind       = $resolved->channelKind();
 

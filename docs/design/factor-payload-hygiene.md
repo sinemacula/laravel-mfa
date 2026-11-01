@@ -13,7 +13,8 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
 ## Invariants
 
 - The `Factor::$secret` column is typed `text` and cast `encrypted` on the shipped model. It carries long-lived
-  material (TOTP keys, SHA-256 digests of backup codes).
+  material (TOTP keys). Recovery codes are not factors: they live in a table of their own, as salted hashes (see
+  [Recovery Codes](recovery-codes.md)).
 - It is listed in the model's `$hidden`, with the full `destination` and the `credential_reference`, so
   Eloquent's default array/JSON serialisation omits them. A consumer who accidentally dumps a factor through
   `toArray()` or `->toJson()` gets a payload with no secret, no code and no full destination.
@@ -52,7 +53,7 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
   summary. This fails safe — the summary still serialises, the consumer still gets a UI-renderable list, but the broken
   row is identifiable.
 - A `null` or empty destination is preserved as-is by the mask helper; the mask is applied only to non-empty strings.
-  Factor drivers that have no destination (TOTP, backup codes) remain `null` in the summary.
+  Factor drivers that have no destination (TOTP) remain `null` in the summary.
 - Email masking uses `explode('@', $destination, 2)`, so an address with multiple `@` characters is split only
   once. The domain portion retains any trailing `@` in the local-part region, which is masked.
 - Opaque masking treats anything without an `@` the same way, including phone numbers, passkey labels, and custom

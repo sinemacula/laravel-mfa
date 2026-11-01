@@ -39,11 +39,12 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
   the application, and `GuardHooks::signedOut()` with the application. A guard that does neither leaves no sign-in,
   so nothing is recorded for it and nothing counts, whatever sign-in the identity holds on another application.
 - A successful verification on a signed-in session records its proof through `Proofs\ProofService::record()`: an
-  additional factor proof on the driver's channel, named by the factor's destination or the factor itself, or a
-  recovery code proof for a backup code, bound to the application of the request (a bound `ApplicationResolver`'s
-  answer, or the default guard's name), the current sign-in there and the purpose the verification was made for. A
-  driver whose channel cannot carry a factor proves nothing. A backup code verified for an enrolment is refused with
-  `not_accepted` before the attempt, so the code is not used up and nothing is counted.
+  additional factor proof on the driver's channel, named by the factor's destination or the factor itself, bound to
+  the application of the request (a bound `ApplicationResolver`'s answer, or the default guard's name), the current
+  sign-in there and the purpose the verification was made for. A driver whose channel cannot carry a factor proves
+  nothing. A redeemed recovery code records a recovery code proof the same way, on no channel; a redemption for an
+  enrolment, or with no sign-in to record the proof on, is refused before the attempt, so the code is not used up and
+  nothing is counted (see [Recovery Codes](recovery-codes.md)).
 - The proof is stamped with the verification generation read, under the attempt's lock, just before the code is
   checked (`ProofService::generationFor()`), so a generation advanced while the code is checked leaves the proof
   behind. The proof is recorded once the attempt has committed, so a lockout refusing the attempt records nothing.

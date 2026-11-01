@@ -4,26 +4,28 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\RecoveryCodes;
 
-use Illuminate\Support\Collection;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Enums\FactorStatus;
-use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
-use SineMacula\Laravel\Mfa\Factors\FactorService;
-use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Events\Actor;
+use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
+use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
-use Tests\Fixtures\Drivers\NoopFactorDriver;
-use Tests\Fixtures\Exceptions\MidRotationFailureException;
+use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use Tests\Fixtures\Identities\FactorHolder;
-use Tests\Fixtures\Identities\SecondaryUser;
-use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
+use Tests\Unit\Concerns\InteractsWithRecoveryCodes;
 
 /**
- * Tests for `RecoveryCodeService`: a batch of backup codes replaces exactly the
- * current identity's previous batch, atomically, and is returned once.
+ * Tests for where a recovery code set stands, how it is removed with the last
+ * factor, and how used and replaced codes are pruned: the remaining count and
+ * the set's time are read without a code, in one statement, of the current
+ * set only; removal runs inside the identity's factor state transaction and
+ * reports a set that existed; pruning deletes only codes that can no longer be
+ * redeemed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,287 +35,275 @@ use Tests\TestCase;
 #[CoversClass(RecoveryCodeService::class)]
 final class RecoveryCodeServiceTest extends TestCase
 {
+    use InteractsWithRecoveryCodes;
+
     /**
-     * A guest is issued nothing, and nothing is written.
+     * An identity that never had a set has none: nothing remaining, no
+     * generation and no time.
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
-    public function testIssuesNothingToAGuest(): void
+    public function testAnIdentityWithoutASetHasNone(): void
     {
-        Event::fake([MfaFactorEnrolled::class]);
+        $status = $this->recoveryCodes()->status($this->signInHolder());
 
-        self::assertSame([], $this->service()->issueBackupCodes($this->manager()));
-        self::assertSame(0, Factor::query()->count());
-        Event::assertNotDispatched(MfaFactorEnrolled::class);
+        self::assertSame(0, $status->remaining);
+        self::assertSame(0, $status->generation);
+        self::assertNull($status->generatedAt);
+        self::assertFalse($status->exists());
     }
 
     /**
-     * A backup-code driver that is not the shipped one is refused.
+     * The status follows the set: its size and time once generated, one less
+     * per redemption, the next generation's size and time once replaced, and
+     * only the identity's own codes.
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
-    public function testRefusesADriverThatIsNotTheBackupCodeDriver(): void
+    public function testTheStatusFollowsTheCurrentSet(): void
     {
-        $this->signIn('refused@example.com');
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 08:00:00'));
 
-        $this->manager()->extend(BackupCodeDriver::NAME, fn (): NoopFactorDriver => new NoopFactorDriver);
+        $neighbor = FactorHolder::query()->create(['email' => 'neighbor@example.com']);
 
-        $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('Driver [backup_code] must be a ' . BackupCodeDriver::class . ' instance to issue backup codes.');
+        $this->addFactor($neighbor);
+        $this->recoveryCodes()->generate($neighbor);
 
-        $this->service()->issueBackupCodes($this->manager());
+        $holder = $this->signInHolder();
+        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $status = $this->recoveryCodes()->status($holder);
+
+        self::assertSame(10, $status->remaining);
+        self::assertSame(1, $status->generation);
+        self::assertSame('2026-11-01 08:00:00', $status->generatedAt?->format('Y-m-d H:i:s'));
+        self::assertTrue($status->exists());
+
+        $this->recoveryCodes()->redeem($holder, $codes[0], Purpose::SIGN_IN);
+        $this->recoveryCodes()->redeem($holder, $codes[1], Purpose::SIGN_IN);
+
+        self::assertSame(8, $this->recoveryCodes()->status($holder)->remaining);
+
+        $this->travelTo(CarbonImmutable::parse('2026-11-03 08:00:00'));
+
+        $this->recoveryCodes()->generate($holder);
+
+        $status = $this->recoveryCodes()->status($holder);
+
+        self::assertSame(10, $status->remaining);
+        self::assertSame(2, $status->generation);
+        self::assertSame('2026-11-03 08:00:00', $status->generatedAt?->format('Y-m-d H:i:s'));
     }
 
     /**
-     * Each code is stored as a backup-code factor of the identity holding its
-     * hash, and enrolled with an event, and the plaintext codes are returned.
+     * The status is read in one statement, so the count and the generation
+     * are always of the same set.
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
-    public function testStoresEachCodeHashedAndReturnsThePlaintext(): void
+    public function testTheStatusIsReadInOneStatement(): void
     {
-        $user = $this->signIn('issue@example.com');
+        $holder = $this->signInHolder();
 
-        Event::fake([MfaFactorEnrolled::class]);
+        $this->recoveryCodes()->generate($holder);
 
-        $codes = $this->service()->issueBackupCodes($this->manager(), 3);
+        $statements = 0;
 
-        self::assertCount(3, $codes);
-
-        $driver = $this->driver();
-        $stored = $this->backupCodes($user)->map(static fn (Factor $factor): ?string => $factor->getSecret())->sort()->values()->all();
-        $hashes = collect($codes)->map(static fn (string $code): string => $driver->hash($code))->sort()->values()->all();
-
-        self::assertSame($hashes, $stored);
-        Event::assertDispatchedTimes(MfaFactorEnrolled::class, 3);
-        Event::assertDispatched(
-            MfaFactorEnrolled::class,
-            static fn (MfaFactorEnrolled $event): bool => $event->driver === BackupCodeDriver::NAME
-                && $event->identity                                      === $user
-                && $event->factor instanceof Factor
-                && $event->factor->exists,
-        );
-    }
-
-    /**
-     * Without a count, the driver's configured count is issued.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testIssuesTheConfiguredCountByDefault(): void
-    {
-        $this->signIn('count@example.com');
-
-        self::assertCount(10, $this->service()->issueBackupCodes($this->manager()));
-    }
-
-    /**
-     * A new batch replaces the identity's previous batch, and leaves its other
-     * factors and other identities' backup codes alone.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testReplacesOnlyTheIdentitysPreviousBatch(): void
-    {
-        $user     = $this->signIn('replace@example.com');
-        $neighbor = TestUser::query()->create(['email' => 'neighbor@example.com']);
-
-        $previous = $this->addFactor($user::class, $user->id, BackupCodeDriver::NAME);
-        $totp     = $this->addFactor($user::class, $user->id, 'totp');
-        $other    = $this->addFactor($neighbor::class, $neighbor->id, BackupCodeDriver::NAME);
-        $foreign  = $this->addFactor(SecondaryUser::class, $user->id, BackupCodeDriver::NAME);
-
-        $this->service()->issueBackupCodes($this->manager(), 2);
-
-        self::assertFalse(Factor::query()->whereKey($previous->getKey())->exists());
-        self::assertTrue(Factor::query()->whereKey($totp->getKey())->exists());
-        self::assertTrue(Factor::query()->whereKey($other->getKey())->exists());
-        self::assertTrue(Factor::query()->whereKey($foreign->getKey())->exists());
-        self::assertCount(2, $this->backupCodes($user));
-    }
-
-    /**
-     * A failure part-way through a rotation keeps the previous batch.
-     *
-     * @return void
-     */
-    public function testAFailedRotationKeepsThePreviousBatch(): void
-    {
-        $user     = $this->signIn('rollback@example.com');
-        $previous = $this->addFactor($user::class, $user->id, BackupCodeDriver::NAME);
-        $enrolled = 0;
-
-        Event::listen(MfaFactorEnrolled::class, static function () use (&$enrolled): void {
-            if (++$enrolled === 2) {
-                throw new MidRotationFailureException('Failed mid-rotation.');
-            }
+        DB::listen(static function () use (&$statements): void {
+            $statements++;
         });
 
-        try {
-            $this->service()->issueBackupCodes($this->manager(), 3);
-            self::fail('The rotation was expected to fail.');
-        } catch (\Throwable $exception) {
-            self::assertInstanceOf(MidRotationFailureException::class, $exception);
-            self::assertCount(1, $this->backupCodes($user));
-            self::assertTrue(Factor::query()->whereKey($previous->getKey())->exists());
+        $this->recoveryCodes()->status($holder);
+
+        self::assertSame(1, $statements);
+    }
+
+    /**
+     * A used-up set still exists, with nothing remaining.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAUsedUpSetKeepsItsTime(): void
+    {
+        config()->set('mfa.recovery_codes.count', 2);
+
+        $holder = $this->signInHolder();
+
+        foreach (self::plaintexts($this->recoveryCodes()->generate($holder)) as $code) {
+            $this->recoveryCodes()->redeem($holder, $code, Purpose::SIGN_IN);
         }
+
+        $status = $this->recoveryCodes()->status($holder);
+
+        self::assertSame(0, $status->remaining);
+        self::assertSame(1, $status->generation);
+        self::assertTrue($status->exists());
     }
 
     /**
-     * The identity's factors include the issued codes at once.
+     * Removing the set deletes every code row, clears the set's time, keeps
+     * its generation, and reports the removal with the actor once it commits.
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
-    public function testTheIssuedCodesAreSeenAtOnce(): void
+    public function testRemovingTheSetDeletesItAndReportsIt(): void
     {
-        $this->signIn('cache@example.com');
+        $holder = $this->signInHolder();
+        $actor  = new Actor('admin', '9');
 
-        $factors = $this->container()->make(FactorService::class);
+        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder);
 
-        self::assertCount(0, $factors->getFactors() ?? collect([1]));
+        Event::fake([RecoveryCodesRemoved::class]);
 
-        $this->service()->issueBackupCodes($this->manager(), 2);
+        self::assertTrue($this->removeSet($holder, $actor));
+        self::assertCount(0, $this->storedCodes($holder));
+        self::assertNull($this->stateOf($holder)->recovery_codes_generated_at);
+        self::assertSame(2, $this->stateOf($holder)->recovery_codes_generation);
+        self::assertFalse($this->recoveryCodes()->status($holder)->exists());
 
-        self::assertCount(2, $factors->getFactors() ?? collect());
+        Event::assertDispatchedTimes(RecoveryCodesRemoved::class, 1);
+        Event::assertDispatched(RecoveryCodesRemoved::class, static fn (RecoveryCodesRemoved $event): bool => $event->actor === $actor);
     }
 
     /**
-     * Each issued code is stored confirmed, usable as soon as it is issued, so
-     * an identity using the shipped trait that holds only backup codes is set
-     * up.
+     * A used-up set whose codes were all pruned is still a set, and its
+     * removal is reported; so are code rows left without a set's time.
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
-    public function testIssuedCodesAreConfirmedAndCountAsSetUp(): void
+    public function testAPrunedSetOrStrayRowsStillReportARemoval(): void
     {
-        $holder = FactorHolder::query()->create(['email' => 'holder@example.com']);
+        $holder = $this->signInHolder();
 
-        $this->actingAs($holder);
+        $this->recoveryCodes()->generate($holder);
 
-        $factors = $this->container()->make(FactorService::class);
+        RecoveryCode::query()->delete();
 
-        self::assertFalse($factors->isSetup());
+        Event::fake([RecoveryCodesRemoved::class]);
 
-        $this->service()->issueBackupCodes($this->manager(), 2);
+        self::assertTrue($this->removeSet($holder));
 
-        $statuses = Factor::query()
-            ->where('authenticatable_id', (string) $holder->id)
-            ->pluck('status')
-            ->all();
-
-        self::assertSame([FactorStatus::CONFIRMED->value, FactorStatus::CONFIRMED->value], $statuses);
-        self::assertTrue($holder->isMfaEnabled());
-        self::assertTrue($factors->isSetup());
-    }
-
-    /**
-     * Resolve the package's MFA manager, the driver registry the service is
-     * called with.
-     *
-     * @return \SineMacula\Laravel\Mfa\MfaManager
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    private function manager(): MfaManager
-    {
-        $manager = $this->container()->make('mfa');
-
-        self::assertInstanceOf(MfaManager::class, $manager);
-
-        return $manager;
-    }
-
-    /**
-     * Resolve the backup-code service.
-     *
-     * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    private function service(): RecoveryCodeService
-    {
-        return $this->container()->make(RecoveryCodeService::class);
-    }
-
-    /**
-     * Resolve the backup-code driver.
-     *
-     * @return \SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    private function driver(): BackupCodeDriver
-    {
-        $driver = $this->manager()->driver(BackupCodeDriver::NAME);
-
-        self::assertInstanceOf(BackupCodeDriver::class, $driver);
-
-        return $driver;
-    }
-
-    /**
-     * Create a test user and authenticate as them.
-     *
-     * @param  string  $email
-     * @return \Tests\Fixtures\Identities\TestUser
-     */
-    private function signIn(string $email): TestUser
-    {
-        /** @var \Tests\Fixtures\Identities\TestUser $user */
-        $user = TestUser::query()->create(['email' => $email]);
-
-        $this->actingAs($user);
-
-        return $user;
-    }
-
-    /**
-     * Add a factor owned by the given type and identifier.
-     *
-     * @param  string  $type
-     * @param  int  $id
-     * @param  string  $driver
-     * @return \SineMacula\Laravel\Mfa\Models\Factor
-     */
-    private function addFactor(string $type, int $id, string $driver): Factor
-    {
-        /** @var \SineMacula\Laravel\Mfa\Models\Factor */
-        return Factor::query()->create([
-            'authenticatable_type' => $type,
-            'authenticatable_id'   => (string) $id,
-            'type'                 => $driver,
-            'secret'               => 'secret-' . $driver,
+        RecoveryCode::query()->create([
+            'authenticatable_type' => $holder->getMorphClass(),
+            'authenticatable_id'   => (string) $holder->id,
+            'code_hash'            => 'stray-hash',
+            'generation'           => 1,
         ]);
+
+        self::assertTrue($this->removeSet($holder));
+        self::assertCount(0, $this->storedCodes($holder));
+
+        Event::assertDispatchedTimes(RecoveryCodesRemoved::class, 2);
     }
 
     /**
-     * The user's stored backup-code factors.
+     * Without a set there is nothing to remove, and nothing is reported.
      *
-     * @param  \Tests\Fixtures\Identities\TestUser  $user
-     * @return \Illuminate\Support\Collection<int, \SineMacula\Laravel\Mfa\Models\Factor>
+     * @return void
+     *
+     * @throws \Throwable
      */
-    private function backupCodes(TestUser $user): Collection
+    public function testWithoutASetNothingIsRemoved(): void
     {
-        /** @var \Illuminate\Support\Collection<int, \SineMacula\Laravel\Mfa\Models\Factor> */
-        return Factor::query()
-            ->where('authenticatable_type', $user::class)
-            ->where('authenticatable_id', (string) $user->id)
-            ->where('type', BackupCodeDriver::NAME)
-            ->get()
-            ->toBase();
+        $holder = $this->signInHolder();
+
+        Event::fake([RecoveryCodesRemoved::class]);
+
+        self::assertFalse($this->removeSet($holder));
+
+        Event::assertNotDispatched(RecoveryCodesRemoved::class);
+    }
+
+    /**
+     * Removing a set outside the identity's factor state transaction is
+     * refused, as it would not be atomic with the factor's removal.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRemovingASetOutsideTheTransactionIsRefused(): void
+    {
+        $holder = $this->signInHolder();
+
+        $this->recoveryCodes()->generate($holder);
+
+        try {
+            $this->recoveryCodes()->removeSet($holder);
+            self::fail('Removing a set outside the transaction was expected to be refused.');
+        } catch (\LogicException $exception) {
+            self::assertSame('A recovery code set is removed only inside the identity\'s factor state transaction.', $exception->getMessage());
+        }
+
+        self::assertCount(10, $this->storedCodes($holder));
+    }
+
+    /**
+     * Pruning deletes the codes used or replaced before the cutoff and keeps
+     * every usable code, every code used or replaced since, and the identity's
+     * state row; it returns how many it deleted.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testPruningDeletesOnlyCodesThatEndedBeforeTheCutoff(): void
+    {
+        config()->set('mfa.recovery_codes.count', 3);
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-01 00:00:00'));
+
+        $holder = $this->signInHolder();
+        $first  = self::plaintexts($this->recoveryCodes()->generate($holder));
+
+        $this->recoveryCodes()->redeem($holder, $first[0], Purpose::SIGN_IN);
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-10 00:00:00'));
+
+        $second = self::plaintexts($this->recoveryCodes()->generate($holder));
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-20 00:00:00'));
+
+        $this->recoveryCodes()->redeem($holder, $second[0], Purpose::SIGN_IN);
+
+        self::assertSame(3, $this->recoveryCodes()->prune(CarbonImmutable::parse('2026-10-15 00:00:00')));
+
+        $kept = $this->storedCodes($holder);
+
+        self::assertCount(3, $kept);
+        self::assertTrue($kept->every(static fn (RecoveryCode $row): bool => $row->getGeneration() === 2));
+        self::assertCount(2, $kept->filter(static fn (RecoveryCode $row): bool => $row->isUsable()));
+        self::assertSame(2, $this->recoveryCodes()->status($holder)->remaining);
+        self::assertTrue($this->recoveryCodes()->status($holder)->exists());
+
+        self::assertSame(0, $this->recoveryCodes()->prune(CarbonImmutable::parse('2026-10-15 00:00:00')));
+        self::assertSame(1, $this->recoveryCodes()->prune(CarbonImmutable::parse('2026-10-21 00:00:00')));
+    }
+
+    /**
+     * Remove the identity's set as the removal of its last factor does: inside
+     * its factor state transaction.
+     *
+     * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
+     * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @return bool
+     *
+     * @throws \Throwable
+     */
+    private function removeSet(FactorHolder $holder, ?Actor $actor = null): bool
+    {
+        return FactorStateTransaction::forIdentity($holder, new Factor, fn (): bool => $this->recoveryCodes()->removeSet($holder, $actor));
     }
 }

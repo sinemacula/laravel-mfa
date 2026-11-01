@@ -25,7 +25,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Codes\LeakingSmsSender;
 use Tests\Fixtures\Codes\RecordingCodeDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
-use Tests\Fixtures\Factors\NonModelEloquentBackupCodeFactor;
+use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\Fixtures\Factors\UncastOwnerKeyFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Secrets\RecordedTrace;
@@ -302,7 +302,7 @@ final class CodeServiceTest extends TestCase
 
         $factors = [
             new InMemoryFactor(type: 'email', destination: self::ADDRESS, authenticatable: $user),
-            new NonModelEloquentBackupCodeFactor(null),
+            new TotpStubFactor(null),
             new Factor(['type' => 'email']),
         ];
 

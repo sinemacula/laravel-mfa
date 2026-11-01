@@ -43,7 +43,7 @@ between requests.
 | `recovery_codes.count`          | `10`                               | 1 to 50                                | `MFA_RECOVERY_CODES_COUNT`          | yes     |
 | `recovery_codes.length`         | `12`                               | 1 to 64, and 40 bits with the alphabet | `MFA_RECOVERY_CODES_LENGTH`         | yes     |
 | `recovery_codes.alphabet`       | `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` | see [Recovery codes](#recovery-codes)  | `MFA_RECOVERY_CODES_ALPHABET`       | yes     |
-| `recovery_codes.low_count`      | `3`                                | 0 to the set's size                    | `MFA_RECOVERY_CODES_LOW_COUNT`      | not yet |
+| `recovery_codes.low_count`      | `3`                                | 0 to the set's size                    | `MFA_RECOVERY_CODES_LOW_COUNT`      | yes     |
 | `attempts.factor_limit`         | `5`                                | 1 to 20                                | `MFA_ATTEMPTS_FACTOR_LIMIT`         | yes     |
 | `attempts.identity_limit`       | `20`                               | 1 to 100                               | `MFA_ATTEMPTS_IDENTITY_LIMIT`       | yes     |
 | `attempts.ip_limit`             | `100`                              | 1 to 10000                             | `MFA_ATTEMPTS_IP_LIMIT`             | yes     |
@@ -85,8 +85,9 @@ name:
 ],
 ```
 
-Every key below is checked, but only `totp_window` is applied yet: the TOTP driver accepts the window of the
-application a bound `Contracts\ApplicationResolver` names for the request, and `totp.window` when none is bound. Until
+Every key below is checked, but only `totp_window` and `recovery_codes.enabled` are applied yet: the TOTP driver
+accepts the window of the application a bound `Contracts\ApplicationResolver` names for the request, and `totp.window`
+when none is bound, and recovery codes are generated and redeemed only where the application accepts them. Until
 the flows that read the other keys ship, the shipped drivers verify a factor of any type whichever application asks, no
 factor is required by this configuration alone, and the limits and freshness are not enforced. Use your own policy
 binding (`Contracts\MfaPolicy`) and routes to decide who must verify.
@@ -299,7 +300,9 @@ without `0`, `1`, `I` and `O`), gives 60. The alphabet is at least two printable
 hyphens, which normalisation would remove, and no character may appear twice, counting two that differ only in case as
 the same: a repeated character would be drawn more often than the others, so the codes would carry less entropy than the
 measure says. `low_count` is how few unused codes count as running low, from 0 (never) to the set's size; left unset it
-is 3, or the set's size when that is smaller. It is checked but not applied yet.
+is 3, or the set's size when that is smaller. A redemption that leaves the set at or below it dispatches
+`RecoveryCodesLow`. The settings govern new sets only: a set already issued keeps redeeming after they change. See
+[Recovery codes](recovery-codes.md).
 
 ## Attempts
 

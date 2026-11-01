@@ -37,7 +37,6 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
-use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\NullMfaPolicy;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
@@ -157,7 +156,6 @@ final class MfaServiceProviderTest extends TestCase
         self::assertInstanceOf(TotpDriver::class, $manager->driver('totp'));
         self::assertInstanceOf(EmailDriver::class, $manager->driver('email'));
         self::assertInstanceOf(SmsDriver::class, $manager->driver('sms'));
-        self::assertInstanceOf(BackupCodeDriver::class, $manager->driver('backup_code'));
     }
 
     /**

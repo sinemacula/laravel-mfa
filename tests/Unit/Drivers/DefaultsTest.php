@@ -10,7 +10,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
-use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 
@@ -27,7 +26,6 @@ use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
  *
  * @internal
  */
-#[CoversClass(BackupCodeDriver::class)]
 #[CoversClass(EmailDriver::class)]
 #[CoversClass(SmsDriver::class)]
 final class DefaultsTest extends TestCase
@@ -61,21 +59,5 @@ final class DefaultsTest extends TestCase
             'Your verification code is: :code',
             $driver->getMessageTemplate(),
         );
-    }
-
-    /**
-     * `BackupCodeDriver`'s constructor defaults — 12-character codes, the
-     * shipped Crockford-style alphabet, and a set size of 10 — must be
-     * preserved.
-     *
-     * @return void
-     */
-    public function testBackupCodeDriverDefaults(): void
-    {
-        $driver = new BackupCodeDriver;
-
-        self::assertSame(12, $driver->getCodeLength());
-        self::assertSame('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', $driver->getAlphabet());
-        self::assertSame(10, $driver->getCodeCount());
     }
 }

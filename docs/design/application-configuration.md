@@ -17,11 +17,11 @@ before anything relies on it.
   capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `proofs`, `lifecycle`) beside `storage`,
   `factor` and `identity_state`.
 - Not every setting is applied yet. Of an application block only `totp_window` is read, by the TOTP driver for the
-  application a bound `ApplicationResolver` names; otherwise nothing is enforced per application: the shipped drivers
-  verify any type, and the limits, freshness and requirement mode are not applied. Of the package-wide blocks, the code
-  resend cooldown and send caps, the recovery code low-count threshold, the enrolment lifetime and the pruning
-  retention are checked only. The configuration guide marks each setting as applied or not, and a flow that starts
-  reading one updates it.
+  application a bound `ApplicationResolver` names, and `recovery_codes.enabled`, by the recovery code service;
+  otherwise nothing is enforced per application: the shipped drivers verify any type, and the limits, freshness and
+  requirement mode are not applied. Of the package-wide blocks, the code resend cooldown and send caps, the enrolment
+  lifetime and the pruning retention are checked only. The configuration guide marks each setting as applied or not,
+  and a flow that starts reading one updates it.
 - Every setting is read through one class that owns its block: `Applications\ApplicationSettings` (with
   `Applications\ApplicationBlock` reading the raw block), `Drivers\TotpSettings`, `Codes\CodeSettings`,
   `RecoveryCodes\RecoveryCodeSettings`, `Attempts\AttemptSettings`, `Enrollment\EnrollmentSettings`,
@@ -105,7 +105,7 @@ before anything relies on it.
 - `src/Config/ConfigurationValidator.php`: `report()`, `validate()`; `src/Config/ConfigurationBindings.php`: `boot()`,
   `validate()`; `src/MfaServiceProvider.php`: `boot()`, `registerManager()`.
 - `src/Console/CheckConfigurationCommand.php`; `src/Exceptions/InvalidConfigurationException.php`.
-- The readers: `src/Drivers/DriverBindings.php`, `src/RecoveryCodes/RecoveryCodeBindings.php`,
+- The readers: `src/Drivers/DriverBindings.php`, `src/RecoveryCodes/RecoveryCodeService.php`,
   `src/Attempts/AttemptService.php` (`attempt()`, `lockout()`), `src/Http/Middleware/RequireMfa.php`
   (`configuredMaxAgeMinutes()`).
 
