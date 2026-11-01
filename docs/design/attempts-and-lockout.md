@@ -31,16 +31,14 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
 - `verify()` reads `$factor->isLocked()`. If the factor is locked, the verification service dispatches a `locked`
   failure and returns `false` without touching the counter or the driver.
 - Otherwise the verification service calls `FactorDriver::verify($factor, $code)`.
-- On driver success, the verification service calls `$factor->recordVerification()`. The trait stamps `verified_at`,
-  calls `resetAttempts()` (zeroes `attempts`, nulls `locked_until`), and clears any pending code via `consumeCode()`,
-  then `persist()` commits.
+- On driver success, the verification service calls `$factor->recordVerification()`. The trait stamps `verified_at`
+  and calls `resetAttempts()` (zeroes `attempts`, nulls `locked_until`), then `persist()` commits.
 - On driver failure, the verification service calls `$factor->recordAttempt()` (increments `attempts`, stamps
   `last_attempted_at`). If the post-increment count is at or above `mfa.attempts.factor_limit`, it then calls
   `$factor->applyLockout(now()->addSeconds(mfa.attempts.lockout_seconds))`. Either way, `persist()` commits the
   mutation.
-- OTP-issuing drivers (email, SMS) reset the attempt counter from inside `issueChallenge()` as part of minting a fresh
-  code. That reset is paired with a fresh secret, so it cannot be used to wipe a lockout without rotating the live
-  credential.
+- Sending a delivered code (email, SMS) resets nothing: neither the factor's attempt counter nor its lockout, so asking
+  for a new code never buys more guesses (see [Delivered Codes](delivered-codes.md)).
 
 ## Failure / Edge Cases
 
@@ -63,11 +61,9 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
 ## Implementation Anchors
 
 - `src/Concerns/ActsAsFactor.php`: `recordAttempt()`, `resetAttempts()`, `applyLockout()`, `isLocked()`,
-  `recordVerification()`, `consumeCode()`.
+  `recordVerification()`.
 - `src/Verification/VerificationService.php`: lock-check short-circuit in `verify()`, `applyVerificationOutcome()`
   and its `Attempts\AttemptSettings` reads of `factorLimit()` and `lockoutSeconds()`.
-- `src/Drivers/EmailDriver.php`, `src/Drivers/SmsDriver.php` (and `src/Drivers/AbstractOtpDriver.php`):
-  attempt-counter reset inside `issueChallenge()` paired with code rotation.
 - `src/Models/Factor.php`: `attempts` / `locked_until` / `last_attempted_at` casts.
 - `database/migrations/2026_04_15_000000_create_mfa_factors_table.php`: column definitions and defaults.
 
@@ -90,15 +86,16 @@ invariants below are what downstream code (audit sinks, admin tooling, custom fa
 - `tests/Unit/Attempts/AttemptSettingsTest.php`
 - `tests/Unit/MfaManagerVerifySuccessTest.php`
   `testVerifySuccessResetsAttemptCounter`
+- `tests/Unit/Verification/VerificationServiceTest.php`
+  `testSendingACodeResetsNothing`
 
 ## Change Triggers
 
 Update this note when any of the following change:
 
 - the rule that a locked factor short-circuits `verify()` before the driver runs and without incrementing the counter
-- the reset-on-success contract (`verified_at` stamped, `attempts` zeroed, `locked_until` nulled, pending code
-  cleared)
+- the reset-on-success contract (`verified_at` stamped, `attempts` zeroed, `locked_until` nulled)
 - the `mfa.attempts.factor_limit` / `mfa.attempts.lockout_seconds` config keys or their bounds
-- the decision that OTP drivers reset attempts from inside `issueChallenge()` paired with a fresh code
+- the rule that sending a delivered code resets no attempt counter and lifts no lockout
 - whether lockouts remain per-factor rather than per-identity
 - whether `isLocked()` remains a live `isFuture()` check versus any eager cleanup of stale stamps

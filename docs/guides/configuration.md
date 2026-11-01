@@ -32,10 +32,12 @@ between requests.
 | `totp.window`                   | `1`                                | 0 to 3 steps                           | `MFA_TOTP_WINDOW`                   | yes     |
 | `codes.length`                  | `6`                                | 6 to 10 digits                         | `MFA_CODES_LENGTH`                  | yes     |
 | `codes.ttl_minutes`             | `10`                               | 1 to 10 minutes                        | `MFA_CODES_TTL_MINUTES`             | yes     |
-| `codes.resend_cooldown_seconds` | `60`                               | 0 to the code lifetime                 | `MFA_CODES_RESEND_COOLDOWN_SECONDS` | not yet |
-| `codes.factor_send_limit`       | `5`                                | 1 to 50                                | `MFA_CODES_FACTOR_SEND_LIMIT`       | not yet |
-| `codes.identity_send_limit`     | `10`                               | 1 to 100                               | `MFA_CODES_IDENTITY_SEND_LIMIT`     | not yet |
-| `codes.send_window_minutes`     | `60`                               | 1 to 1440 minutes                      | `MFA_CODES_SEND_WINDOW_MINUTES`     | not yet |
+| `codes.max_attempts`            | `5`                                | 1 to 10                                | `MFA_CODES_MAX_ATTEMPTS`            | yes     |
+| `codes.challenge_ttl_minutes`   | `30`                               | the code lifetime to 60 minutes        | `MFA_CODES_CHALLENGE_TTL_MINUTES`   | yes     |
+| `codes.resend_cooldown_seconds` | `60`                               | 0 to the code lifetime                 | `MFA_CODES_RESEND_COOLDOWN_SECONDS` | yes     |
+| `codes.factor_send_limit`       | `5`                                | 1 to 50                                | `MFA_CODES_FACTOR_SEND_LIMIT`       | yes     |
+| `codes.identity_send_limit`     | `10`                               | 1 to 100                               | `MFA_CODES_IDENTITY_SEND_LIMIT`     | yes     |
+| `codes.send_window_minutes`     | `60`                               | 1 to 1440 minutes                      | `MFA_CODES_SEND_WINDOW_MINUTES`     | yes     |
 | `codes.sms_message`             | `Your verification code is: :code` | carries `:code`                        | `MFA_CODES_SMS_MESSAGE`             | yes     |
 | `codes.mailable`                | `Codes\MfaCodeMessage`             | `MfaCodeMessage` or a subclass         |                                     | yes     |
 | `recovery_codes.count`          | `10`                               | 1 to 50                                | `MFA_RECOVERY_CODES_COUNT`          | yes     |
@@ -125,10 +127,11 @@ no level, so every configured application must either declare one or have a `Con
 which an authentication layer's adapter provides; with neither, the configuration check fails. The channel `unknown`
 is refused, as it declares nothing.
 
-Each code type an application enables needs something to deliver its codes: `sms` a `Contracts\SmsGateway` other than
-the package's `NullSmsGateway`, and `email` a mailer bound in the container (looked up, not built, so the check builds
-no mail transport). Enabling one without it fails the configuration check, rather than the first send. A binding the
-container cannot build, such as a gateway bound to a class that does not exist, is reported under the application too.
+Each code type an application enables needs something to deliver its codes: `sms` a `Contracts\SmsSender` other than
+the package's `NullSmsSender`, and `email` a `Contracts\EmailSender` other than its `NullEmailSender` (bind
+`Codes\MailEmailSender` to send through Laravel's mailer), and either needs the application key its codes are hashed
+with. Enabling one without them fails the configuration check, rather than the first send. A binding the container
+cannot build, such as a sender bound to a class that does not exist, is reported under the application too.
 
 ## Storage
 
@@ -236,6 +239,8 @@ for transmission delay.
 'codes' => [
     'length'                  => env('MFA_CODES_LENGTH', 6),
     'ttl_minutes'             => env('MFA_CODES_TTL_MINUTES', 10),
+    'max_attempts'            => env('MFA_CODES_MAX_ATTEMPTS', 5),
+    'challenge_ttl_minutes'   => env('MFA_CODES_CHALLENGE_TTL_MINUTES', 30),
     'resend_cooldown_seconds' => env('MFA_CODES_RESEND_COOLDOWN_SECONDS', 60),
     'factor_send_limit'       => env('MFA_CODES_FACTOR_SEND_LIMIT', 5),
     'identity_send_limit'     => env('MFA_CODES_IDENTITY_SEND_LIMIT', 10),
@@ -246,11 +251,19 @@ for transmission delay.
 ```
 
 A code sent by SMS or email has `length` digits, at least 6, and works for `ttl_minutes` after it is sent, at most 10.
-`resend_cooldown_seconds` is how long after a code is sent another may be sent to the same factor, never longer than the
-code's lifetime, and `factor_send_limit` and `identity_send_limit` cap how many one factor and one identity, across its
-factors and sessions, are sent within `send_window_minutes`; these four are checked but not applied yet, so nothing
-limits sending until the flow that applies them ships. `sms_message` is the SMS text, which must carry the `:code`
-placeholder the code replaces, and `mailable` the email message class, `Codes\MfaCodeMessage` or a subclass of it.
+It belongs to a challenge: one factor, session, application and purpose. `max_attempts` is how many codes may be checked
+against one challenge; a resend sends a new code for the same challenge and keeps the attempts already made, so asking
+for another code never brings more guesses. `challenge_ttl_minutes` is how long a challenge's resends may run from its
+first code, at least the code lifetime and at most 60 minutes: no code of the challenge works past it, and the next send
+after it starts a new challenge. `resend_cooldown_seconds` is how long after a code is sent another may be sent for the
+same challenge, never longer than the code's lifetime, and `factor_send_limit` and `identity_send_limit` cap how many
+codes one factor and one identity, across its factors and sessions, are sent within `send_window_minutes`, resends
+included. `sms_message` is the SMS text, which must carry the `:code` placeholder the code replaces, and `mailable` the
+email message class, `Codes\MfaCodeMessage` or a subclass of it, whose queued payload is always encrypted.
+
+A refused send answers `sending_capped` with the seconds until another may be sent (see
+[Delivered codes](../design/delivered-codes.md)). Codes are stored as keyed hashes of the code and its binding, with a
+key derived from `app.key`; rotating the application key only invalidates the codes outstanding.
 
 ## Recovery codes
 

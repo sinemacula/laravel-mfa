@@ -37,10 +37,13 @@ The current note set is:
 - `backup-code-consumption.md`: how backup codes are stored hashed, why consumption and rotation run under the owner's
   factor state lock, and the atomic-replace guarantee on rotation.
 - `attempts-and-lockout.md`: the per-factor rate-limit state machine on `attempts` / `locked_until` /
-  `last_attempted_at`, including how OTP drivers reset attempts paired with a fresh code.
+  `last_attempted_at`, and why sending a code resets none of it.
+- `delivered-codes.md`: the email and SMS codes the package sends and checks on its own: what a code is bound to, its
+  keyed hash, resends, the cooldown, the attempt budget and the delivery caps, the sender contracts, and the encrypted
+  queued message.
 - `per-device-verification-and-step-up.md`: the `MfaVerificationStore` seam, the default session-scoped
   implementation, the `mfa:N` step-up route-parameter contract, and the fail-closed rules inside `hasExpired()`.
-- `factor-payload-hygiene.md`: encryption at rest for `secret` / `code`, the `FactorSummary` projection used on
+- `factor-payload-hygiene.md`: encryption at rest for `secret`, the `FactorSummary` projection used on
   exception payloads, and the destination-masking rules.
 
 These documents are secondary to the code and tests, not a replacement for them. If a note and a cited test disagree,

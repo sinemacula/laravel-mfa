@@ -34,7 +34,7 @@ working.
 - Parent package provides: a `DeviceMfaVerificationStore` binding (lives in `laravel-iam`, not
   this repo), an opinionated `OrganisationMfaPolicy` bound against the `MfaPolicy` contract,
   cross-package event listeners (audit log), and any other opinionated defaults.
-- This repo stays clean of parent-package knowledge. The extension seams (policy, store, gateway)
+- This repo stays clean of parent-package knowledge. The extension seams (policy, store, senders)
   must be expressive enough that the parent package does not need to monkey-patch.
 
 ---
@@ -54,7 +54,9 @@ Historical record of the architectural calls made during the 1.0 cycle.
   `MfaManager::challenge()` orchestrates (events, rate-limiting hooks, logging).
   `FactorDriver::issueChallenge(Factor): void` implements per-factor-type transport (no-op for TOTP,
   mail dispatch for email, gateway dispatch for SMS, no-op for backup codes since they are
-  pre-issued).
+  pre-issued). Since superseded for email and SMS: their codes are bound to a session and purpose
+  the factor alone does not carry, so the package sends and checks them itself and the driver only
+  delivers each one (see [Delivered Codes](design/delivered-codes.md)).
 - **D4 — Per-device verification is the default.** In paired mode the verification timestamp
   lives on the `Device` record; in standalone mode it lives on the session (which is already
   per-device). The step-up middleware (`mfa:N`) is the escape hatch for "re-verify before this
@@ -77,7 +79,8 @@ Historical record of the architectural calls made during the 1.0 cycle.
   column carries long-lived material (TOTP keys, hashed backup codes); the `code` column holds
   live OTPs during their expiry window. Encrypting both closes the read-only-DB-replay attack
   surface. Migration uses `text` for both so the encrypted ciphertext fits regardless of the
-  configured OTP length.
+  configured OTP length. Since superseded for `code`: delivered codes left the factor row for a
+  table of their own, stored only as keyed hashes (see [Delivered Codes](design/delivered-codes.md)).
 - **D8 — Test fixtures extend abstract stubs, not raw contracts.** `AbstractFactorStub` and
   `AbstractEloquentFactorStub` (in `tests/Fixtures/`) provide safe-default implementations of
   every `Factor` / `EloquentFactor` method. Anonymous test fixtures extend the relevant abstract
