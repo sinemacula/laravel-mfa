@@ -24,6 +24,8 @@ call them, so the flows can be built against one fixed set.
 - `EventContextResolver` is the exception: the event dispatcher calls it, so it is bound by default to
   `Context\DefaultEventContextResolver`, which gives the identity, the application and the request (see
   [Event Catalogue](event-catalogue.md)).
+- `CombinationPolicy` is bound by default to `Assurance\DefaultCombinationPolicy`, which the requirement and
+  verification flows are built on (see [Combination Policy](combination-policy.md)).
 
 | Contract                 | Answers                                                                                       |
 |--------------------------|-----------------------------------------------------------------------------------------------|
