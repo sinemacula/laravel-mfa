@@ -29,9 +29,9 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
  * store, SMS and email senders, event context). The shipped drivers are
  * registered against the manager by their capability's `*Bindings` class from
  * inside the singleton's factory, once the configuration is checked. Boots the
- * middleware aliases, config and migration publishing, the `mfa:check`
- * command, and the configuration check that runs once the application has
- * booted, which also refuses a factor model off the storage connection.
+ * middleware aliases, config and migration publishing, the `mfa:check` command,
+ * and the configuration check that runs once the application has booted, which
+ * also refuses a factor model off the storage connection.
  *
  * Consumers with their own enforcement policy, stateless verification store, or
  * SMS and email senders rebind the matching contracts in their own service

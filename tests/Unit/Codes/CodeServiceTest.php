@@ -9,9 +9,10 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Codes\CodeCheck;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\DeliveredCodes;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\CodeSent;
@@ -21,14 +22,16 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Codes\RecordingCodeDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Factors\NonModelEloquentBackupCodeFactor;
+use Tests\Fixtures\Factors\UncastOwnerKeyFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
  * Tests for `CodeService`: a code is stored and delivered in the identity's
- * factor state transaction and reported once committed; a refused send
- * delivers and reports nothing; a delivery that fails keeps nothing; and only
- * a stored factor owned by the binding's identity has codes.
+ * factor state transaction and reported once committed; a refused send delivers
+ * and reports nothing; a delivery that fails keeps nothing; and only a stored
+ * factor owned by the binding's identity has codes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,8 +49,8 @@ final class CodeServiceTest extends TestCase
 
     /**
      * A code sent is delivered to the factor's destination, reported with its
-     * challenge and the factor's masked destination, and accepted once for
-     * its binding.
+     * challenge and the factor's masked destination, and accepted once for its
+     * binding.
      *
      * @return void
      *
@@ -194,14 +197,101 @@ final class CodeServiceTest extends TestCase
     {
         $user = TestUser::query()->create(['email' => self::ADDRESS, 'mfa_enabled' => true]);
 
-        foreach ([new InMemoryFactor(type: 'email', destination: self::ADDRESS, authenticatable: $user), new Factor(['type' => 'email'])] as $factor) {
+        $factors = [
+            new InMemoryFactor(type: 'email', destination: self::ADDRESS, authenticatable: $user),
+            new NonModelEloquentBackupCodeFactor(null),
+            new Factor(['type' => 'email']),
+        ];
+
+        foreach ($factors as $factor) {
 
             try {
                 $this->service()->check($factor, self::binding($user), self::CODE);
                 self::fail('Expected the factor to be refused.');
             } catch (UnsupportedFactorException $exception) {
-                self::assertStringStartsWith('Delivered codes need a stored EloquentFactor model; got ', $exception->getMessage());
+                self::assertSame('Delivered codes need a stored EloquentFactor model; got ' . $factor::class . '.', $exception->getMessage());
             }
+        }
+    }
+
+    /**
+     * Rows of an owner key the factor may hold, and whether it names the
+     * binding's identity: a string or an integer does, anything else does not,
+     * even when it reads the same.
+     *
+     * @return iterable<string, array{\Closure(\Tests\Fixtures\Identities\TestUser): mixed, bool}>
+     */
+    public static function ownerKeys(): iterable
+    {
+        yield 'a string' => [static fn (TestUser $user): string => (string) $user->id, true];
+        yield 'an integer' => [static fn (TestUser $user): int => $user->id, true];
+        yield 'a float' => [static fn (TestUser $user): float => (float) $user->id, false];
+    }
+
+    /**
+     * A factor's owner key names the binding's identity only when it is a
+     * string or an integer that reads as the identity's key.
+     *
+     * @param  \Closure(\Tests\Fixtures\Identities\TestUser): mixed  $key
+     * @param  bool  $owned
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('ownerKeys')]
+    public function testOnlyAStringOrIntegerOwnerKeyNamesTheIdentity(\Closure $key, bool $owned): void
+    {
+        [$user, $stored] = $this->factor();
+
+        $factor = (new UncastOwnerKeyFactor)->newFromBuilder($stored->getAttributes());
+
+        $factor->setAttribute('authenticatable_id', $key($user));
+
+        try {
+            self::assertSame(CodeCheck::MISSING, $this->service()->check($factor, self::binding($user), self::CODE));
+            self::assertTrue($owned, 'Expected the owner key to be refused.');
+        } catch (\InvalidArgumentException $exception) {
+            self::assertFalse($owned, 'Expected the owner key to be accepted.');
+            self::assertSame('A delivered code\'s binding must name the identity that owns the factor.', $exception->getMessage());
+        }
+    }
+
+    /**
+     * Rows of a key the stored factor may have, and whether a code can be bound
+     * to it: a non-empty string or an integer can, anything else cannot.
+     *
+     * @return iterable<string, array{mixed, bool}>
+     */
+    public static function factorKeys(): iterable
+    {
+        yield 'an integer' => [42, true];
+        yield 'an empty string' => ['', false];
+        yield 'a float' => [4.2, false];
+    }
+
+    /**
+     * Codes are bound only to a factor whose key is a non-empty string or an
+     * integer.
+     *
+     * @param  mixed  $key
+     * @param  bool  $bindable
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('factorKeys')]
+    public function testOnlyAFactorWithAStringOrIntegerKeyHasCodes(mixed $key, bool $bindable): void
+    {
+        [$user, $factor] = $this->factor();
+
+        $factor->setAttribute('id', $key);
+
+        try {
+            self::assertSame(CodeCheck::MISSING, $this->service()->check($factor, self::binding($user), self::CODE));
+            self::assertTrue($bindable, 'Expected the factor key to be refused.');
+        } catch (UnsupportedFactorException $exception) {
+            self::assertFalse($bindable, 'Expected the factor key to be accepted.');
+            self::assertSame('A delivered code needs a factor with a string or integer key.', $exception->getMessage());
         }
     }
 
@@ -220,7 +310,12 @@ final class CodeServiceTest extends TestCase
         $other  = TestUser::query()->create(['email' => 'bob@example.test', 'mfa_enabled' => true]);
         $driver = new RecordingCodeDriver;
 
-        foreach ([new ProofBinding(TestUser::class, (string) $other->id, 'web', 'session-a', Purpose::SIGN_IN), new ProofBinding('App\Other', (string) $user->id, 'web', 'session-a', Purpose::SIGN_IN)] as $binding) {
+        $bindings = [
+            new ProofBinding(TestUser::class, (string) $other->id, 'web', 'session-a', Purpose::SIGN_IN),
+            new ProofBinding('App\Other', (string) $user->id, 'web', 'session-a', Purpose::SIGN_IN),
+        ];
+
+        foreach ($bindings as $binding) {
 
             try {
                 $this->service()->send($user, $factor, $binding, $driver);

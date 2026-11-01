@@ -122,8 +122,8 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * The email factory reads the configured message class and delivers
-     * through the bound email sender.
+     * The email factory reads the configured message class and delivers through
+     * the bound email sender.
      *
      * @return void
      *

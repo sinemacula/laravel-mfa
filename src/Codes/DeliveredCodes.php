@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
@@ -19,13 +20,13 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * against it, on the codes table's connection and always on its write PDO.
  *
  * A challenge is one row, bound to a factor and to a binding (the identity, the
- * application, the session and the purpose), and holds one live code at a
- * time. A code is `length` digits drawn uniformly with `random_int()`, stored
- * only as a keyed hash of the code, its challenge, its issue, its factor and
- * its binding (see `CodeKeys`), so it matches nothing else; the session is
- * stored as a keyed digest too. Issuing for a binding with an open challenge (a
- * code not yet used, sent less than `challenge_ttl_minutes` ago) is a resend: a
- * new code replaces the previous one, which stops working at once, the attempt
+ * application, the session and the purpose), and holds one live code at a time.
+ * A code is `length` digits drawn uniformly with `random_int()`, stored only as
+ * a keyed hash of the code, its challenge, its issue, its factor and its
+ * binding (see `CodeKeys`), so it matches nothing else; the session is stored
+ * as a keyed digest too. Issuing for a binding with an open challenge (a code
+ * not yet used, sent less than `challenge_ttl_minutes` ago) is a resend: a new
+ * code replaces the previous one, which stops working at once, the attempt
  * count is kept, and the new code expires at the code lifetime or the end of
  * the challenge, whichever is sooner. A resend waits out the cooldown since the
  * last code, and a challenge that has used up its attempts sends no more until
@@ -93,7 +94,11 @@ final readonly class DeliveredCodes
     {
         $session = $this->keys->session($binding->sessionId);
         $open    = $this->open($factorId, $binding, $session, $now);
-        $wait    = max($open === null ? 0 : $this->resendWait($open, $now), $this->capWait($factorId, $binding, $now));
+        $wait    = $this->capWait($factorId, $binding, $now);
+
+        if ($open !== null) {
+            $wait = max($wait, $this->resendWait($open, $now));
+        }
 
         if ($wait > 0) {
             return $wait;
@@ -114,15 +119,15 @@ final readonly class DeliveredCodes
      * up its attempts says so, without counting. A check that can count an
      * attempt against the issue it read compares the code, and accepts it only
      * when it also uses that issue up; one that cannot (a concurrent resend,
-     * check or expiry got there first) never compares, and answers from a
-     * fresh read.
+     * check or expiry got there first) never compares, and answers from a fresh
+     * read.
      *
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $code
      * @param  \Carbon\CarbonImmutable  $now
      * @param  ?string  $challengeId
-     * @return \SineMacula\Laravel\Mfa\Codes\CodeCheck
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      *
      * @throws \InvalidArgumentException
      *
@@ -141,12 +146,29 @@ final readonly class DeliveredCodes
             return $this->matches($row, $factorId, $binding, $code) ? CodeCheck::REPLAYED : CodeCheck::MISSING;
         }
 
-        $max     = $this->settings->maxAttempts();
-        $refusal = self::refusal($row, $max, $now);
+        return $this->attempt($row, $factorId, $binding, $code, $now);
+    }
 
-        if ($refusal !== null) {
-            return $refusal;
-        }
+    /**
+     * Check the code against the challenge's live issue: count the attempt,
+     * then compare, accepting the code only when this check also uses the issue
+     * up. An issue that has expired or used up its attempts counts nothing, and
+     * the fresh read that follows says which.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
+     * @param  string  $factorId
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  string  $code
+     * @param  \Carbon\CarbonImmutable  $now
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
+     *
+     * @throws \InvalidArgumentException
+     *
+     * @phpstan-impure
+     */
+    private function attempt(Code $row, string $factorId, ProofBinding $binding, #[\SensitiveParameter] string $code, CarbonImmutable $now): CodeCheck
+    {
+        $max = $this->settings->maxAttempts();
 
         if (!$this->countAttempt($row, $max, $now)) {
             return $this->recheck($row, $max, $now);
@@ -323,16 +345,14 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * The answer for a check that could not count its attempt against the
-     * issue it read: why that issue refuses checks when it is still the
-     * challenge's code and does; otherwise `invalid`.
+     * The answer for a check that could not count its attempt against the issue
+     * it read: why that issue refuses checks when it is still the challenge's
+     * code and does; otherwise `invalid`.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
      * @param  int  $max
      * @param  \Carbon\CarbonImmutable  $now
-     * @return \SineMacula\Laravel\Mfa\Codes\CodeCheck
-     *
-     * @throws \InvalidArgumentException
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      */
     private function recheck(Code $row, int $max, CarbonImmutable $now): CodeCheck
     {
@@ -397,8 +417,6 @@ final readonly class DeliveredCodes
      * @param  \Carbon\CarbonImmutable  $now
      * @return bool
      *
-     * @throws \InvalidArgumentException
-     *
      * @phpstan-impure
      *
      * @imperative
@@ -421,8 +439,6 @@ final readonly class DeliveredCodes
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $session
      * @return \Illuminate\Database\Eloquent\Builder<\SineMacula\Laravel\Mfa\Models\Code>
-     *
-     * @throws \InvalidArgumentException
      */
     private function bound(string $factorId, ProofBinding $binding, string $session): Builder
     {
@@ -436,7 +452,7 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Draw a code of the configured number of digits, uniformly, zero-padded.
+     * Draw a code of the configured number of digits, each drawn uniformly.
      *
      * @return string
      *
@@ -451,15 +467,19 @@ final readonly class DeliveredCodes
             return ($this->generator)($length);
         }
 
-        return str_pad((string) random_int(0, (int) str_repeat('9', $length)), $length, '0', STR_PAD_LEFT);
+        $code = '';
+
+        for ($digit = 0; $digit < $length; $digit++) {
+            $code .= random_int(0, 9);
+        }
+
+        return $code;
     }
 
     /**
      * A query on the codes' table, on its own connection, for the writes.
      *
      * @return \Illuminate\Database\Query\Builder
-     *
-     * @throws \InvalidArgumentException
      */
     private function table(): QueryBuilder
     {
@@ -488,7 +508,7 @@ final readonly class DeliveredCodes
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
      * @param  int  $max
      * @param  \Carbon\CarbonImmutable  $now
-     * @return ?\SineMacula\Laravel\Mfa\Codes\CodeCheck
+     * @return ?\SineMacula\Laravel\Mfa\Enums\CodeCheck
      */
     private static function refusal(Code $row, int $max, CarbonImmutable $now): ?CodeCheck
     {

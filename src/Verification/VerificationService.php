@@ -5,13 +5,12 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Verification;
 
 use Carbon\Carbon;
-use Illuminate\Contracts\Config\Repository;
+use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
-use SineMacula\Laravel\Mfa\Codes\CodeCheck;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
@@ -21,6 +20,7 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
@@ -74,10 +74,10 @@ final readonly class VerificationService
      * purpose given.
      *
      * For a driver that delivers codes, a code bound to this session and the
-     * purpose is sent through the code service, and the outcome returned:
-     * sent, or refused with its reason. For any other driver, its
-     * `issueChallenge()` runs and nothing is returned. `MfaChallengeIssued` is
-     * dispatched unless the send was refused.
+     * purpose is sent through the code service, and the outcome returned: sent,
+     * or refused with its reason. For any other driver, its `issueChallenge()`
+     * runs and nothing is returned. `MfaChallengeIssued` is dispatched unless
+     * the send was refused.
      *
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account
@@ -208,8 +208,8 @@ final readonly class VerificationService
      * Persist the post-driver verification outcome on the factor row.
      *
      * Successful verification stamps `verified_at` and resets attempts;
-     * failure increments the attempt counter and, once it
-     * reaches `mfa.attempts.factor_limit`, locks the factor for
+     * failure increments the attempt counter and, once it reaches
+     * `mfa.attempts.factor_limit`, locks the factor for
      * `mfa.attempts.lockout_seconds`. Non-Eloquent factors carry no row to
      * mutate and skip both branches before this method is even called.
      *
@@ -250,7 +250,7 @@ final readonly class VerificationService
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $driver
      * @param  bool  $valid
-     * @param  ?\SineMacula\Laravel\Mfa\Codes\CodeCheck  $check
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\CodeCheck  $check
      * @param  \Illuminate\Contracts\Events\Dispatcher  $events
      * @return void
      *
@@ -295,15 +295,9 @@ final readonly class VerificationService
      */
     private function binding(MultiFactorAuthenticatable $identity, Purpose $purpose): ProofBinding
     {
-        $key = $identity->getAuthIdentifier();
-
-        if ((!is_string($key) && !is_int($key)) || $key === '') {
-            throw new UnsupportedIdentifierException(sprintf('A delivered code is bound to an identity with a string or integer key; got [%s].', get_debug_type($key)));
-        }
-
         return new ProofBinding(
             CurrentIdentity::typeOf($identity),
-            (string) $key,
+            self::identityKey($identity),
             $this->application(),
             $this->container->make(Session::class)->getId(),
             $purpose,
@@ -311,8 +305,27 @@ final readonly class VerificationService
     }
 
     /**
-     * The application the request is for: the one a bound
-     * `ApplicationResolver` names, otherwise the default guard's name.
+     * The identity's key as a string, which a delivered code is bound to.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @return string
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private static function identityKey(MultiFactorAuthenticatable $identity): string
+    {
+        $key = $identity->getAuthIdentifier();
+
+        if ((!is_string($key) && !is_int($key)) || $key === '') {
+            throw new UnsupportedIdentifierException(sprintf('A delivered code is bound to an identity with a string or integer key; got [%s].', get_debug_type($key)));
+        }
+
+        return (string) $key;
+    }
+
+    /**
+     * The application the request is for: the one a bound `ApplicationResolver`
+     * names, otherwise the default guard's name.
      *
      * @return string
      *
@@ -324,8 +337,6 @@ final readonly class VerificationService
             return $this->container->make(ApplicationResolver::class)->resolve($this->container->make('request'));
         }
 
-        $guard = $this->container->make(Repository::class)->get('auth.defaults.guard');
-
-        return is_string($guard) && $guard !== '' ? $guard : 'default';
+        return $this->container->make(AuthManager::class)->getDefaultDriver();
     }
 }

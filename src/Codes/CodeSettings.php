@@ -114,8 +114,8 @@ final readonly class CodeSettings
     }
 
     /**
-     * How long after a code is sent another may be sent for the same
-     * challenge, in seconds, from 0 to the code lifetime.
+     * How long after a code is sent another may be sent for the same challenge,
+     * in seconds, from 0 to the code lifetime.
      *
      * @return int
      *

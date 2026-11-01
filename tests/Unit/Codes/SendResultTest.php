@@ -23,8 +23,8 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final class SendResultTest extends TestCase
 {
     /**
-     * A sent result names the challenge and when its code stops working, and
-     * no reason or wait.
+     * A sent result names the challenge and when its code stops working, and no
+     * reason or wait.
      *
      * @return void
      */

@@ -12,7 +12,7 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   `Proofs\ProofBinding` of the identity (type and key), the application, the session and the purpose (`sign_in`,
   `reauthenticate`, `step_up` or `enrollment`). A code checked against any other factor, identity, application,
   session or purpose is `missing`, even when its challenge is named, and such a check counts no attempt against it.
-- The code is `length` digits from `random_int()`, zero-padded, stored only as `HMAC-SHA256(key', "code\0challenge
+- The code is `length` digits, each drawn with `random_int()`, stored only as `HMAC-SHA256(key', "code\0challenge
   id\0issue\0factor id\0identity type\0identity key\0application\0session id\0purpose\0code")`, compared with
   `hash_equals()`. The session is stored as `HMAC-SHA256(key'', session id)`, never the id itself, which is a bearer
   secret. `key'` and `key''` are separate derivations of `app.key`; rotating it only invalidates the codes outstanding.
@@ -38,9 +38,9 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   now`) is `expired`; a challenge with `attempts >= max_attempts` is `exhausted`; none of these counts an attempt.
   Otherwise the attempt is counted before anything is compared, by `UPDATE ... SET attempts = attempts + 1 WHERE id AND
   sends AND consumed_at IS NULL AND expires_at > now AND attempts < max`. A check whose increment matched no row never
-  compares: it answers from a fresh read (`exhausted` or `expired` when that issue now is, otherwise `invalid`). A
-  matching code is accepted only when `UPDATE ... SET consumed_at = now WHERE id AND sends AND consumed_at IS NULL`
-  changed the row, so of two correct submissions exactly one is accepted.
+  compares: it answers from a fresh read (`missing` when another check used that issue, `exhausted` or `expired` when it
+  now is, otherwise `invalid`). A matching code is accepted only when `UPDATE ... SET consumed_at = now WHERE id AND
+  sends AND consumed_at IS NULL` changed the row, so of two correct submissions exactly one is accepted.
 - `invalid` answers the failure reason `invalid_code`, `replayed` answers `replayed`, and `missing`, `expired` and
   `exhausted` answer `expired`: there is no live code to check against. The detail that tells them apart stays in the
   failure event.
@@ -84,7 +84,7 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 ## Implementation Anchors
 
 - `src/Codes/DeliveredCodes.php` (engine), `src/Codes/CodeKeys.php`, `src/Codes/CodeService.php`,
-  `src/Codes/CodeCheck.php`, `src/Codes/SendResult.php`, `src/Codes/IssuedCode.php`, `src/Codes/CodeSettings.php`.
+  `src/Enums/CodeCheck.php`, `src/Codes/SendResult.php`, `src/Codes/IssuedCode.php`, `src/Codes/CodeSettings.php`.
 - `src/Contracts/CodeDeliveryDriver.php`, `src/Drivers/AbstractCodeDriver.php`, `src/Drivers/EmailDriver.php`,
   `src/Drivers/SmsDriver.php`.
 - `src/Contracts/SmsSender.php`, `src/Contracts/EmailSender.php`, `src/Codes/NullSmsSender.php`,

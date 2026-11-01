@@ -256,12 +256,16 @@ final readonly class ConfigurationValidator
         }
 
         if ($email && $this->container->make(EmailSender::class) instanceof NullEmailSender) {
-            throw new \LogicException(sprintf('The application enables email, but no email sender is bound: bind yours, or the package\'s MailEmailSender, to %s.', EmailSender::class));
+            $message = 'The application enables email, but no email sender is bound: bind yours, or the package\'s MailEmailSender, to %s.';
+
+            throw new \LogicException(sprintf($message, EmailSender::class));
         }
 
-        if ($sms || $email) {
-            (new CodeKeys($this->config))->validate();
+        if (!$sms && !$email) {
+            return;
         }
+
+        (new CodeKeys($this->config))->validate();
     }
 
     /**

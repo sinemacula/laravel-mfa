@@ -65,7 +65,7 @@ final readonly class CodeKeys
         $parts = [
             'code',
             $challengeId,
-            (string) $issue,
+            $issue,
             $factorId,
             $binding->identityType,
             $binding->identityKey,

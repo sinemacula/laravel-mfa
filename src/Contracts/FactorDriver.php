@@ -13,9 +13,9 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
  * manager under the type's name: it states the channel kind its factors travel
  * on and the `amr` values (RFC 8176) a proof by it adds, starts an enrolment,
  * confirms a pending factor, issues a challenge, and verifies a code. A type
- * whose codes are delivered to a destination implements `CodeDeliveryDriver`
- * as well: the package then sends and checks its codes itself, and the driver
- * only delivers them. An application adds a type, or replaces a shipped one, by
+ * whose codes are delivered to a destination implements `CodeDeliveryDriver` as
+ * well: the package then sends and checks its codes itself, and the driver only
+ * delivers them. An application adds a type, or replaces a shipped one, by
  * registering its own driver.
  *
  * The services around a driver own the attempt counters, lockouts, events and
@@ -70,8 +70,8 @@ interface FactorDriver
 
     /**
      * Issue a challenge for the factor: nothing for a type whose codes are made
-     * where they are held (TOTP). A type whose codes are delivered has them sent
-     * through `CodeDeliveryDriver::deliver()` instead.
+     * where they are held (TOTP). A type whose codes are delivered has them
+     * sent through `CodeDeliveryDriver::deliver()` instead.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void

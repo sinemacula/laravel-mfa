@@ -48,6 +48,24 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
+     * The digests are pinned: a code's hash is the HMAC of its labelled,
+     * NUL-joined parts, and a session's the HMAC of its id, each under its own
+     * key derived from the application key. A change to either would make every
+     * code outstanding stop matching, so it fails here first.
+     *
+     * @return void
+     */
+    public function testTheDigestsArePinned(): void
+    {
+        $codeKey    = hash_hmac('sha256', 'sinemacula/laravel-mfa delivered code hashes', self::APP_KEY, true);
+        $sessionKey = hash_hmac('sha256', 'sinemacula/laravel-mfa delivered code sessions', self::APP_KEY, true);
+        $parts      = ['code', 'challenge', '1', 'factor', 'App\User', '1', 'web', 'session-id', 'sign_in', self::CODE];
+
+        self::assertSame(hash_hmac('sha256', implode("\0", $parts), $codeKey), self::keys()->code('challenge', 1, 'factor', self::binding(), self::CODE));
+        self::assertSame(hash_hmac('sha256', 'session-id', $sessionKey), self::keys()->session('session-id'));
+    }
+
+    /**
      * Rows of a hash computed with one part changed.
      *
      * @return iterable<string, array{\Closure(\SineMacula\Laravel\Mfa\Codes\CodeKeys): string}>
@@ -170,8 +188,13 @@ final class CodeKeysTest extends TestCase
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
-    private static function binding(string $type = 'App\User', string $key = '1', string $application = 'web', string $session = 'session-id', Purpose $purpose = Purpose::SIGN_IN): ProofBinding
-    {
+    private static function binding(
+        string $type = 'App\User',
+        string $key = '1',
+        string $application = 'web',
+        string $session = 'session-id',
+        Purpose $purpose = Purpose::SIGN_IN,
+    ): ProofBinding {
         return new ProofBinding($type, $key, $application, $session, $purpose);
     }
 }

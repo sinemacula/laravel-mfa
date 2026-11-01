@@ -16,13 +16,13 @@ use Tests\TestCase;
 /**
  * Unit tests for the `ActsAsFactor` trait via the shipped `Factor` model.
  *
- * The trait implements the full `EloquentFactor` contract, whose public
- * methods span column-name accessors, attribute readers, lockout state and
- * persistence. Every public surface has a paired test (and most
- * readers have separate "value present" / "value absent" cases), so the class
- * size is intrinsic to the contract's surface area, not a sign of conflated
- * subjects. The `php:S1448` suppression below documents that judgement in code
- * so the next quality-gate refresh does not re-flag it.
+ * The trait implements the full `EloquentFactor` contract, whose public methods
+ * span column-name accessors, attribute readers, lockout state and persistence.
+ * Every public surface has a paired test (and most readers have separate "value
+ * present" / "value absent" cases), so the class size is intrinsic to the
+ * contract's surface area, not a sign of conflated subjects. The `php:S1448`
+ * suppression below documents that judgement in code so the next quality-gate
+ * refresh does not re-flag it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

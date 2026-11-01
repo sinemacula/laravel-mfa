@@ -70,8 +70,9 @@ final class MfaManagerTest extends TestCase
      */
     public static function delegations(): iterable
     {
-        $factor = new InMemoryFactor;
-        $models = new Collection;
+        $factor  = new InMemoryFactor;
+        $models  = new Collection;
+        $refused = SendResult::refused(FailureReason::SENDING_CAPPED, 30);
 
         yield 'shouldUse true' => ['shouldUse', RequirementService::class, 'shouldUse', [], true];
         yield 'shouldUse false' => ['shouldUse', RequirementService::class, 'shouldUse', [], false];
@@ -87,7 +88,7 @@ final class MfaManagerTest extends TestCase
         yield 'markVerified' => ['markVerified', ProofService::class, 'markVerified', [], null];
         yield 'forgetVerification' => ['forgetVerification', ProofService::class, 'forgetVerification', [], null];
         yield 'challenge' => ['challenge', VerificationService::class, 'challenge', ['totp', $factor, Purpose::SIGN_IN], null, true];
-        yield 'challenge for a code' => ['challenge', VerificationService::class, 'challenge', ['email', $factor, Purpose::STEP_UP], SendResult::refused(FailureReason::SENDING_CAPPED, 30), true];
+        yield 'challenge for a code' => ['challenge', VerificationService::class, 'challenge', ['email', $factor, Purpose::STEP_UP], $refused, true];
         yield 'verify true' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '123456', Purpose::SIGN_IN], true, true];
         yield 'verify false' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '654321', Purpose::STEP_UP], false, true];
         yield 'enroll' => ['enroll', EnrollmentService::class, 'enroll', [$factor], null];

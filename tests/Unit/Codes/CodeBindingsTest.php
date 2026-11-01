@@ -15,9 +15,9 @@ use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use Tests\TestCase;
 
 /**
- * Tests for `CodeBindings`: the default senders fail loud until the
- * application binds its own, the code service is shared, and the engine is
- * built afresh each time it is resolved.
+ * Tests for `CodeBindings`: the default senders fail loud until the application
+ * binds its own, the code service is shared, and the engine is built afresh
+ * each time it is resolved.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -44,8 +44,8 @@ final class CodeBindingsTest extends TestCase
     }
 
     /**
-     * The code service is shared, and the engine, which reads the
-     * configuration on every call, is built afresh.
+     * The code service is shared, and the engine, which reads the configuration
+     * on every call, is built afresh.
      *
      * @return void
      *

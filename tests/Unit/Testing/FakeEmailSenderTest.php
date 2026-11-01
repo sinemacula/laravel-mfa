@@ -93,4 +93,21 @@ final class FakeEmailSenderTest extends TestCase
 
         self::assertSame([], $fake->sent());
     }
+
+    /**
+     * The last code to an address is read past any message after it that
+     * carries none, and past any before it.
+     *
+     * @return void
+     */
+    public function testTheLastCodeIsReadPastOtherMessages(): void
+    {
+        $fake = new FakeEmailSender;
+
+        $fake->send('ada@example.test', new Mailable);
+        $fake->send('ada@example.test', new MfaCodeMessage('444444', 10));
+        $fake->send('ada@example.test', new Mailable);
+
+        self::assertSame('444444', $fake->lastCodeTo('ada@example.test'));
+    }
 }

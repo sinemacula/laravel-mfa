@@ -34,8 +34,8 @@ use Tests\TestCase;
  * End-to-end lifecycle of the delivered codes (email and SMS) through the
  * manager: a code is delivered through the bound sender and accepted once, for
  * its own session, purpose and factor only; a resend replaces it after the
- * cooldown; the sends are capped across sessions; and nothing is sent without
- * a sender bound.
+ * cooldown; the sends are capped across sessions; and nothing is sent without a
+ * sender bound.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -104,12 +104,12 @@ final class OtpLifecycleTest extends TestCase
 
         self::assertNotNull($message);
         self::assertSame(1, preg_match('/^Your verification code is: (\d{6})$/D', $message, $matches));
-        self::assertTrue(Mfa::verify('sms', $factor, $matches[1] ?? ''));
+        self::assertTrue(Mfa::verify('sms', $factor, $matches[1]));
     }
 
     /**
-     * The code is stored only as a keyed hash: neither the factor nor the
-     * codes table holds it.
+     * The code is stored only as a keyed hash: neither the factor nor the codes
+     * table holds it.
      *
      * @return void
      */

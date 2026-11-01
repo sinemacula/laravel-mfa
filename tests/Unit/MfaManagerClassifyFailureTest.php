@@ -121,7 +121,15 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
      * Rows of a delivered code's failure: what the test does after the code is
      * sent, the code it then submits, and the reason and detail it fails with.
      *
+     * @formatter:off
+     *
+     * @phpcs:disable Generic.Files.LineLength.TooLong
+     *
      * @return iterable<string, array{\Closure(\Tests\Unit\MfaManagerClassifyFailureTest, \SineMacula\Laravel\Mfa\Models\Factor, string): void, ?string, \SineMacula\Laravel\Mfa\Enums\FailureReason, string}>
+     *
+     * @phpcs:enable Generic.Files.LineLength.TooLong
+     *
+     * @formatter:on
      */
     public static function deliveredCodeFailures(): iterable
     {

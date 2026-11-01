@@ -92,9 +92,11 @@ final class FakeEmailSender implements EmailSender
         $code = null;
 
         foreach ($this->sentTo($address) as $entry) {
-            if ($entry['message'] instanceof MfaCodeMessage) {
-                $code = $entry['message']->code;
+            if (!$entry['message'] instanceof MfaCodeMessage) {
+                continue;
             }
+
+            $code = $entry['message']->code;
         }
 
         return $code;

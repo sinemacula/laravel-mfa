@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
@@ -29,8 +30,8 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * Sending runs in the identity's factor state transaction (see
  * `FactorStateTransaction`), so the sends of one identity are serialised and
  * the caps on them cannot be overrun by parallel requests; the factor is read
- * again under the lock, and one a concurrent change removed is `not_found`.
- * The code is stored, then delivered by the factor's driver inside the same
+ * again under the lock, and one a concurrent change removed is `not_found`. The
+ * code is stored, then delivered by the factor's driver inside the same
  * transaction, so a delivery that throws keeps no code and spends no cooldown
  * or cap; `CodeSent` is dispatched once the transaction commits. Neither
  * sending nor checking resets a failure count or lifts a lockout.
@@ -108,7 +109,7 @@ final readonly class CodeService
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $code
      * @param  ?string  $challengeId
-     * @return \SineMacula\Laravel\Mfa\Codes\CodeCheck
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException

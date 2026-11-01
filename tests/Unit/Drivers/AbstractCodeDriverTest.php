@@ -73,7 +73,9 @@ final class AbstractCodeDriverTest extends TestCase
             $call($driver);
             self::fail('Expected the call to be refused.');
         } catch (\LogicException $exception) {
-            self::assertSame(sprintf('A delivered code is bound to its factor, session, application and purpose, so it is %s through the code service, never by the driver alone.', $action), $exception->getMessage());
+            $message = 'A delivered code is bound to its factor, session, application and purpose, so it is %s through the code service, never by the driver alone.';
+
+            self::assertSame(sprintf($message, $action), $exception->getMessage());
         }
 
         self::assertSame([], $driver->delivered);

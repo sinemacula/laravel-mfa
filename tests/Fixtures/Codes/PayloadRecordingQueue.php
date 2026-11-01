@@ -8,8 +8,8 @@ use Illuminate\Queue\SyncQueue;
 
 /**
  * A queue for tests that builds a job's payload exactly as every Laravel queue
- * does before it stores one, and hands it back instead of running the job, so
- * a test can read what a queued message would leave in the queue's storage.
+ * does before it stores one, and hands it back instead of running the job, so a
+ * test can read what a queued message would leave in the queue's storage.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

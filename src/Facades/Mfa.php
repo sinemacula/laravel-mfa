@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\Facade;
  *
  * @formatter:off
  *
+ * @phpcs:disable Generic.Files.LineLength.TooLong
+ *
  * @method static \SineMacula\Laravel\Mfa\Contracts\FactorDriver driver(?string $driver = null)
  * @method static string getDefaultDriver()
  * @method static class-string<\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> factorModel()
@@ -33,6 +35,8 @@ use Illuminate\Support\Facades\Facade;
  * @method static void enroll(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
  * @method static void disable(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
  * @method static list<string> issueBackupCodes(?int $count = null)
+ *
+ * @phpcs:enable Generic.Files.LineLength.TooLong
  *
  * @formatter:on
  *

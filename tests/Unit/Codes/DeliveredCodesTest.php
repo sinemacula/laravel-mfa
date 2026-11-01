@@ -8,9 +8,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
-use SineMacula\Laravel\Mfa\Codes\CodeCheck;
 use SineMacula\Laravel\Mfa\Codes\DeliveredCodes;
 use SineMacula\Laravel\Mfa\Codes\IssuedCode;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -18,9 +18,9 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `DeliveredCodes`, the engine behind delivered codes: a code
- * matches only its own factor, identity, application, session and purpose, is
- * stored only as a keyed hash and used once; a resend replaces the code, keeps
+ * Tests for `DeliveredCodes`, the engine behind delivered codes: a code matches
+ * only its own factor, identity, application, session and purpose, is stored
+ * only as a keyed hash and used once; a resend replaces the code, keeps
  * the attempt budget, waits out the cooldown and never outlives its challenge;
  * and the sends of a factor and of an identity are capped across sessions.
  *
@@ -48,11 +48,13 @@ final class DeliveredCodesTest extends TestCase
     private array $draws = [];
 
     /**
-     * A code is accepted once for its own factor and binding, with the
-     * lifetime configured; used, it is replayed for itself and missing for any
-     * other code.
+     * A code is accepted once for its own factor and binding, with the lifetime
+     * configured; used, it is replayed for itself and missing for any other
+     * code.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testACodeIsAcceptedOnceForItsOwnBinding(): void
     {
@@ -90,6 +92,8 @@ final class DeliveredCodesTest extends TestCase
      * @param  string  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     #[DataProvider('otherBindings')]
     public function testACodeMatchesNothingButItsOwnFactorAndBinding(string $factor, ProofBinding $binding): void
@@ -108,6 +112,8 @@ final class DeliveredCodesTest extends TestCase
      * A challenge named that does not exist is missing.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testAnUnknownChallengeIsMissing(): void
     {
@@ -125,6 +131,8 @@ final class DeliveredCodesTest extends TestCase
      * parts are stored as they are.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testACodeIsStoredOnlyAsAKeyedHash(): void
     {
@@ -152,6 +160,8 @@ final class DeliveredCodesTest extends TestCase
      * A wrong code is invalid and counts an attempt.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testAWrongCodeIsInvalidAndCountsAnAttempt(): void
     {
@@ -169,6 +179,8 @@ final class DeliveredCodesTest extends TestCase
      * without counting another.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testAChallengeIsExhaustedAfterItsAttempts(): void
     {
@@ -187,6 +199,8 @@ final class DeliveredCodesTest extends TestCase
      * attempt, and works until then.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testAnExpiredCodeIsRefusedWithoutCountingAnAttempt(): void
     {
@@ -204,6 +218,8 @@ final class DeliveredCodesTest extends TestCase
      * code for the same challenge.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testAResendWaitsOutTheCooldown(): void
     {
@@ -226,6 +242,8 @@ final class DeliveredCodesTest extends TestCase
      * A resend invalidates the previous code at once: only the new one works.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testAResendReplacesThePreviousCode(): void
     {
@@ -244,6 +262,8 @@ final class DeliveredCodesTest extends TestCase
      * attempts.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testAResendKeepsTheAttemptBudget(): void
     {
@@ -267,6 +287,8 @@ final class DeliveredCodesTest extends TestCase
      * challenge has ended the next code starts a new one.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testAResendNeverOutlivesItsChallenge(): void
     {
@@ -292,6 +314,8 @@ final class DeliveredCodesTest extends TestCase
      * ends.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testAnExhaustedChallengeSendsNoMoreUntilItEnds(): void
     {
@@ -310,6 +334,8 @@ final class DeliveredCodesTest extends TestCase
      * once.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testANewChallengeStartsOnceTheLastWasUsed(): void
     {
@@ -330,6 +356,8 @@ final class DeliveredCodesTest extends TestCase
      * every session, until its oldest send leaves the window.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testTheFactorCapCountsSendsAcrossSessions(): void
     {
@@ -349,6 +377,8 @@ final class DeliveredCodesTest extends TestCase
      * its factors, while another identity is unaffected.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testTheIdentityCapCountsSendsAcrossFactors(): void
     {
@@ -366,6 +396,8 @@ final class DeliveredCodesTest extends TestCase
      * Every resend counts towards the caps.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testEveryResendCountsTowardsTheCaps(): void
     {
@@ -379,11 +411,13 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * Without a generator, a code is the configured number of digits.
+     * Without a generator, a code is the configured number of digits, and every
+     * digit is drawn: across enough codes each of 0 to 9 turns up.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Random\RandomException
      */
     public function testACodeIsDigitsOfTheConfiguredLength(): void
     {
@@ -396,6 +430,23 @@ final class DeliveredCodesTest extends TestCase
 
         self::assertMatchesRegularExpression('/^\d{8}$/D', $issued->code);
         self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), $issued->code, $now));
+
+        $digits = '';
+
+        // 400 digits miss one of the ten with a chance of about 1 in 10^17
+        for ($identity = 2; $identity <= 51; $identity++) {
+            $code = self::issued($codes->issue(self::FACTOR . $identity, self::binding(identity: (string) $identity), $now))->code;
+
+            self::assertMatchesRegularExpression('/^\d{8}$/D', $code);
+
+            $digits .= $code;
+        }
+
+        $seen = array_unique(str_split($digits));
+
+        sort($seen);
+
+        self::assertSame(str_split('0123456789'), $seen);
     }
 
     /**
@@ -403,6 +454,8 @@ final class DeliveredCodesTest extends TestCase
      * fresh read: the challenge is exhausted.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testACheckOvertakenByAnotherAnswersFromAFreshRead(): void
     {
@@ -416,10 +469,12 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A check whose code a concurrent resend replaced first is invalid, and
-     * the replacement is untouched.
+     * A check whose code a concurrent resend replaced first is invalid, and the
+     * replacement is untouched.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function testACheckOvertakenByAResendIsInvalid(): void
     {
@@ -435,8 +490,69 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * The engine over the test configuration with the block's settings
-     * changed, drawing the codes given in order.
+     * A check whose code a concurrent check used first is missing, and counts
+     * no attempt.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testACheckOvertakenByAUseIsMissing(): void
+    {
+        $codes  = $this->codes([], [self::CODE]);
+        $now    = self::now();
+        $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+
+        $this->onFirstRead(static fn () => Code::query()->whereKey($issued->challengeId)->update(['consumed_at' => $now]));
+
+        self::assertSame(CodeCheck::MISSING, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
+        self::assertSame(0, self::row($issued)->attempts);
+    }
+
+    /**
+     * A check whose challenge a concurrent change removed first is invalid.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testACheckOvertakenByARemovalIsInvalid(): void
+    {
+        $codes  = $this->codes([], [self::CODE]);
+        $now    = self::now();
+        $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+
+        $this->onFirstRead(static fn () => Code::query()->whereKey($issued->challengeId)->delete());
+
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
+        self::assertSame(0, Code::query()->count());
+    }
+
+    /**
+     * A resend that a concurrent resend overtook sends nothing and asks for one
+     * second, leaving the other's code in place.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testAResendOvertakenByAnotherWaitsASecond(): void
+    {
+        $codes  = $this->codes(['resend_cooldown_seconds' => 60], [self::CODE, self::NEXT_CODE]);
+        $now    = self::now();
+        $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+        $hash   = self::row($issued)->code_hash;
+
+        $this->onFirstRead(static fn () => Code::query()->whereKey($issued->challengeId)->update(['sends' => 2]));
+
+        self::assertSame(1, $codes->issue(self::FACTOR, self::binding(), $now->addSeconds(60)));
+        self::assertSame(2, self::row($issued)->sends);
+        self::assertSame($hash, self::row($issued)->code_hash);
+    }
+
+    /**
+     * The engine over the test configuration with the block's settings changed,
+     * drawing the codes given in order.
      *
      * @param  array<string, mixed>  $settings
      * @param  list<string>  $draws

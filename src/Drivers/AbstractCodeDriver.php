@@ -141,6 +141,8 @@ abstract class AbstractCodeDriver implements CodeDeliveryDriver
      */
     private static function unbound(string $action): \LogicException
     {
-        return new \LogicException(sprintf('A delivered code is bound to its factor, session, application and purpose, so it is %s through the code service, never by the driver alone.', $action));
+        $message = 'A delivered code is bound to its factor, session, application and purpose, so it is %s through the code service, never by the driver alone.';
+
+        return new \LogicException(sprintf($message, $action));
     }
 }

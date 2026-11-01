@@ -149,8 +149,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
 
     /**
      * Issue a challenge for the given factor through the named driver, for the
-     * purpose given: for a type that delivers codes, the outcome of sending
-     * one bound to this session and the purpose; otherwise `null`.
+     * purpose given: for a type that delivers codes, the outcome of sending one
+     * bound to this session and the purpose; otherwise `null`.
      *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor

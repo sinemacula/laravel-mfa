@@ -2,9 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Codes;
-
-use SineMacula\Laravel\Mfa\Enums\FailureReason;
+namespace SineMacula\Laravel\Mfa\Enums;
 
 /**
  * The outcome of checking a code against the challenge sent for a factor,

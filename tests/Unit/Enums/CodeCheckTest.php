@@ -2,11 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace Tests\Unit\Codes;
+namespace Tests\Unit\Enums;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SineMacula\Laravel\Mfa\Codes\CodeCheck;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**

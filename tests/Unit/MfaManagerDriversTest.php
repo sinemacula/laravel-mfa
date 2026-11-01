@@ -103,8 +103,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the email driver should apply the mailable override in the
-     * code settings.
+     * Resolving the email driver should apply the mailable override in the code
+     * settings.
      *
      * @return void
      *
