@@ -480,6 +480,73 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
+     * A success inside a transaction on the storage connection is reported,
+     * with its proof kept first, only once that transaction commits.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASuccessInATransactionIsReportedOnceItCommits(): void
+    {
+        $user   = $this->signIn();
+        $factor = $this->eloquentFactor($user);
+        $driver = \Mockery::mock(FactorDriver::class);
+
+        $driver->shouldReceive('verify')->once()->andReturnTrue();
+        $driver->shouldReceive('channelKind')->andReturn(ChannelKind::AUTHENTICATOR_APP);
+
+        Auth::login($user);
+
+        $this->stubDriver($driver);
+
+        Event::fake();
+
+        DB::beginTransaction();
+
+        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456', Purpose::STEP_UP));
+        Event::assertNotDispatched(MfaVerified::class);
+
+        DB::commit();
+
+        Event::assertDispatched(MfaVerified::class);
+        self::assertCount(1, $this->container()->make(ProofService::class)->proofs());
+    }
+
+    /**
+     * A success inside a transaction that rolls back is never reported and
+     * leaves no proof.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASuccessInATransactionThatRollsBackIsNeverReported(): void
+    {
+        $user   = $this->signIn();
+        $factor = $this->eloquentFactor($user);
+        $driver = \Mockery::mock(FactorDriver::class);
+
+        $driver->shouldReceive('verify')->once()->andReturnTrue();
+        $driver->shouldReceive('channelKind')->andReturn(ChannelKind::AUTHENTICATOR_APP);
+
+        Auth::login($user);
+
+        $this->stubDriver($driver);
+
+        Event::fake();
+
+        DB::beginTransaction();
+
+        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456', Purpose::STEP_UP));
+
+        DB::rollBack();
+
+        Event::assertNotDispatched(MfaVerified::class);
+        self::assertCount(0, $this->container()->make(ProofService::class)->proofs());
+    }
+
+    /**
      * A valid code verifies a non-Eloquent factor without writing to it.
      *
      * @return void
