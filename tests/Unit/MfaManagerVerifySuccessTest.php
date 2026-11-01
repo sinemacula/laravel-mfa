@@ -14,7 +14,7 @@ use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
 
 /**

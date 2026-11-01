@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Tests\Fixtures;
+namespace Tests\Fixtures\Identities;
 
 use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
 use Illuminate\Contracts\Auth\Authenticatable;

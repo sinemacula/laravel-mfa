@@ -8,7 +8,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
-use Tests\Fixtures\TotpStubFactor;
+use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\TestCase;
 
 /**

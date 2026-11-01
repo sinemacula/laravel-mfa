@@ -8,8 +8,8 @@ use Illuminate\Auth\GenericUser;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
-use Tests\Fixtures\NonEloquentIdentity;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**

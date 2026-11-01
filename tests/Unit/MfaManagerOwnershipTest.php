@@ -15,9 +15,9 @@ use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\InMemoryFactor;
-use Tests\Fixtures\SecondaryUser;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Identities\SecondaryUser;
+use Tests\Fixtures\Identities\TestUser;
 
 /**
  * Cross-account factor enforcement at the manager boundary.
@@ -394,7 +394,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * disable regression tests: build two MFA- enabled users and persist a
      * factor owned by the first.
      *
-     * @return array{0: \Tests\Fixtures\TestUser, 1: \Tests\Fixtures\TestUser, 2: \SineMacula\Laravel\Mfa\Models\Factor}
+     * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \Tests\Fixtures\Identities\TestUser, 2: \SineMacula\Laravel\Mfa\Models\Factor}
      */
     private function stageCrossAccount(): array
     {
@@ -452,7 +452,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      * victim. Returns the attacker and the spoofed factor for the assertions to
      * observe.
      *
-     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
+     * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
     private function stageEnrollHijackAttempt(): array
     {

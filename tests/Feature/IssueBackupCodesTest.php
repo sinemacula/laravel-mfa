@@ -13,8 +13,8 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
-use Tests\Fixtures\NoopFactorDriver;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Drivers\NoopFactorDriver;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -309,7 +309,7 @@ final class IssueBackupCodesTest extends TestCase
     /**
      * Authenticate as a fresh MFA-enabled test user and return them.
      *
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function loginUser(): TestUser
     {
@@ -327,7 +327,7 @@ final class IssueBackupCodesTest extends TestCase
      * Authenticate as a fresh MFA-enabled user and pre-seed an unrelated TOTP
      * factor so cross-driver isolation assertions have a fixture to observe.
      *
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function seedUserWithTotpFactor(): TestUser
     {

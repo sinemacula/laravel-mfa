@@ -15,7 +15,7 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Guards\GenericUserGuard;
 use Tests\Fixtures\Guards\StaticUserGuard;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -168,7 +168,7 @@ final class MultiAuthStackTest extends TestCase
      * Persist a fresh MFA-enrolled user with one TOTP factor.
      *
      * @param  string  $email
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function enrollUser(string $email): TestUser
     {

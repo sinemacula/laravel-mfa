@@ -9,7 +9,7 @@ use Illuminate\Config\Repository;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\MfaManager;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 
 /**

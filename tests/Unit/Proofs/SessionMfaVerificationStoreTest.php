@@ -13,8 +13,8 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Proofs\SessionMfaVerificationStore;
-use Tests\Fixtures\FirstStoreIdentity;
-use Tests\Fixtures\SecondStoreIdentity;
+use Tests\Fixtures\Identities\FirstStoreIdentity;
+use Tests\Fixtures\Identities\SecondStoreIdentity;
 
 /**
  * Unit tests for the `SessionMfaVerificationStore` default store.

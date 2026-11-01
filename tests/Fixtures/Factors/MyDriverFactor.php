@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Tests\Fixtures;
+namespace Tests\Fixtures\Factors;
 
 /**
  * Minimal `Factor` fixture reporting against the `my_driver` name — feeds the

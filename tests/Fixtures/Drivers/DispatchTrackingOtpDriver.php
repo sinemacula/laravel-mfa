@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Tests\Fixtures;
+namespace Tests\Fixtures\Drivers;
 
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;

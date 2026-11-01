@@ -17,8 +17,8 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
-use Tests\Fixtures\SecondaryConnectionFactor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\SecondaryConnectionFactor;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -209,7 +209,7 @@ final class BackupCodeRotationConnectionTest extends TestCase
     /**
      * Authenticate as a fresh MFA-enabled `TestUser`.
      *
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function loginUser(): TestUser
     {

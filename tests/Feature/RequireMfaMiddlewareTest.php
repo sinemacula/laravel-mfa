@@ -14,7 +14,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\Feature\Concerns\InteractsWithRequireMfaMiddleware;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**

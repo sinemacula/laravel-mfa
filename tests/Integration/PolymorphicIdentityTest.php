@@ -9,8 +9,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\SecondaryUser;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\SecondaryUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**

@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Tests\Fixtures;
+namespace Tests\Fixtures\Factors;
 
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Relations\MorphTo;

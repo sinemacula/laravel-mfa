@@ -2,18 +2,20 @@
 
 declare(strict_types = 1);
 
-namespace Tests\Fixtures;
+namespace Tests\Fixtures\Factors;
+
+use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 
 /**
- * `Factor` fixture exposing a configurable stored secret against the TOTP
- * driver — feeds the verify branches without persistence.
+ * `EloquentFactor` fixture that is NOT an Eloquent Model — exercises the
+ * backup-code driver's non-Model atomic-consume early-return.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
-final class TotpStubFactor extends AbstractFactorStub
+final class NonModelEloquentBackupCodeFactor extends AbstractEloquentFactorStub
 {
     /**
      * Capture the seeded secret value.
@@ -23,7 +25,7 @@ final class TotpStubFactor extends AbstractFactorStub
      */
     public function __construct(
 
-        /** Stored TOTP shared secret. */
+        /** Stored backup-code secret hash. */
         #[\SensitiveParameter]
         private readonly ?string $secret,
     ) {}
@@ -36,22 +38,22 @@ final class TotpStubFactor extends AbstractFactorStub
     #[\Override]
     public function getFactorIdentifier(): mixed
     {
-        return 'totp-stub';
+        return 'non-model';
     }
 
     /**
-     * Return the TOTP driver name.
+     * Return the backup-code driver name.
      *
      * @return string
      */
     #[\Override]
     public function getDriver(): string
     {
-        return 'totp';
+        return BackupCodeDriver::NAME;
     }
 
     /**
-     * Return the seeded TOTP secret.
+     * Return the seeded secret hash.
      *
      * @return ?string
      */

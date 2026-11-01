@@ -12,12 +12,12 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\AbstractEloquentFactorStub;
-use Tests\Fixtures\InMemoryFactor;
-use Tests\Fixtures\NonEloquentIdentity;
-use Tests\Fixtures\NonScalarIdentifierUser;
-use Tests\Fixtures\SecondaryUser;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\AbstractEloquentFactorStub;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Fixtures\Identities\NonScalarIdentifierUser;
+use Tests\Fixtures\Identities\SecondaryUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -225,7 +225,7 @@ final class FactorOwnershipTest extends TestCase
      * Build an unsaved test user with the given identifier.
      *
      * @param  int  $id
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function user(int $id): TestUser
     {

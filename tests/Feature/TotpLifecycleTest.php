@@ -17,7 +17,7 @@ use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -362,7 +362,7 @@ final class TotpLifecycleTest extends TestCase
      * Enrol a TOTP factor for a freshly created test user and return the [user,
      * factor, current-code] triple.
      *
-     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
+     * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
      *
      * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
      * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException

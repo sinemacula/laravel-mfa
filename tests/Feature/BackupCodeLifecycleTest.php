@@ -10,7 +10,7 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -112,7 +112,7 @@ final class BackupCodeLifecycleTest extends TestCase
      * Create a fresh MFA-enrolled test user and authenticate as them for the
      * rest of the scenario.
      *
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function loginUser(): TestUser
     {

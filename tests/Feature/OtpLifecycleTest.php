@@ -21,7 +21,7 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -304,7 +304,7 @@ final class OtpLifecycleTest extends TestCase
     /**
      * Enrol a fresh test user with an email factor and authenticate as them.
      *
-     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
+     * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
     private function enrollEmail(): array
     {
@@ -330,7 +330,7 @@ final class OtpLifecycleTest extends TestCase
      * Enrol a fresh test user with an SMS factor and authenticate as them.
      *
      * @param  string  $phone
-     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
+     * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
     private function enrollSms(string $phone): array
     {

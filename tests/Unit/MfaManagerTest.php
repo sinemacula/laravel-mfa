@@ -17,8 +17,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
-use Tests\Fixtures\InMemoryFactor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**

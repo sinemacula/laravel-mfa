@@ -96,7 +96,7 @@ abstract class TestCase extends BaseTestCase
         ]);
         $config->set('auth.providers.users', [
             'driver' => 'eloquent',
-            'model'  => Fixtures\TestUser::class,
+            'model'  => Fixtures\Identities\TestUser::class,
         ]);
     }
 

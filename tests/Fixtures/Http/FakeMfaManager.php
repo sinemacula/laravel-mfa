@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Tests\Fixtures;
+namespace Tests\Fixtures\Http;
 
 use Illuminate\Support\Collection;
 use SineMacula\Laravel\Mfa\MfaManager;

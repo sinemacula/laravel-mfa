@@ -10,9 +10,9 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
-use Tests\Fixtures\AbstractFactorStub;
-use Tests\Fixtures\NonModelEloquentBackupCodeFactor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\AbstractFactorStub;
+use Tests\Fixtures\Factors\NonModelEloquentBackupCodeFactor;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**

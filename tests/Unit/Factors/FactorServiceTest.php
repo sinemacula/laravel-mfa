@@ -10,10 +10,10 @@ use SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\CustomFactor;
-use Tests\Fixtures\NonModelEloquentBackupCodeFactor;
-use Tests\Fixtures\PlainUser;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\CustomFactor;
+use Tests\Fixtures\Factors\NonModelEloquentBackupCodeFactor;
+use Tests\Fixtures\Identities\PlainUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -203,11 +203,11 @@ final class FactorServiceTest extends TestCase
     /**
      * Create a test user and authenticate as them.
      *
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function signIn(): TestUser
     {
-        /** @var \Tests\Fixtures\TestUser $user */
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
         $user = TestUser::query()->create(['email' => 'factors@example.com']);
 
         $this->actingAs($user);
@@ -218,7 +218,7 @@ final class FactorServiceTest extends TestCase
     /**
      * Add a TOTP factor for the user.
      *
-     * @param  \Tests\Fixtures\TestUser  $user
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
     private function addFactor(TestUser $user): Factor

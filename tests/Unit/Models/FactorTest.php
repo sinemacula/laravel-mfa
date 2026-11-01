@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Facade;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -176,7 +176,7 @@ final class FactorTest extends TestCase
 
         self::assertInstanceOf(MorphTo::class, $relation);
 
-        /** @var ?\Tests\Fixtures\TestUser $loaded */
+        /** @var ?\Tests\Fixtures\Identities\TestUser $loaded */
         $loaded = $factor->authenticatable()->getResults();
 
         self::assertInstanceOf(TestUser::class, $loaded);
@@ -283,7 +283,7 @@ final class FactorTest extends TestCase
     /**
      * Return the test user's key as a string for morph-to wiring.
      *
-     * @param  \Tests\Fixtures\TestUser  $user
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return string
      */
     private function authenticatableId(TestUser $user): string

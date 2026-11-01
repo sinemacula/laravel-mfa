@@ -6,7 +6,7 @@ namespace Tests\Fixtures\Guards;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Guard;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 
 /**
  * Token-style `Guard` fixture that hands back a pre-bound `TestUser` — mimics
@@ -22,7 +22,7 @@ final class StaticUserGuard implements Guard
     /**
      * Capture the resolved identity once at construction.
      *
-     * @param  \Tests\Fixtures\TestUser  $resolved
+     * @param  \Tests\Fixtures\Identities\TestUser  $resolved
      * @return void
      */
     public function __construct(
@@ -60,7 +60,7 @@ final class StaticUserGuard implements Guard
     /**
      * Return the pre-bound test user identity.
      *
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     #[\Override]
     public function user(): TestUser

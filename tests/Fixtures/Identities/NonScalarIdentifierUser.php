@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Tests\Fixtures;
+namespace Tests\Fixtures\Identities;
 
 use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -14,26 +14,21 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
- * A second `MultiFactorAuthenticatable` Eloquent model used to assert that the
- * package's polymorphic factor relation works against more than one identity
- * class within the same application.
- *
- * Mirrors `TestUser` but lives on its own table so polymorphic factor lookup
- * must scope by `authenticatable_type` correctly.
+ * MultiFactorAuthenticatable whose `getAuthIdentifier()` returns an object
+ * rather than a scalar, used to exercise the non-scalar auth-identifier
+ * fallback branch of the `Factors\FactorStateCache` key prefix.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
- * @property int $id
- * @property bool $mfa_enabled
- * @property ?string $email
+ * @internal
  */
-final class SecondaryUser extends Model implements Authenticatable, MultiFactorAuthenticatable
+final class NonScalarIdentifierUser extends Model implements Authenticatable, MultiFactorAuthenticatable
 {
     use AuthenticatableTrait;
 
     /** @var string|null */
-    protected $table = 'test_secondary_users';
+    protected $table = 'test_users';
 
     /** @var list<string> */
     protected $fillable = [
@@ -42,30 +37,41 @@ final class SecondaryUser extends Model implements Authenticatable, MultiFactorA
     ];
 
     /**
-     * Opt the identity into MFA enforcement based on the test fixture column.
+     * Return a non-scalar auth identifier to exercise the fallback branch of
+     * the `Factors\FactorStateCache` key prefix.
+     *
+     * @return mixed
+     */
+    #[\Override]
+    public function getAuthIdentifier(): mixed
+    {
+        return (object) ['id' => 1];
+    }
+
+    /**
+     * Always opts into MFA for test purposes.
      *
      * @return bool
      */
     #[\Override]
     public function shouldUseMultiFactor(): bool
     {
-        return (bool) $this->getAttribute('mfa_enabled');
+        return true;
     }
 
     /**
-     * Report whether the identity has at least one persisted factor.
+     * Does not have any factors for the purposes of these tests.
      *
      * @return bool
      */
     #[\Override]
     public function isMfaEnabled(): bool
     {
-        return self::countFactors($this->authFactors()) > 0;
+        return false;
     }
 
     /**
-     * Return the identity's factor builder narrowed to the package intersection
-     * type required by `MultiFactorAuthenticatable`.
+     * Return an empty factor builder (no factors expected).
      *
      * @formatter:off
      *
@@ -80,42 +86,13 @@ final class SecondaryUser extends Model implements Authenticatable, MultiFactorA
     }
 
     /**
-     * Define the polymorphic relation to the shipped Factor model.
+     * Polymorphic `factors` relation.
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany<\SineMacula\Laravel\Mfa\Models\Factor, $this>
      */
     public function factors(): MorphMany
     {
         return $this->morphMany(Factor::class, 'authenticatable');
-    }
-
-    /**
-     * The attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    #[\Override]
-    protected function casts(): array
-    {
-        return [
-            'mfa_enabled' => 'boolean',
-        ];
-    }
-
-    /**
-     * Wrap the dynamic count() call so PHPStan does not flag it as a dynamic
-     * call to a static method.
-     *
-     * @formatter:off
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>  $builder
-     * @return int
-     *
-     * @formatter:on
-     */
-    private static function countFactors(Builder $builder): int
-    {
-        return $builder->toBase()->count();
     }
 
     /**

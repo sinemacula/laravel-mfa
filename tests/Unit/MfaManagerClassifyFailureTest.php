@@ -11,8 +11,8 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\MfaManager;
-use Tests\Fixtures\InMemoryFactor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
 
 /**

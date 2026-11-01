@@ -9,7 +9,7 @@ use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 
 /**
  * Shared scaffolding for the `MfaManager` state-test family.
@@ -59,11 +59,11 @@ trait InteractsWithMfaManagerState
      * Create a test user with a single backing TOTP factor.
      *
      * @param  string  $email
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     protected function makeUserWithFactor(string $email = 'user@example.com'): TestUser
     {
-        /** @var \Tests\Fixtures\TestUser $user */
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
         $user = TestUser::query()->create([
             'email'       => $email,
             'mfa_enabled' => true,

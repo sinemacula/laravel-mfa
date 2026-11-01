@@ -9,7 +9,7 @@ use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Symfony\Component\HttpFoundation\Response;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 
 /**
  * Shared scaffolding for the RequireMfa middleware test family.
@@ -58,7 +58,7 @@ trait InteractsWithRequireMfaMiddleware
      * Enrol a fresh TOTP factor and return the [user, factor, code] triple.
      *
      * @param  string  $email
-     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
+     * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
      *
      * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
      * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException

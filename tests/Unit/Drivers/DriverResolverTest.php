@@ -9,8 +9,8 @@ use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException;
 use SineMacula\Laravel\Mfa\MfaManager;
-use Tests\Fixtures\InMemoryFactor;
-use Tests\Fixtures\NoopFactorDriver;
+use Tests\Fixtures\Drivers\NoopFactorDriver;
+use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 
 /**
