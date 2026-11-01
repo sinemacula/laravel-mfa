@@ -39,8 +39,9 @@ The current note set is:
   each answers and what a fail-closed answer is, and the pending session and passkey assertion values they carry.
 - `totp.md`: how TOTP codes are made and checked, the secret and parameters each factor is enrolled with, the
   window, and the compare-and-set that accepts each time step once per factor, also under concurrency.
-- `backup-code-consumption.md`: how backup codes are stored hashed, why consumption and rotation run under the owner's
-  factor state lock, and the atomic-replace guarantee on rotation.
+- `recovery-codes.md`: how recovery codes are drawn and stored as salted hashes, why a redemption checks the whole
+  unused set as one attempt with the same work whichever code matches, how a new set replaces the old one with no
+  moment when both work or neither exists, and how the set goes with the last factor.
 - `attempts-and-lockout.md`: the durable failure counts on the factor and identity rows, the temporary throttles of
   the identity and the address, when each locks and what resets it, the failure ceiling, and why parallel guesses
   cannot overrun a cap.

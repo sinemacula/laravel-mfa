@@ -11,10 +11,11 @@ it.
 
 ## Invariants
 
-- `Secrets\RevealedSecret` is the type the planned enrolment flow returns the TOTP secret and provisioning URI in,
-  revealed explicitly only for the response to the client and for storing the factor. No flow returns one yet:
-  `TotpDriver::startEnrollment()` and `provisioningUri()`, and `Mfa::issueBackupCodes()`, return plain strings, which
-  the caller must not log, dump or serialise.
+- `Secrets\RevealedSecret` is the type secrets are returned in, revealed explicitly only for the response to the client
+  and for storing the factor. `RecoveryCodes\RecoveryCodeService::generate()` returns each recovery code of a new set
+  as one; the planned enrolment flow will return the TOTP secret and provisioning URI in it. Until then
+  `TotpDriver::startEnrollment()` and `provisioningUri()` return plain strings, which the caller must not log, dump or
+  serialise.
 - A `RevealedSecret` holds its plaintext as a `\SensitiveParameterValue`. The
   plaintext leaves it only through `reveal()`. `__toString()`, `jsonSerialize()`, `__serialize()` and
   `__unserialize()` throw `Exceptions\SecretNotRevealedException`, a `LogicException`; `__debugInfo()` gives a

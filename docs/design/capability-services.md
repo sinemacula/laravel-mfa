@@ -12,7 +12,8 @@ the provider or another capability.
 - `MfaManager` is the factor driver registry (Laravel's `Manager`, so `Mfa::extend()`, `Mfa::driver()` and
   `getDefaultDriver()` behave as for any manager) and the single entry point the `Mfa` facade exposes. Every other
   public method is a one-line delegation to the service of its capability, with its arguments passed through and the
-  service's answer returned unchanged.
+  service's answer returned unchanged; the recovery code methods first resolve the current identity, and answer
+  nothing without one.
 - The manager resolves the service from the container on each call, so a service bound or rebound after the manager
   was resolved is the one used.
 - Services resolve the seams a consumer rebinds (`MfaPolicy`, `ProofStore`, the event dispatcher and the
@@ -21,8 +22,9 @@ the provider or another capability.
 - The services act for the current identity: `Support\CurrentIdentity::resolve()`, which is `Auth::user()` on the
   default guard when it implements `MultiFactorAuthenticatable`. Without one, every service answers as it always has: no
   setup, no factors, no proofs, and nothing written or dispatched.
-- The manager passes itself to the operations that run a factor through its driver (`challenge()`, `verify()`,
-  `issueBackupCodes()`), and `Drivers\DriverResolver` resolves the driver from that registry. The drivers registered
+- The manager passes itself to the operations that run a factor through its driver (`challenge()`, `verify()`), and
+  `Drivers\DriverResolver` resolves the driver from that registry. Recovery codes are not a factor and have no driver:
+  the recovery code methods hand their service the current identity instead. The drivers registered
   against the manager the call was made on are the ones a service runs, whether it is the `mfa` singleton or a manager
   built separately. A factor is only run through the driver it was registered against (`assertMatchesFactor()`), and
   only for its owner (`Factors\FactorOwnership`).
@@ -45,9 +47,9 @@ the provider or another capability.
   `ProofBindings`, `VerificationBindings`, `EnrollmentBindings`, `LifecycleBindings`, `RecoveryCodeBindings`), and at
   boot the middleware aliases (`HttpBindings`), the publishing tags and the configuration check
   (`Config\ConfigurationBindings`), which also refuses a configured model off the storage connection.
-- The `mfa` factory builds the manager, then `DriverBindings::extend()` registers the TOTP, email and SMS drivers and
-  `RecoveryCodeBindings::extend()` the backup-code driver, each built from the settings of its capability's block
-  (`mfa.totp`, `mfa.codes`, `mfa.recovery_codes`), before the container applies any extender or resolving callback.
+- The `mfa` factory builds the manager, then `DriverBindings::extend()` registers the TOTP, email and SMS drivers, each
+  built from the settings of its capability's block (`mfa.totp`, `mfa.codes`), before the container applies any
+  extender or resolving callback.
   The factory first checks the whole configuration (see the application configuration note).
 - A call such as `Mfa::verify('totp', $factor, $code)` reaches `MfaManager::verify()`, which hands it to
   `Verification\VerificationService::verify()` with the manager as the driver registry. The service resolves the current
@@ -60,15 +62,15 @@ the provider or another capability.
   `Mfa::extend()`), not by replacing a service. Binding a different object under a service's class reaches the manager,
   which is how the manager's delegation is tested, but is not a supported extension point.
 - A driver registered under a shipped name that does not implement `FactorDriver` is refused when a service runs it
-  (`LogicException`); a backup-code driver that is not `BackupCodeDriver` is refused when backup codes are issued.
+  (`LogicException`).
 - The default proof store is bound, not shared, so each resolution reads the session of the request at hand.
 
 ## Implementation Anchors
 
 - `src/MfaManager.php`: the registry and the one-line delegations.
 - `src/MfaServiceProvider.php`: `register()`, `registerManager()`, `boot()`, `offerPublishing()`.
-- `src/*/*Bindings.php`: each capability's container wiring; `src/Drivers/DriverBindings.php` and
-  `src/RecoveryCodes/RecoveryCodeBindings.php` also build the shipped drivers from config.
+- `src/*/*Bindings.php`: each capability's container wiring; `src/Drivers/DriverBindings.php` also builds the shipped
+  drivers from config.
 - `src/Requirements/RequirementService.php`, `src/Factors/FactorService.php`, `src/Proofs/ProofService.php`,
   `src/Verification/VerificationService.php`, `src/Enrollment/EnrollmentService.php`,
   `src/Lifecycle/LifecycleService.php`, `src/RecoveryCodes/RecoveryCodeService.php`: the capability services.

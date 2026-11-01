@@ -9,14 +9,14 @@ traces, and the rotation of the key TOTP secrets are encrypted with.
 
 ## Secrets shown once
 
-`Secrets\RevealedSecret` is the type the planned enrolment flow will return the TOTP secret and the provisioning URI
-in, revealed explicitly, and only for the response to the client and for storing the factor. Nothing returns one yet:
-the TOTP driver's `startEnrollment()` and `provisioningUri()`, and `Mfa::issueBackupCodes()`, return plain strings.
-Until the flow returns `RevealedSecret` values, nothing stops a caller leaking those strings (the log redaction below
-only catches one under a key such as `secret`, or an `otpauth://` URI): never log, dump or serialise them (in a
-session, a cache or a queued job), and send them only in a response that is not stored (see
-[Sending a secret](#sending-a-secret)). Wrapping one yourself, `new RevealedSecret($secret)`, gives it the protection
-below.
+`Secrets\RevealedSecret` is the type secrets are returned in, revealed explicitly, and only for the response to the
+client and for storing the factor. `Mfa::generateRecoveryCodes()` returns each recovery code as one (see
+[Recovery codes](recovery-codes.md)); the planned enrolment flow will return the TOTP secret and the provisioning URI
+in it. Until that flow ships, the TOTP driver's `startEnrollment()` and `provisioningUri()` return plain strings, and
+nothing stops a caller leaking them (the log redaction below only catches one under a key such as `secret`, or an
+`otpauth://` URI): never log, dump or serialise them (in a session, a cache or a queued job), and send them only in a
+response that is not stored (see [Sending a secret](#sending-a-secret)). Wrapping one yourself,
+`new RevealedSecret($secret)`, gives it the protection below.
 
 A `RevealedSecret`'s plaintext leaves it only through `reveal()`; every other way out refuses:
 

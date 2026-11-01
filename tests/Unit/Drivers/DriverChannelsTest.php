@@ -13,11 +13,9 @@ use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
-use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use Tests\Fixtures\Drivers\AuthenticatorApp;
-use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\TestCase;
 
@@ -35,7 +33,6 @@ use Tests\TestCase;
 #[CoversClass(TotpDriver::class)]
 #[CoversClass(SmsDriver::class)]
 #[CoversClass(EmailDriver::class)]
-#[CoversClass(BackupCodeDriver::class)]
 final class DriverChannelsTest extends TestCase
 {
     /**
@@ -46,17 +43,15 @@ final class DriverChannelsTest extends TestCase
     public function testEachDriverStatesItsChannelKindAndAmr(): void
     {
         $drivers = [
-            'totp'        => new TotpDriver(new TotpSettings(new Repository), new Container),
-            'sms'         => new SmsDriver(new FakeSmsSender),
-            'email'       => new EmailDriver(new FakeEmailSender),
-            'backup_code' => new BackupCodeDriver,
+            'totp'  => new TotpDriver(new TotpSettings(new Repository), new Container),
+            'sms'   => new SmsDriver(new FakeSmsSender),
+            'email' => new EmailDriver(new FakeEmailSender),
         ];
 
         self::assertSame([
-            'totp'        => [ChannelKind::AUTHENTICATOR_APP, ['otp']],
-            'sms'         => [ChannelKind::SMS, ['sms']],
-            'email'       => [ChannelKind::EMAIL, ['otp']],
-            'backup_code' => [ChannelKind::UNKNOWN, ['otp']],
+            'totp'  => [ChannelKind::AUTHENTICATOR_APP, ['otp']],
+            'sms'   => [ChannelKind::SMS, ['sms']],
+            'email' => [ChannelKind::EMAIL, ['otp']],
         ], array_map(static fn (FactorDriver $driver): array => [$driver->channelKind(), $driver->amr()], $drivers));
     }
 
@@ -78,21 +73,5 @@ final class DriverChannelsTest extends TestCase
         self::assertFalse($driver->confirm($factor, $code === '000000' ? '111111' : '000000'));
         self::assertFalse($driver->confirm(new TotpStubFactor(null), $code));
         self::assertTrue($driver->confirm($factor, $code));
-    }
-
-    /**
-     * A backup code confirms as it verifies: against the stored hash.
-     *
-     * @return void
-     *
-     * @throws \Throwable
-     */
-    public function testABackupCodeConfirmsAsItVerifies(): void
-    {
-        $driver = new BackupCodeDriver;
-        $code   = $driver->startEnrollment(new InMemoryFactor);
-
-        self::assertTrue($driver->confirm(new InMemoryFactor(type: BackupCodeDriver::NAME, secret: $driver->hash($code)), $code));
-        self::assertFalse($driver->confirm(new InMemoryFactor(type: BackupCodeDriver::NAME, secret: $driver->hash($code)), 'WRONGCODE234'));
     }
 }

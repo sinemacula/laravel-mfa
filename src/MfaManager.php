@@ -14,7 +14,9 @@ use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 
 /**
@@ -32,13 +34,13 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  * - `Verification\VerificationService`: `challenge()` and `verify()`.
  * - `Enrollment\EnrollmentService`: `enroll()`.
  * - `Lifecycle\LifecycleService`: `disable()`.
- * - `RecoveryCodes\RecoveryCodeService`: `issueBackupCodes()`.
+ * - `RecoveryCodes\RecoveryCodeService`: `generateRecoveryCodes()`,
+ *   `redeemRecoveryCode()` and `recoveryCodes()`.
  *
  * The operations that run a factor through its driver pass the manager itself
  * to their service, so they use this manager's driver registry. The built-in
- * drivers are registered by `Drivers\DriverBindings` and
- * `RecoveryCodes\RecoveryCodeBindings` through the same `extend()` API a
- * consumer uses.
+ * drivers are registered by `Drivers\DriverBindings` through the same
+ * `extend()` API a consumer uses.
  *
  * Exceeds the project's max-methods-per-class threshold by design: it is the
  * one surface the facade exposes, and each method only delegates.
@@ -188,18 +190,57 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Issue a fresh batch of backup codes for the current identity, returning
-     * the plaintext set exactly once.
+     * Generate a new recovery code set for the current identity, replacing any
+     * earlier one, and return its codes, once, as secrets for the response;
+     * none without an MFA-capable identity.
      *
-     * @param  ?int  $count
-     * @return list<string>
+     * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \LogicException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     * @throws \Throwable
      */
-    public function issueBackupCodes(?int $count = null): array
+    public function generateRecoveryCodes(): array
     {
-        return $this->container->make(RecoveryCodeService::class)->issueBackupCodes($this, $count);
+        $identity = CurrentIdentity::resolve();
+
+        return $identity === null ? [] : $this->container->make(RecoveryCodeService::class)->generate($identity);
+    }
+
+    /**
+     * Redeem a recovery code for the current identity, for the purpose given:
+     * whether a code was used and its proof recorded; `false` without an
+     * MFA-capable identity.
+     *
+     * @param  string  $code
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     *
+     * @imperative
+     */
+    public function redeemRecoveryCode(#[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
+    {
+        $identity = CurrentIdentity::resolve();
+
+        return $identity !== null && $this->container->make(RecoveryCodeService::class)->redeem($identity, $code, $purpose)->passed;
+    }
+
+    /**
+     * Where the current identity's recovery code set stands, without a code;
+     * `null` without an MFA-capable identity.
+     *
+     * @return ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function recoveryCodes(): ?RecoveryCodeStatus
+    {
+        $identity = CurrentIdentity::resolve();
+
+        return $identity === null ? null : $this->container->make(RecoveryCodeService::class)->status($identity);
     }
 
     /**

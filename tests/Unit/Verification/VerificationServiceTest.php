@@ -34,7 +34,6 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
-use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
@@ -947,68 +946,6 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
-     * A valid backup code on a signed-in session records a recovery code proof,
-     * which travels on no channel and names no factor.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testAValidBackupCodeRecordsARecoveryCodeProof(): void
-    {
-        $user   = $this->signIn();
-        $factor = $this->backupCodeFactor($user);
-
-        Auth::login($user);
-
-        self::assertTrue($this->service()->verify($this->manager(), BackupCodeDriver::NAME, $factor, 'PLAIN12345', Purpose::STEP_UP));
-
-        $proofs = $this->container()->make(ProofService::class)->proofs();
-
-        self::assertCount(1, $proofs);
-        self::assertSame(ProofKind::RECOVERY_CODE, $proofs[0]->kind);
-        self::assertSame(BackupCodeDriver::NAME, $proofs[0]->method);
-        self::assertSame(Purpose::STEP_UP, $proofs[0]->binding->purpose);
-        self::assertNull($proofs[0]->channel);
-        self::assertNull($proofs[0]->reference);
-    }
-
-    /**
-     * A backup code verified for an enrolment is refused before the attempt,
-     * since a recovery code cannot confirm an enrolment: the code is not used
-     * up, nothing is counted, nothing is proved and nothing is reported as
-     * verified.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testABackupCodeVerifiedForAnEnrollmentIsRefused(): void
-    {
-        $user   = $this->signIn();
-        $factor = $this->backupCodeFactor($user);
-
-        Auth::login($user);
-
-        Event::fake([MfaVerified::class, MfaVerificationFailed::class]);
-
-        self::assertFalse($this->service()->verify($this->manager(), BackupCodeDriver::NAME, $factor, 'PLAIN12345', Purpose::ENROLLMENT));
-        self::assertSame(hash('sha256', 'PLAIN12345'), $factor->refresh()->getSecret());
-        self::assertSame([], $this->container()->make(ProofService::class)->proofs());
-        self::assertSame(0, DB::table('mfa_attempts')->count());
-
-        Event::assertNotDispatched(MfaVerified::class);
-        Event::assertDispatched(
-            MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->identity === $user
-                && $event->factor                                              === $factor
-                && $event->driver                                              === BackupCodeDriver::NAME
-                && $event->reason                                              === FailureReason::NOT_ACCEPTED
-                && $event->detail                                              === 'A recovery code cannot confirm an enrolment.',
-        );
-    }
-
-    /**
      * A proof is stamped with the verification generation read before the
      * driver checked the code, so a generation advanced while it is checked
      * leaves the proof behind rather than letting it count.
@@ -1290,23 +1227,6 @@ final class VerificationServiceTest extends TestCase
             'authenticatable_id'   => $identity->getAuthIdentifier(),
             'type'                 => 'email',
             'destination'          => self::ADDRESS,
-        ]);
-    }
-
-    /**
-     * Create a backup code factor for the user, holding the hash of
-     * `PLAIN12345`.
-     *
-     * @param  \Tests\Fixtures\Identities\TestUser  $user
-     * @return \SineMacula\Laravel\Mfa\Models\Factor
-     */
-    private function backupCodeFactor(TestUser $user): Factor
-    {
-        return Factor::query()->create([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->id,
-            'type'                 => BackupCodeDriver::NAME,
-            'secret'               => hash('sha256', 'PLAIN12345'),
         ]);
     }
 

@@ -10,7 +10,7 @@ use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\CustomFactor;
-use Tests\Fixtures\Factors\NonModelEloquentBackupCodeFactor;
+use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\Fixtures\Identities\PlainUser;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -140,7 +140,7 @@ final class FactorServiceTest extends TestCase
         yield 'not a string' => [42, 'mfa.factor.model must be a class string; got [int].'];
         yield 'missing class' => ['App\Missing', 'mfa.factor.model class [App\Missing] does not exist.'];
         yield 'model without the contract' => [PlainUser::class, 'mfa.factor.model class [' . PlainUser::class . '] must extend'];
-        yield 'contract without the model' => [NonModelEloquentBackupCodeFactor::class, 'mfa.factor.model class [' . NonModelEloquentBackupCodeFactor::class . '] must extend'];
+        yield 'contract without the model' => [TotpStubFactor::class, 'mfa.factor.model class [' . TotpStubFactor::class . '] must extend'];
     }
 
     /**

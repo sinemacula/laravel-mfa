@@ -13,7 +13,7 @@ use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\InMemoryFactor;
-use Tests\Fixtures\Factors\NonModelEloquentBackupCodeFactor;
+use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\Fixtures\Identities\SecondaryUser;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -198,7 +198,7 @@ final class EnrollmentServiceTest extends TestCase
 
         $this->expectException(FactorOwnershipMismatchException::class);
 
-        $this->service()->enroll(new NonModelEloquentBackupCodeFactor('hash'));
+        $this->service()->enroll(new TotpStubFactor('hash'));
     }
 
     /**

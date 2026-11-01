@@ -8,12 +8,13 @@ use Illuminate\Config\Repository;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
+use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use Tests\Fixtures\Identities\OtherConnectionUser;
 use Tests\TestCase;
 
@@ -24,8 +25,8 @@ use Tests\TestCase;
  * default connection while the identity lives on `identities`. Eloquent gives a
  * related model that names no connection its parent's, so the factor model
  * names the storage connection itself: the identity's factors are read and
- * written on the default connection, and a backup code issued for it verifies
- * once, in a factor state transaction the storage connection accepts.
+ * written on the default connection, and a recovery code generated for it
+ * redeems once, in a factor state transaction the storage connection accepts.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -73,29 +74,28 @@ final class IdentityOffStorageConnectionTest extends TestCase
     }
 
     /**
-     * A backup code issued for the identity is stored on the storage connection
-     * and verifies exactly once.
+     * A recovery code generated for the identity is stored on the storage
+     * connection and redeems exactly once.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testABackupCodeIssuedForTheIdentityVerifiesOnce(): void
+    public function testARecoveryCodeGeneratedForTheIdentityRedeemsOnce(): void
     {
-        $user  = $this->loginUser();
-        $codes = Mfa::issueBackupCodes();
+        $user = $this->loginUser();
+
+        $user->factors()->create(['type' => 'totp', 'status' => 'confirmed']);
+
+        $codes = Mfa::generateRecoveryCodes();
 
         self::assertCount(10, $codes);
-        self::assertSame(10, $user->authFactors()->count());
+        self::assertSame(StorageConnection::resolvedName(), (new RecoveryCode)->getConnectionName());
+        self::assertSame(10, RecoveryCode::query()->where('authenticatable_id', (string) $user->id)->count());
 
-        $factor = $this->factorFor($user, $codes[0]);
-
-        self::assertTrue(Mfa::verify(BackupCodeDriver::NAME, $factor, $codes[0]));
-
-        $factor->refresh();
-
-        self::assertFalse(Mfa::verify(BackupCodeDriver::NAME, $factor, $codes[0]));
-        self::assertSame(9, $user->authFactors()->whereNotNull('secret')->count());
+        self::assertTrue(Mfa::redeemRecoveryCode($codes[0]->reveal()));
+        self::assertFalse(Mfa::redeemRecoveryCode($codes[0]->reveal()));
+        self::assertSame(9, Mfa::recoveryCodes()?->remaining);
     }
 
     /**
@@ -124,11 +124,15 @@ final class IdentityOffStorageConnectionTest extends TestCase
         ]);
 
         $config->set('mfa.storage.connection', null);
+        $config->set('hashing.bcrypt.rounds', 4);
+        $config->set('mfa.applications.web', [
+            'recovery_codes' => ['enabled' => true],
+            'first_factor'   => ['method' => 'password', 'channel' => 'password'],
+        ]);
     }
 
     /**
-     * Authenticate as a fresh MFA-enabled identity on the identities
-     * connection.
+     * Sign in as a fresh MFA-enabled identity on the identities connection.
      *
      * @return \Tests\Fixtures\Identities\OtherConnectionUser
      */
@@ -139,23 +143,8 @@ final class IdentityOffStorageConnectionTest extends TestCase
             'mfa_enabled' => true,
         ]);
 
-        $this->actingAs($user);
+        Auth::login($user);
 
         return $user;
-    }
-
-    /**
-     * The identity's backup-code factor that holds the given code.
-     *
-     * @param  \Tests\Fixtures\Identities\OtherConnectionUser  $user
-     * @param  string  $code
-     * @return \SineMacula\Laravel\Mfa\Models\Factor
-     */
-    private function factorFor(OtherConnectionUser $user, string $code): Factor
-    {
-        $hash = (new BackupCodeDriver)->hash($code);
-
-        /** @var \SineMacula\Laravel\Mfa\Models\Factor */
-        return $user->factors()->get()->firstOrFail(static fn (Factor $factor): bool => $factor->getSecret() === $hash);
     }
 }

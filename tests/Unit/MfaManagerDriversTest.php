@@ -13,7 +13,6 @@ use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use Tests\Fixtures\Codes\CustomMfaCodeMessage;
 use Tests\Fixtures\Identities\TestUser;
 
@@ -155,50 +154,19 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the backup-code driver with an empty config slice should
-     * surface the shipped defaults verbatim.
+     * Recovery codes are not a factor, so no driver is registered for them:
+     * asking the manager for one fails as for any unknown driver.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBackupCodeDriverBuildsWithDefaults(): void
+    public function testNoDriverIsRegisteredForRecoveryCodes(): void
     {
-        $config = app(Repository::class);
-        $config->set('mfa.recovery_codes', []);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Driver [recovery_code] not supported.');
 
-        /** @var \SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver $driver */
-        $driver = $this->manager()->driver('backup_code');
-
-        self::assertInstanceOf(BackupCodeDriver::class, $driver);
-        self::assertSame(12, $driver->getCodeLength());
-        self::assertSame('23456789ABCDEFGHJKLMNPQRSTUVWXYZ', $driver->getAlphabet());
-        self::assertSame(10, $driver->getCodeCount());
-    }
-
-    /**
-     * Resolving the backup-code driver should apply every override in the
-     * recovery code settings — length, alphabet and count.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testBackupCodeDriverBuildsWithConfiguredOverrides(): void
-    {
-        $config = app(Repository::class);
-        $config->set('mfa.recovery_codes', [
-            'length'   => 14,
-            'alphabet' => 'ABCDEFGH',
-            'count'    => 5,
-        ]);
-
-        /** @var \SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver $driver */
-        $driver = $this->manager()->driver('backup_code');
-
-        self::assertSame(14, $driver->getCodeLength());
-        self::assertSame('ABCDEFGH', $driver->getAlphabet());
-        self::assertSame(5, $driver->getCodeCount());
+        $this->manager()->driver('recovery_code');
     }
 
     /**

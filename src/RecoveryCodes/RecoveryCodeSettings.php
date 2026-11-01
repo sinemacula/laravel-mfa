@@ -33,6 +33,9 @@ final readonly class RecoveryCodeSettings
     /** @var int The least entropy of one code, in bits, measured after normalisation. */
     public const int MINIMUM_ENTROPY_BITS = 40;
 
+    /** @var int The longest a code may be, in characters. */
+    public const int MAXIMUM_LENGTH = 64;
+
     /** @var string Prefix of every recovery code setting's key. */
     private const string PREFIX = 'mfa.recovery_codes.';
 
@@ -45,7 +48,7 @@ final readonly class RecoveryCodeSettings
     /** @var array<string, array{0: int, 1: int, 2: int}> Default, least and greatest value of each other numeric setting. */
     private const array NUMBERS = [
         'count'  => [10, 1, 50],
-        'length' => [12, 1, 64],
+        'length' => [12, 1, self::MAXIMUM_LENGTH],
     ];
 
     /**
