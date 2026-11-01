@@ -6,6 +6,7 @@ namespace Tests\Unit\Mail;
 
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
 
@@ -13,10 +14,11 @@ use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
  * Unit tests for the default `MfaCodeMessage` mailable.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaCodeMessage::class)]
 final class MfaCodeMessageTest extends TestCase
 {
     /**

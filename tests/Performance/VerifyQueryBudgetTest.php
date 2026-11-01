@@ -6,8 +6,11 @@ namespace Tests\Performance;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PragmaRX\Google2FA\Google2FA;
+use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
@@ -20,10 +23,12 @@ use Tests\TestCase;
  * (eager-load, cache miss, N+1) trips these assertions before production does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
+#[CoversClass(TotpDriver::class)]
 final class VerifyQueryBudgetTest extends TestCase
 {
     use RefreshDatabase;
@@ -34,7 +39,6 @@ final class VerifyQueryBudgetTest extends TestCase
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
      * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
      * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
@@ -106,8 +110,6 @@ final class VerifyQueryBudgetTest extends TestCase
      * update on the factor row, with no verification store write.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testTotpVerifyMissBudget(): void
     {

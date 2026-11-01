@@ -21,7 +21,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
  * manager orchestration layer writes through.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 interface Factor
 {

@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Gateways;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Exceptions\SmsGatewayNotConfiguredException;
@@ -13,10 +14,11 @@ use SineMacula\Laravel\Mfa\Gateways\NullSmsGateway;
  * Unit tests for the `NullSmsGateway` default gateway implementation.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(NullSmsGateway::class)]
 final class NullSmsGatewayTest extends TestCase
 {
     /**

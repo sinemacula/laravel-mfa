@@ -18,7 +18,7 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
  * consumer rebound the driver name to something incompatible.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */

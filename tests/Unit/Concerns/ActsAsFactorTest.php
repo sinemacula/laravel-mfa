@@ -7,6 +7,8 @@ namespace Tests\Unit\Concerns;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\CoversTrait;
+use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
@@ -19,16 +21,17 @@ use Tests\TestCase;
  * lifecycle, and persistence. Every public surface has a paired test (and most
  * readers have separate "value present" / "value absent" cases), so the class
  * size is intrinsic to the contract's surface area, not a sign of conflated
- * subjects. The `php:S1448` suppression below documents that judgment in code
+ * subjects. The `php:S1448` suppression below documents that judgement in code
  * so the next quality-gate refresh does not re-flag it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  *
  * @SuppressWarnings("php:S1448")
  */
+#[CoversTrait(ActsAsFactor::class)]
 final class ActsAsFactorTest extends TestCase
 {
     use RefreshDatabase;

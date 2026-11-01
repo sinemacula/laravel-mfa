@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Facade;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
@@ -17,10 +18,11 @@ use Tests\TestCase;
  * Integration-leaning unit tests for the shipped `Factor` Eloquent model.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(Factor::class)]
 final class FactorTest extends TestCase
 {
     use RefreshDatabase;
@@ -116,6 +118,21 @@ final class FactorTest extends TestCase
     public function testUniqueIdsReturnsIdColumn(): void
     {
         self::assertSame(['id'], (new Factor)->uniqueIds());
+    }
+
+    /**
+     * Every mass-assignable attribute without a richer cast is cast to a
+     * string, so a read never hands back the driver's native type.
+     *
+     * @return void
+     */
+    public function testPlainFillableAttributesCastToString(): void
+    {
+        $factor = new Factor;
+
+        foreach (['authenticatable_type', 'authenticatable_id', 'driver', 'label', 'recipient'] as $attribute) {
+            self::assertTrue($factor->hasCast($attribute, 'string'), $attribute);
+        }
     }
 
     /**

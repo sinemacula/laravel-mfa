@@ -17,7 +17,7 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  * factors to satisfy policy.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final readonly class MfaFactorDisabled
 {

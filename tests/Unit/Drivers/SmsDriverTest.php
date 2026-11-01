@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
@@ -21,10 +22,11 @@ use Tests\TestCase;
  * against the in-memory `FakeSmsGateway`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(SmsDriver::class)]
 final class SmsDriverTest extends TestCase
 {
     /**

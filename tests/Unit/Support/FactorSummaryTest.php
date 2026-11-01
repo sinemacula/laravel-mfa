@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Support;
 
 use Carbon\Carbon;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Support\FactorSummary;
@@ -20,10 +21,11 @@ use Tests\Unit\Concerns\BuildsFactorSummaries;
  * threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(FactorSummary::class)]
 final class FactorSummaryTest extends TestCase
 {
     use BuildsFactorSummaries;

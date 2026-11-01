@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
@@ -22,10 +23,11 @@ use Tests\TestCase;
  * inside the autoloaded test process.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(TotpDriver::class)]
 final class TotpDriverTest extends TestCase
 {
     /** @var string Account-name fixture used across the provisioning-URI tests. */
@@ -103,6 +105,41 @@ final class TotpDriverTest extends TestCase
         $factor = $this->makeFactor(secret: $secret);
 
         self::assertTrue($driver->verify($factor, $code));
+    }
+
+    /**
+     * The default window accepts a code from one time step either side of the
+     * current one and refuses one from two steps away.
+     *
+     * The codes are drawn and checked again whenever the time step changes
+     * between drawing and checking them, so the assertions never straddle a
+     * step boundary.
+     *
+     * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
+     */
+    public function testDefaultWindowAcceptsOneStepEitherSideOnly(): void
+    {
+        $google2fa = new Google2FA;
+        $secret    = $google2fa->generateSecretKey();
+
+        $driver = new TotpDriver;
+        $factor = $this->makeFactor(secret: $secret);
+
+        do {
+            $step = $google2fa->getTimestamp();
+
+            $previous = $driver->verify($factor, $google2fa->oathTotp($secret, $step - 1));
+            $next     = $driver->verify($factor, $google2fa->oathTotp($secret, $step + 1));
+            $distant  = $driver->verify($factor, $google2fa->oathTotp($secret, $step - 2));
+        } while ($google2fa->getTimestamp() !== $step);
+
+        self::assertTrue($previous);
+        self::assertTrue($next);
+        self::assertFalse($distant);
     }
 
     /**

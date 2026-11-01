@@ -11,58 +11,51 @@ use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 
 /**
- * Base TestCase for the `sinemacula/laravel-mfa` test suites.
+ * Shared base test case for the package's test suites.
  *
- * Boots an Orchestra TestBench application with the MFA service provider
- * registered, an in-memory SQLite connection, and the shipped migration
- * applied. Concrete tests subclass this directly (via `use RefreshDatabase`
- * when persistence is required) or the thinner `Tests\UnitTestCase` for pure
- * unit scenarios.
+ * Boots a Testbench application with the MFA service provider registered, the
+ * database `DB_CONNECTION` names (in-memory SQLite when unset), and the shipped
+ * migration plus the test user migrations applied.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
+ *
+ * @internal
  */
 abstract class TestCase extends BaseTestCase
 {
-    /**
-     * Resolve the test database connection.
-     *
-     * Defaults to in-memory SQLite so `composer test` needs no external
-     * services. Honours `DB_CONNECTION` plus `DB_HOST` / `DB_PORT` /
-     * `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` so the CI database matrix
-     * runs against the provisioned engine. Static so the CI bootstrap-sanity
-     * workflow can call it without instantiating this abstract class.
-     *
-     * @return array<string, mixed>
-     */
-    public static function resolveDatabaseConnection(): array
-    {
-        $driver = getenv('DB_CONNECTION');
+    /** @var array<string, true> Worker databases this process has created. */
+    private static array $workerDatabases = [];
 
-        if ($driver === false || $driver === '' || $driver === 'sqlite') {
-            return [
-                'driver'   => 'sqlite',
-                'database' => ':memory:',
-                'prefix'   => '',
-            ];
+    /**
+     * Destroy the application, then close its database connections.
+     *
+     * The application's objects reference each other, so a destroyed
+     * application's PDO is only closed once the cycles are collected. Without
+     * this, a long run against a persistent database holds dozens of
+     * connections at once, and parallel workers exhaust the server's limit.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function tearDown(): void
+    {
+        /** @var ?\Illuminate\Database\DatabaseManager $database */
+        $database = $this->app?->make('db');
+
+        parent::tearDown();
+
+        foreach ($database?->getConnections() ?? [] as $connection) {
+            $connection->disconnect();
         }
 
-        return [
-            'driver'   => $driver,
-            'host'     => self::envOrDefault('DB_HOST', '127.0.0.1'),
-            'port'     => self::envOrDefault('DB_PORT', $driver === 'pgsql' ? '5432' : '3306'),
-            'database' => self::envOrDefault('DB_DATABASE', 'laravel_mfa_test'),
-            'username' => self::envOrDefault('DB_USERNAME', $driver === 'pgsql' ? 'postgres' : 'root'),
-            'password' => self::envOrDefault('DB_PASSWORD', ''),
-            'prefix'   => '',
-            'charset'  => $driver === 'pgsql' ? 'utf8' : 'utf8mb4',
-        ];
+        gc_collect_cycles();
     }
 
     /**
      * Register the package's service provider with the test application.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param  mixed  $app
      * @return list<class-string<\Illuminate\Support\ServiceProvider>>
      */
     #[\Override]
@@ -76,22 +69,25 @@ abstract class TestCase extends BaseTestCase
     /**
      * Configure the application environment for the test suite.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * Reads `DB_CONNECTION` from the environment to select the driver. Defaults
+     * to in-memory SQLite when unset, so local development needs no extra
+     * configuration.
+     *
+     * @param  mixed  $app
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Random\RandomException
      */
     #[\Override]
     protected function defineEnvironment(mixed $app): void
     {
         /** @var \Illuminate\Config\Repository $config */
-        $config = $app->make(Repository::class);
+        $config = app(Repository::class);
 
         $config->set('app.key', 'base64:' . base64_encode(random_bytes(32)));
 
         $config->set('database.default', 'testing');
-        $config->set('database.connections.testing', self::resolveDatabaseConnection());
+        $config->set('database.connections.testing', $this->databaseConnection());
 
         $config->set('auth.defaults.guard', 'web');
         $config->set('auth.guards.web', [
@@ -105,7 +101,7 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Load the package's migration + the test user migration for the test
+     * Load the package's migration and the test user migrations for the test
      * application database.
      *
      * @return void
@@ -131,18 +127,92 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Return the value of the given env var if it is set and non-empty,
-     * otherwise return the supplied default. Centralised so the connection
-     * resolver does not repeat the `getenv` + falsy-check pattern at every key.
+     * Build the database connection config from environment variables.
      *
-     * @param  string  $key
-     * @param  string  $default
+     * @return array<string, mixed>
+     */
+    private function databaseConnection(): array
+    {
+        $driver = getenv('DB_CONNECTION') ?: 'sqlite';
+
+        if ($driver === 'sqlite') {
+            return [
+                'driver'   => 'sqlite',
+                'database' => ':memory:',
+                'prefix'   => '',
+            ];
+        }
+
+        $connection = [
+            'driver'    => $driver,
+            'host'      => getenv('DB_HOST') ?: '127.0.0.1',
+            'port'      => getenv('DB_PORT') ?: $this->defaultPort($driver),
+            'database'  => getenv('DB_DATABASE') ?: 'laravel_mfa_test',
+            'username'  => getenv('DB_USERNAME') ?: $this->defaultUsername($driver),
+            'password'  => getenv('DB_PASSWORD') ?: '',
+            'prefix'    => '',
+            'charset'   => $driver === 'pgsql' ? 'utf8' : 'utf8mb4',
+            'collation' => $driver === 'pgsql' ? null : 'utf8mb4_unicode_ci',
+        ];
+
+        $connection['database'] = $this->workerDatabase($connection);
+
+        return $connection;
+    }
+
+    /**
+     * Return the database this process tests against.
+     *
+     * Tests create, empty and drop the same tables, so paratest workers sharing
+     * one database would collide. Each process gets its own database, named
+     * after its paratest `TEST_TOKEN` (`0` outside paratest) and created afresh
+     * on first use from a connection to the configured one, so nothing a
+     * previous or interrupted run left behind reaches the next.
+     *
+     * @param  array{driver: string, host: string, port: string, database: string, username: string, password: string}  $connection
      * @return string
      */
-    private static function envOrDefault(string $key, string $default): string
+    private function workerDatabase(array $connection): string
     {
-        $value = getenv($key);
+        $token    = getenv('TEST_TOKEN');
+        $database = $connection['database'] . '_' . ($token === false || $token === '' ? '0' : $token);
 
-        return $value === false || $value === '' ? $default : $value;
+        if (isset(self::$workerDatabases[$database])) {
+            return $database;
+        }
+
+        $dsn = sprintf('%s:host=%s;port=%s;dbname=%s', $connection['driver'], $connection['host'], $connection['port'], $connection['database']);
+        $pdo = new \PDO($dsn, $connection['username'], $connection['password']);
+
+        $quoted = $connection['driver'] === 'pgsql' ? '"' . $database . '"' : '`' . $database . '`';
+
+        $pdo->exec('DROP DATABASE IF EXISTS ' . $quoted . ($connection['driver'] === 'pgsql' ? ' WITH (FORCE)' : ''));
+        $pdo->exec('CREATE DATABASE ' . $quoted);
+
+        self::$workerDatabases[$database] = true;
+
+        return $database;
+    }
+
+    /**
+     * Return the default database port for the given driver.
+     *
+     * @param  string  $driver
+     * @return string
+     */
+    private function defaultPort(string $driver): string
+    {
+        return $driver === 'pgsql' ? '5432' : '3306';
+    }
+
+    /**
+     * Return the default database username for the given driver.
+     *
+     * @param  string  $driver
+     * @return string
+     */
+    private function defaultUsername(string $driver): string
+    {
+        return $driver === 'pgsql' ? 'postgres' : 'root';
     }
 }

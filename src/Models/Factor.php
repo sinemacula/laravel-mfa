@@ -20,7 +20,7 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
  * persistence boundary.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @property string $id
  * @property string $authenticatable_type
@@ -58,7 +58,7 @@ class Factor extends Model implements EloquentFactor
         'last_attempted_at',
     ];
 
-    /** @var list<string> The attributes that should be hidden for serialization. */
+    /** @var list<string> The attributes that should be hidden for serialisation. */
     protected $hidden = [
         'secret',
         'code',
@@ -67,9 +67,12 @@ class Factor extends Model implements EloquentFactor
     /**
      * Create a new Factor bound to the package-configured table name. Reads the
      * table name lazily on each instantiation so runtime config swaps (tests,
-     * tenancy) take effect immediately.
+     * tenancy) take effect immediately. It has to be applied here, before
+     * Eloquent reads it, so this is construction rather than model behaviour.
      *
      * @param  array<string, mixed>  $attributes
+     *
+     * @phpstan-ignore sineMaculaLaravel.modelBehaviour
      */
     public function __construct(array $attributes = [])
     {
@@ -98,13 +101,18 @@ class Factor extends Model implements EloquentFactor
     protected function casts(): array
     {
         return [
-            'secret'            => 'encrypted',
-            'code'              => 'encrypted',
-            'expires_at'        => 'datetime',
-            'verified_at'       => 'datetime',
-            'locked_until'      => 'datetime',
-            'last_attempted_at' => 'datetime',
-            'attempts'          => 'integer',
+            'authenticatable_type' => 'string',
+            'authenticatable_id'   => 'string',
+            'driver'               => 'string',
+            'label'                => 'string',
+            'recipient'            => 'string',
+            'secret'               => 'encrypted',
+            'code'                 => 'encrypted',
+            'expires_at'           => 'datetime',
+            'verified_at'          => 'datetime',
+            'locked_until'         => 'datetime',
+            'last_attempted_at'    => 'datetime',
+            'attempts'             => 'integer',
         ];
     }
 

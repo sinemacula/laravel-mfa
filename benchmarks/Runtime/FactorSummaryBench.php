@@ -2,9 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace Benchmarks;
+namespace Benchmarks\Runtime;
 
-use PhpBench\Attributes as Bench;
+use Benchmarks\Support\InMemoryFactor;
+use PhpBench\Attributes\Iterations;
+use PhpBench\Attributes\Revs;
 use SineMacula\Laravel\Mfa\Support\FactorSummary;
 
 /**
@@ -15,17 +17,17 @@ use SineMacula\Laravel\Mfa\Support\FactorSummary;
  * factors — so this is a soft hot path.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class FactorSummaryBench
 {
-    /** @var \Benchmarks\InMemoryFactor */
+    /** @var \Benchmarks\Support\InMemoryFactor */
     private InMemoryFactor $totpFactor;
 
-    /** @var \Benchmarks\InMemoryFactor */
+    /** @var \Benchmarks\Support\InMemoryFactor */
     private InMemoryFactor $emailFactor;
 
-    /** @var \Benchmarks\InMemoryFactor */
+    /** @var \Benchmarks\Support\InMemoryFactor */
     private InMemoryFactor $smsFactor;
 
     /**
@@ -59,8 +61,8 @@ final class FactorSummaryBench
      *
      * @return void
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchFromTotpFactor(): void
     {
         FactorSummary::fromFactor($this->totpFactor);
@@ -71,8 +73,8 @@ final class FactorSummaryBench
      *
      * @return void
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchFromEmailFactor(): void
     {
         FactorSummary::fromFactor($this->emailFactor);
@@ -83,8 +85,8 @@ final class FactorSummaryBench
      *
      * @return void
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchFromSmsFactor(): void
     {
         FactorSummary::fromFactor($this->smsFactor);
@@ -95,8 +97,8 @@ final class FactorSummaryBench
      *
      * @return void
      */
-    #[Bench\Iterations(3)]
-    #[Bench\Revs(1000)]
+    #[Iterations(3)]
+    #[Revs(1000)]
     public function benchJsonSerialize(): void
     {
         FactorSummary::fromFactor($this->emailFactor)->jsonSerialize();

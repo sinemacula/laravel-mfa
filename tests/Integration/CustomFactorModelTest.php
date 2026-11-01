@@ -5,9 +5,11 @@ declare(strict_types = 1);
 namespace Tests\Integration;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\CustomFactor;
 use Tests\TestCase;
@@ -21,10 +23,11 @@ use Tests\TestCase;
  * default.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class CustomFactorModelTest extends TestCase
 {
     use RefreshDatabase;
@@ -35,8 +38,6 @@ final class CustomFactorModelTest extends TestCase
      * default behaviour.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testReturnsShippedFactorModelByDefault(): void
     {
@@ -52,8 +53,6 @@ final class CustomFactorModelTest extends TestCase
      * `EloquentFactor` contract returns the configured class.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testReturnsConfiguredCustomFactorModel(): void
     {
@@ -70,8 +69,6 @@ final class CustomFactorModelTest extends TestCase
      * package writes through.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testConfiguredModelInstanceSatisfiesEloquentFactorContract(): void
     {
@@ -89,8 +86,6 @@ final class CustomFactorModelTest extends TestCase
      * flowing through to a `class_exists` call that would emit a soft warning.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testRejectsNonStringConfigValue(): void
     {
@@ -107,8 +102,6 @@ final class CustomFactorModelTest extends TestCase
      * cleared" but is never a valid model class.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testRejectsEmptyStringConfigValue(): void
     {
@@ -126,8 +119,6 @@ final class CustomFactorModelTest extends TestCase
      * resulting stack trace.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testRejectsNonExistentClass(): void
     {
@@ -146,8 +137,6 @@ final class CustomFactorModelTest extends TestCase
      * boot.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testRejectsClassThatDoesNotImplementEloquentFactor(): void
     {

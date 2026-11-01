@@ -4,7 +4,9 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Exceptions;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use SineMacula\Laravel\Mfa\Exceptions\AbstractMfaHttpException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Support\FactorSummary;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -13,10 +15,12 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * Unit tests for the `MfaExpiredException` exception.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(AbstractMfaHttpException::class)]
+#[CoversClass(MfaExpiredException::class)]
 final class MfaExpiredExceptionTest extends TestCase
 {
     /**

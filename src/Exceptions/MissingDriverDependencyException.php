@@ -11,6 +11,6 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * a helpful message guiding the developer to install the missing dependency.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class MissingDriverDependencyException extends \RuntimeException {}

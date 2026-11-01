@@ -6,6 +6,7 @@ namespace Tests\Unit;
 
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Assert;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
@@ -27,10 +28,11 @@ use Tests\Fixtures\TestUser;
  * ownership check that runs immediately after.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class MfaManagerDriverMismatchTest extends MfaManagerTestCase
 {
     /** @var string Right-shape OTP value used to drive the rejected verify() paths. */

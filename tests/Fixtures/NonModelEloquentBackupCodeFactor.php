@@ -11,7 +11,7 @@ use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
  * backup-code driver's non-Model atomic-consume early-return.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */

@@ -19,7 +19,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
  * needing external enforcement bind their own implementation.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 interface MfaPolicy
 {
