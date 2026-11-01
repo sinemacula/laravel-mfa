@@ -14,6 +14,7 @@ use Illuminate\Support\ServiceProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Codes\NullSmsGateway;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
+use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
@@ -22,6 +23,7 @@ use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
@@ -114,6 +116,8 @@ final class MfaServiceProviderTest extends TestCase
     public function testRegistersEachCapabilitysBindings(): void
     {
         $abstracts = [
+            EventContextResolver::class,
+            EventDispatcher::class,
             FactorService::class,
             FactorStateCache::class,
             DriverResolver::class,
