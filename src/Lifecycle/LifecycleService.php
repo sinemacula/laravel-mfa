@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
@@ -51,24 +52,27 @@ final readonly class LifecycleService
     /**
      * Disable a previously-enrolled factor for the current identity.
      *
-     * Deletes the underlying row when the factor is an Eloquent model, in the
-     * identity's factor state transaction, and with it the identity's recovery
-     * codes when no confirmed factor remains (a pending one does not count; one
-     * disabled at the failure ceiling does). Then stops counting every proof
-     * made with the factor on the current session, and dispatches
+     * Deletes the underlying row when the factor is an Eloquent model. An
+     * `EloquentFactor` is deleted as stored, in the identity's factor state
+     * transaction, and with it the identity's recovery codes when no confirmed
+     * factor remains (a pending one does not count; one disabled at the failure
+     * ceiling does); any other model is deleted on its own. Then stops counting
+     * every proof made with the factor on the current session, and dispatches
      * `MfaFactorDisabled`. Non-Eloquent factors are left for the consumer to
      * discard, with the recovery codes; their proofs stop counting and the
      * event still fires.
      *
      * Throws `FactorOwnershipMismatchException` when the factor does not belong
-     * to the current identity. No-op when no MFA-capable identity is
-     * resolvable.
+     * to the current identity, and `WriteCancelledException` when a model event
+     * cancels the deletion, which then removes, forgets and reports nothing.
+     * No-op when no MFA-capable identity is resolvable.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      * @throws \Throwable
      */
     public function disable(Factor $factor): void
@@ -83,6 +87,8 @@ final readonly class LifecycleService
 
         if (LockedFactors::keepsState($factor)) {
             $this->remove($identity, $factor);
+        } elseif ($factor instanceof Model) {
+            self::delete($factor);
         }
 
         $identifier = $factor->getFactorIdentifier();
@@ -96,9 +102,10 @@ final readonly class LifecycleService
     }
 
     /**
-     * Delete the factor in the identity's factor state transaction, and the
-     * identity's recovery codes with it when none of the factors left under the
-     * lock is confirmed.
+     * Delete the factor as stored under the identity's lock, in its factor
+     * state transaction, and the identity's recovery codes with it when none of
+     * the factors left under the lock is confirmed. A factor already gone is
+     * not deleted again; the caller's instance is marked as no longer stored.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -110,10 +117,15 @@ final readonly class LifecycleService
     {
         FactorStateTransaction::forIdentity($identity, $factor, function (Collection $factors) use ($identity, $factor): void {
 
+            $stored = LockedFactors::find($factor, $factors);
+
+            if ($stored !== null) {
+                self::delete($stored);
+            }
+
+            $factor->exists = false;
+
             $removed = LockedFactors::idOf($factor);
-
-            $factor->delete();
-
             $remains = $factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $removed && $other->isConfirmed());
 
             if ($remains) {
@@ -122,5 +134,22 @@ final readonly class LifecycleService
 
             $this->recoveryCodes->removeSet($identity);
         });
+    }
+
+    /**
+     * Delete the factor's row, and throw when a model event cancels the
+     * deletion, so nothing is removed, forgotten or reported for a factor that
+     * stays.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $factor
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     */
+    private static function delete(Model $factor): void
+    {
+        if ($factor->delete() === false) {
+            throw new WriteCancelledException('A model event cancelled the factor\'s deletion, so it was not disabled.');
+        }
     }
 }

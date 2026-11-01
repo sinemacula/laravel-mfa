@@ -54,10 +54,10 @@ whose events carry summaries and a scalar context and are dispatched after the c
   `MfaVerified` or `MfaVerificationFailed` last.
 - `enroll()` resolves the identity, stamps ownership onto brand-new Eloquent rows (or asserts ownership on pre-existing
   rows), persists, then dispatches `MfaFactorEnrolled($identity, $factor, $driver)`.
-- `disable()` resolves the identity, asserts ownership, deletes the row for Eloquent factors in the identity's factor
-  state transaction, with the identity's recovery codes when no confirmed factor remains (see
-  [Recovery Codes](recovery-codes.md)), forgets the factor's proofs on the current session, then dispatches
-  `MfaFactorDisabled($identity, $factor, $driver)`.
+- `disable()` resolves the identity, asserts ownership and deletes the factor's row: an `EloquentFactor` as stored under
+  the identity's factor state lock, in its transaction, with the identity's recovery codes when no confirmed factor
+  remains (see [Recovery Codes](recovery-codes.md)); any other Eloquent model on its own. It then forgets the factor's
+  proofs on the current session and dispatches `MfaFactorDisabled($identity, $factor, $driver)`.
 - Recovery codes are not a factor and dispatch none of these events: their redemption dispatches the catalogue's
   `VerificationPassed` or `VerificationFailed` and recovery code events (see [Recovery Codes](recovery-codes.md)).
 
@@ -74,6 +74,8 @@ whose events carry summaries and a scalar context and are dispatched after the c
 - Unsupported identities short-circuit to `false` without dispatching `MfaVerificationFailed`. Unresolved drivers throw
   from `DriverResolver::resolve()` before any event is dispatched. Those branches are deliberately outside the event
   taxonomy.
+- A deletion a model event cancels makes `disable()` throw `WriteCancelledException`: the factor, its proofs and the
+  recovery codes are kept, and nothing is dispatched.
 - Non-Eloquent factors participate in the lifecycle events but carry no row to mutate: they keep no failures in a row,
   lockout or ceiling of their own, and their attempts are counted against the identity and the IP address, whose
   failure ceiling refuses them.

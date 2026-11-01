@@ -45,26 +45,27 @@ moment when both work or neither exists, and what a redemption leaves behind.
   active), the application must accept recovery codes and the identity must have a confirmed factor. The codes are
   drawn and hashed before the lock is taken. Under the lock the checks are made again, the confirmed factor among the
   factors as stored; every code of the identity not yet replaced, used ones included, is marked replaced; the new codes
-  are stored under the next generation; the generation and its time are recorded on the state row; and
-  `RecoveryCodesGenerated` (size, generation, actor) is queued for the commit. The codes are returned once the
-  transaction has committed.
+  are stored under the next generation; the generation and its time are recorded on the state row, every save required
+  to be made; and `RecoveryCodesGenerated` (size, generation, actor) is queued for the commit. The codes are returned
+  once the transaction has committed.
 - Redemption (`RecoveryCodeService::redeem()`, `Mfa::redeemRecoveryCode()`): refusals first (below), then the attempt
   through `Attempts\AttemptService`, charged to the identity and to the request's IP address as resolved through the
   trusted proxies. Under the lock: the sign-in and a confirmed factor are checked again; the verification generation
   is read; the usable codes of the current generation are read with a locking read and all checked; a match is marked
-  used by `UPDATE ... SET used_at WHERE id AND used_at IS NULL AND replaced_at IS NULL`, which must change one row. The
-  attempt service counts the outcome in the same transaction. Once it has committed, a success records a
-  `recovery_code` proof (method `recovery_code`, no channel, no reference, the purpose given, the verification
-  generation read under the lock) and dispatches `VerificationPassed`, `RecoveryCodeUsed` with the remaining count and,
-  when `low_count` is above 0 and the remaining count is at or below it, `RecoveryCodesLow`, in that order.
+  used by `UPDATE ... SET used_at WHERE id AND used_at IS NULL AND replaced_at IS NULL`, which must change one row, and
+  its `recovery_code` proof (method `recovery_code`, no channel, no reference, the purpose given, the verification
+  generation read under the lock) is recorded on the current sign-in, for the store to keep once the transaction
+  commits. The attempt service counts the outcome in the same transaction. Once it has committed, a success dispatches
+  `VerificationPassed`, `RecoveryCodeUsed` with the remaining count and, when `low_count` is above 0 and the remaining
+  count is at or below it, `RecoveryCodesLow`, in that order. A success always carries its proof.
 - Status (`RecoveryCodeService::status()`, `Mfa::recoveryCodes()`): one statement on the write connection, the state
   row left-joined to the usable codes of its current generation, gives the remaining count, the generation and the
   time, so the count and the generation are always of the same set. No lock is taken.
 - Removal (`RecoveryCodeService::removeSet()`): inside the transaction that removes the identity's last confirmed
   factor, every code row is deleted and the set's time cleared; the generation is kept. `RecoveryCodesRemoved` is
-  queued when there was a set, used up or not, or any code row. `Lifecycle\LifecycleService::disable()` calls it when
-  none of the factors left under the lock is confirmed: a pending factor does not keep the set, a confirmed one the
-  failure ceiling disabled does.
+  queued when there was a set, used up or not, or any code row. `Lifecycle\LifecycleService::disable()` deletes the
+  factor as stored under the lock and calls it when none of the factors left there is confirmed: a pending factor does
+  not keep the set, a confirmed one the failure ceiling disabled does.
 - Pruning (`RecoveryCodeService::prune($before)`): deletes the codes used, or replaced, before the time given, never a
   usable code, and leaves the state row as it is.
 
@@ -72,7 +73,8 @@ moment when both work or neither exists, and what a redemption leaves behind.
 
 - Generation is refused with `OperationRefusedException`: `machine_identity`, `identity_inactive`, `type_not_enabled`
   when the application does not accept recovery codes, and `no_factor` without a confirmed factor, before the lock or
-  under it. A failure partway through the replacement rolls all of it back: the previous set is untouched and still
+  under it. A failure partway through the replacement, a save a model event cancels included (it throws
+  `WriteCancelledException`), rolls all of it back: the previous set is untouched and still
   redeems, the generation is unchanged and nothing is reported.
 - A redemption is refused before any attempt, counted nowhere, with one `VerificationFailed` and nothing checked or
   spent: `machine_identity` or `identity_inactive`; `not_accepted` for an enrolment, which a recovery code cannot
@@ -84,6 +86,10 @@ moment when both work or neither exists, and what a redemption leaves behind.
   reset clears.
 - A sign-in that ended, or a last confirmed factor that went, while the redemption waited for the lock: one counted
   failure (`not_accepted` or `no_factor`), nothing checked.
+- A sign-in that ended while the code was being checked leaves no sign-in to record the proof on: the redemption throws
+  `ProofRefusedException`, so the code's use rolls back, nothing is counted and nothing is reported. A redemption never
+  passes without its proof.
+- A factor deletion a model event cancels throws `WriteCancelledException` and keeps the set.
 - No set, or every code used: one counted attempt, `invalid_code`, no hash checked.
 - Two redemptions of one code: the lock serialises them, and the second finds the code used; a redemption that read the
   set before another used or replaced its code finds, when it marks it, that no row changed, and fails `invalid_code`.

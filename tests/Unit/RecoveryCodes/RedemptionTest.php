@@ -28,15 +28,15 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\Redemption;
 final class RedemptionTest extends TestCase
 {
     /**
-     * A passed redemption is counted and carries the remaining count and, once
-     * added, its proof; nothing about a failure.
+     * A passed redemption is counted and carries the remaining count and its
+     * proof; nothing about a failure.
      *
      * @return void
      */
     public function testAPassedRedemption(): void
     {
         $proof      = self::proof();
-        $redemption = Redemption::passed(7)->withProof($proof);
+        $redemption = Redemption::passed(7, $proof);
 
         self::assertTrue($redemption->passed);
         self::assertTrue($redemption->counted);

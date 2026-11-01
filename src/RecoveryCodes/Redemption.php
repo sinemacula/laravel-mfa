@@ -58,12 +58,13 @@ final readonly class Redemption
         /** How many codes were unused when the set was read, or null when it was not. */
         public ?int $remaining = null,
 
-        /** The proof the redemption recorded, when it passed and the store took one. */
+        /** The proof the redemption recorded, when it passed. */
         public ?Proof $proof = null,
     ) {}
 
     /**
-     * A redemption that used a code, leaving the given number unused.
+     * A redemption that used a code, leaving the given number unused, with the
+     * proof it recorded.
      *
      * @param  int  $remaining
      * @param  ?\SineMacula\Laravel\Mfa\Proofs\Proof  $proof
@@ -115,17 +116,6 @@ final readonly class Redemption
         }
 
         return new self(passed: false, counted: false, reason: $reason, detail: $detail, lockedUntil: $lockedUntil);
-    }
-
-    /**
-     * The same redemption, with the proof it recorded.
-     *
-     * @param  ?\SineMacula\Laravel\Mfa\Proofs\Proof  $proof
-     * @return self
-     */
-    public function withProof(?Proof $proof): self
-    {
-        return new self($this->passed, $this->counted, $this->reason, $this->detail, $this->lockedUntil, $this->remaining, $proof);
     }
 
     /**

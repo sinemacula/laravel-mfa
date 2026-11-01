@@ -11,7 +11,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
@@ -224,6 +226,41 @@ final class RecoveryCodeServiceTest extends TestCase
 
         self::assertFalse($this->removeSet($holder));
 
+        Event::assertNotDispatched(RecoveryCodesRemoved::class);
+    }
+
+    /**
+     * A removal whose state row save a model event cancels throws, so the whole
+     * removal rolls back: every code row stays, the set's time is kept and
+     * nothing is reported.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACancelledStateSaveRollsTheRemovalBack(): void
+    {
+        $holder = $this->signInHolder();
+
+        $this->recoveryCodes()->generate($holder);
+
+        IdentityState::saving(static fn (): bool => false);
+
+        Event::fake([RecoveryCodesRemoved::class]);
+
+        $thrown = null;
+
+        try {
+            $this->removeSet($holder);
+        } catch (WriteCancelledException $exception) {
+            $thrown = $exception;
+        }
+
+        self::assertInstanceOf(WriteCancelledException::class, $thrown);
+        self::assertStringContainsString(IdentityState::class, $thrown->getMessage());
+
+        self::assertCount(10, $this->storedCodes($holder));
+        self::assertNotNull($this->stateOf($holder)->recovery_codes_generated_at);
         Event::assertNotDispatched(RecoveryCodesRemoved::class);
     }
 

@@ -47,7 +47,8 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
   nothing is counted (see [Recovery Codes](recovery-codes.md)).
 - The proof is stamped with the verification generation read, under the attempt's lock, just before the code is
   checked (`ProofService::generationFor()`), so a generation advanced while the code is checked leaves the proof
-  behind. The proof is recorded once the attempt has committed, so a lockout refusing the attempt records nothing.
+  behind. A factor's proof is recorded once the attempt has committed, and a recovery code's under the lock, so a
+  lockout refusing the attempt records nothing.
   Bound as it was when the code was checked, it is kept only once the storage connection's open transaction, if any,
   commits (`Database\AfterStorageCommit`, the rule events follow too): a verification made inside a transaction the
   application rolls back leaves no proof behind, with its code and count undone. Its success event waits with it and

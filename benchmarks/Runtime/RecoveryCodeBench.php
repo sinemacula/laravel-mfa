@@ -44,6 +44,8 @@ final class RecoveryCodeBench
      * Draw and hash a full set once per benchmark subject lifetime.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     public function __construct()
     {
@@ -91,6 +93,8 @@ final class RecoveryCodeBench
      * Measure drawing a set of the default size.
      *
      * @return void
+     *
+     * @throws \Random\RandomException
      */
     #[Iterations(3)]
     #[Revs(1000)]

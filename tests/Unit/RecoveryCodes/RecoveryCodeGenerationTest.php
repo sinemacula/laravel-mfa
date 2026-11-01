@@ -14,8 +14,10 @@ use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\SecretNotRevealedException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
@@ -281,6 +283,46 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
+     * A replacement whose code insert a model event cancels, without throwing,
+     * throws instead of committing a partial set: the previous set still
+     * redeems, the generation is unchanged and nothing is reported.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACancelledCodeSaveKeepsThePreviousSet(): void
+    {
+        $holder   = $this->signInHolder();
+        $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $inserted = 0;
+
+        RecoveryCode::creating(static function () use (&$inserted): bool {
+            return ++$inserted !== 4;
+        });
+
+        $this->assertReplacementCancelled($holder, $previous, RecoveryCode::class);
+    }
+
+    /**
+     * A replacement whose state row save a model event cancels throws instead
+     * of committing a set its state row does not record.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACancelledStateSaveKeepsThePreviousSet(): void
+    {
+        $holder   = $this->signInHolder();
+        $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
+
+        IdentityState::saving(static fn (): bool => false);
+
+        $this->assertReplacementCancelled($holder, $previous, IdentityState::class);
+    }
+
+    /**
      * Inside the replacement, the earlier codes are already replaced when the
      * first new code is stored, and the new codes are stored under the next
      * generation before it is recorded, so the set a redemption reads under the
@@ -401,6 +443,46 @@ final class RecoveryCodeGenerationTest extends TestCase
         self::assertCount(10, $this->storedCodes($holder));
         self::assertFalse($holder->isMfaEnabled());
         self::assertFalse(Mfa::isSetup());
+    }
+
+    /**
+     * Assert a new set for the holder throws because a save of the given model
+     * was cancelled, and leaves the previous set in place: its codes stored and
+     * usable, the generation unchanged, nothing reported, and a code of it
+     * still redeeming.
+     *
+     * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
+     * @param  list<string>  $previous
+     * @param  class-string  $model
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    private function assertReplacementCancelled(FactorHolder $holder, array $previous, string $model): void
+    {
+        Event::fake([RecoveryCodesGenerated::class]);
+
+        $thrown = null;
+
+        try {
+            $this->recoveryCodes()->generate($holder);
+        } catch (WriteCancelledException $exception) {
+            $thrown = $exception;
+        }
+
+        self::assertInstanceOf(WriteCancelledException::class, $thrown);
+        self::assertStringContainsString($model, $thrown->getMessage());
+
+        Event::assertNotDispatched(RecoveryCodesGenerated::class);
+
+        self::assertCount(10, $this->storedCodes($holder));
+        self::assertTrue($this->storedCodes($holder)->every(static fn (RecoveryCode $row): bool => $row->isUsable()));
+        self::assertSame(1, $this->stateOf($holder)->recovery_codes_generation);
+
+        IdentityState::flushEventListeners();
+        RecoveryCode::flushEventListeners();
+
+        self::assertTrue($this->recoveryCodes()->redeem($holder, $previous[3], Purpose::SIGN_IN)->passed);
     }
 
     /**

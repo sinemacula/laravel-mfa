@@ -95,7 +95,9 @@ dispatches one `VerificationFailed` with its reason and the type `recovery_code`
 `VerificationPassed`, then `RecoveryCodeUsed` with how many codes remain unused, then, when that is at or below
 `recovery_codes.low_count`, `RecoveryCodesLow`, so the application can prompt for a new set. Each is dispatched once
 the change has committed (see [Events](events.md)). The code is used up and the proof handed to the proof store once
-the change commits; a store that refuses the proof throws `ProofRefusedException`, with the code already used.
+the change commits; a store that refuses the proof throws `ProofRefusedException`, with the code already used. A
+sign-in that ends while the code is being checked also throws `ProofRefusedException`, but then the code is left unused
+and nothing is counted: a redemption never passes without its proof.
 
 The unified verification, which will take a recovery code wherever it takes a factor's code and answer with a
 structured result, is not shipped yet; until it is, call `redeemRecoveryCode()` from your own route where you would

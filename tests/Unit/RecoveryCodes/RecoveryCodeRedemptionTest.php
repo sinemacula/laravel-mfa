@@ -21,6 +21,7 @@ use SineMacula\Laravel\Mfa\Events\RecoveryCodesLow;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
 use SineMacula\Laravel\Mfa\Events\VerificationFailed;
 use SineMacula\Laravel\Mfa\Events\VerificationPassed;
+use SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
@@ -38,10 +39,10 @@ use Tests\Unit\Concerns\InteractsWithRecoveryCodes;
 /**
  * Tests for redeeming a recovery code: one attempt, and one event, against the
  * identity's whole unused set, with the same work whichever code matches and
- * whether one does; the submitted code normalised for case, spaces and
- * hyphens; a code used once only, also by two redemptions racing for it; the
- * refusals made before any attempt; the lockouts and counts of the attempt
- * service; and the proof and the events a redemption leaves.
+ * whether one does; the submitted code normalised for case, spaces and hyphens;
+ * a code used once only, also by two redemptions racing for it; the refusals
+ * made before any attempt; the lockouts and counts of the attempt service; and
+ * the proof and the events a redemption leaves.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -662,6 +663,41 @@ final class RecoveryCodeRedemptionTest extends TestCase
         self::assertTrue($redemption->counted);
         self::assertSame(FailureReason::NOT_ACCEPTED, $redemption->reason);
         self::assertSame(0, $hasher->checks());
+        self::assertTrue($this->storedCodes($holder)->every(static fn (RecoveryCode $row): bool => $row->isUsable()));
+    }
+
+    /**
+     * A redemption whose identity's sign-in ends while the code is being
+     * checked has no sign-in to record its proof on: it throws, so the code's
+     * use rolls back, nothing is counted and nothing is reported, rather than
+     * pass without a proof.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testARedemptionWhoseSignInEndsDuringTheCheckRecordsNothing(): void
+    {
+        $holder = $this->signInHolder();
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $hasher = $this->countChecks();
+        $seen   = $this->recordRedemptionEvents();
+
+        $hasher->before(static function (): void {
+            Auth::logout();
+        });
+
+        try {
+            $this->recoveryCodes()->redeem($holder, $code, Purpose::SIGN_IN);
+            self::fail('A redemption whose sign-in ended during the check was expected to be refused.');
+        } catch (ProofRefusedException $exception) {
+            self::assertSame('The identity\'s sign-in ended before the proof was recorded, so the code was not used.', $exception->getMessage());
+        }
+
+        self::assertSame(10, $hasher->checks());
+        self::assertSame([], $seen->getArrayCopy());
+        self::assertSame(0, (int) DB::table('mfa_attempts')->sum('hits'));
+        self::assertSame(0, (int) IdentityState::query()->sum('consecutive_failures'));
         self::assertTrue($this->storedCodes($holder)->every(static fn (RecoveryCode $row): bool => $row->isUsable()));
     }
 

@@ -38,8 +38,11 @@ use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
 use SineMacula\Laravel\Mfa\Events\VerificationFailed;
 use SineMacula\Laravel\Mfa\Events\VerificationPassed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
@@ -120,7 +123,8 @@ final readonly class RecoveryCodeService
      * hashed before the lock is taken; under it, every code of the identity not
      * yet replaced is marked replaced, the new codes are stored under the next
      * generation, and the generation and its time are recorded on the
-     * identity's state row, so all of it commits or none does.
+     * identity's state row, so all of it commits or none does: a save a model
+     * event cancels throws `WriteCancelledException` and rolls it all back.
      * `RecoveryCodesGenerated` is dispatched once it has committed. The codes
      * are returned unformatted, in the order they were drawn.
      *
@@ -129,6 +133,7 @@ final readonly class RecoveryCodeService
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      * @throws \Throwable
      */
     public function generate(MultiFactorAuthenticatable $identity, ?Actor $actor = null): array
@@ -182,19 +187,23 @@ final readonly class RecoveryCodeService
      * only while it is still unused. A malformed code is checked the same way,
      * against a placeholder, and matches nothing.
      *
-     * On success the proof is recorded on the identity's sign-in, stamped with
-     * the verification generation read under the lock, then
-     * `VerificationPassed`, `RecoveryCodeUsed` and, when the set is left at or
-     * below its low count, `RecoveryCodesLow` are dispatched; on failure,
-     * `VerificationFailed`, once. The proof is handed to the store once the
-     * code's use commits; the two are not one atomic step, so a store that
-     * refuses the proof throws `ProofRefusedException` with the code used.
+     * On a match the proof is recorded on the identity's sign-in, under the
+     * lock, stamped with the verification generation read there; a sign-in that
+     * ended while the code was checked leaves nothing to record it on, so
+     * `ProofRefusedException` is thrown, the code's use rolls back and nothing
+     * is counted or reported. Once the attempt commits, `VerificationPassed`,
+     * `RecoveryCodeUsed` and, when the set is left at or below its low count,
+     * `RecoveryCodesLow` are dispatched; on failure, `VerificationFailed`,
+     * once. The proof is handed to the store once the code's use commits; the
+     * two are not one atomic step, so a store that refuses the proof then
+     * throws `ProofRefusedException` with the code used.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\Redemption
      *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException
      * @throws \Throwable
      */
     public function redeem(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] string $code, Purpose $purpose): Redemption
@@ -282,13 +291,15 @@ final readonly class RecoveryCodeService
      * It must run inside the identity's factor state transaction, holding its
      * lock, as part of the change that removes the factor; a call with no
      * transaction open on the storage connection is refused with a
-     * `LogicException`.
+     * `LogicException`, and a save of the state row a model event cancels
+     * throws `WriteCancelledException`, which rolls the removal back with it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @return bool
      *
      * @throws \LogicException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      * @throws \Throwable
      *
      * @imperative
@@ -304,7 +315,7 @@ final readonly class RecoveryCodeService
 
         if ($state->recovery_codes_generated_at !== null) {
             $state->recovery_codes_generated_at = null;
-            $state->save();
+            self::save($state);
         }
 
         if ($existed) {
@@ -393,13 +404,15 @@ final readonly class RecoveryCodeService
      * Under the identity's lock: mark every code of the identity not yet
      * replaced as replaced, store the new codes' hashes under the next
      * generation, and record the generation and its time on the identity's
-     * state row. Returns the new generation.
+     * state row. Returns the new generation. Every save must be made, so a
+     * cancelled one throws and the whole replacement rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @param  list<string>  $hashes
      * @return int
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      */
     private function replace(ProofOwner $owner, array $hashes): int
     {
@@ -422,12 +435,12 @@ final readonly class RecoveryCodeService
             $code->setAttribute($keyColumn, $owner->key);
             $code->setAttribute($model->getGenerationName(), $generation);
             $code->setAttribute($model->getCodeHashName(), $hash);
-            $code->save();
+            self::save($code);
         }
 
         $state->recovery_codes_generation   = $generation;
         $state->recovery_codes_generated_at = $now;
-        $state->save();
+        self::save($state);
 
         return $generation;
     }
@@ -464,8 +477,10 @@ final readonly class RecoveryCodeService
 
     /**
      * Make the attempt: through the attempt service, which refuses it under a
-     * lockout and counts it otherwise, checking the code under the identity's
-     * lock; on success, record the proof.
+     * lockout and counts it otherwise. Under the identity's lock, a sign-in
+     * that ended while the redemption waited (no verification generation to
+     * stamp the proof with) fails it without checking anything; otherwise the
+     * code is checked, and the proof of a match recorded.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $code
@@ -479,14 +494,15 @@ final readonly class RecoveryCodeService
     {
         $normalized = RecoveryCodeNormalizer::normalize($code);
         $checked    = null;
-        $generation = null;
 
         $outcome = $this->attempts->attempt(
             new Attempt($identity, null, $purpose, RequestIp::resolve($this->container), $application),
-            function () use ($identity, $normalized, &$checked, &$generation): bool {
+            function () use ($identity, $normalized, $purpose, &$checked): bool {
 
                 $generation = $this->proofs->generationFor($identity);
-                $checked    = $this->check($identity, $normalized, $generation !== null);
+                $checked    = $generation === null
+                    ? Redemption::failed(FailureReason::NOT_ACCEPTED, 'The identity\'s sign-in ended before the code was checked.')
+                    : $this->check($identity, $normalized, $purpose, $generation);
 
                 return $checked->passed;
             },
@@ -496,39 +512,30 @@ final readonly class RecoveryCodeService
             return Redemption::refused(FailureReason::LOCKED, $outcome->lockout->detail(), $outcome->lockout->until);
         }
 
-        $checked = self::checked($checked);
-
-        if (!$checked->passed || $generation === null) {
-            return $checked;
-        }
-
-        return $checked->withProof($this->proofs->record($identity, $generation, ProofKind::RECOVERY_CODE, self::TYPE, null, null, $purpose));
+        return self::checked($checked);
     }
 
     /**
-     * Under the identity's lock: refuse a redemption whose sign-in or last
-     * confirmed factor went while it waited, without checking anything;
-     * otherwise check the normalised code against every unused code of the
-     * current generation, and mark the match used.
+     * Under the identity's lock: refuse a redemption whose last confirmed
+     * factor went while it waited, without checking anything; otherwise check
+     * the normalised code against every unused code of the current generation,
+     * mark the match used and record its proof, stamped with the generation
+     * given.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?string  $normalized
-     * @param  bool  $signedIn
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @param  int  $generation
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\Redemption
      *
      * @throws \Throwable
      */
-    private function check(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] ?string $normalized, bool $signedIn): Redemption
+    private function check(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] ?string $normalized, Purpose $purpose, int $generation): Redemption
     {
-        $owner       = ProofOwner::of($identity);
-        $interrupted = match (true) {
-            !$signedIn                         => Redemption::failed(FailureReason::NOT_ACCEPTED, 'The identity\'s sign-in ended before the code was checked.'),
-            !$this->hasConfirmedFactor($owner) => Redemption::failed(FailureReason::NO_FACTOR, 'The identity\'s last confirmed factor went before the code was checked.'),
-            default                            => null,
-        };
+        $owner = ProofOwner::of($identity);
 
-        if ($interrupted !== null) {
-            return $interrupted;
+        if (!$this->hasConfirmedFactor($owner)) {
+            return Redemption::failed(FailureReason::NO_FACTOR, 'The identity\'s last confirmed factor went before the code was checked.');
         }
 
         $usable  = $this->usableCodes($owner);
@@ -540,7 +547,27 @@ final readonly class RecoveryCodeService
             return Redemption::failed(FailureReason::INVALID_CODE, 'The code matched no unused recovery code.', $usable->count());
         }
 
-        return Redemption::passed($usable->count() - 1);
+        return Redemption::passed($usable->count() - 1, $this->prove($identity, $generation, $purpose));
+    }
+
+    /**
+     * Record the proof of a redemption on the identity's sign-in, stamped with
+     * the verification generation read under the lock; the store keeps it once
+     * the code's use commits. A sign-in that ended while the code was checked
+     * leaves nothing to record it on: `ProofRefusedException` is thrown then,
+     * so the code's use rolls back and nothing is counted or reported.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  int  $generation
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return \SineMacula\Laravel\Mfa\Proofs\Proof
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException
+     */
+    private function prove(MultiFactorAuthenticatable $identity, int $generation, Purpose $purpose): Proof
+    {
+        return $this->proofs->record($identity, $generation, ProofKind::RECOVERY_CODE, self::TYPE, null, null, $purpose)
+            ?? throw new ProofRefusedException('The identity\'s sign-in ended before the proof was recorded, so the code was not used.');
     }
 
     /**
@@ -555,6 +582,22 @@ final readonly class RecoveryCodeService
     private static function checked(?Redemption $checked): Redemption
     {
         return $checked ?? throw new \LogicException('An attempt that was not refused checks the code.');
+    }
+
+    /**
+     * Save the model, and throw when a model event cancels the save, so the
+     * change it is part of rolls back rather than commit without it.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     */
+    private static function save(Model $model): void
+    {
+        if (!$model->save()) {
+            throw new WriteCancelledException(sprintf('A model event cancelled the save of a [%s], so the change it is part of was rolled back.', $model::class));
+        }
     }
 
     /**
