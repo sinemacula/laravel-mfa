@@ -40,8 +40,9 @@ whatever UI you like.
 - **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; backup codes hash to SHA-256 before
   persistence; email and SMS codes are stored only as keyed hashes bound to their factor, session, application and
   purpose, and the package's email code message encrypts its payload whenever it is queued.
-- **Per-factor lockouts**: `attempts.factor_limit` failures in a row lock a factor of any type for
-  `attempts.lockout_seconds`.
+- **Attempt caps and lockouts**: failures are counted per factor, per identity and per IP address in the database, with
+  no cache; too many lock the factor, the identity or the address out before the driver is called, and a factor that
+  reaches the failure ceiling is disabled. See [Attempts and lockouts](docs/guides/attempts.md).
 - **Zero ecosystem coupling**: depends only on Laravel and the standard `Authenticatable` contract.
 
 ## Installation
@@ -57,14 +58,6 @@ php artisan vendor:publish --tag=mfa-config
 php artisan vendor:publish --tag=mfa-migrations
 php artisan migrate
 ```
-
-For TOTP support, install the suggested dependency:
-
-```bash
-composer require pragmarx/google2fa
-```
-
-The TOTP driver checks for this package at runtime and raises a clear error if it is missing.
 
 ## Configuration
 
@@ -201,32 +194,44 @@ $this->renderable(function (MfaRequiredException $e) {
 
 ### TOTP enrolment
 
-Generate a shared secret and a provisioning URI, render the URI as a QR code, then hand a fresh `Factor` to
-`Mfa::enroll()`:
+Start the enrolment on a fresh `Factor`, which stamps the TOTP parameters it will keep (`mfa.totp`'s algorithm,
+digits and period) and returns a new secret. Store the secret on the factor, render its provisioning URI as a QR code,
+confirm the first code the person's authenticator app shows, then hand the factor to `Mfa::enroll()`:
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
-$driver = Mfa::driver('totp');
-$secret = $driver->startEnrollment(new Factor);
-$uri    = $driver->provisioningUri(
+$factor        = new Factor;
+$factor->type  = 'totp';
+$factor->label = 'Authenticator app';
+
+$driver         = Mfa::driver('totp');
+$factor->secret = $driver->startEnrollment($factor);
+
+$uri = $driver->provisioningUri(
+    factor: $factor,
     issuer: config('app.name'),
     accountName: $user->email,
-    secret: $secret,
+    secret: $factor->secret,
 );
 
-// Render $uri as a QR code with your library of choice.
-
-$factor         = new Factor;
-$factor->type   = 'totp';
-$factor->label  = 'Authenticator app';
-$factor->secret = $secret;
+// Render $uri as a QR code with your library of choice, then check the
+// first code the app shows. Its time step is recorded, so the same code
+// cannot be used again. Enrol the factor only once the code is confirmed.
+if (! $driver->confirm($factor, $request->string('code')->toString())) {
+    return back()->withErrors(['code' => 'The code is not valid. Try the next one your app shows.']);
+}
 
 // `Mfa::enroll()` stamps the identity's morph columns itself —
 // callers do not (and should not) populate them.
 Mfa::enroll($factor);
 ```
+
+The package computes TOTP codes itself (RFC 6238) and needs no other dependency. Each code is checked against the
+application's `totp_window` steps either side of now (`mfa.totp.window` when it sets none), and each time step is
+accepted once per factor, also when two requests race with the same code. See
+[Configuration](docs/guides/configuration.md#totp) and [the TOTP design note](docs/design/totp.md).
 
 ### Backup codes
 
@@ -312,9 +317,9 @@ provider's `register()` / `boot()` rather than mid-request.
 
 ### Rate limiting
 
-The per-factor lockout (`attempts.factor_limit` + `attempts.lockout_seconds`) protects an individual factor from runaway
-attempts on the same code, but does not by itself defend against distributed brute force across many factors
-or DoS against the lockout window. Layer Laravel's built-in `RateLimiter` on the verify endpoint:
+The package counts failures per factor, per identity and per IP address and locks each out past its cap (see
+[Attempts and lockouts](docs/guides/attempts.md)). Those caps bound guessing at a factor; they do not bound load on the
+endpoint itself. Layer Laravel's built-in `RateLimiter` on the verify endpoint as well:
 
 ```php
 use Illuminate\Cache\RateLimiting\Limit;

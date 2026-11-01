@@ -29,6 +29,19 @@ A custom factor or recovery code model lives on the storage connection with the 
 [Storage](configuration.md#storage)): one on another connection is refused when the package boots. The recovery code
 model is set with `mfa.recovery_codes.model`. Identity models are described in [Identity models](identity-models.md).
 
+A custom factor model that implements `Contracts\EloquentFactor` itself, rather than through `Concerns\ActsAsFactor`,
+must make `storeAcceptedStep()` a compare-and-set on its stored row: record the TOTP time step only when it is later
+than the stored one, in one atomic statement, and report whether it did. The TOTP driver accepts a code only when the
+step is recorded, so each time step is used once per factor however many requests race with it (see
+[the TOTP design note](../design/totp.md)). A factor implementing only `Contracts\Factor` has nowhere to record a step,
+so the TOTP driver accepts no code for it.
+
+`TotpDriver::startEnrollment()` stamps the TOTP parameters on an Eloquent factor itself. A factor of another kind is
+given them by its caller: `TotpDriver::parameters()` returns a `Drivers\TotpParameters` whose public `algorithm`
+(`sha1`, `sha256` or `sha512`), `digits` (6 to 8) and `period` (15 to 120 seconds) are what the factor's
+`getTotpAlgorithm()`, `getTotpDigits()` and `getTotpPeriod()` must return from then on, whatever the configuration
+later says.
+
 ## Factor drivers
 
 A driver is one factor type behind `Contracts\FactorDriver`, registered under the type's name:
@@ -103,7 +116,7 @@ registers it with the container, and the classes only it uses:
 | `Enrollment`    | `enroll()` and `EnrollmentSettings`                                                                 |
 | `Lifecycle`     | `disable()`, `ForgetIdentity` and `LifecycleSettings`                                               |
 | `RecoveryCodes` | Backup codes: `issueBackupCodes()`, `BackupCodeDriver` and `RecoveryCodeSettings`                   |
-| `Attempts`      | `AttemptSettings`, the attempt caps and lockouts                                                    |
+| `Attempts`      | `AttemptService`: attempts counted, lockouts applied and lifted, `AttemptSettings`                  |
 | `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
 | `Http`          | The `mfa` and `mfa.skip` middleware, `RequireMfa` and `SkipMfa`                                     |
 | `Testing`       | Test doubles for applications: `FakeSmsSender` and `FakeEmailSender`                                |

@@ -18,8 +18,8 @@ factors starts with.
   `totp_algorithm`, `totp_digits` and `totp_period` stored with the factor, `last_accepted_step`, `status` (`pending`
   until confirmed, by the table's default and the model's), `preferred`, the durable `consecutive_failures` and
   `disabled_at` of the failure ceiling, the `application` it was enrolled through, `confirmed_at` and `last_used_at`.
-  The `attempts` and `locked_until` counters, `last_attempted_at` and `verified_at` stay until the attempt throttles
-  and proof store replace their readers. A delivered code is never on the factor: it lives in `mfa_codes`.
+  `verified_at` stays until the proof store replaces its readers. A delivered code is never on the factor: it lives in
+  `mfa_codes`.
 - `mfa_identity_states`, one row per owner and the lock of every serialised change: `verification_generation`,
   `reenrollment_required`, the identity's `consecutive_failures` and `locked_until`, and `recovery_codes_generation`
   and `recovery_codes_generated_at`.
@@ -32,7 +32,9 @@ factors starts with.
   `expires_at` and `consumed_at` (see [Delivered Codes](delivered-codes.md)).
 - `mfa_recovery_codes`: owner, the salted `code_hash`, the set's `generation`, `used_at` and `replaced_at`.
 - `mfa_attempts`, the temporary throttles: `key` (a keyed hash of the scope and subject), `scope`, `hits` and
-  `window_ends_at`.
+  `window_ends_at`. An identity's and an IP address's rows count failures within a window; a factor's row records the
+  lockout its failures in a row applied, ending when its window does (see [Attempts and
+  Lockout](attempts-and-lockout.md)).
 - `mfa_passkey_associations`: the `factor_id` (unique), owner, and the credential by the SHA-256 `credential_id_hash`
   of its id (unique per owner) with the `credential_id` in full.
 - No table holds a code, a recovery code or a grant in plaintext; the TOTP secret is encrypted by the model's cast.

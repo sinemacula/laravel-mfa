@@ -4,19 +4,22 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Verification;
 
-use Carbon\Carbon;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Manager;
-use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
+use SineMacula\Laravel\Mfa\Attempts\Attempt;
+use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
@@ -41,7 +44,9 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  * application, the session and the purpose: the application a bound
  * `ApplicationResolver` names for the request, otherwise the default guard's
  * name, and the Laravel session the request runs in. Every other factor goes
- * through its driver.
+ * through its driver. Every verification is an attempt made through
+ * `Attempts\AttemptService`, so it is counted, and refused while a lockout
+ * applies, whichever way its code is checked.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -114,10 +119,11 @@ final readonly class VerificationService
         $resolved = $this->drivers->resolve($registry, $driver);
         $result   = null;
 
-        // A delivered code is sent bound to this session and purpose, and
-        // neither resets a failure count nor lifts a lockout. TOTP and backup
-        // codes have no per-challenge secret to mint, so their
-        // `issueChallenge()` is a no-op.
+        // A delivered code is sent bound to this session and purpose. Sending a
+        // code resets no count and lifts no lockout: only a success of the
+        // factor resets its failures in a row, so a resend cannot be used to
+        // wipe a lockout. TOTP and backup codes have no per-challenge secret to
+        // mint, so their `issueChallenge()` is a no-op.
         if ($resolved instanceof CodeDeliveryDriver) {
             $result = $this->container->make(CodeService::class)->send($identity, $factor, $this->binding($identity, $purpose), $resolved);
         } else {
@@ -136,21 +142,31 @@ final readonly class VerificationService
      * Verify a submitted code against the given factor through the named
      * driver, for the purpose given.
      *
-     * - Rejects the attempt when the factor is locked.
-     * - Checks the code: through the code service, against the code sent for
-     *   this session and the purpose, for a driver that delivers codes;
-     *   through the driver's verification logic otherwise.
-     * - On success: resets attempts, stamps the factor's verified-at, records
-     *   the identity-level verification through the bound store, dispatches
-     *   `MfaVerified`.
-     * - On failure: increments attempts, applies a lockout once the configured
-     *   per-driver threshold is reached, dispatches `MfaVerificationFailed`
-     *   with a machine-readable reason.
+     * - The attempt is made through the attempt service, charged to the current
+     *   identity, the factor and the request's IP address, for the purpose:
+     *   refused without checking the code while a lockout applies, otherwise
+     *   counted with its outcome under the identity's factor state lock.
+     * - The code is checked against the factor as stored under that lock, not
+     *   the instance passed in, so a secret replaced in the meantime is the one
+     *   checked, and a factor removed in the meantime is reported as not found
+     *   without checking anything: through the code service, against the code
+     *   sent for this session and the purpose, for a driver that delivers
+     *   codes; through the driver's verification logic otherwise.
+     * - On success, inside the same transaction: a delivered code is used up
+     *   and the factor's verified-at stamped, so they commit with the count and
+     *   two requests with the same code cannot both pass.
+     * - Once the code is checked, the instance passed in is brought up to date
+     *   with the stored factor. On success the identity-level verification is
+     *   recorded through the bound store and `MfaVerified` dispatched; on
+     *   failure `MfaVerificationFailed` is dispatched with a machine-readable
+     *   reason, `locked` for an attempt a lockout refused and `not_found` for a
+     *   factor removed in the meantime.
      *
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account MFA-bypass
-     * primitive. Throws `FactorDriverMismatchException` when the requested
-     * driver name does not match the factor's own `getType()`.
+     * primitive, before anything is counted. Throws
+     * `FactorDriverMismatchException` when the requested driver name does not
+     * match the factor's own `getType()`.
      *
      * The driver is resolved from the given registry: the manager the
      * verification was called on.
@@ -165,6 +181,7 @@ final readonly class VerificationService
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
+     * @throws \Throwable
      */
     public function verify(Manager $registry, string $driver, Factor $factor, #[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
     {
@@ -177,67 +194,90 @@ final readonly class VerificationService
         $this->drivers->assertMatchesFactor($driver, $factor);
         FactorOwnership::assert($factor, $identity);
 
-        $events = $this->container->make(Dispatcher::class);
+        $events   = $this->container->make(Dispatcher::class);
+        $resolved = $this->drivers->resolve($registry, $driver);
+        $binding  = $resolved instanceof CodeDeliveryDriver ? $this->binding($identity, $purpose) : null;
+        $verified = $factor;
+        $check    = null;
 
-        if ($factor->isLocked()) {
-            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, FailureReason::LOCKED, 'The factor is locked after too many failed attempts.'));
+        // The current identity's own session makes the attempt, so the identity
+        // is charged for it.
+        $outcome = $this->container->make(AttemptService::class)->attempt(
+            new Attempt($identity, $factor, $purpose, $this->ip()),
+            function (?Factor $stored) use ($resolved, $binding, $code, &$verified, &$check): bool {
+
+                $verified = $stored ?? $verified;
+
+                return $this->isAccepted($resolved, $binding, $verified, $code, $check);
+            },
+        );
+
+        if ($outcome->lockout !== null || $outcome->isNotFound()) {
+
+            [$reason, $detail] = $outcome->lockout !== null
+                ? [FailureReason::LOCKED, $outcome->lockout->detail()]
+                : [FailureReason::NOT_FOUND, 'The factor is no longer among the identity\'s factors.'];
+
+            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason, $detail));
 
             return false;
         }
 
-        $resolved = $this->drivers->resolve($registry, $driver);
-        $check    = null;
-
-        if ($resolved instanceof CodeDeliveryDriver) {
-            $check = $this->container->make(CodeService::class)->check($factor, $this->binding($identity, $purpose), $code);
-            $valid = $check === CodeCheck::ACCEPTED;
-        } else {
-            $valid = $resolved->verify($factor, $code);
+        if ($factor instanceof Model && $verified instanceof Model && $verified !== $factor) {
+            $factor->setRawAttributes($verified->getAttributes(), true);
         }
 
-        if ($factor instanceof EloquentFactor) {
-            $this->applyVerificationOutcome($factor, $valid);
-        }
+        $this->finalizeVerification($identity, $factor, $driver, $outcome->passed, $check, $events);
 
-        $this->finalizeVerification($identity, $factor, $driver, $valid, $check, $events);
-
-        return $valid;
+        return $outcome->passed;
     }
 
     /**
-     * Persist the post-driver verification outcome on the factor row.
+     * Check the code against the factor as stored, and record a success on it:
+     * through the code service, under the binding, for a driver that delivers
+     * codes, recording what the check found in `$check`; through the driver
+     * otherwise.
      *
-     * Successful verification stamps `verified_at` and resets attempts;
-     * failure increments the attempt counter and, once it reaches
-     * `mfa.attempts.factor_limit`, locks the factor for
-     * `mfa.attempts.lockout_seconds`. Non-Eloquent factors carry no row to
-     * mutate and skip both branches before this method is even called.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
-     * @param  bool  $valid
-     * @return void
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
+     * @param  ?\SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $code
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\CodeCheck  $check
+     * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
      */
-    private function applyVerificationOutcome(EloquentFactor $factor, bool $valid): void
+    private function isAccepted(FactorDriver $driver, ?ProofBinding $binding, Factor $factor, #[\SensitiveParameter] string $code, ?CodeCheck &$check): bool
     {
-        if ($valid) {
+        if ($binding !== null) {
+            $check = $this->container->make(CodeService::class)->check($factor, $binding, $code);
+        }
+
+        $accepted = $check === null ? $driver->verify($factor, $code) : $check === CodeCheck::ACCEPTED;
+
+        if ($accepted && $factor instanceof EloquentFactor) {
             $factor->recordVerification();
             $factor->persist();
-
-            return;
         }
 
-        $factor->recordAttempt();
+        return $accepted;
+    }
 
-        $attempts = new AttemptSettings($this->container->make('config'));
+    /**
+     * The IP address of the request being served, as resolved through the
+     * application's trusted proxies, or `null` outside a request.
+     *
+     * @return ?string
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function ip(): ?string
+    {
+        $request = $this->container->bound('request') ? $this->container->make('request') : null;
 
-        if ($factor->getAttempts() >= $attempts->factorLimit()) {
-            $factor->applyLockout(Carbon::now()->addSeconds($attempts->lockoutSeconds()));
-        }
-
-        $factor->persist();
+        return $request instanceof Request ? $request->ip() : null;
     }
 
     /**

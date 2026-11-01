@@ -5,10 +5,10 @@ declare(strict_types = 1);
 namespace Tests\Feature\Concerns;
 
 use Illuminate\Http\Request;
-use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
@@ -59,10 +59,6 @@ trait InteractsWithRequireMfaMiddleware
      *
      * @param  string  $email
      * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     protected function enrollTotp(string $email = 'totp-mw@example.test'): array
     {
@@ -72,17 +68,13 @@ trait InteractsWithRequireMfaMiddleware
         ]);
         $this->actingAs($user);
 
-        $google = new Google2FA;
-        $secret = $google->generateSecretKey();
-
         /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
+            ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => $secret,
         ]);
 
-        return [$user, $factor, $google->getCurrentOtp($secret)];
+        return [$user, $factor, AuthenticatorApp::code($factor)];
     }
 }

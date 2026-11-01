@@ -289,9 +289,6 @@ final class FactorTest extends TestCase
             'confirmed_at',
             'last_used_at',
             'verified_at',
-            'attempts',
-            'locked_until',
-            'last_attempted_at',
         ], (new Factor)->getFillable());
     }
 

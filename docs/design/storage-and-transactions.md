@@ -58,6 +58,9 @@ cannot interleave.
   with it and must say so.
 - Backup codes already run on it: `issueBackupCodes()` replaces the batch inside the transaction, and the backup-code
   driver consumes a code inside the owner's transaction, comparing it again as stored under the lock.
+- Every verification runs on it too: `Attempts\AttemptService::attempt()` reads the lockouts, runs the driver and counts
+  the outcome in the identity's transaction, so a driver's own transaction nests in it (see
+  [Attempts and Lockout](attempts-and-lockout.md)).
 
 ## Success Path
 

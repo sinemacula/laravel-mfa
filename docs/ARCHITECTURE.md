@@ -49,7 +49,9 @@ Historical record of the architectural calls made during the 1.0 cycle.
   `OrganisationMfaPolicy` at its layer. The MFA package never learns the word "organisation".
 - **D2 — Single `mfa_factors` table.** Columns include `attempts`, `locked_until`,
   `last_attempted_at`, `verified_at`. No separate `mfa_attempts` log — audit goes through events,
-  owned by `laravel-audit-log`.
+  owned by `laravel-audit-log`. *Superseded:* failures are now counted durably on the factor and
+  identity state rows, with temporary throttles in `mfa_attempts` (see
+  [Attempts and Lockout](design/attempts-and-lockout.md)); audit still goes through events.
 - **D3 — Challenge split between manager and driver.** The verification service behind
   `MfaManager::challenge()` orchestrates (events, rate-limiting hooks, logging).
   `FactorDriver::issueChallenge(Factor): void` implements per-factor-type transport (no-op for TOTP,

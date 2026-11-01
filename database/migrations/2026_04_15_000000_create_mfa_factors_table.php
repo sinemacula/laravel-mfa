@@ -88,12 +88,7 @@ return new class extends Migration {
             $blueprint->timestamp('confirmed_at')->nullable();
             $blueprint->timestamp('last_used_at')->nullable();
 
-            // The per-factor attempt counter and lockout, until the attempt
-            // throttles replace them, and when verification was last attempted
-            // and passed.
-            $blueprint->unsignedInteger('attempts')->default(0);
-            $blueprint->timestamp('locked_until')->nullable();
-            $blueprint->timestamp('last_attempted_at')->nullable();
+            // When verification last passed, until the proof store replaces it.
             $blueprint->timestamp('verified_at')->nullable();
 
             $blueprint->timestamps();

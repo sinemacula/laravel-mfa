@@ -45,10 +45,13 @@ whose events carry summaries and a scalar context and are dispatched after the c
 - `challenge()` resolves the identity, asserts factor ownership, calls `FactorDriver::issueChallenge($factor)`, or
   sends a code bound to the session and the purpose through the code service, then dispatches
   `MfaChallengeIssued($identity, $factor, $driver)`.
-- `verify()` resolves the identity, asserts ownership, rejects if `$factor->isLocked()` with a `locked`
-  failure, calls `FactorDriver::verify($factor, $code)`, persists the success/failure side effects on the factor row,
-  writes through `MfaVerificationStore::markVerified()` on success, then dispatches either `MfaVerified` or
-  `MfaVerificationFailed` last.
+- `verify()` resolves the identity, asserts ownership, and makes the attempt through `AttemptService::attempt()`, which
+  refuses it while a lockout applies and otherwise, under the identity's factor state lock, checks the code against the
+  factor as stored (through the code service, against the code sent for the session and the purpose, for a driver that
+  delivers codes; through `FactorDriver::verify()` otherwise), records a success on that factor (`verified_at`,
+  `last_used_at`, the code used up) and counts the outcome, all in one transaction. It then writes through
+  `MfaVerificationStore::markVerified()` on success, and dispatches either `MfaVerified` or `MfaVerificationFailed`
+  last.
 - `enroll()` resolves the identity, stamps ownership onto brand-new Eloquent rows (or asserts ownership on pre-existing
   rows), persists, invalidates the setup cache, then dispatches `MfaFactorEnrolled($identity, $factor, $driver)`.
 - `disable()` resolves the identity, asserts ownership, deletes the row for Eloquent factors, invalidates the setup
@@ -58,8 +61,10 @@ whose events carry summaries and a scalar context and are dispatched after the c
 
 ## Failure / Edge Cases
 
-- `verify()` on a locked factor emits `MfaVerificationFailed` with `locked` and returns `false` without
-  calling the driver. The attempt counter is not incremented because the attempt never reached the driver.
+- `verify()` refused by a lockout (the factor's, the identity's or the IP address's, or a factor disabled at the
+  failure ceiling) emits `MfaVerificationFailed` with `locked` and returns `false` without checking the code. Nothing
+  is counted because the attempt never reached the check (see [Attempts and Lockout](attempts-and-lockout.md)). A
+  factor no longer among the identity's own when the attempt is made emits `not_found`, also without the check.
 - On a verification failure, the verification service classifies the reason: for a delivered code, by what its check
   found (`invalid_code` for a wrong code, `replayed` for a used one, `expired` for an expired code, a challenge out of
   attempts or none at all, each with its own detail); for any other factor, `not_confirmed` when it has no secret and
@@ -67,16 +72,17 @@ whose events carry summaries and a scalar context and are dispatched after the c
 - Unsupported identities short-circuit to `false` without dispatching `MfaVerificationFailed`. Unresolved drivers throw
   from `DriverResolver::resolve()` before any event is dispatched. Those branches are deliberately outside the event
   taxonomy.
-- Non-Eloquent factors participate in the lifecycle events but carry no row to mutate. `applyVerificationOutcome()`
-  is skipped for them; attempt counters and lockouts only exist on factors whose implementation persists them.
+- Non-Eloquent factors participate in the lifecycle events but carry no row to mutate: they keep no failures in a row,
+  lockout or ceiling of their own, and their attempts are counted against the identity and the IP address, whose
+  failure ceiling refuses them.
 - Backup-code rotation inside `issueBackupCodes()` runs in the identity's factor state transaction on the storage
   connection, so the "atomic replace + N events" guarantee holds wherever `mfa.storage.connection` puts the tables, and
   a listener that throws rolls the whole rotation back.
 
 ## Implementation Anchors
 
-- `src/Verification/VerificationService.php`: `challenge()`, `verify()`, `applyVerificationOutcome()`,
-  `finalizeVerification()`.
+- `src/Verification/VerificationService.php`: `challenge()`, `verify()`, `finalizeVerification()`.
+- `src/Attempts/AttemptService.php`: `attempt()`, which refuses a locked attempt and counts the outcome.
 - `src/Enrollment/EnrollmentService.php`: `enroll()`. `src/Lifecycle/LifecycleService.php`: `disable()`.
 - `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`, `rotateBackupCodeBatch()`.
 - `src/Drivers/DriverResolver.php`: `resolve()`, `assertMatchesFactor()`. `src/Factors/FactorOwnership.php`:

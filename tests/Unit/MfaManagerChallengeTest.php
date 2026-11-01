@@ -44,8 +44,7 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
 
     /**
      * The manager should hand the Eloquent factor through to the driver
-     * unchanged, and never reset its attempt state on its own behalf: a
-     * challenge, whatever its driver, never lifts a lockout.
+     * unchanged: sending a code resets no count, whatever the driver.
      *
      * @return void
      *
@@ -62,7 +61,7 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
             'authenticatable_id'   => (string) $user->id,
             'type'                 => 'email',
             'destination'          => 'c1@example.com',
-            'attempts'             => 4,
+            'consecutive_failures' => 4,
         ]);
 
         $driver = \Mockery::mock(FactorDriver::class);
@@ -79,8 +78,8 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
         $factor->refresh();
 
         // The mock driver is a no-op; the manager must NOT have wiped the
-        // attempt counter on its own behalf.
-        self::assertSame(4, $factor->getAttempts());
+        // factor's failures in a row on its own behalf.
+        self::assertSame(4, $factor->getConsecutiveFailures());
 
         Event::assertDispatched(
             MfaChallengeIssued::class,

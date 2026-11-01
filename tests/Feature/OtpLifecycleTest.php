@@ -9,6 +9,7 @@ use Illuminate\Contracts\Session\Session;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\DeliveredCodes;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
@@ -34,8 +35,8 @@ use Tests\TestCase;
  * End-to-end lifecycle of the delivered codes (email and SMS) through the
  * manager: a code is delivered through the bound sender and accepted once, for
  * its own session, purpose and factor only; a resend replaces it after the
- * cooldown; the sends are capped across sessions; and nothing is sent without a
- * sender bound.
+ * cooldown, and resets no failure count or lockout; the sends are capped across
+ * sessions; and nothing is sent without a sender bound.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -264,6 +265,51 @@ final class OtpLifecycleTest extends TestCase
         }
 
         self::assertTrue(Mfa::verify('email', $factor, $second));
+    }
+
+    /**
+     * Sending a fresh code resets nothing: the factor's failures in a row and
+     * its lockout survive the send, so a resend is never a free unlock, and the
+     * code it sends is refused until the lockout ends.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function testEmailChallengeResetsNothing(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 3);
+
+        $sender = FakeEmailSender::fake($this->container());
+        $factor = $this->enroll('email', self::ADDRESS);
+        $user   = TestUser::query()->sole();
+
+        self::assertFalse(Mfa::verify('email', $factor, '000000'));
+        self::assertFalse(Mfa::verify('email', $factor, '000000'));
+        self::assertFalse(Mfa::verify('email', $factor, '000000'));
+
+        $attempts = $this->container()->make(AttemptService::class);
+        $before   = $attempts->lockout($user, $factor);
+
+        self::assertNotNull($before);
+        self::assertTrue(Mfa::challenge('email', $factor)?->wasSent());
+
+        $factor->refresh();
+
+        $after = $attempts->lockout($user, $factor);
+        $code  = $sender->lastCodeTo(self::ADDRESS);
+
+        self::assertSame(3, $factor->getConsecutiveFailures());
+        self::assertNotNull($after);
+        self::assertEquals($before->until, $after->until);
+        self::assertNotNull($code);
+
+        Event::fake([MfaVerificationFailed::class]);
+
+        self::assertFalse(Mfa::verify('email', $factor, $code));
+
+        Event::assertDispatched(MfaVerificationFailed::class, static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::LOCKED);
     }
 
     /**

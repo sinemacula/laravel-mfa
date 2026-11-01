@@ -21,9 +21,10 @@ use SineMacula\Laravel\Mfa\MfaManager;
  * `Mfa::extend('totp', ...)` from their own service provider, or from a
  * container extender or resolving callback on `mfa`, since Laravel's `Manager`
  * resolves the most recent registration. Each factory reads only the settings
- * its driver needs: the TOTP window from `mfa.totp`, and the message from
- * `mfa.codes`, with the application's bound sender. The code's length and
- * lifetime belong to the code service, not the drivers.
+ * its driver needs: the TOTP settings from `mfa.totp` and the application's
+ * `totp_window`, and the message from `mfa.codes`, with the application's bound
+ * sender. The code's length and lifetime belong to the code service, not the
+ * drivers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -64,22 +65,23 @@ final class DriverBindings
         // Laravel's `Manager::extend()` rebinds each closure to the manager, so
         // the factories are named by class rather than through `self::`, which
         // would then resolve to `MfaManager`.
-        $manager->extend('totp', fn (): TotpDriver => DriverBindings::totp($config));
+        $manager->extend('totp', fn (): TotpDriver => DriverBindings::totp($app, $config));
         $manager->extend('email', fn (): EmailDriver => DriverBindings::email($app, $config));
         $manager->extend('sms', fn (): SmsDriver => DriverBindings::sms($app, $config));
     }
 
     /**
-     * Build the TOTP driver with the window in `mfa.totp`.
+     * Build the TOTP driver over the settings in `mfa.totp`, which it reads on
+     * every call, and the container it reads the current request's application
+     * from.
      *
+     * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
-     *
-     * @throws \InvalidArgumentException
      */
-    public static function totp(Repository $config): TotpDriver
+    public static function totp(Application $app, Repository $config): TotpDriver
     {
-        return new TotpDriver(window: (new TotpSettings($config))->window());
+        return new TotpDriver(new TotpSettings($config), $app);
     }
 
     /**

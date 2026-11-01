@@ -71,11 +71,10 @@ final class DriverBindingsTest extends TestCase
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \ReflectionException
      */
     public function testExtendRegistersDriversThatReadTheConfig(): void
     {
-        config()->set('mfa.totp.window', 2);
+        config()->set('mfa.totp.digits', 8);
         config()->set('mfa.codes.mailable', CustomMfaCodeMessage::class);
         config()->set('mfa.codes.sms_message', 'Code :code');
 
@@ -83,10 +82,12 @@ final class DriverBindingsTest extends TestCase
 
         DriverBindings::extend($manager, $this->app());
 
+        $totp  = $manager->driver('totp');
         $email = $manager->driver('email');
         $sms   = $manager->driver('sms');
 
-        self::assertSame(2, $this->window($manager->driver('totp')));
+        self::assertInstanceOf(TotpDriver::class, $totp);
+        self::assertSame(8, $totp->parameters()->digits);
         self::assertInstanceOf(EmailDriver::class, $email);
         self::assertSame(CustomMfaCodeMessage::class, $email->getMailable());
         self::assertInstanceOf(SmsDriver::class, $sms);
@@ -94,17 +95,24 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * The TOTP factory defaults the window to one step and reads a configured
-     * one.
+     * The TOTP factory builds a driver over the settings in `mfa.totp`, with
+     * their defaults when none is set, read as they change.
      *
      * @return void
-     *
-     * @throws \ReflectionException
      */
-    public function testTotpFactoryReadsTheWindow(): void
+    public function testTotpFactoryReadsTheTotpSettings(): void
     {
-        self::assertSame(1, $this->window(DriverBindings::totp(new Repository)));
-        self::assertSame(3, $this->window(DriverBindings::totp(new Repository(['mfa' => ['totp' => ['window' => 3]]]))));
+        $defaults = DriverBindings::totp($this->app(), new Repository)->parameters();
+
+        self::assertSame(['sha1', 6, 30], [$defaults->algorithm, $defaults->digits, $defaults->period]);
+
+        $config = new Repository(['mfa' => ['totp' => ['algorithm' => 'sha256']]]);
+        $driver = DriverBindings::totp($this->app(), $config);
+
+        $config->set('mfa.totp.period', 60);
+
+        self::assertSame('sha256', $driver->parameters()->algorithm);
+        self::assertSame(60, $driver->parameters()->period);
     }
 
     /**
@@ -189,20 +197,5 @@ final class DriverBindingsTest extends TestCase
     private function app(): Application
     {
         return $this->container();
-    }
-
-    /**
-     * Read the TOTP driver's window, which it does not expose.
-     *
-     * @param  mixed  $driver
-     * @return mixed
-     *
-     * @throws \ReflectionException
-     */
-    private function window(mixed $driver): mixed
-    {
-        self::assertInstanceOf(TotpDriver::class, $driver);
-
-        return (new \ReflectionProperty($driver, 'window'))->getValue($driver);
     }
 }

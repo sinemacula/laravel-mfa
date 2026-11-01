@@ -44,9 +44,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property ?\Carbon\CarbonInterface $confirmed_at
  * @property ?\Carbon\CarbonInterface $last_used_at
  * @property ?\Carbon\CarbonInterface $verified_at
- * @property int $attempts
- * @property ?\Carbon\CarbonInterface $locked_until
- * @property ?\Carbon\CarbonInterface $last_attempted_at
  *
  * @inheritable
  */
@@ -75,9 +72,6 @@ class Factor extends Model implements EloquentFactor
         'confirmed_at',
         'last_used_at',
         'verified_at',
-        'attempts',
-        'locked_until',
-        'last_attempted_at',
     ];
 
     /** @var list<string> The attributes that should be hidden for serialisation. */
@@ -158,9 +152,6 @@ class Factor extends Model implements EloquentFactor
             'confirmed_at'         => 'datetime',
             'last_used_at'         => 'datetime',
             'verified_at'          => 'datetime',
-            'locked_until'         => 'datetime',
-            'last_attempted_at'    => 'datetime',
-            'attempts'             => 'integer',
         ];
     }
 }
