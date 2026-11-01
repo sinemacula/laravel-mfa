@@ -13,7 +13,7 @@ Concrete classes in this package are `final` except `MfaManager`, the shipped `M
 | Enforcement policy         | Implement `Contracts\MfaPolicy` and bind it in the container                           |
 | Verification store         | Implement `Contracts\MfaVerificationStore` and bind it in the container                |
 | SMS delivery               | Implement `Contracts\SmsGateway` and bind it in the container                          |
-| Email code message         | Extend `Codes\MfaCodeMessage` and set `mfa.drivers.email.mailable`                     |
+| Email code message         | Extend `Codes\MfaCodeMessage` and set `mfa.codes.mailable`                             |
 | Custom factor model        | Extend `Models\Factor` or implement `Contracts\EloquentFactor`; set `mfa.factor.model` |
 
 Every class name above is relative to `SineMacula\Laravel\Mfa`. Bind your own implementations from a service provider: a
@@ -25,6 +25,11 @@ callback on `mfa`, since the shipped drivers are registered before either runs. 
 A custom factor model lives on the storage connection with the package's other tables (see
 [Storage](configuration.md#storage)): one on another connection is refused when the package boots.
 
+Bind your implementations in a service provider's `register()` or `boot()`: the package checks its configuration once
+every provider has booted (see [Checking the configuration](configuration.md#checking-the-configuration)), and refuses an
+application that enables `sms` while the default `NullSmsGateway` is still bound, or that neither declares its first
+factor nor has a `Contracts\FirstFactorResolver` bound.
+
 In tests, bind `Testing\FakeSmsGateway` as the `SmsGateway` to capture the messages the SMS driver sends instead of
 delivering them.
 
@@ -33,27 +38,32 @@ delivering them.
 The package is organised by capability. Each capability's namespace holds its service, the `*Bindings` class that
 registers it with the container, and the classes only it uses:
 
-| Namespace       | Holds                                                                               |
-|-----------------|-------------------------------------------------------------------------------------|
-| `Factors`       | Factor reads (`isSetup()`, `getFactors()`), their cache, ownership, `FactorSummary` |
-| `Drivers`       | The TOTP, email and SMS drivers, and the resolver the services run drivers through  |
-| `Codes`         | Delivery of email and SMS codes: `MfaCodeMessage` and the default `NullSmsGateway`  |
-| `Requirements`  | Whether MFA applies (`shouldUse()`), the default `NullMfaPolicy`, `Requirement`     |
-| `Proofs`        | The recorded verification (`hasExpired()`), `SessionMfaVerificationStore`, `Proof`  |
-| `Verification`  | `challenge()`, `verify()` and `VerificationResult`                                  |
-| `Assurance`     | `Channel`, `ObservedProperties` and `Evaluation`                                    |
-| `Context`       | `PendingContext`, a pending session as an authentication layer resolves it          |
-| `Passkeys`      | `PasskeyAssertion`, what a verified passkey assertion observed                      |
-| `Enrollment`    | `enroll()`                                                                          |
-| `Lifecycle`     | `disable()`                                                                         |
-| `RecoveryCodes` | Backup codes: `issueBackupCodes()` and `BackupCodeDriver`                           |
-| `Http`          | The `mfa` and `mfa.skip` middleware, `RequireMfa` and `SkipMfa`                     |
-| `Testing`       | Test doubles for applications: `FakeSmsGateway`                                     |
+| Namespace       | Holds                                                                                               |
+|-----------------|-----------------------------------------------------------------------------------------------------|
+| `Factors`       | Factor reads (`isSetup()`, `getFactors()`), their cache, ownership, `FactorSummary`                 |
+| `Drivers`       | The TOTP, email and SMS drivers, the resolver the services run drivers through, `TotpSettings`      |
+| `Codes`         | Delivery of email and SMS codes: `MfaCodeMessage`, the default `NullSmsGateway`, `CodeSettings`     |
+| `Requirements`  | Whether MFA applies (`shouldUse()`), the default `NullMfaPolicy`, `Requirement`                     |
+| `Proofs`        | The recorded verification (`hasExpired()`), `SessionMfaVerificationStore`, `Proof`, `ProofSettings` |
+| `Verification`  | `challenge()`, `verify()` and `VerificationResult`                                                  |
+| `Assurance`     | `Channel`, `ObservedProperties` and `Evaluation`                                                    |
+| `Context`       | `PendingContext`, a pending session as an authentication layer resolves it                          |
+| `Passkeys`      | `PasskeyAssertion`, what a verified passkey assertion observed                                      |
+| `Enrollment`    | `enroll()` and `EnrollmentSettings`                                                                 |
+| `Lifecycle`     | `disable()` and `LifecycleSettings`                                                                 |
+| `RecoveryCodes` | Backup codes: `issueBackupCodes()`, `BackupCodeDriver` and `RecoveryCodeSettings`                   |
+| `Attempts`      | `AttemptSettings`, the attempt caps and lockouts                                                    |
+| `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
+| `Http`          | The `mfa` and `mfa.skip` middleware, `RequireMfa` and `SkipMfa`                                     |
+| `Testing`       | Test doubles for applications: `FakeSmsGateway`                                                     |
+| `Console`       | The `mfa:check` command                                                                             |
 
 `Contracts`, `Concerns`, `Models`, `Events`, `Exceptions`, `Enums` and `Facades` hold what their names say for every
 capability (the values and enums assurance is described with are in [Proofs, assurance and requirements](assurance.md)),
 and `Config`, `Database` and `Support` the internal helpers the capabilities share, among them
-`Database\StorageConnection` and `Support\FactorStateTransaction` (see [Storage](configuration.md#storage)).
+`Config\ConfigurationValidator` (see [Checking the configuration](configuration.md#checking-the-configuration)),
+`Database\StorageConnection` and `Support\FactorStateTransaction` (see [Storage](configuration.md#storage)). Each
+capability reads its own block of `config/mfa.php` through its `*Settings` class, on every call.
 `Contracts` also declares the seams the requirement, verification, enrolment and lifecycle flows are built against,
 listed in [the seam contracts design note](../design/seam-contracts.md); no shipped flow calls them yet, so none is
 bound by default, and binding one changes nothing until its flow does. The `Mfa` facade and `MfaManager`

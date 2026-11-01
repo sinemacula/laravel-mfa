@@ -46,8 +46,9 @@ the provider or another capability.
   lives on the storage connection (`Database\StorageBindings`), the middleware aliases (`HttpBindings`) and the
   publishing tags.
 - The `mfa` factory builds the manager, then `DriverBindings::extend()` registers the TOTP, email and SMS drivers and
-  `RecoveryCodeBindings::extend()` the backup-code driver, each built from its slice of `mfa.drivers.*`, before the
-  container applies any extender or resolving callback.
+  `RecoveryCodeBindings::extend()` the backup-code driver, each built from the settings of its capability's block
+  (`mfa.totp`, `mfa.codes`, `mfa.recovery_codes`), before the container applies any extender or resolving callback.
+  The factory first checks the whole configuration (see the application configuration note).
 - A call such as `Mfa::verify('totp', $factor, $code)` reaches `MfaManager::verify()`, which hands it to
   `Verification\VerificationService::verify()` with the manager as the driver registry. The service resolves the current
   identity, checks the driver and the owner, runs the driver, records the outcome on the factor, writes the verification

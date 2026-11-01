@@ -24,6 +24,9 @@ The current note set is:
 - `verification-lifecycle-and-events.md`: the five lifecycle events (`MfaChallengeIssued`, `MfaVerified`,
   `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`), who dispatches them, and the exact ordering
   against driver calls and store writes.
+- `application-configuration.md`: the shape of the configuration (one block per application, one per capability),
+  the settings classes that read and check each block on every call, the bounds they enforce, and the check of the
+  whole configuration and the bindings it needs at boot, at manager resolution and from `mfa:check`.
 - `storage-and-transactions.md`: the storage connection every table and shipped model uses, the refusal of a model on
   another connection, and the one transaction and lock order of every change to an identity's whole factor state.
 - `seam-contracts.md`: the contracts declared for the seams with an authentication layer and the application, what

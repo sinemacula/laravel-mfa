@@ -41,7 +41,7 @@ by a single swappable seam — the `MfaVerificationStore` contract — plus the 
 - A subsequent request routes through `RequireMfa`. The middleware calls `Mfa::shouldUse()` (consumer-bound policy),
   `Mfa::isSetup()`, `Mfa::hasEverVerified()`, then `Mfa::hasExpired($maxAgeMinutes)`.
 - `hasExpired()` resolves the bound store, reads `lastVerifiedAt($identity)`, and compares the elapsed time to
-  either the route-parameter window (if present) or the `mfa.default_expiry` config value (minutes).
+  either the route-parameter window (if present) or the `mfa.proofs.max_age_minutes` config value (minutes).
 - For step-up: a controller route annotated with `mfa:5` runs the same middleware with a 5-minute window. The
   identity's prior verification is still valid globally but is rejected for this specific route group, prompting a
   fresh verification challenge.
@@ -80,7 +80,7 @@ by a single swappable seam — the `MfaVerificationStore` contract — plus the 
 - `src/Http/Middleware/RequireMfa.php`: `handle()`, `parseMaxAgeMinutes()`, `resolveFactorSummaries()`.
 - `src/Http/Middleware/SkipMfa.php`: sets the `skip_mfa` request attribute for the verification endpoints.
 - `src/Exceptions/MfaRequiredException.php`, `src/Exceptions/MfaExpiredException.php`.
-- `config/mfa.php`: `default_expiry` (minutes).
+- `config/mfa.php`: `proofs.max_age_minutes`; `src/Proofs/ProofSettings.php`.
 
 ## Authoritative Tests
 

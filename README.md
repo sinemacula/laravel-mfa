@@ -37,7 +37,8 @@ whatever UI you like.
   shipped `authenticatable_type` / `authenticatable_id` morph.
 - **Encrypted at rest**: factor `secret` and `code` columns are `encrypted`-cast; backup codes hash to SHA-256
   before persistence.
-- **Per-factor lockouts**: configurable `max_attempts` + `lockout_minutes` for OTP drivers.
+- **Per-factor lockouts**: `attempts.factor_limit` failures in a row lock a factor of any type for
+  `attempts.lockout_seconds`.
 - **Zero ecosystem coupling**: depends only on Laravel and the standard `Authenticatable` contract.
 
 ## Installation
@@ -64,35 +65,39 @@ The TOTP driver checks for this package at runtime and raises a clear error if i
 
 ## Configuration
 
-The published `mfa.php` config controls global expiry, lockout, and per-driver settings:
+The published `mfa.php` config holds one block per application, for what it accepts and offers, and one block per
+capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `proofs`, `lifecycle`) for what is the same
+everywhere:
 
 ```php
 return [
-    'default_expiry'  => 20160, // minutes (14 days)
-    'lockout_minutes' => 15,
+    'applications' => [
+        'web' => [
+            'types'        => ['totp', 'email'],
+            'requirement'  => 'enrolled',
+            'first_factor' => ['method' => 'password', 'channel' => 'password'],
+        ],
+    ],
 
-    'drivers' => [
-        'totp' => [
-            'window' => 1,
-        ],
-        'email' => [
-            'code_length'  => 6,
-            'expiry'       => 10,
-            'max_attempts' => 3,
-        ],
-        'sms' => [
-            'code_length'      => 6,
-            'expiry'           => 10,
-            'max_attempts'     => 3,
-            'message_template' => 'Your verification code is: :code',
-        ],
-        'backup_code' => [
-            'code_length' => 10,
-            'code_count'  => 10,
-        ],
+    'codes' => [
+        'length'      => 6,  // digits, 6 to 10
+        'ttl_minutes' => 10, // 1 to 10
+    ],
+
+    'attempts' => [
+        'factor_limit'    => 5,
+        'lockout_seconds' => 900,
+    ],
+
+    'proofs' => [
+        'max_age_minutes' => 20160, // 14 days
     ],
 ];
 ```
+
+Every setting has a production-safe default and enforced bounds, and an application enables nothing until it lists it.
+The package checks the whole configuration when it boots, and `php artisan mfa:check` reports every problem for a
+deploy pipeline. See [Configuration](docs/guides/configuration.md) for every key, its default and its bounds.
 
 > **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so a key rotation
 > must use `php artisan key:rotate` rather than simply swapping `APP_KEY` in `.env` — a naive swap leaves
@@ -198,7 +203,7 @@ Route::middleware('mfa')->group(function () {
 Route::middleware('mfa.skip')->post('/mfa/verify', MfaVerifyController::class);
 ```
 
-An optional `max-age` parameter overrides `default_expiry` per route group — the step-up lever for sensitive
+An optional `max-age` parameter overrides `proofs.max_age_minutes` per route group — the step-up lever for sensitive
 actions:
 
 ```php
@@ -321,7 +326,7 @@ provider's `register()` / `boot()` rather than mid-request.
 
 ### Rate limiting
 
-The per-factor lockout (`max_attempts` + `lockout_minutes`) protects an individual factor from runaway
+The per-factor lockout (`attempts.factor_limit` + `attempts.lockout_seconds`) protects an individual factor from runaway
 attempts on the same code, but does not by itself defend against distributed brute force across many factors
 or DoS against the lockout window. Layer Laravel's built-in `RateLimiter` on the verify endpoint:
 

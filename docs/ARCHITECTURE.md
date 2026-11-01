@@ -77,7 +77,7 @@ Historical record of the architectural calls made during the 1.0 cycle.
   column carries long-lived material (TOTP keys, hashed backup codes); the `code` column holds
   live OTPs during their expiry window. Encrypting both closes the read-only-DB-replay attack
   surface. Migration uses `text` for both so the encrypted ciphertext fits regardless of the
-  configured OTP alphabet / length.
+  configured OTP length.
 - **D8 — Test fixtures extend abstract stubs, not raw contracts.** `AbstractFactorStub` and
   `AbstractEloquentFactorStub` (in `tests/Fixtures/`) provide safe-default implementations of
   every `Factor` / `EloquentFactor` method. Anonymous test fixtures extend the relevant abstract
