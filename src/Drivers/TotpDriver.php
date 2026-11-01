@@ -4,58 +4,62 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
-use PragmaRX\Google2FA\Google2FA;
+use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Container\Container;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
+use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
-use SineMacula\Laravel\Mfa\Exceptions\MissingDriverDependencyException;
 
 /**
- * TOTP factor driver.
+ * TOTP factor driver: time-based one-time passwords (RFC 6238) from an
+ * authenticator app, computed by the package itself over `hash_hmac`.
  *
- * Verifies time-based one-time passwords using the pragmarx/google2fa library.
- * The library is a suggested dependency and is checked at runtime so the
- * package remains lightweight for applications that do not use TOTP.
+ * A new enrolment gets a secret of random bytes as long as its algorithm's
+ * output (20 for SHA-1, 32 for SHA-256, 64 for SHA-512, never under 160 bits)
+ * and the algorithm, digits and period `mfa.totp` sets for new enrolments,
+ * which the factor keeps. A code is checked against every time step of the
+ * window, each compared with `hash_equals()` and none skipped when an earlier
+ * one matches, so the work does not depend on which step matches or whether one
+ * does. The window is the `totp_window` of the application a bound
+ * `ApplicationResolver` names for the current request, or `mfa.totp.window`
+ * without one; it is read from the configuration on every call and never
+ * widens.
+ *
+ * A time step is single-use per factor (RFC 6238 §5.2): a code is accepted only
+ * when its step is later than the factor's last accepted one, recorded in the
+ * same compare-and-set (see `EloquentFactor::storeAcceptedStep()`), at
+ * confirmation as at verification. Of two requests with the same code, only one
+ * records the step, and a code for an earlier step is refused. A factor that
+ * cannot record a step, one implementing only the `Factor` read surface, cannot
+ * be held to single use, so it verifies nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final readonly class TotpDriver implements FactorDriver
 {
-    /** @var object The Google2FA instance */
-    private object $google2fa;
-
     /**
-     * Create a new TOTP driver instance.
+     * Constructor.
      *
-     * @param  int  $window
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingDriverDependencyException
+     * @param  \SineMacula\Laravel\Mfa\Drivers\TotpSettings  $settings
+     * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** Clock-drift tolerance in 30-second steps on either side of "now". */
-        private int $window = 1,
-    ) {
-        // @codeCoverageIgnoreStart
-        // This branch only fires when `pragmarx/google2fa` is absent, which
-        // cannot be exercised under the package's own test suite without
-        // uninstalling the dev dependency.
-        if (!class_exists(Google2FA::class)) {
-            $message = 'The pragmarx/google2fa package is required for the '
-                . 'TOTP MFA driver. Install it via: composer '
-                . 'require pragmarx/google2fa';
+        /** The parameters of new enrolments and the window, read per call. */
+        private TotpSettings $settings,
 
-            throw new MissingDriverDependencyException($message);
-        }
-        // @codeCoverageIgnoreEnd
-        $this->google2fa = new Google2FA;
-    }
+        /** The container the request and application resolver are read from. */
+        private Container $container,
+    ) {}
 
     /**
-     * TOTP challenges are implicit: the authenticator app generates codes
-     * locally from the shared secret, so there is no server action to take on
-     * challenge issuance.
+     * TOTP challenges are implicit: the authenticator app makes codes locally
+     * from the shared secret, so there is nothing to send.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
@@ -63,30 +67,28 @@ final readonly class TotpDriver implements FactorDriver
     #[\Override]
     public function issueChallenge(Factor $factor): void
     {
-        // No-op — TOTP codes are generated client-side.
+        // Nothing to send: the authenticator app makes the code.
     }
 
     /**
-     * Verify the given code against the factor's stored secret.
+     * Verify the code against the factor's secret and parameters, recording the
+     * matched time step so it is never accepted again.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @return bool
      *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
      */
     #[\Override]
     public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
     {
-        $secret = $factor->getSecret();
+        $step = $this->matchedStep($factor, $code);
 
-        if ($secret === null || $secret === '') {
-            return false;
-        }
-
-        return (bool) $this->google2fa->verifyKey($secret, $code, $this->window);
+        return $step !== null
+            && $factor instanceof EloquentFactor
+            && $factor->storeAcceptedStep($step);
     }
 
     /**
@@ -115,31 +117,42 @@ final readonly class TotpDriver implements FactorDriver
      * Start an enrolment with a new shared secret, which the caller stores on
      * the pending factor and shows the person once.
      *
+     * The parameters new enrolments use are stamped on an Eloquent factor, with
+     * no step accepted yet; a factor of another kind is given them by its
+     * caller, from `parameters()`.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return string
      *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
+     * @throws \InvalidArgumentException
+     * @throws \Random\RandomException
      */
     #[\Override]
     public function startEnrollment(Factor $factor): string
     {
-        /** @var string */
-        return $this->google2fa->generateSecretKey();
+        $parameters = $this->parameters();
+
+        if ($factor instanceof EloquentFactor && $factor instanceof Model) {
+            $factor->setAttribute($factor->getTotpAlgorithmName(), $parameters->algorithm);
+            $factor->setAttribute($factor->getTotpDigitsName(), $parameters->digits);
+            $factor->setAttribute($factor->getTotpPeriodName(), $parameters->period);
+            $factor->setAttribute($factor->getLastAcceptedStepName(), null);
+        }
+
+        return Base32::encode(random_bytes($parameters->secretLength()));
     }
 
     /**
      * Confirm the pending factor with the first code its authenticator app
-     * shows, checked as any other.
+     * shows, checked as any other, so its step is recorded and the confirming
+     * code cannot be used again.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @return bool
      *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
      *
      * @imperative
      */
@@ -150,21 +163,112 @@ final readonly class TotpDriver implements FactorDriver
     }
 
     /**
-     * Build the canonical `otpauth://totp/...` provisioning URI for an
-     * authenticator-app QR code.
+     * The algorithm, digits and period a new enrolment is made with, as
+     * `mfa.totp` sets them now.
      *
-     * Wraps `Google2FA::getQRCodeUrl()`, which URL-encodes the issuer and
-     * account name internally — callers should pass raw values rather than
-     * pre-encoding them.
+     * @return \SineMacula\Laravel\Mfa\Drivers\TotpParameters
      *
+     * @throws \InvalidArgumentException
+     */
+    public function parameters(): TotpParameters
+    {
+        return $this->settings->parameters();
+    }
+
+    /**
+     * Build the factor's provisioning URI in the `otpauth://` key URI format,
+     * for an authenticator app to read from a QR code: the label
+     * `issuer:account` and the secret, issuer, algorithm, digits and period.
+     * Pass the issuer and account name as they are, not encoded; neither may be
+     * empty or hold a colon, which separates them in the label.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $issuer
      * @param  string  $accountName
      * @param  string  $secret
      * @return string
+     *
+     * @throws \InvalidArgumentException
      */
-    public function provisioningUri(string $issuer, string $accountName, #[\SensitiveParameter] string $secret): string
+    public function provisioningUri(Factor $factor, string $issuer, string $accountName, #[\SensitiveParameter] string $secret): string
     {
-        /** @var string */
-        return $this->google2fa->getQRCodeUrl($issuer, $accountName, $secret);
+        $parameters = TotpParameters::fromFactor($factor);
+
+        if ($parameters === null) {
+            throw new \InvalidArgumentException('The factor holds no TOTP parameters; start its enrolment first.');
+        }
+
+        foreach (['issuer' => $issuer, 'account name' => $accountName] as $name => $value) {
+            if ($value === '' || str_contains($value, ':')) {
+                throw new \InvalidArgumentException(sprintf('The %s of a provisioning URI must not be empty or hold a colon.', $name));
+            }
+        }
+
+        $query = http_build_query([
+            'secret'    => $secret,
+            'issuer'    => $issuer,
+            'algorithm' => strtoupper($parameters->algorithm),
+            'digits'    => $parameters->digits,
+            'period'    => $parameters->period,
+        ], '', '&', PHP_QUERY_RFC3986);
+
+        return sprintf('otpauth://totp/%s:%s?%s', rawurlencode($issuer), rawurlencode($accountName), $query);
+    }
+
+    /**
+     * The latest time step of the window whose code is the one given, or `null`
+     * when none is, or the factor has no usable secret or parameters. Every
+     * step of the window is computed and compared.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $code
+     * @return ?int
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    private function matchedStep(Factor $factor, #[\SensitiveParameter] string $code): ?int
+    {
+        $parameters = TotpParameters::fromFactor($factor);
+        $key        = Base32::decode($factor->getSecret() ?? '');
+
+        if ($parameters === null || $key === null || $key === '') {
+            return null;
+        }
+
+        $window  = $this->settings->windowFor($this->application());
+        $current = $parameters->stepAt(CarbonImmutable::now()->getTimestamp());
+        $matched = null;
+
+        for ($step = $current - $window; $step <= $current + $window; $step++) {
+            if (!hash_equals($parameters->code($key, $step), $code)) {
+                continue;
+            }
+
+            $matched = $step;
+        }
+
+        return $matched;
+    }
+
+    /**
+     * The application a bound `ApplicationResolver` names for the current
+     * request, or `null` without either, so the package-wide window applies.
+     *
+     * @return ?string
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function application(): ?string
+    {
+        if (!$this->container->bound(ApplicationResolver::class)) {
+            return null;
+        }
+
+        $request = $this->container->bound('request') ? $this->container->make('request') : null;
+
+        return $request instanceof Request
+            ? $this->container->make(ApplicationResolver::class)->resolve($request)
+            : null;
     }
 }

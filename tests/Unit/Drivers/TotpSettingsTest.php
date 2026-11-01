@@ -119,6 +119,57 @@ final class TotpSettingsTest extends TestCase
     }
 
     /**
+     * The parameters of a new enrolment are the configured algorithm, digits
+     * and period, and fail closed on a value out of bounds.
+     *
+     * @return void
+     */
+    public function testTheParametersOfANewEnrollmentAreTheConfiguredOnes(): void
+    {
+        $defaults = self::settingsWith([])->parameters();
+
+        self::assertSame(['sha1', 6, 30], [$defaults->algorithm, $defaults->digits, $defaults->period]);
+
+        $configured = self::settingsWith(['algorithm' => 'sha512', 'digits' => '8', 'period' => 60])->parameters();
+
+        self::assertSame(['sha512', 8, 60], [$configured->algorithm, $configured->digits, $configured->period]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('mfa.totp.period must be an integer from 15 to 120.');
+
+        self::settingsWith(['period' => 121])->parameters();
+    }
+
+    /**
+     * An application's window is its own `totp_window`, and the package-wide
+     * one when it sets none, is not configured or none is named; one out of
+     * bounds is refused, naming the application's key.
+     *
+     * @return void
+     */
+    public function testTheWindowOfAnApplicationIsItsOwn(): void
+    {
+        $settings = new TotpSettings(new Repository(['mfa' => [
+            'totp'         => ['window' => 2],
+            'applications' => [
+                'strict'  => ['totp_window' => 0],
+                'default' => ['types' => ['totp']],
+                'broken'  => ['totp_window' => 4],
+            ],
+        ]]));
+
+        self::assertSame(0, $settings->windowFor('strict'));
+        self::assertSame(2, $settings->windowFor('default'));
+        self::assertSame(2, $settings->windowFor('unconfigured'));
+        self::assertSame(2, $settings->windowFor(null));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('mfa.applications.broken.totp_window must be an integer from 0 to 3.');
+
+        $settings->windowFor('broken');
+    }
+
+    /**
      * Build the settings over an `mfa.totp` block.
      *
      * @param  array<string, mixed>  $block

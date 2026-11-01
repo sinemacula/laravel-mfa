@@ -22,7 +22,7 @@ return [
     | says so, and one that is not listed here enables nothing. Every
     | configured application declares the first factor its guard signs people
     | in with, unless a first factor resolver is bound. Every key is checked
-    | when the package boots, but no flow applies these blocks yet. See the
+    | when the package boots, but only `totp_window` is applied yet. See the
     | configuration guide for every key, its default, its bounds and whether
     | it is applied yet:
     |

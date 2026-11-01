@@ -7,7 +7,6 @@ namespace Tests\Performance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
@@ -15,6 +14,7 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -37,31 +37,25 @@ final class VerifyQueryBudgetTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * A successful TOTP verify must stay within the documented eight-query
+     * A successful TOTP verify must stay within the documented nine-query
      * budget: the IP address's slot taken and given back, the identity's state
      * lock and its factors, the identity's state and the factor's lockout read
-     * under the lock, and the factor-row update.
+     * under the lock, the accepted step's compare-and-set and the factor-row
+     * update.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testTotpVerifyHitBudget(): void
     {
-        $user   = $this->loginUser();
-        $secret = 'JBSWY3DPEHPK3PXP';
+        $user = $this->loginUser();
 
         $factor = Factor::create([
+            ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => $secret,
         ]);
 
-        $google = new Google2FA;
-        $code   = $google->getCurrentOtp($secret);
+        $code = AuthenticatorApp::code($factor);
 
         $count = $this->countQueries(
             static fn () => Mfa::verify('totp', $factor, $code),
@@ -70,11 +64,12 @@ final class VerifyQueryBudgetTest extends TestCase
         // Budget: the IP slot (an update, and an insert for its first window),
         // the identity state lock and the factors locked under it, the identity
         // state and the factor lockout read under the lock, the slot given
-        // back, and one update on the factor row for recordVerification. The
-        // verification store is session-backed, not a database connection in
-        // the default binding.
+        // back, one conditional update recording the accepted time step, and
+        // one update on the factor row for recordVerification. The verification
+        // store is session-backed in the default binding, so its write goes
+        // through the session driver, not the database.
         self::assertLessThanOrEqual(
-            8,
+            9,
             $count,
             sprintf('TOTP verify hit exceeded query budget: %d queries', $count),
         );
@@ -95,10 +90,9 @@ final class VerifyQueryBudgetTest extends TestCase
         $user = $this->loginUser();
 
         $factor = Factor::create([
+            ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => 'JBSWY3DPEHPK3PXP',
             'consecutive_failures' => 5,
         ]);
 
@@ -124,9 +118,10 @@ final class VerifyQueryBudgetTest extends TestCase
     }
 
     /**
-     * A failed TOTP verify must stay within eleven queries: the reads and locks
-     * of a hit, the identity's failure counted in its window and its state row,
-     * and the factor's failure in a row, with no verification store write.
+     * A failed TOTP verify must stay within ten queries: the reads and locks of
+     * a hit, the identity's failure counted in its window and its state row,
+     * and the factor's failure in a row, with no step recorded and no
+     * verification store write.
      *
      * @return void
      */
@@ -135,10 +130,9 @@ final class VerifyQueryBudgetTest extends TestCase
         $user = $this->loginUser();
 
         $factor = Factor::create([
+            ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => 'JBSWY3DPEHPK3PXP',
         ]);
 
         $count = $this->countQueries(
@@ -146,11 +140,12 @@ final class VerifyQueryBudgetTest extends TestCase
         );
 
         // The six reads and locks of a hit before the driver, the identity's
-        // window counted (an update, and an insert for its first window) and
-        // read back, its state row and the factor row updated. The IP slot is
-        // kept, not given back. No verification store write on failure.
+        // window counted in one upsert and read back, its state row and the
+        // factor row updated. No code matches, so no step is recorded, and the
+        // IP slot is kept, not given back. No verification store write on
+        // failure.
         self::assertLessThanOrEqual(
-            11,
+            10,
             $count,
             sprintf('TOTP verify miss exceeded query budget: %d queries', $count),
         );

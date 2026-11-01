@@ -26,9 +26,9 @@ between requests.
 | `recovery_codes.table`          | `mfa_recovery_codes`               | a table name                           | `MFA_RECOVERY_CODES_TABLE`          | yes     |
 | `attempts.table`                | `mfa_attempts`                     | a table name                           | `MFA_ATTEMPTS_TABLE`                | yes     |
 | `passkeys.table`                | `mfa_passkey_associations`         | a table name                           | `MFA_PASSKEYS_TABLE`                | yes     |
-| `totp.algorithm`                | `sha1`                             | `sha1`, `sha256`, `sha512`             | `MFA_TOTP_ALGORITHM`                | not yet |
-| `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   | not yet |
-| `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   | not yet |
+| `totp.algorithm`                | `sha1`                             | `sha1`, `sha256`, `sha512`             | `MFA_TOTP_ALGORITHM`                | yes     |
+| `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   | yes     |
+| `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   | yes     |
 | `totp.window`                   | `1`                                | 0 to 3 steps                           | `MFA_TOTP_WINDOW`                   | yes     |
 | `codes.length`                  | `6`                                | 6 to 10 digits                         | `MFA_CODES_LENGTH`                  | yes     |
 | `codes.ttl_minutes`             | `10`                               | 1 to 10 minutes                        | `MFA_CODES_TTL_MINUTES`             | yes     |
@@ -82,10 +82,11 @@ name:
 ],
 ```
 
-No flow reads an application's block yet: every key below is checked, but none is applied. Until the flows that read
-them ship, the shipped drivers verify a factor of any type whichever application asks, no factor is required by this
-configuration alone, the TOTP driver accepts `totp.window` steps for every application, and the limits and freshness
-are not enforced. Use your own policy binding (`Contracts\MfaPolicy`) and routes to decide who must verify.
+Every key below is checked, but only `totp_window` is applied yet: the TOTP driver accepts the window of the
+application a bound `Contracts\ApplicationResolver` names for the request, and `totp.window` when none is bound. Until
+the flows that read the other keys ship, the shipped drivers verify a factor of any type whichever application asks, no
+factor is required by this configuration alone, and the limits and freshness are not enforced. Use your own policy
+binding (`Contracts\MfaPolicy`) and routes to decide who must verify.
 
 | Key                         | Default                   | Meaning                                                                                                                                |
 |-----------------------------|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
@@ -223,12 +224,20 @@ replaced.
 ],
 ```
 
-`algorithm`, `digits` and `period` are the parameters new TOTP enrolments will use; the defaults (SHA-1, 6 digits, 30
-seconds) are what authenticator apps expect, and they are what the TOTP driver uses today whatever is set, as these
-three are not applied yet. A period is at most 120 seconds. `window` is the number of time steps either side of
-the current one a code is accepted for, absorbing clock skew and entry delay, for an application that sets no
-`totp_window` of its own. It is at most 3; the default of 1 follows RFC 6238, which recommends allowing at most one step
-for transmission delay.
+`algorithm`, `digits` and `period` are the parameters new TOTP enrolments use. The defaults (SHA-1, 6 digits, 30
+seconds) are what authenticator apps expect; some apps ignore other values and show codes that never match, so change
+them only for apps you know honour them. Each factor stores the parameters it was enrolled with, so changing them
+affects only enrolments started afterwards: existing factors keep working as they were. A period is at most 120
+seconds. A new factor's secret is random and as long as the algorithm's output: 20 bytes for SHA-1, 32 for SHA-256 and
+64 for SHA-512.
+
+`window` is the number of time steps either side of the current one a code is accepted for, absorbing clock skew and
+entry delay, for an application that sets no `totp_window` of its own, and for every request when no
+`Contracts\ApplicationResolver` is bound. It is at most 3; the default of 1 follows RFC 6238, which recommends allowing
+at most one step for transmission delay. The window never widens after failures, and the package does not resynchronise
+a drifting clock. Each time step is accepted once per factor: a code for the step last accepted, or an earlier one, is
+refused even inside the window, so the code that confirmed a factor cannot be used again (see
+[the TOTP design note](../design/totp.md)).
 
 ## Delivered codes
 

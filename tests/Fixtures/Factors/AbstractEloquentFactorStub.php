@@ -138,6 +138,19 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Record nothing — the fixture keeps no time step, so no step is ever
+     * accepted.
+     *
+     * @param  int  $step
+     * @return bool
+     */
+    #[\Override]
+    public function storeAcceptedStep(int $step): bool
+    {
+        return false;
+    }
+
+    /**
      * Return the conventional status column name.
      *
      * @return string
