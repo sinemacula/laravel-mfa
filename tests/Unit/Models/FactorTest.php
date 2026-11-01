@@ -260,7 +260,7 @@ final class FactorTest extends TestCase
      *
      * @return void
      */
-    public function testSecretAndCodeAreHiddenFromSerialisation(): void
+    public function testSecretAndCodeAreHiddenFromSerialization(): void
     {
         $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
 

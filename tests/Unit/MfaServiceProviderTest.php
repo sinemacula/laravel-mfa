@@ -18,7 +18,7 @@ use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
-use SineMacula\Laravel\Mfa\Enrolment\EnrolmentService;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
@@ -118,7 +118,7 @@ final class MfaServiceProviderTest extends TestCase
             MfaVerificationStore::class,
             ProofService::class,
             VerificationService::class,
-            EnrolmentService::class,
+            EnrollmentService::class,
             LifecycleService::class,
             RecoveryCodeService::class,
         ];

@@ -53,7 +53,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testSuccessfulVerificationReturnsTrue(): void
     {
-        [, $factor, $code] = $this->enrolTotp();
+        [, $factor, $code] = $this->enrollTotp();
 
         self::assertTrue(Mfa::verify('totp', $factor, $code));
     }
@@ -69,7 +69,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testSuccessfulVerificationMarksVerificationStore(): void
     {
-        [, $factor, $code] = $this->enrolTotp();
+        [, $factor, $code] = $this->enrollTotp();
 
         Mfa::verify('totp', $factor, $code);
 
@@ -88,7 +88,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testSuccessfulVerificationStampsFactorVerifiedAt(): void
     {
-        [, $factor, $code] = $this->enrolTotp();
+        [, $factor, $code] = $this->enrollTotp();
 
         Mfa::verify('totp', $factor, $code);
 
@@ -111,7 +111,7 @@ final class TotpLifecycleTest extends TestCase
     {
         Event::fake([MfaVerified::class]);
 
-        [$user, $factor, $code] = $this->enrolTotp();
+        [$user, $factor, $code] = $this->enrollTotp();
 
         Mfa::verify('totp', $factor, $code);
 
@@ -139,7 +139,7 @@ final class TotpLifecycleTest extends TestCase
     {
         Event::fake([MfaVerificationFailed::class]);
 
-        [, $factor] = $this->enrolTotp();
+        [, $factor] = $this->enrollTotp();
 
         $verified = Mfa::verify('totp', $factor, self::WRONG_CODE);
 
@@ -166,7 +166,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testThresholdCrossingRecordsConfiguredAttemptsCount(): void
     {
-        $factor = $this->enrolAndBurnAttempts();
+        $factor = $this->enrollAndBurnAttempts();
 
         self::assertSame(3, $factor->getAttempts());
     }
@@ -182,7 +182,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testThresholdCrossingStampsFutureLockedUntil(): void
     {
-        $factor = $this->enrolAndBurnAttempts();
+        $factor = $this->enrollAndBurnAttempts();
 
         self::assertNotNull($factor->getLockedUntil());
         self::assertTrue($factor->isLocked());
@@ -199,7 +199,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testVerifyingAfterLockoutReturnsFalse(): void
     {
-        $factor = $this->enrolAndBurnAttempts();
+        $factor = $this->enrollAndBurnAttempts();
 
         self::assertFalse(Mfa::verify('totp', $factor, self::WRONG_CODE));
     }
@@ -215,7 +215,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testVerifyingAfterLockoutDispatchesFactorLockedFailure(): void
     {
-        $factor = $this->enrolAndBurnAttempts();
+        $factor = $this->enrollAndBurnAttempts();
 
         Event::fake([MfaVerificationFailed::class]);
 
@@ -243,7 +243,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testChallengePreservesAttemptsAfterLockout(): void
     {
-        $factor = $this->enrolAndBurnAttempts();
+        $factor = $this->enrollAndBurnAttempts();
 
         Mfa::challenge('totp', $factor);
 
@@ -263,7 +263,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testChallengePreservesLockedUntilTimestampAfterLockout(): void
     {
-        $factor = $this->enrolAndBurnAttempts();
+        $factor = $this->enrollAndBurnAttempts();
 
         $lockedUntilBefore = $factor->getLockedUntil();
         self::assertNotNull($lockedUntilBefore);
@@ -291,7 +291,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testChallengeKeepsFactorLockedAfterLockout(): void
     {
-        $factor = $this->enrolAndBurnAttempts();
+        $factor = $this->enrollAndBurnAttempts();
 
         Mfa::challenge('totp', $factor);
 
@@ -311,7 +311,7 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testChallengeDispatchesEventEvenWhenLocked(): void
     {
-        $factor = $this->enrolAndBurnAttempts();
+        $factor = $this->enrollAndBurnAttempts();
 
         Event::fake([MfaChallengeIssued::class]);
 
@@ -368,7 +368,7 @@ final class TotpLifecycleTest extends TestCase
      * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
      * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
-    private function enrolTotp(): array
+    private function enrollTotp(): array
     {
         $user = TestUser::create([
             'email'       => 'totp@example.test',
@@ -401,9 +401,9 @@ final class TotpLifecycleTest extends TestCase
      * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
      * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
-    private function enrolAndBurnAttempts(): Factor
+    private function enrollAndBurnAttempts(): Factor
     {
-        [, $factor] = $this->enrolTotp();
+        [, $factor] = $this->enrollTotp();
 
         config()->set('mfa.drivers.totp.max_attempts', 3);
 

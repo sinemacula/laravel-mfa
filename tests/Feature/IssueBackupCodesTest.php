@@ -38,7 +38,7 @@ final class IssueBackupCodesTest extends TestCase
 
     /**
      * Without an authenticated MFA-capable identity, the call must be a no-op
-     * (returns `[]`) rather than throw — matches the established `enrol()` /
+     * (returns `[]`) rather than throw — matches the established `enroll()` /
      * `disable()` shape so consumers can call it unconditionally during
      * onboarding flows.
      *
@@ -203,7 +203,7 @@ final class IssueBackupCodesTest extends TestCase
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function testHonoursExplicitCountArgument(): void
+    public function testHonorsExplicitCountArgument(): void
     {
         $this->loginUser();
 

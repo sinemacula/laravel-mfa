@@ -53,7 +53,7 @@ final class OtpLifecycleTest extends TestCase
     {
         Mail::fake();
 
-        [$user, $factor] = $this->enrolEmail();
+        [$user, $factor] = $this->enrollEmail();
 
         Mfa::challenge('email', $factor);
 
@@ -70,7 +70,7 @@ final class OtpLifecycleTest extends TestCase
         Mail::fake();
         Event::fake([MfaChallengeIssued::class]);
 
-        [, $factor] = $this->enrolEmail();
+        [, $factor] = $this->enrollEmail();
 
         Mfa::challenge('email', $factor);
 
@@ -86,7 +86,7 @@ final class OtpLifecycleTest extends TestCase
     {
         Mail::fake();
 
-        [, $factor] = $this->enrolEmail();
+        [, $factor] = $this->enrollEmail();
 
         Mfa::challenge('email', $factor);
 
@@ -104,7 +104,7 @@ final class OtpLifecycleTest extends TestCase
     {
         Mail::fake();
 
-        [, $factor] = $this->enrolEmail();
+        [, $factor] = $this->enrollEmail();
 
         Mfa::challenge('email', $factor);
         $factor->refresh();
@@ -124,7 +124,7 @@ final class OtpLifecycleTest extends TestCase
     {
         Mail::fake();
 
-        [, $factor] = $this->enrolEmail();
+        [, $factor] = $this->enrollEmail();
 
         Mfa::challenge('email', $factor);
         $factor->refresh();
@@ -144,7 +144,7 @@ final class OtpLifecycleTest extends TestCase
         Mail::fake();
         Event::fake([MfaVerified::class]);
 
-        [, $factor] = $this->enrolEmail();
+        [, $factor] = $this->enrollEmail();
 
         Mfa::challenge('email', $factor);
         $factor->refresh();
@@ -163,7 +163,7 @@ final class OtpLifecycleTest extends TestCase
     {
         Mail::fake();
 
-        [, $factor] = $this->enrolEmail();
+        [, $factor] = $this->enrollEmail();
 
         Mfa::challenge('email', $factor);
         $factor->refresh();
@@ -189,7 +189,7 @@ final class OtpLifecycleTest extends TestCase
 
         Event::fake([MfaChallengeIssued::class, MfaVerified::class]);
 
-        [, $factor] = $this->enrolSms('+441234567890');
+        [, $factor] = $this->enrollSms('+441234567890');
 
         Mfa::challenge('sms', $factor);
 
@@ -218,7 +218,7 @@ final class OtpLifecycleTest extends TestCase
         Mail::fake();
         Event::fake([MfaVerificationFailed::class]);
 
-        [, $factor] = $this->enrolEmail();
+        [, $factor] = $this->enrollEmail();
         Mfa::challenge('email', $factor);
         $factor->refresh();
 
@@ -245,7 +245,7 @@ final class OtpLifecycleTest extends TestCase
     {
         Mail::fake();
 
-        [, $factor] = $this->enrolEmail();
+        [, $factor] = $this->enrollEmail();
         Mfa::challenge('email', $factor);
         $factor->refresh();
 
@@ -278,7 +278,7 @@ final class OtpLifecycleTest extends TestCase
     {
         Mail::fake();
 
-        [, $factor] = $this->enrolEmail();
+        [, $factor] = $this->enrollEmail();
 
         // Stage a previously-locked-out factor: max attempts burned and a
         // future lockout still active.
@@ -307,7 +307,7 @@ final class OtpLifecycleTest extends TestCase
      *
      * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
-    private function enrolEmail(): array
+    private function enrollEmail(): array
     {
         $user = TestUser::create([
             'email'       => 'email-mfa@example.test',
@@ -333,7 +333,7 @@ final class OtpLifecycleTest extends TestCase
      * @param  string  $phone
      * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
-    private function enrolSms(string $phone): array
+    private function enrollSms(string $phone): array
     {
         $user = TestUser::create([
             'email'       => 'sms-mfa@example.test',

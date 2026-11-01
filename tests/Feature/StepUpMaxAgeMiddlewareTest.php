@@ -44,7 +44,7 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
      */
     public function testStepUpPassesWhenVerificationIsWithinMaxAge(): void
     {
-        [, $factor, $code] = $this->enrolTotp();
+        [, $factor, $code] = $this->enrollTotp();
 
         self::assertTrue(Mfa::verify('totp', $factor, $code));
 
@@ -68,7 +68,7 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
      */
     public function testStepUpThrowsExpiredWhenVerificationOlderThanMaxAge(): void
     {
-        [, $factor, $code] = $this->enrolTotp();
+        [, $factor, $code] = $this->enrollTotp();
 
         self::assertTrue(Mfa::verify('totp', $factor, $code));
 
@@ -92,7 +92,7 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
      */
     public function testStepUpZeroAlwaysThrowsEvenForFreshVerification(): void
     {
-        [, $factor, $code] = $this->enrolTotp();
+        [, $factor, $code] = $this->enrollTotp();
 
         self::assertTrue(Mfa::verify('totp', $factor, $code));
 
@@ -119,7 +119,7 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
         // verification 30 minutes old still pass.
         config()->set('mfa.default_expiry', 1);
 
-        [, $factor, $code] = $this->enrolTotp();
+        [, $factor, $code] = $this->enrollTotp();
 
         self::assertTrue(Mfa::verify('totp', $factor, $code));
 

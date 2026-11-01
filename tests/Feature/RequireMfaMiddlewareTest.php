@@ -104,7 +104,7 @@ final class RequireMfaMiddlewareTest extends TestCase
      */
     public function testRaisesRequiredExceptionWhenNeverVerified(): void
     {
-        [, $factor] = $this->enrolTotp();
+        [, $factor] = $this->enrollTotp();
 
         try {
             $middleware = $this->container()->make(
@@ -141,7 +141,7 @@ final class RequireMfaMiddlewareTest extends TestCase
      */
     public function testRaisesExpiredExceptionWhenVerificationAgedOut(): void
     {
-        [$user, $factor, $code] = $this->enrolTotp();
+        [$user, $factor, $code] = $this->enrollTotp();
 
         // Complete a verification first.
         self::assertTrue(Mfa::verify('totp', $factor, $code));

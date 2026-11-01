@@ -11,7 +11,7 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
  * Factor ownership mismatch exception.
  *
  * Thrown by the MFA manager when an entry-point method (`challenge`, `verify`,
- * `disable`, `enrol` for non-Eloquent factors) receives a `Factor` whose owner
+ * `disable`, `enroll` for non-Eloquent factors) receives a `Factor` whose owner
  * does not match the currently authenticated identity. Closes the
  * cross-account-factor primitive: a consumer looking a factor up by an ID drawn
  * from request input cannot use it to satisfy MFA on a different identity than

@@ -123,12 +123,12 @@ final class RecoveryCodeServiceTest extends TestCase
      */
     public function testReplacesOnlyTheIdentitysPreviousBatch(): void
     {
-        $user      = $this->signIn('replace@example.com');
-        $neighbour = TestUser::query()->create(['email' => 'neighbour@example.com']);
+        $user     = $this->signIn('replace@example.com');
+        $neighbor = TestUser::query()->create(['email' => 'neighbor@example.com']);
 
         $previous = $this->addFactor($user::class, $user->id, BackupCodeDriver::NAME);
         $totp     = $this->addFactor($user::class, $user->id, 'totp');
-        $other    = $this->addFactor($neighbour::class, $neighbour->id, BackupCodeDriver::NAME);
+        $other    = $this->addFactor($neighbor::class, $neighbor->id, BackupCodeDriver::NAME);
         $foreign  = $this->addFactor(SecondaryUser::class, $user->id, BackupCodeDriver::NAME);
 
         $this->service()->issueBackupCodes($this->manager(), 2);

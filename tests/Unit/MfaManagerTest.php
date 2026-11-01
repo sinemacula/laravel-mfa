@@ -7,7 +7,7 @@ namespace Tests\Unit;
 use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
-use SineMacula\Laravel\Mfa\Enrolment\EnrolmentService;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
@@ -86,7 +86,7 @@ final class MfaManagerTest extends TestCase
         yield 'challenge' => ['challenge', VerificationService::class, 'challenge', ['totp', $factor], null, true];
         yield 'verify true' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '123456'], true, true];
         yield 'verify false' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '654321'], false, true];
-        yield 'enrol' => ['enrol', EnrolmentService::class, 'enrol', [$factor], null];
+        yield 'enroll' => ['enroll', EnrollmentService::class, 'enroll', [$factor], null];
         yield 'disable' => ['disable', LifecycleService::class, 'disable', [$factor], null];
         yield 'issueBackupCodes with count' => ['issueBackupCodes', RecoveryCodeService::class, 'issueBackupCodes', [3], ['A', 'B', 'C'], true];
         yield 'issueBackupCodes without count' => ['issueBackupCodes', RecoveryCodeService::class, 'issueBackupCodes', [null], [], true];

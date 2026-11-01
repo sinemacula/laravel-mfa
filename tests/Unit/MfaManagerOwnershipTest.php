@@ -24,7 +24,7 @@ use Tests\Fixtures\TestUser;
  *
  * Closes the MFA-bypass / factor-tampering primitive: every entry- point method
  * (`challenge`, `verify`, `disable`) rejects a factor that does not belong to
- * the current identity, and `enrol()` stamps ownership rather than trusting
+ * the current identity, and `enroll()` stamps ownership rather than trusting
  * caller-supplied morph columns.
  *
  * Each test exercises the "natural endpoint shape" attack: the acting identity
@@ -145,17 +145,17 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * Test enrol overwrites caller-supplied morph_id with current identity.
+     * Test enroll() overwrites caller-supplied morph_id with current identity.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrolOverwritesCallerSuppliedMorphId(): void
+    public function testEnrollOverwritesCallerSuppliedMorphId(): void
     {
         [$attacker, $factor] = $this->stageEnrolHijackAttempt();
 
-        $this->manager()->enrol($factor);
+        $this->manager()->enroll($factor);
 
         $factor->refresh();
 
@@ -163,17 +163,18 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * Test enrol overwrites caller-supplied morph_type with current identity.
+     * Test enroll() overwrites caller-supplied morph_type with current
+     * identity.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrolOverwritesCallerSuppliedMorphType(): void
+    public function testEnrollOverwritesCallerSuppliedMorphType(): void
     {
         [$attacker, $factor] = $this->stageEnrolHijackAttempt();
 
-        $this->manager()->enrol($factor);
+        $this->manager()->enroll($factor);
 
         $factor->refresh();
 
@@ -181,20 +182,20 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * Test enrol dispatches MfaFactorEnrolled even when caller spoofs morph
+     * Test enroll() dispatches MfaFactorEnrolled even when caller spoofs morph
      * columns.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrolDispatchesEnrolledEventWhenCallerSpoofsMorphColumns(): void
+    public function testEnrollDispatchesEnrolledEventWhenCallerSpoofsMorphColumns(): void
     {
         [, $factor] = $this->stageEnrolHijackAttempt();
 
         Event::fake([MfaFactorEnrolled::class]);
 
-        $this->manager()->enrol($factor);
+        $this->manager()->enroll($factor);
 
         Event::assertDispatched(MfaFactorEnrolled::class);
     }
@@ -254,7 +255,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * `enrol()` must NOT silently rewrite the morph columns of an
+     * `enroll()` must NOT silently rewrite the morph columns of an
      * already-persisted factor row — that would let an attacker hijack any
      * factor whose primary key they could enumerate by passing it straight from
      * request input. An existing row is treated like a verify/disable target:
@@ -264,7 +265,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrolRejectsExistingRowOwnedByDifferentIdentity(): void
+    public function testEnrollRejectsExistingRowOwnedByDifferentIdentity(): void
     {
         [$victim, $attacker, $victimsFactor] = $this->stageCrossAccount();
 
@@ -275,7 +276,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
         $this->expectException(FactorOwnershipMismatchException::class);
 
         try {
-            $this->manager()->enrol($victimsFactor);
+            $this->manager()->enroll($victimsFactor);
         } finally {
             $victimsFactor->refresh();
 
@@ -291,8 +292,8 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     }
 
     /**
-     * `enrol()` of a non-Eloquent factor must reject the call when the factor's
-     * reported owner does not match the current identity. Mirrors the
+     * `enroll()` of a non-Eloquent factor must reject the call when the
+     * factor's reported owner does not match the current identity. Mirrors the
      * verify/challenge/disable enforcement so the four entry points present a
      * single boundary, not three.
      *
@@ -300,15 +301,15 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrolRejectsNonEloquentFactorOwnedByDifferentIdentity(): void
+    public function testEnrollRejectsNonEloquentFactorOwnedByDifferentIdentity(): void
     {
         $user = TestUser::query()->create([
-            'email'       => 'enrol-acting@example.test',
+            'email'       => 'enroll-acting@example.test',
             'mfa_enabled' => true,
         ]);
 
         $foe = TestUser::query()->create([
-            'email'       => 'enrol-foe@example.test',
+            'email'       => 'enroll-foe@example.test',
             'mfa_enabled' => true,
         ]);
 
@@ -321,14 +322,14 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
         $this->expectException(FactorOwnershipMismatchException::class);
 
         try {
-            $this->manager()->enrol($factor);
+            $this->manager()->enroll($factor);
         } finally {
             Event::assertNotDispatched(MfaFactorEnrolled::class);
         }
     }
 
     /**
-     * The matching-identity branch of non-Eloquent `enrol()` must succeed
+     * The matching-identity branch of non-Eloquent `enroll()` must succeed
      * end-to-end: persistence is the consumer's job for non-Eloquent factors,
      * but the cache invalidation and lifecycle event MUST still fire.
      *
@@ -336,10 +337,10 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrolAcceptsNonEloquentFactorOwnedByCurrentIdentity(): void
+    public function testEnrollAcceptsNonEloquentFactorOwnedByCurrentIdentity(): void
     {
         $user = TestUser::query()->create([
-            'email'       => 'enrol-ok@example.test',
+            'email'       => 'enroll-ok@example.test',
             'mfa_enabled' => true,
         ]);
 
@@ -349,7 +350,7 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
 
         $factor = new InMemoryFactor(driver: 'totp', authenticatable: $user);
 
-        $this->manager()->enrol($factor);
+        $this->manager()->enroll($factor);
 
         Event::assertDispatched(MfaFactorEnrolled::class);
     }
@@ -456,12 +457,12 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
     private function stageEnrolHijackAttempt(): array
     {
         $victim = TestUser::query()->create([
-            'email'       => 'enrol-victim@example.test',
+            'email'       => 'enroll-victim@example.test',
             'mfa_enabled' => true,
         ]);
 
         $attacker = TestUser::query()->create([
-            'email'       => 'enrol-attacker@example.test',
+            'email'       => 'enroll-attacker@example.test',
             'mfa_enabled' => true,
         ]);
 
