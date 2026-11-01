@@ -43,7 +43,15 @@ final class AuthenticatorTest extends TestCase
         yield 'a passkey that did not verify the person' => [SessionProofs::passkey(SessionProofs::unverified()), false, true, false, false, true, ['pop', 'user']];
         yield 'a passkey that observed nothing' => [SessionProofs::passkey(ObservedProperties::none()), false, true, false, false, false, ['pop']];
         yield 'a passkey on a hardware key' => [SessionProofs::passkey(SessionProofs::verified(KeyProtection::HARDWARE)), false, true, true, false, true, ['pop', 'user', 'hwk']];
-        yield 'a passkey on a software key' => [SessionProofs::passkey(new ObservedProperties(keyProtection: KeyProtection::SOFTWARE)), false, true, false, false, false, ['pop', 'swk']];
+        yield 'a passkey on a software key' => [
+            SessionProofs::passkey(new ObservedProperties(keyProtection: KeyProtection::SOFTWARE)),
+            false,
+            true,
+            false,
+            false,
+            false,
+            ['pop', 'swk'],
+        ];
         yield 'an external provider' => [SessionProofs::externalProvider(), false, false, false, false, false, []];
         yield 'an unknown first factor' => [SessionProofs::unknownFirstFactor(), false, false, false, false, false, []];
     }

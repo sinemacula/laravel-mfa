@@ -41,8 +41,22 @@ final class CombinationTest extends TestCase
         yield 'a password, then TOTP' => [Combination::after(SessionProofs::password(), SessionProofs::totp()), true, true, false, false, AssuranceLevel::AAL2];
         yield 'a password, then an SMS code' => [Combination::after(SessionProofs::password(), SessionProofs::sms()), true, true, true, false, AssuranceLevel::AAL2];
         yield 'a phone code, then TOTP' => [Combination::after(SessionProofs::phoneCode(), SessionProofs::totp()), true, false, true, false, AssuranceLevel::AAL1];
-        yield 'a phone code, then a verified passkey' => [Combination::after(SessionProofs::phoneCode(), SessionProofs::passkey(SessionProofs::verified())), true, true, false, true, AssuranceLevel::AAL2];
-        yield 'an external provider, then an email code' => [Combination::after(SessionProofs::externalProvider(), SessionProofs::email()), true, false, false, false, AssuranceLevel::UNCLASSIFIED];
+        yield 'a phone code, then a verified passkey' => [
+            Combination::after(SessionProofs::phoneCode(), SessionProofs::passkey(SessionProofs::verified())),
+            true,
+            true,
+            false,
+            true,
+            AssuranceLevel::AAL2,
+        ];
+        yield 'an external provider, then an email code' => [
+            Combination::after(SessionProofs::externalProvider(), SessionProofs::email()),
+            true,
+            false,
+            false,
+            false,
+            AssuranceLevel::UNCLASSIFIED,
+        ];
     }
 
     /**
@@ -57,12 +71,18 @@ final class CombinationTest extends TestCase
      * @return void
      */
     #[DataProvider('provideCombinations')]
-    public function testAnswersFromItsAuthenticators(Combination $combination, bool $accepted, bool $multifactor, bool $restricted, bool $phishingResistant, AssuranceLevel $level): void
-    {
+    public function testAnswersFromItsAuthenticators(
+        Combination $combination,
+        bool $accepted,
+        bool $multifactor,
+        bool $restricted,
+        bool $phishingResistant,
+        AssuranceLevel $level,
+    ): void {
         self::assertSame($accepted, $combination->accepted);
-        self::assertSame($multifactor, $combination->multifactor());
-        self::assertSame($restricted, $combination->restricted());
-        self::assertSame($phishingResistant, $combination->phishingResistant());
+        self::assertSame($multifactor, $combination->isMultifactor());
+        self::assertSame($restricted, $combination->isRestricted());
+        self::assertSame($phishingResistant, $combination->isPhishingResistant());
         self::assertSame($level, $combination->level());
     }
 

@@ -72,7 +72,7 @@ values they report, and which parts of a requirement they meet within each part'
 
 ## Implementation Anchors
 
-- `src/Assurance/DefaultCombinationPolicy.php`: `accepts()`, `evaluate()`, `shareChannel()`, `firstFactor()`,
+- `src/Assurance/DefaultCombinationPolicy.php`: `accepts()`, `evaluate()`, `isSameChannel()`, `firstFactor()`,
   `combinationOf()`, `restrictedAt()`, `amr()`, `isMet()`.
 - `src/Assurance/Authenticator.php`: the classification of one proof and its `amr` values.
 - `src/Assurance/Combination.php`: the level, multifactor answer, restriction and maximum age of one combination.

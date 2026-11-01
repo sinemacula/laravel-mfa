@@ -9,16 +9,16 @@ use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * One way a session's proofs can satisfy a requirement: a first-factor proof
- * on its own, or the first factor followed by one further proof the policy
+ * One way a session's proofs can satisfy a requirement: a first-factor proof on
+ * its own, or the first factor followed by one further proof the policy
  * accepted after it.
  *
  * A combination supports AAL2 when it holds a multi-factor authenticator, or
  * something known with something had; AAL1 when it holds anything that can
  * establish a level; and no level otherwise. It never supports AAL3, which
  * needs hardware-bound keys that cannot be seen without attestation. It is
- * restricted when it relies on a restricted authenticator, which a
- * multi-factor authenticator makes unnecessary.
+ * restricted when it relies on a restricted authenticator, which a multi-factor
+ * authenticator makes unnecessary.
  *
  * Its time is that of the proof that completes it: a further proof refreshes
  * the combination it completes, and a first factor made again never stands in
@@ -81,14 +81,14 @@ final readonly class Combination
      *
      * @return bool
      */
-    public function multifactor(): bool
+    public function isMultifactor(): bool
     {
         if ($this->hasMultiFactorAuthenticator()) {
             return true;
         }
 
-        return $this->any(static fn (Authenticator $authenticator): bool => $authenticator->knowledge)
-            && $this->any(static fn (Authenticator $authenticator): bool => $authenticator->possession);
+        return $this->hasAuthenticatorWhere(static fn (Authenticator $authenticator): bool => $authenticator->knowledge)
+            && $this->hasAuthenticatorWhere(static fn (Authenticator $authenticator): bool => $authenticator->possession);
     }
 
     /**
@@ -98,7 +98,7 @@ final readonly class Combination
      */
     public function level(): AssuranceLevel
     {
-        if ($this->multifactor()) {
+        if ($this->isMultifactor()) {
             return AssuranceLevel::AAL2;
         }
 
@@ -117,10 +117,10 @@ final readonly class Combination
      *
      * @return bool
      */
-    public function restricted(): bool
+    public function isRestricted(): bool
     {
         return !$this->hasMultiFactorAuthenticator()
-            && $this->any(static fn (Authenticator $authenticator): bool => $authenticator->restricted);
+            && $this->hasAuthenticatorWhere(static fn (Authenticator $authenticator): bool => $authenticator->restricted);
     }
 
     /**
@@ -128,9 +128,9 @@ final readonly class Combination
      *
      * @return bool
      */
-    public function phishingResistant(): bool
+    public function isPhishingResistant(): bool
     {
-        return $this->any(static fn (Authenticator $authenticator): bool => $authenticator->phishingResistant);
+        return $this->hasAuthenticatorWhere(static fn (Authenticator $authenticator): bool => $authenticator->phishingResistant);
     }
 
     /**
@@ -174,7 +174,7 @@ final readonly class Combination
      */
     private function hasMultiFactorAuthenticator(): bool
     {
-        return $this->any(static fn (Authenticator $authenticator): bool => $authenticator->multiFactor);
+        return $this->hasAuthenticatorWhere(static fn (Authenticator $authenticator): bool => $authenticator->multiFactor);
     }
 
     /**
@@ -184,7 +184,7 @@ final readonly class Combination
      * @param  \Closure(\SineMacula\Laravel\Mfa\Assurance\Authenticator): bool  $answer
      * @return bool
      */
-    private function any(\Closure $answer): bool
+    private function hasAuthenticatorWhere(\Closure $answer): bool
     {
         foreach ($this->authenticators as $authenticator) {
             if ($answer($authenticator)) {

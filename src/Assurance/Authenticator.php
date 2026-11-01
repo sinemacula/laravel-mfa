@@ -15,9 +15,9 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  * phishing, and the RFC 8176 `amr` values it adds.
  *
  * The answers come from the channel the proof travelled on, which the driver
- * fixes, and from the properties the proof actually observed, never from a
- * type name or from configuration. A password is something known; an SMS code,
- * a TOTP code, a recovery code and a passkey are something had; a passkey whose
+ * fixes, and from the properties the proof actually observed, never from a type
+ * name or from configuration. A password is something known; an SMS code, a
+ * TOTP code, a recovery code and a passkey are something had; a passkey whose
  * assertion was observed to verify the person is a multi-factor authenticator.
  * An email code is not an out-of-band authenticator, and an external provider's
  * result says nothing this package can classify, so neither is either.
@@ -82,8 +82,8 @@ final readonly class Authenticator
     ) {}
 
     /**
-     * What the given proof shows as an authenticator. A proof without a
-     * channel is a recovery code.
+     * What the given proof shows as an authenticator. A proof without a channel
+     * is a recovery code.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return self
@@ -132,8 +132,8 @@ final readonly class Authenticator
     }
 
     /**
-     * Whether a proof on a channel of the given kind, with what it observed,
-     * is a multi-factor authenticator: a passkey whose assertion verified the
+     * Whether a proof on a channel of the given kind, with what it observed, is
+     * a multi-factor authenticator: a passkey whose assertion verified the
      * person.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
@@ -155,9 +155,26 @@ final readonly class Authenticator
      */
     private static function amrOf(?ChannelKind $kind, ObservedProperties $properties): array
     {
-        $amr = [];
+        $amr = [
+            self::methodAmrOf($kind),
+            $properties->userPresence === true ? self::AMR_USER_PRESENCE : null,
+            self::keyAmrOf($properties->keyProtection),
+        ];
 
-        $method = match ($kind) {
+        return array_values(array_filter($amr, static fn (?string $value): bool => $value !== null));
+    }
+
+    /**
+     * The `amr` value of the method a proof on a channel of the given kind
+     * used, or of a recovery code when there is none; `null` for a channel this
+     * package cannot classify.
+     *
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
+     * @return ?string
+     */
+    private static function methodAmrOf(?ChannelKind $kind): ?string
+    {
+        return match ($kind) {
             ChannelKind::PASSWORD => self::AMR_PASSWORD,
             ChannelKind::SMS      => self::AMR_SMS,
             ChannelKind::EMAIL,
@@ -167,25 +184,21 @@ final readonly class Authenticator
             ChannelKind::EXTERNAL_PROVIDER,
             ChannelKind::UNKNOWN => null,
         };
+    }
 
-        if ($method !== null) {
-            $amr[] = $method;
-        }
-
-        if ($properties->userPresence === true) {
-            $amr[] = self::AMR_USER_PRESENCE;
-        }
-
-        $key = match ($properties->keyProtection) {
+    /**
+     * The `amr` value of the observed protection of a key, or `null` when none
+     * was observed.
+     *
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\KeyProtection  $protection
+     * @return ?string
+     */
+    private static function keyAmrOf(?KeyProtection $protection): ?string
+    {
+        return match ($protection) {
             KeyProtection::HARDWARE => self::AMR_HARDWARE_KEY,
             KeyProtection::SOFTWARE => self::AMR_SOFTWARE_KEY,
             null                    => null,
         };
-
-        if ($key !== null) {
-            $amr[] = $key;
-        }
-
-        return $amr;
     }
 }

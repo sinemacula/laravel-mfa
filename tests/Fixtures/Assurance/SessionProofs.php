@@ -168,9 +168,19 @@ final class SessionProofs
      * @param  string  $application
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
-    public static function totp(int $secondsAgo = 0, string $identityType = self::IDENTITY_TYPE, string $identityKey = self::IDENTITY_KEY, string $application = self::APPLICATION): Proof
-    {
-        return self::factor('totp', new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'), ObservedProperties::none(), $secondsAgo, new ProofBinding($identityType, $identityKey, $application, 'session-1', Purpose::SIGN_IN));
+    public static function totp(
+        int $secondsAgo = 0,
+        string $identityType = self::IDENTITY_TYPE,
+        string $identityKey = self::IDENTITY_KEY,
+        string $application = self::APPLICATION,
+    ): Proof {
+        return self::factor(
+            'totp',
+            new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'),
+            ObservedProperties::none(),
+            $secondsAgo,
+            new ProofBinding($identityType, $identityKey, $application, 'session-1', Purpose::SIGN_IN),
+        );
     }
 
     /**

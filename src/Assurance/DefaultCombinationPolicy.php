@@ -28,12 +28,12 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  * followed by each further proof it accepts. The session is accepted as an
  * additional verification when any further proof is accepted, is multifactor
  * when any combination is, reaches the highest level any combination supports,
- * and is restricted when every combination at that level relies on a
- * restricted authenticator. A requirement part is met when one combination
- * provides it with its completing proof within the part's maximum age, so a
- * fresh further proof refreshes an old first factor, a fresh first factor never
- * stands in for an additional factor, and an old multi-factor first factor does
- * not meet a part that asks for a fresh proof.
+ * and is restricted when every combination at that level relies on a restricted
+ * authenticator. A requirement part is met when one combination provides it
+ * with its completing proof within the part's maximum age, so a fresh further
+ * proof refreshes an old first factor, a fresh first factor never stands in for
+ * an additional factor, and an old multi-factor first factor does not meet a
+ * part that asks for a fresh proof.
  *
  * The proofs must hold exactly one first factor, on a known channel: without
  * one, or with more, nothing is accepted and no level is established. A proof
@@ -75,7 +75,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
             return false;
         }
 
-        return $factor->kind->carriesFactor() && !self::shareChannel($channel, $factor);
+        return $factor->kind->carriesFactor() && !self::isSameChannel($channel, $factor);
     }
 
     /**
@@ -91,8 +91,8 @@ final class DefaultCombinationPolicy implements CombinationPolicy
         $firstFactor  = self::firstFactor($proofs);
         $combinations = $firstFactor === null ? [] : $this->combinations($firstFactor, $proofs);
 
-        $accepted    = self::any($combinations, static fn (Combination $combination): bool => $combination->accepted);
-        $multifactor = self::any($combinations, static fn (Combination $combination): bool => $combination->multifactor());
+        $accepted    = self::hasCombinationWhere($combinations, static fn (Combination $combination): bool => $combination->accepted);
+        $multifactor = self::hasCombinationWhere($combinations, static fn (Combination $combination): bool => $combination->isMultifactor());
         $level       = self::highestLevel($combinations);
 
         [$met, $unmet] = self::judge($requirement, $combinations, CarbonImmutable::now());
@@ -101,7 +101,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
             accepted: $accepted,
             multifactor: $multifactor,
             level: $level,
-            phishingResistant: self::any($combinations, static fn (Combination $combination): bool => $combination->phishingResistant()),
+            phishingResistant: self::hasCombinationWhere($combinations, static fn (Combination $combination): bool => $combination->isPhishingResistant()),
             restricted: self::restrictedAt($level, $combinations),
             amr: self::amr($combinations, $accepted, $multifactor),
             met: $met,
@@ -110,15 +110,15 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Whether a first factor's channel and a factor's channel are the same:
-     * the same kind, with the same destination or credential, or with either
-     * naming none.
+     * Whether a first factor's channel and a factor's channel are the same: the
+     * same kind, with the same destination or credential, or with either naming
+     * none.
      *
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $first
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $factor
      * @return bool
      */
-    private static function shareChannel(Channel $first, Channel $factor): bool
+    private static function isSameChannel(Channel $first, Channel $factor): bool
     {
         if ($first->kind !== $factor->kind) {
             return false;
@@ -128,11 +128,22 @@ final class DefaultCombinationPolicy implements CombinationPolicy
             return true;
         }
 
-        if ($first->kind === ChannelKind::EMAIL) {
-            return mb_strtolower($first->reference) === mb_strtolower($factor->reference);
-        }
+        return self::normalizeReference($first->kind, $first->reference)
+            === self::normalizeReference($factor->kind, $factor->reference);
+    }
 
-        return $first->reference === $factor->reference;
+    /**
+     * A channel's destination or credential in the form two channels of its
+     * kind are compared in: an email address without regard to case, anything
+     * else exactly as given.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
+     * @param  string  $reference
+     * @return string
+     */
+    private static function normalizeReference(ChannelKind $kind, string $reference): string
+    {
+        return $kind === ChannelKind::EMAIL ? mb_strtolower($reference) : $reference;
     }
 
     /**
@@ -167,9 +178,11 @@ final class DefaultCombinationPolicy implements CombinationPolicy
         foreach ($proofs as $proof) {
             $combination = self::isBoundAlike($firstFactor, $proof) ? $this->combinationOf($firstFactor, $proof) : null;
 
-            if ($combination !== null) {
-                $combinations[] = $combination;
+            if ($combination === null) {
+                continue;
             }
+
+            $combinations[] = $combination;
         }
 
         return $combinations;
@@ -223,7 +236,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
      * @param  \Closure(\SineMacula\Laravel\Mfa\Assurance\Combination): bool  $answer
      * @return bool
      */
-    private static function any(array $combinations, \Closure $answer): bool
+    private static function hasCombinationWhere(array $combinations, \Closure $answer): bool
     {
         foreach ($combinations as $combination) {
             if ($answer($combination)) {
@@ -246,9 +259,11 @@ final class DefaultCombinationPolicy implements CombinationPolicy
         $level = AssuranceLevel::UNCLASSIFIED;
 
         foreach ($combinations as $combination) {
-            if ($combination->level()->meets($level)) {
-                $level = $combination->level();
+            if (!$combination->level()->meets($level)) {
+                continue;
             }
+
+            $level = $combination->level();
         }
 
         return $level;
@@ -269,7 +284,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
         }
 
         foreach ($combinations as $combination) {
-            if ($combination->level() === $level && !$combination->restricted()) {
+            if ($combination->level() === $level && !$combination->isRestricted()) {
                 return false;
             }
         }
@@ -367,10 +382,10 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     private static function provides(Combination $combination, RequirementPart $part, ?AssuranceLevel $minimumLevel): bool
     {
         return match ($part) {
-            RequirementPart::ADDITIONAL_VERIFICATION => $combination->accepted || $combination->multifactor(),
-            RequirementPart::MULTIFACTOR             => $combination->multifactor(),
+            RequirementPart::ADDITIONAL_VERIFICATION => $combination->accepted || $combination->isMultifactor(),
+            RequirementPart::MULTIFACTOR             => $combination->isMultifactor(),
             RequirementPart::MINIMUM_LEVEL           => $minimumLevel !== null && $combination->level()->meets($minimumLevel),
-            RequirementPart::PHISHING_RESISTANCE     => $combination->phishingResistant(),
+            RequirementPart::PHISHING_RESISTANCE     => $combination->isPhishingResistant(),
         };
     }
 }

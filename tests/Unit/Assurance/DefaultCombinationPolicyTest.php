@@ -91,20 +91,32 @@ final class DefaultCombinationPolicyTest extends TestCase
         yield 'email to another address' => [SessionProofs::emailCode(), new Channel(ChannelKind::EMAIL, SessionProofs::OTHER_EMAIL), true];
         yield 'SMS after an email code' => [SessionProofs::emailCode(), new Channel(ChannelKind::SMS, SessionProofs::PHONE), true];
         yield 'the passkey signed in with' => [SessionProofs::passkeySignIn(SessionProofs::verified()), new Channel(ChannelKind::PASSKEY, SessionProofs::PASSKEY), false];
-        yield 'a passkey whose credential differs only in case' => [SessionProofs::passkeySignIn(SessionProofs::verified()), new Channel(ChannelKind::PASSKEY, 'Credential-1'), true];
+        yield 'a passkey whose credential differs only in case' => [
+            SessionProofs::passkeySignIn(SessionProofs::verified()),
+            new Channel(ChannelKind::PASSKEY, 'Credential-1'),
+            true,
+        ];
         yield 'another passkey' => [SessionProofs::passkeySignIn(SessionProofs::verified()), new Channel(ChannelKind::PASSKEY, SessionProofs::OTHER_PASSKEY), true];
         yield 'TOTP after an external provider' => [SessionProofs::externalProvider(), new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'), true];
         yield 'TOTP after an unknown first factor' => [SessionProofs::unknownFirstFactor(), new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'), false];
-        yield 'TOTP after a reauthentication with a password' => [SessionProofs::reauthentication(new Channel(ChannelKind::PASSWORD)), new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'), true];
-        yield 'TOTP after a reauthentication on an unknown channel' => [SessionProofs::reauthentication(Channel::unknown()), new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'), false];
+        yield 'TOTP after a reauthentication with a password' => [
+            SessionProofs::reauthentication(new Channel(ChannelKind::PASSWORD)),
+            new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'),
+            true,
+        ];
+        yield 'TOTP after a reauthentication on an unknown channel' => [
+            SessionProofs::reauthentication(Channel::unknown()),
+            new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'),
+            false,
+        ];
         yield 'SMS after another factor, which is no first factor' => [SessionProofs::totp(), new Channel(ChannelKind::SMS, SessionProofs::OTHER_PHONE), false];
         yield 'TOTP after a recovery code, which is no first factor' => [SessionProofs::recoveryCode(), new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'), false];
     }
 
     /**
      * A factor may follow a known first factor unless it shares its channel or
-     * cannot carry a factor; a first factor that is unknown, or no first
-     * factor at all, accepts nothing.
+     * cannot carry a factor; a first factor that is unknown, or no first factor
+     * at all, accepts nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $factor
@@ -118,9 +130,9 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * One row per row of the default classification, then the unknown
-     * channel, the same channel and a passkey that did not verify the person:
-     * the proofs, then whether the combination is accepted, multifactor,
+     * One row per row of the default classification, then the unknown channel,
+     * the same channel and a passkey that did not verify the person: the
+     * proofs, then whether the combination is accepted, multifactor,
      * phishing-resistant and restricted, its level and its `amr` values.
      *
      * @return iterable<string, array{list<\SineMacula\Laravel\Mfa\Proofs\Proof>, bool, bool, bool, bool, \SineMacula\Laravel\Mfa\Enums\AssuranceLevel, list<string>}>
@@ -131,7 +143,15 @@ final class DefaultCombinationPolicyTest extends TestCase
         $unverified = SessionProofs::unverified();
 
         yield 'password, TOTP' => [[SessionProofs::password(), SessionProofs::totp()], true, true, false, false, AssuranceLevel::AAL2, ['pwd', 'otp', 'mfa']];
-        yield 'password, passkey' => [[SessionProofs::password(), SessionProofs::passkey($unverified)], true, true, true, false, AssuranceLevel::AAL2, ['pwd', 'pop', 'user', 'mfa']];
+        yield 'password, passkey' => [
+            [SessionProofs::password(), SessionProofs::passkey($unverified)],
+            true,
+            true,
+            true,
+            false,
+            AssuranceLevel::AAL2,
+            ['pwd', 'pop', 'user', 'mfa'],
+        ];
         yield 'password, recovery code' => [[SessionProofs::password(), SessionProofs::recoveryCode()], true, true, false, false, AssuranceLevel::AAL2, ['pwd', 'otp', 'mfa']];
         yield 'password, SMS code' => [[SessionProofs::password(), SessionProofs::sms()], true, true, false, true, AssuranceLevel::AAL2, ['pwd', 'sms', 'mfa']];
         yield 'password, email code' => [[SessionProofs::password(), SessionProofs::email()], true, false, false, false, AssuranceLevel::AAL1, ['pwd', 'otp', 'mca']];
@@ -139,24 +159,128 @@ final class DefaultCombinationPolicyTest extends TestCase
         yield 'phone code, recovery code' => [[SessionProofs::phoneCode(), SessionProofs::recoveryCode()], true, false, false, true, AssuranceLevel::AAL1, ['sms', 'otp', 'mca']];
         yield 'phone code, SMS code to a different phone' => [[SessionProofs::phoneCode(), SessionProofs::sms()], true, false, false, true, AssuranceLevel::AAL1, ['sms', 'mca']];
         yield 'phone code, email code' => [[SessionProofs::phoneCode(), SessionProofs::email()], true, false, false, true, AssuranceLevel::AAL1, ['sms', 'otp', 'mca']];
-        yield 'phone code, passkey with observed verification' => [[SessionProofs::phoneCode(), SessionProofs::passkey($verified)], true, true, true, false, AssuranceLevel::AAL2, ['sms', 'pop', 'user', 'mfa']];
-        yield 'email code, passkey with observed verification' => [[SessionProofs::emailCode(), SessionProofs::passkey($verified)], true, true, true, false, AssuranceLevel::AAL2, ['otp', 'pop', 'user', 'mfa']];
+        yield 'phone code, passkey with observed verification' => [
+            [SessionProofs::phoneCode(), SessionProofs::passkey($verified)],
+            true,
+            true,
+            true,
+            false,
+            AssuranceLevel::AAL2,
+            ['sms', 'pop', 'user', 'mfa'],
+        ];
+        yield 'email code, passkey with observed verification' => [
+            [SessionProofs::emailCode(), SessionProofs::passkey($verified)],
+            true,
+            true,
+            true,
+            false,
+            AssuranceLevel::AAL2,
+            ['otp', 'pop', 'user', 'mfa'],
+        ];
         yield 'email code, TOTP' => [[SessionProofs::emailCode(), SessionProofs::totp()], true, false, false, false, AssuranceLevel::AAL1, ['otp', 'mca']];
         yield 'email code, recovery code' => [[SessionProofs::emailCode(), SessionProofs::recoveryCode()], true, false, false, false, AssuranceLevel::AAL1, ['otp', 'mca']];
-        yield 'email code, SMS code' => [[SessionProofs::emailCode(), SessionProofs::sms(SessionProofs::PHONE)], true, false, false, true, AssuranceLevel::AAL1, ['otp', 'sms', 'mca']];
-        yield 'phone code, SMS code to the same phone' => [[SessionProofs::phoneCode(), SessionProofs::sms(SessionProofs::PHONE)], false, false, false, true, AssuranceLevel::AAL1, ['sms']];
-        yield 'email code, email code to the same address' => [[SessionProofs::emailCode(), SessionProofs::email(SessionProofs::EMAIL)], false, false, false, false, AssuranceLevel::UNCLASSIFIED, ['otp']];
-        yield 'passkey with observed verification, nothing more' => [[SessionProofs::passkeySignIn($verified)], false, true, true, false, AssuranceLevel::AAL2, ['pop', 'user', 'mfa']];
+        yield 'email code, SMS code' => [
+            [SessionProofs::emailCode(), SessionProofs::sms(SessionProofs::PHONE)],
+            true,
+            false,
+            false,
+            true,
+            AssuranceLevel::AAL1,
+            ['otp', 'sms', 'mca'],
+        ];
+        yield 'phone code, SMS code to the same phone' => [
+            [SessionProofs::phoneCode(), SessionProofs::sms(SessionProofs::PHONE)],
+            false,
+            false,
+            false,
+            true,
+            AssuranceLevel::AAL1,
+            ['sms'],
+        ];
+        yield 'email code, email code to the same address' => [
+            [SessionProofs::emailCode(), SessionProofs::email(SessionProofs::EMAIL)],
+            false,
+            false,
+            false,
+            false,
+            AssuranceLevel::UNCLASSIFIED,
+            ['otp'],
+        ];
+        yield 'passkey with observed verification, nothing more' => [
+            [SessionProofs::passkeySignIn($verified)],
+            false,
+            true,
+            true,
+            false,
+            AssuranceLevel::AAL2,
+            ['pop', 'user', 'mfa'],
+        ];
         yield 'external provider, TOTP' => [[SessionProofs::externalProvider(), SessionProofs::totp()], true, false, false, false, AssuranceLevel::AAL1, ['otp', 'mca']];
-        yield 'external provider, email code' => [[SessionProofs::externalProvider(), SessionProofs::email()], true, false, false, false, AssuranceLevel::UNCLASSIFIED, ['otp', 'mca']];
-        yield 'external provider, passkey with observed verification' => [[SessionProofs::externalProvider(), SessionProofs::passkey($verified)], true, true, true, false, AssuranceLevel::AAL2, ['pop', 'user', 'mfa']];
+        yield 'external provider, email code' => [
+            [SessionProofs::externalProvider(), SessionProofs::email()],
+            true,
+            false,
+            false,
+            false,
+            AssuranceLevel::UNCLASSIFIED,
+            ['otp', 'mca'],
+        ];
+        yield 'external provider, passkey with observed verification' => [
+            [SessionProofs::externalProvider(), SessionProofs::passkey($verified)],
+            true,
+            true,
+            true,
+            false,
+            AssuranceLevel::AAL2,
+            ['pop', 'user', 'mfa'],
+        ];
         yield 'unknown first factor, TOTP' => [[SessionProofs::unknownFirstFactor(), SessionProofs::totp()], false, false, false, false, AssuranceLevel::UNCLASSIFIED, []];
-        yield 'unknown first factor, passkey with observed verification' => [[SessionProofs::unknownFirstFactor(), SessionProofs::passkey($verified)], false, false, false, false, AssuranceLevel::UNCLASSIFIED, []];
+        yield 'unknown first factor, passkey with observed verification' => [
+            [SessionProofs::unknownFirstFactor(), SessionProofs::passkey($verified)],
+            false,
+            false,
+            false,
+            false,
+            AssuranceLevel::UNCLASSIFIED,
+            [],
+        ];
         yield 'no first factor, TOTP' => [[SessionProofs::totp()], false, false, false, false, AssuranceLevel::UNCLASSIFIED, []];
-        yield 'passkey signed in with, then as a factor' => [[SessionProofs::passkeySignIn($unverified), SessionProofs::passkey($unverified, SessionProofs::PASSKEY)], false, false, true, false, AssuranceLevel::AAL1, ['pop', 'user']];
-        yield 'phone code, passkey without observed verification' => [[SessionProofs::phoneCode(), SessionProofs::passkey($unverified)], true, false, true, true, AssuranceLevel::AAL1, ['sms', 'pop', 'user', 'mca']];
-        yield 'phone code, passkey observed not to verify' => [[SessionProofs::phoneCode(), SessionProofs::passkey(SessionProofs::unverified(false))], true, false, true, true, AssuranceLevel::AAL1, ['sms', 'pop', 'user', 'mca']];
-        yield 'passkey without observed verification, nothing more' => [[SessionProofs::passkeySignIn($unverified)], false, false, true, false, AssuranceLevel::AAL1, ['pop', 'user']];
+        yield 'passkey signed in with, then as a factor' => [
+            [SessionProofs::passkeySignIn($unverified), SessionProofs::passkey($unverified, SessionProofs::PASSKEY)],
+            false,
+            false,
+            true,
+            false,
+            AssuranceLevel::AAL1,
+            ['pop', 'user'],
+        ];
+        yield 'phone code, passkey without observed verification' => [
+            [SessionProofs::phoneCode(), SessionProofs::passkey($unverified)],
+            true,
+            false,
+            true,
+            true,
+            AssuranceLevel::AAL1,
+            ['sms', 'pop', 'user', 'mca'],
+        ];
+        yield 'phone code, passkey observed not to verify' => [
+            [SessionProofs::phoneCode(), SessionProofs::passkey(SessionProofs::unverified(false))],
+            true,
+            false,
+            true,
+            true,
+            AssuranceLevel::AAL1,
+            ['sms', 'pop', 'user', 'mca'],
+        ];
+        yield 'passkey without observed verification, nothing more' => [
+            [SessionProofs::passkeySignIn($unverified)],
+            false,
+            false,
+            true,
+            false,
+            AssuranceLevel::AAL1,
+            ['pop', 'user'],
+        ];
         yield 'password, nothing more' => [[SessionProofs::password()], false, false, false, false, AssuranceLevel::AAL1, ['pwd']];
         yield 'email code, nothing more' => [[SessionProofs::emailCode()], false, false, false, false, AssuranceLevel::UNCLASSIFIED, ['otp']];
     }
@@ -175,8 +299,15 @@ final class DefaultCombinationPolicyTest extends TestCase
      * @return void
      */
     #[DataProvider('provideCombinations')]
-    public function testClassifiesTheCombination(array $proofs, bool $accepted, bool $multifactor, bool $phishingResistant, bool $restricted, AssuranceLevel $level, array $amr): void
-    {
+    public function testClassifiesTheCombination(
+        array $proofs,
+        bool $accepted,
+        bool $multifactor,
+        bool $phishingResistant,
+        bool $restricted,
+        AssuranceLevel $level,
+        array $amr,
+    ): void {
         $evaluation = $this->evaluate(Requirement::none(), ...$proofs);
 
         self::assertSame([
@@ -302,8 +433,8 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A fresh further proof refreshes the combination it completes after an
-     * old first factor.
+     * A fresh further proof refreshes the combination it completes after an old
+     * first factor.
      *
      * @return void
      */
@@ -392,7 +523,12 @@ final class DefaultCombinationPolicyTest extends TestCase
      * Rows of a session's proofs, a requirement, and the parts it meets and
      * does not meet.
      *
-     * @return iterable<string, array{list<\SineMacula\Laravel\Mfa\Proofs\Proof>, \SineMacula\Laravel\Mfa\Requirements\Requirement, list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>, list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>}>
+     * @return iterable<string, array{
+     *     list<\SineMacula\Laravel\Mfa\Proofs\Proof>,
+     *     \SineMacula\Laravel\Mfa\Requirements\Requirement,
+     *     list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>,
+     *     list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>,
+     * }>
      */
     public static function provideRequirements(): iterable
     {
@@ -430,7 +566,12 @@ final class DefaultCombinationPolicyTest extends TestCase
             [RequirementPart::MINIMUM_LEVEL],
             [RequirementPart::ADDITIONAL_VERIFICATION],
         ];
-        yield 'an email code alone meets no level' => [[SessionProofs::emailCode()], Requirement::none()->withMinimumLevel(AssuranceLevel::AAL1), [], [RequirementPart::MINIMUM_LEVEL]];
+        yield 'an email code alone meets no level' => [
+            [SessionProofs::emailCode()],
+            Requirement::none()->withMinimumLevel(AssuranceLevel::AAL1),
+            [],
+            [RequirementPart::MINIMUM_LEVEL],
+        ];
         yield 'an unknown first factor meets nothing' => [[SessionProofs::unknownFirstFactor(), SessionProofs::passkey(SessionProofs::verified())], $everything, [], $all];
         yield 'an unknown first factor is not refreshed by a reauthentication' => [
             [SessionProofs::unknownFirstFactor(), SessionProofs::reauthentication(new Channel(ChannelKind::PASSWORD))],
@@ -466,8 +607,8 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Rows of a further proof bound to another identity or application than
-     * the first factor.
+     * Rows of a further proof bound to another identity or application than the
+     * first factor.
      *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Proofs\Proof}>
      */
