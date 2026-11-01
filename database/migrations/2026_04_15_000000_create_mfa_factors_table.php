@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
 use SineMacula\Laravel\Mfa\Database\MigrationCollisionGuard;
+use SineMacula\Laravel\Mfa\Database\StorageConnection;
 
 /**
  * Create the MFA factors table.
@@ -21,17 +22,17 @@ return new class extends Migration {
      *
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorTableAlreadyExistsException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\TableAlreadyExistsException
      */
     public function up(): void
     {
         $table = Config::string('mfa.factor.table', 'mfa_factors') ?: 'mfa_factors';
 
-        $schema = Schema::getConnection()->getSchemaBuilder();
+        $schema = Schema::connection($this->getConnection());
 
-        (new MigrationCollisionGuard($schema))->ensureNotExists($table);
+        (new MigrationCollisionGuard($schema))->ensureNotExists($table, 'factor.table');
 
-        Schema::create($table, static function (Blueprint $blueprint): void {
+        $schema->create($table, static function (Blueprint $blueprint): void {
             $blueprint->ulid('id')->primary();
 
             // Plain string polymorphic columns so the table works against
@@ -97,6 +98,20 @@ return new class extends Migration {
     {
         $table = Config::string('mfa.factor.table', 'mfa_factors') ?: 'mfa_factors';
 
-        Schema::dropIfExists($table);
+        Schema::connection($this->getConnection())->dropIfExists($table);
+    }
+
+    /**
+     * The connection the package's tables live on (see `StorageConnection`),
+     * the one the model reads and writes the table on.
+     *
+     * @return ?string
+     *
+     * @throws \InvalidArgumentException
+     */
+    #[Override]
+    public function getConnection(): ?string
+    {
+        return StorageConnection::name();
     }
 };

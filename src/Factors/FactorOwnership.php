@@ -10,6 +10,7 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
+use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
 
 /**
  * Checks that a factor belongs to an identity, closing the cross-account
@@ -49,9 +50,10 @@ final class FactorOwnership
         $expectedId = $identity->getAuthIdentifier();
 
         if ($factor instanceof EloquentFactor && $factor instanceof Model) {
-            $relation   = $factor->authenticatable();
-            $factorType = $factor->getAttribute($relation->getMorphType());
-            $factorId   = $factor->getAttribute($relation->getForeignKeyName());
+            [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factor);
+
+            $factorType = $factor->getAttribute($typeColumn);
+            $factorId   = $factor->getAttribute($keyColumn);
             $matches    = $factorType === CurrentIdentity::typeOf($identity) && self::isSameIdentifier($factorId, $expectedId);
         } else {
             $owner   = $factor->getAuthenticatable();

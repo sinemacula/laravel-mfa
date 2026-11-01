@@ -12,10 +12,10 @@ use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\InMemoryFactor;
-use Tests\Fixtures\NonModelEloquentBackupCodeFactor;
-use Tests\Fixtures\SecondaryUser;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Factors\NonModelEloquentBackupCodeFactor;
+use Tests\Fixtures\Identities\SecondaryUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -234,11 +234,11 @@ final class EnrollmentServiceTest extends TestCase
     /**
      * Create a test user and authenticate as them.
      *
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function signIn(): TestUser
     {
-        /** @var \Tests\Fixtures\TestUser $user */
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
         $user = TestUser::query()->create(['email' => 'enroll@example.com']);
 
         $this->actingAs($user);

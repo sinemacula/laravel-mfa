@@ -11,8 +11,8 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\InMemoryFactor;
-use Tests\Fixtures\NonEloquentIdentity;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
 
 /**
  * Coverage for the FQCN-fallback paths behind the manager.

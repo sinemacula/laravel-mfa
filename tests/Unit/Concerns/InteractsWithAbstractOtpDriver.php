@@ -8,11 +8,11 @@ use Carbon\CarbonInterface;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
-use Tests\Fixtures\AbstractFactorStub;
-use Tests\Fixtures\CallOrderTrackingFactor;
-use Tests\Fixtures\DispatchTrackingOtpDriver;
+use Tests\Fixtures\Drivers\DispatchTrackingOtpDriver;
 use Tests\Fixtures\Exceptions\DispatchTransportFailureException;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\AbstractFactorStub;
+use Tests\Fixtures\Factors\CallOrderTrackingFactor;
+use Tests\Fixtures\Identities\TestUser;
 
 /**
  * Shared scaffolding for the `AbstractOtpDriver` test family.
@@ -44,7 +44,7 @@ trait InteractsWithAbstractOtpDriver
      * @param  bool  $throwOnDispatch
      * @param  ?string  $alphabet
      * @param  array<int, string>  $orderTracker
-     * @return \Tests\Fixtures\DispatchTrackingOtpDriver
+     * @return \Tests\Fixtures\Drivers\DispatchTrackingOtpDriver
      */
     protected function makeDriver(
         int $codeLength = 6,

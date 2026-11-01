@@ -12,11 +12,11 @@ use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
-use Tests\Fixtures\InMemoryFactor;
-use Tests\Fixtures\MyDriverFactor;
-use Tests\Fixtures\NoopFactorDriver;
-use Tests\Fixtures\RecordingFactorDriver;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Drivers\NoopFactorDriver;
+use Tests\Fixtures\Drivers\RecordingFactorDriver;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Factors\MyDriverFactor;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -288,11 +288,11 @@ final class CustomDriverExtensionTest extends TestCase
     /**
      * Create a test user and authenticate as them.
      *
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function signIn(): TestUser
     {
-        /** @var \Tests\Fixtures\TestUser $user */
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
         $user = TestUser::query()->create(['email' => 'extension@example.com']);
 
         $this->actingAs($user);

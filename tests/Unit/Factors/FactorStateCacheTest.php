@@ -7,10 +7,10 @@ namespace Tests\Unit\Factors;
 use Illuminate\Contracts\Auth\Authenticatable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
-use Tests\Fixtures\NonEloquentIdentity;
-use Tests\Fixtures\NonScalarIdentifierUser;
-use Tests\Fixtures\SecondaryUser;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Fixtures\Identities\NonScalarIdentifierUser;
+use Tests\Fixtures\Identities\SecondaryUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -191,7 +191,7 @@ final class FactorStateCacheTest extends TestCase
      * Build an unsaved test user with the given identifier.
      *
      * @param  int  $id
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function user(int $id): TestUser
     {

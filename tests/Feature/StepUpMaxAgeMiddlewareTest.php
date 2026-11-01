@@ -11,7 +11,7 @@ use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use Tests\Feature\Concerns\InteractsWithRequireMfaMiddleware;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**

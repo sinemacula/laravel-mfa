@@ -13,10 +13,10 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
-use Tests\Fixtures\NoopFactorDriver;
-use Tests\Fixtures\SecondaryUser;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\SecondaryUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -236,11 +236,11 @@ final class RecoveryCodeServiceTest extends TestCase
      * Create a test user and authenticate as them.
      *
      * @param  string  $email
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function signIn(string $email): TestUser
     {
-        /** @var \Tests\Fixtures\TestUser $user */
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
         $user = TestUser::query()->create(['email' => $email]);
 
         $this->actingAs($user);
@@ -270,7 +270,7 @@ final class RecoveryCodeServiceTest extends TestCase
     /**
      * The user's stored backup-code factors.
      *
-     * @param  \Tests\Fixtures\TestUser  $user
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \Illuminate\Support\Collection<int, \SineMacula\Laravel\Mfa\Models\Factor>
      */
     private function backupCodes(TestUser $user): Collection

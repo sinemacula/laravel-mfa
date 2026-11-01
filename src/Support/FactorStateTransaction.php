@@ -1,0 +1,214 @@
+<?php
+
+declare(strict_types = 1);
+
+namespace SineMacula\Laravel\Mfa\Support;
+
+use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
+use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
+
+/**
+ * The one transaction, and the one lock order, of every change that depends on
+ * an identity's whole factor state: confirming its first additional factor,
+ * replacing its recovery codes, removing a factor, a reset, and a verification
+ * racing any of them.
+ *
+ * The transaction runs on the storage connection (see `StorageConnection`),
+ * where every package table lives, so the change commits or rolls back as one.
+ * Inside it the identity's row in the identity states table is locked first,
+ * inserted when the identity has none yet, and the identity's factors second,
+ * read `FOR UPDATE` from the write connection. Every change takes the locks in
+ * that order, so two changes for one identity never wait on each other in
+ * opposite orders: the second waits for the first to commit, then finds what it
+ * left. The callback is handed the factors as stored under the lock, so it
+ * checks its preconditions again on them rather than on what its caller read
+ * before (a factor a concurrent change removed is gone).
+ *
+ * The identity's row is locked by an insert that updates the existing row on a
+ * conflict, which takes the row's exclusive lock in one statement on MySQL and
+ * PostgreSQL, also when two first changes race to create it; SQLite serialises
+ * its writers anyway. A factor model on another connection is refused before
+ * the transaction opens, as two connections cannot commit as one.
+ *
+ * Calls the change makes to another package that must be atomic with it, such
+ * as revoking sessions, belong inside the callback; an adapter whose own
+ * storage is on another connection cannot be.
+ *
+ * @author      Ben Carey <bdmc@sinemacula.co.uk>
+ * @copyright   2026 Sine Macula Limited
+ *
+ * @internal
+ */
+final class FactorStateTransaction
+{
+    /** @var string The setting that names the identity states table. */
+    private const string TABLE_SETTING = 'mfa.identity_state.table';
+
+    /** @var string The identity states table when the setting names none. */
+    private const string DEFAULT_TABLE = 'mfa_identity_states';
+
+    /**
+     * Disallow instantiation; utility container only.
+     */
+    private function __construct() {}
+
+    /**
+     * Run the callback in a transaction on the storage connection, holding the
+     * identity's state lock and then its factors' locks, and return what the
+     * callback returns.
+     *
+     * The factor model is the configured one (an instance only names the class
+     * and its connection); the callback is handed the identity's factors as
+     * stored under the lock.
+     *
+     * @template TReturn
+     *
+     * @formatter:off
+     *
+     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factorModel
+     * @param  \Closure(\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>): TReturn  $callback
+     * @return TReturn
+     *
+     * @formatter:on
+     *
+     * @throws \Throwable
+     *
+     * @param-immediately-invoked-callable $callback
+     */
+    public static function forIdentity(Authenticatable $identity, EloquentFactor&Model $factorModel, \Closure $callback): mixed
+    {
+        return self::run(CurrentIdentity::typeOf($identity), self::keyOf($identity->getAuthIdentifier()), $factorModel, $callback);
+    }
+
+    /**
+     * Run the callback as `forIdentity()` does, for the identity that owns the
+     * factor, read from the factor's owner columns (see `FactorOwnerColumns`),
+     * so an owner that is not an Eloquent model is locked as one that is.
+     *
+     * @template TReturn
+     *
+     * @formatter:off
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \Closure(\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>): TReturn  $callback
+     * @return TReturn
+     *
+     * @formatter:on
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     *
+     * @param-immediately-invoked-callable $callback
+     */
+    public static function forFactor(EloquentFactor&Model $factor, \Closure $callback): mixed
+    {
+        [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factor);
+
+        $type = $factor->getAttribute($typeColumn);
+
+        if (!is_string($type) || $type === '') {
+            throw new UnsupportedIdentifierException('The factor names no owner type, so its owner\'s factor state cannot be locked.');
+        }
+
+        return self::run($type, self::keyOf($factor->getAttribute($keyColumn)), $factor, $callback);
+    }
+
+    /**
+     * Open the transaction, take the locks in order and run the callback.
+     *
+     * @template TReturn
+     *
+     * @formatter:off
+     *
+     * @param  string  $type
+     * @param  string  $key
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factorModel
+     * @param  \Closure(\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>): TReturn  $callback
+     * @return TReturn
+     *
+     * @formatter:on
+     *
+     * @throws \Throwable
+     */
+    private static function run(string $type, string $key, EloquentFactor&Model $factorModel, \Closure $callback): mixed
+    {
+        StorageConnection::assertHolds($factorModel, 'mfa.factor.model');
+
+        $connection = DB::connection(StorageConnection::name());
+
+        return $connection->transaction(static function () use ($connection, $type, $key, $factorModel, $callback): mixed {
+
+            self::lockIdentityState($connection, $type, $key);
+
+            [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factorModel);
+
+            /** @var \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $factors */
+            $factors = $factorModel->newQuery()
+                ->where($typeColumn, $type)
+                ->where($keyColumn, $key)
+                ->lockForUpdate()
+                ->get();
+
+            return $callback($factors);
+        });
+    }
+
+    /**
+     * Lock the identity's state row until the transaction ends, creating it
+     * when the identity has none yet.
+     *
+     * @param  \Illuminate\Database\ConnectionInterface  $connection
+     * @param  string  $type
+     * @param  string  $key
+     * @return void
+     */
+    private static function lockIdentityState(ConnectionInterface $connection, string $type, string $key): void
+    {
+        $now = CarbonImmutable::now();
+
+        $connection->table(self::table())->upsert([[
+            'id'                   => Str::lower((string) Str::ulid()),
+            'authenticatable_type' => $type,
+            'authenticatable_id'   => $key,
+            'created_at'           => $now,
+            'updated_at'           => $now,
+        ]], ['authenticatable_type', 'authenticatable_id'], ['updated_at']);
+    }
+
+    /**
+     * The identity states table.
+     *
+     * @return string
+     */
+    private static function table(): string
+    {
+        return Config::string(self::TABLE_SETTING, self::DEFAULT_TABLE) ?: self::DEFAULT_TABLE;
+    }
+
+    /**
+     * An owner key as it is stored on the owner columns: a string or an
+     * integer, as a string. Anything else is refused rather than collapsing
+     * distinct identities onto one lock.
+     *
+     * @param  mixed  $key
+     * @return string
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private static function keyOf(mixed $key): string
+    {
+        if ((!is_string($key) && !is_int($key)) || $key === '') {
+            throw new UnsupportedIdentifierException(sprintf('An owner key must be a non-empty string or an integer to lock its factor state; got [%s].', get_debug_type($key)));
+        }
+
+        return (string) $key;
+    }
+}

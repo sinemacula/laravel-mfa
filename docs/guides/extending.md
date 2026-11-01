@@ -22,6 +22,9 @@ shipped driver of the same name. So does a driver registered on the manager from
 callback on `mfa`, since the shipped drivers are registered before either runs. Register drivers before any code calls
 `Mfa::driver(...)`, since the manager keeps a driver once it is built.
 
+A custom factor model lives on the storage connection with the package's other tables (see
+[Storage](configuration.md#storage)): one on another connection is refused when the package boots.
+
 In tests, bind `Testing\FakeSmsGateway` as the `SmsGateway` to capture the messages the SMS driver sends instead of
 delivering them.
 
@@ -39,6 +42,8 @@ registers it with the container, and the classes only it uses:
 | `Proofs`        | The recorded verification (`hasExpired()`), `SessionMfaVerificationStore`, `Proof`  |
 | `Verification`  | `challenge()`, `verify()` and `VerificationResult`                                  |
 | `Assurance`     | `Channel`, `ObservedProperties` and `Evaluation`                                    |
+| `Context`       | `PendingContext`, a pending session as an authentication layer resolves it          |
+| `Passkeys`      | `PasskeyAssertion`, what a verified passkey assertion observed                      |
 | `Enrollment`    | `enroll()`                                                                          |
 | `Lifecycle`     | `disable()`                                                                         |
 | `RecoveryCodes` | Backup codes: `issueBackupCodes()` and `BackupCodeDriver`                           |
@@ -47,7 +52,11 @@ registers it with the container, and the classes only it uses:
 
 `Contracts`, `Concerns`, `Models`, `Events`, `Exceptions`, `Enums` and `Facades` hold what their names say for every
 capability (the values and enums assurance is described with are in [Proofs, assurance and requirements](assurance.md)),
-and `Config`, `Database` and `Support` the internal helpers the capabilities share. The `Mfa` facade and `MfaManager`
+and `Config`, `Database` and `Support` the internal helpers the capabilities share, among them
+`Database\StorageConnection` and `Support\FactorStateTransaction` (see [Storage](configuration.md#storage)).
+`Contracts` also declares the seams the requirement, verification, enrolment and lifecycle flows are built against,
+listed in [the seam contracts design note](../design/seam-contracts.md); no shipped flow calls them yet, so none is
+bound by default, and binding one changes nothing until its flow does. The `Mfa` facade and `MfaManager`
 stay the entry point: each manager method hands its call to the service of its capability, so nothing you call changes
 with the layout. The services and `*Bindings` classes are internal; extend the package through the points in the table
 above. How the layout works is described in [the capability services design note](../design/capability-services.md).

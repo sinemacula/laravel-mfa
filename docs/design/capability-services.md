@@ -42,8 +42,9 @@ the provider or another capability.
 
 - The provider registers the configuration, the `mfa` manager singleton and each capability's bindings
   (`FactorBindings`, `DriverBindings`, `CodeBindings`, `RequirementBindings`, `ProofBindings`, `VerificationBindings`,
-  `EnrollmentBindings`, `LifecycleBindings`, `RecoveryCodeBindings`), and at boot the middleware aliases
-  (`HttpBindings`) and the publishing tags.
+  `EnrollmentBindings`, `LifecycleBindings`, `RecoveryCodeBindings`), and at boot the check that every configured model
+  lives on the storage connection (`Database\StorageBindings`), the middleware aliases (`HttpBindings`) and the
+  publishing tags.
 - The `mfa` factory builds the manager, then `DriverBindings::extend()` registers the TOTP, email and SMS drivers and
   `RecoveryCodeBindings::extend()` the backup-code driver, each built from its slice of `mfa.drivers.*`, before the
   container applies any extender or resolving callback.

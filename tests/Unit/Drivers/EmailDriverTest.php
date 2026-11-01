@@ -11,8 +11,8 @@ use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
-use Tests\Fixtures\CustomMfaCodeMessage;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Codes\CustomMfaCodeMessage;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**

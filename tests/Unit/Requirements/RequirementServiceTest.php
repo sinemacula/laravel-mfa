@@ -7,7 +7,7 @@ namespace Tests\Unit\Requirements;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -99,7 +99,7 @@ final class RequirementServiceTest extends TestCase
      * must not be asked when the decision is null.
      *
      * @param  ?bool  $decision
-     * @param  ?\Tests\Fixtures\TestUser  $identity
+     * @param  ?\Tests\Fixtures\Identities\TestUser  $identity
      * @return void
      */
     private function policyAnswering(?bool $decision, ?TestUser $identity = null): void
@@ -119,11 +119,11 @@ final class RequirementServiceTest extends TestCase
      * Create a test user with the given preference and authenticate as them.
      *
      * @param  bool  $prefersMfa
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function signIn(bool $prefersMfa): TestUser
     {
-        /** @var \Tests\Fixtures\TestUser $user */
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
         $user = TestUser::query()->create(['email' => 'requirement@example.com', 'mfa_enabled' => $prefersMfa]);
 
         $this->actingAs($user);

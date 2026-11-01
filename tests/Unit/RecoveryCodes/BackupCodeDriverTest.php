@@ -10,9 +10,10 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
-use Tests\Fixtures\AbstractFactorStub;
-use Tests\Fixtures\NonModelEloquentBackupCodeFactor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\AbstractFactorStub;
+use Tests\Fixtures\Factors\NonModelEloquentBackupCodeFactor;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -145,6 +146,31 @@ final class BackupCodeDriverTest extends TestCase
 
         // Replay against the now-consumed code fails.
         self::assertFalse($driver->verify($fresh, $plain));
+    }
+
+    /**
+     * A stored code whose owner is not an Eloquent model is consumed in that
+     * owner's factor state transaction, once.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testVerifyConsumesAFactorOfANonEloquentOwner(): void
+    {
+        $driver = new BackupCodeDriver;
+        $plain  = 'ELSEWHERE1';
+
+        $factor = FactorModel::query()->create([
+            'authenticatable_type' => NonEloquentIdentity::class,
+            'authenticatable_id'   => 'plain-1',
+            'driver'               => BackupCodeDriver::NAME,
+            'secret'               => $driver->hash($plain),
+        ]);
+
+        self::assertTrue($driver->verify($factor, $plain));
+        self::assertNull($factor->refresh()->getSecret());
+        self::assertFalse($driver->verify($factor, $plain));
     }
 
     /**

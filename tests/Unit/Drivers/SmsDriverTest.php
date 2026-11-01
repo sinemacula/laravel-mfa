@@ -11,7 +11,7 @@ use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**

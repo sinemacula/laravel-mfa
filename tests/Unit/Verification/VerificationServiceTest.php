@@ -20,8 +20,8 @@ use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
-use Tests\Fixtures\InMemoryFactor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -586,11 +586,11 @@ final class VerificationServiceTest extends TestCase
     /**
      * Create a test user and authenticate as them.
      *
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function signIn(): TestUser
     {
-        /** @var \Tests\Fixtures\TestUser $user */
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
         $user = TestUser::query()->create(['email' => 'verify@example.com']);
 
         $this->actingAs($user);
@@ -601,7 +601,7 @@ final class VerificationServiceTest extends TestCase
     /**
      * Create a TOTP factor for the user with the given attempts.
      *
-     * @param  \Tests\Fixtures\TestUser  $user
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  int  $attempts
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */

@@ -98,6 +98,10 @@ return [
 > must use `php artisan key:rotate` rather than simply swapping `APP_KEY` in `.env` — a naive swap leaves
 > existing factor rows un-decryptable.
 
+Every package table lives on one database connection, `storage.connection` (`MFA_STORAGE_CONNECTION`, the default
+connection when `null`), which the shipped models and migrations both use; a factor model on another connection is
+refused when the package boots. See [Storage](docs/guides/configuration.md#storage).
+
 ## Identity Model
 
 Implement `MultiFactorAuthenticatable` on the identity the authentication stack hands back:

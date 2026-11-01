@@ -14,8 +14,8 @@ use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\InMemoryFactor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Identities\TestUser;
 
 /**
  * Driver/factor identity enforcement at the manager boundary.
@@ -158,7 +158,7 @@ final class MfaManagerDriverMismatchTest extends MfaManagerTestCase
      * that user. Returned as a tuple so individual tests can exercise the
      * mismatch shape without re-staging the setup.
      *
-     * @return array{0: \Tests\Fixtures\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
+     * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
     private function stageEmailFactor(): array
     {

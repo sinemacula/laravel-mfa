@@ -16,7 +16,7 @@ use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
-use Tests\Fixtures\FakeMfaManager;
+use Tests\Fixtures\Http\FakeMfaManager;
 
 /**
  * Unit tests for the `RequireMfa` middleware.
@@ -244,7 +244,7 @@ final class RequireMfaTest extends TestCase
     /**
      * Bind the supplied fake manager against the container's `'mfa'` key.
      *
-     * @param  \Tests\Fixtures\FakeMfaManager  $manager
+     * @param  \Tests\Fixtures\Http\FakeMfaManager  $manager
      * @return void
      */
     private function bindManager(FakeMfaManager $manager): void

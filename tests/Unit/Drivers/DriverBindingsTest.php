@@ -16,7 +16,7 @@ use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
-use Tests\Fixtures\CustomMfaCodeMessage;
+use Tests\Fixtures\Codes\CustomMfaCodeMessage;
 use Tests\TestCase;
 
 /**

@@ -12,7 +12,7 @@ use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 
 /**
@@ -366,7 +366,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * Build a fresh TOTP `Factor` model that is NOT yet persisted — the
      * consumer-side shape that `enroll()` is intended to receive.
      *
-     * @param  ?\Tests\Fixtures\TestUser  $user
+     * @param  ?\Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
     private function makeUnpersistedTotpFactor(?TestUser $user = null): Factor
@@ -387,7 +387,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      * Create an MFA-enabled user and authenticate as them, returning the user
      * for enrol-flow tests.
      *
-     * @return \Tests\Fixtures\TestUser
+     * @return \Tests\Fixtures\Identities\TestUser
      */
     private function makeEnrollUser(): TestUser
     {
@@ -404,7 +404,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     /**
      * Persist a TOTP factor against the supplied identity and return the row.
      *
-     * @param  \Tests\Fixtures\TestUser  $user
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
     private function persistTotpFactorFor(TestUser $user): Factor
@@ -423,7 +423,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      *
      * @formatter:off
      *
-     * @return array{0: \SineMacula\Laravel\Mfa\MfaManager, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: \Tests\Fixtures\TestUser}
+     * @return array{0: \SineMacula\Laravel\Mfa\MfaManager, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: \Tests\Fixtures\Identities\TestUser}
      *
      * @formatter:on
      *

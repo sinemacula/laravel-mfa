@@ -14,7 +14,7 @@ use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\TestUser;
 
 /**
  * Unit tests for the `MfaManager` driver factories exposed via `driver($name)`.

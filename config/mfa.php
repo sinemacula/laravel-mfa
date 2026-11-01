@@ -26,6 +26,41 @@ return [
 
     /*
     |---------------------------------------------------------------------------
+    | Storage
+    |---------------------------------------------------------------------------
+    |
+    | The database connection every package table lives on, `null` for the
+    | default connection. The shipped models read and write it, the shipped
+    | migrations create their tables on it, and every change that depends on an
+    | identity's whole factor state runs its transaction on it, so a configured
+    | model on another connection is refused when the package boots. Changing
+    | it moves no table: it is deployment configuration, fixed for the life of
+    | a process.
+    |
+    */
+
+    'storage' => [
+        'connection' => env('MFA_STORAGE_CONNECTION'),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
+    | Identity state
+    |---------------------------------------------------------------------------
+    |
+    | The table holding one row per identity that owns factors. Every change
+    | that depends on the identity's whole factor state locks its row first,
+    | then the identity's factors, so two such changes for one identity run one
+    | after the other.
+    |
+    */
+
+    'identity_state' => [
+        'table' => env('MFA_IDENTITY_STATE_TABLE', 'mfa_identity_states'),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
     | Default expiry
     |---------------------------------------------------------------------------
     |

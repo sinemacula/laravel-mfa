@@ -27,8 +27,30 @@ abstract class TestCase extends BaseTestCase
     /** @var array<string, true> Worker databases this process has created. */
     private static array $workerDatabases = [];
 
+    /** @var mixed The storage connection setting the migrations ran against. */
+    private mixed $migratedStorageConnection = null;
+
+    /**
+     * Boot the application and run its migrations, noting the storage
+     * connection they created the package's tables on.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->migratedStorageConnection = $this->app?->make(Repository::class)->get('mfa.storage.connection');
+    }
+
     /**
      * Destroy the application, then close its database connections.
+     *
+     * The storage connection setting is put back first, so a test that changed
+     * it has the migrations rolled back where they ran: on a database that
+     * outlives the test, a rollback elsewhere would forget the package's tables
+     * while leaving them in place, and the next test could not create them.
      *
      * The application's objects reference each other, so a destroyed
      * application's PDO is only closed once the cycles are collected. Without
@@ -40,6 +62,8 @@ abstract class TestCase extends BaseTestCase
     #[\Override]
     protected function tearDown(): void
     {
+        $this->app?->make(Repository::class)->set('mfa.storage.connection', $this->migratedStorageConnection);
+
         /** @var ?\Illuminate\Database\DatabaseManager $database */
         $database = $this->app?->make('db');
 
@@ -96,7 +120,7 @@ abstract class TestCase extends BaseTestCase
         ]);
         $config->set('auth.providers.users', [
             'driver' => 'eloquent',
-            'model'  => Fixtures\TestUser::class,
+            'model'  => Fixtures\Identities\TestUser::class,
         ]);
     }
 

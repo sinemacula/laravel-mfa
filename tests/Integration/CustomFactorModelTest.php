@@ -11,7 +11,7 @@ use SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\CustomFactor;
+use Tests\Fixtures\Factors\CustomFactor;
 use Tests\TestCase;
 
 /**

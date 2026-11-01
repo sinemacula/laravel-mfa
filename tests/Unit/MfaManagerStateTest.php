@@ -11,9 +11,9 @@ use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use Tests\Fixtures\NonScalarIdentifierUser;
-use Tests\Fixtures\PlainUser;
-use Tests\Fixtures\TestUser;
+use Tests\Fixtures\Identities\NonScalarIdentifierUser;
+use Tests\Fixtures\Identities\PlainUser;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 
 /**
