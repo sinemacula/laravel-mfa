@@ -97,19 +97,23 @@ final class FactorStateCacheTest extends TestCase
     }
 
     /**
-     * Identities with a non-scalar identifier share one slot per type rather
-     * than failing.
+     * An identity with a non-scalar identifier is cached and cleared without
+     * failing.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testIdentitiesWithANonScalarIdentifierShareTheirTypesSlot(): void
+    public function testAcceptsAnIdentityWithANonScalarIdentifier(): void
     {
-        $cache = $this->cache();
+        $cache    = $this->cache();
+        $identity = new NonScalarIdentifierUser;
 
-        self::assertSame('first', $this->read($cache, new NonScalarIdentifierUser, 'setup', 'first'));
-        self::assertSame('first', $this->read($cache, new NonScalarIdentifierUser, 'setup', 'second'));
+        self::assertSame('value', $this->read($cache, $identity, 'setup', 'value'));
+
+        $cache->clear($identity);
+
+        self::assertSame('fresh', $this->read($cache, $identity, 'setup', 'fresh'));
     }
 
     /**

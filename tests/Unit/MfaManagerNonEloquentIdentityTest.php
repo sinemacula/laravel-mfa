@@ -15,14 +15,16 @@ use Tests\Fixtures\InMemoryFactor;
 use Tests\Fixtures\NonEloquentIdentity;
 
 /**
- * Coverage for the manager's FQCN-fallback paths.
+ * Coverage for the FQCN-fallback paths behind the manager.
  *
- * `assertFactorOwnership()`, `getCachePrefix()`, and `issueBackupCodes()` all
- * branch on `$identity instanceof Model` — Eloquent identities use
- * `getMorphClass()`, non-Eloquent identities fall back to a strict FQCN
- * comparison. The shipped test identities (`TestUser`, `SecondaryUser`,
- * `NonScalarIdentifierUser`) are all Eloquent, so a dedicated non-Eloquent
- * fixture is needed to drive the FQCN branches and keep coverage at 100%.
+ * `Support\CurrentIdentity::typeOf()`, which
+ * `Factors\FactorOwnership::assert()`, the `Factors\FactorStateCache` key
+ * prefix and backup-code issuing all use, branches on whether the identity is a
+ * `Model` — Eloquent identities use `getMorphClass()`, non-Eloquent identities
+ * fall back to a strict FQCN comparison. The shipped test identities
+ * (`TestUser`, `SecondaryUser`, `NonScalarIdentifierUser`) are all Eloquent, so
+ * a dedicated non-Eloquent fixture is needed to drive the FQCN branches and
+ * keep coverage at 100%.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -66,7 +68,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * `assertFactorOwnership()` must reject a non-Eloquent factor whose owner
+     * `FactorOwnership::assert()` must reject a non-Eloquent factor whose owner
      * FQCN matches but whose identifier is non-scalar — exercising the
      * `isSameIdentifier()` short-circuit on the non-string-non-int branch.
      *

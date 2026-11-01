@@ -12,14 +12,16 @@ use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\MfaManager;
 
 /**
- * Registers the driver resolver and the shipped TOTP, email and SMS drivers.
+ * Registers the driver resolver, and builds the shipped TOTP, email and SMS
+ * drivers.
  *
- * The drivers are registered against the manager through the standard
- * `extend()` API when the manager is resolved, so they are indistinguishable
+ * The service provider's `mfa` factory registers the drivers against the
+ * manager through the standard `extend()` API, so they are indistinguishable
  * from a consumer's own: a consumer replaces one by calling
- * `Mfa::extend('totp', ...)` from their own service provider, since Laravel's
- * `Manager` resolves the most recent registration. Each factory consumes only
- * the slice of config its driver needs.
+ * `Mfa::extend('totp', ...)` from their own service provider, or from a
+ * container extender or resolving callback on `mfa`, since Laravel's `Manager`
+ * resolves the most recent registration. Each factory consumes only the slice
+ * of config its driver needs.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,8 +36,7 @@ final class DriverBindings
     private function __construct() {}
 
     /**
-     * Register the driver resolver, and the shipped drivers against the manager
-     * once it is resolved.
+     * Register the driver resolver.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
@@ -43,10 +44,6 @@ final class DriverBindings
     public static function register(Application $app): void
     {
         $app->singleton(DriverResolver::class);
-
-        $app->afterResolving(MfaManager::class, static function (MfaManager $manager, Application $app): void {
-            DriverBindings::extend($manager, $app);
-        });
     }
 
     /**

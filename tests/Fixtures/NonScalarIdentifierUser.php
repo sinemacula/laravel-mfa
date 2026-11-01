@@ -15,8 +15,8 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
  * MultiFactorAuthenticatable whose `getAuthIdentifier()` returns an object
- * rather than a scalar, used to exercise the manager's non-scalar
- * auth-identifier fallback branch in `getCachePrefix()`.
+ * rather than a scalar, used to exercise the non-scalar auth-identifier
+ * fallback branch of the `Factors\FactorStateCache` key prefix.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,7 +38,7 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
 
     /**
      * Return a non-scalar auth identifier to exercise the fallback branch of
-     * the manager's `getCachePrefix()` helper.
+     * the `Factors\FactorStateCache` key prefix.
      *
      * @return mixed
      */

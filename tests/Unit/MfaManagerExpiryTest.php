@@ -285,9 +285,9 @@ final class MfaManagerExpiryTest extends MfaManagerTestCase
             $this->fixedStore(Carbon::now()->subMinute()),
         );
 
-        // A non-numeric config falls back to 0 via the manager's
-        // `resolveIntConfig()` defence (with `malformedFallback: 0`), meaning
-        // any prior verification is treated as expired.
+        // A non-numeric config falls back to 0 via the `IntegerSetting::read()`
+        // defence (with `malformedFallback: 0`), meaning any prior verification
+        // is treated as expired.
         self::assertTrue($this->manager()->hasExpired());
     }
 

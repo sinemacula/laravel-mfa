@@ -14,7 +14,7 @@ use Tests\Fixtures\NoopFactorDriver;
 use Tests\TestCase;
 
 /**
- * Tests for `DriverResolver`: drivers come from the manager's registry, a
+ * Tests for `DriverResolver`: drivers come from the registry passed in, a
  * driver that is not a `FactorDriver` is refused, and a factor is only run
  * through its own driver.
  *
@@ -40,9 +40,28 @@ final class DriverResolverTest extends TestCase
 
         $this->manager()->extend('custom', fn (): NoopFactorDriver => $custom);
 
-        self::assertSame($this->manager()->driver('totp'), $this->resolver()->driver('totp'));
-        self::assertInstanceOf(TotpDriver::class, $this->resolver()->resolve('totp'));
-        self::assertSame($custom, $this->resolver()->resolve('custom'));
+        self::assertSame($this->manager()->driver('totp'), $this->resolver()->driver($this->manager(), 'totp'));
+        self::assertInstanceOf(TotpDriver::class, $this->resolver()->resolve($this->manager(), 'totp'));
+        self::assertSame($custom, $this->resolver()->resolve($this->manager(), 'custom'));
+    }
+
+    /**
+     * Each registry answers with its own driver, so a manager built apart from
+     * the `mfa` singleton is not answered from the singleton's registry.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testResolvesFromTheRegistryPassedIn(): void
+    {
+        $own      = new NoopFactorDriver;
+        $separate = new MfaManager($this->container());
+
+        $separate->extend('totp', fn (): NoopFactorDriver => $own);
+
+        self::assertSame($own, $this->resolver()->resolve($separate, 'totp'));
+        self::assertInstanceOf(TotpDriver::class, $this->resolver()->resolve($this->manager(), 'totp'));
     }
 
     /**
@@ -59,12 +78,12 @@ final class DriverResolverTest extends TestCase
 
         $this->manager()->extend('other', fn (): \stdClass => $other);
 
-        self::assertSame($other, $this->resolver()->driver('other'));
+        self::assertSame($other, $this->resolver()->driver($this->manager(), 'other'));
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Driver [other] must implement SineMacula\Laravel\Mfa\Contracts\FactorDriver.');
 
-        $this->resolver()->resolve('other');
+        $this->resolver()->resolve($this->manager(), 'other');
     }
 
     /**

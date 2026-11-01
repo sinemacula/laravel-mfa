@@ -42,7 +42,7 @@ final class RecoveryCodeServiceTest extends TestCase
     {
         Event::fake([MfaFactorEnrolled::class]);
 
-        self::assertSame([], $this->service()->issueBackupCodes());
+        self::assertSame([], $this->service()->issueBackupCodes($this->manager()));
         self::assertSame(0, Factor::query()->count());
         Event::assertNotDispatched(MfaFactorEnrolled::class);
     }
@@ -58,16 +58,12 @@ final class RecoveryCodeServiceTest extends TestCase
     {
         $this->signIn('refused@example.com');
 
-        $manager = $this->container()->make('mfa');
-
-        self::assertInstanceOf(MfaManager::class, $manager);
-
-        $manager->extend(BackupCodeDriver::NAME, fn (): NoopFactorDriver => new NoopFactorDriver);
+        $this->manager()->extend(BackupCodeDriver::NAME, fn (): NoopFactorDriver => new NoopFactorDriver);
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Driver [backup_code] must be a ' . BackupCodeDriver::class . ' instance to issue backup codes.');
 
-        $this->service()->issueBackupCodes();
+        $this->service()->issueBackupCodes($this->manager());
     }
 
     /**
@@ -84,7 +80,7 @@ final class RecoveryCodeServiceTest extends TestCase
 
         Event::fake([MfaFactorEnrolled::class]);
 
-        $codes = $this->service()->issueBackupCodes(3);
+        $codes = $this->service()->issueBackupCodes($this->manager(), 3);
 
         self::assertCount(3, $codes);
 
@@ -114,7 +110,7 @@ final class RecoveryCodeServiceTest extends TestCase
     {
         $this->signIn('count@example.com');
 
-        self::assertCount(10, $this->service()->issueBackupCodes());
+        self::assertCount(10, $this->service()->issueBackupCodes($this->manager()));
     }
 
     /**
@@ -135,7 +131,7 @@ final class RecoveryCodeServiceTest extends TestCase
         $other    = $this->addFactor($neighbour::class, $neighbour->id, BackupCodeDriver::NAME);
         $foreign  = $this->addFactor(SecondaryUser::class, $user->id, BackupCodeDriver::NAME);
 
-        $this->service()->issueBackupCodes(2);
+        $this->service()->issueBackupCodes($this->manager(), 2);
 
         self::assertFalse(Factor::query()->whereKey($previous->getKey())->exists());
         self::assertTrue(Factor::query()->whereKey($totp->getKey())->exists());
@@ -162,7 +158,7 @@ final class RecoveryCodeServiceTest extends TestCase
         });
 
         try {
-            $this->service()->issueBackupCodes(3);
+            $this->service()->issueBackupCodes($this->manager(), 3);
             self::fail('The rotation was expected to fail.');
         } catch (\Throwable $exception) {
             self::assertInstanceOf(MidRotationFailureException::class, $exception);
@@ -186,9 +182,26 @@ final class RecoveryCodeServiceTest extends TestCase
 
         self::assertCount(0, $factors->getFactors() ?? collect([1]));
 
-        $this->service()->issueBackupCodes(2);
+        $this->service()->issueBackupCodes($this->manager(), 2);
 
         self::assertCount(2, $factors->getFactors() ?? collect());
+    }
+
+    /**
+     * Resolve the package's MFA manager, the driver registry the service is
+     * called with.
+     *
+     * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function manager(): MfaManager
+    {
+        $manager = $this->container()->make('mfa');
+
+        self::assertInstanceOf(MfaManager::class, $manager);
+
+        return $manager;
     }
 
     /**
@@ -212,11 +225,7 @@ final class RecoveryCodeServiceTest extends TestCase
      */
     private function driver(): BackupCodeDriver
     {
-        $manager = $this->container()->make('mfa');
-
-        self::assertInstanceOf(MfaManager::class, $manager);
-
-        $driver = $manager->driver(BackupCodeDriver::NAME);
+        $driver = $this->manager()->driver(BackupCodeDriver::NAME);
 
         self::assertInstanceOf(BackupCodeDriver::class, $driver);
 

@@ -13,10 +13,11 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
  * Non-Eloquent identity fixture.
  *
  * Implements `MultiFactorAuthenticatable` without extending
- * `Illuminate\Database\Eloquent\Model`, used to exercise the manager's
- * FQCN-fallback branches in `assertFactorOwnership()`, `getCachePrefix()`, and
- * `issueBackupCodes()` — those paths only fire for identities the morph map
- * cannot resolve through `getMorphClass()`.
+ * `Illuminate\Database\Eloquent\Model`, used to exercise the FQCN-fallback
+ * branch of `Support\CurrentIdentity::typeOf()` that
+ * `Factors\FactorOwnership::assert()`, the `Factors\FactorStateCache` key
+ * prefix and backup-code issuing rely on — that path only fires for identities
+ * the morph map cannot resolve through `getMorphClass()`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +30,8 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      * Constructor.
      *
      * The configurable `$identifier` lets a single fixture exercise both the
-     * normal scalar branch and the unsupported-shape branch of the manager's
-     * identifier-coercion logic.
+     * normal scalar branch and the unsupported-shape branch of
+     * `Factors\FactorOwnership::assert()`'s identifier comparison.
      *
      * @param  mixed  $identifier
      * @param  bool  $mfaEnabled

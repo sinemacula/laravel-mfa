@@ -9,8 +9,8 @@ use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\MfaManager;
 
 /**
- * Registers the backup-code service, and the shipped backup-code driver against
- * the manager once it is resolved.
+ * Registers the backup-code service, and builds the shipped backup-code driver
+ * the service provider's `mfa` factory registers against the manager.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,7 +25,7 @@ final class RecoveryCodeBindings
     private function __construct() {}
 
     /**
-     * Register the backup-code service and driver.
+     * Register the backup-code service.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
@@ -33,10 +33,6 @@ final class RecoveryCodeBindings
     public static function register(Application $app): void
     {
         $app->singleton(RecoveryCodeService::class);
-
-        $app->afterResolving(MfaManager::class, static function (MfaManager $manager, Application $app): void {
-            RecoveryCodeBindings::extend($manager, $app);
-        });
     }
 
     /**

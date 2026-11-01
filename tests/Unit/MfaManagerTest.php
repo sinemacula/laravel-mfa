@@ -24,7 +24,8 @@ use Tests\TestCase;
 /**
  * Pins the manager as a thin entry point: every method hands its arguments to
  * the service of its capability, resolved from the container, and returns that
- * service's answer unchanged.
+ * service's answer unchanged. The methods that run a factor through its driver
+ * also hand the service the manager itself, as the driver registry.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -58,10 +59,11 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * The delegation matrix: manager method, service, service method, arguments
-     * and the service's result.
+     * The delegation matrix: manager method, service, service method,
+     * arguments, the service's result and, where the service runs a driver,
+     * that the manager is passed first as the driver registry.
      *
-     * @return iterable<string, array{string, class-string, string, list<mixed>, mixed}>
+     * @return iterable<string, array{0: string, 1: class-string, 2: string, 3: list<mixed>, 4: mixed, 5?: bool}>
      */
     public static function delegations(): iterable
     {
@@ -81,35 +83,45 @@ final class MfaManagerTest extends TestCase
         yield 'hasExpired without window' => ['hasExpired', ProofService::class, 'hasExpired', [null], false];
         yield 'markVerified' => ['markVerified', ProofService::class, 'markVerified', [], null];
         yield 'forgetVerification' => ['forgetVerification', ProofService::class, 'forgetVerification', [], null];
-        yield 'challenge' => ['challenge', VerificationService::class, 'challenge', ['totp', $factor], null];
-        yield 'verify true' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '123456'], true];
-        yield 'verify false' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '654321'], false];
+        yield 'challenge' => ['challenge', VerificationService::class, 'challenge', ['totp', $factor], null, true];
+        yield 'verify true' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '123456'], true, true];
+        yield 'verify false' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '654321'], false, true];
         yield 'enrol' => ['enrol', EnrolmentService::class, 'enrol', [$factor], null];
         yield 'disable' => ['disable', LifecycleService::class, 'disable', [$factor], null];
-        yield 'issueBackupCodes with count' => ['issueBackupCodes', RecoveryCodeService::class, 'issueBackupCodes', [3], ['A', 'B', 'C']];
-        yield 'issueBackupCodes without count' => ['issueBackupCodes', RecoveryCodeService::class, 'issueBackupCodes', [null], []];
+        yield 'issueBackupCodes with count' => ['issueBackupCodes', RecoveryCodeService::class, 'issueBackupCodes', [3], ['A', 'B', 'C'], true];
+        yield 'issueBackupCodes without count' => ['issueBackupCodes', RecoveryCodeService::class, 'issueBackupCodes', [null], [], true];
         yield 'clearCache for every identity' => ['clearCache', FactorStateCache::class, 'clear', [null], null];
         yield 'clearCache for an identity' => ['clearCache', FactorStateCache::class, 'clear', [new TestUser], null];
     }
 
     /**
      * Each manager method calls the same method on its capability's service
-     * with the arguments it was given, and returns the service's result.
+     * with the arguments it was given, preceded by the manager where the
+     * service runs a driver, and returns the service's result.
      *
      * @param  string  $method
      * @param  class-string  $service
      * @param  string  $serviceMethod
      * @param  list<mixed>  $arguments
      * @param  mixed  $result
+     * @param  bool  $withRegistry
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     #[DataProvider('delegations')]
-    public function testMethodDelegatesToItsCapabilityService(string $method, string $service, string $serviceMethod, array $arguments, mixed $result): void
-    {
+    public function testMethodDelegatesToItsCapabilityService(
+        string $method,
+        string $service,
+        string $serviceMethod,
+        array $arguments,
+        mixed $result,
+        bool $withRegistry = false,
+    ): void {
+        $expected = $withRegistry ? [$this->manager(), ...$arguments] : $arguments;
+
         $double = \Mockery::mock($this->container()->make($service));
-        $double->shouldReceive($serviceMethod)->once()->with(...$arguments)->andReturn($result);
+        $double->shouldReceive($serviceMethod)->once()->with(...$expected)->andReturn($result);
 
         $this->container()->instance($service, $double);
 
@@ -136,7 +148,7 @@ final class MfaManagerTest extends TestCase
         $proofs->shouldReceive('hasExpired')->once()->with(null)->andReturnTrue();
 
         $codes = \Mockery::mock($this->container()->make(RecoveryCodeService::class));
-        $codes->shouldReceive('issueBackupCodes')->once()->with(null)->andReturn([]);
+        $codes->shouldReceive('issueBackupCodes')->once()->with($this->manager(), null)->andReturn([]);
 
         $cache = \Mockery::mock($this->container()->make(FactorStateCache::class));
         $cache->shouldReceive('clear')->once()->with(null);

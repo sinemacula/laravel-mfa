@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\RecoveryCodes;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
@@ -60,12 +61,16 @@ final readonly class RecoveryCodeService
      *
      * No-op (returns `[]`) when no MFA-capable identity is resolvable.
      *
+     * The backup-code driver is resolved from the given registry: the manager
+     * the codes were issued through.
+     *
+     * @param  \Illuminate\Support\Manager  $registry
      * @param  ?int  $count
      * @return list<string>
      *
      * @throws \LogicException
      */
-    public function issueBackupCodes(?int $count = null): array
+    public function issueBackupCodes(Manager $registry, ?int $count = null): array
     {
         $identity = CurrentIdentity::resolve();
 
@@ -73,7 +78,7 @@ final readonly class RecoveryCodeService
             return [];
         }
 
-        $driver = $this->drivers->driver(BackupCodeDriver::NAME);
+        $driver = $this->drivers->driver($registry, BackupCodeDriver::NAME);
 
         if (!$driver instanceof BackupCodeDriver) {
             throw new \LogicException(sprintf('Driver [%s] must be a %s instance to issue backup codes.', BackupCodeDriver::NAME, BackupCodeDriver::class));

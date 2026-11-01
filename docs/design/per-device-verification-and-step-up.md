@@ -35,10 +35,9 @@ by a single swappable seam — the `MfaVerificationStore` contract — plus the 
 
 ## Success Path
 
-- A user completes a verification. `MfaManager::verify()` (the verification service) calls
-  `store->markVerified($identity)` through the bound
-  implementation before dispatching `MfaVerified`. The default session store stamps the current Unix timestamp under
-  `mfa.verified_at.<class>.<identifier>`.
+- A user completes a verification. `MfaManager::verify()` (answered by `Verification\VerificationService`) calls
+  `store->markVerified($identity)` through the bound implementation before dispatching `MfaVerified`. The default
+  session store stamps the current Unix timestamp under `mfa.verified_at.<class>.<identifier>`.
 - A subsequent request routes through `RequireMfa`. The middleware calls `Mfa::shouldUse()` (consumer-bound policy),
   `Mfa::isSetup()`, `Mfa::hasEverVerified()`, then `Mfa::hasExpired($maxAgeMinutes)`.
 - `hasExpired()` resolves the bound store, reads `lastVerifiedAt($identity)`, and compares the elapsed time to

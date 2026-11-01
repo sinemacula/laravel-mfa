@@ -20,11 +20,12 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
 /**
  * MFA service provider.
  *
- * Registers the `mfa` manager singleton and the configuration, then hands each
+ * Registers the configuration and the `mfa` manager singleton, then hands each
  * capability's container wiring to that capability's `*Bindings` class: its
- * service, its defaults for the seams consumers rebind (policy, verification
- * store, SMS gateway) and the drivers it ships. Boots the middleware aliases
- * and config and migration publishing.
+ * service and its defaults for the seams consumers rebind (policy, verification
+ * store, SMS gateway). The shipped drivers are registered against the manager
+ * by their capability's `*Bindings` class from inside the singleton's factory.
+ * Boots the middleware aliases and config and migration publishing.
  *
  * Consumers with their own enforcement policy, stateless verification store, or
  * real SMS gateway rebind the matching contracts in their own service provider;
@@ -45,7 +46,7 @@ final class MfaServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/mfa.php', 'mfa');
 
-        $this->app->singleton('mfa', static fn (Application $app): MfaManager => new MfaManager($app));
+        $this->registerManager();
 
         FactorBindings::register($this->app);
         DriverBindings::register($this->app);
@@ -70,6 +71,29 @@ final class MfaServiceProvider extends ServiceProvider
         $this->offerPublishing();
 
         HttpBindings::boot($this->app);
+    }
+
+    /**
+     * Register the MFA manager singleton with the shipped drivers.
+     *
+     * The shipped drivers are registered inside the factory, through the same
+     * `extend()` API a consumer uses, so they exist before the container runs
+     * any extender or resolving callback a consumer has attached to `mfa`. A
+     * consumer's own registration of a shipped driver's name, whether made
+     * there or later through `Mfa::extend()`, therefore always wins.
+     *
+     * @return void
+     */
+    protected function registerManager(): void
+    {
+        $this->app->singleton('mfa', static function (Application $app): MfaManager {
+            $manager = new MfaManager($app);
+
+            DriverBindings::extend($manager, $app);
+            RecoveryCodeBindings::extend($manager, $app);
+
+            return $manager;
+        });
     }
 
     /**

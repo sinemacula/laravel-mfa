@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Verification;
 use Carbon\Carbon;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Config\IntegerSetting;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
@@ -66,6 +67,10 @@ final readonly class VerificationService
      * routing one driver's logic through a factor registered against another is
      * always a caller bug.
      *
+     * The driver is resolved from the given registry: the manager the challenge
+     * was issued through.
+     *
+     * @param  \Illuminate\Support\Manager  $registry
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
@@ -74,7 +79,7 @@ final readonly class VerificationService
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
      */
-    public function challenge(string $driver, Factor $factor): void
+    public function challenge(Manager $registry, string $driver, Factor $factor): void
     {
         $identity = CurrentIdentity::resolve();
 
@@ -92,7 +97,7 @@ final readonly class VerificationService
         // per-challenge secret to mint and no state to persist, so their
         // `issueChallenge()` is a no-op and their lockout state is preserved
         // across challenge calls.
-        $this->drivers->resolve($driver)->issueChallenge($factor);
+        $this->drivers->resolve($registry, $driver)->issueChallenge($factor);
 
         $events = $this->container->make(Dispatcher::class);
         $events->dispatch(new MfaChallengeIssued($identity, $factor, $driver));
@@ -116,6 +121,10 @@ final readonly class VerificationService
      * primitive. Throws `FactorDriverMismatchException` when the requested
      * driver name does not match the factor's own `getDriver()`.
      *
+     * The driver is resolved from the given registry: the manager the
+     * verification was called on.
+     *
+     * @param  \Illuminate\Support\Manager  $registry
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
@@ -125,7 +134,7 @@ final readonly class VerificationService
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
      */
-    public function verify(string $driver, Factor $factor, #[\SensitiveParameter] string $code): bool
+    public function verify(Manager $registry, string $driver, Factor $factor, #[\SensitiveParameter] string $code): bool
     {
         $identity = CurrentIdentity::resolve();
 
@@ -144,7 +153,7 @@ final readonly class VerificationService
             return false;
         }
 
-        $valid = $this->drivers->resolve($driver)->verify($factor, $code);
+        $valid = $this->drivers->resolve($registry, $driver)->verify($factor, $code);
 
         if ($factor instanceof EloquentFactor) {
             $this->applyVerificationOutcome($factor, $driver, $valid);

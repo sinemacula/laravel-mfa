@@ -16,10 +16,11 @@ Concrete classes in this package are `final` except `MfaManager`, the shipped `M
 | Email code message         | Extend `Codes\MfaCodeMessage` and set `mfa.drivers.email.mailable`                     |
 | Custom factor model        | Extend `Models\Factor` or implement `Contracts\EloquentFactor`; set `mfa.factor.model` |
 
-Every class name above is relative to `SineMacula\Laravel\Mfa`. Bind your own implementations from a service provider:
-a binding made after the package's provider has registered replaces the package's default, and `Mfa::extend()`
-replaces a shipped driver of the same name. Register drivers before any code calls `Mfa::driver(...)`, since the
-manager keeps a driver once it is built.
+Every class name above is relative to `SineMacula\Laravel\Mfa`. Bind your own implementations from a service provider: a
+binding made after the package's provider has registered replaces the package's default, and `Mfa::extend()` replaces a
+shipped driver of the same name. So does a driver registered on the manager from a container extender or a resolving
+callback on `mfa`, since the shipped drivers are registered before either runs. Register drivers before any code calls
+`Mfa::driver(...)`, since the manager keeps a driver once it is built.
 
 In tests, bind `Testing\FakeSmsGateway` as the `SmsGateway` to capture the messages the SMS driver sends instead of
 delivering them.

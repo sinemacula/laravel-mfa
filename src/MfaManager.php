@@ -35,7 +35,9 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  * - `Lifecycle\LifecycleService`: `disable()`.
  * - `RecoveryCodes\RecoveryCodeService`: `issueBackupCodes()`.
  *
- * The built-in drivers are registered by `Drivers\DriverBindings` and
+ * The operations that run a factor through its driver pass the manager itself
+ * to their service, so they use this manager's driver registry. The built-in
+ * drivers are registered by `Drivers\DriverBindings` and
  * `RecoveryCodes\RecoveryCodeBindings` through the same `extend()` API a
  * consumer uses.
  *
@@ -156,7 +158,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function challenge(string $driver, Factor $factor): void
     {
-        $this->container->make(VerificationService::class)->challenge($driver, $factor);
+        $this->container->make(VerificationService::class)->challenge($this, $driver, $factor);
     }
 
     /**
@@ -174,7 +176,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function verify(string $driver, Factor $factor, #[\SensitiveParameter] string $code): bool
     {
-        return $this->container->make(VerificationService::class)->verify($driver, $factor, $code);
+        return $this->container->make(VerificationService::class)->verify($this, $driver, $factor, $code);
     }
 
     /**
@@ -244,7 +246,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function issueBackupCodes(?int $count = null): array
     {
-        return $this->container->make(RecoveryCodeService::class)->issueBackupCodes($count);
+        return $this->container->make(RecoveryCodeService::class)->issueBackupCodes($this, $count);
     }
 
     /**

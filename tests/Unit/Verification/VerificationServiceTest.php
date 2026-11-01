@@ -68,7 +68,7 @@ final class VerificationServiceTest extends TestCase
 
         Event::fake();
 
-        $this->service()->challenge('totp', new InMemoryFactor);
+        $this->service()->challenge($this->manager(), 'totp', new InMemoryFactor);
 
         Event::assertNothingDispatched();
     }
@@ -92,7 +92,7 @@ final class VerificationServiceTest extends TestCase
 
         Event::fake();
 
-        $this->service()->challenge('totp', $factor);
+        $this->service()->challenge($this->manager(), 'totp', $factor);
 
         Event::assertDispatched(
             MfaChallengeIssued::class,
@@ -121,7 +121,7 @@ final class VerificationServiceTest extends TestCase
 
         $this->expectException(FactorDriverMismatchException::class);
 
-        $this->service()->challenge('totp', new InMemoryFactor(driver: 'email', authenticatable: $user));
+        $this->service()->challenge($this->manager(), 'totp', new InMemoryFactor(driver: 'email', authenticatable: $user));
     }
 
     /**
@@ -145,7 +145,7 @@ final class VerificationServiceTest extends TestCase
 
         $this->expectException(FactorOwnershipMismatchException::class);
 
-        $this->service()->challenge('totp', new InMemoryFactor(authenticatable: $other));
+        $this->service()->challenge($this->manager(), 'totp', new InMemoryFactor(authenticatable: $other));
     }
 
     /**
@@ -164,7 +164,7 @@ final class VerificationServiceTest extends TestCase
 
         Event::fake();
 
-        self::assertFalse($this->service()->verify('totp', new InMemoryFactor, '123456'));
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', new InMemoryFactor, '123456'));
         Event::assertNothingDispatched();
     }
 
@@ -183,7 +183,7 @@ final class VerificationServiceTest extends TestCase
 
         $this->expectException(FactorDriverMismatchException::class);
 
-        $this->service()->verify('totp', new InMemoryFactor(driver: 'email', authenticatable: $user), '123456');
+        $this->service()->verify($this->manager(), 'totp', new InMemoryFactor(driver: 'email', authenticatable: $user), '123456');
     }
 
     /**
@@ -203,7 +203,7 @@ final class VerificationServiceTest extends TestCase
 
         $this->expectException(FactorOwnershipMismatchException::class);
 
-        $this->service()->verify('totp', new InMemoryFactor(authenticatable: $other), '123456');
+        $this->service()->verify($this->manager(), 'totp', new InMemoryFactor(authenticatable: $other), '123456');
     }
 
     /**
@@ -222,7 +222,7 @@ final class VerificationServiceTest extends TestCase
 
         Event::fake();
 
-        self::assertFalse($this->service()->verify('totp', $factor, '123456'));
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
         $this->assertFailedWith(MfaVerificationFailureReason::FACTOR_LOCKED);
         Event::assertNotDispatched(MfaVerified::class);
     }
@@ -257,7 +257,7 @@ final class VerificationServiceTest extends TestCase
 
         Event::fake();
 
-        self::assertTrue($this->service()->verify('totp', $factor, '123456'));
+        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
 
         $factor->refresh();
 
@@ -289,7 +289,7 @@ final class VerificationServiceTest extends TestCase
 
         Event::fake();
 
-        self::assertTrue($this->service()->verify('totp', $factor, '123456'));
+        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
         self::assertSame(0, $factor->getAttempts());
         Event::assertDispatched(MfaVerified::class);
     }
@@ -317,7 +317,7 @@ final class VerificationServiceTest extends TestCase
 
         Event::fake();
 
-        self::assertFalse($this->service()->verify('totp', $factor, '000000'));
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '000000'));
 
         $factor->refresh();
 
@@ -374,7 +374,7 @@ final class VerificationServiceTest extends TestCase
 
         $this->stubDriver($this->driverAnswering(false));
 
-        self::assertFalse($this->service()->verify('totp', $factor, '000000'));
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '000000'));
 
         $factor->refresh();
 
@@ -412,7 +412,7 @@ final class VerificationServiceTest extends TestCase
 
         $this->stubDriver($this->driverAnswering(false));
 
-        self::assertFalse($this->service()->verify('totp', $factor, '000000'));
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '000000'));
 
         $factor->refresh();
 
@@ -464,7 +464,7 @@ final class VerificationServiceTest extends TestCase
 
         Event::fake();
 
-        self::assertFalse($this->service()->verify('totp', $factor, '000000'));
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '000000'));
         $this->assertFailedWith($reason);
     }
 
@@ -481,6 +481,23 @@ final class VerificationServiceTest extends TestCase
             MfaVerificationFailed::class,
             static fn (MfaVerificationFailed $event): bool => $event->reason === $reason && $event->driver === 'totp',
         );
+    }
+
+    /**
+     * Resolve the package's MFA manager, the driver registry the service is
+     * called with.
+     *
+     * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function manager(): MfaManager
+    {
+        $manager = $this->container()->make('mfa');
+
+        self::assertInstanceOf(MfaManager::class, $manager);
+
+        return $manager;
     }
 
     /**
@@ -505,11 +522,7 @@ final class VerificationServiceTest extends TestCase
      */
     private function stubDriver(FactorDriver $driver): void
     {
-        $manager = $this->container()->make('mfa');
-
-        self::assertInstanceOf(MfaManager::class, $manager);
-
-        $manager->extend('totp', fn (): FactorDriver => $driver);
+        $this->manager()->extend('totp', fn (): FactorDriver => $driver);
     }
 
     /**
