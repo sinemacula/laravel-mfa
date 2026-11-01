@@ -106,7 +106,7 @@ final class FactorStateCache
         $identifier = $identity->getAuthIdentifier();
 
         $suffix = is_string($identifier) || is_int($identifier)
-            ? (string) $identifier
+            ? $identifier
             : '';
 
         return $prefix . CurrentIdentity::typeOf($identity) . ':' . $suffix . ':';

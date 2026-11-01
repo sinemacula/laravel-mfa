@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Factors;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -11,6 +12,7 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\AbstractEloquentFactorStub;
 use Tests\Fixtures\InMemoryFactor;
 use Tests\Fixtures\NonEloquentIdentity;
 use Tests\Fixtures\NonScalarIdentifierUser;
@@ -137,6 +139,32 @@ final class FactorOwnershipTest extends TestCase
         $this->expectNotToPerformAssertions();
 
         FactorOwnership::assert(new InMemoryFactor(authenticatable: new NonEloquentIdentity($ownerId)), new NonEloquentIdentity(1));
+    }
+
+    /**
+     * A factor that implements the Eloquent contract without being a model is
+     * matched by the owner it reports, not by owner columns it does not have.
+     *
+     * @return void
+     */
+    public function testANonModelEloquentFactorBelongsToItsReportedOwner(): void
+    {
+        $factor = new class extends AbstractEloquentFactorStub {
+            /**
+             * Report identity 1 as the owner.
+             *
+             * @return \Illuminate\Contracts\Auth\Authenticatable
+             */
+            #[\Override]
+            public function getAuthenticatable(): Authenticatable
+            {
+                return new NonEloquentIdentity(1);
+            }
+        };
+
+        $this->expectNotToPerformAssertions();
+
+        FactorOwnership::assert($factor, new NonEloquentIdentity(1));
     }
 
     /**
