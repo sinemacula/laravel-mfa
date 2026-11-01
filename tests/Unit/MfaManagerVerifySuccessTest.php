@@ -5,11 +5,13 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -18,11 +20,11 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
 
 /**
- * Unit tests covering the verify success path and cache-invalidation invariants
- * on `MfaManager::verify()`.
+ * Unit tests covering the verify success path on `MfaManager::verify()`: the
+ * factor's state and the proof recorded on the identity's sign-in.
  *
  * Split out from `MfaManagerVerifyTest` so the success-scenario and
- * cache-side-effect assertions stay cohesive and each test class remains under
+ * proof-recording assertions stay cohesive and each test class remains under
  * the project's max-methods threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -37,9 +39,6 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
 
     /** @var string Canonical right-shape OTP fixture used for the success-path assertions. */
     private const string VALID_CODE = '123456';
-
-    /** @var string Sentinel mismatch code used to drive cache-invalidation scenarios where the driver is stubbed to return success regardless of input. */
-    private const string WRONG_CODE = '000000';
 
     /**
      * Tear down Mockery expectations between test cases.
@@ -89,13 +88,13 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     }
 
     /**
-     * Test successful Eloquent verify stamps the factor verified_at.
+     * Test successful Eloquent verify stamps the factor's last use.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testVerifySuccessStampsVerifiedAtOnFactor(): void
+    public function testVerifySuccessStampsLastUseOnFactor(): void
     {
         [$factor] = $this->seedEloquentVerifySuccessScenario();
 
@@ -103,7 +102,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
 
         $factor->refresh();
 
-        self::assertNotNull($factor->getVerifiedAt());
+        self::assertNotNull($factor->getLastUsedAt());
     }
 
     /**
@@ -161,63 +160,80 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     }
 
     /**
-     * Test verify success clears the per-identity manager cache.
-     *
-     * Pre-condition: the cache is warmed and the underlying row is deleted, so
-     * a stale cache would still report `isSetup()` true. The post-verify
-     * assertion observes the cache invalidation by proving `isSetup()` now
-     * reflects the deleted state.
-     *
-     * @return void
-     */
-    public function testVerifySuccessClearsPerIdentityCache(): void
-    {
-        $manager = $this->seedWarmedCacheVerifyScenario();
-
-        self::assertFalse($manager->isSetup());
-    }
-
-    /**
-     * Test the warming setup remains true before verify is called.
-     *
-     * Documents the pre-condition the cache-clear assertion above relies on:
-     * without the cache the underlying-row deletion would have already flipped
-     * `isSetup()` to false.
+     * Test verify success on a signed-in session records an additional factor
+     * proof on the driver's channel, named by the factor's destination.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testCacheStaysWarmAfterUnderlyingRowDeletion(): void
+    public function testVerifySuccessRecordsAProofOnTheSignIn(): void
     {
-        $user = TestUser::query()->create([
-            'email'       => 'v3-warm@example.com',
-            'mfa_enabled' => true,
-        ]);
+        [$factor, $driver, $user] = $this->seedEloquentVerifySuccessScenario();
 
-        $this->actingAs($user);
+        $driver->shouldReceive('channelKind')->andReturn(ChannelKind::EMAIL);
 
-        Factor::query()->create([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => 'JBSWY3DPEHPK3PXP',
-        ]);
+        Auth::login($user);
 
-        $manager = $this->manager();
+        $this->manager()->verify('email', $factor, self::VALID_CODE);
 
-        self::assertTrue($manager->isSetup());
+        $proofs = $this->manager()->proofs();
 
-        Factor::query()->where('authenticatable_id', $user->getKey())->delete();
-
-        self::assertTrue($manager->isSetup(), 'cache still warm before verify');
+        self::assertCount(1, $proofs);
+        self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proofs[0]->kind);
+        self::assertSame('email', $proofs[0]->method);
+        self::assertSame($factor->getKey(), $proofs[0]->reference);
+        self::assertSame(['kind' => 'email', 'reference' => 'v2@example.com'], $proofs[0]->channel?->toArray());
     }
 
     /**
-     * Stage the Eloquent-factor success scenario and return the persisted
-     * factor for the assertions to observe.
+     * Test verify success without a sign-in records nothing and never asks
+     * the driver for its channel.
      *
-     * @return array{0: \SineMacula\Laravel\Mfa\Models\Factor}
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testVerifySuccessWithoutASignInRecordsNothing(): void
+    {
+        [$factor, $driver] = $this->seedEloquentVerifySuccessScenario();
+
+        $driver->shouldNotReceive('channelKind');
+
+        self::assertTrue($this->manager()->verify('email', $factor, self::VALID_CODE));
+        self::assertSame([], $this->manager()->proofs());
+    }
+
+    /**
+     * Test verify success through a driver whose channel cannot carry a
+     * factor records nothing, even on a signed-in session.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testVerifySuccessOnAnUnknownChannelRecordsNothing(): void
+    {
+        [$factor, $driver, $user] = $this->seedEloquentVerifySuccessScenario();
+
+        $driver->shouldReceive('channelKind')->andReturn(ChannelKind::UNKNOWN);
+
+        Auth::login($user);
+
+        self::assertTrue($this->manager()->verify('email', $factor, self::VALID_CODE));
+        self::assertSame([], $this->manager()->proofs());
+    }
+
+    /**
+     * Stage the Eloquent-factor success scenario, acting as the user without
+     * signing them in, and return the persisted factor, the stubbed driver and
+     * the user for the assertions to observe.
+     *
+     * @formatter:off
+     *
+     * @return array{0: \SineMacula\Laravel\Mfa\Models\Factor, 1: \Mockery\MockInterface&\SineMacula\Laravel\Mfa\Contracts\FactorDriver, 2: \Tests\Fixtures\Identities\TestUser}
+     *
+     * @formatter:on
      */
     private function seedEloquentVerifySuccessScenario(): array
     {
@@ -242,56 +258,6 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
 
         $this->stubDriver('email', $driver);
 
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('markVerified')
-            ->andReturn();
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
-
-        return [$factor];
-    }
-
-    /**
-     * Stage the warm-cache verify scenario: enrol a factor, warm the manager's
-     * per-identity cache, delete the row, then run a successful verify so the
-     * post-verify cache state is observable.
-     *
-     * @return \SineMacula\Laravel\Mfa\MfaManager
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    private function seedWarmedCacheVerifyScenario(): MfaManager
-    {
-        $user = TestUser::query()->create([
-            'email'       => 'v3@example.com',
-            'mfa_enabled' => true,
-        ]);
-
-        $this->actingAs($user);
-
-        $factor = Factor::query()->create([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => 'JBSWY3DPEHPK3PXP',
-        ]);
-
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldReceive('verify')->andReturnTrue();
-
-        $this->stubDriver('totp', $driver);
-
-        $manager = $this->manager();
-
-        // Warm the setup cache.
-        $manager->isSetup();
-
-        // Remove the backing row so a stale cache would still report
-        // `isSetup()` true after the verify.
-        Factor::query()->where('authenticatable_id', $user->getKey())->delete();
-
-        $manager->verify('totp', $factor, self::WRONG_CODE);
-
-        return $manager;
+        return [$factor, $driver, $user];
     }
 }

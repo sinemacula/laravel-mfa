@@ -6,11 +6,13 @@ namespace Tests\Feature;
 
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
@@ -24,9 +26,9 @@ use Tests\TestCase;
  * End-to-end TOTP lifecycle feature tests.
  *
  * Exercises the full enrolment → challenge → verify flow against a real Factor
- * row, a real Google2FA instance, and the default session-backed verification
- * store. Assertions cover the events fired, the factor state transitions, and
- * the store updates.
+ * row, a real Google2FA instance, and the default session-backed proof store.
+ * Assertions cover the events fired, the factor state transitions, and the
+ * proofs recorded.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -59,7 +61,8 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test successful TOTP verification marks the verification store.
+     * Test successful TOTP verification on a signed-in session records an
+     * additional factor proof of the factor.
      *
      * @return void
      *
@@ -67,18 +70,23 @@ final class TotpLifecycleTest extends TestCase
      * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
      * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
-    public function testSuccessfulVerificationMarksVerificationStore(): void
+    public function testSuccessfulVerificationRecordsAProof(): void
     {
-        [, $factor, $code] = $this->enrollTotp();
+        [$user, $factor, $code] = $this->enrollTotp();
+
+        Auth::login($user);
 
         Mfa::verify('totp', $factor, $code);
 
-        self::assertTrue(Mfa::hasEverVerified());
-        self::assertFalse(Mfa::hasExpired());
+        $proofs = Mfa::proofs();
+
+        self::assertCount(1, $proofs);
+        self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proofs[0]->kind);
+        self::assertSame($factor->getKey(), $proofs[0]->reference);
     }
 
     /**
-     * Test successful TOTP verification stamps the factor verified_at.
+     * Test successful TOTP verification stamps the factor's last use.
      *
      * @return void
      *
@@ -86,7 +94,7 @@ final class TotpLifecycleTest extends TestCase
      * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
      * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
-    public function testSuccessfulVerificationStampsFactorVerifiedAt(): void
+    public function testSuccessfulVerificationStampsFactorLastUse(): void
     {
         [, $factor, $code] = $this->enrollTotp();
 
@@ -94,7 +102,7 @@ final class TotpLifecycleTest extends TestCase
 
         $factor->refresh();
 
-        self::assertNotNull($factor->getVerifiedAt());
+        self::assertNotNull($factor->getLastUsedAt());
         self::assertSame(0, $factor->getAttempts());
     }
 
@@ -147,7 +155,7 @@ final class TotpLifecycleTest extends TestCase
 
         $factor->refresh();
         self::assertSame(1, $factor->getAttempts());
-        self::assertNull($factor->getVerifiedAt());
+        self::assertNull($factor->getLastUsedAt());
 
         Event::assertDispatched(
             MfaVerificationFailed::class,

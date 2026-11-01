@@ -242,7 +242,6 @@ final class ActsAsFactorStateTest extends TestCase
         $factor->recordVerification();
 
         self::assertSame('2026-04-15T10:00:00+00:00', $factor->getLastUsedAt()?->toIso8601String());
-        self::assertSame('2026-04-15T10:00:00+00:00', $factor->getVerifiedAt()?->toIso8601String());
 
         $factor->recordVerification(Carbon::parse('2026-04-14T08:00:00+00:00'));
 

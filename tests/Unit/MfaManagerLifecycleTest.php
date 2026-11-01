@@ -4,23 +4,31 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
-use Illuminate\Contracts\Auth\Authenticatable;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\Assurance\Channel;
+use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 
 /**
  * Unit tests for `MfaManager` lifecycle mutations.
  *
- * Covers `markVerified()`, `forgetVerification()`, `clearCache()`, `enroll()`,
- * and `disable()`. Split out from the broader state-test family so each subject
- * stays under the project's max-methods-per-class threshold.
+ * Covers `enroll()` and `disable()`. Split out from the broader state-test
+ * family so each subject stays under the project's max-methods-per-class
+ * threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -31,164 +39,6 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 final class MfaManagerLifecycleTest extends MfaManagerTestCase
 {
     use InteractsWithMfaManagerState;
-
-    /**
-     * Without an identity `markVerified()` must not touch the verification
-     * store.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testMarkVerifiedIsNoopWhenNoIdentity(): void
-    {
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldNotReceive('markVerified');
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
-
-        $this->manager()->markVerified();
-
-        $store->shouldNotHaveReceived('markVerified');
-    }
-
-    /**
-     * With an identity `markVerified()` should delegate to the bound store's
-     * `markVerified()` method.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testMarkVerifiedDelegatesToStore(): void
-    {
-        $user = TestUser::query()->create(['email' => 'p@example.com']);
-
-        $this->actingAs($user);
-
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('markVerified')
-            ->once()
-            ->with(\Mockery::type(Authenticatable::class));
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
-
-        $this->manager()->markVerified();
-
-        $store->shouldHaveReceived('markVerified')
-            ->once()
-            ->with(\Mockery::type(Authenticatable::class));
-    }
-
-    /**
-     * Without an identity `forgetVerification()` must not touch the
-     * verification store.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testForgetVerificationIsNoopWhenNoIdentity(): void
-    {
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldNotReceive('forget');
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
-
-        $this->manager()->forgetVerification();
-
-        $store->shouldNotHaveReceived('forget');
-    }
-
-    /**
-     * With an identity `forgetVerification()` should delegate to the bound
-     * store's `forget()` method.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testForgetVerificationDelegatesToStore(): void
-    {
-        $user = TestUser::query()->create(['email' => 'q@example.com']);
-
-        $this->actingAs($user);
-
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('forget')
-            ->once()
-            ->with(\Mockery::type(Authenticatable::class));
-
-        $this->container()->instance(MfaVerificationStore::class, $store);
-
-        $this->manager()->forgetVerification();
-
-        $store->shouldHaveReceived('forget')
-            ->once()
-            ->with(\Mockery::type(Authenticatable::class));
-    }
-
-    /**
-     * Calling `clearCache()` without an identity argument should flush every
-     * cached entry across the manager.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testClearCacheWithoutIdentityFlushesEverything(): void
-    {
-        $user = $this->makeUserWithFactor();
-
-        $this->actingAs($user);
-
-        $manager = $this->manager();
-
-        self::assertTrue($manager->isSetup());
-
-        Factor::query()->where('authenticatable_id', $user->getKey())->delete();
-
-        // Still cached before flush.
-        self::assertTrue($manager->isSetup());
-
-        $manager->clearCache();
-
-        self::assertFalse($manager->isSetup());
-    }
-
-    /**
-     * Scoping `clearCache()` to a single identity must leave other identities'
-     * cache entries intact.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testClearCacheScopedToIdentityLeavesOthersAlone(): void
-    {
-        $userA = $this->makeUserWithFactor('user-a@example.com');
-        $userB = $this->makeUserWithFactor('user-b@example.com');
-
-        $manager = $this->manager();
-
-        $this->actingAs($userA);
-        self::assertTrue($manager->isSetup());
-
-        $this->actingAs($userB);
-        self::assertTrue($manager->isSetup());
-
-        // Wipe the underlying data for both users, then scope-clear A.
-        Factor::query()->delete();
-
-        $manager->clearCache($userA);
-
-        $this->actingAs($userA);
-        self::assertFalse($manager->isSetup());
-
-        // B's cache entry survives the scoped clear.
-        $this->actingAs($userB);
-        self::assertTrue($manager->isSetup());
-    }
 
     /**
      * Without an identity `enroll()` must not persist the factor or dispatch
@@ -254,24 +104,22 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Test enroll() invalidates the identity's isSetup cache.
+     * Test isSetup() sees a factor enroll() persisted at once.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrollInvalidatesIsSetupCache(): void
+    public function testEnrollIsSeenByIsSetupAtOnce(): void
     {
         $user    = $this->makeEnrollUser();
         $manager = $this->manager();
 
-        // Warm the setup cache to "no factors" so the post-enrol invalidation
-        // must force a fresh lookup.
         self::assertFalse($manager->isSetup());
 
         $manager->enroll($this->makeUnpersistedTotpFactor($user));
 
-        self::assertTrue($manager->isSetup(), 'cache must be cleared after enroll()');
+        self::assertTrue($manager->isSetup(), 'isSetup() must see the enrolled factor');
     }
 
     /**
@@ -343,23 +191,62 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Test disable invalidates the identity's isSetup cache.
+     * Test isSetup() sees a factor disable() removed at once.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testDisableInvalidatesIsSetupCache(): void
+    public function testDisableIsSeenByIsSetupAtOnce(): void
     {
         [$manager, $factor] = $this->enrollAndResolveFactor();
 
-        // Warm the setup cache to "has factor" so the post-disable invalidation
-        // must force a fresh lookup.
         self::assertTrue($manager->isSetup());
 
         $manager->disable($factor);
 
-        self::assertFalse($manager->isSetup(), 'cache must be cleared after disable');
+        self::assertFalse($manager->isSetup(), 'isSetup() must no longer see the disabled factor');
+    }
+
+    /**
+     * Test disable stops every proof made with the factor counting on the
+     * current sign-in, and keeps the proofs of other factors.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testDisableStopsTheFactorsProofsCounting(): void
+    {
+        [$manager, $factor, $user] = $this->enrollAndResolveFactor();
+
+        Auth::login($user);
+
+        $store   = $this->container()->make(ProofStore::class);
+        $session = $store->currentSession($user);
+
+        self::assertIsString($session);
+
+        $factorId = $factor->getKey();
+
+        self::assertIsString($factorId);
+
+        foreach ([$factorId, 'another-factor'] as $reference) {
+            $store->record(new Proof(
+                ProofKind::ADDITIONAL_FACTOR,
+                'totp',
+                new Channel(ChannelKind::AUTHENTICATOR_APP, $reference),
+                $reference,
+                ObservedProperties::none(),
+                CarbonImmutable::now(),
+                new ProofBinding(TestUser::class, (string) $user->id, 'web', $session, Purpose::STEP_UP),
+                0,
+            ));
+        }
+
+        $manager->disable($factor);
+
+        self::assertSame(['another-factor'], array_map(static fn (Proof $proof): ?string => $proof->reference, $manager->proofs()));
     }
 
     /**

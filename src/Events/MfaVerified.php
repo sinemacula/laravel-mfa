@@ -11,9 +11,9 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  * Dispatched after the MFA manager records a successful verification against a
  * factor.
  *
- * Fires after the factor's attempt counters have been reset, the verification
- * timestamp has been stamped, and the bound verification store has been updated
- * for the current identity. Consumers can subscribe to extend the
+ * Fires after the factor's attempt counters have been reset, its last use has
+ * been stamped, and the proof has been recorded on the identity's current
+ * sign-in through the bound proof store. Consumers can subscribe to extend the
  * request-scoped verification window, emit audit-log entries, or refresh cached
  * authorisation decisions.
  *

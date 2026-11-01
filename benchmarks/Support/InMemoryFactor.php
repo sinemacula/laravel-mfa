@@ -37,7 +37,6 @@ final class InMemoryFactor implements Factor
      * @param  int  $attempts
      * @param  ?\Carbon\CarbonInterface  $lockedUntil
      * @param  ?\Carbon\CarbonInterface  $lastAttemptedAt
-     * @param  ?\Carbon\CarbonInterface  $verifiedAt
      * @param  ?\Illuminate\Contracts\Auth\Authenticatable  $authenticatable
      * @return void
      */
@@ -72,9 +71,6 @@ final class InMemoryFactor implements Factor
 
         /** Timestamp of the most recent verification attempt. */
         private ?CarbonInterface $lastAttemptedAt = null,
-
-        /** Timestamp of the most recent successful verification. */
-        private ?CarbonInterface $verifiedAt = null,
 
         /** Owning authenticatable, if bound. */
         private ?Authenticatable $authenticatable = null,
@@ -234,27 +230,5 @@ final class InMemoryFactor implements Factor
     public function getLastAttemptedAt(): ?CarbonInterface
     {
         return $this->lastAttemptedAt;
-    }
-
-    /**
-     * Return the configured verification timestamp.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getVerifiedAt(): ?CarbonInterface
-    {
-        return $this->verifiedAt;
-    }
-
-    /**
-     * Report whether the factor has been verified at least once.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isVerified(): bool
-    {
-        return $this->verifiedAt !== null;
     }
 }

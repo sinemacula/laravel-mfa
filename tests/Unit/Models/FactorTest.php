@@ -329,7 +329,6 @@ final class FactorTest extends TestCase
             'last_used_at',
             'code',
             'expires_at',
-            'verified_at',
             'attempts',
             'locked_until',
             'last_attempted_at',

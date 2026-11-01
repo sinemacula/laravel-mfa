@@ -4,11 +4,9 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
@@ -19,11 +17,10 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 /**
  * Unit tests for `MfaManager` lookup-style state queries.
  *
- * Covers `getDefaultDriver()`, `shouldUse()`, `isSetup()`, `hasEverVerified()`,
- * and `getFactors()`. The expiry-window and lifecycle-mutation surfaces live in
- * dedicated sibling files (`MfaManagerExpiryTest`, `MfaManagerLifecycleTest`)
- * so each subject stays under the project's max-methods-per-class threshold
- * without losing its cohesive grouping.
+ * Covers `getDefaultDriver()`, `shouldUse()`, `isSetup()` and `getFactors()`.
+ * The lifecycle-mutation surface lives in a dedicated sibling file
+ * (`MfaManagerLifecycleTest`) so each subject stays under the project's
+ * max-methods-per-class threshold without losing its cohesive grouping.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -197,14 +194,15 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Repeated `isSetup()` calls within a single request must hit the runtime
-     * cache rather than re-querying the database.
+     * `isSetup()` reads the identity's factors on every call, so a factor
+     * removed since the last call is gone at once and nothing is kept from
+     * one request to the next.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testIsSetupCachesResultBetweenCalls(): void
+    public function testIsSetupReadsTheFactorsOnEveryCall(): void
     {
         $user = $this->makeUserWithFactor();
 
@@ -214,66 +212,9 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         self::assertTrue($manager->isSetup());
 
-        // Wipe the underlying data — the cached entry must survive.
         Factor::query()->where('authenticatable_id', $user->getKey())->delete();
 
-        self::assertTrue($manager->isSetup());
-    }
-
-    /**
-     * Without an identity `hasEverVerified()` must short-circuit to false.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testHasEverVerifiedReturnsFalseWhenNoIdentity(): void
-    {
-        self::assertFalse($this->manager()->hasEverVerified());
-    }
-
-    /**
-     * When the bound store reports no prior verification timestamp,
-     * `hasEverVerified()` must return false.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testHasEverVerifiedReturnsFalseWhenStoreReturnsNull(): void
-    {
-        $user = TestUser::query()->create(['email' => 'e@example.com']);
-
-        $this->actingAs($user);
-
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->nullStore(),
-        );
-
-        self::assertFalse($this->manager()->hasEverVerified());
-    }
-
-    /**
-     * When the bound store reports a non-null verification timestamp,
-     * `hasEverVerified()` must return true.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testHasEverVerifiedReturnsTrueWhenStoreReturnsTimestamp(): void
-    {
-        $user = TestUser::query()->create(['email' => 'f@example.com']);
-
-        $this->actingAs($user);
-
-        $this->container()->instance(
-            MfaVerificationStore::class,
-            $this->fixedStore(Carbon::now()->subMinute()),
-        );
-
-        self::assertTrue($this->manager()->hasEverVerified());
+        self::assertFalse($manager->isSetup());
     }
 
     /**
@@ -311,14 +252,14 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * `getFactors()` should cache its returned collection so repeated calls
-     * within the same request do not re-query the database.
+     * `getFactors()` reads the identity's factors on every call, so a factor
+     * removed since the last call is gone at once.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testGetFactorsCachesCollectionBetweenCalls(): void
+    public function testGetFactorsReadsTheFactorsOnEveryCall(): void
     {
         $user = $this->makeUserWithFactor();
 
@@ -326,22 +267,17 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $manager = $this->manager();
 
-        $first = $manager->getFactors();
+        self::assertCount(1, $manager->getFactors() ?? []);
 
-        // Mutate the underlying store; cached result stays stable.
         Factor::query()->where('authenticatable_id', $user->getKey())->delete();
 
-        $second = $manager->getFactors();
-
-        self::assertSame($first, $second);
+        self::assertCount(0, $manager->getFactors() ?? [1]);
     }
 
     /**
      * `isSetup()` must complete without throwing when the resolved identity's
-     * auth identifier is non-scalar (neither string nor int). The empty-suffix
-     * fallback inside the cache-prefix builder is exercised on the way in; the
-     * actual composition is private to the manager and asserted indirectly
-     * through the no-throw outcome here.
+     * auth identifier is non-scalar (neither string nor int): it asks the
+     * identity alone and keys nothing by the identifier.
      *
      * @return void
      *

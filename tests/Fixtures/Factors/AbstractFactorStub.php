@@ -136,9 +136,7 @@ abstract class AbstractFactorStub implements Factor
     public function isLocked(): bool
     {
         // Derived from the accessor so subclasses can flip the lock state by
-        // overriding `getLockedUntil()` alone — and so the body is not
-        // byte-identical to `isVerified()` (radarlint S4144 flags structurally
-        // identical method bodies).
+        // overriding `getLockedUntil()` alone.
         return $this->getLockedUntil() !== null;
     }
 
@@ -160,28 +158,6 @@ abstract class AbstractFactorStub implements Factor
      */
     #[\Override]
     public function getLastAttemptedAt(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
-     * Report whether the stub has been verified at least once.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isVerified(): bool
-    {
-        return $this->getVerifiedAt() !== null;
-    }
-
-    /**
-     * Return the stub's default verification timestamp (none).
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getVerifiedAt(): ?CarbonInterface
     {
         return null;
     }

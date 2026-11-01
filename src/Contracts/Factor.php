@@ -228,18 +228,4 @@ interface Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethod
      * @return ?\Carbon\CarbonInterface
      */
     public function getLastAttemptedAt(): ?CarbonInterface;
-
-    /**
-     * Return when the factor last passed a verification.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getVerifiedAt(): ?CarbonInterface;
-
-    /**
-     * Determine whether the factor has ever passed a verification.
-     *
-     * @return bool
-     */
-    public function isVerified(): bool;
 }

@@ -4,9 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Concerns;
 
-use Carbon\Carbon;
 use PHPUnit\Framework\Assert;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Identities\TestUser;
@@ -14,10 +12,9 @@ use Tests\Fixtures\Identities\TestUser;
 /**
  * Shared scaffolding for the `MfaManager` state-test family.
  *
- * The state suite is split into three subjects (lookups / expiry / lifecycle)
- * to stay under the max-methods-per-class threshold. This trait centralises the
- * shared helpers — manager resolution, factor seeding, fake stores, and Mockery
- * teardown.
+ * The state suite is split into two subjects (lookups / lifecycle) to stay
+ * under the max-methods-per-class threshold. This trait centralises the shared
+ * helpers — manager resolution, factor seeding, and Mockery teardown.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -77,37 +74,5 @@ trait InteractsWithMfaManagerState
         ]);
 
         return $user;
-    }
-
-    /**
-     * Build a store mock whose `lastVerifiedAt()` always returns the supplied
-     * timestamp.
-     *
-     * @param  \Carbon\Carbon  $at
-     * @return \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore
-     */
-    protected function fixedStore(Carbon $at): MfaVerificationStore
-    {
-        /** @var \Mockery\MockInterface&\SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('lastVerifiedAt')
-            ->andReturn($at);
-
-        return $store;
-    }
-
-    /**
-     * Build a store mock whose `lastVerifiedAt()` always returns null.
-     *
-     * @return \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore
-     */
-    protected function nullStore(): MfaVerificationStore
-    {
-        /** @var \Mockery\MockInterface&\SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
-        $store = \Mockery::mock(MfaVerificationStore::class);
-        $store->shouldReceive('lastVerifiedAt')
-            ->andReturnNull();
-
-        return $store;
     }
 }

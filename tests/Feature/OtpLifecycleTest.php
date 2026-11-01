@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -116,22 +117,29 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * Test verifying the persisted email code marks the verification store.
+     * Test verifying the persisted email code on a signed-in session records
+     * a proof on the email channel, named by the factor's destination.
      *
      * @return void
      */
-    public function testVerifyingPersistedEmailCodeMarksVerificationStore(): void
+    public function testVerifyingPersistedEmailCodeRecordsAProof(): void
     {
         Mail::fake();
 
-        [, $factor] = $this->enrollEmail();
+        [$user, $factor] = $this->enrollEmail();
+
+        Auth::login($user);
 
         Mfa::challenge('email', $factor);
         $factor->refresh();
 
         Mfa::verify('email', $factor, $factor->getCode() ?? '');
 
-        self::assertTrue(Mfa::hasEverVerified());
+        $proofs = Mfa::proofs();
+
+        self::assertCount(1, $proofs);
+        self::assertSame('email', $proofs[0]->method);
+        self::assertSame(['kind' => 'email', 'reference' => 'email-mfa@example.test'], $proofs[0]->channel?->toArray());
     }
 
     /**

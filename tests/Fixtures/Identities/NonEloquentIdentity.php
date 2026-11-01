@@ -16,9 +16,9 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
  * Implements `MultiFactorAuthenticatable` without extending
  * `Illuminate\Database\Eloquent\Model`, used to exercise the FQCN-fallback
  * branch of `Support\CurrentIdentity::typeOf()` that
- * `Factors\FactorOwnership::assert()`, the `Factors\FactorStateCache` key
- * prefix and backup-code issuing rely on — that path only fires for identities
- * the morph map cannot resolve through `getMorphClass()`.
+ * `Factors\FactorOwnership::assert()`, the proof store and backup-code
+ * issuing rely on — that path only fires for identities the morph map cannot
+ * resolve through `getMorphClass()`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

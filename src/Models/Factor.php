@@ -45,7 +45,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property ?\Carbon\CarbonInterface $last_used_at
  * @property ?string $code
  * @property ?\Carbon\CarbonInterface $expires_at
- * @property ?\Carbon\CarbonInterface $verified_at
  * @property int $attempts
  * @property ?\Carbon\CarbonInterface $locked_until
  * @property ?\Carbon\CarbonInterface $last_attempted_at
@@ -78,7 +77,6 @@ class Factor extends Model implements EloquentFactor
         'last_used_at',
         'code',
         'expires_at',
-        'verified_at',
         'attempts',
         'locked_until',
         'last_attempted_at',
@@ -164,7 +162,6 @@ class Factor extends Model implements EloquentFactor
             'last_used_at'         => 'datetime',
             'code'                 => 'encrypted',
             'expires_at'           => 'datetime',
-            'verified_at'          => 'datetime',
             'locked_until'         => 'datetime',
             'last_attempted_at'    => 'datetime',
             'attempts'             => 'integer',

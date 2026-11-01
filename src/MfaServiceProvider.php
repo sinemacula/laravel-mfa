@@ -25,16 +25,16 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
  *
  * Registers the configuration and the `mfa` manager singleton, then hands each
  * capability's container wiring to that capability's `*Bindings` class: its
- * service and its defaults for the seams consumers rebind (policy, verification
- * store, SMS gateway, event context). The shipped drivers are registered
+ * service and its defaults for the seams consumers rebind (policy, proof store,
+ * SMS gateway, event context). The shipped drivers are registered
  * against the manager by their capability's `*Bindings` class from inside the
  * singleton's factory, once the configuration is checked. Boots the middleware
  * aliases, config and migration publishing, the `mfa:check` command, and the
  * configuration check that runs once the application has booted, which also
  * refuses a factor model off the storage connection.
  *
- * Consumers with their own enforcement policy, stateless verification store, or
- * real SMS gateway rebind the matching contracts in their own service provider;
+ * Consumers with their own enforcement policy, stateless proof store, or real
+ * SMS gateway rebind the matching contracts in their own service provider;
  * `laravel-iam` ships an opinionated set of bindings for paired-mode use.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>

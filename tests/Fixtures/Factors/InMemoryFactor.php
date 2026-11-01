@@ -41,7 +41,6 @@ final class InMemoryFactor implements Factor
      * @param  ?\Carbon\CarbonInterface  $expiresAt
      * @param  int  $attempts
      * @param  ?\Carbon\CarbonInterface  $lockedUntil
-     * @param  ?\Carbon\CarbonInterface  $verifiedAt
      * @param  ?string  $destination
      * @param  ?string  $label
      * @param  mixed  $identifier
@@ -67,9 +66,6 @@ final class InMemoryFactor implements Factor
 
         /** Lockout expiry timestamp. */
         private readonly ?CarbonInterface $lockedUntil = null,
-
-        /** Last successful verification timestamp. */
-        private readonly ?CarbonInterface $verifiedAt = null,
 
         /** Delivery destination (email address, phone number, etc). */
         private readonly ?string $destination = null,
@@ -216,27 +212,5 @@ final class InMemoryFactor implements Factor
     public function getLastAttemptedAt(): ?CarbonInterface
     {
         return null;
-    }
-
-    /**
-     * Return the configured verification timestamp.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getVerifiedAt(): ?CarbonInterface
-    {
-        return $this->verifiedAt;
-    }
-
-    /**
-     * Report whether the factor has been verified at least once.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isVerified(): bool
-    {
-        return $this->verifiedAt !== null;
     }
 }

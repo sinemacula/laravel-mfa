@@ -281,17 +281,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional verified-at column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getVerifiedAtName(): string
-    {
-        return 'verified_at';
-    }
-
-    /**
      * No-op — the fixture does not track attempts.
      *
      * @param  ?\Carbon\CarbonInterface  $at

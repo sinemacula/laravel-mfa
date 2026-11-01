@@ -8,18 +8,22 @@ use Carbon\Carbon;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Manager;
+use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
-use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
+use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
@@ -38,18 +42,18 @@ final readonly class VerificationService
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Drivers\DriverResolver  $drivers
-     * @param  \SineMacula\Laravel\Mfa\Factors\FactorStateCache  $cache
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
      */
     public function __construct(
 
-        /** The container the store, dispatcher and config are read from. */
+        /** The container the dispatcher and config are read from. */
         private Container $container,
 
         /** The resolver of the factor drivers. */
         private DriverResolver $drivers,
 
-        /** The per-request cache of the identity's factor state. */
-        private FactorStateCache $cache,
+        /** The recorder of the proofs a verification makes. */
+        private ProofService $proofs,
     ) {}
 
     /**
@@ -109,9 +113,9 @@ final readonly class VerificationService
      *
      * - Rejects the attempt when the factor is locked.
      * - Runs the driver's verification logic.
-     * - On success: resets attempts, stamps the factor's verified-at, clears
-     *   any pending code, records the identity-level verification through the
-     *   bound store, dispatches `MfaVerified`.
+     * - On success: resets attempts, stamps the factor's last use, clears any
+     *   pending code, records the proof on the identity's current sign-in
+     *   through the bound proof store, dispatches `MfaVerified`.
      * - On failure: increments attempts, applies a lockout once the configured
      *   per-driver threshold is reached, dispatches `MfaVerificationFailed`
      *   with a machine-readable reason.
@@ -153,10 +157,15 @@ final readonly class VerificationService
             return false;
         }
 
-        $valid = $this->drivers->resolve($registry, $driver)->verify($factor, $code);
+        $resolved = $this->drivers->resolve($registry, $driver);
+        $valid    = $resolved->verify($factor, $code);
 
         if ($factor instanceof EloquentFactor) {
             $this->applyVerificationOutcome($factor, $valid);
+        }
+
+        if ($valid) {
+            $this->recordProof($identity, $factor, $driver, $resolved);
         }
 
         $this->finalizeVerification($identity, $factor, $driver, $valid, $events);
@@ -167,9 +176,9 @@ final readonly class VerificationService
     /**
      * Persist the post-driver verification outcome on the factor row.
      *
-     * Successful verification stamps `verified_at`, resets attempts, and clears
-     * any pending OTP code; failure increments the attempt counter and, once it
-     * reaches `mfa.attempts.factor_limit`, locks the factor for
+     * Successful verification stamps `last_used_at`, resets attempts, and
+     * clears any pending OTP code; failure increments the attempt counter and,
+     * once it reaches `mfa.attempts.factor_limit`, locks the factor for
      * `mfa.attempts.lockout_seconds`. Non-Eloquent factors carry no row to
      * mutate and skip both branches before this method is even called.
      *
@@ -201,9 +210,50 @@ final readonly class VerificationService
     }
 
     /**
-     * Apply the post-verify side effects: stamp the identity-level verification
-     * through the bound store and dispatch `MfaVerified` on success, or
-     * classify the failure and dispatch `MfaVerificationFailed` with a
+     * Record the proof a successful verification made on the identity's
+     * current sign-in: a recovery code proof for a backup code, which travels
+     * on no channel, and an additional factor proof on the factor's channel
+     * otherwise, named by the factor's destination when it has one and by the
+     * factor itself when not. Without a sign-in the store knows of, nothing
+     * is recorded and the driver is not asked for its channel. A driver whose
+     * channel cannot carry a factor proves nothing, and neither does a factor
+     * whose identifier cannot name it.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  string  $driver
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $resolved
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function recordProof(MultiFactorAuthenticatable $identity, Factor $factor, string $driver, FactorDriver $resolved): void
+    {
+        if (!$this->proofs->hasSignIn($identity)) {
+            return;
+        }
+
+        if ($resolved instanceof BackupCodeDriver) {
+            $this->proofs->record($identity, ProofKind::RECOVERY_CODE, $driver, null, null, Purpose::STEP_UP);
+
+            return;
+        }
+
+        $identifier = $factor->getFactorIdentifier();
+        $kind       = $resolved->channelKind();
+
+        if (!$kind->carriesFactor() || (!is_string($identifier) && !is_int($identifier))) {
+            return;
+        }
+
+        $reference = (string) $identifier;
+
+        $this->proofs->record($identity, ProofKind::ADDITIONAL_FACTOR, $driver, new Channel($kind, $factor->getDestination() ?? $reference), $reference, Purpose::STEP_UP);
+    }
+
+    /**
+     * Apply the post-verify side effects: dispatch `MfaVerified` on success,
+     * or classify the failure and dispatch `MfaVerificationFailed` with a
      * machine-readable reason on failure.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -218,11 +268,6 @@ final readonly class VerificationService
     private function finalizeVerification(MultiFactorAuthenticatable $identity, Factor $factor, string $driver, bool $valid, Dispatcher $events): void
     {
         if ($valid) {
-            /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */
-            $store = $this->container->make(MfaVerificationStore::class);
-            $store->markVerified($identity);
-            $this->cache->clear($identity);
-
             $events->dispatch(new MfaVerified($identity, $factor, $driver));
 
             return;

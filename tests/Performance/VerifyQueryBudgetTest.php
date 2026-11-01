@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Performance;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PragmaRX\Google2FA\Google2FA;
@@ -34,8 +35,9 @@ final class VerifyQueryBudgetTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * A successful TOTP verify must stay within the documented two-query
-     * budget: the factor-row update plus the verification store write.
+     * A successful TOTP verify on a signed-in session must stay within the
+     * documented two-query budget: the factor-row update plus the read of the
+     * verification generation its proof carries.
      *
      * @return void
      *
@@ -63,9 +65,9 @@ final class VerifyQueryBudgetTest extends TestCase
         );
 
         // Budget: one update on the factor row for recordVerification + one
-        // write to the verification store (session-backed, not a DB connection
-        // in the default binding). Session writes happen via the session
-        // driver, not the database — so the DB budget is 1.
+        // read of the identity's verification generation, which the proof
+        // recorded on the signed-in session carries. The proof itself is
+        // written to the session, not the database.
         self::assertLessThanOrEqual(
             2,
             $count,
@@ -107,7 +109,7 @@ final class VerifyQueryBudgetTest extends TestCase
 
     /**
      * A failed TOTP verify must stay within a single query — the attempt-count
-     * update on the factor row, with no verification store write.
+     * update on the factor row, with no proof recorded.
      *
      * @return void
      */
@@ -126,8 +128,8 @@ final class VerifyQueryBudgetTest extends TestCase
             static fn () => Mfa::verify('totp', $factor, '000000'),
         );
 
-        // One update on the factor row for recordAttempt. No verification store
-        // write on failure.
+        // One update on the factor row for recordAttempt. No proof is recorded
+        // on failure.
         self::assertLessThanOrEqual(
             1,
             $count,
@@ -136,8 +138,8 @@ final class VerifyQueryBudgetTest extends TestCase
     }
 
     /**
-     * Create a fresh MFA-enrolled test user and authenticate as them for the
-     * rest of the scenario.
+     * Create a fresh MFA-enrolled test user and sign them in for the rest of
+     * the scenario.
      *
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -148,7 +150,7 @@ final class VerifyQueryBudgetTest extends TestCase
             'mfa_enabled' => true,
         ]);
 
-        $this->actingAs($user);
+        Auth::login($user);
 
         return $user;
     }
