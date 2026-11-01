@@ -14,12 +14,25 @@ use SineMacula\Laravel\Mfa\Codes\NullSmsGateway;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
+use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
+use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
+use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
+use SineMacula\Laravel\Mfa\Enrolment\EnrolmentService;
+use SineMacula\Laravel\Mfa\Factors\FactorService;
+use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
+use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
+use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\SessionMfaVerificationStore;
+use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\NullMfaPolicy;
+use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\TestCase;
 
 /**
@@ -86,6 +99,51 @@ final class MfaServiceProviderTest extends TestCase
     public function testBindsSmsGatewayToNullSmsGateway(): void
     {
         self::assertInstanceOf(NullSmsGateway::class, $this->container()->make(SmsGateway::class));
+    }
+
+    /**
+     * Test registers each capability's services and defaults as singletons.
+     *
+     * @return void
+     */
+    public function testRegistersEachCapabilitysBindings(): void
+    {
+        $abstracts = [
+            FactorService::class,
+            FactorStateCache::class,
+            DriverResolver::class,
+            SmsGateway::class,
+            MfaPolicy::class,
+            RequirementService::class,
+            MfaVerificationStore::class,
+            ProofService::class,
+            VerificationService::class,
+            EnrolmentService::class,
+            LifecycleService::class,
+            RecoveryCodeService::class,
+        ];
+
+        foreach ($abstracts as $abstract) {
+            self::assertTrue($this->container()->isShared($abstract), $abstract . ' is not registered as a singleton.');
+        }
+    }
+
+    /**
+     * Test registers the shipped drivers with the manager.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRegistersTheShippedDrivers(): void
+    {
+        $manager = $this->container()->make('mfa');
+
+        self::assertInstanceOf(MfaManager::class, $manager);
+        self::assertInstanceOf(TotpDriver::class, $manager->driver('totp'));
+        self::assertInstanceOf(EmailDriver::class, $manager->driver('email'));
+        self::assertInstanceOf(SmsDriver::class, $manager->driver('sms'));
+        self::assertInstanceOf(BackupCodeDriver::class, $manager->driver('backup_code'));
     }
 
     /**

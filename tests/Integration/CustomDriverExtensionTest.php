@@ -63,11 +63,11 @@ final class CustomDriverExtensionTest extends TestCase
 
     /**
      * `Mfa::extend('totp', ...)` must override the built-in TOTP driver
-     * registered by `DriverBindings::extend()`. Pins the
-     * override invariant — both built-ins and consumer overrides go through the
-     * same `Mfa::extend()` registry, so a future Laravel `Manager` upgrade that
-     * changed override-precedence semantics would silently break consumer
-     * overrides without this guard.
+     * registered by `DriverBindings::extend()`. Pins the override invariant —
+     * both built-ins and consumer overrides go through the same `Mfa::extend()`
+     * registry, so a future Laravel `Manager` upgrade that changed
+     * override-precedence semantics would silently break consumer overrides
+     * without this guard.
      *
      * @return void
      *
