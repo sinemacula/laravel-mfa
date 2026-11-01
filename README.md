@@ -37,10 +37,12 @@ whatever UI you like.
   change commits (see [Events](docs/guides/events.md)).
 - **Polymorphic identity support**: works with any Eloquent identity type (`User`, `Admin`, ...) via the
   shipped `authenticatable_type` / `authenticatable_id` morph.
-- **Encrypted at rest**: factor `secret` and `code` columns are `encrypted`-cast; backup codes hash to SHA-256
-  before persistence.
-- **Per-factor lockouts**: `attempts.factor_limit` failures in a row lock a factor of any type for
-  `attempts.lockout_seconds`.
+- **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; backup codes hash to SHA-256 before
+  persistence; email and SMS codes are stored only as keyed hashes bound to their factor, session, application and
+  purpose, and the package's email code message encrypts its payload whenever it is queued.
+- **Attempt caps and lockouts**: failures are counted per factor, per identity and per IP address in the database, with
+  no cache; too many lock the factor, the identity or the address out before the driver is called, and a factor that
+  reaches the failure ceiling is disabled. See [Attempts and lockouts](docs/guides/attempts.md).
 - **Zero ecosystem coupling**: depends only on Laravel and the standard `Authenticatable` contract.
 
 ## Installation
@@ -56,14 +58,6 @@ php artisan vendor:publish --tag=mfa-config
 php artisan vendor:publish --tag=mfa-migrations
 php artisan migrate
 ```
-
-For TOTP support, install the suggested dependency:
-
-```bash
-composer require pragmarx/google2fa
-```
-
-The TOTP driver checks for this package at runtime and raises a clear error if it is missing.
 
 ## Configuration
 
@@ -134,8 +128,8 @@ class AppUser extends User implements MultiFactorAuthenticatable
 The trait gives the identity its factors (of the configured factor model), counts it as enabled once it has a
 confirmed factor, treats it as an active person who requires nothing of their own sign-ins until the model says
 otherwise, and deletes everything the package holds for it once the model is deleted (a soft delete keeps it). See
-[Identity models](docs/guides/identity-models.md). Per-request verification freshness lives separately on
-`Mfa::hasExpired()` / the verification store, so keep the two predicates orthogonal.
+[Identity models](docs/guides/identity-models.md). What the current sign-in has proved lives separately, in the proof
+store (`Mfa::proofs()`), so keep the two predicates orthogonal.
 
 ## Usage
 
@@ -147,11 +141,10 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 
 Mfa::shouldUse();                       // bool
 Mfa::isSetup();                         // bool
-Mfa::hasEverVerified();                 // bool
-Mfa::hasExpired();                      // bool
+Mfa::proofs();                          // list<Proof> of the current sign-in
 Mfa::getFactors();                      // Collection|null
 
-Mfa::challenge($driver, $factor);       // MfaChallengeIssued
+Mfa::challenge($driver, $factor);       // MfaChallengeIssued; a SendResult for email and SMS
 Mfa::verify($driver, $factor, $code);   // MfaVerified | MfaVerificationFailed
 Mfa::enroll($factor);                   // MfaFactorEnrolled
 Mfa::disable($factor);                  // MfaFactorDisabled
@@ -183,7 +176,8 @@ Route::middleware('mfa:5')->delete('/account', AccountController::class);   // r
 Route::middleware('mfa:0')->post('/admin/danger', DangerController::class); // every request
 ```
 
-When MFA is required, `MfaRequiredException` is thrown; when a prior verification has expired,
+The middleware judges the newest factor or recovery code proof the current sign-in recorded. When MFA is required
+(no factor, or no such proof), `MfaRequiredException` is thrown; when that proof is older than the window,
 `MfaExpiredException`. Both carry a masked `FactorSummary` list safe to ship through JSON bodies and log
 sinks:
 
@@ -200,32 +194,44 @@ $this->renderable(function (MfaRequiredException $e) {
 
 ### TOTP enrolment
 
-Generate a shared secret and a provisioning URI, render the URI as a QR code, then hand a fresh `Factor` to
-`Mfa::enroll()`:
+Start the enrolment on a fresh `Factor`, which stamps the TOTP parameters it will keep (`mfa.totp`'s algorithm,
+digits and period) and returns a new secret. Store the secret on the factor, render its provisioning URI as a QR code,
+confirm the first code the person's authenticator app shows, then hand the factor to `Mfa::enroll()`:
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
-$driver = Mfa::driver('totp');
-$secret = $driver->startEnrollment(new Factor);
-$uri    = $driver->provisioningUri(
+$factor        = new Factor;
+$factor->type  = 'totp';
+$factor->label = 'Authenticator app';
+
+$driver         = Mfa::driver('totp');
+$factor->secret = $driver->startEnrollment($factor);
+
+$uri = $driver->provisioningUri(
+    factor: $factor,
     issuer: config('app.name'),
     accountName: $user->email,
-    secret: $secret,
+    secret: $factor->secret,
 );
 
-// Render $uri as a QR code with your library of choice.
-
-$factor         = new Factor;
-$factor->type   = 'totp';
-$factor->label  = 'Authenticator app';
-$factor->secret = $secret;
+// Render $uri as a QR code with your library of choice, then check the
+// first code the app shows. Its time step is recorded, so the same code
+// cannot be used again. Enrol the factor only once the code is confirmed.
+if (! $driver->confirm($factor, $request->string('code')->toString())) {
+    return back()->withErrors(['code' => 'The code is not valid. Try the next one your app shows.']);
+}
 
 // `Mfa::enroll()` stamps the identity's morph columns itself —
 // callers do not (and should not) populate them.
 Mfa::enroll($factor);
 ```
+
+The package computes TOTP codes itself (RFC 6238) and needs no other dependency. Each code is checked against the
+application's `totp_window` steps either side of now (`mfa.totp.window` when it sets none), and each time step is
+accepted once per factor, also when two requests race with the same code. See
+[Configuration](docs/guides/configuration.md#totp) and [the TOTP design note](docs/design/totp.md).
 
 ### Backup codes
 
@@ -244,26 +250,36 @@ return view('mfa.backup-codes', ['codes' => $codes]);
 Pass an explicit `$count` argument to override the configured default batch size for that single call:
 `Mfa::issueBackupCodes(20)`.
 
-### SMS gateway binding
+### SMS and email senders
 
-The SMS driver delegates outbound delivery to a `SmsGateway` implementation. The shipped `NullSmsGateway`
-throws `SmsGatewayNotConfiguredException` to surface missing wiring loudly — consumers enabling the SMS
-driver bind their own implementation:
+The email and SMS drivers deliver their codes through senders the application binds: `SmsSender` for SMS and
+`EmailSender` for email. The shipped defaults throw `SenderNotConfiguredException`, and the configuration check refuses
+an application that enables `sms` or `email` while its default is still bound, so a missing binding fails loudly before
+anyone is sent a code. Email can go through Laravel's mailer with the package's own sender:
 
 ```php
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
+use SineMacula\Laravel\Mfa\Contracts\EmailSender;
+
+$this->app->singleton(EmailSender::class, MailEmailSender::class);
+```
+
+An SMS sender wraps the application's provider:
+
+```php
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use Twilio\Rest\Client;
 
-final readonly class TwilioSmsGateway implements SmsGateway
+final readonly class TwilioSmsSender implements SmsSender
 {
     public function __construct(
         private Client $twilio,
         private string $fromNumber,
     ) {}
 
-    public function send(string $to, #[\SensitiveParameter] string $message): void
+    public function send(string $phoneNumber, #[\SensitiveParameter] string $message): void
     {
-        $this->twilio->messages->create($to, [
+        $this->twilio->messages->create($phoneNumber, [
             'from' => $this->fromNumber,
             'body' => $message,
         ]);
@@ -274,14 +290,16 @@ final readonly class TwilioSmsGateway implements SmsGateway
 Bind it in a service provider:
 
 ```php
-$this->app->singleton(SmsGateway::class, static fn ($app): TwilioSmsGateway => new TwilioSmsGateway(
+$this->app->singleton(SmsSender::class, static fn ($app): TwilioSmsSender => new TwilioSmsSender(
     twilio: new Client(config('services.twilio.sid'), config('services.twilio.token')),
     fromNumber: config('services.twilio.from'),
 ));
 ```
 
-The contract exposes only the destination and rendered message — the package owns code generation, template
-substitution, lockouts, and verification state — so the adapter stays thin.
+The contracts expose only the destination and the message: the package owns drawing, hashing, binding and checking the
+code, the resend cooldown, the delivery caps and lockouts, so the adapter stays thin. Sending for a factor answers a
+`Codes\SendResult`: sent, with the challenge's id and expiry, or refused with `sending_capped` and the seconds to wait.
+In tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` capture the messages instead.
 
 ### Custom factor drivers
 
@@ -299,9 +317,9 @@ provider's `register()` / `boot()` rather than mid-request.
 
 ### Rate limiting
 
-The per-factor lockout (`attempts.factor_limit` + `attempts.lockout_seconds`) protects an individual factor from runaway
-attempts on the same code, but does not by itself defend against distributed brute force across many factors
-or DoS against the lockout window. Layer Laravel's built-in `RateLimiter` on the verify endpoint:
+The package counts failures per factor, per identity and per IP address and locks each out past its cap (see
+[Attempts and lockouts](docs/guides/attempts.md)). Those caps bound guessing at a factor; they do not bound load on the
+endpoint itself. Layer Laravel's built-in `RateLimiter` on the verify endpoint as well:
 
 ```php
 use Illuminate\Cache\RateLimiting\Limit;
@@ -324,12 +342,14 @@ Route::post('/mfa/verify', VerifyController::class)
 Apply the throttle **only** to the verify endpoint — state-read routes (`Mfa::shouldUse()`, `Mfa::isSetup()`,
 etc.) are called on every request and would exhaust the bucket without representing an attack signal.
 
-### Verification store
+### Proof store
 
-The default `SessionMfaVerificationStore` assumes consumers regenerate the session on auth state change —
-Laravel's default on login / logout. Apps that disable session regeneration on login must call
-`Mfa::forgetVerification()` themselves on auth state change, so a new identity cannot inherit the prior
-identity's verification timestamp from a reused session.
+Each verification on a signed-in session records a proof, kept by the default `SessionProofStore` in the Laravel session
+for the identity's current sign-in on the application. Laravel's `Login` event begins a sign-in on the guard's
+application and `Logout` or `CurrentDeviceLogout` ends it, so a new identity on a reused session inherits nothing. A
+guard that fires neither event calls `Proofs\GuardHooks::signedIn()` and `signedOut()` instead; one that does neither
+leaves no proof to rely on. A stateless guard rebinds `Contracts\ProofStore`.
+See [Recorded proofs](docs/guides/proofs.md).
 
 ## Extensibility
 
@@ -341,11 +361,12 @@ All concrete classes in this package are `final` unless explicitly designed for 
 | Custom factor driver       | Implement `FactorDriver`, register via `Mfa::extend()`         |
 | Custom identity model      | Implement `MultiFactorAuthenticatable` and use `HasFactors`    |
 | Organisation enforcement   | Implement `MfaPolicy` and bind it via the container            |
-| Custom verification store  | Implement `MfaVerificationStore` and bind it via the container |
+| Custom proof store         | Implement `ProofStore` and bind it via the container           |
 | Custom factor model        | Set `config('mfa.factor.model')` to your subclass              |
 | Custom recovery code model | Set `config('mfa.recovery_codes.model')` to your subclass      |
 | Event context              | Implement `EventContextResolver` and bind it via the container |
-| Custom SMS gateway         | Implement `SmsGateway` and bind it via the container           |
+| SMS delivery               | Implement `SmsSender` and bind it via the container            |
+| Email delivery             | Bind `MailEmailSender`, or your own `EmailSender`              |
 
 The security and lifecycle contracts behind the package, for maintainers and reviewers, are in
 [docs/design](docs/design/README.md).

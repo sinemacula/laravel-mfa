@@ -6,6 +6,7 @@ namespace Tests\Unit\Lifecycle;
 
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
@@ -17,8 +18,7 @@ use Tests\TestCase;
 
 /**
  * Tests for `LifecycleService`: only the current identity's own factor is
- * disabled, its row deleted, its cached factors cleared and the removal
- * reported.
+ * disabled, its row deleted, its proofs forgotten and the removal reported.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,6 +28,19 @@ use Tests\TestCase;
 #[CoversClass(LifecycleService::class)]
 final class LifecycleServiceTest extends TestCase
 {
+    /**
+     * Tear down Mockery expectations between test cases.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function tearDown(): void
+    {
+        \Mockery::close();
+
+        parent::tearDown();
+    }
+
     /**
      * A guest disables nothing and nothing is reported.
      *
@@ -117,13 +130,55 @@ final class LifecycleServiceTest extends TestCase
     }
 
     /**
-     * Disabling clears the identity's cached factors.
+     * Disabling stops every proof made with the factor counting.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testDisablingClearsTheIdentitysCachedFactors(): void
+    public function testDisablingForgetsTheFactorsProofs(): void
+    {
+        $user  = $this->signIn();
+        $store = \Mockery::mock(ProofStore::class);
+
+        $store->shouldReceive('forgetFactor')->once()->with($user, 'factor-id');
+
+        $this->container()->instance(ProofStore::class, $store);
+
+        $this->service()->disable(new InMemoryFactor(type: 'sms', authenticatable: $user));
+
+        $store->shouldHaveReceived('forgetFactor')->once();
+    }
+
+    /**
+     * Disabling a factor whose identifier cannot name it forgets no proofs.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAFactorWhoseIdentifierCannotNameItForgetsNoProofs(): void
+    {
+        $user  = $this->signIn();
+        $store = \Mockery::mock(ProofStore::class);
+
+        $store->shouldNotReceive('forgetFactor');
+
+        $this->container()->instance(ProofStore::class, $store);
+
+        $this->service()->disable(new InMemoryFactor(type: 'sms', identifier: null, authenticatable: $user));
+
+        $store->shouldNotHaveReceived('forgetFactor');
+    }
+
+    /**
+     * `isSetup()` no longer sees a disabled factor.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testADisabledFactorIsGoneAtOnce(): void
     {
         $user    = $this->signIn();
         $factor  = $this->factorOf($user);

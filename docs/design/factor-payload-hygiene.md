@@ -2,19 +2,19 @@
 
 ## Purpose
 
-This note records the rule that a `Factor` row never leaves the database with its sensitive fields intact. Secrets and
-live OTP codes are encrypted at rest, excluded from default Eloquent serialisation, and projected through a
-masked-destination summary before any exception payload, JSON body, or log sink sees them.
+This note records the rule that a `Factor` row never leaves the database with its sensitive fields intact. Secrets are
+encrypted at rest, excluded from default Eloquent serialisation, and projected through a masked-destination summary
+before any exception payload, JSON body, or log sink sees them. Delivered codes are not on the factor at all: they are
+kept as keyed hashes in a table of their own (see [Delivered Codes](delivered-codes.md)).
 
 The contract matters because exception responses are consumed by the browser, rendered into HTML, and frequently
 captured by third-party logging and error-reporting tooling. A leak at this layer is a leak everywhere downstream.
 
 ## Invariants
 
-- `Factor::$secret` and `Factor::$code` columns are both typed `text` and cast `encrypted` on the shipped model.
-  `secret` carries long-lived material (TOTP keys, SHA-256 digests of backup codes); `code` carries the live OTP for
-  email / SMS factors during its expiry window. Encrypting `code` closes the read-only-DB-replay attack surface.
-- Both columns are listed in the model's `$hidden`, with the full `destination` and the `credential_reference`, so
+- The `Factor::$secret` column is typed `text` and cast `encrypted` on the shipped model. It carries long-lived
+  material (TOTP keys, SHA-256 digests of backup codes).
+- It is listed in the model's `$hidden`, with the full `destination` and the `credential_reference`, so
   Eloquent's default array/JSON serialisation omits them. A consumer who accidentally dumps a factor through
   `toArray()` or `->toJson()` gets a payload with no secret, no code and no full destination.
 - `MfaRequiredException` and `MfaExpiredException` do not carry `Factor` instances, and neither does any event (see
@@ -43,7 +43,7 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
   renders the exception payload via its exception handler, and the JSON body ends up carrying only the seven safe
   fields.
 - If a consumer dumps the full `Factor` record (admin tooling, debug output), the model's `$hidden` list ensures
-  the default array representation omits `secret`, `code`, `destination` and `credential_reference` even before the
+  the default array representation omits `secret`, `destination` and `credential_reference` even before the
   summary layer runs.
 
 ## Failure / Edge Cases
@@ -67,14 +67,13 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
 
 - `src/Factors/FactorSummary.php`: constructor, `fromFactor()`, `jsonSerialize()`, `mask()`, `maskEmail()`,
   `maskOpaque()`.
-- `src/Models/Factor.php`: `$casts` (including `'secret' => 'encrypted'`, `'code' => 'encrypted'`) and
-  `$hidden`.
+- `src/Models/Factor.php`: `$casts` (including `'secret' => 'encrypted'`) and `$hidden`.
 - `src/Exceptions/MfaRequiredException.php`, `src/Exceptions/MfaExpiredException.php`: exception payloads keyed on
   `FactorSummary[]`.
 - `src/Http/Middleware/RequireMfa.php`: `resolveFactorSummaries()` — the single choke point where factors are projected
   through the summary before an exception is thrown.
-- `database/migrations/2026_04_15_000000_create_mfa_factors_table.php`: `secret` and `code` defined as `text`
-  columns to accommodate ciphertext regardless of the configured code length.
+- `database/migrations/2026_04_15_000000_create_mfa_factors_table.php`: `secret` defined as a `text` column to
+  accommodate ciphertext.
 
 ## Authoritative Tests
 
@@ -107,17 +106,13 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
 - `tests/Unit/Models/FactorTest.php`
   `testRawSecretColumnIsNotStoredAsPlaintext`
 - `tests/Unit/Models/FactorTest.php`
-  `testCodeRoundTripsThroughEncryption`
-- `tests/Unit/Models/FactorTest.php`
-  `testRawCodeColumnIsNotStoredAsPlaintext`
-- `tests/Unit/Models/FactorTest.php`
-  `testSecretAndCodeAreHiddenFromSerialization`
+  `testSecretIsHiddenFromSerialization`
 
 ## Change Triggers
 
 Update this note when any of the following change:
 
-- the `encrypted` cast on `secret` or `code`, or the `text` column types in the migration
+- the `encrypted` cast on `secret`, or the `text` column type in the migration
 - the `$hidden` list on the shipped `Factor` model
 - the field set on `FactorSummary` or the snake-case JSON shape from `jsonSerialize()`
 - the masking rules for email local-parts or opaque destinations

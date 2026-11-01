@@ -7,8 +7,8 @@ namespace SineMacula\Laravel\Mfa\Factors;
 use Illuminate\Contracts\Foundation\Application;
 
 /**
- * Registers the factor services: the factor reader and the per-request cache of
- * an identity's factor state, which every service that changes factors clears.
+ * Registers the factor services: the reader of the identity's factors and of
+ * the configured factor model.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,7 +30,6 @@ final class FactorBindings
      */
     public static function register(Application $app): void
     {
-        $app->singleton(FactorStateCache::class);
         $app->singleton(FactorService::class);
     }
 }

@@ -30,8 +30,8 @@ use Tests\TestCase;
  *   3. A custom in-memory guard built on `Illuminate\Contracts\Auth\Guard` that
  *      hands back a fixture identity directly.
  *
- * Each guard authenticates a user, then asks the MFA manager to verify setup
- * state, run a TOTP verification, and report `hasEverVerified()`.
+ * Each guard authenticates a user, then asks the MFA manager for its setup
+ * state and its factors.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -82,7 +82,6 @@ final class MultiAuthStackTest extends TestCase
 
         config()->set('auth.defaults.guard', 'token');
         $this->container()->forgetInstance('mfa');
-        Mfa::clearCache();
 
         self::assertTrue(Mfa::shouldUse());
         self::assertTrue(Mfa::isSetup());
@@ -111,7 +110,6 @@ final class MultiAuthStackTest extends TestCase
         ]);
         config()->set('auth.defaults.guard', 'custom');
         $this->container()->forgetInstance('mfa');
-        Mfa::clearCache();
 
         // GenericUser does not implement MultiFactorAuthenticatable, so the
         // manager must short-circuit cleanly rather than throw.
@@ -147,7 +145,6 @@ final class MultiAuthStackTest extends TestCase
 
         $this->container()->forgetInstance('mfa');
         Auth::forgetGuards();
-        Mfa::clearCache();
 
         // Sanctum::actingAs() handles the rest: it stamps the user as resolved
         // through the sanctum guard with a TransientToken (no DB write needed

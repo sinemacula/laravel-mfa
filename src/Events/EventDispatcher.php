@@ -6,12 +6,10 @@ namespace SineMacula\Laravel\Mfa\Events;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Database\DatabaseTransactionRecord;
-use Illuminate\Database\DatabaseTransactionsManager;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
 
 /**
  * The one way the package dispatches its events: once the change they report
@@ -81,38 +79,8 @@ final readonly class EventDispatcher
      */
     public function dispatch(MfaEvent $event): void
     {
-        $events  = $this->container->make(Dispatcher::class);
-        $pending = $this->pendingTransaction();
+        $events = $this->container->make(Dispatcher::class);
 
-        if ($pending === null) {
-
-            $events->dispatch($event);
-
-            return;
-        }
-
-        $pending->addCallback(static fn () => $events->dispatch($event));
-    }
-
-    /**
-     * The innermost transaction open on the storage connection whose commit
-     * runs callbacks, or `null` when there is none.
-     *
-     * @return ?\Illuminate\Database\DatabaseTransactionRecord
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
-     */
-    private function pendingTransaction(): ?DatabaseTransactionRecord
-    {
-        $manager = $this->container->bound('db.transactions') ? $this->container->make('db.transactions') : null;
-
-        if (!$manager instanceof DatabaseTransactionsManager) {
-            return null;
-        }
-
-        $connection = StorageConnection::resolvedName();
-
-        return $manager->callbackApplicableTransactions()->last(static fn (DatabaseTransactionRecord $transaction): bool => $transaction->connection === $connection);
+        AfterStorageCommit::run($this->container, static fn () => $events->dispatch($event));
     }
 }

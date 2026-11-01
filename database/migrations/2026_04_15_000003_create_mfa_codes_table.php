@@ -48,7 +48,8 @@ return new class extends Migration {
             $blueprint->index(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_index'));
 
             // What the code is bound to: it is accepted only for the same
-            // factor, purpose, application and session.
+            // factor, purpose, application and session. The session is stored
+            // as a keyed digest of its id, never the id itself.
             $blueprint->string('purpose', 32);
             $blueprint->string('application');
             $blueprint->string('session_id')->nullable();
@@ -58,12 +59,14 @@ return new class extends Migration {
             // the application key, never the code.
             $blueprint->char('code_hash', 64);
 
-            // The attempts made against the code, how many times it was sent
-            // and when last, when it expires (indexed for pruning) and when it
-            // was used.
+            // The attempts made against the code, how many times it was sent,
+            // when last and when each time (a JSON list of Unix times, which
+            // the send caps count), when it expires (indexed for pruning) and
+            // when it was used.
             $blueprint->unsignedInteger('attempts')->default(0);
             $blueprint->unsignedInteger('sends')->default(1);
             $blueprint->timestamp('sent_at');
+            $blueprint->json('sent_times');
             $blueprint->timestamp('expires_at')->index(IndexName::for($table, '_expiry_index'));
             $blueprint->timestamp('consumed_at')->nullable();
 

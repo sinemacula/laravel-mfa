@@ -12,13 +12,16 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Codes\NullSmsGateway;
+use SineMacula\Laravel\Mfa\Codes\CodeService;
+use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
+use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
+use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
@@ -27,14 +30,13 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
-use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
-use SineMacula\Laravel\Mfa\Proofs\SessionMfaVerificationStore;
+use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\NullMfaPolicy;
@@ -83,30 +85,31 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test binds mfa verification store to session store.
+     * Test binds the proof store to the session store.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBindsMfaVerificationStoreToSessionStore(): void
+    public function testBindsProofStoreToSessionStore(): void
     {
         self::assertInstanceOf(
-            SessionMfaVerificationStore::class,
-            $this->container()->make(MfaVerificationStore::class),
+            SessionProofStore::class,
+            $this->container()->make(ProofStore::class),
         );
     }
 
     /**
-     * Test binds sms gateway to null sms gateway.
+     * Test binds the SMS and email senders to the null senders.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBindsSmsGatewayToNullSmsGateway(): void
+    public function testBindsTheSendersToTheNullSenders(): void
     {
-        self::assertInstanceOf(NullSmsGateway::class, $this->container()->make(SmsGateway::class));
+        self::assertInstanceOf(NullSmsSender::class, $this->container()->make(SmsSender::class));
+        self::assertInstanceOf(NullEmailSender::class, $this->container()->make(EmailSender::class));
     }
 
     /**
@@ -120,13 +123,13 @@ final class MfaServiceProviderTest extends TestCase
             EventContextResolver::class,
             EventDispatcher::class,
             FactorService::class,
-            FactorStateCache::class,
             DriverResolver::class,
-            SmsGateway::class,
+            SmsSender::class,
+            EmailSender::class,
+            CodeService::class,
             CombinationPolicy::class,
             MfaPolicy::class,
             RequirementService::class,
-            MfaVerificationStore::class,
             ProofService::class,
             VerificationService::class,
             EnrollmentService::class,

@@ -7,9 +7,11 @@ namespace Tests\Unit;
 use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
-use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -18,7 +20,6 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Factors\InMemoryFactor;
-use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -67,8 +68,9 @@ final class MfaManagerTest extends TestCase
      */
     public static function delegations(): iterable
     {
-        $factor = new InMemoryFactor;
-        $models = new Collection;
+        $factor  = new InMemoryFactor;
+        $models  = new Collection;
+        $refused = SendResult::refused(FailureReason::SENDING_CAPPED, 30);
 
         yield 'shouldUse true' => ['shouldUse', RequirementService::class, 'shouldUse', [], true];
         yield 'shouldUse false' => ['shouldUse', RequirementService::class, 'shouldUse', [], false];
@@ -77,21 +79,15 @@ final class MfaManagerTest extends TestCase
         yield 'getFactors' => ['getFactors', FactorService::class, 'getFactors', [], $models];
         yield 'getFactors null' => ['getFactors', FactorService::class, 'getFactors', [], null];
         yield 'factorModel' => ['factorModel', FactorService::class, 'factorModel', [], Factor::class];
-        yield 'hasEverVerified true' => ['hasEverVerified', ProofService::class, 'hasEverVerified', [], true];
-        yield 'hasEverVerified false' => ['hasEverVerified', ProofService::class, 'hasEverVerified', [], false];
-        yield 'hasExpired with window' => ['hasExpired', ProofService::class, 'hasExpired', [5], true];
-        yield 'hasExpired without window' => ['hasExpired', ProofService::class, 'hasExpired', [null], false];
-        yield 'markVerified' => ['markVerified', ProofService::class, 'markVerified', [], null];
-        yield 'forgetVerification' => ['forgetVerification', ProofService::class, 'forgetVerification', [], null];
-        yield 'challenge' => ['challenge', VerificationService::class, 'challenge', ['totp', $factor], null, true];
-        yield 'verify true' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '123456'], true, true];
-        yield 'verify false' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '654321'], false, true];
+        yield 'proofs' => ['proofs', ProofService::class, 'proofs', [], []];
+        yield 'challenge' => ['challenge', VerificationService::class, 'challenge', ['totp', $factor, Purpose::SIGN_IN], null, true];
+        yield 'challenge for a code' => ['challenge', VerificationService::class, 'challenge', ['email', $factor, Purpose::STEP_UP], $refused, true];
+        yield 'verify true' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '123456', Purpose::SIGN_IN], true, true];
+        yield 'verify false' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '654321', Purpose::STEP_UP], false, true];
         yield 'enroll' => ['enroll', EnrollmentService::class, 'enroll', [$factor], null];
         yield 'disable' => ['disable', LifecycleService::class, 'disable', [$factor], null];
         yield 'issueBackupCodes with count' => ['issueBackupCodes', RecoveryCodeService::class, 'issueBackupCodes', [3], ['A', 'B', 'C'], true];
         yield 'issueBackupCodes without count' => ['issueBackupCodes', RecoveryCodeService::class, 'issueBackupCodes', [null], [], true];
-        yield 'clearCache for every identity' => ['clearCache', FactorStateCache::class, 'clear', [null], null];
-        yield 'clearCache for an identity' => ['clearCache', FactorStateCache::class, 'clear', [new TestUser], null];
     }
 
     /**
@@ -139,7 +135,7 @@ final class MfaManagerTest extends TestCase
 
     /**
      * A manager method called without its optional argument passes the
-     * argument's default to the service.
+     * argument's default to the service: `null`, or the sign-in purpose.
      *
      * @return void
      *
@@ -147,23 +143,20 @@ final class MfaManagerTest extends TestCase
      */
     public function testOptionalArgumentsDefaultToNull(): void
     {
-        $proofs = \Mockery::mock($this->container()->make(ProofService::class));
-        $proofs->shouldReceive('hasExpired')->once()->with(null)->andReturnTrue();
-
         $codes = \Mockery::mock($this->container()->make(RecoveryCodeService::class));
         $codes->shouldReceive('issueBackupCodes')->once()->with($this->manager(), null)->andReturn([]);
 
-        $cache = \Mockery::mock($this->container()->make(FactorStateCache::class));
-        $cache->shouldReceive('clear')->once()->with(null);
+        $factor       = new InMemoryFactor;
+        $verification = \Mockery::mock($this->container()->make(VerificationService::class));
+        $verification->shouldReceive('challenge')->once()->with($this->manager(), 'totp', $factor, Purpose::SIGN_IN)->andReturnNull();
+        $verification->shouldReceive('verify')->once()->with($this->manager(), 'totp', $factor, '123456', Purpose::SIGN_IN)->andReturnTrue();
 
-        $this->container()->instance(ProofService::class, $proofs);
         $this->container()->instance(RecoveryCodeService::class, $codes);
-        $this->container()->instance(FactorStateCache::class, $cache);
+        $this->container()->instance(VerificationService::class, $verification);
 
-        self::assertTrue($this->manager()->hasExpired());
         self::assertSame([], $this->manager()->issueBackupCodes());
-
-        $this->manager()->clearCache();
+        self::assertNull($this->manager()->challenge('totp', $factor));
+        self::assertTrue($this->manager()->verify('totp', $factor, '123456'));
     }
 
     /**

@@ -4,23 +4,20 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
-use Illuminate\Contracts\Mail\Mailer;
-use Illuminate\Support\Facades\Mail;
+use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
-use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
-use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use Tests\Fixtures\Codes\CustomMfaCodeMessage;
-use Tests\Fixtures\Identities\TestUser;
-use Tests\TestCase;
+use Tests\Fixtures\Factors\InMemoryFactor;
 
 /**
- * Unit tests for `EmailDriver`.
- *
- * Exercises the Laravel mailer dispatch path (via `Mail::fake()`), the
- * missing-destination guard, the Mailable class override, and the end-to-end
- * challenge-issuance happy path persisting a real `Factor` row.
+ * Unit tests for `EmailDriver`: its channel, and the message it delivers each
+ * code in through the bound `EmailSender`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,204 +27,117 @@ use Tests\TestCase;
 #[CoversClass(EmailDriver::class)]
 final class EmailDriverTest extends TestCase
 {
+    /** @var string The address the factor delivers to. */
+    private const string ADDRESS = 'ada@example.test';
+
     /**
-     * `dispatch()` must reject a null destination with a clear
-     * `MissingDestinationException` rather than silently dropping the outbound
-     * mail.
+     * Put the clock back.
      *
      * @return void
      */
-    public function testDispatchThrowsWhenDestinationIsNull(): void
+    #[\Override]
+    protected function tearDown(): void
     {
-        Mail::fake();
+        CarbonImmutable::setTestNow();
 
-        $driver = $this->makeDriver();
-        $factor = $this->makeFactor(destination: null);
-
-        $this->expectException(MissingDestinationException::class);
-        $this->expectExceptionMessage('Email factor has no destination configured');
-
-        $driver->issueChallenge($factor);
+        parent::tearDown();
     }
 
     /**
-     * `dispatch()` must reject an empty-string destination identically to a
-     * null one.
+     * An email factor travels by email and adds `otp`.
      *
      * @return void
      */
-    public function testDispatchThrowsWhenDestinationIsEmptyString(): void
+    public function testTheDriverStatesItsChannel(): void
     {
-        Mail::fake();
+        $driver = new EmailDriver(new FakeEmailSender);
 
-        $driver = $this->makeDriver();
-        $factor = $this->makeFactor(destination: '');
-
-        $this->expectException(MissingDestinationException::class);
-
-        $driver->issueChallenge($factor);
+        self::assertSame(ChannelKind::EMAIL, $driver->channelKind());
+        self::assertSame(['otp'], $driver->amr());
     }
 
     /**
-     * Issuing a challenge with a configured destination should send the default
-     * `MfaCodeMessage` Mailable to that address with a fresh 6-digit numeric
-     * code and the configured 10-minute expiry.
+     * The code goes to the factor's address in the shipped message, and no
+     * other.
      *
      * @return void
      */
-    public function testDispatchSendsDefaultMailableToDestination(): void
+    public function testTheCodeIsDeliveredToTheAddressInTheShippedMessage(): void
     {
-        Mail::fake();
+        $sender = new FakeEmailSender;
 
-        $driver = $this->makeDriver();
-        $factor = $this->makeFactor(destination: 'user@example.com');
+        (new EmailDriver($sender))->deliver(self::factor(), '123456', CarbonImmutable::now()->addMinutes(10));
 
-        $driver->issueChallenge($factor);
+        $sent = $sender->sent();
 
-        Mail::assertSent(
-            MfaCodeMessage::class,
-            static fn (MfaCodeMessage $mail): bool => $mail->hasTo('user@example.com')
-                    && $mail->expiresInMinutes              === 10
-                    && preg_match('/^\d{6}$/', $mail->code) === 1,
-        );
+        self::assertCount(1, $sent);
+        self::assertSame(self::ADDRESS, $sent[0]['to']);
+        self::assertInstanceOf(MfaCodeMessage::class, $sent[0]['message']);
+        self::assertSame('123456', $sent[0]['message']->code);
     }
 
     /**
-     * The driver must honour a constructor-supplied custom Mailable class so
-     * consumers can ship branded message templates.
+     * A configured message class is the one delivered.
      *
      * @return void
      */
-    public function testDispatchUsesCustomMailableClass(): void
+    public function testAConfiguredMessageClassIsDelivered(): void
     {
-        Mail::fake();
+        $sender = new FakeEmailSender;
+        $driver = new EmailDriver($sender, CustomMfaCodeMessage::class);
 
-        $driver = $this->makeDriver(mailable: CustomMfaCodeMessage::class);
-        $factor = $this->makeFactor(destination: 'brand@example.com');
-
-        $driver->issueChallenge($factor);
-
-        Mail::assertSent(
-            CustomMfaCodeMessage::class,
-            static fn (CustomMfaCodeMessage $mail): bool => $mail->hasTo('brand@example.com'),
-        );
-    }
-
-    /**
-     * `getMailable()` must return the constructor-supplied class verbatim.
-     *
-     * @return void
-     */
-    public function testGetMailableReturnsConstructorValue(): void
-    {
-        $driver = $this->makeDriver(mailable: CustomMfaCodeMessage::class);
+        $driver->deliver(self::factor(), '654321', CarbonImmutable::now()->addMinutes(10));
 
         self::assertSame(CustomMfaCodeMessage::class, $driver->getMailable());
+        self::assertInstanceOf(CustomMfaCodeMessage::class, $sender->sent()[0]['message']);
+        self::assertSame('654321', $sender->lastCodeTo(self::ADDRESS));
     }
 
     /**
-     * Without an explicit constructor argument `getMailable()` must fall back
-     * to the shipped `MfaCodeMessage` default.
+     * Rows of `[seconds the code has left, minutes the message states]`.
      *
+     * @return iterable<string, array{int, int}>
+     */
+    public static function lifetimes(): iterable
+    {
+        yield 'whole minutes' => [600, 10];
+        yield 'part of a minute rounds up' => [570, 10];
+        yield 'just over a minute' => [61, 2];
+        yield 'under a minute is one' => [30, 1];
+        yield 'already past is one' => [-5, 1];
+    }
+
+    /**
+     * The message states the whole minutes, at least one, the code has left.
+     *
+     * @param  int  $seconds
+     * @param  int  $minutes
      * @return void
      */
-    public function testGetMailableDefaultsToMfaCodeMessage(): void
+    #[DataProvider('lifetimes')]
+    public function testTheMessageStatesTheMinutesTheCodeHasLeft(int $seconds, int $minutes): void
     {
-        $driver = $this->makeDriver();
+        $now = CarbonImmutable::parse('2026-11-01 12:00:00');
 
-        self::assertSame(MfaCodeMessage::class, $driver->getMailable());
+        CarbonImmutable::setTestNow($now);
+
+        $sender = new FakeEmailSender;
+
+        (new EmailDriver($sender))->deliver(self::factor(), '123456', $now->addSeconds($seconds));
+
+        $message = $sender->sent()[0]['message'];
+
+        self::assertInstanceOf(MfaCodeMessage::class, $message);
+        self::assertSame($minutes, $message->expiresInMinutes);
     }
 
     /**
-     * After issuing a challenge the underlying factor row must carry a freshly
-     * issued numeric code with a future expiry.
+     * An email factor.
      *
-     * @return void
+     * @return \Tests\Fixtures\Factors\InMemoryFactor
      */
-    public function testIssueChallengePersistsCodeAndExpiry(): void
+    private static function factor(): InMemoryFactor
     {
-        Mail::fake();
-
-        $driver = $this->makeDriver();
-        $factor = $this->makeFactor(destination: 'persist@example.com');
-
-        $driver->issueChallenge($factor);
-        $factor->refresh();
-
-        $code    = $factor->getCode();
-        $expires = $factor->getExpiresAt();
-
-        self::assertNotNull($code);
-        self::assertMatchesRegularExpression('/^\d{6}$/', $code);
-        self::assertNotNull($expires);
-        self::assertTrue($expires->isFuture());
-    }
-
-    /**
-     * A configured code length must be honoured by the issued code, which stays
-     * numeric.
-     *
-     * @return void
-     */
-    public function testDispatchUsesConfiguredCodeLength(): void
-    {
-        Mail::fake();
-
-        $mailer = app(Mailer::class);
-
-        $driver = new EmailDriver(
-            mailer: $mailer,
-            codeLength: 8,
-        );
-        $factor = $this->makeFactor(destination: 'length@example.com');
-
-        $driver->issueChallenge($factor);
-
-        Mail::assertSent(
-            MfaCodeMessage::class,
-            static fn (MfaCodeMessage $mail): bool => $mail->hasTo('length@example.com')
-                    && preg_match('/^\d{8}$/', $mail->code) === 1,
-        );
-    }
-
-    /**
-     * Build an `EmailDriver` with the container's mailer and an optional
-     * Mailable override.
-     *
-     * @param  class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>  $mailable
-     * @return \SineMacula\Laravel\Mfa\Drivers\EmailDriver
-     */
-    private function makeDriver(string $mailable = MfaCodeMessage::class): EmailDriver
-    {
-        $mailer = app(Mailer::class);
-
-        return new EmailDriver(
-            mailer: $mailer,
-            mailable: $mailable,
-        );
-    }
-
-    /**
-     * Persist and return a fresh email factor owned by a freshly inserted test
-     * user.
-     *
-     * @param  ?string  $destination
-     * @return \SineMacula\Laravel\Mfa\Models\Factor
-     */
-    private function makeFactor(?string $destination): FactorModel
-    {
-        $user = TestUser::query()->create([
-            'email'       => 'owner@example.com',
-            'mfa_enabled' => true,
-        ]);
-
-        $factor                       = new FactorModel;
-        $factor->type                 = 'email';
-        $factor->destination          = $destination;
-        $factor->authenticatable_type = $user->getMorphClass();
-        $factor->authenticatable_id   = (string) $user->id;
-        $factor->save();
-
-        return $factor;
+        return new InMemoryFactor(type: 'email', destination: self::ADDRESS);
     }
 }

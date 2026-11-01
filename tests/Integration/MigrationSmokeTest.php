@@ -48,8 +48,7 @@ final class MigrationSmokeTest extends TestCase
         yield 'mfa_factors' => ['mfa_factors', [
             'id', ...$owner, 'type', 'label', 'destination', 'credential_reference', 'secret', 'totp_algorithm', 'totp_digits',
             'totp_period', 'last_accepted_step', 'status', 'preferred', 'consecutive_failures', 'disabled_at', 'application',
-            'confirmed_at', 'last_used_at', 'code', 'expires_at', 'attempts', 'locked_until', 'last_attempted_at', 'verified_at',
-            'created_at', 'updated_at',
+            'confirmed_at', 'last_used_at', 'created_at', 'updated_at',
         ]];
         yield 'mfa_identity_states' => ['mfa_identity_states', [
             'id', ...$owner, 'verification_generation', 'reenrollment_required', 'consecutive_failures', 'locked_until',
@@ -60,7 +59,7 @@ final class MigrationSmokeTest extends TestCase
         ]];
         yield 'mfa_codes' => ['mfa_codes', [
             'id', 'factor_id', ...$owner, 'purpose', 'application', 'session_id', 'code_hash', 'attempts', 'sends', 'sent_at',
-            'expires_at', 'consumed_at', 'created_at', 'updated_at',
+            'sent_times', 'expires_at', 'consumed_at', 'created_at', 'updated_at',
         ]];
         yield 'mfa_recovery_codes' => ['mfa_recovery_codes', [
             'id', ...$owner, 'code_hash', 'generation', 'used_at', 'replaced_at', 'created_at', 'updated_at',
@@ -84,6 +83,18 @@ final class MigrationSmokeTest extends TestCase
     {
         self::assertTrue(Schema::hasTable($table));
         self::assertSame([], array_values(array_diff($columns, Schema::getColumnListing($table))), sprintf('Missing columns on %s after migration.', $table));
+    }
+
+    /**
+     * A delivered code lives in the codes table, as a keyed hash, so the
+     * factors table has no column to hold one or its expiry.
+     *
+     * @return void
+     */
+    public function testTheFactorsTableHoldsNoDeliveredCode(): void
+    {
+        self::assertFalse(Schema::hasColumn('mfa_factors', 'code'));
+        self::assertFalse(Schema::hasColumn('mfa_factors', 'expires_at'));
     }
 
     /**

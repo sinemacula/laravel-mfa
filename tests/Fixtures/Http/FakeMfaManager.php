@@ -27,11 +27,8 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
     /** @var bool */
     public bool $isSetup = true;
 
-    /** @var bool */
-    public bool $hasEverVerified = true;
-
-    /** @var bool */
-    public bool $hasExpired = false;
+    /** @var list<\SineMacula\Laravel\Mfa\Proofs\Proof> */
+    public array $proofs = [];
 
     /** @var ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> */
     public ?Collection $factors = null;
@@ -71,26 +68,14 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
     }
 
     /**
-     * Report whether the identity has ever completed a verification.
+     * Return the seeded proofs of the current sign-in.
      *
-     * @return bool
+     * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */
     #[\Override]
-    public function hasEverVerified(): bool
+    public function proofs(): array
     {
-        return $this->hasEverVerified;
-    }
-
-    /**
-     * Report whether the active verification is past its expiry.
-     *
-     * @param  ?int  $expiresAfter
-     * @return bool
-     */
-    #[\Override]
-    public function hasExpired(?int $expiresAfter = null): bool
-    {
-        return $this->hasExpired;
+        return $this->proofs;
     }
 
     /**

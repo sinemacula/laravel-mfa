@@ -24,14 +24,17 @@ call them, so the flows can be built against one fixed set.
 - `EventContextResolver` is the exception: the event dispatcher calls it, so it is bound by default to
   `Context\DefaultEventContextResolver`, which gives the identity, the application and the request (see
   [Event Catalogue](event-catalogue.md)).
-- `CombinationPolicy` is the other exception: it is bound by default to `Assurance\DefaultCombinationPolicy` ahead of
-  the requirement and verification flows that will call it, since they will use its default (see
+- `ProofStore` is called by verification and the `mfa` middleware, so it is bound by default to
+  `Proofs\SessionProofStore`, which keeps each sign-in's proofs in the Laravel session (see
+  [Proof Store and Sign-Ins](proof-store.md)).
+- `CombinationPolicy` is also bound by default, to `Assurance\DefaultCombinationPolicy`, ahead of the requirement and
+  verification flows that will call it, since they will use its default (see
   [Combination Policy](combination-policy.md)). No shipped flow calls it yet.
 
 | Contract                 | Answers                                                                                       |
 |--------------------------|-----------------------------------------------------------------------------------------------|
 | `CombinationPolicy`      | Whether a factor may follow a first factor, and what a combination of proofs establishes      |
-| `ProofStore`             | The proofs a session has made that still count; forgetting them by factor or for the session  |
+| `ProofStore`             | The current sign-in and its proofs that still count; forgetting them by factor or sign-in     |
 | `RequirementPolicy`      | What a sign-in must prove after its first factor, composed from every source                  |
 | `IdentityRequirement`    | What the identity itself requires                                                             |
 | `TenantRequirement`      | What the active tenant requires                                                               |

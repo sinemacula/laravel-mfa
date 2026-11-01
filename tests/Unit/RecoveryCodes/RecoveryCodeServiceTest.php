@@ -170,13 +170,13 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * Issuing clears the identity's cached factor state.
+     * The identity's factors include the issued codes at once.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testClearsTheIdentitysCachedFactors(): void
+    public function testTheIssuedCodesAreSeenAtOnce(): void
     {
         $this->signIn('cache@example.com');
 

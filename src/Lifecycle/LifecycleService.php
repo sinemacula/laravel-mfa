@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
-use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
+use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
@@ -27,24 +27,25 @@ final readonly class LifecycleService
      * Constructor.
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
-     * @param  \SineMacula\Laravel\Mfa\Factors\FactorStateCache  $cache
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
      */
     public function __construct(
 
         /** The container the event dispatcher is read from. */
         private Container $container,
 
-        /** The per-request cache of the identity's factor state. */
-        private FactorStateCache $cache,
+        /** The proofs the removed factor made, which stop counting. */
+        private ProofService $proofs,
     ) {}
 
     /**
      * Disable a previously-enrolled factor for the current identity.
      *
-     * Deletes the underlying row when the factor is an Eloquent model,
-     * invalidates the setup-state cache, and dispatches `MfaFactorDisabled`.
-     * Non-Eloquent factors are left for the consumer to discard; the event
-     * still fires.
+     * Deletes the underlying row when the factor is an Eloquent model, stops
+     * counting every proof made with the factor on the current session, and
+     * dispatches `MfaFactorDisabled`. Non-Eloquent factors are left for the
+     * consumer to discard; their proofs stop counting and the event still
+     * fires.
      *
      * Throws `FactorOwnershipMismatchException` when the factor does not belong
      * to the current identity. No-op when no MFA-capable identity is
@@ -70,7 +71,11 @@ final readonly class LifecycleService
             $factor->delete();
         }
 
-        $this->cache->clear($identity);
+        $identifier = $factor->getFactorIdentifier();
+
+        if (is_string($identifier) || is_int($identifier)) {
+            $this->proofs->forgetFactor($identity, (string) $identifier);
+        }
 
         $events = $this->container->make(Dispatcher::class);
         $events->dispatch(new MfaFactorDisabled($identity, $factor, $factor->getType()));

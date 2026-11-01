@@ -29,6 +29,7 @@ use SineMacula\Laravel\Mfa\Events\LockoutApplied;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
 use SineMacula\Laravel\Mfa\Events\PasskeyAssociated;
 use SineMacula\Laravel\Mfa\Events\PreferredFactorChanged;
+use SineMacula\Laravel\Mfa\Events\RecoveryCodeRedemptionEvent;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesLow;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
@@ -69,6 +70,7 @@ use Tests\TestCase;
 #[CoversClass(CodeSent::class)]
 #[CoversClass(VerificationPassed::class)]
 #[CoversClass(VerificationFailed::class)]
+#[CoversClass(RecoveryCodeRedemptionEvent::class)]
 #[CoversClass(RecoveryCodesGenerated::class)]
 #[CoversClass(RecoveryCodeUsed::class)]
 #[CoversClass(RecoveryCodesLow::class)]
@@ -279,7 +281,6 @@ final class EventCatalogueTest extends TestCase
             'destination'          => self::DESTINATION,
             'credential_reference' => self::CREDENTIAL,
             'secret'               => self::SECRET,
-            'code'                 => self::CODE,
             'status'               => 'confirmed',
         ]);
     }

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Codes;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
@@ -14,20 +15,22 @@ use Illuminate\Queue\SerializesModels;
  * Default Mailable for MFA email-code delivery.
  *
  * Ships an inline HTML body so the package works out of the box with no
- * published views. Consumers who want a branded email / a text alternative
- * subclass this Mailable (or configure the email driver to use their own
- * Mailable class) and override `content()` or `renderHtml()` to point at their
- * own view.
+ * published views. Consumers who want a branded email or a text alternative
+ * subclass this Mailable, name the subclass in `mfa.codes.mailable`, and
+ * override `content()` or `renderHtml()` to point at their own view.
  *
  * The code and expiry are exposed as public readonly properties so custom views
- * can render them as `{{ $code }}` / `{{ $expiresInMinutes }}`.
+ * can render them as `{{ $code }}` / `{{ $expiresInMinutes }}`. The message
+ * carries the code in clear, so it is never queued in clear: whenever it is
+ * queued, by a sender that queues it or by a subclass that is queueable, the
+ * queue payload is encrypted with the application key.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
  * @inheritable
  */
-class MfaCodeMessage extends Mailable
+class MfaCodeMessage extends Mailable implements ShouldBeEncrypted
 {
     use Queueable, SerializesModels;
 
@@ -43,7 +46,7 @@ class MfaCodeMessage extends Mailable
         #[\SensitiveParameter]
         public readonly string $code,
 
-        /** Minutes until the code expires from the factor's point of view. */
+        /** Minutes until the code expires. */
         public readonly int $expiresInMinutes,
     ) {}
 

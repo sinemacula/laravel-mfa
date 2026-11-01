@@ -38,9 +38,11 @@ concurrent requests, not just sequential ones.
 - On a match against an Eloquent factor, the driver enters `consumeAtomic()`: runs
   `FactorStateTransaction::forFactor()` for the factor's owner, finds the factor among the owner's factors read under
   the lock, compares the candidate's hash with the stored one again, writes `null` to the secret column, commits.
-- The verification service's `applyVerificationOutcome()` then runs `recordVerification()` on the factor (stamps
-  `verified_at`, resets attempts, clears any pending code) and persists; `finalizeVerification()` writes the
-  identity-level verification through the bound store and dispatches `MfaVerified`.
+- The driver runs inside the attempt's transaction (see [Attempts and Lockout](attempts-and-lockout.md)), so its own
+  factor state transaction nests in it; the attempt service then resets the factor's failures in a row. The
+  verification service runs `recordVerification()` on the factor (stamps `last_used_at`) and persists;
+  `recordProof()` records a recovery code proof on the identity's sign-in through the bound proof store, and
+  `finalizeVerification()` dispatches `MfaVerified`.
 - A fresh batch via `issueBackupCodes()` deletes old rows, inserts new rows (each with the SHA-256 digest on
   `secret`, stored confirmed since a code is usable as soon as it is issued), dispatches `MfaFactorEnrolled` once per
   new code, and returns the plaintext list to the caller. Being confirmed, the rows count towards `isMfaEnabled()` as
@@ -48,8 +50,8 @@ concurrent requests, not just sequential ones.
 
 ## Failure / Edge Cases
 
-- A wrong candidate fails the constant-time comparison before any lock is acquired. There is no row mutation and the
-  verification service increments the factor's attempt counter.
+- A wrong candidate fails the constant-time comparison before the driver takes its lock. The driver mutates nothing,
+  and the attempt service counts the failure against the factor, the identity and the IP address.
 - Two concurrent requests submitting the same valid code race on the owner's lock. The winner consumes the row and
   returns `true`; the loser re-reads a secret that is now `null`, fails its second hash check, and returns `false`
   without mutating anything.
