@@ -17,12 +17,12 @@ use SineMacula\Laravel\Mfa\Exceptions\MissingDriverDependencyException;
  * package remains lightweight for applications that do not use TOTP.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
-final class TotpDriver implements FactorDriver
+final readonly class TotpDriver implements FactorDriver
 {
     /** @var object The Google2FA instance */
-    private readonly object $google2fa;
+    private object $google2fa;
 
     /**
      * Create a new TOTP driver instance.
@@ -34,7 +34,7 @@ final class TotpDriver implements FactorDriver
     public function __construct(
 
         /** Clock-drift tolerance in 30-second steps on either side of "now". */
-        private readonly int $window = 1,
+        private int $window = 1,
     ) {
         // @codeCoverageIgnoreStart
         // This branch only fires when `pragmarx/google2fa` is absent, which

@@ -16,7 +16,7 @@ use SineMacula\Laravel\Mfa\Exceptions\SmsGatewayNotConfiguredException;
  * provider (Twilio, Vonage, AWS SNS, etc.).
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final readonly class NullSmsGateway implements SmsGateway
 {

@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
@@ -19,10 +20,11 @@ use Tests\Fixtures\SecondStoreIdentity;
  * Unit tests for the `SessionMfaVerificationStore` default store.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(SessionMfaVerificationStore::class)]
 final class SessionMfaVerificationStoreTest extends TestCase
 {
     /** @var string Fixed "now" used throughout the suite. */

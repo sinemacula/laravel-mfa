@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Integration;
 
 use PHPUnit\Framework\Assert;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -22,10 +23,11 @@ use Tests\TestCase;
  * issueChallenge surface must be exercised identically to built-in drivers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
 final class CustomDriverExtensionTest extends TestCase
 {
     /**

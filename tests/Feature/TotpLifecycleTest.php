@@ -7,12 +7,15 @@ namespace Tests\Feature;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PragmaRX\Google2FA\Google2FA;
+use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enums\MfaVerificationFailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
 use Tests\TestCase;
@@ -26,10 +29,12 @@ use Tests\TestCase;
  * the store updates.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaManager::class)]
+#[CoversClass(TotpDriver::class)]
 final class TotpLifecycleTest extends TestCase
 {
     use RefreshDatabase;
@@ -41,6 +46,10 @@ final class TotpLifecycleTest extends TestCase
      * Test successful TOTP verification returns true.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSuccessfulVerificationReturnsTrue(): void
     {
@@ -53,6 +62,10 @@ final class TotpLifecycleTest extends TestCase
      * Test successful TOTP verification marks the verification store.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSuccessfulVerificationMarksVerificationStore(): void
     {
@@ -69,7 +82,9 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSuccessfulVerificationStampsFactorVerifiedAt(): void
     {
@@ -88,7 +103,9 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSuccessfulVerificationDispatchesVerifiedEvent(): void
     {
@@ -114,7 +131,9 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testFailedVerificationIncrementsAttemptsAndFiresFailureEvent(): void
     {
@@ -140,6 +159,10 @@ final class TotpLifecycleTest extends TestCase
      * Test crossing max_attempts records the configured attempts count.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testThresholdCrossingRecordsConfiguredAttemptsCount(): void
     {
@@ -152,6 +175,10 @@ final class TotpLifecycleTest extends TestCase
      * Test crossing max_attempts stamps a future locked_until.
      *
      * @return void
+     *
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testThresholdCrossingStampsFutureLockedUntil(): void
     {
@@ -166,7 +193,9 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testVerifyingAfterLockoutReturnsFalse(): void
     {
@@ -180,7 +209,9 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testVerifyingAfterLockoutDispatchesFactorLockedFailure(): void
     {
@@ -206,7 +237,9 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testChallengePreservesAttemptsAfterLockout(): void
     {
@@ -224,7 +257,9 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testChallengePreservesLockedUntilTimestampAfterLockout(): void
     {
@@ -250,7 +285,9 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testChallengeKeepsFactorLockedAfterLockout(): void
     {
@@ -268,7 +305,9 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return void
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testChallengeDispatchesEventEvenWhenLocked(): void
     {
@@ -358,7 +397,9 @@ final class TotpLifecycleTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
+     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
+     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     private function enrolAndBurnAttempts(): Factor
     {

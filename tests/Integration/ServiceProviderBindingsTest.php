@@ -5,11 +5,13 @@ declare(strict_types = 1);
 namespace Tests\Integration;
 
 use Illuminate\Routing\Router;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Gateways\NullSmsGateway;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\MfaServiceProvider;
 use SineMacula\Laravel\Mfa\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Middleware\SkipMfa;
 use SineMacula\Laravel\Mfa\Policies\NullMfaPolicy;
@@ -23,10 +25,11 @@ use Tests\TestCase;
  * and the middleware aliases are registered on the router.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(MfaServiceProvider::class)]
 final class ServiceProviderBindingsTest extends TestCase
 {
     /**

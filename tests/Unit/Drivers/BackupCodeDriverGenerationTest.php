@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
 use Tests\TestCase;
@@ -16,10 +17,11 @@ use Tests\TestCase;
  * project's max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(BackupCodeDriver::class)]
 final class BackupCodeDriverGenerationTest extends TestCase
 {
     /**

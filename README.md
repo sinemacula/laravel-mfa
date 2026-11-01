@@ -40,17 +40,6 @@ whatever UI you like.
 - **Per-factor lockouts**: configurable `max_attempts` + `lockout_minutes` for OTP drivers.
 - **Zero ecosystem coupling**: depends only on Laravel and the standard `Authenticatable` contract.
 
-## Design Notes
-
-Adoption-focused quick-starts are below. Maintainer-oriented security and lifecycle contracts live in
-`docs/design/`:
-
-- `docs/design/verification-lifecycle-and-events.md`
-- `docs/design/backup-code-consumption.md`
-- `docs/design/attempts-and-lockout.md`
-- `docs/design/per-device-verification-and-step-up.md`
-- `docs/design/factor-payload-hygiene.md`
-
 ## Installation
 
 ```bash
@@ -374,6 +363,9 @@ All concrete classes in this package are `final` unless explicitly designed for 
 | Custom factor model       | Set `config('mfa.factor.model')` to your subclass              |
 | Custom SMS gateway        | Implement `SmsGateway` and bind it via the container           |
 
+The security and lifecycle contracts behind the package, for maintainers and reviewers, are in
+[docs/design](docs/design/README.md).
+
 ## Requirements
 
 - PHP ^8.3 (extensions: mbstring)
@@ -392,6 +384,8 @@ composer test:mutation      # scoped mutation gate
 composer test:mutation:full # full mutation suite (no thresholds)
 composer bench              # PHPBench hot-path benchmarks
 composer check              # static analysis + style
+composer format             # format the codebase
+composer smells             # advisory code smells (duplication, complexity)
 ```
 
 ## Changelog
@@ -400,7 +394,7 @@ See [CHANGELOG.md](CHANGELOG.md) for a list of notable changes.
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)for guidelines on branching, commits, code
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on branching, commits, code
 quality, and pull requests.
 
 ## Security

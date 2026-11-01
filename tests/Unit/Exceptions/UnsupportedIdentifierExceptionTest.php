@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Exceptions;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 
@@ -11,10 +12,11 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
  * Unit tests for the `UnsupportedIdentifierException` exception.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(UnsupportedIdentifierException::class)]
 final class UnsupportedIdentifierExceptionTest extends TestCase
 {
     /**

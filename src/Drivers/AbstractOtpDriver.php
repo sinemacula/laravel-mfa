@@ -25,7 +25,7 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
  * raises `UnsupportedFactorException`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 abstract class AbstractOtpDriver implements FactorDriver
 {

@@ -28,7 +28,7 @@ use SineMacula\Laravel\Mfa\Exceptions\InvalidDriverConfigurationException;
  * holds them out-of-band.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class BackupCodeDriver implements FactorDriver
 {
@@ -293,13 +293,12 @@ final class BackupCodeDriver implements FactorDriver
         $result = DB::connection($factor->getConnectionName())->transaction(
             static function () use ($factor, $secretColumn, $expectedSecret): bool {
 
-                /** @var ?\Illuminate\Database\Eloquent\Model $locked */
                 // @phpstan-ignore staticMethod.dynamicCall
                 $locked = $factor->newQuery()
                     ->lockForUpdate()
                     ->find($factor->getKey());
 
-                if (!$locked instanceof EloquentFactor) {
+                if (!$locked instanceof Model) {
                     return false;
                 }
 

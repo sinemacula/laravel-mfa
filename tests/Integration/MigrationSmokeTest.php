@@ -6,6 +6,7 @@ namespace Tests\Integration;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use Tests\TestCase;
 
 /**
@@ -22,10 +23,11 @@ use Tests\TestCase;
  * `DB_CONNECTION` exported); local runs hit in-memory SQLite by default.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversNothing]
 final class MigrationSmokeTest extends TestCase
 {
     use RefreshDatabase;
@@ -82,7 +84,7 @@ final class MigrationSmokeTest extends TestCase
         $hasMorphIndex = false;
 
         foreach ($columns as $index) {
-            $cols = $index['columns'] ?? [];
+            $cols = $index['columns'];
 
             if (in_array('authenticatable_type', $cols, true) && in_array('authenticatable_id', $cols, true)) {
                 $hasMorphIndex = true;

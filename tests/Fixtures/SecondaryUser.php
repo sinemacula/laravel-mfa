@@ -22,7 +22,7 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
  * must scope by `authenticatable_type` correctly.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @property int $id
  * @property bool $mfa_enabled

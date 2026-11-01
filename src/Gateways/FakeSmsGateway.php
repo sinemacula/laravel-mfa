@@ -15,7 +15,7 @@ use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
  * container.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class FakeSmsGateway implements SmsGateway
 {

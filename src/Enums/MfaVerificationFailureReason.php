@@ -12,7 +12,7 @@ namespace SineMacula\Laravel\Mfa\Enums;
  * parsing human-readable messages.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 enum MfaVerificationFailureReason: string
 {

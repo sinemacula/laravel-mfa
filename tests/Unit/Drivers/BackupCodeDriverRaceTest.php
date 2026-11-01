@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Drivers;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Drivers\BackupCodeDriver;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\TestUser;
@@ -18,10 +19,11 @@ use Tests\TestCase;
  * in-memory hash compare and the transaction lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(BackupCodeDriver::class)]
 final class BackupCodeDriverRaceTest extends TestCase
 {
     use RefreshDatabase;

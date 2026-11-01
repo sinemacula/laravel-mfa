@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Benchmarks;
+namespace Benchmarks\Support;
 
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -17,7 +17,7 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  * the entire object.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class InMemoryFactor implements Factor
 {

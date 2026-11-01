@@ -16,7 +16,7 @@ use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
  * bind their own policy implementation in place of this default.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class NullMfaPolicy implements MfaPolicy
 {

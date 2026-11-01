@@ -6,6 +6,7 @@ namespace Tests\Unit\Drivers;
 
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Exceptions\MissingRecipientException;
 use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
@@ -22,10 +23,11 @@ use Tests\TestCase;
  * challenge-issuance happy path persisting a real `Factor` row.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
+#[CoversClass(EmailDriver::class)]
 final class EmailDriverTest extends TestCase
 {
     /**

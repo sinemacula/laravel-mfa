@@ -13,6 +13,6 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * collapsing distinct identities to a shared bucket.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class UnsupportedIdentifierException extends \RuntimeException {}

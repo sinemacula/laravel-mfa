@@ -19,7 +19,7 @@ use SineMacula\Laravel\Mfa\Mail\MfaCodeMessage;
  * driver constructor) and override its `content()` to point at their own view.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final class EmailDriver extends AbstractOtpDriver
 {

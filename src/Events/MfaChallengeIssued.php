@@ -18,7 +18,7 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  * side effects, or write UI hints.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
- * @copyright   2026 Sine Macula Limited.
+ * @copyright   2026 Sine Macula Limited
  */
 final readonly class MfaChallengeIssued
 {
