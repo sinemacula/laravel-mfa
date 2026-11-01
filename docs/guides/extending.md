@@ -38,7 +38,7 @@ registers it with the container, and the classes only it uses:
 | `Requirements`  | Whether MFA applies (`shouldUse()`) and the default `NullMfaPolicy`                 |
 | `Proofs`        | The recorded verification (`hasExpired()`) and `SessionMfaVerificationStore`        |
 | `Verification`  | `challenge()` and `verify()`                                                        |
-| `Enrolment`     | `enrol()`                                                                           |
+| `Enrollment`    | `enroll()`                                                                          |
 | `Lifecycle`     | `disable()`                                                                         |
 | `RecoveryCodes` | Backup codes: `issueBackupCodes()` and `BackupCodeDriver`                           |
 | `Http`          | The `mfa` and `mfa.skip` middleware, `RequireMfa` and `SkipMfa`                     |

@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Enrolment;
+namespace SineMacula\Laravel\Mfa\Enrollment;
 
 use Illuminate\Contracts\Foundation\Application;
 
@@ -14,7 +14,7 @@ use Illuminate\Contracts\Foundation\Application;
  *
  * @internal
  */
-final class EnrolmentBindings
+final class EnrollmentBindings
 {
     /**
      * Disallow instantiation; utility container only.
@@ -29,6 +29,6 @@ final class EnrolmentBindings
      */
     public static function register(Application $app): void
     {
-        $app->singleton(EnrolmentService::class);
+        $app->singleton(EnrollmentService::class);
     }
 }

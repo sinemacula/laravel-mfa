@@ -31,9 +31,9 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
 - Enrolment and disable both invalidate the identity's setup-state cache before dispatching their event, so a listener
   that reads `Mfa::isSetup()` inside the handler observes the post-change state.
 - Ownership is enforced before any lifecycle event fires. A factor belonging to a different identity raises
-  `FactorOwnershipMismatchException` from `challenge()`, `verify()`, `enrol()`, and `disable()`; no event is
+  `FactorOwnershipMismatchException` from `challenge()`, `verify()`, `enroll()`, and `disable()`; no event is
   dispatched on the mismatch path.
-- `challenge()`, `enrol()`, `disable()`, and `issueBackupCodes()` are no-ops when no MFA-capable identity resolves.
+- `challenge()`, `enroll()`, `disable()`, and `issueBackupCodes()` are no-ops when no MFA-capable identity resolves.
   They dispatch nothing in that branch — consumers can call them unconditionally in bootstrap code.
 
 ## Success Path
@@ -44,7 +44,7 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
   failure, calls `FactorDriver::verify($factor, $code)`, persists the success/failure side effects on the factor row,
   writes through `MfaVerificationStore::markVerified()` on success, then dispatches either `MfaVerified` or
   `MfaVerificationFailed` last.
-- `enrol()` resolves the identity, stamps ownership onto brand-new Eloquent rows (or asserts ownership on pre-existing
+- `enroll()` resolves the identity, stamps ownership onto brand-new Eloquent rows (or asserts ownership on pre-existing
   rows), persists, invalidates the setup cache, then dispatches `MfaFactorEnrolled($identity, $factor, $driver)`.
 - `disable()` resolves the identity, asserts ownership, deletes the row for Eloquent factors, invalidates the setup
   cache, then dispatches `MfaFactorDisabled($identity, $factor, $driver)`.
@@ -71,8 +71,8 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
 ## Implementation Anchors
 
 - `src/Verification/VerificationService.php`: `challenge()`, `verify()`, `applyVerificationOutcome()`,
-  `finaliseVerification()`.
-- `src/Enrolment/EnrolmentService.php`: `enrol()`. `src/Lifecycle/LifecycleService.php`: `disable()`.
+  `finalizeVerification()`.
+- `src/Enrollment/EnrollmentService.php`: `enroll()`. `src/Lifecycle/LifecycleService.php`: `disable()`.
 - `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`, `rotateBackupCodeBatch()`.
 - `src/Drivers/DriverResolver.php`: `resolve()`, `assertMatchesFactor()`. `src/Factors/FactorOwnership.php`:
   `assert()`. `src/Factors/FactorStateCache.php`: `clear()`.
@@ -98,9 +98,9 @@ The shipped lifecycle surface is five events, all under `SineMacula\Laravel\Mfa\
 - `tests/Unit/MfaManagerVerifySuccessTest.php`
   `testVerifySuccessDoesNotDispatchFailureEvent`
 - `tests/Unit/MfaManagerLifecycleTest.php`
-  `testEnrolDispatchesEnrolledEvent`
+  `testEnrollDispatchesEnrolledEvent`
 - `tests/Unit/MfaManagerLifecycleTest.php`
-  `testEnrolInvalidatesIsSetupCache`
+  `testEnrollInvalidatesIsSetupCache`
 - `tests/Unit/MfaManagerLifecycleTest.php`
   `testDisableDispatchesDisabledEvent`
 - `tests/Unit/MfaManagerLifecycleTest.php`

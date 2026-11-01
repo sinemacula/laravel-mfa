@@ -242,7 +242,7 @@ final class FactorSummaryTest extends TestCase
      *
      * @return void
      */
-    public function testMaskingEmailHonoursExplodeLimitOnSecondAtSign(): void
+    public function testMaskingEmailHonorsExplodeLimitOnSecondAtSign(): void
     {
         $summary = $this->buildSummaryWithRecipient('alice@inner@example.com');
 

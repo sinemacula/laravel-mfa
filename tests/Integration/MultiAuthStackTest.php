@@ -51,7 +51,7 @@ final class MultiAuthStackTest extends TestCase
      */
     public function testSessionGuardSeesIdentityAndFactors(): void
     {
-        $user = $this->enrolUser('session@example.test');
+        $user = $this->enrollUser('session@example.test');
 
         $this->actingAs($user);
 
@@ -73,7 +73,7 @@ final class MultiAuthStackTest extends TestCase
             'provider' => 'users',
         ]);
 
-        $user = $this->enrolUser('token@example.test');
+        $user = $this->enrollUser('token@example.test');
 
         // Mimic what Sanctum / Passport do: register a guard whose resolver
         // hands back a real Eloquent identity — the MFA manager reads through
@@ -130,7 +130,7 @@ final class MultiAuthStackTest extends TestCase
      */
     public function testSanctumGuardSeesIdentityAndFactors(): void
     {
-        $user = $this->enrolUser('sanctum@example.test');
+        $user = $this->enrollUser('sanctum@example.test');
 
         // Register Sanctum's auth driver inside this test so the package's
         // standalone-auth-stack story is exercised against the real
@@ -170,7 +170,7 @@ final class MultiAuthStackTest extends TestCase
      * @param  string  $email
      * @return \Tests\Fixtures\TestUser
      */
-    private function enrolUser(string $email): TestUser
+    private function enrollUser(string $email): TestUser
     {
         $user = TestUser::create([
             'email'       => $email,

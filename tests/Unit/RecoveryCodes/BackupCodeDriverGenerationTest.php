@@ -71,7 +71,7 @@ final class BackupCodeDriverGenerationTest extends TestCase
      *
      * @return void
      */
-    public function testGenerateSetHonoursExplicitCountArgument(): void
+    public function testGenerateSetHonorsExplicitCountArgument(): void
     {
         $driver = new BackupCodeDriver(codeCount: 5);
         $codes  = $driver->generateSet(3);

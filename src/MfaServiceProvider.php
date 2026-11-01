@@ -8,7 +8,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use SineMacula\Laravel\Mfa\Codes\CodeBindings;
 use SineMacula\Laravel\Mfa\Drivers\DriverBindings;
-use SineMacula\Laravel\Mfa\Enrolment\EnrolmentBindings;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentBindings;
 use SineMacula\Laravel\Mfa\Factors\FactorBindings;
 use SineMacula\Laravel\Mfa\Http\HttpBindings;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleBindings;
@@ -54,7 +54,7 @@ final class MfaServiceProvider extends ServiceProvider
         RequirementBindings::register($this->app);
         ProofBindings::register($this->app);
         VerificationBindings::register($this->app);
-        EnrolmentBindings::register($this->app);
+        EnrollmentBindings::register($this->app);
         LifecycleBindings::register($this->app);
         RecoveryCodeBindings::register($this->app);
     }

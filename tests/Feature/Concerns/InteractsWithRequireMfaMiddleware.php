@@ -64,7 +64,7 @@ trait InteractsWithRequireMfaMiddleware
      * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
      * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
-    protected function enrolTotp(string $email = 'totp-mw@example.test'): array
+    protected function enrollTotp(string $email = 'totp-mw@example.test'): array
     {
         $user = TestUser::create([
             'email'       => $email,

@@ -107,7 +107,7 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
 - `tests/Unit/Models/FactorTest.php`
   `testRawCodeColumnIsNotStoredAsPlaintext`
 - `tests/Unit/Models/FactorTest.php`
-  `testSecretAndCodeAreHiddenFromSerialisation`
+  `testSecretAndCodeAreHiddenFromSerialization`
 
 ## Change Triggers
 

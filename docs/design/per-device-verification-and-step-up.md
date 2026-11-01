@@ -75,7 +75,7 @@ by a single swappable seam — the `MfaVerificationStore` contract — plus the 
 - `src/Proofs/SessionMfaVerificationStore.php`: shipped default implementation, including the identity-class-scoped
   `key()` helper.
 - `src/Proofs/ProofService.php`: `hasExpired()`, `markVerified()`, `forgetVerification()`.
-- `src/Verification/VerificationService.php`: `finaliseVerification()` (writes through the store on successful
+- `src/Verification/VerificationService.php`: `finalizeVerification()` (writes through the store on successful
   verify).
 - `src/Http/Middleware/RequireMfa.php`: `handle()`, `parseMaxAgeMinutes()`, `resolveFactorSummaries()`.
 - `src/Http/Middleware/SkipMfa.php`: sets the `skip_mfa` request attribute for the verification endpoints.

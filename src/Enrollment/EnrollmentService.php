@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Enrolment;
+namespace SineMacula\Laravel\Mfa\Enrollment;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -22,7 +22,7 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  *
  * @internal
  */
-final readonly class EnrolmentService
+final readonly class EnrollmentService
 {
     /**
      * Constructor.
@@ -63,7 +63,7 @@ final readonly class EnrolmentService
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
      */
-    public function enrol(Factor $factor): void
+    public function enroll(Factor $factor): void
     {
         $identity = CurrentIdentity::resolve();
 

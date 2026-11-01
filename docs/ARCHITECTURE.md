@@ -68,7 +68,7 @@ Historical record of the architectural calls made during the 1.0 cycle.
   most-recent registration. Pinned by
   `tests/Integration/CustomDriverExtensionTest::testConsumerCanOverrideBuiltInTotpDriver`.
 - **D6 — Lifecycle events are dispatched by the package's services behind the manager, not by
-  consumer code.** Factor enrolment goes through `Mfa::enrol(Factor)`; factor removal goes through
+  consumer code.** Factor enrolment goes through `Mfa::enroll(Factor)`; factor removal goes through
   `Mfa::disable(Factor)`. Both invalidate the identity's setup-state cache and dispatch
   `MfaFactorEnrolled` / `MfaFactorDisabled` so audit subscribers do not have to rely on consumer
   cooperation. Five lifecycle events in total: `MfaChallengeIssued`, `MfaVerified`,

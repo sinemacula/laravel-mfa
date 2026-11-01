@@ -172,7 +172,7 @@ Mfa::getFactors();                      // Collection|null
 
 Mfa::challenge($driver, $factor);       // MfaChallengeIssued
 Mfa::verify($driver, $factor, $code);   // MfaVerified | MfaVerificationFailed
-Mfa::enrol($factor);                    // MfaFactorEnrolled
+Mfa::enroll($factor);                   // MfaFactorEnrolled
 Mfa::disable($factor);                  // MfaFactorDisabled
 Mfa::issueBackupCodes();                // atomic rotation — returns plaintext once
 ```
@@ -220,7 +220,7 @@ $this->renderable(function (MfaRequiredException $e) {
 ### TOTP enrolment
 
 Generate a shared secret and a provisioning URI, render the URI as a QR code, then hand a fresh `Factor` to
-`Mfa::enrol()`:
+`Mfa::enroll()`:
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -241,9 +241,9 @@ $factor->driver = 'totp';
 $factor->label  = 'Authenticator app';
 $factor->secret = $secret;
 
-// `Mfa::enrol()` stamps the identity's morph columns itself —
+// `Mfa::enroll()` stamps the identity's morph columns itself —
 // callers do not (and should not) populate them.
-Mfa::enrol($factor);
+Mfa::enroll($factor);
 ```
 
 ### Backup codes

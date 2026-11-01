@@ -8,7 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
-use SineMacula\Laravel\Mfa\Enrolment\EnrolmentService;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
@@ -31,7 +31,7 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  * - `Proofs\ProofService`: the recorded verification (`markVerified()`,
  *   `hasEverVerified()`, `hasExpired()`, `forgetVerification()`).
  * - `Verification\VerificationService`: `challenge()` and `verify()`.
- * - `Enrolment\EnrolmentService`: `enrol()`.
+ * - `Enrollment\EnrollmentService`: `enroll()`.
  * - `Lifecycle\LifecycleService`: `disable()`.
  * - `RecoveryCodes\RecoveryCodeService`: `issueBackupCodes()`.
  *
@@ -215,9 +215,9 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
      */
-    public function enrol(Factor $factor): void
+    public function enroll(Factor $factor): void
     {
-        $this->container->make(EnrolmentService::class)->enrol($factor);
+        $this->container->make(EnrollmentService::class)->enroll($factor);
     }
 
     /**

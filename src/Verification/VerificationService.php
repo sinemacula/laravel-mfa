@@ -159,7 +159,7 @@ final readonly class VerificationService
             $this->applyVerificationOutcome($factor, $driver, $valid);
         }
 
-        $this->finaliseVerification($identity, $factor, $driver, $valid, $events);
+        $this->finalizeVerification($identity, $factor, $driver, $valid, $events);
 
         return $valid;
     }
@@ -218,7 +218,7 @@ final readonly class VerificationService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function finaliseVerification(MultiFactorAuthenticatable $identity, Factor $factor, string $driver, bool $valid, Dispatcher $events): void
+    private function finalizeVerification(MultiFactorAuthenticatable $identity, Factor $factor, string $driver, bool $valid, Dispatcher $events): void
     {
         if ($valid) {
             /** @var \SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore $store */

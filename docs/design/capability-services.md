@@ -28,7 +28,7 @@ the provider or another capability.
   only for its owner (`Factors\FactorOwnership`).
 - The per-request cache of an identity's factor state is one shared `Factors\FactorStateCache`. The reads
   (`isSetup()`, `getFactors()`) are served from it, and every service that changes an identity's factors or
-  verification (`verify()` on success, `enrol()`, `disable()`, `issueBackupCodes()`) clears that identity's entries.
+  verification (`verify()` on success, `enroll()`, `disable()`, `issueBackupCodes()`) clears that identity's entries.
 - Each capability registers its container wiring in its own `*Bindings` class, which the provider calls: the
   capability's service as a singleton and the defaults for the seams it owns. The capabilities that ship drivers also
   build them, and the provider's `mfa` factory registers them against the manager through the same `extend()` API a
@@ -42,7 +42,7 @@ the provider or another capability.
 
 - The provider registers the configuration, the `mfa` manager singleton and each capability's bindings
   (`FactorBindings`, `DriverBindings`, `CodeBindings`, `RequirementBindings`, `ProofBindings`, `VerificationBindings`,
-  `EnrolmentBindings`, `LifecycleBindings`, `RecoveryCodeBindings`), and at boot the middleware aliases
+  `EnrollmentBindings`, `LifecycleBindings`, `RecoveryCodeBindings`), and at boot the middleware aliases
   (`HttpBindings`) and the publishing tags.
 - The `mfa` factory builds the manager, then `DriverBindings::extend()` registers the TOTP, email and SMS drivers and
   `RecoveryCodeBindings::extend()` the backup-code driver, each built from its slice of `mfa.drivers.*`, before the
@@ -69,7 +69,7 @@ the provider or another capability.
 - `src/*/*Bindings.php`: each capability's container wiring; `src/Drivers/DriverBindings.php` and
   `src/RecoveryCodes/RecoveryCodeBindings.php` also build the shipped drivers from config.
 - `src/Requirements/RequirementService.php`, `src/Factors/FactorService.php`, `src/Proofs/ProofService.php`,
-  `src/Verification/VerificationService.php`, `src/Enrolment/EnrolmentService.php`,
+  `src/Verification/VerificationService.php`, `src/Enrollment/EnrollmentService.php`,
   `src/Lifecycle/LifecycleService.php`, `src/RecoveryCodes/RecoveryCodeService.php`: the capability services.
 - `src/Factors/FactorStateCache.php`, `src/Factors/FactorOwnership.php`, `src/Drivers/DriverResolver.php`,
   `src/Support/CurrentIdentity.php`, `src/Config/IntegerSetting.php`: what the services share.

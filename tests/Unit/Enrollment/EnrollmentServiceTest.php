@@ -2,12 +2,12 @@
 
 declare(strict_types = 1);
 
-namespace Tests\Unit\Enrolment;
+namespace Tests\Unit\Enrollment;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Enrolment\EnrolmentService;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
@@ -19,7 +19,7 @@ use Tests\Fixtures\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `EnrolmentService`: a new factor is stamped as the current
+ * Tests for `EnrollmentService`: a new factor is stamped as the current
  * identity's and saved, an existing one only when it is already theirs, and
  * every enrolment clears the identity's cached factors and is reported.
  *
@@ -28,8 +28,8 @@ use Tests\TestCase;
  *
  * @internal
  */
-#[CoversClass(EnrolmentService::class)]
-final class EnrolmentServiceTest extends TestCase
+#[CoversClass(EnrollmentService::class)]
+final class EnrollmentServiceTest extends TestCase
 {
     /**
      * Forget any morph map a test set.
@@ -51,11 +51,11 @@ final class EnrolmentServiceTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAGuestEnrolsNothing(): void
+    public function testAGuestEnrollsNothing(): void
     {
         Event::fake([MfaFactorEnrolled::class]);
 
-        $this->service()->enrol($this->newFactor());
+        $this->service()->enroll($this->newFactor());
 
         self::assertSame(0, Factor::query()->count());
         Event::assertNotDispatched(MfaFactorEnrolled::class);
@@ -79,7 +79,7 @@ final class EnrolmentServiceTest extends TestCase
 
         Event::fake([MfaFactorEnrolled::class]);
 
-        $this->service()->enrol($factor);
+        $this->service()->enroll($factor);
 
         self::assertTrue($factor->exists);
         self::assertSame($user::class, $factor->getAttribute('authenticatable_type'));
@@ -107,7 +107,7 @@ final class EnrolmentServiceTest extends TestCase
 
         $factor = $this->newFactor();
 
-        $this->service()->enrol($factor);
+        $this->service()->enroll($factor);
 
         self::assertSame('test-user', $factor->getAttribute('authenticatable_type'));
     }
@@ -128,7 +128,7 @@ final class EnrolmentServiceTest extends TestCase
 
         Event::fake([MfaFactorEnrolled::class]);
 
-        $this->service()->enrol($factor);
+        $this->service()->enroll($factor);
 
         self::assertSame('Phone', $factor->fresh()?->getAttribute('label'));
         Event::assertDispatched(MfaFactorEnrolled::class);
@@ -153,7 +153,7 @@ final class EnrolmentServiceTest extends TestCase
         Event::fake([MfaFactorEnrolled::class]);
 
         try {
-            $this->service()->enrol($factor);
+            $this->service()->enroll($factor);
             self::fail('Enrolling another identity\'s factor was expected to be refused.');
         } catch (FactorOwnershipMismatchException) {
             $stored = $factor->fresh();
@@ -178,7 +178,7 @@ final class EnrolmentServiceTest extends TestCase
 
         Event::fake([MfaFactorEnrolled::class]);
 
-        $this->service()->enrol(new InMemoryFactor(driver: 'email', authenticatable: $user));
+        $this->service()->enroll(new InMemoryFactor(driver: 'email', authenticatable: $user));
 
         Event::assertDispatched(MfaFactorEnrolled::class, static fn (MfaFactorEnrolled $event): bool => $event->driver === 'email');
     }
@@ -196,7 +196,7 @@ final class EnrolmentServiceTest extends TestCase
 
         $this->expectException(FactorOwnershipMismatchException::class);
 
-        $this->service()->enrol(new NonModelEloquentBackupCodeFactor('hash'));
+        $this->service()->enroll(new NonModelEloquentBackupCodeFactor('hash'));
     }
 
     /**
@@ -214,7 +214,7 @@ final class EnrolmentServiceTest extends TestCase
 
         self::assertFalse($factors->isSetup());
 
-        $this->service()->enrol($this->newFactor());
+        $this->service()->enroll($this->newFactor());
 
         self::assertTrue($factors->isSetup());
     }
@@ -222,13 +222,13 @@ final class EnrolmentServiceTest extends TestCase
     /**
      * Resolve the enrolment service.
      *
-     * @return \SineMacula\Laravel\Mfa\Enrolment\EnrolmentService
+     * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function service(): EnrolmentService
+    private function service(): EnrollmentService
     {
-        return $this->container()->make(EnrolmentService::class);
+        return $this->container()->make(EnrollmentService::class);
     }
 
     /**
@@ -239,7 +239,7 @@ final class EnrolmentServiceTest extends TestCase
     private function signIn(): TestUser
     {
         /** @var \Tests\Fixtures\TestUser $user */
-        $user = TestUser::query()->create(['email' => 'enrol@example.com']);
+        $user = TestUser::query()->create(['email' => 'enroll@example.com']);
 
         $this->actingAs($user);
 

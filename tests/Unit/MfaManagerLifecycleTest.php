@@ -18,7 +18,7 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 /**
  * Unit tests for `MfaManager` lifecycle mutations.
  *
- * Covers `markVerified()`, `forgetVerification()`, `clearCache()`, `enrol()`,
+ * Covers `markVerified()`, `forgetVerification()`, `clearCache()`, `enroll()`,
  * and `disable()`. Split out from the broader state-test family so each subject
  * stays under the project's max-methods-per-class threshold.
  *
@@ -191,59 +191,59 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Without an identity `enrol()` must not persist the factor or dispatch the
-     * lifecycle event.
+     * Without an identity `enroll()` must not persist the factor or dispatch
+     * the lifecycle event.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrolIsNoopWhenNoIdentity(): void
+    public function testEnrollIsNoopWhenNoIdentity(): void
     {
         Event::fake([MfaFactorEnrolled::class]);
 
         $factor = $this->makeUnpersistedTotpFactor();
 
-        $this->manager()->enrol($factor);
+        $this->manager()->enroll($factor);
 
         Event::assertNotDispatched(MfaFactorEnrolled::class);
         self::assertFalse($factor->exists);
     }
 
     /**
-     * Test enrol persists the supplied factor row.
+     * Test enroll() persists the supplied factor row.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrolPersistsFactor(): void
+    public function testEnrollPersistsFactor(): void
     {
-        $user    = $this->makeEnrolUser();
+        $user    = $this->makeEnrollUser();
         $factor  = $this->makeUnpersistedTotpFactor($user);
         $manager = $this->manager();
 
-        $manager->enrol($factor);
+        $manager->enroll($factor);
 
-        self::assertTrue($factor->exists, 'enrol() must persist the factor row');
+        self::assertTrue($factor->exists, 'enroll() must persist the factor row');
     }
 
     /**
-     * Test enrol dispatches the MfaFactorEnrolled event.
+     * Test enroll() dispatches the MfaFactorEnrolled event.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrolDispatchesEnrolledEvent(): void
+    public function testEnrollDispatchesEnrolledEvent(): void
     {
         Event::fake([MfaFactorEnrolled::class]);
 
-        $user    = $this->makeEnrolUser();
+        $user    = $this->makeEnrollUser();
         $factor  = $this->makeUnpersistedTotpFactor($user);
         $manager = $this->manager();
 
-        $manager->enrol($factor);
+        $manager->enroll($factor);
 
         Event::assertDispatched(
             MfaFactorEnrolled::class,
@@ -254,24 +254,24 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     }
 
     /**
-     * Test enrol invalidates the identity's isSetup cache.
+     * Test enroll() invalidates the identity's isSetup cache.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrolInvalidatesIsSetupCache(): void
+    public function testEnrollInvalidatesIsSetupCache(): void
     {
-        $user    = $this->makeEnrolUser();
+        $user    = $this->makeEnrollUser();
         $manager = $this->manager();
 
         // Warm the setup cache to "no factors" so the post-enrol invalidation
         // must force a fresh lookup.
         self::assertFalse($manager->isSetup());
 
-        $manager->enrol($this->makeUnpersistedTotpFactor($user));
+        $manager->enroll($this->makeUnpersistedTotpFactor($user));
 
-        self::assertTrue($manager->isSetup(), 'cache must be cleared after enrol');
+        self::assertTrue($manager->isSetup(), 'cache must be cleared after enroll()');
     }
 
     /**
@@ -310,7 +310,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      */
     public function testDisableDeletesFactorRow(): void
     {
-        [$manager, $factor] = $this->enrolAndResolveFactor();
+        [$manager, $factor] = $this->enrollAndResolveFactor();
 
         $manager->disable($factor);
 
@@ -331,7 +331,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
     {
         Event::fake([MfaFactorDisabled::class]);
 
-        [$manager, $factor, $user] = $this->enrolAndResolveFactor();
+        [$manager, $factor, $user] = $this->enrollAndResolveFactor();
 
         $manager->disable($factor);
 
@@ -351,7 +351,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      */
     public function testDisableInvalidatesIsSetupCache(): void
     {
-        [$manager, $factor] = $this->enrolAndResolveFactor();
+        [$manager, $factor] = $this->enrollAndResolveFactor();
 
         // Warm the setup cache to "has factor" so the post-disable invalidation
         // must force a fresh lookup.
@@ -364,7 +364,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
 
     /**
      * Build a fresh TOTP `Factor` model that is NOT yet persisted — the
-     * consumer-side shape that `enrol()` is intended to receive.
+     * consumer-side shape that `enroll()` is intended to receive.
      *
      * @param  ?\Tests\Fixtures\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -389,10 +389,10 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      *
      * @return \Tests\Fixtures\TestUser
      */
-    private function makeEnrolUser(): TestUser
+    private function makeEnrollUser(): TestUser
     {
         $user = TestUser::query()->create([
-            'email'       => 'enrol@example.test',
+            'email'       => 'enroll@example.test',
             'mfa_enabled' => true,
         ]);
 
@@ -429,7 +429,7 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function enrolAndResolveFactor(): array
+    private function enrollAndResolveFactor(): array
     {
         $user = $this->makeUserWithFactor();
 
