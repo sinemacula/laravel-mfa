@@ -46,9 +46,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property ?string $code
  * @property ?\Carbon\CarbonInterface $expires_at
  * @property ?\Carbon\CarbonInterface $verified_at
- * @property int $attempts
- * @property ?\Carbon\CarbonInterface $locked_until
- * @property ?\Carbon\CarbonInterface $last_attempted_at
  *
  * @inheritable
  */
@@ -79,9 +76,6 @@ class Factor extends Model implements EloquentFactor
         'code',
         'expires_at',
         'verified_at',
-        'attempts',
-        'locked_until',
-        'last_attempted_at',
     ];
 
     /** @var list<string> The attributes that should be hidden for serialisation. */
@@ -165,9 +159,6 @@ class Factor extends Model implements EloquentFactor
             'code'                 => 'encrypted',
             'expires_at'           => 'datetime',
             'verified_at'          => 'datetime',
-            'locked_until'         => 'datetime',
-            'last_attempted_at'    => 'datetime',
-            'attempts'             => 'integer',
         ];
     }
 }

@@ -470,64 +470,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Determine whether the factor is currently locked.
-     *
-     * @return bool
-     */
-    public function isLocked(): bool
-    {
-        $until = $this->getLockedUntil();
-
-        return $until !== null && $until->isFuture();
-    }
-
-    /**
-     * Return when the factor is locked until, or `null`.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getLockedUntil(): ?CarbonInterface
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getLockedUntilName());
-
-        return $value instanceof CarbonInterface ? $value : null;
-    }
-
-    /**
-     * Column name holding the lockout expiry timestamp.
-     *
-     * @return string
-     */
-    public function getLockedUntilName(): string
-    {
-        return 'locked_until';
-    }
-
-    /**
-     * Return when verification was last attempted.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getLastAttemptedAt(): ?CarbonInterface
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getLastAttemptedAtName());
-
-        return $value instanceof CarbonInterface ? $value : null;
-    }
-
-    /**
-     * Column name holding the last-attempted timestamp.
-     *
-     * @return string
-     */
-    public function getLastAttemptedAtName(): string
-    {
-        return 'last_attempted_at';
-    }
-
-    /**
      * Determine whether the factor has ever completed a successful
      * verification.
      *
@@ -562,60 +504,8 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Increment the attempt counter and stamp the last-attempted timestamp.
-     *
-     * @param  ?\Carbon\CarbonInterface  $at
-     * @return void
-     */
-    public function recordAttempt(?CarbonInterface $at = null): void
-    {
-        $this->setAttribute(
-            $this->getAttemptsName(),
-            $this->getAttempts() + 1,
-        );
-        $this->setAttribute(
-            $this->getLastAttemptedAtName(),
-            $at ?? Carbon::now(),
-        );
-    }
-
-    /**
-     * Column name holding the failed-attempt counter.
-     *
-     * @return string
-     */
-    public function getAttemptsName(): string
-    {
-        return 'attempts';
-    }
-
-    /**
-     * Return the number of consecutive failed attempts.
-     *
-     * @return int
-     */
-    public function getAttempts(): int
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getAttemptsName());
-
-        return is_int($value) ? $value : 0;
-    }
-
-    /**
-     * Apply a lockout window deferring further verification attempts.
-     *
-     * @param  \Carbon\CarbonInterface  $until
-     * @return void
-     */
-    public function applyLockout(CarbonInterface $until): void
-    {
-        $this->setAttribute($this->getLockedUntilName(), $until);
-    }
-
-    /**
-     * Stamp a successful verification, as the last use too, and reset the
-     * attempt state.
+     * Stamp a successful verification, as the last use too, and clear any
+     * pending one-time code.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
@@ -626,7 +516,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
 
         $this->setAttribute($this->getVerifiedAtName(), $at);
         $this->setAttribute($this->getLastUsedAtName(), $at);
-        $this->resetAttempts();
         $this->consumeCode();
     }
 
@@ -640,17 +529,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     {
         $this->setAttribute($this->getStatusName(), FactorStatus::CONFIRMED->value);
         $this->setAttribute($this->getConfirmedAtName(), $at ?? Carbon::now());
-    }
-
-    /**
-     * Reset the attempt counter and clear any active lockout.
-     *
-     * @return void
-     */
-    public function resetAttempts(): void
-    {
-        $this->setAttribute($this->getAttemptsName(), 0);
-        $this->setAttribute($this->getLockedUntilName(), null);
     }
 
     /**

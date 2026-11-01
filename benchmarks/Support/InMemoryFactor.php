@@ -34,9 +34,6 @@ final class InMemoryFactor implements Factor
      * @param  ?string  $secret
      * @param  ?string  $code
      * @param  ?\Carbon\CarbonInterface  $expiresAt
-     * @param  int  $attempts
-     * @param  ?\Carbon\CarbonInterface  $lockedUntil
-     * @param  ?\Carbon\CarbonInterface  $lastAttemptedAt
      * @param  ?\Carbon\CarbonInterface  $verifiedAt
      * @param  ?\Illuminate\Contracts\Auth\Authenticatable  $authenticatable
      * @return void
@@ -63,15 +60,6 @@ final class InMemoryFactor implements Factor
 
         /** Expiry timestamp of the pending code. */
         private ?CarbonInterface $expiresAt = null,
-
-        /** Consecutive failed verification attempts. */
-        private int $attempts = 0,
-
-        /** Lockout expiry after too many failed attempts. */
-        private ?CarbonInterface $lockedUntil = null,
-
-        /** Timestamp of the most recent verification attempt. */
-        private ?CarbonInterface $lastAttemptedAt = null,
 
         /** Timestamp of the most recent successful verification. */
         private ?CarbonInterface $verifiedAt = null,
@@ -190,50 +178,6 @@ final class InMemoryFactor implements Factor
     public function getExpiresAt(): ?CarbonInterface
     {
         return $this->expiresAt;
-    }
-
-    /**
-     * Return the configured attempt count.
-     *
-     * @return int
-     */
-    #[\Override]
-    public function getAttempts(): int
-    {
-        return $this->attempts;
-    }
-
-    /**
-     * Return the configured lock expiry.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLockedUntil(): ?CarbonInterface
-    {
-        return $this->lockedUntil;
-    }
-
-    /**
-     * Report whether the factor is currently locked.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isLocked(): bool
-    {
-        return $this->lockedUntil !== null && $this->lockedUntil->isFuture();
-    }
-
-    /**
-     * Return the configured last-attempted timestamp.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLastAttemptedAt(): ?CarbonInterface
-    {
-        return $this->lastAttemptedAt;
     }
 
     /**

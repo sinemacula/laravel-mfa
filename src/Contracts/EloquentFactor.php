@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * Explicit persistence boundary for Eloquent-backed factors.
  *
  * Extends the generic `Factor` read surface with the relation and column-name
- * accessors the manager orchestration layer uses when incrementing attempts,
- * applying lockouts, or marking verification — operations that write through to
+ * accessors the services use when counting failures, disabling a factor at the
+ * failure ceiling, or marking verification — operations that write through to
  * the underlying row and therefore require a persistable implementation.
  *
  * Non-Eloquent implementations (in-memory test doubles, API-backed adapters)
@@ -168,61 +168,11 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
     public function getExpiresAtName(): string;
 
     /**
-     * Column name holding the failed-attempt counter.
-     *
-     * @return string
-     */
-    public function getAttemptsName(): string;
-
-    /**
-     * Column name holding the lockout expiry timestamp.
-     *
-     * @return string
-     */
-    public function getLockedUntilName(): string;
-
-    /**
-     * Column name holding the last-attempted timestamp.
-     *
-     * @return string
-     */
-    public function getLastAttemptedAtName(): string;
-
-    /**
      * Column name holding the last-verified timestamp.
      *
      * @return string
      */
     public function getVerifiedAtName(): string;
-
-    /**
-     * Record a new verification attempt against the factor. Increments the
-     * attempt counter and stamps the last-attempted timestamp. Does NOT persist
-     * — callers invoke `persist()` once the full orchestration step is
-     * complete.
-     *
-     * @param  ?\Carbon\CarbonInterface  $at
-     * @return void
-     */
-    public function recordAttempt(?CarbonInterface $at = null): void;
-
-    /**
-     * Reset the attempt counter and clear any active lockout. Called after a
-     * successful verification or on a fresh challenge issuance.
-     *
-     * @return void
-     */
-    public function resetAttempts(): void;
-
-    /**
-     * Apply a lockout window, deferring further verification attempts until the
-     * given timestamp. Orthogonal to `recordAttempt()`; callers may lock after
-     * recording an attempt that crosses the max-attempts threshold.
-     *
-     * @param  \Carbon\CarbonInterface  $until
-     * @return void
-     */
-    public function applyLockout(CarbonInterface $until): void;
 
     /**
      * Mark the factor confirmed, and so usable, at the given time or now. Does
@@ -235,9 +185,8 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
 
     /**
      * Record a successful verification. Stamps the verified-at and last-used
-     * timestamps, resets attempts, and clears any pending one-time code. Does
-     * NOT persist — callers invoke `persist()` once the full orchestration step
-     * is complete.
+     * timestamps and clears any pending one-time code. Does NOT persist —
+     * callers invoke `persist()` once the full orchestration step is complete.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void

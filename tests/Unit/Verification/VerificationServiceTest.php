@@ -5,11 +5,18 @@ declare(strict_types = 1);
 namespace Tests\Unit\Verification;
 
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
+use SineMacula\Laravel\Mfa\Attempts\AttemptService;
+use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
+use SineMacula\Laravel\Mfa\Attempts\Lockout;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
@@ -26,9 +33,9 @@ use Tests\TestCase;
 
 /**
  * Tests for `VerificationService`: challenges and verification run only for the
- * current identity's own factor through its own driver, record the outcome on
- * the factor, lock it at the configured attempt limit, and report each outcome
- * with its event.
+ * current identity's own factor through its own driver, count the outcome
+ * through the attempt service, which locks the factor at the configured
+ * attempt limit, and report each outcome with its event.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -227,11 +234,19 @@ final class VerificationServiceTest extends TestCase
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
      */
     public function testALockedFactorFailsWithoutReachingTheDriver(): void
     {
         $user   = $this->signIn();
-        $factor = new InMemoryFactor(secret: 'secret', lockedUntil: Carbon::now()->addMinutes(5), authenticatable: $user);
+        $factor = $this->eloquentFactor($user, failures: 5);
+
+        $this->container()->make(AttemptStore::class)->hold(
+            $this->container()->make(AttemptKeys::class)->factor($factor->id),
+            AttemptScope::FACTOR,
+            5,
+            Carbon::now()->addMinutes(5)->getTimestamp(),
+        );
 
         $this->stubDriver($this->driverAnswering(null));
 
@@ -243,9 +258,69 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
-     * A valid code verifies an Eloquent factor: its attempts reset, its
-     * verification is stamped and persisted, the identity's verification is
-     * recorded, its cached factors cleared, and the success reported.
+     * An attempt on another identity's factor is refused before anything is
+     * counted, so nobody is charged for it.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAnAttemptOnAnotherIdentitysFactorChargesNobody(): void
+    {
+        $this->signIn();
+
+        $other  = TestUser::query()->create(['email' => 'other@example.com']);
+        $factor = $this->eloquentFactor($other);
+        $thrown = null;
+
+        $this->stubDriver($this->driverAnswering(null));
+
+        try {
+            $this->service()->verify($this->manager(), 'totp', $factor, '000000');
+        } catch (FactorOwnershipMismatchException $exception) {
+            $thrown = $exception;
+        }
+
+        self::assertInstanceOf(FactorOwnershipMismatchException::class, $thrown);
+        self::assertSame(0, DB::table('mfa_identity_states')->count());
+        self::assertSame(0, DB::table('mfa_attempts')->count());
+        self::assertSame(0, $factor->refresh()->getConsecutiveFailures());
+    }
+
+    /**
+     * A failure is counted against the request's address, so past its limit
+     * the address is throttled whatever the factor, without reaching the
+     * driver.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAFailureIsCountedAgainstTheRequestsAddress(): void
+    {
+        config()->set('mfa.attempts.ip_limit', 1);
+
+        $this->container()->instance('request', Request::create('/mfa/verify', 'POST', server: ['REMOTE_ADDR' => '192.0.2.1']));
+
+        $user = $this->signIn();
+
+        $this->stubDriver($this->driverAnswering(false));
+
+        Event::fake();
+
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', $this->eloquentFactor($user), '000000'));
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', $this->eloquentFactor($user), '000000'));
+        Event::assertDispatched(
+            MfaVerificationFailed::class,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::LOCKED
+                && $event->detail                                            === 'The IP address is throttled after too many failed attempts.',
+        );
+    }
+
+    /**
+     * A valid code verifies an Eloquent factor: its failures in a row reset,
+     * its verification is stamped and persisted, the identity's verification
+     * is recorded, its cached factors cleared, and the success reported.
      *
      * @return void
      *
@@ -256,7 +331,7 @@ final class VerificationServiceTest extends TestCase
         Carbon::setTestNow('2026-10-31 12:00:00');
 
         $user   = $this->signIn();
-        $factor = $this->eloquentFactor($user, attempts: 2);
+        $factor = $this->eloquentFactor($user, failures: 2);
 
         $store = \Mockery::mock(MfaVerificationStore::class);
         $store->shouldReceive('markVerified')->once()->with($user);
@@ -276,7 +351,7 @@ final class VerificationServiceTest extends TestCase
 
         $factor->refresh();
 
-        self::assertSame(0, $factor->getAttempts());
+        self::assertSame(0, $factor->getConsecutiveFailures());
         self::assertTrue(Carbon::now()->equalTo($factor->getVerifiedAt()));
         self::assertCount(2, $factors->getFactors() ?? collect());
         Event::assertDispatched(
@@ -305,13 +380,12 @@ final class VerificationServiceTest extends TestCase
         Event::fake();
 
         self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
-        self::assertSame(0, $factor->getAttempts());
         Event::assertDispatched(MfaVerified::class);
     }
 
     /**
-     * An invalid code counts an attempt on the factor and persists it, below
-     * the limit without a lockout.
+     * An invalid code counts a failure in a row on the factor and persists it,
+     * below the limit without a lockout.
      *
      * @return void
      *
@@ -322,7 +396,7 @@ final class VerificationServiceTest extends TestCase
         config()->set('mfa.attempts.factor_limit', 3);
 
         $user   = $this->signIn();
-        $factor = $this->eloquentFactor($user, attempts: 1);
+        $factor = $this->eloquentFactor($user, failures: 1);
 
         $store = \Mockery::mock(MfaVerificationStore::class);
         $store->shouldNotReceive('markVerified');
@@ -336,8 +410,8 @@ final class VerificationServiceTest extends TestCase
 
         $factor->refresh();
 
-        self::assertSame(2, $factor->getAttempts());
-        self::assertNull($factor->getLockedUntil());
+        self::assertSame(2, $factor->getConsecutiveFailures());
+        self::assertNull($this->lockoutOf($user, $factor));
         self::assertNull($factor->getVerifiedAt());
         Event::assertNotDispatched(MfaVerified::class);
         Event::assertDispatched(
@@ -383,7 +457,7 @@ final class VerificationServiceTest extends TestCase
 
         $attempts = $limit ?? 5;
         $user     = $this->signIn();
-        $factor   = $this->eloquentFactor($user, attempts: $attempts - 1);
+        $factor   = $this->eloquentFactor($user, failures: $attempts - 1);
 
         $this->stubDriver($this->driverAnswering(false));
 
@@ -391,8 +465,12 @@ final class VerificationServiceTest extends TestCase
 
         $factor->refresh();
 
-        self::assertSame($attempts, $factor->getAttempts());
-        self::assertTrue(Carbon::now()->addSeconds($expectedSeconds)->equalTo($factor->getLockedUntil()));
+        $lockout = $this->lockoutOf($user, $factor);
+
+        self::assertSame($attempts, $factor->getConsecutiveFailures());
+        self::assertNotNull($lockout);
+        self::assertNotNull($lockout->until);
+        self::assertTrue(Carbon::now()->addSeconds($expectedSeconds)->equalTo($lockout->until));
     }
 
     /**
@@ -408,7 +486,7 @@ final class VerificationServiceTest extends TestCase
         config()->set('mfa.attempts', []);
 
         $user   = $this->signIn();
-        $factor = $this->eloquentFactor($user, attempts: 3);
+        $factor = $this->eloquentFactor($user, failures: 3);
 
         $this->stubDriver($this->driverAnswering(false));
 
@@ -416,8 +494,8 @@ final class VerificationServiceTest extends TestCase
 
         $factor->refresh();
 
-        self::assertSame(4, $factor->getAttempts());
-        self::assertNull($factor->getLockedUntil());
+        self::assertSame(4, $factor->getConsecutiveFailures());
+        self::assertNull($this->lockoutOf($user, $factor));
     }
 
     /**
@@ -506,6 +584,20 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
+     * The lockout the user's attempts against the factor are refused by now.
+     *
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
+     * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function lockoutOf(TestUser $user, Factor $factor): ?Lockout
+    {
+        return $this->container()->make(AttemptService::class)->lockout($user, $factor);
+    }
+
+    /**
      * Resolve the package's MFA manager, the driver registry the service is
      * called with.
      *
@@ -583,13 +675,13 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
-     * Create a TOTP factor for the user with the given attempts.
+     * Create a TOTP factor for the user with the given failures in a row.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
-     * @param  int  $attempts
+     * @param  int  $failures
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
-    private function eloquentFactor(TestUser $user, int $attempts = 0): Factor
+    private function eloquentFactor(TestUser $user, int $failures = 0): Factor
     {
         /** @var \SineMacula\Laravel\Mfa\Models\Factor */
         return Factor::query()->create([
@@ -597,7 +689,7 @@ final class VerificationServiceTest extends TestCase
             'authenticatable_id'   => (string) $user->id,
             'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
-            'attempts'             => $attempts,
+            'consecutive_failures' => $failures,
         ]);
     }
 }

@@ -39,8 +39,6 @@ final class InMemoryFactor implements Factor
      * @param  ?string  $secret
      * @param  ?string  $code
      * @param  ?\Carbon\CarbonInterface  $expiresAt
-     * @param  int  $attempts
-     * @param  ?\Carbon\CarbonInterface  $lockedUntil
      * @param  ?\Carbon\CarbonInterface  $verifiedAt
      * @param  ?string  $destination
      * @param  ?string  $label
@@ -61,12 +59,6 @@ final class InMemoryFactor implements Factor
 
         /** Code expiry timestamp. */
         private readonly ?CarbonInterface $expiresAt = null,
-
-        /** Failed verification attempt count. */
-        private int $attempts = 0,
-
-        /** Lockout expiry timestamp. */
-        private readonly ?CarbonInterface $lockedUntil = null,
 
         /** Last successful verification timestamp. */
         private readonly ?CarbonInterface $verifiedAt = null,
@@ -171,51 +163,6 @@ final class InMemoryFactor implements Factor
     public function getExpiresAt(): ?CarbonInterface
     {
         return $this->expiresAt;
-    }
-
-    /**
-     * Return the configured attempt count.
-     *
-     * @return int
-     */
-    #[\Override]
-    public function getAttempts(): int
-    {
-        return $this->attempts;
-    }
-
-    /**
-     * Return the configured lock expiry.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLockedUntil(): ?CarbonInterface
-    {
-        return $this->lockedUntil;
-    }
-
-    /**
-     * Report whether the factor is currently locked (i.e. has a future lock
-     * expiry).
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isLocked(): bool
-    {
-        return $this->lockedUntil !== null && $this->lockedUntil->isFuture();
-    }
-
-    /**
-     * Always returns `null`; the fixture does not track attempt timestamps.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLastAttemptedAt(): ?CarbonInterface
-    {
-        return null;
     }
 
     /**

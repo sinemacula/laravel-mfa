@@ -71,13 +71,13 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     }
 
     /**
-     * Test successful Eloquent verify resets the attempt counter.
+     * Test successful Eloquent verify resets the factor's failures in a row.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testVerifySuccessResetsAttemptCounter(): void
+    public function testVerifySuccessResetsConsecutiveFailures(): void
     {
         [$factor] = $this->seedEloquentVerifySuccessScenario();
 
@@ -85,7 +85,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
 
         $factor->refresh();
 
-        self::assertSame(0, $factor->getAttempts());
+        self::assertSame(0, $factor->getConsecutiveFailures());
     }
 
     /**
@@ -232,7 +232,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
             'destination'          => 'v2@example.com',
             'code'                 => self::VALID_CODE,
             'expires_at'           => Carbon::now()->addMinutes(10),
-            'attempts'             => 1,
+            'consecutive_failures' => 1,
         ]);
 
         $driver = \Mockery::mock(FactorDriver::class);
