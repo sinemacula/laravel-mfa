@@ -48,7 +48,8 @@ return new class extends Migration {
             $blueprint->index(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_index'));
 
             // What the code is bound to: it is accepted only for the same
-            // factor, purpose, application and session.
+            // factor, purpose, application and session. The session is stored
+            // as a keyed digest of its id, never the id itself.
             $blueprint->string('purpose', 32);
             $blueprint->string('application');
             $blueprint->string('session_id')->nullable();

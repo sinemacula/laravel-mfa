@@ -7,13 +7,15 @@ namespace SineMacula\Laravel\Mfa\Config;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Container\Container;
-use Illuminate\Contracts\Mail\Mailer;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
+use SineMacula\Laravel\Mfa\Codes\CodeKeys;
 use SineMacula\Laravel\Mfa\Codes\CodeSettings;
-use SineMacula\Laravel\Mfa\Codes\NullSmsGateway;
+use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
+use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
+use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
@@ -233,23 +235,32 @@ final readonly class ConfigurationValidator
 
     /**
      * Refuse an application that enables a code type with nothing bound to
-     * deliver its codes: `sms` with the package's `NullSmsGateway` still bound
-     * as the `SmsGateway`, or `email` with no mailer bound. The mailer is only
-     * looked up, never built, so the check builds no mail transport.
+     * deliver its codes: `sms` with the package's `NullSmsSender` still bound
+     * as the `SmsSender`, or `email` with its `NullEmailSender` still bound as
+     * the `EmailSender`; and one that enables either while no application key
+     * is set to hash its codes with.
      *
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $application
      * @return void
      *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \LogicException
      */
     private function checkDelivery(ApplicationSettings $application): void
     {
-        if ($application->enables('sms') && $this->container->make(SmsGateway::class) instanceof NullSmsGateway) {
-            throw new \LogicException(sprintf('The application enables sms, but no SMS gateway is bound: bind your gateway to %s.', SmsGateway::class));
+        $sms   = $application->enables('sms');
+        $email = $application->enables('email');
+
+        if ($sms && $this->container->make(SmsSender::class) instanceof NullSmsSender) {
+            throw new \LogicException(sprintf('The application enables sms, but no SMS sender is bound: bind yours to %s.', SmsSender::class));
         }
 
-        if ($application->enables('email') && !$this->container->bound(Mailer::class)) {
-            throw new \LogicException(sprintf('The application enables email, but no mailer is bound to %s.', Mailer::class));
+        if ($email && $this->container->make(EmailSender::class) instanceof NullEmailSender) {
+            throw new \LogicException(sprintf('The application enables email, but no email sender is bound: bind yours, or the package\'s MailEmailSender, to %s.', EmailSender::class));
+        }
+
+        if ($sms || $email) {
+            (new CodeKeys($this->config))->validate();
         }
     }
 

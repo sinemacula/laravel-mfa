@@ -154,20 +154,6 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
     public function getSecretName(): string;
 
     /**
-     * Column name holding the pending one-time code.
-     *
-     * @return string
-     */
-    public function getCodeName(): string;
-
-    /**
-     * Column name holding the expiry of the pending one-time code.
-     *
-     * @return string
-     */
-    public function getExpiresAtName(): string;
-
-    /**
      * Column name holding the failed-attempt counter.
      *
      * @return string
@@ -208,7 +194,7 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
 
     /**
      * Reset the attempt counter and clear any active lockout. Called after a
-     * successful verification or on a fresh challenge issuance.
+     * successful verification.
      *
      * @return void
      */
@@ -235,35 +221,13 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
 
     /**
      * Record a successful verification. Stamps the verified-at and last-used
-     * timestamps, resets attempts, and clears any pending one-time code. Does
-     * NOT persist — callers invoke `persist()` once the full orchestration step
-     * is complete.
+     * timestamps and resets attempts. Does NOT persist — callers invoke
+     * `persist()` once the full orchestration step is complete.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
     public function recordVerification(?CarbonInterface $at = null): void;
-
-    /**
-     * Persist a newly issued one-time code and its expiry against the factor.
-     * Used by OTP-delivery drivers (email, SMS) during challenge issuance. Does
-     * NOT save the model — callers invoke `persist()` once the challenge
-     * handoff completes.
-     *
-     * @param  string  $code
-     * @param  \Carbon\CarbonInterface  $expiresAt
-     * @return void
-     */
-    public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void;
-
-    /**
-     * Clear the pending one-time code and its expiry. Called on successful
-     * verification to prevent replay within the expiry window and on any
-     * driver-side invalidation (e.g. user-initiated reissue).
-     *
-     * @return void
-     */
-    public function consumeCode(): void;
 
     /**
      * Persist any pending mutations to the underlying storage. The shipped

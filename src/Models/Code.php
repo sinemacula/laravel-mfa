@@ -30,6 +30,8 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property \Carbon\CarbonInterface $sent_at
  * @property \Carbon\CarbonInterface $expires_at
  * @property ?\Carbon\CarbonInterface $consumed_at
+ * @property \Carbon\CarbonInterface $created_at
+ * @property \Carbon\CarbonInterface $updated_at
  *
  * @internal
  */

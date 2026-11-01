@@ -4,13 +4,15 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
@@ -31,9 +33,6 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
 final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
 {
     use InteractsWithMfaManagerVerify;
-
-    /** @var string Canonical right-shape OTP fixture used for the success-path assertions. */
-    private const string VALID_CODE = '123456';
 
     /** @var string Sentinel mismatch code used to drive the failure-path assertions. */
     private const string WRONG_CODE = '000000';
@@ -84,42 +83,6 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
     }
 
     /**
-     * A factor whose pending code's expiry has passed fails as `expired`.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testClassifyFailureReturnsExpiredWhenPendingCodeHasExpired(): void
-    {
-        $user = TestUser::query()->create(['email' => 'cf2@example.com']);
-
-        $this->actingAs($user);
-
-        $factor = new InMemoryFactor(
-            type         : 'email',
-            code           : self::VALID_CODE,
-            expiresAt      : Carbon::now()->subMinute(),
-            authenticatable: $user,
-        );
-
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldReceive('verify')->once()->andReturnFalse();
-
-        $this->stubDriver('email', $driver);
-
-        Event::fake();
-
-        $this->manager()->verify('email', $factor, self::WRONG_CODE);
-
-        Event::assertDispatched(
-            MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::EXPIRED
-                && $event->detail                                            === 'The pending code has expired.',
-        );
-    }
-
-    /**
      * A TOTP factor with a stored secret whose verification still fails fails
      * as `invalid_code`.
      *
@@ -155,74 +118,111 @@ final class MfaManagerClassifyFailureTest extends MfaManagerTestCase
     }
 
     /**
-     * A factor with a pending code but no expiry timestamp fails as `expired`,
-     * with a detail that says no live code exists.
+     * Rows of a delivered code's failure: what the test does after the code is
+     * sent, the code it then submits, and the reason and detail it fails with.
      *
+     * @return iterable<string, array{\Closure(\Tests\Unit\MfaManagerClassifyFailureTest, \SineMacula\Laravel\Mfa\Models\Factor, string): void, ?string, \SineMacula\Laravel\Mfa\Enums\FailureReason, string}>
+     */
+    public static function deliveredCodeFailures(): iterable
+    {
+        $nothing = static function (): void {};
+
+        yield 'a wrong code' => [$nothing, self::WRONG_CODE, FailureReason::INVALID_CODE, 'The code did not match.'];
+        yield 'an expired code' => [
+            static function (self $test): void {
+                $test->travel(11)->minutes();
+            },
+            null,
+            FailureReason::EXPIRED,
+            'The code has expired.',
+        ];
+        yield 'a used code' => [
+            static function (self $test, Factor $factor, string $code): void {
+                $test->manager()->verify('email', $factor, $code);
+            },
+            null,
+            FailureReason::REPLAYED,
+            'The code was already used.',
+        ];
+    }
+
+    /**
+     * A delivered code fails with the reason its check found, and its detail.
+     *
+     * @param  \Closure(\Tests\Unit\MfaManagerClassifyFailureTest, \SineMacula\Laravel\Mfa\Models\Factor, string): void  $after
+     * @param  ?string  $submitted
+     * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
+     * @param  string  $detail
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
-    public function testClassifyFailureReturnsExpiredWhenPendingCodeHasNoExpiry(): void
+    #[DataProvider('deliveredCodeFailures')]
+    public function testClassifyFailureReportsWhatTheDeliveredCodeCheckFound(\Closure $after, ?string $submitted, FailureReason $reason, string $detail): void
     {
-        $user = TestUser::query()->create(['email' => 'cf4@example.com']);
+        $factor = $this->emailFactor('cf6@example.com');
+        $sender = FakeEmailSender::fake($this->container());
 
-        $this->actingAs($user);
+        $this->manager()->challenge('email', $factor);
 
-        $factor = new InMemoryFactor(
-            type         : 'email',
-            code           : self::VALID_CODE,
-            authenticatable: $user,
-        );
+        $code = $sender->lastCodeTo('cf6@example.com');
 
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldReceive('verify')->once()->andReturnFalse();
+        self::assertNotNull($code);
 
-        $this->stubDriver('email', $driver);
+        $after($this, $factor, $code);
 
-        Event::fake();
+        Event::fake([MfaVerificationFailed::class]);
 
-        $this->manager()->verify('email', $factor, self::WRONG_CODE);
+        self::assertFalse($this->manager()->verify('email', $factor, $submitted ?? $code));
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::EXPIRED
-                && $event->detail                                            === 'The pending code has no expiry, so no live code exists.',
+            static fn (MfaVerificationFailed $event): bool => $event->reason === $reason && $event->detail === $detail,
         );
     }
 
     /**
-     * A factor with a valid pending code and a future expiry that the driver
-     * still rejects fails as `invalid_code`.
+     * A delivered-code factor with no code sent fails as `expired`: there is no
+     * live code to check against.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testClassifyFailureReturnsInvalidCodeForValidPendingCodeWithFutureExpiry(): void
+    public function testClassifyFailureReturnsExpiredWhenNoCodeWasSent(): void
     {
-        $user = TestUser::query()->create(['email' => 'cf5@example.com']);
+        $factor = $this->emailFactor('cf7@example.com');
 
-        $this->actingAs($user);
+        FakeEmailSender::fake($this->container());
+        Event::fake([MfaVerificationFailed::class]);
 
-        $factor = new InMemoryFactor(
-            type         : 'email',
-            code           : self::VALID_CODE,
-            expiresAt      : Carbon::now()->addMinutes(5),
-            authenticatable: $user,
-        );
-
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldReceive('verify')->once()->andReturnFalse();
-
-        $this->stubDriver('email', $driver);
-
-        Event::fake();
-
-        $this->manager()->verify('email', $factor, self::WRONG_CODE);
+        self::assertFalse($this->manager()->verify('email', $factor, self::WRONG_CODE));
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::INVALID_CODE,
+            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::EXPIRED
+                && $event->detail                                            === 'No code was sent for this factor, session, application and purpose.',
         );
+    }
+
+    /**
+     * Sign in as a new user with a stored email factor.
+     *
+     * @param  string  $address
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function emailFactor(string $address): Factor
+    {
+        $user = TestUser::query()->create(['email' => $address]);
+
+        $this->actingAs($user);
+
+        return Factor::query()->create([
+            'authenticatable_type' => $user->getMorphClass(),
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'email',
+            'destination'          => $address,
+        ]);
     }
 }

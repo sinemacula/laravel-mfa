@@ -6,18 +6,20 @@ namespace Tests\Unit\Config;
 
 use Illuminate\Config\Repository;
 use Illuminate\Container\Container;
-use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
 use SineMacula\Laravel\Mfa\Config\ConfigurationValidator;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
+use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\RecoveryCode;
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
+use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
+use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use Tests\Fixtures\Factors\SecondaryConnectionFactor;
 use Tests\Fixtures\RecoveryCodes\SecondaryConnectionRecoveryCode;
 use Tests\TestCase;
@@ -244,7 +246,7 @@ final class ConfigurationValidatorTest extends TestCase
      */
     public function testAWellConfiguredApplicationHasNoProblem(): void
     {
-        $this->configureApplication(['types' => ['totp', 'email'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+        $this->configureApplication(['types' => ['totp'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
         self::assertSame([...self::SHIPPED, 'applications.web' => []], $this->validator()->report());
     }
@@ -269,54 +271,81 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * An application that enables `sms` while the package's null gateway is
-     * still bound is refused; binding a gateway is enough.
+     * An application that enables `sms` while the package's null sender is
+     * still bound is refused; binding a sender is enough.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAnSmsApplicationNeedsAGateway(): void
+    public function testAnSmsApplicationNeedsASender(): void
     {
         $this->configureApplication(['types' => ['sms'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
         self::assertSame(
-            ['The application enables sms, but no SMS gateway is bound: bind your gateway to ' . SmsGateway::class . '.'],
+            ['The application enables sms, but no SMS sender is bound: bind yours to ' . SmsSender::class . '.'],
             $this->validator()->report()['applications.web'],
         );
 
-        $this->container()->instance(SmsGateway::class, new FakeSmsGateway);
+        FakeSmsSender::fake($this->container());
 
         self::assertSame([], $this->validator()->report()['applications.web']);
     }
 
     /**
-     * An application that enables `email` in a container with no mailer bound
-     * is refused; one that does not enable it needs none, and a bound mailer is
-     * enough without being built.
+     * An application that enables `email` while the package's null sender is
+     * still bound is refused; binding a sender, the package's mailer sender
+     * included, is enough, and one that does not enable it needs none.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAnEmailApplicationNeedsAMailer(): void
+    public function testAnEmailApplicationNeedsASender(): void
     {
         $this->configureApplication(['types' => ['email'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
-        $container = new Container;
-        $validator = new ConfigurationValidator($container, $this->config());
+        self::assertSame(
+            ['The application enables email, but no email sender is bound: bind yours, or the package\'s MailEmailSender, to ' . EmailSender::class . '.'],
+            $this->validator()->report()['applications.web'],
+        );
 
-        self::assertSame(['The application enables email, but no mailer is bound to ' . Mailer::class . '.'], $validator->report()['applications.web']);
+        FakeEmailSender::fake($this->container());
 
-        // A binding that could not be built: the check passes only by not
-        // building it.
-        $container->bind(Mailer::class, 'App\Missing\Mailer');
+        self::assertSame([], $this->validator()->report()['applications.web']);
 
-        self::assertSame([], $validator->report()['applications.web']);
+        $this->container()->singleton(EmailSender::class, MailEmailSender::class);
+
+        self::assertSame([], $this->validator()->report()['applications.web']);
 
         $this->configureApplication(['types' => ['totp'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
         self::assertSame([], (new ConfigurationValidator(new Container, $this->config()))->report()['applications.web']);
+    }
+
+    /**
+     * An application that enables a type delivering codes needs an application
+     * key to hash them with; one that enables none does not.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testACodeTypeNeedsAnApplicationKey(): void
+    {
+        FakeSmsSender::fake($this->container());
+
+        $this->config()->set('app.key', null);
+        $this->configureApplication(['types' => ['sms'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        self::assertSame(
+            ['Delivered codes are hashed with a key derived from the application key; set app.key.'],
+            $this->validator()->report()['applications.web'],
+        );
+
+        $this->configureApplication(['types' => ['totp'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        self::assertSame([], $this->validator()->report()['applications.web']);
     }
 
     /**
@@ -331,12 +360,12 @@ final class ConfigurationValidatorTest extends TestCase
     {
         $this->configureApplication(['types' => ['sms'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
-        $this->container()->bind(SmsGateway::class, 'App\Missing\Gateway');
+        $this->container()->bind(SmsSender::class, 'App\Missing\Sender');
 
         $problems = $this->validator()->report()['applications.web'];
 
         self::assertCount(1, $problems);
-        self::assertStringContainsString('App\Missing\Gateway', $problems[0]);
+        self::assertStringContainsString('App\Missing\Sender', $problems[0]);
     }
 
     /**

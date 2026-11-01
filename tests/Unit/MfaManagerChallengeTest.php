@@ -44,10 +44,8 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
 
     /**
      * The manager should hand the Eloquent factor through to the driver
-     * unchanged — the per-driver attempt-state policy lives in
-     * `FactorDriver::issueChallenge()` (OTP drivers reset alongside minting a
-     * fresh code; TOTP and backup-code drivers preserve the lockout because
-     * they cannot rotate any secret of their own).
+     * unchanged, and never reset its attempt state on its own behalf: a
+     * challenge, whatever its driver, never lifts a lockout.
      *
      * @return void
      *

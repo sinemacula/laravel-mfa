@@ -31,9 +31,6 @@ final class FactorTest extends TestCase
     /** @var string */
     private const string TEST_USER_EMAIL = 'alice@example.com';
 
-    /** @var string Cleartext OTP fixture used to assert the code-encryption round-trip. */
-    private const string CLEARTEXT_CODE = '123456';
-
     /**
      * Test implements eloquent factor contract.
      *
@@ -255,42 +252,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test code round-trips through encryption when read back.
-     *
-     * @return void
-     */
-    public function testCodeRoundTripsThroughEncryption(): void
-    {
-        $factor = $this->persistFactorWithCode(self::CLEARTEXT_CODE);
-
-        $reloaded = Factor::query()->findOrFail($factor->id);
-
-        self::assertSame(self::CLEARTEXT_CODE, $reloaded->code);
-    }
-
-    /**
-     * Test raw code column is not stored as plaintext.
-     *
-     * @return void
-     */
-    public function testRawCodeColumnIsNotStoredAsPlaintext(): void
-    {
-        $factor = $this->persistFactorWithCode(self::CLEARTEXT_CODE);
-
-        $raw = $factor->getConnection()
-            ->table($factor->getTable())
-            ->where('id', $factor->id)
-            ->first(['code']);
-
-        self::assertNotNull($raw);
-
-        /** @var mixed $rawCode */
-        $rawCode = $raw->code;
-        self::assertIsString($rawCode);
-        self::assertNotSame(self::CLEARTEXT_CODE, $rawCode);
-    }
-
-    /**
      * A new factor is pending, not preferred, and has not failed, before it is
      * stored.
      *
@@ -327,8 +288,6 @@ final class FactorTest extends TestCase
             'application',
             'confirmed_at',
             'last_used_at',
-            'code',
-            'expires_at',
             'verified_at',
             'attempts',
             'locked_until',
@@ -337,12 +296,12 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test secret and code are hidden from serialisation, as are the full
-     * destination and the credential reference.
+     * Test the secret is hidden from serialisation, as are the full destination
+     * and the credential reference.
      *
      * @return void
      */
-    public function testSecretAndCodeAreHiddenFromSerialization(): void
+    public function testSecretIsHiddenFromSerialization(): void
     {
         $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
 
@@ -351,7 +310,6 @@ final class FactorTest extends TestCase
             'authenticatable_id'   => $this->authenticatableId($user),
             'type'                 => 'email',
             'secret'               => 'super-secret',
-            'code'                 => '654321',
             'destination'          => 'alice@example.com',
             'credential_reference' => 'credential-1',
         ]);
@@ -360,7 +318,6 @@ final class FactorTest extends TestCase
         $array = $factor->toArray();
 
         self::assertArrayNotHasKey('secret', $array);
-        self::assertArrayNotHasKey('code', $array);
         self::assertArrayNotHasKey('destination', $array);
         self::assertArrayNotHasKey('credential_reference', $array);
         self::assertArrayHasKey('type', $array);
@@ -395,28 +352,6 @@ final class FactorTest extends TestCase
             'authenticatable_id'   => $this->authenticatableId($user),
             'type'                 => 'totp',
             'secret'               => $secret,
-        ]);
-        $factor->save();
-
-        return $factor;
-    }
-
-    /**
-     * Persist an email factor carrying the given plaintext OTP code.
-     *
-     * @param  string  $code
-     * @return \SineMacula\Laravel\Mfa\Models\Factor
-     */
-    private function persistFactorWithCode(string $code): Factor
-    {
-        $user = TestUser::create(['email' => self::TEST_USER_EMAIL, 'mfa_enabled' => true]);
-
-        $factor = new Factor([
-            'authenticatable_type' => $user::class,
-            'authenticatable_id'   => $this->authenticatableId($user),
-            'type'                 => 'email',
-            'destination'          => 'verify@example.test',
-            'code'                 => $code,
         ]);
         $factor->save();
 

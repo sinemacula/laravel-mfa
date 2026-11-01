@@ -4,25 +4,28 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Drivers\DriverBindings;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\MfaManager;
-use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
+use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
+use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use Tests\Fixtures\Codes\CustomMfaCodeMessage;
+use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 
 /**
  * Tests for `DriverBindings`: the driver resolver is shared, the TOTP, email
  * and SMS drivers are registered against the manager, and each factory reads
- * its slice of config with the documented defaults.
+ * its slice of config with the documented defaults and delivers through the
+ * bound sender.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -73,7 +76,8 @@ final class DriverBindingsTest extends TestCase
     public function testExtendRegistersDriversThatReadTheConfig(): void
     {
         config()->set('mfa.totp.window', 2);
-        config()->set('mfa.codes.length', 7);
+        config()->set('mfa.codes.mailable', CustomMfaCodeMessage::class);
+        config()->set('mfa.codes.sms_message', 'Code :code');
 
         $manager = new MfaManager($this->app());
 
@@ -84,9 +88,9 @@ final class DriverBindingsTest extends TestCase
 
         self::assertSame(2, $this->window($manager->driver('totp')));
         self::assertInstanceOf(EmailDriver::class, $email);
-        self::assertSame(7, $email->getCodeLength());
+        self::assertSame(CustomMfaCodeMessage::class, $email->getMailable());
         self::assertInstanceOf(SmsDriver::class, $sms);
-        self::assertSame(7, $sms->getCodeLength());
+        self::assertSame('Code :code', $sms->getMessageTemplate());
     }
 
     /**
@@ -104,7 +108,7 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * The email factory applies the documented defaults.
+     * The email factory applies the documented default message class.
      *
      * @return void
      *
@@ -115,32 +119,34 @@ final class DriverBindingsTest extends TestCase
         $driver = DriverBindings::email($this->app(), new Repository);
 
         self::assertSame(MfaCodeMessage::class, $driver->getMailable());
-        self::assertSame(6, $driver->getCodeLength());
-        self::assertSame(10, $driver->getExpiry());
     }
 
     /**
-     * The email factory reads every configured value.
+     * The email factory reads the configured message class and delivers
+     * through the bound email sender.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEmailFactoryReadsTheConfig(): void
+    public function testEmailFactoryReadsTheConfigAndSendsThroughTheBoundSender(): void
     {
+        $sender = FakeEmailSender::fake($this->container());
+
         $driver = DriverBindings::email($this->app(), new Repository(['mfa' => ['codes' => [
-            'mailable'    => CustomMfaCodeMessage::class,
-            'length'      => 8,
-            'ttl_minutes' => 5,
+            'mailable' => CustomMfaCodeMessage::class,
         ]]]));
 
+        $driver->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), '123456', CarbonImmutable::now()->addMinutes(5));
+
         self::assertSame(CustomMfaCodeMessage::class, $driver->getMailable());
-        self::assertSame(8, $driver->getCodeLength());
-        self::assertSame(5, $driver->getExpiry());
+        self::assertCount(1, $sender->sentTo('ada@example.test'));
+        self::assertInstanceOf(CustomMfaCodeMessage::class, $sender->sentTo('ada@example.test')[0]['message']);
+        self::assertSame('123456', $sender->lastCodeTo('ada@example.test'));
     }
 
     /**
-     * The SMS factory applies the documented defaults.
+     * The SMS factory applies the documented default message.
      *
      * @return void
      *
@@ -151,33 +157,28 @@ final class DriverBindingsTest extends TestCase
         $driver = DriverBindings::sms($this->app(), new Repository);
 
         self::assertSame('Your verification code is: :code', $driver->getMessageTemplate());
-        self::assertSame(6, $driver->getCodeLength());
-        self::assertSame(10, $driver->getExpiry());
     }
 
     /**
-     * The SMS factory reads every configured value and sends through the bound
-     * gateway.
+     * The SMS factory reads the configured message and delivers through the
+     * bound SMS sender.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testSmsFactoryReadsTheConfig(): void
+    public function testSmsFactoryReadsTheConfigAndSendsThroughTheBoundSender(): void
     {
-        $gateway = new FakeSmsGateway;
-
-        $this->container()->instance(SmsGateway::class, $gateway);
+        $sender = FakeSmsSender::fake($this->container());
 
         $driver = DriverBindings::sms($this->app(), new Repository(['mfa' => ['codes' => [
             'sms_message' => 'Code :code',
-            'length'      => 8,
-            'ttl_minutes' => 5,
         ]]]));
 
+        $driver->deliver(new InMemoryFactor(type: 'sms', destination: '+447700900123'), '123456', CarbonImmutable::now()->addMinutes(5));
+
         self::assertSame('Code :code', $driver->getMessageTemplate());
-        self::assertSame(8, $driver->getCodeLength());
-        self::assertSame(5, $driver->getExpiry());
+        self::assertSame('Code 123456', $sender->lastMessageTo('+447700900123'));
     }
 
     /**

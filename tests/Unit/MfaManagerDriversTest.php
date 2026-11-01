@@ -99,14 +99,12 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $driver = $this->manager()->driver('email');
 
         self::assertInstanceOf(EmailDriver::class, $driver);
-        self::assertSame(6, $driver->getCodeLength());
-        self::assertSame(10, $driver->getExpiry());
         self::assertSame(MfaCodeMessage::class, $driver->getMailable());
     }
 
     /**
-     * Resolving the email driver should apply every override in the code
-     * settings — code length, lifetime and mailable.
+     * Resolving the email driver should apply the mailable override in the
+     * code settings.
      *
      * @return void
      *
@@ -116,16 +114,12 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     {
         $config = app(Repository::class);
         $config->set('mfa.codes', [
-            'length'      => 8,
-            'ttl_minutes' => 5,
-            'mailable'    => CustomMfaCodeMessage::class,
+            'mailable' => CustomMfaCodeMessage::class,
         ]);
 
         /** @var \SineMacula\Laravel\Mfa\Drivers\EmailDriver $driver */
         $driver = $this->manager()->driver('email');
 
-        self::assertSame(8, $driver->getCodeLength());
-        self::assertSame(5, $driver->getExpiry());
         self::assertSame(CustomMfaCodeMessage::class, $driver->getMailable());
     }
 
@@ -147,13 +141,11 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
 
         self::assertInstanceOf(SmsDriver::class, $driver);
         self::assertSame('Your verification code is: :code', $driver->getMessageTemplate());
-        self::assertSame(6, $driver->getCodeLength());
-        self::assertSame(10, $driver->getExpiry());
     }
 
     /**
-     * Resolving the SMS driver should apply every override in the code settings
-     * — code length, lifetime and message.
+     * Resolving the SMS driver should apply the message override in the code
+     * settings.
      *
      * @return void
      *
@@ -163,8 +155,6 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     {
         $config = app(Repository::class);
         $config->set('mfa.codes', [
-            'length'      => 7,
-            'ttl_minutes' => 5,
             'sms_message' => 'Code: :code',
         ]);
 
@@ -172,8 +162,6 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $driver = $this->manager()->driver('sms');
 
         self::assertSame('Code: :code', $driver->getMessageTemplate());
-        self::assertSame(7, $driver->getCodeLength());
-        self::assertSame(5, $driver->getExpiry());
     }
 
     /**

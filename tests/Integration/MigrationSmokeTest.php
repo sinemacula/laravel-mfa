@@ -48,7 +48,7 @@ final class MigrationSmokeTest extends TestCase
         yield 'mfa_factors' => ['mfa_factors', [
             'id', ...$owner, 'type', 'label', 'destination', 'credential_reference', 'secret', 'totp_algorithm', 'totp_digits',
             'totp_period', 'last_accepted_step', 'status', 'preferred', 'consecutive_failures', 'disabled_at', 'application',
-            'confirmed_at', 'last_used_at', 'code', 'expires_at', 'attempts', 'locked_until', 'last_attempted_at', 'verified_at',
+            'confirmed_at', 'last_used_at', 'attempts', 'locked_until', 'last_attempted_at', 'verified_at',
             'created_at', 'updated_at',
         ]];
         yield 'mfa_identity_states' => ['mfa_identity_states', [
@@ -84,6 +84,18 @@ final class MigrationSmokeTest extends TestCase
     {
         self::assertTrue(Schema::hasTable($table));
         self::assertSame([], array_values(array_diff($columns, Schema::getColumnListing($table))), sprintf('Missing columns on %s after migration.', $table));
+    }
+
+    /**
+     * A delivered code lives in the codes table, as a keyed hash, so the
+     * factors table has no column to hold one or its expiry.
+     *
+     * @return void
+     */
+    public function testTheFactorsTableHoldsNoDeliveredCode(): void
+    {
+        self::assertFalse(Schema::hasColumn('mfa_factors', 'code'));
+        self::assertFalse(Schema::hasColumn('mfa_factors', 'expires_at'));
     }
 
     /**

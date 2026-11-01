@@ -88,11 +88,6 @@ return new class extends Migration {
             $blueprint->timestamp('confirmed_at')->nullable();
             $blueprint->timestamp('last_used_at')->nullable();
 
-            // The delivered code and its expiry, encrypted at rest by the
-            // model's cast, until delivered codes have a table of their own.
-            $blueprint->text('code')->nullable();
-            $blueprint->timestamp('expires_at')->nullable();
-
             // The per-factor attempt counter and lockout, until the attempt
             // throttles replace them, and when verification was last attempted
             // and passed.

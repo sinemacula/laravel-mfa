@@ -37,8 +37,6 @@ final class InMemoryFactor implements Factor
      *
      * @param  string  $type
      * @param  ?string  $secret
-     * @param  ?string  $code
-     * @param  ?\Carbon\CarbonInterface  $expiresAt
      * @param  int  $attempts
      * @param  ?\Carbon\CarbonInterface  $lockedUntil
      * @param  ?\Carbon\CarbonInterface  $verifiedAt
@@ -55,12 +53,6 @@ final class InMemoryFactor implements Factor
 
         /** Stored secret value. */
         private readonly ?string $secret = null,
-
-        /** Pending one-time code. */
-        private readonly ?string $code = null,
-
-        /** Code expiry timestamp. */
-        private readonly ?CarbonInterface $expiresAt = null,
 
         /** Failed verification attempt count. */
         private int $attempts = 0,
@@ -149,28 +141,6 @@ final class InMemoryFactor implements Factor
     public function getSecret(): ?string
     {
         return $this->secret;
-    }
-
-    /**
-     * Return the configured one-time code value.
-     *
-     * @return ?string
-     */
-    #[\Override]
-    public function getCode(): ?string
-    {
-        return $this->code;
-    }
-
-    /**
-     * Return the configured code expiry.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getExpiresAt(): ?CarbonInterface
-    {
-        return $this->expiresAt;
     }
 
     /**

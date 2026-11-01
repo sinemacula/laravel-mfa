@@ -6,10 +6,12 @@ namespace Tests\Integration;
 
 use Illuminate\Routing\Router;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Codes\NullSmsGateway;
+use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
+use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
+use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -80,18 +82,17 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `SmsGateway` contract must resolve to the
-     * loud-failing `NullSmsGateway` default.
+     * Without a consumer override the `SmsSender` and `EmailSender` contracts
+     * must resolve to the loud-failing null defaults.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testDefaultSmsGatewayIsNull(): void
+    public function testDefaultSendersAreNull(): void
     {
-        $gateway = $this->container()->make(SmsGateway::class);
-
-        self::assertInstanceOf(NullSmsGateway::class, $gateway);
+        self::assertInstanceOf(NullSmsSender::class, $this->container()->make(SmsSender::class));
+        self::assertInstanceOf(NullEmailSender::class, $this->container()->make(EmailSender::class));
     }
 
     /**

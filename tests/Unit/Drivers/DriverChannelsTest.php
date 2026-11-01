@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
-use Illuminate\Contracts\Mail\Mailer;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
@@ -13,7 +12,8 @@ use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
-use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
+use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
+use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\TestCase;
@@ -44,8 +44,8 @@ final class DriverChannelsTest extends TestCase
     {
         $drivers = [
             'totp'        => new TotpDriver,
-            'sms'         => new SmsDriver(new FakeSmsGateway),
-            'email'       => new EmailDriver(self::createStub(Mailer::class)),
+            'sms'         => new SmsDriver(new FakeSmsSender),
+            'email'       => new EmailDriver(new FakeEmailSender),
             'backup_code' => new BackupCodeDriver,
         ];
 
