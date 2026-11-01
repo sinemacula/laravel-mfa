@@ -12,26 +12,31 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\DeliveredCodes;
+use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\CodeSent;
+use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use Tests\Fixtures\Codes\LeakingSmsSender;
 use Tests\Fixtures\Codes\RecordingCodeDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\NonModelEloquentBackupCodeFactor;
 use Tests\Fixtures\Factors\UncastOwnerKeyFactor;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Secrets\RecordedTrace;
 use Tests\TestCase;
 
 /**
  * Tests for `CodeService`: a code is stored and delivered in the identity's
  * factor state transaction and reported once committed; a refused send delivers
- * and reports nothing; a delivery that fails keeps nothing; and only a stored
- * factor owned by the binding's identity has codes.
+ * and reports nothing; a delivery that fails keeps nothing, and surfaces
+ * scrubbed of the code and the destination; and only a stored factor owned by
+ * the binding's identity has codes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,6 +51,9 @@ final class CodeServiceTest extends TestCase
 
     /** @var string The address the factor delivers to. */
     private const string ADDRESS = 'ada@example.test';
+
+    /** @var string The phone number an SMS factor delivers to. */
+    private const string PHONE = '+447700900123';
 
     /**
      * A code sent is delivered to the factor's destination, reported with its
@@ -133,7 +141,9 @@ final class CodeServiceTest extends TestCase
 
     /**
      * A delivery that throws keeps no code and spends no cooldown: the next
-     * send goes out at once.
+     * send goes out at once. The failure surfaces as the package's own
+     * exception, naming the factor with its destination masked, with the
+     * driver's failure as the previous one.
      *
      * @return void
      *
@@ -151,8 +161,10 @@ final class CodeServiceTest extends TestCase
         try {
             $this->service()->send($user, $factor, self::binding($user), $driver);
             self::fail('Expected the delivery to fail.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('The transport failed.', $exception->getMessage());
+        } catch (CodeDeliveryFailedException $exception) {
+            self::assertSame('The code could not be delivered to the email factor at a**@example.test.', $exception->getMessage());
+            self::assertSame('a**@example.test', $exception->factor->maskedDestination);
+            self::assertSame('The transport failed.', $exception->getPrevious()?->getMessage());
         }
 
         self::assertSame(0, Code::query()->count());
@@ -161,6 +173,62 @@ final class CodeServiceTest extends TestCase
         $driver->fail = false;
 
         self::assertTrue($this->service()->send($user, $factor, self::binding($user), $driver)->wasSent());
+    }
+
+    /**
+     * Rows of whether PHP records the arguments of each call in a trace, as a
+     * development configuration does, or ignores them, as a production one
+     * does.
+     *
+     * @return iterable<string, array{bool}>
+     */
+    public static function traceArguments(): iterable
+    {
+        yield 'arguments recorded' => [true];
+        yield 'arguments ignored' => [false];
+    }
+
+    /**
+     * A sender's failure that quotes the code and the phone number, in its
+     * message, a previous exception's message and its trace, surfaces as an
+     * exception naming neither, over the failure scrubbed of both, whether or
+     * not PHP recorded the arguments; nothing is kept.
+     *
+     * @param  bool  $arguments
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('traceArguments')]
+    public function testAFailedDeliveryIsScrubbedOfTheCodeAndTheDestination(bool $arguments): void
+    {
+        [$user, $factor] = $this->factor('sms', self::PHONE);
+
+        $driver    = new SmsDriver(new LeakingSmsSender);
+        $exception = RecordedTrace::thrownBy(fn () => $this->service()->send($user, $factor, self::binding($user), $driver), $arguments);
+
+        self::assertInstanceOf(CodeDeliveryFailedException::class, $exception);
+        self::assertSame('The code could not be delivered to the sms factor at *********0123.', $exception->getMessage());
+
+        $failure = $exception->getPrevious();
+
+        self::assertInstanceOf(\RuntimeException::class, $failure);
+        self::assertSame('The gateway refused the message to [redacted].', $failure->getMessage());
+        self::assertStringStartsWith('Gateway said: invalid body "', (string) $failure->getPrevious()?->getMessage());
+        self::assertStringEndsWith('[redacted]"', (string) $failure->getPrevious()?->getMessage());
+
+        for ($current = $exception; $current !== null; $current = $current->getPrevious()) {
+            foreach ([self::CODE, self::PHONE] as $plaintext) {
+                self::assertStringNotContainsString($plaintext, $current->getMessage());
+                self::assertStringNotContainsString($plaintext, $current->getTraceAsString());
+
+                foreach (RecordedTrace::strings($current) as $string) {
+                    self::assertStringNotContainsString($plaintext, $string);
+                }
+            }
+        }
+
+        self::assertSame(0, Code::query()->count());
     }
 
     /**
@@ -364,14 +432,16 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A user with a stored email factor, the clock stopped, and the engine
-     * drawing a known code.
+     * A user with a stored factor of the type (email, unless another is given),
+     * the clock stopped, and the engine drawing a known code.
      *
+     * @param  string  $type
+     * @param  string  $destination
      * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function factor(): array
+    private function factor(string $type = 'email', string $destination = self::ADDRESS): array
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00:00'));
 
@@ -382,8 +452,8 @@ final class CodeServiceTest extends TestCase
         $factor = Factor::query()->create([
             'authenticatable_type' => $user->getMorphClass(),
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'email',
-            'destination'          => self::ADDRESS,
+            'type'                 => $type,
+            'destination'          => $destination,
             'status'               => 'confirmed',
         ]);
 

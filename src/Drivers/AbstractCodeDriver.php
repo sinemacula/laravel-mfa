@@ -131,7 +131,7 @@ abstract class AbstractCodeDriver implements CodeDeliveryDriver
      * @param  \Carbon\CarbonImmutable  $expiresAt
      * @return void
      */
-    abstract protected function send(string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void;
+    abstract protected function send(#[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void;
 
     /**
      * The refusal of a factor-only call for a code that needs its binding.

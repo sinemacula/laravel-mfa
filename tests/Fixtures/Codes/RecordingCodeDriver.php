@@ -62,7 +62,7 @@ final class RecordingCodeDriver extends AbstractCodeDriver
      * @throws \RuntimeException
      */
     #[\Override]
-    protected function send(string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
+    protected function send(#[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
     {
         if ($this->onSend !== null) {
             ($this->onSend)();

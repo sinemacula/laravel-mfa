@@ -53,6 +53,7 @@ between requests.
 | `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        | not yet |
 | `proofs.max_age_minutes`        | `20160`                            | 0 to 525600 minutes                    | `MFA_PROOFS_MAX_AGE_MINUTES`        | yes     |
 | `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    | not yet |
+| `secrets.redact`                | `true`                             | off only for a false value             | `MFA_SECRETS_REDACT`                | yes     |
 
 Every class name is relative to `SineMacula\Laravel\Mfa`. Numbers may be integers or the digit strings `env()` returns;
 anything else, a sign, padding, a fraction or an exponent included, is refused.
@@ -358,6 +359,20 @@ refuses every request; use its step-up parameter to require a fresh verification
 
 `prune_after_days` is how long pruning is to keep abandoned enrolments, expired codes, and used or replaced recovery
 codes after they stop being usable. It is checked but not applied yet: the package prunes nothing so far.
+
+## Secrets
+
+```php
+'secrets' => [
+    'redact' => env('MFA_SECRETS_REDACT', true),
+],
+```
+
+While `redact` is on, the package redacts secrets, codes and full destinations from every channel in
+`logging.channels` and from the messages and traces of the exceptions the exception handler reports (see
+[Logs and exceptions](secrets.md#logs-and-exceptions)). It fails safe: only a value that reads as false (`false`, `0`,
+`off`, `no`) turns it off, and anything else, a missing or malformed value included, leaves it on, so it is not one of
+the subjects the configuration check reports. The `mfa.no-store` middleware is aliased either way.
 
 ## Checking the configuration
 

@@ -29,7 +29,7 @@ final readonly class NullSmsSender implements SmsSender
      * @throws \SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException
      */
     #[\Override]
-    public function send(string $phoneNumber, #[\SensitiveParameter] string $message): void
+    public function send(#[\SensitiveParameter] string $phoneNumber, #[\SensitiveParameter] string $message): void
     {
         throw SenderNotConfiguredException::for(SmsSender::class);
     }

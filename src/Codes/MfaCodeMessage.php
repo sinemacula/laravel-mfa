@@ -10,6 +10,8 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use SineMacula\Laravel\Mfa\Secrets\ExceptionScrubber;
+use SineMacula\Laravel\Mfa\Secrets\SensitiveValues;
 
 /**
  * Default Mailable for MFA email-code delivery.
@@ -24,6 +26,14 @@ use Illuminate\Queue\SerializesModels;
  * carries the code in clear, so it is never queued in clear: whenever it is
  * queued, by a sender that queues it or by a subclass that is queueable, the
  * queue payload is encrypted with the application key.
+ *
+ * A failure while the message is sent, whether by the sender at once or by a
+ * queue worker running the queued message, where the code service cannot catch
+ * it, is scrubbed of the code and the recipients' addresses before it leaves
+ * `send()` (see `Secrets\ExceptionScrubber`): in the message and the trace of
+ * every exception in its chain, whether or not PHP recorded the arguments. The
+ * values come from the message itself, so nothing is carried from one job to
+ * the next.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -49,6 +59,28 @@ class MfaCodeMessage extends Mailable implements ShouldBeEncrypted
         /** Minutes until the code expires. */
         public readonly int $expiresInMinutes,
     ) {}
+
+    /**
+     * Send the message through the mailer, scrubbing a failure of the code and
+     * the recipients' addresses before rethrowing it.
+     *
+     * @param  \Illuminate\Contracts\Mail\Factory|\Illuminate\Contracts\Mail\Mailer  $mailer
+     * @return \Illuminate\Mail\SentMessage|null
+     *
+     * @throws \Throwable
+     */
+    #[\Override]
+    public function send($mailer)
+    {
+        // Laravel's send() declares no exception, but its transport throws
+        try {
+            return parent::send($mailer);
+        } catch (\Throwable $exception) { // @phpstan-ignore catch.neverThrown
+            ExceptionScrubber::scrub($exception, ...SensitiveValues::ofCodeMessage($this));
+
+            throw $exception;
+        }
+    }
 
     /**
      * Build the envelope.

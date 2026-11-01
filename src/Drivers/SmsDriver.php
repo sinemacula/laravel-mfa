@@ -84,7 +84,7 @@ final class SmsDriver extends AbstractCodeDriver
      * @return void
      */
     #[\Override]
-    protected function send(string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
+    protected function send(#[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
     {
         $this->sender->send($destination, str_replace(self::CODE_PLACEHOLDER, $code, $this->messageTemplate));
     }

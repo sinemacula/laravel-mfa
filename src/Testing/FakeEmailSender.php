@@ -53,7 +53,7 @@ final class FakeEmailSender implements EmailSender
      * @return void
      */
     #[\Override]
-    public function send(string $address, Mailable $message): void
+    public function send(#[\SensitiveParameter] string $address, #[\SensitiveParameter] Mailable $message): void
     {
         $this->sent[] = [
             'to'      => $address,
@@ -77,7 +77,7 @@ final class FakeEmailSender implements EmailSender
      * @param  string  $address
      * @return list<array{to: string, message: \Illuminate\Contracts\Mail\Mailable}>
      */
-    public function sentTo(string $address): array
+    public function sentTo(#[\SensitiveParameter] string $address): array
     {
         return array_values(array_filter($this->sent, static fn (array $entry): bool => $entry['to'] === $address));
     }
@@ -89,7 +89,7 @@ final class FakeEmailSender implements EmailSender
      * @param  string  $address
      * @return ?string
      */
-    public function lastCodeTo(string $address): ?string
+    public function lastCodeTo(#[\SensitiveParameter] string $address): ?string
     {
         $code = null;
 

@@ -118,6 +118,7 @@ registers it with the container, and the classes only it uses:
 | `RecoveryCodes` | Backup codes: `issueBackupCodes()`, `BackupCodeDriver` and `RecoveryCodeSettings`                   |
 | `Attempts`      | `AttemptService`: attempts counted, lockouts applied and lifted, `AttemptSettings`                  |
 | `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
+| `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction             |
 | `Http`          | The `mfa` and `mfa.skip` middleware, `RequireMfa` and `SkipMfa`                                     |
 | `Testing`       | Test doubles for applications: `FakeSmsSender` and `FakeEmailSender`                                |
 | `Console`       | The `mfa:check` command                                                                             |

@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\Lifecycle\LifecycleBindings;
 use SineMacula\Laravel\Mfa\Proofs\ProofBindings;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeBindings;
 use SineMacula\Laravel\Mfa\Requirements\RequirementBindings;
+use SineMacula\Laravel\Mfa\Secrets\SecretBindings;
 use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
 
 /**
@@ -80,6 +81,7 @@ final class MfaServiceProvider extends ServiceProvider
         $this->registerCommands();
 
         HttpBindings::boot($this->app);
+        SecretBindings::boot($this->app);
         ConfigurationBindings::boot($this->app);
     }
 

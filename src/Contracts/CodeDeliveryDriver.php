@@ -32,6 +32,8 @@ interface CodeDeliveryDriver extends FactorDriver
      * @param  string  $code
      * @param  \Carbon\CarbonImmutable  $expiresAt
      * @return void
+     *
+     * @throws \Throwable
      */
     public function deliver(Factor $factor, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void;
 }

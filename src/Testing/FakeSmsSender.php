@@ -51,7 +51,7 @@ final class FakeSmsSender implements SmsSender
      * @return void
      */
     #[\Override]
-    public function send(string $phoneNumber, #[\SensitiveParameter] string $message): void
+    public function send(#[\SensitiveParameter] string $phoneNumber, #[\SensitiveParameter] string $message): void
     {
         $this->sent[] = [
             'to'      => $phoneNumber,
@@ -75,7 +75,7 @@ final class FakeSmsSender implements SmsSender
      * @param  string  $phoneNumber
      * @return list<array{to: string, message: string}>
      */
-    public function sentTo(string $phoneNumber): array
+    public function sentTo(#[\SensitiveParameter] string $phoneNumber): array
     {
         return array_values(array_filter($this->sent, static fn (array $entry): bool => $entry['to'] === $phoneNumber));
     }
@@ -86,7 +86,7 @@ final class FakeSmsSender implements SmsSender
      * @param  string  $phoneNumber
      * @return ?string
      */
-    public function lastMessageTo(string $phoneNumber): ?string
+    public function lastMessageTo(#[\SensitiveParameter] string $phoneNumber): ?string
     {
         $sent = $this->sentTo($phoneNumber);
 

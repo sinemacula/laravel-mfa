@@ -16,9 +16,11 @@ use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
+use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Secrets\ExceptionScrubber;
 use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
@@ -36,6 +38,12 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * a delivery that throws keeps no code and spends no cooldown or cap;
  * `CodeSent` is dispatched once the transaction commits. Neither sending nor
  * checking resets a failure count or lifts a lockout.
+ *
+ * A delivery that throws is scrubbed of the code and the factor's destination,
+ * which the service knows, in the message and the trace of every exception in
+ * its chain, whether or not PHP recorded the arguments, and surfaces as a
+ * `CodeDeliveryFailedException` naming the destination only masked, with the
+ * scrubbed failure as its previous exception.
  *
  * A delivered code needs a stored factor and a binding naming the factor's
  * owner: anything else is refused before anything is read.
@@ -70,6 +78,7 @@ final readonly class CodeService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
      * @throws \Throwable
      */
@@ -96,7 +105,7 @@ final readonly class CodeService
                 return SendResult::refused(FailureReason::SENDING_CAPPED, $issued);
             }
 
-            $driver->deliver($locked, $issued->code, $issued->expiresAt);
+            self::deliver($driver, $locked, $issued);
 
             $events->dispatch(new CodeSent($events->context($identity, $binding->application), FactorSummary::fromFactor($locked), $binding->purpose, $issued->challengeId));
 
@@ -123,6 +132,30 @@ final readonly class CodeService
         $stored = self::stored($factor, $binding);
 
         return $this->container->make(DeliveredCodes::class)->check(self::idOf($stored), $binding, $code, CarbonImmutable::now()->startOfSecond(), $challengeId);
+    }
+
+    /**
+     * Deliver the issued code to the factor through its driver. A failure is
+     * scrubbed of the code and the factor's destination, which are given to the
+     * scrub rather than read from the trace, and rethrown as a
+     * `CodeDeliveryFailedException`, so the transaction still rolls back.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver  $driver
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Codes\IssuedCode  $issued
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException
+     */
+    private static function deliver(CodeDeliveryDriver $driver, Factor $factor, #[\SensitiveParameter] IssuedCode $issued): void
+    {
+        try {
+            $driver->deliver($factor, $issued->code, $issued->expiresAt);
+        } catch (\Throwable $exception) {
+            ExceptionScrubber::scrub($exception, $issued->code, $factor->getDestination());
+
+            throw new CodeDeliveryFailedException(FactorSummary::fromFactor($factor), $exception);
+        }
     }
 
     /**

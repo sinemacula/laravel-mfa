@@ -22,6 +22,7 @@ use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
+use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
 use SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -371,7 +372,7 @@ final class OtpLifecycleTest extends TestCase
 
     /**
      * Without a sender bound, a code is never dropped silently: the send
-     * throws, and no code is kept.
+     * throws, over the default sender's refusal, and no code is kept.
      *
      * @return void
      */
@@ -382,7 +383,8 @@ final class OtpLifecycleTest extends TestCase
         try {
             Mfa::challenge('sms', $factor);
             self::fail('Expected the send to be refused.');
-        } catch (SenderNotConfiguredException) {
+        } catch (CodeDeliveryFailedException $exception) {
+            self::assertInstanceOf(SenderNotConfiguredException::class, $exception->getPrevious());
             self::assertSame(0, Code::query()->count());
         }
     }

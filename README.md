@@ -40,6 +40,11 @@ whatever UI you like.
 - **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; backup codes hash to SHA-256 before
   persistence; email and SMS codes are stored only as keyed hashes bound to their factor, session, application and
   purpose, and the package's email code message encrypts its payload whenever it is queued.
+- **Secrets shown once**: a value that refuses to be serialised, cast or dumped, which the planned enrolment flow will
+  return secrets in (until then the TOTP driver returns plain strings the caller must not log, dump or serialise), a
+  response helper and an `mfa.no-store` middleware that no cache keeps, and the redaction of secrets, codes and full
+  destinations from logs, exception messages and traces, delivery failures included (see
+  [Secrets](docs/guides/secrets.md)).
 - **Attempt caps and lockouts**: failures are counted per factor, per identity and per IP address in the database, with
   no cache; too many lock the factor, the identity or the address out before the driver is called, and a factor that
   reaches the failure ceiling is disabled. See [Attempts and lockouts](docs/guides/attempts.md).
@@ -97,9 +102,10 @@ application blocks, among others, are checked but no flow reads them, so listing
 nothing for now. See [Configuration](docs/guides/configuration.md) for every key, its default, its bounds and whether it
 is applied yet.
 
-> **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so a key rotation
-> must use `php artisan key:rotate` rather than simply swapping `APP_KEY` in `.env` — a naive swap leaves
-> existing factor rows un-decryptable.
+> **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so when you rotate
+> `APP_KEY`, list the old key in `APP_PREVIOUS_KEYS` for as long as factors enrolled under it exist: a plain swap
+> leaves existing factor rows undecryptable. See
+> [Rotating the application key](docs/guides/secrets.md#rotating-the-application-key).
 
 Every package table lives on one database connection, `storage.connection` (`MFA_STORAGE_CONNECTION`, the default
 connection when `null`), which the shipped models and migrations both use; a factor model on another connection is
@@ -255,7 +261,9 @@ Pass an explicit `$count` argument to override the configured default batch size
 The email and SMS drivers deliver their codes through senders the application binds: `SmsSender` for SMS and
 `EmailSender` for email. The shipped defaults throw `SenderNotConfiguredException`, and the configuration check refuses
 an application that enables `sms` or `email` while its default is still bound, so a missing binding fails loudly before
-anyone is sent a code. Email can go through Laravel's mailer with the package's own sender:
+anyone is sent a code. A sender's failure surfaces as `CodeDeliveryFailedException`, scrubbed of the code and the full
+destination, with the sender's own exception as its previous one. Email can go through Laravel's mailer with the
+package's own sender:
 
 ```php
 use SineMacula\Laravel\Mfa\Codes\MailEmailSender;

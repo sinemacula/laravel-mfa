@@ -44,7 +44,7 @@ final readonly class MailEmailSender implements EmailSender
      * @return void
      */
     #[\Override]
-    public function send(string $address, Mailable $message): void
+    public function send(#[\SensitiveParameter] string $address, #[\SensitiveParameter] Mailable $message): void
     {
         $this->mail->mailer()->to($address)->send($message);
     }

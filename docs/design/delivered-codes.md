@@ -86,6 +86,10 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 - A factor with no destination: `MissingDestinationException`, before the transport; the code is not kept.
 - No sender bound: `SenderNotConfiguredException` from the default sender; the code is not kept. The configuration check
   normally refuses this before any send.
+- Any throwable from the driver's `deliver()`, the two above included, is caught around that call alone, scrubbed of the
+  code and the factor's destination (see [Secrets in Responses and Logs](secrets-in-responses-and-logs.md)), and
+  rethrown as `CodeDeliveryFailedException`, which names the factor's type and masked destination and keeps the
+  scrubbed throwable as its previous one. The transaction rolls back, so the code is not kept.
 - A factor that is not a stored Eloquent factor: `UnsupportedFactorException`. A binding that names another identity
   than the factor's owner: `InvalidArgumentException`. Neither reads anything.
 - A code sent inside a transaction that rolls back is gone with it, and `CodeSent` is never dispatched.

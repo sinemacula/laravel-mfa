@@ -68,7 +68,7 @@ final class EmailDriver extends AbstractCodeDriver
      * @return void
      */
     #[\Override]
-    protected function send(string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
+    protected function send(#[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
     {
         $minutes = max(1, (int) ceil(($expiresAt->getTimestamp() - CarbonImmutable::now()->getTimestamp()) / 60));
 

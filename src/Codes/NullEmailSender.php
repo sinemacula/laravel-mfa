@@ -32,7 +32,7 @@ final readonly class NullEmailSender implements EmailSender
      * @throws \SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException
      */
     #[\Override]
-    public function send(string $address, Mailable $message): void
+    public function send(#[\SensitiveParameter] string $address, #[\SensitiveParameter] Mailable $message): void
     {
         throw SenderNotConfiguredException::for(EmailSender::class);
     }
