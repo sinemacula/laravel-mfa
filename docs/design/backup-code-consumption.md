@@ -35,22 +35,22 @@ concurrent requests, not just sequential ones.
 - On a match against an Eloquent factor, the driver enters `consumeAtomic()`: opens a transaction on the factor's
   connection, re-reads the row under `lockForUpdate()`, rehashes the candidate against the locked row, writes `null`
   to the secret column, commits.
-- The manager's `applyVerificationOutcome()` then runs `recordVerification()` on the factor (stamps `verified_at`,
-  resets attempts, clears any pending code) and persists; `finaliseVerification()` writes the identity-level
-  verification through the bound store and dispatches `MfaVerified`.
+- The verification service's `applyVerificationOutcome()` then runs `recordVerification()` on the factor (stamps
+  `verified_at`, resets attempts, clears any pending code) and persists; `finaliseVerification()` writes the
+  identity-level verification through the bound store and dispatches `MfaVerified`.
 - A fresh batch via `issueBackupCodes()` deletes old rows, inserts new rows (each with the SHA-256 digest on
   `secret`), dispatches `MfaFactorEnrolled` once per new code, and returns the plaintext list to the caller.
 
 ## Failure / Edge Cases
 
 - A wrong candidate fails the constant-time comparison before any lock is acquired. There is no row mutation and the
-  manager increments the factor's attempt counter.
+  verification service increments the factor's attempt counter.
 - Two concurrent requests submitting the same valid code race on `lockForUpdate()`. The winner consumes the row and
   returns `true`; the loser re-reads a secret that is now `null`, fails its second hash check, and returns `false`
   without mutating anything.
 - If the row is deleted by a concurrent actor between the initial hash check and the lock, `find()` returns `null`
-  inside the transaction and consumption returns `false`. The manager treats this as a verification failure with the
-  standard classification.
+  inside the transaction and consumption returns `false`. The verification service treats this as a verification failure
+  with the standard classification.
 - A stored `null` or empty secret short-circuits to `false` before the lock is acquired. This covers the already-
   consumed state and the stale-in-memory-but-cleared-in-DB state.
 - `generateSet()` rejects a `$count` of zero or negative with `InvalidArgumentException`. Consumers cannot
@@ -60,40 +60,45 @@ concurrent requests, not just sequential ones.
 
 ## Implementation Anchors
 
-- `src/Drivers/BackupCodeDriver.php`: `verify()`, `consumeAtomic()`, `hash()`, `generateSecret()`,
+- `src/RecoveryCodes/BackupCodeDriver.php`: `verify()`, `consumeAtomic()`, `hash()`, `generateSecret()`,
   `generatePlaintextCode()`, `generateSet()`, `issueChallenge()` (no-op).
-- `src/MfaManager.php`: `issueBackupCodes()`, `rotateBackupCodeBatch()`, `resolveDriver()`.
+- `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`, `rotateBackupCodeBatch()`.
+- `src/RecoveryCodes/RecoveryCodeBindings.php`: `backupCodes()`, the driver's construction from config.
 - `src/Models/Factor.php`: `secret` `encrypted` cast, `secret` included in `$hidden`.
 - `src/Contracts/EloquentFactor.php`: `persist()`, `getSecretName()`, `getConnectionName()`.
 
 ## Authoritative Tests
 
-- `tests/Unit/Drivers/BackupCodeDriverTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverTest.php`
   `testIssueChallengeIsNoOp`
-- `tests/Unit/Drivers/BackupCodeDriverTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverTest.php`
   `testVerifyReturnsFalseWhenStoredSecretIsNull`
-- `tests/Unit/Drivers/BackupCodeDriverTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverTest.php`
   `testVerifyReturnsFalseWhenStoredSecretIsEmptyString`
-- `tests/Unit/Drivers/BackupCodeDriverTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverTest.php`
   `testVerifyReturnsFalseForWrongCodeHash`
-- `tests/Unit/Drivers/BackupCodeDriverTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverTest.php`
   `testVerifyReturnsTrueForNonEloquentFactorWithoutPersistence`
-- `tests/Unit/Drivers/BackupCodeDriverTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverTest.php`
   `testVerifyConsumesEloquentFactorAtomically`
-- `tests/Unit/Drivers/BackupCodeDriverTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverTest.php`
   `testVerifyReturnsFalseWhenConcurrentConsumeWinsFirst`
-- `tests/Unit/Drivers/BackupCodeDriverTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverTest.php`
   `testVerifyReturnsFalseWhenConcurrentConsumerDeletedTheRow`
-- `tests/Unit/Drivers/BackupCodeDriverRaceTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverRaceTest.php`
   `testConsumeReturnsFalseWhenRowVanishes`
-- `tests/Unit/Drivers/BackupCodeDriverGenerationTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverGenerationTest.php`
   `testGenerateSetReturnsConfiguredNumberOfCodes`
-- `tests/Unit/Drivers/BackupCodeDriverGenerationTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverGenerationTest.php`
   `testGenerateSetReturnsDistinctCodes`
-- `tests/Unit/Drivers/BackupCodeDriverGenerationTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverGenerationTest.php`
   `testGenerateSetThrowsWhenExplicitCountIsZero`
-- `tests/Unit/Drivers/BackupCodeDriverGenerationTest.php`
+- `tests/Unit/RecoveryCodes/BackupCodeDriverGenerationTest.php`
   `testHashIsDeterministicSha256`
+- `tests/Unit/RecoveryCodes/RecoveryCodeServiceTest.php`
+  `testReplacesOnlyTheIdentitysPreviousBatch`
+- `tests/Unit/RecoveryCodes/RecoveryCodeServiceTest.php`
+  `testAFailedRotationKeepsThePreviousBatch`
 
 ## Change Triggers
 

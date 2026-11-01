@@ -15,6 +15,9 @@ Each note is intentionally short and follows the same structure:
 
 The current note set is:
 
+- `capability-services.md`: how the package is organised by capability, the manager as a one-line delegation to each
+  capability's service, the `*Bindings` class each capability registers its wiring through, and what the services
+  share.
 - `verification-lifecycle-and-events.md`: the five lifecycle events (`MfaChallengeIssued`, `MfaVerified`,
   `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`), who dispatches them, and the exact ordering
   against driver calls and store writes.

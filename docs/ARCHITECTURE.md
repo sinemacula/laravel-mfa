@@ -58,12 +58,12 @@ Historical record of the architectural calls made during the 1.0 cycle.
   lives on the `Device` record; in standalone mode it lives on the session (which is already
   per-device). The step-up middleware (`mfa:N`) is the escape hatch for "re-verify before this
   specific action regardless of device state".
-- **D5 — Built-in driver factories live in the service provider.** The four shipped drivers
+- **D5 — Built-in driver factories live in the capability bindings.** The four shipped drivers
   (TOTP, email, SMS, backup codes) are registered against the manager via the standard
-  `Mfa::extend(...)` API from `MfaServiceProvider::registerBuiltInDrivers()`. Built-in drivers
-  are indistinguishable from consumer-registered ones, which is what the three-mode story needs.
-  Consumer overrides via `Mfa::extend()` work because Laravel's `Manager` resolves the most-
-  recent registration. Pinned by
+  `Mfa::extend(...)` API from `Drivers\DriverBindings` and `RecoveryCodes\RecoveryCodeBindings`.
+  Built-in drivers are indistinguishable from consumer-registered ones, which is what the
+  three-mode story needs. Consumer overrides via `Mfa::extend()` work because Laravel's `Manager`
+  resolves the most-recent registration. Pinned by
   `tests/Integration/CustomDriverExtensionTest::testConsumerCanOverrideBuiltInTotpDriver`.
 - **D6 — Lifecycle events are dispatched by the manager, not by consumer code.** Factor
   enrolment goes through `Mfa::enrol(Factor)`; factor removal goes through

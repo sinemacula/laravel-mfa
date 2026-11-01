@@ -61,42 +61,42 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
 
 ## Implementation Anchors
 
-- `src/Support/FactorSummary.php`: constructor, `fromFactor()`, `jsonSerialize()`, `mask()`, `maskEmail()`,
+- `src/Factors/FactorSummary.php`: constructor, `fromFactor()`, `jsonSerialize()`, `mask()`, `maskEmail()`,
   `maskOpaque()`.
 - `src/Models/Factor.php`: `$casts` (including `'secret' => 'encrypted'`, `'code' => 'encrypted'`) and
   `$hidden`.
 - `src/Exceptions/MfaRequiredException.php`, `src/Exceptions/MfaExpiredException.php`: exception payloads keyed on
   `FactorSummary[]`.
-- `src/Middleware/RequireMfa.php`: `resolveFactorSummaries()` — the single choke point where factors are projected
+- `src/Http/Middleware/RequireMfa.php`: `resolveFactorSummaries()` — the single choke point where factors are projected
   through the summary before an exception is thrown.
 - `database/migrations/2026_04_15_000000_create_mfa_factors_table.php`: `secret` and `code` defined as `text`
   columns to accommodate ciphertext regardless of the configured alphabet / length.
 
 ## Authoritative Tests
 
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testIsFinalReadonlyClass`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testImplementsJsonSerializable`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testFromFactorCapturesAllFields`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testFromFactorCollapsesNonScalarIdentifierToEmptyString`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testMaskingKeepsNullRecipientAsNull`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testMaskingEmailWithShortSingleCharLocalPart`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testMaskingEmailWithFourCharLocalPart`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testMaskingEmailPreservesDomain`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testMaskingPhonePreservesLastFourDigits`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testMaskingShortStringsAreFullyMasked`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testJsonSerializeShapeWithVerifiedAt`
-- `tests/Unit/Support/FactorSummaryTest.php`
+- `tests/Unit/Factors/FactorSummaryTest.php`
   `testJsonEncodesViaJsonSerializable`
 - `tests/Unit/Models/FactorTest.php`
   `testSecretRoundTripsThroughEncryption`
