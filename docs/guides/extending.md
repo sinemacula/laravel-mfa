@@ -110,7 +110,7 @@ registers it with the container, and the classes only it uses:
 | `Requirements`  | Whether MFA applies (`shouldUse()`), the default `NullMfaPolicy`, `Requirement`                     |
 | `Proofs`        | The sign-in's proofs (`proofs()`), `SessionProofStore`, `GuardHooks`, `Proof`, `ProofSettings`      |
 | `Verification`  | `challenge()`, `verify()` and `VerificationResult`                                                  |
-| `Assurance`     | `Channel`, `ObservedProperties` and `Evaluation`                                                    |
+| `Assurance`     | `Channel`, `ObservedProperties`, `Evaluation` and the default `DefaultCombinationPolicy`            |
 | `Context`       | `PendingContext` and the default event context resolver                                             |
 | `Passkeys`      | `PasskeyAssertion`, what a verified passkey assertion observed                                      |
 | `Enrollment`    | `enroll()` and `EnrollmentSettings`                                                                 |
@@ -130,9 +130,11 @@ and `Config`, `Database` and `Support` the internal helpers the capabilities sha
 `Database\StorageConnection` and `Support\FactorStateTransaction` (see [Storage](configuration.md#storage)). Each
 capability reads its own block of `config/mfa.php` through its `*Settings` class, on every call.
 `Contracts` also declares the seams the requirement, verification, enrolment and lifecycle flows are built against,
-listed in [the seam contracts design note](../design/seam-contracts.md). Apart from `ProofStore` (see
-[Recorded proofs](proofs.md)) and `EventContextResolver`, no shipped flow calls them yet, so none is bound by default,
-and binding one changes nothing until its flow does. The `Mfa` facade and `MfaManager`
-stay the entry point: each manager method hands its call to the service of its capability, so nothing you call changes
-with the layout. The services and `*Bindings` classes are internal; extend the package through the points in the table
-above. How the layout works is described in [the capability services design note](../design/capability-services.md).
+listed in [the seam contracts design note](../design/seam-contracts.md). `ProofStore` is bound to the session store (see
+[Recorded proofs](proofs.md)), and `CombinationPolicy` to `Assurance\DefaultCombinationPolicy` (see
+[Combination policy](assurance.md#combination-policy)) ahead of the flows that will use it; apart from those and
+`EventContextResolver`, no shipped flow calls the others yet, so none of them is bound by default, and binding one
+changes nothing until its flow does. The `Mfa` facade and `MfaManager` stay the entry point: each manager method hands
+its call to the service of its capability, so nothing you call changes with the layout. The services and `*Bindings`
+classes are internal; extend the package through the points in the table above. How the layout works is described in
+[the capability services design note](../design/capability-services.md).

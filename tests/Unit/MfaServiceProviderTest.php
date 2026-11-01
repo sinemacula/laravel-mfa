@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
 use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
+use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
@@ -126,6 +127,7 @@ final class MfaServiceProviderTest extends TestCase
             SmsSender::class,
             EmailSender::class,
             CodeService::class,
+            CombinationPolicy::class,
             MfaPolicy::class,
             RequirementService::class,
             ProofService::class,

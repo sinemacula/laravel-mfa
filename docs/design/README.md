@@ -21,6 +21,9 @@ The current note set is:
 - `assurance-vocabulary.md`: the values assurance is described with (channels, observed properties, proofs,
   levels, requirements and their composition, evaluations, verification results), what each refuses, their serialised
   forms, and the enums whose values are stable names.
+- `combination-policy.md`: how the default combination policy decides which factors may follow a first factor, how it
+  classifies a session's proofs (accepted, multifactor, level, phishing resistance, restriction, `amr`), and how it
+  judges each requirement part and its maximum age.
 - `verification-lifecycle-and-events.md`: the five lifecycle events (`MfaChallengeIssued`, `MfaVerified`,
   `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`), who dispatches them, and the exact ordering
   against driver calls and proof writes.

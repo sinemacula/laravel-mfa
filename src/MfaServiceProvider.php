@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
+use SineMacula\Laravel\Mfa\Assurance\AssuranceBindings;
 use SineMacula\Laravel\Mfa\Codes\CodeBindings;
 use SineMacula\Laravel\Mfa\Config\ConfigurationBindings;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
@@ -59,6 +60,7 @@ final class MfaServiceProvider extends ServiceProvider
         FactorBindings::register($this->app);
         DriverBindings::register($this->app);
         CodeBindings::register($this->app);
+        AssuranceBindings::register($this->app);
         RequirementBindings::register($this->app);
         ProofBindings::register($this->app);
         VerificationBindings::register($this->app);
