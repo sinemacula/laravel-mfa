@@ -113,14 +113,15 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * The model lives on the storage connection: the default one when none is
-     * configured, the configured one otherwise.
+     * The model lives on the storage connection, named even when it is the
+     * default one: the default one when none is configured, the configured one
+     * otherwise.
      *
      * @return void
      */
     public function testTakesTheStorageConnection(): void
     {
-        self::assertNull((new Factor)->getConnectionName());
+        self::assertSame('testing', (new Factor)->getConnectionName());
 
         Config::set('mfa.storage.connection', 'secondary');
 

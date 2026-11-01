@@ -12,9 +12,12 @@ cannot interleave.
   empty for the default connection. A value that is neither a name nor `null` or empty fails closed with an
   `InvalidArgumentException` naming the key, rather than putting a table on another connection than the one meant.
 - The shipped `Models\Factor` takes the storage connection when it is built, unless its class names a connection of its
-  own. Every shipped migration's `getConnection()` returns the same value, and its collision guard, `create()` and
-  `dropIfExists()` run on `Schema::connection($this->getConnection())`, so `php artisan migrate` puts each table where
-  its model reads and writes it. With `null` the migrations name no connection and follow the migrator's.
+  own, and always by name, the default connection included: Eloquent gives a related model that names no connection its
+  parent's, so an identity on another connection would otherwise read and write its factors there, and the first
+  serialised change for it would be refused. Every shipped migration's `getConnection()` returns the same value, and its
+  collision guard, `create()` and `dropIfExists()` run on `Schema::connection($this->getConnection())`, so `php artisan
+  migrate` puts each table where its model reads and writes it. With `null` the migrations name no connection and follow
+  the migrator's.
 - Every package table lives on the storage connection: `mfa_factors` and `mfa_identity_states`, and every table added
   later. A change that depends on the identity's whole factor state writes several of them in one transaction, which
   two connections cannot commit as one, so a configured model on another connection is refused
@@ -32,9 +35,20 @@ cannot interleave.
   which takes the row's exclusive lock in one statement on MySQL and PostgreSQL, also when two first changes race to
   create it. A separate insert and `SELECT ... FOR UPDATE` would let two transactions share a lock on MySQL and then
   deadlock upgrading it. SQLite serialises its writers, so the insert takes the database's write lock there.
-- The owner is recorded as on the factors table: its morph class for an Eloquent identity (honouring the morph map),
-  its class name otherwise, and its key as a string. A key that is neither a non-empty string nor an integer is refused
-  (`UnsupportedIdentifierException`) rather than collapsing distinct identities onto one lock.
+- Reads that decide a verification, a lockout or who owns a factor go to the storage connection's write host
+  (`Database\WriteConnection::query()`), so a replica that lags behind a lockout, a used code or a removed factor
+  cannot answer them: the identity's factors as `FactorService::getFactors()` reads them, and every read inside
+  `FactorStateTransaction`, which locks its rows and so reads from the writer anyway. A factor the application loads
+  itself and hands in is read wherever the application read it.
+- The identity states table's one-row-per-owner index is named `{table}_owner_unique`, or, when that would pass 63
+  characters (PostgreSQL's limit; MySQL's is 64), the start of the table's name, a hash of the whole and the same
+  suffix, so a long configured table name still migrates and the name is the same on every run.
+- The owner is recorded as on the factors table: its morph class for an Eloquent identity (honouring the morph map), its
+  class name otherwise, and its key as a string. Its columns are read from the owner relation of a blank instance of the
+  factor's class (`Support\FactorOwnerColumns`), never of a stored factor, on which Eloquent would build the owner: an
+  owner that is not an Eloquent model cannot be built, and is locked and matched by its columns all the same. A key that
+  is neither a non-empty string nor an integer is refused (`UnsupportedIdentifierException`) rather than collapsing
+  distinct identities onto one lock.
 - Calls to another package that must be atomic with the change (revoking sessions, reporting a challenge's outcome, a
   passkey change gate) run inside the callback. An adapter whose own storage is on another connection cannot be atomic
   with it and must say so.
@@ -67,7 +81,9 @@ cannot interleave.
 
 - `src/Database/StorageConnection.php`: `name()`, `resolvedName()`, `nameOf()`, `assertHolds()`.
 - `src/Database/StorageBindings.php`: `boot()`; `src/MfaServiceProvider.php`: `boot()`.
-- `src/Support/FactorStateTransaction.php`: `forIdentity()`, `forFactor()`, the lock order in `run()`.
+- `src/Database/WriteConnection.php`: `query()`; `src/Factors/FactorService.php`: `getFactors()`.
+- `src/Support/FactorStateTransaction.php`: `forIdentity()`, `forFactor()`, the lock order in `run()`;
+  `src/Support/FactorOwnerColumns.php`: `of()`.
 - `src/Models/Factor.php`: the constructor; `getConnection()` in every migration under `database/migrations/`.
 - `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`; `src/RecoveryCodes/BackupCodeDriver.php`:
   `consumeAtomic()`.
@@ -76,14 +92,21 @@ cannot interleave.
 
 - `tests/Integration/Database/FactorStateLockTest.php`
 - `tests/Integration/Database/StorageConnectionRotationTest.php`
+- `tests/Integration/Database/IdentityOffStorageConnectionTest.php`
+- `tests/Integration/Database/WriteConnectionReadTest.php`
+- `tests/Unit/Database/WriteConnectionTest.php`
+- `tests/Unit/Support/FactorOwnerColumnsTest.php`
 - `tests/Unit/Support/FactorStateTransactionTest.php`
 - `tests/Unit/Database/StorageConnectionTest.php`
 - `tests/Unit/Database/StorageBindingsTest.php`
 - `tests/Unit/Models/FactorTest.php` `testTakesTheStorageConnection`, `testKeepsAConnectionTheClassNames`
-- `tests/Integration/MigrationSmokeTest.php` `testIdentityStatesTableHasOneRowPerOwner`
+- `tests/Integration/MigrationSmokeTest.php` `testIdentityStatesTableHasOneRowPerOwner`,
+  `testALongIdentityStatesTableNameGivesAShortOwnerIndexName`
 
 ## Change Triggers
 
 - A new package table: its model and its migration take the resolver, and `StorageBindings` checks its model.
 - A new change that depends on the identity's whole factor state: it runs in `FactorStateTransaction`.
 - Any change to the lock order, to how the identity's row is locked, or to how connections are compared.
+- A new read that decides a verification, a lockout or ownership outside `FactorStateTransaction`: it goes through
+  `WriteConnection`.

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
+use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidFactorModelException;
 use SineMacula\Laravel\Mfa\Models\Factor as ShippedFactorModel;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
@@ -68,7 +69,9 @@ final readonly class FactorService
      * Get the authentication factors for the current identity.
      *
      * Returns null if the identity does not support multi-factor
-     * authentication. The result is cached for the duration of the request.
+     * authentication. The factors are read from the write connection (see
+     * `Database\WriteConnection`), as they decide verification and lockout. The
+     * result is cached for the duration of the request.
      *
      * @formatter:off
      *
@@ -87,7 +90,7 @@ final readonly class FactorService
         }
 
         /** @var \Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> */
-        return $this->cache->remember($identity, self::CACHE_KEY_FACTORS, static fn (): Collection => $identity->authFactors()->get()->toBase());
+        return $this->cache->remember($identity, self::CACHE_KEY_FACTORS, static fn (): Collection => WriteConnection::query($identity->authFactors())->get()->toBase());
     }
 
     /**

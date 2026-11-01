@@ -74,6 +74,10 @@ class Factor extends Model implements EloquentFactor
      * immediately. They have to be applied here, before Eloquent reads them, so
      * this is construction rather than model behaviour.
      *
+     * The connection is always named, the default one included: Eloquent gives
+     * a related model that names none its parent's connection, so an identity
+     * on another connection would otherwise read and write its factors there.
+     *
      * @param  array<string, mixed>  $attributes
      *
      * @phpstan-ignore sineMaculaLaravel.modelBehaviour
@@ -123,8 +127,8 @@ class Factor extends Model implements EloquentFactor
     }
 
     /**
-     * Read the storage connection, or `null` (the default connection) while the
-     * Config facade is not yet bootstrapped.
+     * Read the name of the storage connection, or `null` (the default
+     * connection) while the Config facade is not yet bootstrapped.
      *
      * @return ?string
      *
@@ -132,7 +136,7 @@ class Factor extends Model implements EloquentFactor
      */
     private function resolveStorageConnection(): ?string
     {
-        return Config::getFacadeRoot() === null ? null : StorageConnection::name();
+        return Config::getFacadeRoot() === null ? null : StorageConnection::resolvedName();
     }
 
     /**

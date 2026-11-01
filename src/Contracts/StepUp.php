@@ -24,8 +24,15 @@ interface StepUp
     /**
      * Hand a successful verification to the active session it was made in.
      *
+     * Returning means the proof was accepted and recorded. A result whose
+     * binding does not validate, or a proof that cannot be recorded, is refused
+     * by throwing, never by returning, so the change the call is part of rolls
+     * back.
+     *
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return void
+     *
+     * @throws \RuntimeException
      */
     public function stepUp(VerificationResult $result): void;
 }

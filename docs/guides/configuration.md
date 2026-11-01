@@ -29,7 +29,13 @@ must therefore live there too: the shipped `Models\Factor` takes the storage con
 connection of its own, and a factor model, shipped or custom, on any other connection fails with a
 `ModelOffStorageConnectionException` when the package boots, rather than splitting a change across two transactions.
 Connections are compared by name, a model's own or the default one, so two names for one database count as two
-connections. Identity models may live on any connection.
+connections. Identity models may live on any connection: the shipped factor model always names the storage connection,
+the default one included, so an identity's factor relation reads and writes the factors there rather than on the
+identity's own connection. A custom factor model that names no connection of its own should do the same.
+
+When the storage connection splits reads and writes (`read` and `write` hosts), the reads that decide a verification, a
+lockout or who owns a factor go to the write host, so a replica that has not caught up cannot pass a used code or miss
+a lockout.
 
 A value that is neither a connection name nor `null` or empty fails closed with an `InvalidArgumentException` naming the
 key. A model takes the connection when it is built, so keep the setting fixed while the application runs. Changing it
@@ -50,6 +56,8 @@ a deploy, with a migration of your own that moves them and a restart of every wo
 ```
 
 `factor.table` names the factors table and `identity_state.table` the identity states table, which holds one row per
-identity that owns factors. Set them before running the migrations: a migration whose table already exists on the
-storage connection stops with a `TableAlreadyExistsException` naming the setting to change, before it changes anything.
-`factor.model` names the factor model; see [Extending](extending.md).
+identity that owns factors. A long identity states table name is fine: its one-row-per-owner index is named after the
+start of the table's name and a hash of the whole when the full name would pass the length an index name may have. Set
+them before running the migrations: a migration whose table already exists on the storage connection stops with a
+`TableAlreadyExistsException` naming the setting to change, before it changes anything. `factor.model` names the factor
+model; see [Extending](extending.md).

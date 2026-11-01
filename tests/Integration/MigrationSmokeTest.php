@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Integration;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Tests\TestCase;
@@ -122,5 +123,39 @@ final class MigrationSmokeTest extends TestCase
         );
 
         self::assertCount(1, $unique, 'Expected one unique index on (authenticatable_type, authenticatable_id).');
+        self::assertSame('mfa_identity_states_owner_unique', array_values($unique)[0]['name']);
+    }
+
+    /**
+     * A long configured identity states table name still gives an owner index
+     * name every engine accepts: cut short and hashed, the same on every run.
+     *
+     * @return void
+     */
+    public function testALongIdentityStatesTableNameGivesAShortOwnerIndexName(): void
+    {
+        $table = str_pad('mfa_identity_states_', 60, 'x');
+
+        Config::set('mfa.identity_state.table', $table);
+
+        $migration = require __DIR__ . '/../../database/migrations/2026_04_15_000001_create_mfa_identity_states_table.php';
+
+        self::assertIsObject($migration);
+        self::assertTrue(method_exists($migration, 'up') && method_exists($migration, 'down'));
+
+        $migration->up();
+
+        try {
+            $unique = array_values(array_filter(
+                Schema::getIndexes($table),
+                static fn (array $index): bool => $index['unique'] && $index['columns'] === ['authenticatable_type', 'authenticatable_id'],
+            ));
+
+            self::assertCount(1, $unique);
+            self::assertSame(substr($table, 0, 41) . '_' . substr(hash('sha256', $table), 0, 8) . '_owner_unique', $unique[0]['name']);
+            self::assertSame(63, strlen($unique[0]['name']));
+        } finally {
+            $migration->down();
+        }
     }
 }

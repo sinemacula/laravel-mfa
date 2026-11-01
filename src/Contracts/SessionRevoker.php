@@ -23,16 +23,28 @@ interface SessionRevoker
     /**
      * End every session of the identity except the current one.
      *
+     * Returning means the sessions are ended. A session that cannot be ended is
+     * reported by throwing, never by returning, so the change the call is part
+     * of rolls back.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
+     *
+     * @throws \RuntimeException
      */
     public function revokeOthers(MultiFactorAuthenticatable $identity): void;
 
     /**
      * End every session of the identity, the current one included.
      *
+     * Returning means the sessions are ended. A session that cannot be ended is
+     * reported by throwing, never by returning, so the change the call is part
+     * of rolls back.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
+     *
+     * @throws \RuntimeException
      */
     public function revokeAll(MultiFactorAuthenticatable $identity): void;
 }

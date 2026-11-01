@@ -14,6 +14,10 @@ call them, so the flows can be built against one fixed set.
 - An answer that cannot be given safely is the refusing one: `null` for an unknown first factor, no reauthentication or
   no pending session, `false` for a passkey gateway that is unavailable or a factor that may not be removed, and "not
   fresh" for an operation with no setting or a session with no record.
+- A call that changes state and answers nothing (`PendingCompletion`, `StepUp`, `SessionRevoker`, `SessionTransition`)
+  reports a refusal or a failure by throwing, never by returning: a binding that does not validate, a proof that cannot
+  be recorded, a session that cannot be ended or returned to pending. Returning means it was done, and a throw rolls
+  back the factor state change the call runs in.
 - Results cross the seams as structured values, never reduced to `amr`.
 - A contract that no shipped flow calls yet has no default binding. The package resolves none of them until the flow
   that calls it is in place, with its default.

@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
 use Tests\TestCase;
 
 /**
@@ -37,11 +38,26 @@ use Tests\TestCase;
 #[CoversClass(FactorStateTransaction::class)]
 final class FactorStateLockTest extends TestCase
 {
+    use MigratesTheStorageConnection;
+
     /** @var string The key of the identity whose factor state is locked. */
     private const string IDENTITY_KEY = 'person-1';
 
     /** @var string The SQLite file the package's tables live in. */
     private string $database = '';
+
+    /**
+     * Create the package's tables on the storage connection.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->migrateTheStorageConnection();
+    }
 
     /**
      * Remove the SQLite file once the application is gone.

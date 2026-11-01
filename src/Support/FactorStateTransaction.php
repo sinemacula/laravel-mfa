@@ -91,7 +91,8 @@ final class FactorStateTransaction
 
     /**
      * Run the callback as `forIdentity()` does, for the identity that owns the
-     * factor, read from the factor's owner columns.
+     * factor, read from the factor's owner columns (see `FactorOwnerColumns`),
+     * so an owner that is not an Eloquent model is locked as one that is.
      *
      * @template TReturn
      *
@@ -109,14 +110,15 @@ final class FactorStateTransaction
      */
     public static function forFactor(EloquentFactor&Model $factor, \Closure $callback): mixed
     {
-        $relation = $factor->authenticatable();
-        $type     = $factor->getAttribute($relation->getMorphType());
+        [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factor);
+
+        $type = $factor->getAttribute($typeColumn);
 
         if (!is_string($type) || $type === '') {
             throw new UnsupportedIdentifierException('The factor names no owner type, so its owner\'s factor state cannot be locked.');
         }
 
-        return self::run($type, self::keyOf($factor->getAttribute($relation->getForeignKeyName())), $factor, $callback);
+        return self::run($type, self::keyOf($factor->getAttribute($keyColumn)), $factor, $callback);
     }
 
     /**
@@ -146,12 +148,12 @@ final class FactorStateTransaction
 
             self::lockIdentityState($connection, $type, $key);
 
-            $relation = $factorModel->authenticatable();
+            [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factorModel);
 
             /** @var \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $factors */
             $factors = $factorModel->newQuery()
-                ->where($relation->getMorphType(), $type)
-                ->where($relation->getForeignKeyName(), $key)
+                ->where($typeColumn, $type)
+                ->where($keyColumn, $key)
                 ->lockForUpdate()
                 ->get();
 

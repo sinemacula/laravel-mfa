@@ -25,10 +25,16 @@ interface SessionTransition
      * Return the identity's current session on the application to pending,
      * owing the requirement.
      *
+     * Returning means the session is pending. A session that cannot be returned
+     * to pending is reported by throwing, never by returning, so the change the
+     * call is part of rolls back.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $outstanding
      * @return void
+     *
+     * @throws \RuntimeException
      */
     public function returnToPending(MultiFactorAuthenticatable $identity, string $application, Requirement $outstanding): void;
 }

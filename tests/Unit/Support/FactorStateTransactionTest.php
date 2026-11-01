@@ -171,6 +171,33 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
+     * A stored factor whose owner is not an Eloquent model locks that owner,
+     * named by the factor's owner columns, without building it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testLocksTheNonEloquentOwnerOfAFactor(): void
+    {
+        $factor = Factor::query()->create([
+            'authenticatable_type' => NonEloquentIdentity::class,
+            'authenticatable_id'   => 'plain-3',
+            'driver'               => 'totp',
+        ]);
+
+        $factors = FactorStateTransaction::forFactor($factor, static fn (Collection $factors): Collection => $factors);
+
+        self::assertSame([$factor->getKey()], $factors->modelKeys());
+
+        $row = DB::table('mfa_identity_states')->first();
+
+        self::assertIsObject($row);
+        self::assertSame(NonEloquentIdentity::class, $row->authenticatable_type);
+        self::assertSame('plain-3', $row->authenticatable_id);
+    }
+
+    /**
      * An empty setting names the default identity states table.
      *
      * @return void

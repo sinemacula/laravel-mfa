@@ -87,6 +87,19 @@ final class FactorOwnershipTest extends TestCase
     }
 
     /**
+     * An Eloquent factor owned by an identity that is not an Eloquent model
+     * belongs to it, matched by class name and key without building the owner.
+     *
+     * @return void
+     */
+    public function testAnEloquentFactorBelongsToItsNonEloquentOwner(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        FactorOwnership::assert($this->eloquentFactor(NonEloquentIdentity::class, 'plain-1'), new NonEloquentIdentity('plain-1'));
+    }
+
+    /**
      * Owner columns that do not name identity 1 of `TestUser`.
      *
      * @return iterable<string, array{string, mixed}>
