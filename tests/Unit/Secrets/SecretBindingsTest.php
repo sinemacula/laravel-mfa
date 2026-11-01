@@ -25,6 +25,7 @@ use SineMacula\Laravel\Mfa\Secrets\RedactSecretsInLogs;
 use SineMacula\Laravel\Mfa\Secrets\SecretBindings;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\Fixtures\Secrets\ForgedTrace;
+use Tests\Fixtures\Secrets\RecordedTrace;
 
 /**
  * Tests for `SecretBindings`: the middleware is aliased, and while redaction is
@@ -228,10 +229,10 @@ final class SecretBindingsTest extends TestCase
 
         $this->bindHandler($container);
 
-        $trace = $this->reportedTrace($container);
+        $arguments = $this->reportedArguments($container);
 
-        self::assertStringNotContainsString(self::CODE, $trace);
-        self::assertStringContainsString('[redacted]', $trace);
+        self::assertNotContains(self::CODE, $arguments);
+        self::assertContains('[redacted]', $arguments);
     }
 
     /**
@@ -253,7 +254,7 @@ final class SecretBindingsTest extends TestCase
 
         SecretBindings::boot($container);
 
-        self::assertStringNotContainsString(self::CODE, $this->reportedTrace($container));
+        self::assertNotContains(self::CODE, $this->reportedArguments($container));
     }
 
     /**
@@ -272,7 +273,7 @@ final class SecretBindingsTest extends TestCase
 
         $this->bindHandler($container);
 
-        self::assertStringContainsString(self::CODE, $this->reportedTrace($container));
+        self::assertContains(self::CODE, $this->reportedArguments($container));
     }
 
     /**
@@ -406,24 +407,25 @@ final class SecretBindingsTest extends TestCase
 
     /**
      * Report an exception whose trace holds a code passed into the package, and
-     * return its trace as a reporter registered after the package's sees it.
+     * return the strings its trace recorded as arguments, as a reporter
+     * registered after the package's sees them.
      *
      * @param  \Illuminate\Container\Container  $container
-     * @return string
+     * @return list<string>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    private function reportedTrace(Container $container): string
+    private function reportedArguments(Container $container): array
     {
         $handler = $this->handler($container);
 
         self::assertInstanceOf(Handler::class, $handler);
 
-        $trace = '';
+        $arguments = [];
 
-        $handler->reportable(static function (\Throwable $throwable) use (&$trace): bool {
-            $trace = $throwable->getTraceAsString();
+        $handler->reportable(static function (\Throwable $throwable) use (&$arguments): bool {
+            $arguments = RecordedTrace::strings($throwable);
 
             return false;
         });
@@ -432,6 +434,6 @@ final class SecretBindingsTest extends TestCase
             ['file' => '/app/Http/Controllers/VerifyController.php', 'line' => 12, 'class' => MfaManager::class, 'type' => '::', 'function' => 'verify', 'args' => [self::CODE]],
         ]));
 
-        return $trace;
+        return $arguments;
     }
 }
