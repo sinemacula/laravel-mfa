@@ -8,6 +8,7 @@ use Illuminate\Config\Repository;
 use Illuminate\Foundation\Application;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 use PHPUnit\Framework\Assert;
+use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 
 /**
@@ -27,12 +28,12 @@ abstract class TestCase extends BaseTestCase
     /** @var array<string, true> Worker databases this process has created. */
     private static array $workerDatabases = [];
 
-    /** @var mixed The storage connection setting the migrations ran against. */
-    private mixed $migratedStorageConnection = null;
+    /** @var array<string, mixed> The settings the migrations ran against. */
+    private array $migratedSettings = [];
 
     /**
      * Boot the application and run its migrations, noting the storage
-     * connection they created the package's tables on.
+     * connection and table names they created the package's tables with.
      *
      * @return void
      */
@@ -41,16 +42,21 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        $this->migratedStorageConnection = $this->app?->make(Repository::class)->get('mfa.storage.connection');
+        $config = $this->app?->make(Repository::class);
+
+        foreach ($this->migrationSettings() as $setting) {
+            $this->migratedSettings[$setting] = $config?->get($setting);
+        }
     }
 
     /**
      * Destroy the application, then close its database connections.
      *
-     * The storage connection setting is put back first, so a test that changed
-     * it has the migrations rolled back where they ran: on a database that
-     * outlives the test, a rollback elsewhere would forget the package's tables
-     * while leaving them in place, and the next test could not create them.
+     * The storage connection and table name settings are put back first, so a
+     * test that changed them has the migrations roll back the tables they
+     * created: on a database that outlives the test, a rollback of other names
+     * or elsewhere would forget the package's tables while leaving them in
+     * place, and the next test could not create them.
      *
      * The application's objects reference each other, so a destroyed
      * application's PDO is only closed once the cycles are collected. Without
@@ -62,7 +68,7 @@ abstract class TestCase extends BaseTestCase
     #[\Override]
     protected function tearDown(): void
     {
-        $this->app?->make(Repository::class)->set('mfa.storage.connection', $this->migratedStorageConnection);
+        $this->app?->make(Repository::class)->set($this->migratedSettings);
 
         /** @var ?\Illuminate\Database\DatabaseManager $database */
         $database = $this->app?->make('db');
@@ -148,6 +154,20 @@ abstract class TestCase extends BaseTestCase
         Assert::assertNotNull($this->app);
 
         return $this->app;
+    }
+
+    /**
+     * Return the settings the package's migrations read: the storage connection
+     * and every table's name.
+     *
+     * @return list<string>
+     */
+    private function migrationSettings(): array
+    {
+        return [
+            'mfa.storage.connection',
+            ...array_map(TableNames::setting(...), array_keys(TableNames::DEFAULTS)),
+        ];
     }
 
     /**
