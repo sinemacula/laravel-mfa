@@ -18,24 +18,28 @@ factors starts with.
   `totp_algorithm`, `totp_digits` and `totp_period` stored with the factor, `last_accepted_step`, `status` (`pending`
   until confirmed, by the table's default and the model's), `preferred`, the durable `consecutive_failures` and
   `disabled_at` of the failure ceiling, the `application` it was enrolled through, `confirmed_at` and `last_used_at`.
-  The delivered `code` and its `expires_at`, the `attempts` and `locked_until` counters, `last_attempted_at` and
-  `verified_at` stay until the delivered codes, attempt throttles and proof store replace their readers.
+  A delivered code is never on the factor: it lives in `mfa_codes`. A successful verification is recorded as a proof
+  on the session (see the proof store note), not on the factor.
 - `mfa_identity_states`, one row per owner and the lock of every serialised change: `verification_generation`,
   `reenrollment_required`, the identity's `consecutive_failures` and `locked_until`, and `recovery_codes_generation`
   and `recovery_codes_generated_at`.
 - `mfa_enrollments`, one row per enrolment in progress: the pending `factor_id` (unique), owner, the SHA-256
   `grant_hash` of its grant (unique), the `application` and `session_id` the grant is bound to, `expires_at` and its
   confirmation `attempts`.
-- `mfa_codes`, the codes sent by SMS or email: `factor_id`, owner, the `purpose`, `application` and `session_id` the
-  code is bound to, its keyed `code_hash`, `attempts`, `sends`, `sent_at`, `expires_at` and `consumed_at`.
+- `mfa_codes`, one row per challenge of a code sent by SMS or email: `factor_id`, owner, the `purpose`, `application`
+  and session the code is bound to (`session_id`, a keyed digest of the session's id), its keyed `code_hash`, the
+  challenge's `attempts`, how many codes it was `sends`, the last `sent_at` and every send's time (`sent_times`),
+  `expires_at` and `consumed_at` (see [Delivered Codes](delivered-codes.md)).
 - `mfa_recovery_codes`: owner, the salted `code_hash`, the set's `generation`, `used_at` and `replaced_at`.
 - `mfa_attempts`, the temporary throttles: `key` (a keyed hash of the scope and subject), `scope`, `hits` and
-  `window_ends_at`.
+  `window_ends_at`. An identity's and an IP address's rows count failures within a window; a factor's row records the
+  lockout its failures in a row applied, ending when its window does (see [Attempts and
+  Lockout](attempts-and-lockout.md)).
 - `mfa_passkey_associations`: the `factor_id` (unique), owner, and the credential by the SHA-256 `credential_id_hash`
   of its id (unique per owner) with the `credential_id` in full.
-- No table holds a code, a recovery code or a grant in plaintext; the TOTP secret and the transitional delivered code
-  are encrypted by the model's casts. The factor model hides `secret`, `code`, `destination` and
-  `credential_reference` from serialisation; the other models hide their hashes and session ids.
+- No table holds a code, a recovery code or a grant in plaintext; the TOTP secret is encrypted by the model's cast.
+  The factor model hides `secret`, `destination` and `credential_reference` from serialisation; the other models hide
+  their hashes and session ids.
 - Two models may be replaced through configuration: the factor model (`mfa.factor.model`, `Contracts\EloquentFactor`,
   through `Concerns\ActsAsFactor`) and the recovery code model (`mfa.recovery_codes.model`, `Contracts\RecoveryCode`,
   through `Concerns\ActsAsRecoveryCode`), resolved by `Database\ConfiguredModels`. Each exposes its columns through

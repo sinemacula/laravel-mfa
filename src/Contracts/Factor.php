@@ -20,9 +20,10 @@ use SineMacula\Laravel\Mfa\Enums\FactorStatus;
  * applies to the shipped Eloquent model, a consumer's own model, or a test
  * double.
  *
- * The delivered code, its expiry, the attempt counter, the lockout and the last
- * verification time are still read here until the delivered codes, attempts and
- * proof store replace them with records of their own.
+ * The last verification time is still read here until the proof store replaces
+ * it with a record of its own. Delivered codes have a record of their own, and
+ * lockouts are not a property of the factor: the attempt service reads them
+ * (see `Attempts\AttemptService::lockout()`).
  *
  * Persistence-capable implementations also implement the narrower
  * `EloquentFactor` boundary, which adds the owner relation, the column names
@@ -185,61 +186,4 @@ interface Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethod
      * @return ?\Carbon\CarbonInterface
      */
     public function getLastUsedAt(): ?CarbonInterface;
-
-    /**
-     * Return the delivered code currently issued for the factor, if any.
-     *
-     * @return ?string
-     */
-    public function getCode(): ?string;
-
-    /**
-     * Return when the delivered code expires, or `null` when none is issued.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getExpiresAt(): ?CarbonInterface;
-
-    /**
-     * Return the number of failed attempts against the factor since its last
-     * success or issued code.
-     *
-     * @return int
-     */
-    public function getAttempts(): int;
-
-    /**
-     * Return when the factor's lockout ends, or `null` when it is not locked.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getLockedUntil(): ?CarbonInterface;
-
-    /**
-     * Determine whether the factor is locked now.
-     *
-     * @return bool
-     */
-    public function isLocked(): bool;
-
-    /**
-     * Return when verification was last attempted, whatever its outcome.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getLastAttemptedAt(): ?CarbonInterface;
-
-    /**
-     * Return when the factor last passed a verification.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getVerifiedAt(): ?CarbonInterface;
-
-    /**
-     * Determine whether the factor has ever passed a verification.
-     *
-     * @return bool
-     */
-    public function isVerified(): bool;
 }

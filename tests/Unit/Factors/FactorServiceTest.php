@@ -8,7 +8,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
-use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\CustomFactor;
 use Tests\Fixtures\Factors\NonModelEloquentBackupCodeFactor;
@@ -18,7 +17,7 @@ use Tests\TestCase;
 
 /**
  * Tests for `FactorService`: the current identity's setup state and factors,
- * cached per request, and the configured factor model.
+ * read on every call, and the configured factor model.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -78,48 +77,24 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * The setup state and the factors are read once per request, until the
-     * identity's cache is cleared.
+     * The setup state and the factors are read on every call, so nothing is
+     * kept from one read, or one request, to the next.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testReadsAreCachedUntilCleared(): void
+    public function testReadsTheFactorsOnEveryCall(): void
     {
         $user = $this->signIn();
 
         self::assertFalse($this->service()->isSetup());
-        self::assertCount(0, $this->service()->getFactors() ?? collect([1]));
-
-        $this->addFactor($user);
-
-        self::assertFalse($this->service()->isSetup());
-        self::assertCount(0, $this->service()->getFactors() ?? collect([1]));
-
-        $this->container()->make(FactorStateCache::class)->clear($user);
-
-        self::assertTrue($this->service()->isSetup());
-        self::assertCount(1, $this->service()->getFactors() ?? collect());
-    }
-
-    /**
-     * The setup state and the factors are cached apart: reading one does not
-     * answer the other.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testSetupStateAndFactorsAreCachedApart(): void
-    {
-        $user = $this->signIn();
-
         self::assertCount(0, $this->service()->getFactors() ?? collect([1]));
 
         $this->addFactor($user);
 
         self::assertTrue($this->service()->isSetup());
+        self::assertCount(1, $this->service()->getFactors() ?? collect());
     }
 
     /**

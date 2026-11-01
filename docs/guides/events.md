@@ -15,7 +15,7 @@ Every event the package dispatches is a class in `SineMacula\Laravel\Mfa\Events`
 | `FactorRenamed`                | A factor is given a new label                                               | `factor`, `previousLabel`                                  |
 | `PreferredFactorChanged`       | The identity chooses another preferred factor                               | `factor`, `previous`                                       |
 | `FactorRemoved`                | A factor is removed, by the identity or by someone else                     | `factor`, `actor`                                          |
-| `FactorDisabled`               | A factor reaches the failure ceiling and is disabled                        | `factor`, `purpose`                                        |
+| `FactorDisabled`               | A factor, or the identity's run, reaches the failure ceiling                | `factor`, `purpose`                                        |
 | `FactorsReset`                 | Someone resets the identity's factors                                       | `actor`, `reason`, `reenrollmentRequired`                  |
 | `LockoutApplied`               | Failed attempts lock a factor, or the identity across its factors           | `factor` (null for the identity), `lockedUntil`, `purpose` |
 | `LockoutLifted`                | A lockout is lifted before it ends                                          | `factor` (null for the identity), `actor`                  |
@@ -31,11 +31,14 @@ The flows that dispatch them are built over the package's enrolment, verificatio
 capabilities; until each flow ships, its events are declared but not yet dispatched, and the earlier
 `MfaChallengeIssued`, `MfaVerified`, `MfaVerificationFailed`, `MfaFactorEnrolled` and `MfaFactorDisabled` events,
 described in [the lifecycle events design note](../design/verification-lifecycle-and-events.md), are dispatched instead.
+`CodeSent` is dispatched already, once for every code the package sends, resends included, with the id of the code's
+challenge (see [Delivered Codes](../design/delivered-codes.md)). `LockoutApplied`, `LockoutLifted` and
+`FactorDisabled` are dispatched already, by the attempt caps (see [Attempts and lockouts](attempts.md)).
 
 The names of the events and of their fields are stable. `factor` is a `Factors\FactorSummary` (id, type, label, masked
 destination, status, preferred, last use), `previous` another; `purpose` is an `Enums\Purpose` (`sign_in`, `step_up`,
 `enrollment` and `reauthenticate`); `reason` an `Enums\FailureReason`; `actor` an `Events\Actor` (type and id), set when
-someone other than the identity took the action; `challengeId` the authentication challenge an attempt went through,
+someone other than the identity took the action; `challengeId` the challenge a code or an attempt went through,
 when it went through one; `type` the type proved or tried (`recovery_code` for a recovery code).
 
 Every event also says what it was for through `$event->purpose()`: the purpose of the attempt, code or proof behind it

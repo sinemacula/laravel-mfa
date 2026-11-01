@@ -4,13 +4,13 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa;
 
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Manager;
+use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
-use SineMacula\Laravel\Mfa\Factors\FactorStateCache;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
@@ -27,9 +27,8 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  *
  * - `Requirements\RequirementService`: whether MFA applies (`shouldUse()`).
  * - `Factors\FactorService`: the identity's factors and the factor model.
- * - `Factors\FactorStateCache`: the per-request factor state (`clearCache()`).
- * - `Proofs\ProofService`: the recorded verification (`markVerified()`,
- *   `hasEverVerified()`, `hasExpired()`, `forgetVerification()`).
+ * - `Proofs\ProofService`: the proofs the current sign-in has recorded
+ *   (`proofs()`).
  * - `Verification\VerificationService`: `challenge()` and `verify()`.
  * - `Enrollment\EnrollmentService`: `enroll()`.
  * - `Lifecycle\LifecycleService`: `disable()`.
@@ -91,41 +90,17 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Determine whether the current identity has ever completed a successful
-     * MFA verification.
+     * The proofs of the current identity's sign-in on the current application
+     * that still count, oldest first: none without an MFA-capable identity or a
+     * sign-in.
      *
-     * @return bool
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function hasEverVerified(): bool
-    {
-        return $this->container->make(ProofService::class)->hasEverVerified();
-    }
-
-    /**
-     * Determine whether the current identity's MFA verification has expired.
-     *
-     * @param  ?int  $expiresAfter
-     * @return bool
+     * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function hasExpired(?int $expiresAfter = null): bool
+    public function proofs(): array
     {
-        return $this->container->make(ProofService::class)->hasExpired($expiresAfter);
-    }
-
-    /**
-     * Clear any stored verification timestamp for the current identity.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function forgetVerification(): void
-    {
-        $this->container->make(ProofService::class)->forgetVerification();
+        return $this->container->make(ProofService::class)->proofs();
     }
 
     /**
@@ -146,64 +121,42 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Issue a challenge for the given factor through the named driver.
+     * Issue a challenge for the given factor through the named driver, for the
+     * purpose given: for a type that delivers codes, the outcome of sending one
+     * bound to this session and the purpose; otherwise `null`.
      *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return ?\SineMacula\Laravel\Mfa\Codes\SendResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
+     * @throws \Throwable
      */
-    public function challenge(string $driver, Factor $factor): void
+    public function challenge(string $driver, Factor $factor, Purpose $purpose = Purpose::SIGN_IN): ?SendResult
     {
-        $this->container->make(VerificationService::class)->challenge($this, $driver, $factor);
+        return $this->container->make(VerificationService::class)->challenge($this, $driver, $factor, $purpose);
     }
 
     /**
      * Verify a submitted code against the given factor through the named
-     * driver.
+     * driver, for the purpose given.
      *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
      */
-    public function verify(string $driver, Factor $factor, #[\SensitiveParameter] string $code): bool
+    public function verify(string $driver, Factor $factor, #[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
     {
-        return $this->container->make(VerificationService::class)->verify($this, $driver, $factor, $code);
-    }
-
-    /**
-     * Record that the current identity has completed a successful MFA
-     * verification.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function markVerified(): void
-    {
-        $this->container->make(ProofService::class)->markVerified();
-    }
-
-    /**
-     * Clear the factor state cache, for the given identity or, when none is
-     * given, for every identity.
-     *
-     * @param  ?\Illuminate\Contracts\Auth\Authenticatable  $identity
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function clearCache(?Authenticatable $identity = null): void
-    {
-        $this->container->make(FactorStateCache::class)->clear($identity);
+        return $this->container->make(VerificationService::class)->verify($this, $driver, $factor, $code, $purpose);
     }
 
     /**

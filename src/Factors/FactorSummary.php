@@ -116,7 +116,7 @@ final readonly class FactorSummary implements \JsonSerializable
      * @param  ?string  $destination
      * @return ?string
      */
-    private static function mask(?string $destination): ?string
+    private static function mask(#[\SensitiveParameter] ?string $destination): ?string
     {
         if ($destination === null || $destination === '') {
             return $destination;
@@ -135,7 +135,7 @@ final readonly class FactorSummary implements \JsonSerializable
      * @param  string  $destination
      * @return string
      */
-    private static function maskEmail(string $destination): string
+    private static function maskEmail(#[\SensitiveParameter] string $destination): string
     {
         [$local, $domain] = explode('@', $destination, 2);
 
@@ -154,7 +154,7 @@ final readonly class FactorSummary implements \JsonSerializable
      * @param  string  $destination
      * @return string
      */
-    private static function maskOpaque(string $destination): string
+    private static function maskOpaque(#[\SensitiveParameter] string $destination): string
     {
         $keep   = 4;
         $length = strlen($destination);

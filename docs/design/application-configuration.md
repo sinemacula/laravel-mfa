@@ -16,12 +16,12 @@ before anything relies on it.
   and the first factor its guard uses. Those live in `mfa.applications.{name}`; everything else lives in a block per
   capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `proofs`, `lifecycle`) beside `storage`,
   `factor` and `identity_state`.
-- Not every setting is applied yet. No flow reads an application block, so nothing is enforced per application: the
-  shipped drivers verify any type, the TOTP driver takes the package-wide `totp.window`, and the limits, freshness and
-  requirement mode are not applied. Of the package-wide blocks, the TOTP algorithm, digits and period, the code resend
-  cooldown and send caps, the recovery code low-count threshold, the identity and IP attempt caps with their window,
-  the failure ceiling, the enrolment lifetime and the pruning retention are checked only. The configuration guide marks
-  each setting as applied or not, and a flow that starts reading one updates it.
+- Not every setting is applied yet. Of an application block only `totp_window` is read, by the TOTP driver for the
+  application a bound `ApplicationResolver` names; otherwise nothing is enforced per application: the shipped drivers
+  verify any type, and the limits, freshness and requirement mode are not applied. Of the package-wide blocks, the code
+  resend cooldown and send caps, the recovery code low-count threshold, the enrolment lifetime and the pruning
+  retention are checked only. The configuration guide marks each setting as applied or not, and a flow that starts
+  reading one updates it.
 - Every setting is read through one class that owns its block: `Applications\ApplicationSettings` (with
   `Applications\ApplicationBlock` reading the raw block), `Drivers\TotpSettings`, `Codes\CodeSettings`,
   `RecoveryCodes\RecoveryCodeSettings`, `Attempts\AttemptSettings`, `Enrollment\EnrollmentSettings`,
@@ -48,9 +48,10 @@ before anything relies on it.
 - An application declares the first factor its guard uses (a method and a channel kind other than `unknown`), or a
   `Contracts\FirstFactorResolver` is bound to report it. A configured application with neither is a misconfiguration:
   an unknown first factor accepts no further factor and establishes no level.
-- A code type an application enables has something to deliver its codes: `sms` a `Contracts\SmsGateway` other than the
-  package's `NullSmsGateway`, `email` a mailer bound in the container. The mailer is looked up, not built, so the boot
-  check of every request builds no mail transport.
+- A code type an application enables has something to deliver its codes: `sms` a `Contracts\SmsSender` other than the
+  package's `NullSmsSender`, `email` a `Contracts\EmailSender` other than its `NullEmailSender`; and either has the
+  application key its codes are hashed with (see [Delivered Codes](delivered-codes.md)). The package's
+  `MailEmailSender` looks its mailer up only to send, so the boot check of every request builds no mail transport.
 - `Config\ConfigurationValidator` runs every check and groups the problems by subject: `storage`, `factor`,
   `identity_state`, each capability block, `applications`, and `applications.{name}`. It runs once the application has
   booted (`Config\ConfigurationBindings::boot()`, from the provider's `boot()`, deferred until every provider has
@@ -105,8 +106,8 @@ before anything relies on it.
   `validate()`; `src/MfaServiceProvider.php`: `boot()`, `registerManager()`.
 - `src/Console/CheckConfigurationCommand.php`; `src/Exceptions/InvalidConfigurationException.php`.
 - The readers: `src/Drivers/DriverBindings.php`, `src/RecoveryCodes/RecoveryCodeBindings.php`,
-  `src/Verification/VerificationService.php` (`applyVerificationOutcome()`), `src/Proofs/ProofService.php`
-  (`hasExpired()`).
+  `src/Attempts/AttemptService.php` (`attempt()`, `lockout()`), `src/Http/Middleware/RequireMfa.php`
+  (`configuredMaxAgeMinutes()`).
 
 ## Authoritative Tests
 

@@ -21,25 +21,15 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  */
 final readonly class FactorService
 {
-    /** @var string Cache key for the setup state */
-    private const string CACHE_KEY_SETUP = 'setup';
-
-    /** @var string Cache key for the factors collection */
-    private const string CACHE_KEY_FACTORS = 'factors';
-
     /**
      * Constructor.
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
-     * @param  \SineMacula\Laravel\Mfa\Factors\FactorStateCache  $cache
      */
     public function __construct(
 
         /** The container the configuration is read from. */
         private Container $container,
-
-        /** The per-request cache of the identity's factor state. */
-        private FactorStateCache $cache,
     ) {}
 
     /**
@@ -56,8 +46,7 @@ final readonly class FactorService
             return false;
         }
 
-        /** @var bool */
-        return $this->cache->remember($identity, self::CACHE_KEY_SETUP, static fn (): bool => $identity->isMfaEnabled());
+        return $identity->isMfaEnabled();
     }
 
     /**
@@ -65,8 +54,8 @@ final readonly class FactorService
      *
      * Returns null if the identity does not support multi-factor
      * authentication. The factors are read from the write connection (see
-     * `Database\WriteConnection`), as they decide verification and lockout. The
-     * result is cached for the duration of the request.
+     * `Database\WriteConnection`), as they decide verification and lockout, and
+     * on every call, so nothing is kept from one request to the next.
      *
      * @formatter:off
      *
@@ -82,8 +71,7 @@ final readonly class FactorService
             return null;
         }
 
-        /** @var \Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> */
-        return $this->cache->remember($identity, self::CACHE_KEY_FACTORS, static fn (): Collection => WriteConnection::query($identity->authFactors())->get()->toBase());
+        return WriteConnection::query($identity->authFactors())->get()->toBase();
     }
 
     /**

@@ -1,9 +1,9 @@
 # Proofs, assurance and requirements
 
 The package describes what a session has proved, and what it must prove, with a small set of immutable values and
-backed enums. They hold no behaviour beyond checking themselves: a value that contradicts itself is refused with an
-`InvalidArgumentException` when it is built, so one that exists is always consistent. Every class name below is
-relative to `SineMacula\Laravel\Mfa`.
+backed enums, and judges what the proofs add up to with a combination policy. The values hold no behaviour beyond
+checking themselves: a value that contradicts itself is refused with an `InvalidArgumentException` when it is built, so
+one that exists is always consistent. Every class name below is relative to `SineMacula\Laravel\Mfa`.
 
 ## Channels
 
@@ -138,6 +138,172 @@ An evaluation never reports more than its own answers allow, whichever combinati
 - `minimum_level` is never met at `unclassified`;
 - `mfa` is reported only for a multifactor combination, and `mca` only for an accepted one that is not.
 
+## Combination policy
+
+The combination policy (`Contracts\CombinationPolicy`) answers two questions: whether a factor may follow a session's
+first factor, and what the session's proofs add up to. The package binds `Assurance\DefaultCombinationPolicy`, which
+classifies combinations as NIST SP 800-63B-4 does, from the channel each proof travelled on and the properties it
+actually observed, never from a factor type's name or from configuration.
+
+### Independent factors
+
+`accepts($firstFactor, $channel)` is true when a factor on the channel may follow the first factor. A factor that
+shares the first factor's channel is not independent of it, and is neither offered on the session nor verified on it:
+
+- an SMS code to the phone the person signed in with, or an email code to the address they signed in with (compared
+  without regard to case);
+- the passkey that started the sign-in;
+- a factor of the same kind as the first factor when either names no destination or credential, since independence
+  cannot then be shown.
+
+A first factor whose channel is unknown, a proof that is not a first factor or a reauthentication with one, and a
+channel that cannot carry a factor (a password or an unknown one) accept nothing. A recovery code has no channel, so it
+follows any known first factor.
+
+```php
+use SineMacula\Laravel\Mfa\Assurance\Channel;
+use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+
+$policy = app(CombinationPolicy::class);
+
+$policy->accepts($firstFactor, new Channel(ChannelKind::SMS, '+447700900456'));
+```
+
+### Classification
+
+`evaluate($requirement, ...$proofs)` takes the session's proofs, the first factor's included, and returns an
+`Evaluation`. Accepting an additional verification, achieving multifactor authentication and reaching a level are
+separate answers:
+
+| First factor                             | Further proof                                        | Accepted | Multifactor | Level                         |
+|------------------------------------------|------------------------------------------------------|----------|-------------|-------------------------------|
+| Password                                 | TOTP, passkey, recovery code                         | Yes      | Yes         | AAL2                          |
+| Password                                 | SMS code                                             | Yes      | Yes         | AAL2, restricted              |
+| Password                                 | Email code                                           | Yes      | No          | AAL1, from the password alone |
+| Phone code                               | TOTP, recovery code, SMS code to a different phone   | Yes      | No          | AAL1, restricted              |
+| Phone code                               | Email code                                           | Yes      | No          | AAL1, restricted              |
+| Phone or email code                      | Passkey with observed user verification              | Yes      | Yes         | AAL2                          |
+| Email code                               | TOTP, recovery code, SMS code                        | Yes      | No          | AAL1, from the further proof  |
+| Phone code                               | SMS code to the same phone                           | No       | No          | AAL1, from the phone code     |
+| Email code                               | Email code to the same address                       | No       | No          | Unclassified                  |
+| Passkey with observed user verification  | None needed                                          | No       | Yes         | AAL2                          |
+| External provider                        | Any enabled factor                                   | Yes      | No          | The further proof's own level |
+| Unknown, or none                         | Any                                                  | No       | No          | Unclassified                  |
+
+Behind the table are a few rules. A password is something the person knows; an SMS code, a TOTP code, a recovery code
+and a passkey are something they have; a passkey whose assertion observed user verification is a multi-factor
+authenticator on its own. Something known with something had, or a multi-factor authenticator, is multifactor
+authentication and supports AAL2; anything else that is known or had supports AAL1. An email code is not an
+out-of-band authenticator in NIST SP 800-63B-4 and establishes no level of its own, and an external provider's first
+factor adds none, so the further proof's level applies (a passkey with observed user verification still reaches AAL2).
+The default never reports AAL3, which needs hardware-bound keys it cannot see without attestation.
+
+A combination is phishing-resistant when one of its proofs observed phishing resistance, as a passkey assertion does.
+It is restricted when it relies on an SMS code, a restricted authenticator in NIST SP 800-63B-4: a phone code followed
+by a passkey with observed user verification is not, since the passkey carries the level on its own, and neither is a
+session that also reaches its level without the SMS code.
+
+### `amr` values
+
+The evaluation's `amr` values (RFC 8176) state only what happened. Each proof that counts adds its method's value,
+first factor first: `pwd` for a password, `sms` for an SMS code, `otp` for a TOTP, email or recovery code, and `pop`
+for a passkey; then `user` when it observed user presence, and `hwk` or `swk` when it observed how its key was
+protected. `mfa` is added when the combination is multifactor, and `mca` when it is an accepted additional verification
+that is not. An external provider's own methods are not repeated: an application that trusts them rebinds the policy.
+
+### Requirements and maximum ages
+
+Each part of the requirement is judged on its own. The session's proofs form combinations: the first factor alone,
+each reauthentication with it alone, and the first factor followed by each further proof it accepts. A part is met when
+one combination provides it on evidence no older than the part's maximum age:
+
+- `additional_verification` is met by an accepted combination, or by a multi-factor first factor on its own;
+- `multifactor`, `minimum_level` and `phishing_resistance` by a combination that is multifactor, reaches the level, or
+  is phishing-resistant.
+
+The evidence is the proof that completes the combination (the further proof, or the first factor or reauthentication
+on its own), unless the first factor provides the part on its own and the further proof does not: the part then rests
+on the first factor, and its age is the first factor's. A fresh weaker proof never refreshes an old stronger one.
+
+So a fresh TOTP code after a password made hours ago meets a fifteen-minute `multifactor` part, since only the two
+together are multifactor. A fresh TOTP or email code after a passkey sign-in made hours ago meets a fifteen-minute
+`additional_verification` part, but not a fifteen-minute `multifactor`, `minimum_level` or `phishing_resistance` part,
+which only the passkey provides. A fresh password reauthentication never stands in for an additional factor made hours
+ago, and a passkey sign-in made hours ago no longer meets a part that asks for a fresh proof, though what it established
+is still reported.
+
+```php
+use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
+
+$evaluation = $policy->evaluate(
+    Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2, maxAge: 900),
+    ...$proofs,
+);
+
+$evaluation->meetsRequirement();
+```
+
+### Failing closed
+
+Nothing is accepted and no level is established when the proofs hold no first factor, more than one, or one whose
+channel is unknown: the session cannot satisfy a requirement until its first factor is known. A proof bound to another
+identity or application than the first factor counts for nothing, and so does a proof made before the first factor,
+which an earlier sign-in left, or dated after the current time.
+
+### Rebinding the policy
+
+An application may bind its own policy, to be stricter than the default or to trust an external provider's reported
+methods, in its own service provider. Decorating the default keeps its classification:
+
+```php
+use SineMacula\Laravel\Mfa\Assurance\Channel;
+use SineMacula\Laravel\Mfa\Assurance\DefaultCombinationPolicy;
+use SineMacula\Laravel\Mfa\Assurance\Evaluation;
+use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
+
+final class NoSmsAfterPhoneCode implements CombinationPolicy
+{
+    public function __construct(private DefaultCombinationPolicy $default) {}
+
+    public function accepts(Proof $firstFactor, Channel $factor): bool
+    {
+        if ($firstFactor->channel?->kind === ChannelKind::SMS && $factor->kind === ChannelKind::SMS) {
+            return false;
+        }
+
+        return $this->default->accepts($firstFactor, $factor);
+    }
+
+    public function evaluate(Requirement $requirement, Proof ...$proofs): Evaluation
+    {
+        $firstFactors = array_filter($proofs, fn (Proof $proof): bool => $proof->kind === ProofKind::FIRST_FACTOR);
+        $firstFactor  = count($firstFactors) === 1 ? reset($firstFactors) : null;
+
+        $counted = array_filter($proofs, fn (Proof $proof): bool => $firstFactor === null
+            || $proof->kind !== ProofKind::ADDITIONAL_FACTOR
+            || $proof->channel === null
+            || $this->accepts($firstFactor, $proof->channel));
+
+        return $this->default->evaluate($requirement, ...$counted);
+    }
+}
+
+$this->app->singleton(CombinationPolicy::class, NoSmsAfterPhoneCode::class);
+```
+
+A stricter `accepts()` must be applied in `evaluate()` too, as above: the default's `evaluate()` asks its own
+`accepts()`, so without the filter a proof the stricter policy refuses, recorded before it was bound or passed in by an
+adapter, would still count. The flows never offer or verify a factor the policy does not accept, so the filter guards
+only against proofs that reached the session another way. Whatever policy is bound, an `Evaluation` refuses to report
+more than its own answers allow (see [Evaluations](#evaluations)). How the default reaches its answers is described in
+[the combination policy design note](../design/combination-policy.md).
+
 ## Verification results
 
 A verification result (`Verification\VerificationResult`) is either `verified($proof, $evaluation)` or
@@ -146,9 +312,10 @@ is what a caller may be told, and a detail, which stays in events and logs. A `l
 the lockout lifts (`lockedUntil`), and no other failure does.
 
 Today `Mfa::verify()` answers `true` or `false`, and a failure is reported by the `MfaVerificationFailed` event, which
-carries the same `FailureReason` as `$event->reason` and the detail as `$event->detail`: `locked`, `invalid_code`,
-`expired` (for an expired code, and for a pending code without an expiry, told apart by the detail) and
-`not_confirmed` (a factor with neither a pending code nor a secret).
+carries the same `FailureReason` as `$event->reason` and the detail as `$event->detail`. A locked factor fails as
+`locked`. A delivered code fails as what its check found: `invalid_code` for a wrong code, `replayed` for a used one,
+and `expired` for an expired code, a challenge out of attempts or no code at all, told apart by the detail. Any other
+factor fails as `not_confirmed` when it has no secret, and as `invalid_code` otherwise.
 
 ## Stable names
 

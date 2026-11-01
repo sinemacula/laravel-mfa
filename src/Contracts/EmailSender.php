@@ -28,5 +28,5 @@ interface EmailSender
      * @param  \Illuminate\Contracts\Mail\Mailable  $message
      * @return void
      */
-    public function send(string $address, Mailable $message): void;
+    public function send(#[\SensitiveParameter] string $address, #[\SensitiveParameter] Mailable $message): void;
 }

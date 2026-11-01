@@ -4,16 +4,22 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Proofs;
 
+use Illuminate\Auth\Events\CurrentDeviceLogout;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Contracts\Events\Dispatcher;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Proofs\ProofBindings;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
-use SineMacula\Laravel\Mfa\Proofs\SessionMfaVerificationStore;
+use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `ProofBindings`: the proof service is shared, and the default
- * verification store keeps verification in the session.
+ * Tests for `ProofBindings`: the proof service is shared, the default proof
+ * store keeps proofs in the session and is built afresh on every resolution,
+ * and Laravel's sign-in and sign-out events begin and forget a sign-in.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,16 +43,46 @@ final class ProofBindingsTest extends TestCase
     }
 
     /**
-     * The default verification store keeps verification in the session, and is
-     * shared.
+     * The default proof store keeps proofs in the session, and is not shared,
+     * so no singleton holds one request's session into the next.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBindsTheSessionStoreAsASingleton(): void
+    public function testBindsTheSessionStoreAfreshOnEveryResolution(): void
     {
-        self::assertInstanceOf(SessionMfaVerificationStore::class, $this->container()->make(MfaVerificationStore::class));
-        self::assertSame($this->container()->make(MfaVerificationStore::class), $this->container()->make(MfaVerificationStore::class));
+        self::assertInstanceOf(SessionProofStore::class, $this->container()->make(ProofStore::class));
+        self::assertFalse($this->container()->isShared(ProofStore::class));
+        self::assertNotSame($this->container()->make(ProofStore::class), $this->container()->make(ProofStore::class));
+    }
+
+    /**
+     * Laravel's `Login` event begins a sign-in, and `Logout` and
+     * `CurrentDeviceLogout` forget it.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testListensForSignInAndSignOut(): void
+    {
+        $events = $this->container()->make(Dispatcher::class);
+        $user   = new TestUser;
+
+        $user->setAttribute('id', 7);
+
+        $events->dispatch(new Login('web', $user, false));
+
+        self::assertNotNull($this->container()->make(ProofStore::class)->currentSession($user, 'web'));
+
+        $events->dispatch(new Logout('web', $user));
+
+        self::assertNull($this->container()->make(ProofStore::class)->currentSession($user, 'web'));
+
+        $events->dispatch(new Login('web', $user, false));
+        $events->dispatch(new CurrentDeviceLogout('web', $user));
+
+        self::assertNull($this->container()->make(ProofStore::class)->currentSession($user, 'web'));
     }
 }

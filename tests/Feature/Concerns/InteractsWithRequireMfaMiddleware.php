@@ -5,18 +5,19 @@ declare(strict_types = 1);
 namespace Tests\Feature\Concerns;
 
 use Illuminate\Http\Request;
-use PragmaRX\Google2FA\Google2FA;
+use Illuminate\Support\Facades\Auth;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
  * Shared scaffolding for the RequireMfa middleware test family.
  *
- * Centralises the middleware invocation helper and the "enrol a TOTP factor for
- * a fresh user" fixture so the enforcement-matrix and step-up-parser test
- * classes stay focused on their respective subjects.
+ * Centralises the middleware invocation helper and the "sign in a fresh user
+ * and enrol a TOTP factor" fixture so the enforcement-matrix and step-up-parser
+ * test classes stay focused on their respective subjects.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -55,14 +56,12 @@ trait InteractsWithRequireMfaMiddleware
     }
 
     /**
-     * Enrol a fresh TOTP factor and return the [user, factor, code] triple.
+     * Sign a fresh user in through the session guard, which begins the sign-in
+     * its proofs are recorded on, then enrol a TOTP factor and return the
+     * [user, factor, code] triple.
      *
      * @param  string  $email
      * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     protected function enrollTotp(string $email = 'totp-mw@example.test'): array
     {
@@ -70,19 +69,16 @@ trait InteractsWithRequireMfaMiddleware
             'email'       => $email,
             'mfa_enabled' => true,
         ]);
-        $this->actingAs($user);
 
-        $google = new Google2FA;
-        $secret = $google->generateSecretKey();
+        Auth::login($user);
 
         /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
+            ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => $secret,
         ]);
 
-        return [$user, $factor, $google->getCurrentOtp($secret)];
+        return [$user, $factor, AuthenticatorApp::code($factor)];
     }
 }

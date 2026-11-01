@@ -4,11 +4,15 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Secrets;
 
+use Illuminate\Mail\SendQueuedMailable;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Secrets\ExceptionScrubber;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
+use SineMacula\Laravel\Mfa\Secrets\SensitiveValues;
 use Tests\Fixtures\Secrets\ForgedTrace;
 use Tests\Fixtures\Secrets\RecordedTrace;
 
@@ -16,8 +20,9 @@ use Tests\Fixtures\Secrets\RecordedTrace;
  * Tests for `ExceptionScrubber`: every argument of a frame that touches the
  * package is redacted, every value the package passed on or a frame marked as
  * sensitive is redacted from every other frame, other frames keep the rest of
- * their arguments with the secrets in them redacted, provisioning URIs leave
- * the messages, and every exception in the chain is scrubbed.
+ * their arguments with the secrets in them redacted, code messages leave every
+ * frame, the values collected and the values given leave the messages, and
+ * every exception in the chain is scrubbed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -340,6 +345,138 @@ final class ExceptionScrubberTest extends TestCase
         self::assertSame('QR code for [redacted]', $exception->getMessage());
         self::assertSame('Rendering [redacted] failed.', $error->getMessage());
         self::assertSame('Verification failed.', $kept->getMessage());
+    }
+
+    /**
+     * A value a frame of the chain recorded as sensitive, after a frame without
+     * arguments too, is redacted from the message of every exception in the
+     * chain, each occurrence replaced, and a message that is a shorter value is
+     * redacted whole.
+     *
+     * @return void
+     */
+    public function testRedactsTheValuesCollectedFromEveryMessageOfTheChain(): void
+    {
+        $previous = ForgedTrace::onto(new \RuntimeException('Hashing ' . self::CODE . ' failed.'), [
+            ['file' => self::VENDOR_FILE, 'line' => 10, 'function' => 'hash'],
+            $this->frame(self::VENDOR_FILE, MfaManager::class, 'verify', ['totp', self::CODE]),
+        ]);
+
+        $exception = ForgedTrace::onto(new \RuntimeException('Verification of ' . self::CODE . ' failed, again ' . self::CODE . '.', 0, $previous), [
+            $this->frame(self::APPLICATION_FILE, 'App\Http\Controllers\VerifyController', 'store', []),
+        ]);
+
+        $short = ForgedTrace::onto(new \RuntimeException('totp'), [
+            $this->frame(self::VENDOR_FILE, MfaManager::class, 'verify', ['totp']),
+        ]);
+
+        ExceptionScrubber::scrub($exception);
+        ExceptionScrubber::scrub($short);
+
+        self::assertSame('Verification of [redacted] failed, again [redacted].', $exception->getMessage());
+        self::assertSame('Hashing [redacted] failed.', $previous->getMessage());
+        self::assertSame('[redacted]', $short->getMessage());
+    }
+
+    /**
+     * Rows of whether PHP records the arguments of each call in a trace, as a
+     * development configuration does, or ignores them, as a production one
+     * does.
+     *
+     * @return iterable<string, array{bool}>
+     */
+    public static function traceArguments(): iterable
+    {
+        yield 'arguments recorded' => [true];
+        yield 'arguments ignored' => [false];
+    }
+
+    /**
+     * The values given to the scrub are redacted from every message and frame
+     * of the chain, whatever their length, whether or not PHP recorded the
+     * arguments; empty and missing values are ignored.
+     *
+     * @param  bool  $arguments
+     * @return void
+     */
+    #[DataProvider('traceArguments')]
+    public function testRedactsTheValuesGivenWhetherOrNotArgumentsWereRecorded(bool $arguments): void
+    {
+        $exception = RecordedTrace::thrownBy(static function (): void {
+            (static function (string $body, string $to): void {
+                throw new \RuntimeException('Refused "' . $body . '" for ' . $to, 0, new \LogicException('Upstream: ' . $to));
+            })('Your code is 4821', '+447700900123');
+        }, $arguments);
+
+        ExceptionScrubber::scrub($exception, '4821', '+447700900123', '', null);
+
+        self::assertSame('Refused "Your code is [redacted]" for [redacted]', $exception->getMessage());
+        self::assertSame('Upstream: [redacted]', $exception->getPrevious()?->getMessage());
+
+        foreach (RecordedTrace::strings($exception) as $string) {
+            self::assertStringNotContainsString('4821', $string);
+            self::assertStringNotContainsString('+447700900123', $string);
+        }
+    }
+
+    /**
+     * A code message in another frame, or a queued job sending one, nested in
+     * an argument too, is redacted, and its code and recipient are redacted
+     * from every other frame and every message, whatever their length.
+     *
+     * @return void
+     */
+    public function testRedactsACodeMessageAndWhatItCarries(): void
+    {
+        $message = (new MfaCodeMessage('4821', 10))->to('ada@example.test');
+
+        $exception = ForgedTrace::onto(new \RuntimeException('The relay refused ada@example.test.'), [
+            $this->frame(self::VENDOR_FILE, 'Symfony\Component\Mime\Email', 'html', ['<p>Your code is 4821</p>']),
+            $this->frame(self::VENDOR_FILE, 'Illuminate\Mail\Mailer', 'send', [['html' => 'view'], ['message' => $message]]),
+            $this->frame(self::VENDOR_FILE, 'Illuminate\Queue\CallQueuedHandler', 'dispatchThroughMiddleware', ['job', new SendQueuedMailable($message)]),
+        ]);
+
+        ExceptionScrubber::scrub($exception);
+
+        self::assertSame('The relay refused [redacted].', $exception->getMessage());
+        self::assertSame(['[redacted]'], $this->arguments($exception, 0));
+        self::assertSame([['html' => 'view'], ['message' => '[redacted]']], $this->arguments($exception, 1));
+        self::assertSame(['job', '[redacted]'], $this->arguments($exception, 2));
+    }
+
+    /**
+     * The sensitive values given are redacted from every message of the chain,
+     * each as its kind is: a known value whatever its length, a collected one
+     * only from six characters.
+     *
+     * @return void
+     */
+    public function testRedactsTheSensitiveValuesGivenByTheirKind(): void
+    {
+        $exception = new \RuntimeException('Rejected 4821 and abcd, then 482915', 0, new \LogicException('Previously 4821'));
+
+        ExceptionScrubber::scrubWith($exception, SensitiveValues::known('4821')->with(SensitiveValues::inArguments(['abcd', '482915'], true)));
+
+        self::assertSame('Rejected [redacted] and abcd, then [redacted]', $exception->getMessage());
+        self::assertSame('Previously [redacted]', $exception->getPrevious()?->getMessage());
+    }
+
+    /**
+     * The values a chain recorded are read without scrubbing anything.
+     *
+     * @return void
+     */
+    public function testReadsTheSensitiveValuesWithoutScrubbing(): void
+    {
+        $exception = ForgedTrace::onto(new \RuntimeException('Verification of ' . self::CODE . ' failed.'), [
+            $this->frame(self::VENDOR_FILE, MfaManager::class, 'verify', [self::CODE]),
+        ]);
+
+        $values = ExceptionScrubber::sensitiveValuesOf($exception);
+
+        self::assertTrue($values->matches(self::CODE));
+        self::assertSame([self::CODE], $this->arguments($exception, 0));
+        self::assertSame('Verification of ' . self::CODE . ' failed.', $exception->getMessage());
     }
 
     /**

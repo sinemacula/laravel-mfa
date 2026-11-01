@@ -21,7 +21,7 @@ use Tests\TestCase;
 /**
  * Tests for `EnrollmentService`: a new factor is stamped as the current
  * identity's and saved, an existing one only when it is already theirs, and
- * every enrolment clears the identity's cached factors and is reported.
+ * every enrolment is seen at once and reported.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -202,13 +202,13 @@ final class EnrollmentServiceTest extends TestCase
     }
 
     /**
-     * Enrolling clears the identity's cached factors.
+     * `isSetup()` sees an enrolled factor at once.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEnrollingClearsTheIdentitysCachedFactors(): void
+    public function testAnEnrolledFactorIsSeenAtOnce(): void
     {
         $this->signIn();
 

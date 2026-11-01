@@ -10,7 +10,9 @@ namespace SineMacula\Laravel\Mfa\Contracts;
  * Delivers a message carrying a code to an E.164 phone number through the
  * application's own SMS gateway: the package ships no provider. An exception it
  * throws is the delivery's failure; a return means the gateway accepted the
- * message. The message carries the code in clear: do not log it.
+ * message. The message carries the code in clear: do not log it, and an
+ * implementation that queues it must encrypt the queued payload (for example,
+ * with a job that implements `ShouldBeEncrypted`).
  *
  * @api
  *
@@ -26,5 +28,5 @@ interface SmsSender
      * @param  string  $message
      * @return void
      */
-    public function send(string $phoneNumber, #[\SensitiveParameter] string $message): void;
+    public function send(#[\SensitiveParameter] string $phoneNumber, #[\SensitiveParameter] string $message): void;
 }

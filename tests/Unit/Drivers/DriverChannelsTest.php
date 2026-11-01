@@ -4,16 +4,19 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
-use Illuminate\Contracts\Mail\Mailer;
+use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
+use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\RecoveryCodes\BackupCodeDriver;
-use SineMacula\Laravel\Mfa\Testing\FakeSmsGateway;
+use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
+use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
+use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\TestCase;
@@ -43,9 +46,9 @@ final class DriverChannelsTest extends TestCase
     public function testEachDriverStatesItsChannelKindAndAmr(): void
     {
         $drivers = [
-            'totp'        => new TotpDriver,
-            'sms'         => new SmsDriver(new FakeSmsGateway),
-            'email'       => new EmailDriver(self::createStub(Mailer::class)),
+            'totp'        => new TotpDriver(new TotpSettings(new Repository), new Container),
+            'sms'         => new SmsDriver(new FakeSmsSender),
+            'email'       => new EmailDriver(new FakeEmailSender),
             'backup_code' => new BackupCodeDriver,
         ];
 
@@ -59,25 +62,22 @@ final class DriverChannelsTest extends TestCase
 
     /**
      * A TOTP factor is confirmed by the code its authenticator app shows now,
-     * and not by another.
+     * and not by another, nor by a factor with no secret.
      *
      * @return void
      *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
+     * @throws \Random\RandomException
      */
     public function testATotpFactorIsConfirmedByItsCurrentCode(): void
     {
-        $google2fa = new Google2FA;
-        $driver    = new TotpDriver;
-        $secret    = $driver->startEnrollment(new TotpStubFactor(null));
-        $factor    = new TotpStubFactor($secret);
-        $code      = $google2fa->getCurrentOtp($secret);
+        $driver = new TotpDriver(new TotpSettings(new Repository), new Container);
+        $secret = $driver->startEnrollment(new TotpStubFactor(null));
+        $factor = new TotpStubFactor($secret);
+        $code   = AuthenticatorApp::code($factor);
 
-        self::assertTrue($driver->confirm($factor, $code));
         self::assertFalse($driver->confirm($factor, $code === '000000' ? '111111' : '000000'));
         self::assertFalse($driver->confirm(new TotpStubFactor(null), $code));
+        self::assertTrue($driver->confirm($factor, $code));
     }
 
     /**

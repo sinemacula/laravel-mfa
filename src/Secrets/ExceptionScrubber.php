@@ -18,16 +18,25 @@ namespace SineMacula\Laravel\Mfa\Secrets;
  * What the package passes on travels further down the stack, and up it too: a
  * facade call records the code in the facade's frame, and the code the package
  * hands to a hasher or an encrypter is recorded again in every frame below. So
- * every string the package's frames received, and every value any frame marks
- * as sensitive (a `\SensitiveParameterValue` or a `RevealedSecret`), is
- * redacted wherever it appears in another frame: a string equal to one, and a
- * string containing one of six characters or more. Other arguments are kept,
- * with the secrets in them redacted as `Redactor` redacts a log context, and
- * objects are kept as they are.
+ * every string the package's frames received, every value any frame marks as
+ * sensitive (a `\SensitiveParameterValue` or a `RevealedSecret`), and every
+ * value under a key naming a secret, a code or a destination is collected
+ * before anything is scrubbed, and redacted wherever it appears in another
+ * frame: a string equal to one, and a string containing one of six characters
+ * or more. A code message (an `MfaCodeMessage`, or a queued job sending one)
+ * becomes `[redacted]` in every frame, and its code and its recipients'
+ * addresses are redacted from any string containing them, whatever their
+ * length. Other arguments are kept, with the secrets in them redacted as
+ * `Redactor` redacts a log context, and other objects are kept as they are.
  *
- * An `otpauth://` provisioning URI in an exception's message is redacted too.
- * The exception and every previous one are scrubbed in place, and what one of
- * them passed on is redacted in all of them.
+ * The values collected are redacted from the message of every exception in the
+ * chain too, each occurrence replaced by `[redacted]`, and so is every
+ * `otpauth://` provisioning URI. A caller that knows what it handed down, as
+ * the delivery of a code does, gives those values to `scrub()`: they are
+ * redacted from every message and every frame, whatever their length, and do
+ * not depend on PHP recording arguments at all. The exception and every
+ * previous one are scrubbed in place, and what one of them passed on is
+ * redacted in all of them.
  *
  * The package scrubs every exception the application's exception handler
  * reports, and every exception in a log record's context, unless
@@ -53,28 +62,79 @@ final class ExceptionScrubber
 
     /**
      * Scrub the message and the trace of the exception and of every previous
-     * one.
+     * one, redacting the values known to be sensitive too, whatever their
+     * length.
      *
      * @param  \Throwable  $throwable
+     * @param  ?string  ...$known
      * @return void
      */
-    public static function scrub(\Throwable $throwable): void
+    public static function scrub(\Throwable $throwable, #[\SensitiveParameter] ?string ...$known): void
+    {
+        self::scrubWith($throwable, SensitiveValues::known(...$known));
+    }
+
+    /**
+     * Scrub the message and the trace of the exception and of every previous
+     * one, redacting the sensitive values given too, each as its kind is
+     * redacted: those a log record holds, for an exception logged with it.
+     *
+     * @param  \Throwable  $throwable
+     * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $sensitive
+     * @return void
+     *
+     * @internal
+     */
+    public static function scrubWith(\Throwable $throwable, #[\SensitiveParameter] SensitiveValues $sensitive): void
     {
         $chain  = self::chain($throwable);
-        $passed = [];
+        $values = self::collect($chain)->with($sensitive);
+
+        foreach ($chain as $current) {
+            self::scrubMessage($current, $values);
+            self::scrubTrace($current, $values);
+        }
+    }
+
+    /**
+     * The sensitive values the exception and every previous one recorded in
+     * their traces, as `scrub()` collects them, read without scrubbing
+     * anything, so a log record's message copied from the exception's can be
+     * redacted of them first.
+     *
+     * @param  \Throwable  $throwable
+     * @return \SineMacula\Laravel\Mfa\Secrets\SensitiveValues
+     *
+     * @internal
+     */
+    public static function sensitiveValuesOf(\Throwable $throwable): SensitiveValues
+    {
+        return self::collect(self::chain($throwable));
+    }
+
+    /**
+     * The sensitive values recorded in the traces of the chain.
+     *
+     * @param  list<\Throwable>  $chain
+     * @return \SineMacula\Laravel\Mfa\Secrets\SensitiveValues
+     */
+    private static function collect(array $chain): SensitiveValues
+    {
+        $values = SensitiveValues::none();
 
         foreach ($chain as $current) {
             foreach (self::traceOf($current) as $frame) {
-                array_push($passed, ...self::passedOn($frame));
+                $arguments = $frame['args'] ?? null;
+
+                if (!is_array($arguments)) {
+                    continue;
+                }
+
+                $values = $values->with(SensitiveValues::inArguments($arguments, self::touchesThePackage($frame)));
             }
         }
 
-        $passed = array_values(array_unique($passed));
-
-        foreach ($chain as $current) {
-            self::scrubMessage($current);
-            self::scrubTrace($current, $passed);
-        }
+        return $values;
     }
 
     /**
@@ -108,98 +168,42 @@ final class ExceptionScrubber
     }
 
     /**
-     * The strings the frame passed on that must not appear in any frame: every
-     * string among the arguments of a frame that touches the package, and every
-     * value any frame marks as sensitive.
-     *
-     * @param  array<string, mixed>  $frame
-     * @return list<string>
-     */
-    private static function passedOn(array $frame): array
-    {
-        $arguments = $frame['args'] ?? null;
-
-        return is_array($arguments) ? self::stringsIn($arguments, self::touchesThePackage($frame), 0) : [];
-    }
-
-    /**
-     * The strings in the value worth redacting elsewhere: every one when all
-     * are, and otherwise only those a sensitive value holds.
-     *
-     * @param  mixed  $value
-     * @param  bool  $all
-     * @param  int  $depth
-     * @return list<string>
-     */
-    private static function stringsIn(mixed $value, bool $all, int $depth): array
-    {
-        if ($depth > Redactor::MAX_DEPTH) {
-            return [];
-        }
-
-        return match (true) {
-            $value instanceof \SensitiveParameterValue => self::stringsIn($value->getValue(), true, $depth + 1),
-            $value instanceof RevealedSecret           => self::stringsIn($value->reveal(), true, $depth + 1),
-            is_string($value)                          => $all && $value !== '' && $value !== RevealedSecret::REDACTED ? [$value] : [],
-            is_array($value)                           => self::stringsInEach($value, $all, $depth),
-            default                                    => [],
-        };
-    }
-
-    /**
-     * The strings worth redacting elsewhere in each item of the array.
-     *
-     * @param  array<array-key, mixed>  $values
-     * @param  bool  $all
-     * @param  int  $depth
-     * @return list<string>
-     */
-    private static function stringsInEach(array $values, bool $all, int $depth): array
-    {
-        $strings = [];
-
-        foreach ($values as $value) {
-            array_push($strings, ...self::stringsIn($value, $all, $depth + 1));
-        }
-
-        return $strings;
-    }
-
-    /**
-     * Redact every provisioning URI in the exception's message.
+     * Redact every sensitive value and every provisioning URI in the
+     * exception's message.
      *
      * @param  \Throwable  $throwable
+     * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $values
      * @return void
      */
-    private static function scrubMessage(\Throwable $throwable): void
+    private static function scrubMessage(\Throwable $throwable, SensitiveValues $values): void
     {
-        self::property($throwable, 'message')->setValue($throwable, Redactor::redactString($throwable->getMessage())); // NOSONAR
+        self::property($throwable, 'message')->setValue($throwable, Redactor::redactMessage($throwable->getMessage(), $values)); // NOSONAR
     }
 
     /**
      * Scrub the arguments recorded in the exception's own trace.
      *
      * @param  \Throwable  $throwable
-     * @param  list<string>  $passed
+     * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $values
      * @return void
      */
-    private static function scrubTrace(\Throwable $throwable, array $passed): void
+    private static function scrubTrace(\Throwable $throwable, SensitiveValues $values): void
     {
-        $trace = array_map(static fn (array $frame): array => self::scrubFrame($frame, $passed), self::traceOf($throwable));
+        $trace = array_map(static fn (array $frame): array => self::scrubFrame($frame, $values), self::traceOf($throwable));
 
         self::property($throwable, 'trace')->setValue($throwable, $trace); // NOSONAR
     }
 
     /**
      * The frame with its arguments scrubbed: all of them for a frame that
-     * touches the package; for any other, the secrets in them and the values
-     * passed on.
+     * touches the package; for any other, the secrets in them and the sensitive
+     * values collected.
      *
      * @param  array<string, mixed>  $frame
-     * @param  list<string>  $passed
+     * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $values
      * @return array<string, mixed>
      */
-    private static function scrubFrame(array $frame, array $passed): array
+    private static function scrubFrame(array $frame, SensitiveValues $values): array
     {
         if (!isset($frame['args']) || !is_array($frame['args'])) {
             return $frame;
@@ -207,7 +211,7 @@ final class ExceptionScrubber
 
         $frame['args'] = self::touchesThePackage($frame)
             ? array_map(static fn (): string => RevealedSecret::REDACTED, $frame['args'])
-            : Redactor::arguments($frame['args'], $passed);
+            : Redactor::arguments($frame['args'], $values);
 
         return $frame;
     }

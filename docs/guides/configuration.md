@@ -26,16 +26,18 @@ between requests.
 | `recovery_codes.table`          | `mfa_recovery_codes`               | a table name                           | `MFA_RECOVERY_CODES_TABLE`          | yes     |
 | `attempts.table`                | `mfa_attempts`                     | a table name                           | `MFA_ATTEMPTS_TABLE`                | yes     |
 | `passkeys.table`                | `mfa_passkey_associations`         | a table name                           | `MFA_PASSKEYS_TABLE`                | yes     |
-| `totp.algorithm`                | `sha1`                             | `sha1`, `sha256`, `sha512`             | `MFA_TOTP_ALGORITHM`                | not yet |
-| `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   | not yet |
-| `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   | not yet |
+| `totp.algorithm`                | `sha1`                             | `sha1`, `sha256`, `sha512`             | `MFA_TOTP_ALGORITHM`                | yes     |
+| `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   | yes     |
+| `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   | yes     |
 | `totp.window`                   | `1`                                | 0 to 3 steps                           | `MFA_TOTP_WINDOW`                   | yes     |
 | `codes.length`                  | `6`                                | 6 to 10 digits                         | `MFA_CODES_LENGTH`                  | yes     |
 | `codes.ttl_minutes`             | `10`                               | 1 to 10 minutes                        | `MFA_CODES_TTL_MINUTES`             | yes     |
-| `codes.resend_cooldown_seconds` | `60`                               | 0 to the code lifetime                 | `MFA_CODES_RESEND_COOLDOWN_SECONDS` | not yet |
-| `codes.factor_send_limit`       | `5`                                | 1 to 50                                | `MFA_CODES_FACTOR_SEND_LIMIT`       | not yet |
-| `codes.identity_send_limit`     | `10`                               | 1 to 100                               | `MFA_CODES_IDENTITY_SEND_LIMIT`     | not yet |
-| `codes.send_window_minutes`     | `60`                               | 1 to 1440 minutes                      | `MFA_CODES_SEND_WINDOW_MINUTES`     | not yet |
+| `codes.max_attempts`            | `5`                                | 1 to 10                                | `MFA_CODES_MAX_ATTEMPTS`            | yes     |
+| `codes.challenge_ttl_minutes`   | `30`                               | the code lifetime to 60 minutes        | `MFA_CODES_CHALLENGE_TTL_MINUTES`   | yes     |
+| `codes.resend_cooldown_seconds` | `60`                               | 0 to the code lifetime                 | `MFA_CODES_RESEND_COOLDOWN_SECONDS` | yes     |
+| `codes.factor_send_limit`       | `5`                                | 1 to 50                                | `MFA_CODES_FACTOR_SEND_LIMIT`       | yes     |
+| `codes.identity_send_limit`     | `10`                               | 1 to 100                               | `MFA_CODES_IDENTITY_SEND_LIMIT`     | yes     |
+| `codes.send_window_minutes`     | `60`                               | 1 to 1440 minutes                      | `MFA_CODES_SEND_WINDOW_MINUTES`     | yes     |
 | `codes.sms_message`             | `Your verification code is: :code` | carries `:code`                        | `MFA_CODES_SMS_MESSAGE`             | yes     |
 | `codes.mailable`                | `Codes\MfaCodeMessage`             | `MfaCodeMessage` or a subclass         |                                     | yes     |
 | `recovery_codes.count`          | `10`                               | 1 to 50                                | `MFA_RECOVERY_CODES_COUNT`          | yes     |
@@ -43,11 +45,11 @@ between requests.
 | `recovery_codes.alphabet`       | `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` | see [Recovery codes](#recovery-codes)  | `MFA_RECOVERY_CODES_ALPHABET`       | yes     |
 | `recovery_codes.low_count`      | `3`                                | 0 to the set's size                    | `MFA_RECOVERY_CODES_LOW_COUNT`      | not yet |
 | `attempts.factor_limit`         | `5`                                | 1 to 20                                | `MFA_ATTEMPTS_FACTOR_LIMIT`         | yes     |
-| `attempts.identity_limit`       | `20`                               | 1 to 100                               | `MFA_ATTEMPTS_IDENTITY_LIMIT`       | not yet |
-| `attempts.ip_limit`             | `100`                              | 1 to 10000                             | `MFA_ATTEMPTS_IP_LIMIT`             | not yet |
-| `attempts.window_seconds`       | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_WINDOW_SECONDS`       | not yet |
+| `attempts.identity_limit`       | `20`                               | 1 to 100                               | `MFA_ATTEMPTS_IDENTITY_LIMIT`       | yes     |
+| `attempts.ip_limit`             | `100`                              | 1 to 10000                             | `MFA_ATTEMPTS_IP_LIMIT`             | yes     |
+| `attempts.window_seconds`       | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_WINDOW_SECONDS`       | yes     |
 | `attempts.lockout_seconds`      | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_LOCKOUT_SECONDS`      | yes     |
-| `attempts.failure_ceiling`      | `100`                              | 1 to 100                               | `MFA_ATTEMPTS_FAILURE_CEILING`      | not yet |
+| `attempts.failure_ceiling`      | `100`                              | 1 to 100                               | `MFA_ATTEMPTS_FAILURE_CEILING`      | yes     |
 | `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        | not yet |
 | `proofs.max_age_minutes`        | `20160`                            | 0 to 525600 minutes                    | `MFA_PROOFS_MAX_AGE_MINUTES`        | yes     |
 | `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    | not yet |
@@ -83,10 +85,11 @@ name:
 ],
 ```
 
-No flow reads an application's block yet: every key below is checked, but none is applied. Until the flows that read
-them ship, the shipped drivers verify a factor of any type whichever application asks, no factor is required by this
-configuration alone, the TOTP driver accepts `totp.window` steps for every application, and the limits and freshness
-are not enforced. Use your own policy binding (`Contracts\MfaPolicy`) and routes to decide who must verify.
+Every key below is checked, but only `totp_window` is applied yet: the TOTP driver accepts the window of the
+application a bound `Contracts\ApplicationResolver` names for the request, and `totp.window` when none is bound. Until
+the flows that read the other keys ship, the shipped drivers verify a factor of any type whichever application asks, no
+factor is required by this configuration alone, and the limits and freshness are not enforced. Use your own policy
+binding (`Contracts\MfaPolicy`) and routes to decide who must verify.
 
 | Key                         | Default                   | Meaning                                                                                                                                |
 |-----------------------------|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
@@ -126,10 +129,11 @@ no level, so every configured application must either declare one or have a `Con
 which an authentication layer's adapter provides; with neither, the configuration check fails. The channel `unknown`
 is refused, as it declares nothing.
 
-Each code type an application enables needs something to deliver its codes: `sms` a `Contracts\SmsGateway` other than
-the package's `NullSmsGateway`, and `email` a mailer bound in the container (looked up, not built, so the check builds
-no mail transport). Enabling one without it fails the configuration check, rather than the first send. A binding the
-container cannot build, such as a gateway bound to a class that does not exist, is reported under the application too.
+Each code type an application enables needs something to deliver its codes: `sms` a `Contracts\SmsSender` other than
+the package's `NullSmsSender`, and `email` a `Contracts\EmailSender` other than its `NullEmailSender` (bind
+`Codes\MailEmailSender` to send through Laravel's mailer), and either needs the application key its codes are hashed
+with. Enabling one without them fails the configuration check, rather than the first send. A binding the container
+cannot build, such as a sender bound to a class that does not exist, is reported under the application too.
 
 ## Storage
 
@@ -224,12 +228,20 @@ replaced.
 ],
 ```
 
-`algorithm`, `digits` and `period` are the parameters new TOTP enrolments will use; the defaults (SHA-1, 6 digits, 30
-seconds) are what authenticator apps expect, and they are what the TOTP driver uses today whatever is set, as these
-three are not applied yet. A period is at most 120 seconds. `window` is the number of time steps either side of
-the current one a code is accepted for, absorbing clock skew and entry delay, for an application that sets no
-`totp_window` of its own. It is at most 3; the default of 1 follows RFC 6238, which recommends allowing at most one step
-for transmission delay.
+`algorithm`, `digits` and `period` are the parameters new TOTP enrolments use. The defaults (SHA-1, 6 digits, 30
+seconds) are what authenticator apps expect; some apps ignore other values and show codes that never match, so change
+them only for apps you know honour them. Each factor stores the parameters it was enrolled with, so changing them
+affects only enrolments started afterwards: existing factors keep working as they were. A period is at most 120
+seconds. A new factor's secret is random and as long as the algorithm's output: 20 bytes for SHA-1, 32 for SHA-256 and
+64 for SHA-512.
+
+`window` is the number of time steps either side of the current one a code is accepted for, absorbing clock skew and
+entry delay, for an application that sets no `totp_window` of its own, and for every request when no
+`Contracts\ApplicationResolver` is bound. It is at most 3; the default of 1 follows RFC 6238, which recommends allowing
+at most one step for transmission delay. The window never widens after failures, and the package does not resynchronise
+a drifting clock. Each time step is accepted once per factor: a code for the step last accepted, or an earlier one, is
+refused even inside the window, so the code that confirmed a factor cannot be used again (see
+[the TOTP design note](../design/totp.md)).
 
 ## Delivered codes
 
@@ -237,6 +249,8 @@ for transmission delay.
 'codes' => [
     'length'                  => env('MFA_CODES_LENGTH', 6),
     'ttl_minutes'             => env('MFA_CODES_TTL_MINUTES', 10),
+    'max_attempts'            => env('MFA_CODES_MAX_ATTEMPTS', 5),
+    'challenge_ttl_minutes'   => env('MFA_CODES_CHALLENGE_TTL_MINUTES', 30),
     'resend_cooldown_seconds' => env('MFA_CODES_RESEND_COOLDOWN_SECONDS', 60),
     'factor_send_limit'       => env('MFA_CODES_FACTOR_SEND_LIMIT', 5),
     'identity_send_limit'     => env('MFA_CODES_IDENTITY_SEND_LIMIT', 10),
@@ -247,11 +261,25 @@ for transmission delay.
 ```
 
 A code sent by SMS or email has `length` digits, at least 6, and works for `ttl_minutes` after it is sent, at most 10.
-`resend_cooldown_seconds` is how long after a code is sent another may be sent to the same factor, never longer than the
-code's lifetime, and `factor_send_limit` and `identity_send_limit` cap how many one factor and one identity, across its
-factors and sessions, are sent within `send_window_minutes`; these four are checked but not applied yet, so nothing
-limits sending until the flow that applies them ships. `sms_message` is the SMS text, which must carry the `:code`
-placeholder the code replaces, and `mailable` the email message class, `Codes\MfaCodeMessage` or a subclass of it.
+It belongs to a challenge: one factor, session, application and purpose. `max_attempts` is how many codes may be checked
+against one challenge; a resend sends a new code for the same challenge and keeps the attempts already made, so asking
+for another code never brings more guesses. `challenge_ttl_minutes` is how long a challenge's resends may run from its
+first code, at least the code lifetime and at most 60 minutes: no code of the challenge works past it, and the next send
+after it starts a new challenge. `resend_cooldown_seconds` is how long after a code is sent another may be sent for the
+same challenge, never longer than the code's lifetime, and `factor_send_limit` and `identity_send_limit` cap how many
+codes one factor and one identity, across its factors and sessions, are sent within `send_window_minutes`, resends
+included. `sms_message` is the SMS text, which must carry the `:code` placeholder the code replaces, and `mailable` the
+email message class, `Codes\MfaCodeMessage` or a subclass of it, whose queued payload is always encrypted.
+
+Each send counts towards the caps for `send_window_minutes` from when it was made, and a refused send answers
+`sending_capped` with the seconds until another may be sent (see [Delivered codes](../design/delivered-codes.md)).
+Codes are stored as keyed hashes of the code and its binding, with a key derived from `app.key`; rotating the
+application key only invalidates the codes outstanding.
+
+A code is sent and checked within the request's Laravel session, whose id it is bound to: the challenge and the
+verification must run in the same started session (the `StartSession` middleware), so stateless requests, such as a
+token-authenticated API, cannot use email or SMS codes. A session regenerated between the two, as at sign-in, leaves the
+code behind, and the check answers `expired`.
 
 ## Recovery codes
 
@@ -286,12 +314,16 @@ is 3, or the set's size when that is smaller. It is checked but not applied yet.
 ],
 ```
 
-`factor_limit` failed attempts in a row lock a factor, of any type, for `lockout_seconds`. These two are applied today.
-`identity_limit` failed attempts across an identity's factors and recovery codes, and `ip_limit` from one IP address,
-within `window_seconds`, are to lock the identity and throttle the address, and `failure_ceiling` consecutive failures
-are to disable a factor until the person proves another, it is rebound or the identity is reset; it is at most 100, the
-most NIST SP 800-63B-4 allows. These four are checked but not applied yet: until they are, only the per-factor lockout
-limits guessing.
+`factor_limit` failed attempts in a row lock a factor, of any type, for `lockout_seconds`. The count is durable: only a
+success of that factor resets it, so once it has reached the limit every further failure locks the factor again.
+`identity_limit` failed attempts across an identity's factors and recovery codes within `window_seconds` lock the
+identity for `lockout_seconds`, and `ip_limit` from one IP address within `window_seconds` throttle the address until
+its window ends. `failure_ceiling` consecutive failures of one factor disable it until the person proves another factor,
+it is rebound or the identity is reset; it is at most 100, the most NIST SP 800-63B-4 allows. The identity's own
+consecutive failures, across its factors and recovery codes, meet the same ceiling: from there each failure disables
+the factor it was made against, and attempts that name no factor (recovery codes) are refused. A refused attempt counts
+nowhere, so it never extends a lockout or a throttle, and sending a code resets nothing. Every counter, what resets it
+and when it expires is set out in [Attempts and lockouts](attempts.md).
 
 ## Enrolment
 
@@ -313,8 +345,9 @@ that. It is checked but not applied yet.
 ```
 
 `max_age_minutes` is how long a recorded verification counts before the person must verify again, 14 days by default
-and at most a year. With `0` none counts, so the `mfa` middleware refuses every request; use its step-up parameter to
-require a fresh verification for one route group instead.
+and at most a year: the `mfa` middleware's window when the route gives none, judged on the newest factor or recovery
+code proof of the current sign-in (see [Recorded proofs](proofs.md)). With `0` none counts, so the `mfa` middleware
+refuses every request; use its step-up parameter to require a fresh verification for one route group instead.
 
 ## Lifecycle
 

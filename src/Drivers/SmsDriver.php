@@ -4,26 +4,24 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
+use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Codes\CodeSettings;
-use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
-use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 
 /**
  * SMS factor driver.
  *
- * Issues one-time codes through a consumer-provided `SmsGateway` and verifies
- * them in constant time. The default gateway binding is `NullSmsGateway`, which
- * throws to surface the missing provider wiring to the developer rather than
- * silently dropping codes.
+ * Delivers each code to the factor's phone number in the configured message
+ * through the application's `SmsSender`. The default sender throws until the
+ * application binds one, so a code is never dropped silently.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
-final class SmsDriver extends AbstractOtpDriver
+final class SmsDriver extends AbstractCodeDriver
 {
-    /** @var string Placeholder in the message template, replaced with the issued code at dispatch. */
+    /** @var string Placeholder in the message template, replaced with the code. */
     private const string CODE_PLACEHOLDER = CodeSettings::CODE_PLACEHOLDER;
 
     /**
@@ -33,31 +31,17 @@ final class SmsDriver extends AbstractOtpDriver
      * `mfa.codes.sms_message`, which the package checks carries the
      * `CODE_PLACEHOLDER` when it boots (see `Codes\CodeSettings`).
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\SmsGateway  $gateway
+     * @param  \SineMacula\Laravel\Mfa\Contracts\SmsSender  $sender
      * @param  string  $messageTemplate
-     * @param  int  $codeLength
-     * @param  int  $expiry
-     * @param  ?callable(int, int): int  $randomInt
      */
     public function __construct(
 
-        /** SMS gateway implementation that delivers the rendered message. */
-        private readonly SmsGateway $gateway,
+        /** The sender the message is delivered through. */
+        private readonly SmsSender $sender,
 
         /** Message template; the code replaces its `CODE_PLACEHOLDER`. */
         private readonly string $messageTemplate = 'Your verification code is: ' . self::CODE_PLACEHOLDER,
-
-        // Generated code length; passthrough to `AbstractOtpDriver`.
-        int $codeLength = 6,
-
-        // Code lifetime in minutes; passthrough to `AbstractOtpDriver`.
-        int $expiry = 10,
-
-        // Randomness seam; passthrough to `AbstractOtpDriver`.
-        ?callable $randomInt = null,
-    ) {
-        parent::__construct($codeLength, $expiry, $randomInt);
-    }
+    ) {}
 
     /**
      * A code sent by SMS to the factor's phone number.
@@ -92,26 +76,16 @@ final class SmsDriver extends AbstractOtpDriver
     }
 
     /**
-     * Dispatch the code to the factor's destination phone number via the bound
-     * SMS gateway.
+     * Deliver the message carrying the code to the phone number.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  string  $destination
      * @param  string  $code
+     * @param  \Carbon\CarbonImmutable  $expiresAt
      * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException
      */
     #[\Override]
-    protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void
+    protected function send(#[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
     {
-        $destination = $factor->getDestination();
-
-        if ($destination === null || $destination === '') {
-            throw new MissingDestinationException('SMS factor has no destination configured; cannot deliver code.');
-        }
-
-        $message = str_replace(self::CODE_PLACEHOLDER, $code, $this->messageTemplate);
-
-        $this->gateway->send($destination, $message);
+        $this->sender->send($destination, str_replace(self::CODE_PLACEHOLDER, $code, $this->messageTemplate));
     }
 }

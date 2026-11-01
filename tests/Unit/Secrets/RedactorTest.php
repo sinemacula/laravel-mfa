@@ -4,13 +4,17 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Secrets;
 
+use Illuminate\Mail\Mailable;
+use Illuminate\Mail\SendQueuedMailable;
 use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Secrets\Redactor;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
+use SineMacula\Laravel\Mfa\Secrets\SensitiveValues;
 use Tests\Fixtures\Secrets\ForgedTrace;
 
 /**
@@ -49,6 +53,13 @@ final class RedactorTest extends TestCase
         yield 'recovery codes with hyphens' => ['recovery-codes'];
         yield 'recovery codes with spaces' => ['recovery codes'];
         yield 'destination' => ['destination'];
+        yield 'address' => ['address'];
+        yield 'email' => ['email'];
+        yield 'phone' => ['phone'];
+        yield 'phone number' => ['phone_number'];
+        yield 'phone number in camel case' => ['phoneNumber'];
+        yield 'to' => ['to'];
+        yield 'recipient' => ['recipient'];
         yield 'provisioning URI' => ['provisioning_uri'];
         yield 'otpauth URI' => ['otpauthUri'];
     }
@@ -78,6 +89,8 @@ final class RedactorTest extends TestCase
         yield 'status code' => ['status_code'];
         yield 'country code' => ['country_code'];
         yield 'masked destination' => ['masked_destination'];
+        yield 'email verified at' => ['email_verified_at'];
+        yield 'total' => ['total'];
         yield 'factor id' => ['factor_id'];
     }
 
@@ -304,21 +317,124 @@ final class RedactorTest extends TestCase
 
     /**
      * A trace's arguments keep their objects, and lose every string that is a
-     * value passed on, or contains one of six characters or more.
+     * value collected, or contains one of six characters or more, and every
+     * string containing a value known to be sensitive, whatever its length.
      *
      * @return void
      */
-    public function testRedactsTheValuesPassedOnFromATracesArguments(): void
+    public function testRedactsTheSensitiveValuesFromATracesArguments(): void
     {
         $object    = (object) ['secret' => self::SECRET];
-        $arguments = [$object, '482915', 'code 482915 sent', 'sms gateway', 'sms', 'harmless', ['secret' => 'x', 'note' => 'otpauth://totp/A?secret=B']];
+        $arguments = [$object, '482915', 'code 482915 sent', 'sms gateway', 'sms', 'harmless', ['secret' => 'x', 'note' => 'otpauth://totp/A?secret=B'], 'Your code is 4821'];
+        $values    = SensitiveValues::inArguments(['482915', 'sms'], true)->with(SensitiveValues::known('4821'));
 
         self::assertSame(
-            [$object, '[redacted]', '[redacted]', 'sms gateway', '[redacted]', 'harmless', ['secret' => '[redacted]', 'note' => '[redacted]']],
-            Redactor::arguments($arguments, ['482915', 'sms']),
+            [$object, '[redacted]', '[redacted]', 'sms gateway', '[redacted]', 'harmless', ['secret' => '[redacted]', 'note' => '[redacted]'], '[redacted]'],
+            Redactor::arguments($arguments, $values),
         );
 
         self::assertSame(['482915'], Redactor::arguments(['482915']));
+    }
+
+    /**
+     * A code message, or a queued job sending one, is redacted from a trace's
+     * arguments and from a log's values, nested in an array too; a job sending
+     * another message is kept in a trace.
+     *
+     * @return void
+     */
+    public function testRedactsCodeMessages(): void
+    {
+        $message = (new MfaCodeMessage('482915', 10))->to('ada@example.test');
+        $other   = new SendQueuedMailable(new Mailable);
+
+        self::assertSame(['[redacted]', ['[redacted]'], $other], Redactor::arguments([$message, [new SendQueuedMailable($message)], $other]));
+        self::assertSame(['message' => '[redacted]', 'nested' => ['[redacted]']], Redactor::redact(['message' => $message, 'nested' => [new SendQueuedMailable($message)]]));
+    }
+
+    /**
+     * Normalising turns each object into its logged form, keyed by its class,
+     * and keeps secret values, code messages, exceptions, dates and enums, and
+     * scalars, as they are, bounded as the redaction is.
+     *
+     * @return void
+     */
+    public function testNormalisesObjectsIntoTheirLoggedForm(): void
+    {
+        $secret    = new RevealedSecret(self::SECRET);
+        $message   = new MfaCodeMessage('482915', 10);
+        $exception = new \RuntimeException('Failed.');
+        $date      = new \DateTimeImmutable('2026-11-01');
+
+        self::assertSame(
+            [
+                'payload' => [\stdClass::class => ['code' => '482915', 'inner' => [Collection::class => ['kept']]]],
+                'kept'    => [$secret, $message, $exception, $date, FailureReason::LOCKED, 'text', 42],
+            ],
+            Redactor::normalise([
+                'payload' => (object) ['code' => '482915', 'inner' => new Collection(['kept'])],
+                'kept'    => [$secret, $message, $exception, $date, FailureReason::LOCKED, 'text', 42],
+            ]),
+        );
+
+        self::assertSame($this->nested('[truncated]', 11), Redactor::normalise($this->nested([], 11)));
+        self::assertSame($this->nested([\stdClass::class => '[truncated]'], 10), Redactor::normalise($this->nested(new \stdClass, 10)));
+        self::assertCount(1001, Redactor::normalise(range(1, 1001)));
+        self::assertSame('[truncated]', Redactor::normalise(range(1, 1001))['...']);
+    }
+
+    /**
+     * Values already normalised are redacted as they are, and a logged
+     * exception among them is scrubbed of the values given.
+     *
+     * @return void
+     */
+    public function testRedactsNormalisedValues(): void
+    {
+        $exception = new \RuntimeException('Rejected 482915');
+
+        self::assertSame(
+            ['payload' => [\stdClass::class => ['code' => '[redacted]']], 'exception' => $exception, 'deep' => $this->nested('[truncated]', 10)],
+            Redactor::redactNormalised(
+                ['payload' => [\stdClass::class => ['code' => '482915']], 'exception' => $exception, 'deep' => $this->nested([], 10)],
+                SensitiveValues::known('482915'),
+            ),
+        );
+        self::assertSame('Rejected [redacted]', $exception->getMessage());
+    }
+
+    /**
+     * A logged exception is scrubbed of the sensitive values given too, while
+     * the strings beside it are kept, and a log's own strings are not matched
+     * against them.
+     *
+     * @return void
+     */
+    public function testScrubsALoggedExceptionOfTheValuesGiven(): void
+    {
+        $exception = new \RuntimeException('Rejected 482915', 0, new \LogicException('Previously 482915'));
+
+        $redacted = Redactor::redact(['exception' => $exception, 'note' => 'Rejected 482915'], SensitiveValues::inArguments(['482915'], true));
+
+        self::assertSame(['exception' => $exception, 'note' => 'Rejected 482915'], $redacted);
+        self::assertSame('Rejected [redacted]', $exception->getMessage());
+        self::assertSame('Previously [redacted]', $exception->getPrevious()?->getMessage());
+    }
+
+    /**
+     * A message loses every occurrence of the sensitive values in it, and every
+     * provisioning URI.
+     *
+     * @return void
+     */
+    public function testRedactsAMessage(): void
+    {
+        $values = SensitiveValues::known('4821', 'ada@example.test');
+
+        self::assertSame(
+            'Sent [redacted] to [redacted] with [redacted]',
+            Redactor::redactMessage('Sent 4821 to ada@example.test with otpauth://totp/A?secret=' . self::SECRET, $values),
+        );
     }
 
     /**

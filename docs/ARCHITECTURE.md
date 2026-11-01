@@ -13,8 +13,9 @@ working.
 ### Standalone
 
 - Identity model implements `MultiFactorAuthenticatable`.
-- Default `SessionMfaVerificationStore` keeps verification state in the session (per-device by
-  construction).
+- Default `SessionProofStore` keeps each sign-in's proofs in the session (per-device by
+  construction), one sign-in per identity and application, begun on Laravel's `Login` event and
+  forgotten on `Logout` or `CurrentDeviceLogout`.
 - Works behind SessionGuard, Sanctum, Passport, or any custom guard whose `Auth::user()` returns
   a `MultiFactorAuthenticatable`. Sanctum integration is asserted by
   `tests/Integration/MultiAuthStackTest::testSanctumGuardSeesIdentityAndFactors`.
@@ -24,17 +25,17 @@ working.
 - The same identity model implements both `Identity` (from the auth package) and
   `MultiFactorAuthenticatable` (from this package). Both contracts extend Laravel's standard
   `Authenticatable`, so a single class satisfies both.
-- Verification state should live on the `Device` record (`last_mfa_verified_at`) because the auth
-  package is stateless. The seam is the `MfaVerificationStore` contract — paired-mode apps rebind
+- The session's proofs should live with the authentication package's session record, because the
+  auth package is stateless. The seam is the `ProofStore` contract — paired-mode apps rebind
   it. This package must **never** import anything from `SineMacula\Laravel\Authentication\*`; the
   bridge is constructed in the consumer's service provider or in the `laravel-iam` glue.
 
 ### Wrapped by `sinemacula/laravel-iam`
 
-- Parent package provides: a `DeviceMfaVerificationStore` binding (lives in `laravel-iam`, not
-  this repo), an opinionated `OrganisationMfaPolicy` bound against the `MfaPolicy` contract,
+- Parent package provides: a `ProofStore` binding over the authentication session (lives in
+  `laravel-iam`, not this repo), an opinionated `OrganisationMfaPolicy` bound against the `MfaPolicy` contract,
   cross-package event listeners (audit log), and any other opinionated defaults.
-- This repo stays clean of parent-package knowledge. The extension seams (policy, store, gateway)
+- This repo stays clean of parent-package knowledge. The extension seams (policy, store, senders)
   must be expressive enough that the parent package does not need to monkey-patch.
 
 ---
@@ -48,17 +49,22 @@ Historical record of the architectural calls made during the 1.0 cycle.
   policy (org-aware, role-aware, feature-flag-aware). `laravel-iam` ships an opinionated
   `OrganisationMfaPolicy` at its layer. The MFA package never learns the word "organisation".
 - **D2 — Single `mfa_factors` table.** Columns include `attempts`, `locked_until`,
-  `last_attempted_at`, `verified_at`. No separate `mfa_attempts` log — audit goes through events,
-  owned by `laravel-audit-log`.
+  `last_attempted_at`. No separate `mfa_attempts` log — audit goes through events,
+  owned by `laravel-audit-log`. *Superseded:* failures are now counted durably on the factor and
+  identity state rows, with temporary throttles in `mfa_attempts` (see
+  [Attempts and Lockout](design/attempts-and-lockout.md)); audit still goes through events.
 - **D3 — Challenge split between manager and driver.** The verification service behind
   `MfaManager::challenge()` orchestrates (events, rate-limiting hooks, logging).
   `FactorDriver::issueChallenge(Factor): void` implements per-factor-type transport (no-op for TOTP,
   mail dispatch for email, gateway dispatch for SMS, no-op for backup codes since they are
-  pre-issued).
-- **D4 — Per-device verification is the default.** In paired mode the verification timestamp
-  lives on the `Device` record; in standalone mode it lives on the session (which is already
-  per-device). The step-up middleware (`mfa:N`) is the escape hatch for "re-verify before this
-  specific action regardless of device state".
+  pre-issued). Since superseded for email and SMS: their codes are bound to a session and purpose
+  the factor alone does not carry, so the package sends and checks them itself and the driver only
+  delivers each one (see [Delivered Codes](design/delivered-codes.md)).
+- **D4 — Per-device verification is the default.** A session's proofs are its own. In paired
+  mode they live in the authentication package's session record, through a rebound `ProofStore`;
+  in standalone mode they live in the Laravel session, through `SessionProofStore` (which is
+  already per-device). The step-up middleware (`mfa:N`) is the escape hatch for "re-verify before
+  this specific action regardless of device state".
 - **D5 — Built-in driver factories live in the capability bindings.** The four shipped drivers
   (TOTP, email, SMS, backup codes) are registered against the manager via the standard
   `Mfa::extend(...)` API from `Drivers\DriverBindings` and `RecoveryCodes\RecoveryCodeBindings`,
@@ -69,7 +75,7 @@ Historical record of the architectural calls made during the 1.0 cycle.
   `tests/Integration/CustomDriverExtensionTest::testConsumerCanOverrideBuiltInTotpDriver`.
 - **D6 — Lifecycle events are dispatched by the package's services behind the manager, not by
   consumer code.** Factor enrolment goes through `Mfa::enroll(Factor)`; factor removal goes through
-  `Mfa::disable(Factor)`. Both invalidate the identity's setup-state cache and dispatch
+  `Mfa::disable(Factor)`. Both finish their change and dispatch
   `MfaFactorEnrolled` / `MfaFactorDisabled` so audit subscribers do not have to rely on consumer
   cooperation. Five lifecycle events in total: `MfaChallengeIssued`, `MfaVerified`,
   `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`.
@@ -77,7 +83,8 @@ Historical record of the architectural calls made during the 1.0 cycle.
   column carries long-lived material (TOTP keys, hashed backup codes); the `code` column holds
   live OTPs during their expiry window. Encrypting both closes the read-only-DB-replay attack
   surface. Migration uses `text` for both so the encrypted ciphertext fits regardless of the
-  configured OTP length.
+  configured OTP length. Since superseded for `code`: delivered codes left the factor row for a
+  table of their own, stored only as keyed hashes (see [Delivered Codes](design/delivered-codes.md)).
 - **D8 — Test fixtures extend abstract stubs, not raw contracts.** `AbstractFactorStub` and
   `AbstractEloquentFactorStub` (in `tests/Fixtures/`) provide safe-default implementations of
   every `Factor` / `EloquentFactor` method. Anonymous test fixtures extend the relevant abstract

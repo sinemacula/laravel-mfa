@@ -4,54 +4,38 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
-use Illuminate\Contracts\Mail\Mailer;
+use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
-use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
+use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
-use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 
 /**
  * Email factor driver.
  *
- * Issues one-time codes via Laravel's mail subsystem and verifies them in
- * constant time. The shipped `MfaCodeMessage` Mailable carries an inline HTML
- * body so the package works with no published views; consumers who want a
- * branded email subclass the Mailable (or pass their own Mailable class via the
- * driver constructor) and override its `content()` to point at their own view.
+ * Delivers each code to the factor's email address in the configured message
+ * class (`MfaCodeMessage` or a subclass, whose queued payload is encrypted),
+ * through the application's `EmailSender`. The default sender throws until the
+ * application binds one.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
-final class EmailDriver extends AbstractOtpDriver
+final class EmailDriver extends AbstractCodeDriver
 {
     /**
      * Constructor.
      *
-     * @param  \Illuminate\Contracts\Mail\Mailer  $mailer
+     * @param  \SineMacula\Laravel\Mfa\Contracts\EmailSender  $sender
      * @param  class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>  $mailable
-     * @param  int  $codeLength
-     * @param  int  $expiry
-     * @param  ?callable(int, int): int  $randomInt
      */
     public function __construct(
 
-        /** Laravel mailer used to dispatch the outbound code. */
-        private readonly Mailer $mailer,
+        /** The sender the message is delivered through. */
+        private readonly EmailSender $sender,
 
-        /** Mailable class responsible for rendering the code email. */
+        /** The message class the code is delivered in. */
         private readonly string $mailable = MfaCodeMessage::class,
-
-        // Generated code length; passthrough to `AbstractOtpDriver`.
-        int $codeLength = 6,
-
-        // Code lifetime in minutes; passthrough to `AbstractOtpDriver`.
-        int $expiry = 10,
-
-        // Randomness seam; passthrough to `AbstractOtpDriver`.
-        ?callable $randomInt = null,
-    ) {
-        parent::__construct($codeLength, $expiry, $randomInt);
-    }
+    ) {}
 
     /**
      * A code sent by email to the factor's address.
@@ -65,7 +49,7 @@ final class EmailDriver extends AbstractOtpDriver
     }
 
     /**
-     * Get the configured Mailable class.
+     * Get the configured message class.
      *
      * @return class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>
      */
@@ -75,26 +59,19 @@ final class EmailDriver extends AbstractOtpDriver
     }
 
     /**
-     * Dispatch the Mailable to the factor's destination email.
+     * Deliver the code to the address in the message class, with the whole
+     * minutes, at least 1, it has left.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  string  $destination
      * @param  string  $code
+     * @param  \Carbon\CarbonImmutable  $expiresAt
      * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException
      */
     #[\Override]
-    protected function dispatch(EloquentFactor $factor, #[\SensitiveParameter] string $code): void
+    protected function send(#[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
     {
-        $destination = $factor->getDestination();
+        $minutes = max(1, (int) ceil(($expiresAt->getTimestamp() - CarbonImmutable::now()->getTimestamp()) / 60));
 
-        if ($destination === null || $destination === '') {
-            throw new MissingDestinationException('Email factor has no destination configured; cannot deliver code.');
-        }
-
-        /** @var \SineMacula\Laravel\Mfa\Codes\MfaCodeMessage $message */
-        $message = new ($this->mailable)($code, $this->getExpiry());
-
-        $this->mailer->to($destination)->send($message);
+        $this->sender->send($destination, new ($this->mailable)($code, $minutes));
     }
 }
