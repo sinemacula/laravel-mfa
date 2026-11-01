@@ -69,7 +69,7 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
 
         foreach ($parts as $requirement) {
             foreach ($requirement->maxAges as $part => $maxAge) {
-                $maxAges[$part] = array_key_exists($part, $maxAges) ? self::shorter($maxAges[$part], $maxAge) : $maxAge;
+                $maxAges[$part] = self::shorter($maxAges[$part] ?? $maxAge, $maxAge);
             }
 
             $level = self::higher($level, $requirement->minimumLevel);

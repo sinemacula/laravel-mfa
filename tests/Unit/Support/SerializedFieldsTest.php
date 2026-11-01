@@ -34,7 +34,7 @@ final class SerializedFieldsTest extends TestCase
             'empty'  => '',
             'bool'   => false,
             'int'    => 0,
-            'array'  => ['nested' => true],
+            'array'  => ['nested' => true, 'other' => 1],
             'list'   => [],
             'enum'   => 'hardware',
         ], 'a sample');
@@ -45,9 +45,9 @@ final class SerializedFieldsTest extends TestCase
         self::assertFalse($fields->nullableBool('bool'));
         self::assertSame(0, $fields->int('int'));
         self::assertSame(0, $fields->nullableInt('int'));
-        self::assertSame(['nested' => true], $fields->array('array'));
+        self::assertSame(['nested' => true, 'other' => 1], $fields->array('array'));
         self::assertSame([], $fields->array('list'));
-        self::assertSame(['nested' => true], $fields->nullableArray('array'));
+        self::assertSame(['nested' => true, 'other' => 1], $fields->nullableArray('array'));
         self::assertSame(KeyProtection::HARDWARE, $fields->enum('enum', KeyProtection::class));
         self::assertSame(KeyProtection::HARDWARE, $fields->nullableEnum('enum', KeyProtection::class));
     }

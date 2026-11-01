@@ -56,11 +56,13 @@ final class AssuranceLevelTest extends TestCase
         yield 'unclassified misses aal2' => [AssuranceLevel::UNCLASSIFIED, AssuranceLevel::AAL2, false];
         yield 'unclassified misses aal3' => [AssuranceLevel::UNCLASSIFIED, AssuranceLevel::AAL3, false];
         yield 'unclassified misses unclassified' => [AssuranceLevel::UNCLASSIFIED, AssuranceLevel::UNCLASSIFIED, false];
+        yield 'aal1 meets no minimum' => [AssuranceLevel::AAL1, AssuranceLevel::UNCLASSIFIED, true];
+        yield 'aal3 meets no minimum' => [AssuranceLevel::AAL3, AssuranceLevel::UNCLASSIFIED, true];
     }
 
     /**
-     * A level meets every minimum at or below it, and an unclassified level
-     * meets none.
+     * A level meets every minimum at or below it, an unclassified minimum
+     * included, and an unclassified level meets none.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $minimum

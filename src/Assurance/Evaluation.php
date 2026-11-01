@@ -123,18 +123,14 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
      */
     private static function assertAmr(array $amr): void
     {
-        $seen = [];
-
-        foreach ($amr as $value) {
+        foreach ($amr as $index => $value) {
             if (trim($value) === '') {
                 throw new \InvalidArgumentException('An amr value must not be blank.');
             }
 
-            if (isset($seen[$value])) {
+            if (array_search($value, $amr, true) !== $index) {
                 throw new \InvalidArgumentException(sprintf('The amr value [%s] is listed more than once.', $value));
             }
-
-            $seen[$value] = true;
         }
     }
 

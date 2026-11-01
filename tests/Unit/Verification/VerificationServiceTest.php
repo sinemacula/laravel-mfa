@@ -445,7 +445,7 @@ final class VerificationServiceTest extends TestCase
     public static function failureReasons(): iterable
     {
         yield 'no code and no secret' => [null, null, null, FailureReason::NOT_CONFIRMED, self::UNCONFIRMED];
-        yield 'no code and no secret, past an expiry' => [null, null, -1, FailureReason::NOT_CONFIRMED, self::UNCONFIRMED];
+        yield 'no code and no secret past an expiry' => [null, null, -1, FailureReason::NOT_CONFIRMED, self::UNCONFIRMED];
         yield 'an expired code without a secret' => ['123456', null, -1, FailureReason::EXPIRED, self::EXPIRED];
         yield 'an expired code with a secret' => ['123456', 'secret', -1, FailureReason::EXPIRED, self::EXPIRED];
         yield 'a secret past an expiry' => [null, 'secret', -1, FailureReason::EXPIRED, self::EXPIRED];
@@ -483,6 +483,26 @@ final class VerificationServiceTest extends TestCase
 
         self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '000000'));
         $this->assertFailedWith($reason, $detail);
+    }
+
+    /**
+     * A factor with a secret but no pending code is confirmed, so a miss on it
+     * is an invalid code.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAFactorWithOnlyASecretIsNotUnconfirmed(): void
+    {
+        $user = $this->signIn();
+
+        $this->stubDriver($this->driverAnswering(false));
+
+        Event::fake();
+
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', new InMemoryFactor(secret: 'secret', authenticatable: $user), '000000'));
+        $this->assertFailedWith(FailureReason::INVALID_CODE, self::MISMATCH);
     }
 
     /**

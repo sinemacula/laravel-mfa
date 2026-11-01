@@ -85,11 +85,11 @@ final class ObservedPropertiesTest extends TestCase
     public static function provideConsistentBackupFlags(): iterable
     {
         yield 'neither observed' => [null, null];
-        yield 'backed up, eligibility not observed' => [null, true];
+        yield 'backed up with eligibility not observed' => [null, true];
         yield 'eligible and backed up' => [true, true];
-        yield 'eligible, not backed up' => [true, false];
-        yield 'not eligible, not backed up' => [false, false];
-        yield 'not eligible, state not observed' => [false, null];
+        yield 'eligible and not backed up' => [true, false];
+        yield 'neither eligible nor backed up' => [false, false];
+        yield 'not eligible with state not observed' => [false, null];
     }
 
     /**

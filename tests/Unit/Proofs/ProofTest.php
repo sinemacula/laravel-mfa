@@ -98,6 +98,7 @@ final class ProofTest extends TestCase
         yield 'an additional factor without a channel' => [['channel' => null], 'A proof of kind [additional_factor] needs a channel.'];
         yield 'a recovery code with a channel' => [['kind' => ProofKind::RECOVERY_CODE], 'A proof of kind [recovery_code] has no channel.'];
         yield 'a blank reference' => [['reference' => ''], 'The factor or credential reference of a proof must not be blank.'];
+        yield 'a reference of spaces' => [['reference' => ' '], 'The factor or credential reference of a proof must not be blank.'];
         yield 'an additional factor without a reference' => [['reference' => null], 'An additional factor proof needs the reference of the factor it was made with.'];
         yield 'a first factor on a step-up' => [['kind' => ProofKind::FIRST_FACTOR], 'A proof of kind [first_factor] carries the [sign_in] purpose, not [step_up].'];
         yield 'a reauthentication at sign-in' => [
@@ -106,6 +107,7 @@ final class ProofTest extends TestCase
         ];
         yield 'a negative generation' => [['generation' => -1], 'The verification generation of a proof must not be negative.'];
         yield 'a blank challenge id' => [['challengeId' => ''], 'The challenge id of a proof must not be blank.'];
+        yield 'a challenge id of spaces' => [['challengeId' => '  '], 'The challenge id of a proof must not be blank.'];
     }
 
     /**

@@ -175,11 +175,11 @@ final class RequirementTest extends TestCase
         yield 'empty parts' => [[$none, $none], $none];
         yield 'a part asked by either' => [[$none->withMultifactor(), $none->withPhishingResistance()], $none->withMultifactor()->withPhishingResistance()];
         yield 'the shorter maximum age' => [[$none->withMultifactor(900), $none->withMultifactor(300)], $none->withMultifactor(300)];
-        yield 'the shorter maximum age, given last' => [[$none->withMultifactor(300), $none->withMultifactor(900)], $none->withMultifactor(300)];
+        yield 'the shorter maximum age given last' => [[$none->withMultifactor(300), $none->withMultifactor(900)], $none->withMultifactor(300)];
         yield 'a maximum age over none' => [[$none->withAdditionalVerification(), $none->withAdditionalVerification(120)], $none->withAdditionalVerification(120)];
-        yield 'a maximum age over none, given first' => [[$none->withAdditionalVerification(120), $none->withAdditionalVerification()], $none->withAdditionalVerification(120)];
+        yield 'a maximum age over none given first' => [[$none->withAdditionalVerification(120), $none->withAdditionalVerification()], $none->withAdditionalVerification(120)];
         yield 'the higher level' => [[$none->withMinimumLevel(AssuranceLevel::AAL1), $none->withMinimumLevel(AssuranceLevel::AAL2)], $none->withMinimumLevel(AssuranceLevel::AAL2)];
-        yield 'the higher level, given first' => [
+        yield 'the higher level given first' => [
             [$none->withMinimumLevel(AssuranceLevel::AAL3), $none->withMinimumLevel(AssuranceLevel::AAL2)],
             $none->withMinimumLevel(AssuranceLevel::AAL3),
         ];
@@ -215,6 +215,23 @@ final class RequirementTest extends TestCase
 
         self::assertSame($expected->toArray(), $strictest->toArray());
         self::assertSame($expected->toArray(), Requirement::strictest(...array_reverse($parts))->toArray());
+    }
+
+    /**
+     * A shorter maximum age set first is kept when a longer one, or none,
+     * follows, and a level asked first is kept when a lower one follows.
+     *
+     * @return void
+     */
+    public function testTheStrictestKeepsWhatWasAskedFirst(): void
+    {
+        $first = Requirement::none()->withMultifactor(300)->withMinimumLevel(AssuranceLevel::AAL2);
+
+        $strictest = Requirement::strictest($first, Requirement::none()->withMultifactor(900)->withMinimumLevel(AssuranceLevel::AAL1));
+
+        self::assertSame(300, $strictest->maxAge(RequirementPart::MULTIFACTOR));
+        self::assertSame(AssuranceLevel::AAL2, $strictest->minimumLevel);
+        self::assertSame(300, Requirement::strictest($first, Requirement::none()->withMultifactor())->maxAge(RequirementPart::MULTIFACTOR));
     }
 
     /**
