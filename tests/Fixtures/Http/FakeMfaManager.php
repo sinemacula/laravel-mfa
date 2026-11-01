@@ -6,6 +6,7 @@ namespace Tests\Fixtures\Http;
 
 use Illuminate\Support\Collection;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
  * Test double for `MfaManager` used by the `RequireMfa` middleware tests.
@@ -21,8 +22,8 @@ use SineMacula\Laravel\Mfa\MfaManager;
  */
 final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
 {
-    /** @var bool */
-    public bool $shouldUse = true;
+    /** @var \SineMacula\Laravel\Mfa\Requirements\Requirement The requirement of the current sign-in: an additional verification unless a test sets another. */
+    public Requirement $requirement;
 
     /** @var bool */
     public bool $isSetup = true;
@@ -43,17 +44,20 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
      *
      * @phpstan-ignore constructor.missingParentCall
      */
-    public function __construct() {}
+    public function __construct()
+    {
+        $this->requirement = Requirement::none()->withAdditionalVerification();
+    }
 
     /**
-     * Report whether MFA enforcement should fire on this request.
+     * Return the seeded requirement of the current sign-in.
      *
-     * @return bool
+     * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
      */
     #[\Override]
-    public function shouldUse(): bool
+    public function requirement(): Requirement
     {
-        return $this->shouldUse;
+        return $this->requirement;
     }
 
     /**

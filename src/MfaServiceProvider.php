@@ -35,7 +35,7 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
  * configuration check that runs once the application has booted, which also
  * refuses a factor model off the storage connection.
  *
- * Consumers with their own enforcement policy, stateless proof store, or SMS
+ * Consumers with their own requirement policy, stateless proof store, or SMS
  * and email senders rebind the matching contracts in their own service
  * provider; `laravel-iam` ships an opinionated set of bindings for paired-mode
  * use.

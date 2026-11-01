@@ -49,17 +49,6 @@ final class OtherConnectionUser extends Model implements Authenticatable, MultiF
     ];
 
     /**
-     * Determine whether MFA should be applied for this user.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function shouldUseMultiFactor(): bool
-    {
-        return (bool) $this->getAttribute('mfa_enabled');
-    }
-
-    /**
      * Determine whether the user has at least one enrolled factor.
      *
      * @return bool

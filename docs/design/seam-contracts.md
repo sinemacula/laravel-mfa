@@ -27,15 +27,37 @@ call them, so the flows can be built against one fixed set.
 - `ProofStore` is called by verification and the `mfa` middleware, so it is bound by default to
   `Proofs\SessionProofStore`, which keeps each sign-in's proofs in the Laravel session (see
   [Proof Store and Sign-Ins](proof-store.md)).
-- `CombinationPolicy` is also bound by default, to `Assurance\DefaultCombinationPolicy`, ahead of the requirement and
-  verification flows that will call it, since they will use its default (see
-  [Combination Policy](combination-policy.md)). No shipped flow calls it yet.
+- `CombinationPolicy` is also bound by default, to `Assurance\DefaultCombinationPolicy` (see
+  [Combination Policy](combination-policy.md)); the default `RequirementCheck` calls it.
+- The requirement seams are bound by default, since `Mfa::requirement()`, `Mfa::isFresh()` and the `mfa` middleware call
+  them: `RequirementPolicy` to `Requirements\ConfiguredRequirementPolicy`, `IdentityRequirement` to
+  `Requirements\IdentityContractRequirement`, `TenantRequirement` to `Requirements\NoTenantRequirement`,
+  `RequirementCheck` to `Requirements\ProofRequirementCheck` and `FreshnessGate` to
+  `Requirements\ConfiguredFreshnessGate` (see [Requirements and Freshness](requirements-and-freshness.md)). A
+  `FreshnessGate` bound in its place is handed this package's own setting for the operation as part of the caller's
+  requirement, and must apply the stricter of that and its own.
+- Authentication's proof kinds are this package's four plus `external_reauthentication`, which this package does not
+  add. An adapter maps them one way, by value, onto `ProofKind`:
+
+  | Authentication's kind           | This package's proof                                                                 |
+  |---------------------------------|--------------------------------------------------------------------------------------|
+  | `first_factor`                  | `first_factor`                                                                       |
+  | `first_factor_reauthentication` | `first_factor_reauthentication`                                                      |
+  | `external_reauthentication`     | `first_factor_reauthentication` on an `external_provider` channel, observing nothing |
+  | `additional_factor`             | `additional_factor`                                                                  |
+  | `recovery_code`                 | `recovery_code`                                                                      |
+
+  The mapped external reauthentication keeps its own time and binding, carries the `reauthenticate` purpose, and conveys
+  no assurance: it asserts no observed property, so it meets no additional verification, multifactor, level or phishing
+  resistance part, and only renews the time of a reauthentication with the first factor. This package never makes such
+  a proof and never hands one back, so the mapping runs one way only. Trusting a provider's own evidence for more is a
+  separate decision, made by rebinding the combination policy.
 
 | Contract                 | Answers                                                                                       |
 |--------------------------|-----------------------------------------------------------------------------------------------|
 | `CombinationPolicy`      | Whether a factor may follow a first factor, and what a combination of proofs establishes      |
 | `ProofStore`             | The current sign-in and its proofs that still count; forgetting them by factor or sign-in     |
-| `RequirementPolicy`      | What a sign-in must prove after its first factor, composed from every source                  |
+| `RequirementPolicy`      | What a sign-in must prove after its first factor, but for the active tenant's requirement     |
 | `IdentityRequirement`    | What the identity itself requires                                                             |
 | `TenantRequirement`      | What the active tenant requires                                                               |
 | `RequirementCheck`       | Whether a session's proofs meet a requirement, judged on the newest proof meeting each part   |
@@ -78,11 +100,15 @@ call them, so the flows can be built against one fixed set.
 
 - `src/Contracts/`: one file per contract.
 - `src/Context/PendingContext.php`, `src/Passkeys/PasskeyAssertion.php`.
+- `src/Requirements/RequirementBindings.php`: the requirement seams' defaults.
 
 ## Authoritative Tests
 
 - `tests/Unit/Context/PendingContextTest.php`
 - `tests/Unit/Passkeys/PasskeyAssertionTest.php`
+- `tests/Unit/Requirements/RequirementBindingsTest.php`
+- `tests/Unit/Requirements/ProofRequirementCheckTest.php`: an external reauthentication mapped as above gives no
+  assurance.
 
 ## Change Triggers
 

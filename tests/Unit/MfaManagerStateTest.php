@@ -6,7 +6,8 @@ namespace Tests\Unit;
 
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
+use SineMacula\Laravel\Mfa\Enums\RequirementPart;
+use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
@@ -17,7 +18,7 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 /**
  * Unit tests for `MfaManager` lookup-style state queries.
  *
- * Covers `getDefaultDriver()`, `shouldUse()`, `isSetup()` and `getFactors()`.
+ * Covers `getDefaultDriver()`, `requirement()`, `isSetup()` and `getFactors()`.
  * The lifecycle-mutation surface lives in a dedicated sibling file
  * (`MfaManagerLifecycleTest`) so each subject stays under the project's
  * max-methods-per-class threshold without losing its cohesive grouping.
@@ -47,44 +48,44 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Without an identity in the guard, `shouldUse()` must return false
-     * regardless of the bound policy.
+     * Without an identity in the guard, the sign-in requirement asks for
+     * nothing.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testShouldUseReturnsFalseWhenNoIdentityResolved(): void
+    public function testRequirementIsEmptyWhenNoIdentityResolved(): void
     {
-        self::assertFalse($this->manager()->shouldUse());
+        self::assertTrue($this->manager()->requirement()->isEmpty());
     }
 
     /**
-     * An identity that does not implement `MultiFactorAuthenticatable` must
-     * short-circuit `shouldUse()` to false.
+     * An identity that does not implement `MultiFactorAuthenticatable` is
+     * required to prove nothing.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testShouldUseReturnsFalseWhenIdentityIsNotMfaAuthenticatable(): void
+    public function testRequirementIsEmptyWhenIdentityIsNotMfaAuthenticatable(): void
     {
         $plain = new PlainUser;
 
         $this->actingAs($plain);
 
-        self::assertFalse($this->manager()->shouldUse());
+        self::assertTrue($this->manager()->requirement()->isEmpty());
     }
 
     /**
-     * An identity opting in via `shouldUseMultiFactor()` should make
-     * `shouldUse()` return true without consulting the policy.
+     * An identity that requires an additional factor of its own sign-ins is
+     * required one, whatever the application's setting.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testShouldUseReturnsTrueWhenIdentityOptsIn(): void
+    public function testRequirementAsksForAnAdditionalVerificationTheIdentityRequires(): void
     {
         $user = TestUser::query()->create([
             'email'       => 'a@example.com',
@@ -93,19 +94,24 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        self::assertTrue($this->manager()->shouldUse());
+        self::assertSame([RequirementPart::ADDITIONAL_VERIFICATION], $this->manager()->requirement()->parts());
     }
 
     /**
-     * When the identity does not opt in but the bound `MfaPolicy` enforces MFA
-     * externally, `shouldUse()` should still return true.
+     * When the identity requires nothing of its own but its application always
+     * requires an additional factor, the requirement still asks for one.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testShouldUseReturnsTrueWhenPolicyEnforces(): void
+    public function testRequirementAsksForAnAdditionalVerificationTheApplicationRequires(): void
     {
+        config()->set('mfa.applications.web', [
+            'requirement'  => 'always',
+            'first_factor' => ['method' => 'password', 'channel' => 'password'],
+        ]);
+
         $user = TestUser::query()->create([
             'email'       => 'b@example.com',
             'mfa_enabled' => false,
@@ -113,26 +119,18 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        /** @var \Mockery\MockInterface&\SineMacula\Laravel\Mfa\Contracts\MfaPolicy $policy */
-        $policy = \Mockery::mock(MfaPolicy::class);
-        $policy->shouldReceive('shouldEnforce')
-            ->once()
-            ->andReturnTrue();
-
-        $this->container()->instance(MfaPolicy::class, $policy);
-
-        self::assertTrue($this->manager()->shouldUse());
+        self::assertSame([RequirementPart::ADDITIONAL_VERIFICATION], $this->manager()->requirement()->parts());
     }
 
     /**
-     * If neither the identity nor the policy enforces MFA, the manager must
-     * report `shouldUse()` as false.
+     * When neither the identity nor the application requires anything, the
+     * requirement is empty.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testShouldUseReturnsFalseWhenNeitherIdentityNorPolicyEnforce(): void
+    public function testRequirementIsEmptyWhenNeitherIdentityNorApplicationRequire(): void
     {
         $user = TestUser::query()->create([
             'email'       => 'c@example.com',
@@ -141,7 +139,30 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        self::assertFalse($this->manager()->shouldUse());
+        self::assertTrue($this->manager()->requirement()->isEmpty());
+    }
+
+    /**
+     * The requirement of an identity whose auth identifier is non-scalar is
+     * refused rather than answered as empty, so the `mfa` middleware fails
+     * closed for it, even on an application that never requires a factor.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRequirementIsRefusedForNonScalarAuthIdentifier(): void
+    {
+        config()->set('mfa.applications.web', [
+            'requirement'  => 'never',
+            'first_factor' => ['method' => 'password', 'channel' => 'password'],
+        ]);
+
+        $this->actingAs(new NonScalarIdentifierUser);
+
+        $this->expectException(UnsupportedIdentifierException::class);
+
+        $this->manager()->requirement();
     }
 
     /**

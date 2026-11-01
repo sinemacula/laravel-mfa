@@ -27,6 +27,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Http\FakeMfaManager;
 use Tests\Unit\Concerns\BuildsProofs;
 
@@ -110,14 +111,14 @@ final class RequireMfaTest extends TestCase
     }
 
     /**
-     * Test passes through when should use returns false.
+     * Test passes through when the sign-in's requirement asks for nothing.
      *
      * @return void
      */
-    public function testPassesThroughWhenShouldUseReturnsFalse(): void
+    public function testPassesThroughWhenTheRequirementIsEmpty(): void
     {
-        $manager            = new FakeMfaManager;
-        $manager->shouldUse = false;
+        $manager              = new FakeMfaManager;
+        $manager->requirement = Requirement::none();
         $this->bindManager($manager);
 
         $middleware = new RequireMfa;
@@ -144,9 +145,8 @@ final class RequireMfaTest extends TestCase
         $factor->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
         $factor->method('getLastUsedAt')->willReturn(null);
 
-        $manager            = new FakeMfaManager;
-        $manager->shouldUse = true;
-        $manager->isSetup   = false;
+        $manager          = new FakeMfaManager;
+        $manager->isSetup = false;
         // The fake's `$factors` is typed Collection<int, Factor>; the test
         // injects a Collection of MockObject Factor doubles that satisfy the
         // interface but not PHPStan's strict-class check.
@@ -175,10 +175,9 @@ final class RequireMfaTest extends TestCase
      */
     public function testThrowsMfaRequiredWhenNeverVerified(): void
     {
-        $manager            = new FakeMfaManager;
-        $manager->shouldUse = true;
-        $manager->isSetup   = true;
-        $manager->factors   = null;
+        $manager          = new FakeMfaManager;
+        $manager->isSetup = true;
+        $manager->factors = null;
         $this->bindManager($manager);
 
         $middleware = new RequireMfa;
@@ -207,10 +206,9 @@ final class RequireMfaTest extends TestCase
         $factor->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
         $factor->method('getLastUsedAt')->willReturn(null);
 
-        $manager            = new FakeMfaManager;
-        $manager->shouldUse = true;
-        $manager->isSetup   = true;
-        $manager->proofs    = [self::verifiedMinutesAgo(61)];
+        $manager          = new FakeMfaManager;
+        $manager->isSetup = true;
+        $manager->proofs  = [self::verifiedMinutesAgo(61)];
         // The fake's `$factors` is typed Collection<int, Factor>; the test
         // injects a Collection of MockObject Factor doubles that satisfy the
         // interface but not PHPStan's strict-class check.
@@ -239,10 +237,9 @@ final class RequireMfaTest extends TestCase
      */
     public function testCallsNextAndReturnsResponseOnSuccess(): void
     {
-        $manager            = new FakeMfaManager;
-        $manager->shouldUse = true;
-        $manager->isSetup   = true;
-        $manager->proofs    = [self::verifiedMinutesAgo(1)];
+        $manager          = new FakeMfaManager;
+        $manager->isSetup = true;
+        $manager->proofs  = [self::verifiedMinutesAgo(1)];
         $this->bindManager($manager);
 
         $middleware = new RequireMfa;

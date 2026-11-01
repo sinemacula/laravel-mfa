@@ -122,6 +122,9 @@ and, for the minimum level, its `level`:
 `Requirement::fromArray()` reads that form back and refuses an unknown part, or an unknown field within a part (a
 `level` anywhere but the minimum level, or a mistyped `max_age`), so a mistyped one never weakens it.
 
+What a sign-in and a sensitive operation require, and how a session is checked against it, is in
+[Requirements and step-up](requirements.md).
+
 ## Evaluations
 
 An evaluation (`Assurance\Evaluation`) is what a session's proofs add up to: whether the combination is `accepted` as

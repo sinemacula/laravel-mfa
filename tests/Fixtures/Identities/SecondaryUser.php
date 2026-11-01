@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
@@ -45,14 +46,15 @@ final class SecondaryUser extends Model implements Authenticatable, MultiFactorA
     ];
 
     /**
-     * Opt the identity into MFA enforcement based on the test fixture column.
+     * Require an additional verification of every sign-in while the
+     * `mfa_enabled` column is set, and nothing of the user's own otherwise.
      *
-     * @return bool
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      */
     #[\Override]
-    public function shouldUseMultiFactor(): bool
+    public function requiresAdditionalFactor(): ?Requirement
     {
-        return (bool) $this->getAttribute('mfa_enabled');
+        return (bool) $this->getAttribute('mfa_enabled') ? Requirement::none()->withAdditionalVerification() : null;
     }
 
     /**

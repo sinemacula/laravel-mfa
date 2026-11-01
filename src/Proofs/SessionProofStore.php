@@ -310,13 +310,9 @@ final readonly class SessionProofStore implements ProofStore
      */
     private static function counts(Proof $proof, ProofOwner $owner, string $application, string $session, int $generation, CarbonImmutable $now): bool
     {
-        $binding = $proof->binding;
-
-        if (!$owner->owns($binding) || $binding->application !== $application || $binding->sessionId !== $session) {
-            return false;
-        }
-
-        return $proof->generation === $generation && $proof->provedAt->lessThanOrEqualTo($now);
+        return $owner->ownsSignIn($proof->binding, $application, $session)
+            && $proof->generation === $generation
+            && $proof->provedAt->lessThanOrEqualTo($now);
     }
 
     /**

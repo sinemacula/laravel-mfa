@@ -20,7 +20,7 @@ use Tests\TestCase;
 /**
  * RequireMfa middleware enforcement matrix.
  *
- * Covers the lifecycle branches: skip-flag, shouldUse false, no factors
+ * Covers the lifecycle branches: skip-flag, an empty requirement, no factors
  * (MfaRequiredException), never verified (MfaRequiredException), expired
  * (MfaExpiredException), and fresh verification (passes). Step-up `mfa:N`
  * parameter parsing lives in its own dedicated test class.
@@ -39,8 +39,8 @@ final class RequireMfaMiddlewareTest extends TestCase
     private const string NOT_REACHED = 'not reached';
 
     /**
-     * An identity that does not opt into MFA must not trigger the middleware
-     * enforcement chain.
+     * An identity whose sign-in requires nothing must not trigger the
+     * middleware enforcement chain.
      *
      * @return void
      */
@@ -52,7 +52,7 @@ final class RequireMfaMiddlewareTest extends TestCase
         ]);
         $this->actingAs($user);
 
-        self::assertFalse(Mfa::shouldUse());
+        self::assertTrue(Mfa::requirement()->isEmpty());
     }
 
     /**
@@ -71,7 +71,7 @@ final class RequireMfaMiddlewareTest extends TestCase
         ]);
         $this->actingAs($user);
 
-        self::assertTrue(Mfa::shouldUse());
+        self::assertFalse(Mfa::requirement()->isEmpty());
         self::assertFalse(Mfa::isSetup());
 
         try {

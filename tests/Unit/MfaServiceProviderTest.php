@@ -19,9 +19,13 @@ use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
-use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
+use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
+use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
+use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
+use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
@@ -38,7 +42,11 @@ use SineMacula\Laravel\Mfa\MfaServiceProvider;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
-use SineMacula\Laravel\Mfa\Requirements\NullMfaPolicy;
+use SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate;
+use SineMacula\Laravel\Mfa\Requirements\ConfiguredRequirementPolicy;
+use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
+use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
+use SineMacula\Laravel\Mfa\Requirements\ProofRequirementCheck;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Factors\SecondaryConnectionFactor;
@@ -72,15 +80,19 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test binds mfa policy to null mfa policy.
+     * Test binds each requirement seam to its default.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBindsMfaPolicyToNullMfaPolicy(): void
+    public function testBindsTheRequirementSeamsToTheirDefaults(): void
     {
-        self::assertInstanceOf(NullMfaPolicy::class, $this->container()->make(MfaPolicy::class));
+        self::assertInstanceOf(ConfiguredRequirementPolicy::class, $this->container()->make(RequirementPolicy::class));
+        self::assertInstanceOf(IdentityContractRequirement::class, $this->container()->make(IdentityRequirement::class));
+        self::assertInstanceOf(NoTenantRequirement::class, $this->container()->make(TenantRequirement::class));
+        self::assertInstanceOf(ProofRequirementCheck::class, $this->container()->make(RequirementCheck::class));
+        self::assertInstanceOf(ConfiguredFreshnessGate::class, $this->container()->make(FreshnessGate::class));
     }
 
     /**
@@ -127,8 +139,12 @@ final class MfaServiceProviderTest extends TestCase
             EmailSender::class,
             CodeService::class,
             CombinationPolicy::class,
-            MfaPolicy::class,
             RequirementService::class,
+            RequirementPolicy::class,
+            IdentityRequirement::class,
+            TenantRequirement::class,
+            RequirementCheck::class,
+            FreshnessGate::class,
             ProofService::class,
             VerificationService::class,
             EnrollmentService::class,

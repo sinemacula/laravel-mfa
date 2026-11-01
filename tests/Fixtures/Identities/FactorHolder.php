@@ -34,15 +34,4 @@ final class FactorHolder extends Model implements Authenticatable, MultiFactorAu
     protected $fillable = [
         'email',
     ];
-
-    /**
-     * Always use multi-factor authentication.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function shouldUseMultiFactor(): bool
-    {
-        return true;
-    }
 }

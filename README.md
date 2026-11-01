@@ -99,10 +99,11 @@ return [
 ```
 
 Every setting has a production-safe default and enforced bounds. The package checks the whole configuration when it
-boots, and `php artisan mfa:check` reports every problem for a deploy pipeline. Not every setting is applied yet: the
-application blocks, among others, are checked but no flow reads them, so listing a type or a requirement there enforces
-nothing for now. See [Configuration](docs/guides/configuration.md) for every key, its default, its bounds and whether it
-is applied yet.
+boots, and `php artisan mfa:check` reports every problem for a deploy pipeline. Not every setting is applied yet: of an
+application's block, only its `requirement`, `totp_window` and `freshness` are read so far, so listing a type there
+enforces nothing for now. See [Configuration](docs/guides/configuration.md) for every key, its default, its bounds and
+whether it is applied yet, and [Requirements and step-up](docs/guides/requirements.md) for what a sign-in and a
+sensitive operation must prove.
 
 > **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so when you rotate
 > `APP_KEY`, list the old key in `APP_PREVIOUS_KEYS` for as long as factors enrolled under it exist: a plain swap
@@ -125,11 +126,6 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 class AppUser extends User implements MultiFactorAuthenticatable
 {
     use HasFactors;
-
-    public function shouldUseMultiFactor(): bool
-    {
-        return true;
-    }
 }
 ```
 
@@ -147,7 +143,8 @@ lockouts and attempt counting, and dispatches lifecycle events:
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 
-Mfa::shouldUse();                       // bool
+Mfa::requirement();                     // Requirement the current sign-in must meet
+Mfa::isFresh('mfa.remove_factor');      // bool: fresh enough for the operation
 Mfa::isSetup();                         // bool
 Mfa::proofs();                          // list<Proof> of the current sign-in
 Mfa::getFactors();                      // Collection|null
@@ -351,7 +348,7 @@ Route::post('/mfa/verify', VerifyController::class)
     ->middleware(['mfa.skip', 'throttle:mfa-verify']);
 ```
 
-Apply the throttle **only** to the verify endpoint — state-read routes (`Mfa::shouldUse()`, `Mfa::isSetup()`,
+Apply the throttle **only** to the verify endpoint — state-read routes (`Mfa::requirement()`, `Mfa::isSetup()`,
 etc.) are called on every request and would exhaust the bucket without representing an attack signal.
 
 ### Proof store
@@ -372,7 +369,7 @@ All concrete classes in this package are `final` unless explicitly designed for 
 |----------------------------|----------------------------------------------------------------|
 | Custom factor driver       | Implement `FactorDriver`, register via `Mfa::extend()`         |
 | Custom identity model      | Implement `MultiFactorAuthenticatable` and use `HasFactors`    |
-| Organisation enforcement   | Implement `MfaPolicy` and bind it via the container            |
+| Requirements and freshness | Implement `RequirementPolicy` or `FreshnessGate` and bind it   |
 | Custom proof store         | Implement `ProofStore` and bind it via the container           |
 | Custom factor model        | Set `config('mfa.factor.model')` to your subclass              |
 | Custom recovery code model | Set `config('mfa.recovery_codes.model')` to your subclass      |

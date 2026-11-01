@@ -52,17 +52,6 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
     }
 
     /**
-     * Always opts into MFA for test purposes.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function shouldUseMultiFactor(): bool
-    {
-        return true;
-    }
-
-    /**
      * Does not have any factors for the purposes of these tests.
      *
      * @return bool

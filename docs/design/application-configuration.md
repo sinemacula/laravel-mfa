@@ -12,16 +12,17 @@ before anything relies on it.
 - Factors, the recovery code set, attempt state and lockouts belong to the identity and are the same in every
   application. What varies per application is only what it accepts and offers: the factor types it enables, when it
   requires a factor, whether it accepts recovery codes and at what level it issues them, whether a pending session may
-  enrol its first factor, its limits on enrolments made through it, its TOTP window, the freshness of each operation,
-  and the first factor its guard uses. Those live in `mfa.applications.{name}`; everything else lives in a block per
-  capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `proofs`, `lifecycle`) beside `storage`,
-  `factor` and `identity_state`.
-- Not every setting is applied yet. Of an application block only `totp_window` is read, by the TOTP driver for the
-  application a bound `ApplicationResolver` names, and `recovery_codes.enabled`, by the recovery code service;
-  otherwise nothing is enforced per application: the shipped drivers verify any type, and the limits, freshness and
-  requirement mode are not applied. Of the package-wide blocks, the code resend cooldown and send caps, the enrolment
-  lifetime and the pruning retention are checked only. The configuration guide marks each setting as applied or not,
-  and a flow that starts reading one updates it.
+  enrol its first factor, its limits on enrolments made through it, its TOTP window, the requirement of each operation's
+  step-up, and the first factor its guard uses. Those live in `mfa.applications.{name}`; everything else lives in a
+  block per capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `proofs`, `lifecycle`) beside
+  `storage`, `factor` and `identity_state`.
+- Not every setting is applied yet. Of an application block, `totp_window` is read by the TOTP driver for the
+  application a bound `ApplicationResolver` names, `recovery_codes.enabled` by the recovery code service, `requirement`
+  by `Mfa::requirement()` and `freshness` by `Mfa::isFresh()` (see
+  [Requirements and Freshness](requirements-and-freshness.md)); otherwise nothing is enforced per application: the
+  shipped drivers verify any type, and the limits are not applied. Of the package-wide blocks, the code resend cooldown
+  and send caps, the enrolment lifetime and the pruning retention are checked only. The configuration guide marks each
+  setting as applied or not, and a flow that starts reading one updates it.
 - Every setting is read through one class that owns its block: `Applications\ApplicationSettings` (with
   `Applications\ApplicationBlock` reading the raw block), `Drivers\TotpSettings`, `Codes\CodeSettings`,
   `RecoveryCodes\RecoveryCodeSettings`, `Attempts\AttemptSettings`, `Enrollment\EnrollmentSettings`,

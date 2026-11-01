@@ -36,7 +36,8 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Requests flagged with the `skip_mfa` request attribute (set by `SkipMfa`)
  * bypass enforcement entirely — used on the verification endpoints themselves
- * to avoid circular enforcement.
+ * to avoid circular enforcement — as do requests whose identity's sign-in
+ * requirement (`Mfa::requirement()`) asks for nothing.
  *
  * Optional route-middleware parameter overrides the configured
  * `mfa.proofs.max_age_minutes` per route group: `mfa:5` requires a verification
@@ -71,7 +72,7 @@ final class RequireMfa
             return $next($request);
         }
 
-        if (!Mfa::shouldUse()) {
+        if (Mfa::requirement()->isEmpty()) {
             return $next($request);
         }
 

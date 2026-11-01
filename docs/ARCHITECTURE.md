@@ -33,7 +33,8 @@ working.
 ### Wrapped by `sinemacula/laravel-iam`
 
 - Parent package provides: a `ProofStore` binding over the authentication session (lives in
-  `laravel-iam`, not this repo), an opinionated `OrganisationMfaPolicy` bound against the `MfaPolicy` contract,
+  `laravel-iam`, not this repo), its own requirement seams (`RequirementPolicy`, `IdentityRequirement`,
+  `TenantRequirement`) and freshness gate,
   cross-package event listeners (audit log), and any other opinionated defaults.
 - This repo stays clean of parent-package knowledge. The extension seams (policy, store, senders)
   must be expressive enough that the parent package does not need to monkey-patch.
@@ -44,10 +45,12 @@ working.
 
 Historical record of the architectural calls made during the 1.0 cycle.
 
-- **D1 — Generic `MfaPolicy` contract, not org-specific `EnforcesMfa`.** The package ships a
-  `MfaPolicy` extension seam with a no-op default (`NullMfaPolicy`). Consumers bind their own
-  policy (org-aware, role-aware, feature-flag-aware). `laravel-iam` ships an opinionated
-  `OrganisationMfaPolicy` at its layer. The MFA package never learns the word "organisation".
+- **D1 — Generic requirement contracts, not org-specific `EnforcesMfa`.** The package composes what a sign-in must
+  prove from the application's configured mode, the identity's own requirement and a re-enrolment obligation, behind
+  the `RequirementPolicy`, `IdentityRequirement` and `TenantRequirement` seams, and judges step-up freshness behind
+  `FreshnessGate`. `laravel-iam` binds its own at its layer. The MFA package never learns the word "organisation".
+  *Superseded:* the earlier `MfaPolicy` seam and its no-op default are gone (see
+  [Requirements and Freshness](design/requirements-and-freshness.md)).
 - **D2 — Single `mfa_factors` table.** Columns include `attempts`, `locked_until`,
   `last_attempted_at`. No separate `mfa_attempts` log — audit goes through events,
   owned by `laravel-audit-log`. *Superseded:* failures are now counted durably on the factor and

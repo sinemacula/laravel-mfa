@@ -70,7 +70,9 @@ values they report, and which parts of a requirement they meet within each part'
   `additional_verification`, but not a fresh `multifactor`, `minimum_level` or `phishing_resistance`, which rest on the
   passkey alone. A fresh verified passkey of another credential meets them all.
 - A fresh reauthentication with the first factor meets a fresh `minimum_level` it reaches on its own, never a fresh
-  `additional_verification`: it is not an additional factor.
+  `additional_verification`: it is not an additional factor, unless it is itself a multi-factor authenticator, such as
+  a passkey whose assertion verified the person. A reauthentication on an external provider's channel that observed
+  nothing gives no level at all.
 - A fresh further proof after an old first factor meets a fresh part that the two give together or the further proof
   gives on its own, as a step-up does: a fresh TOTP code after an old password meets a fresh `multifactor`.
 - A further proof made before the first factor, which an earlier sign-in left behind, counts for nothing, as does one
