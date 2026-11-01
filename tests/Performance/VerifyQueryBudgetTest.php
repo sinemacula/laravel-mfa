@@ -55,10 +55,10 @@ final class VerifyQueryBudgetTest extends TestCase
             static fn () => Mfa::verify('totp', $factor, $code),
         );
 
-        // Budget: one conditional update recording the accepted time step,
-        // and one update on the factor row for recordVerification. The
-        // verification store is session-backed in the default binding, so
-        // its write goes through the session driver, not the database.
+        // Budget: one conditional update recording the accepted time step, and
+        // one update on the factor row for recordVerification. The verification
+        // store is session-backed in the default binding, so its write goes
+        // through the session driver, not the database.
         self::assertLessThanOrEqual(
             2,
             $count,

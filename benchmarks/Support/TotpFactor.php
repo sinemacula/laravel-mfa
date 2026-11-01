@@ -39,10 +39,10 @@ final readonly class TotpFactor implements Factor
     /**
      * The HMAC algorithm: SHA-1.
      *
-     * @return ?string
+     * @return string
      */
     #[\Override]
-    public function getTotpAlgorithm(): ?string
+    public function getTotpAlgorithm(): string
     {
         return 'sha1';
     }
@@ -50,10 +50,10 @@ final readonly class TotpFactor implements Factor
     /**
      * The number of digits: 6.
      *
-     * @return ?int
+     * @return int
      */
     #[\Override]
-    public function getTotpDigits(): ?int
+    public function getTotpDigits(): int
     {
         return 6;
     }
@@ -61,10 +61,10 @@ final readonly class TotpFactor implements Factor
     /**
      * The period: 30 seconds.
      *
-     * @return ?int
+     * @return int
      */
     #[\Override]
-    public function getTotpPeriod(): ?int
+    public function getTotpPeriod(): int
     {
         return 30;
     }
@@ -127,10 +127,10 @@ final readonly class TotpFactor implements Factor
     /**
      * The shared secret.
      *
-     * @return ?string
+     * @return string
      */
     #[\Override]
-    public function getSecret(): ?string
+    public function getSecret(): string
     {
         return $this->secret;
     }
@@ -220,6 +220,6 @@ final readonly class TotpFactor implements Factor
     #[\Override]
     public function isVerified(): bool
     {
-        return false;
+        return $this->getVerifiedAt() !== null;
     }
 }

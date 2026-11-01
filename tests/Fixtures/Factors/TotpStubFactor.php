@@ -129,7 +129,7 @@ final class TotpStubFactor extends AbstractEloquentFactorStub
      * @return bool
      */
     #[\Override]
-    public function acceptStep(int $step): bool
+    public function storeAcceptedStep(int $step): bool
     {
         if ($this->lastAcceptedStep !== null && $this->lastAcceptedStep >= $step) {
             return false;

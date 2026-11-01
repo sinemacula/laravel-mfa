@@ -340,8 +340,8 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A factor that holds no parameters, or parameters out of bounds,
-     * verifies nothing, rather than taking the configured ones.
+     * A factor that holds no parameters, or parameters out of bounds, verifies
+     * nothing, rather than taking the configured ones.
      *
      * @param  ?string  $algorithm
      * @param  ?int  $digits
@@ -355,8 +355,8 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A factor with nowhere to record an accepted step cannot be held to
-     * single use, so even its current code is refused.
+     * A factor with nowhere to record an accepted step cannot be held to single
+     * use, so even its current code is refused.
      *
      * @return void
      */
@@ -522,8 +522,8 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * An empty issuer or account name, or one holding the colon that
-     * separates them in the label, is refused.
+     * An empty issuer or account name, or one holding the colon that separates
+     * them in the label, is refused.
      *
      * @param  string  $issuer
      * @param  string  $accountName
@@ -558,8 +558,6 @@ final class TotpDriverTest extends TestCase
      * never reach a stack trace.
      *
      * @return void
-     *
-     * @throws \ReflectionException
      */
     public function testSecretsAndCodesAreSensitiveParameters(): void
     {

@@ -55,8 +55,8 @@ final class TotpDriverBench
     }
 
     /**
-     * Compute the factor's current code before each iteration, so the
-     * matching bench always submits a code of the window.
+     * Compute the factor's current code before each iteration, so the matching
+     * bench always submits a code of the window.
      *
      * @return void
      */
@@ -65,7 +65,7 @@ final class TotpDriverBench
         $parameters = new TotpParameters('sha1', 6, 30);
 
         $this->code = $parameters->code(
-            (string) Base32::decode((string) $this->factor->getSecret()),
+            (string) Base32::decode($this->factor->getSecret()),
             $parameters->stepAt(CarbonImmutable::now()->getTimestamp()),
         );
     }

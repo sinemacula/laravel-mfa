@@ -8,8 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 
 /**
  * The parameters a TOTP factor's codes are made with (RFC 6238): the HMAC
- * algorithm, the number of digits and the period of a time step. A factor
- * keeps the parameters it was enrolled with, so it works the same way in every
+ * algorithm, the number of digits and the period of a time step. A factor keeps
+ * the parameters it was enrolled with, so it works the same way in every
  * application and after the configuration changes.
  *
  * A code is the HOTP value (RFC 4226 §5.3) of the time step: the HMAC of the

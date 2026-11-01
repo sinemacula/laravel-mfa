@@ -27,11 +27,10 @@ use Tests\TestCase;
  * come from a snapshot taken before the first request committed. The first
  * request then verifies and commits on the default connection, and the second
  * verifies with the same code, or one for an earlier step. The step is checked
- * by the database as it records it, against the row as committed, so the
- * second request is refused although everything it read says otherwise. On
- * SQLite, whose in-memory test database one connection holds, both requests
- * share that connection, and the first records its step inside the second's
- * transaction.
+ * by the database as it records it, against the row as committed, so the second
+ * request is refused although everything it read says otherwise. On SQLite,
+ * whose in-memory test database one connection holds, both requests share that
+ * connection, and the first records its step inside the second's transaction.
  *
  * The tables are committed rather than wrapped in a transaction of the test's
  * own, so the second connection sees what the first commits; the migrations
@@ -111,8 +110,7 @@ final class TotpReplayRaceTest extends TestCase
 
     /**
      * Give the second request a connection of its own to the test database,
-     * unless the database is SQLite in memory, which only one connection
-     * holds.
+     * unless the database is SQLite in memory, which only one connection holds.
      *
      * @param  mixed  $app
      * @return void
@@ -143,8 +141,8 @@ final class TotpReplayRaceTest extends TestCase
 
     /**
      * Run the race: the second request opens its transaction and reads the
-     * factor, the first verifies its code and commits, then the second
-     * verifies its own and commits. Returns whether each passed.
+     * factor, the first verifies its code and commits, then the second verifies
+     * its own and commits. Returns whether each passed.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @param  \Closure(\SineMacula\Laravel\Mfa\Models\Factor): string  $firstCode
@@ -200,11 +198,19 @@ final class TotpReplayRaceTest extends TestCase
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return ?int
+     *
+     * @phpstan-impure
      */
     private function storedStep(Factor $factor): ?int
     {
         $step = DB::table('mfa_factors')->where('id', $factor->id)->value('last_accepted_step');
 
-        return $step === null ? null : (int) $step;
+        if ($step === null) {
+            return null;
+        }
+
+        self::assertIsNumeric($step);
+
+        return (int) $step;
     }
 }

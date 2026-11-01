@@ -12,8 +12,8 @@ use SineMacula\Laravel\Mfa\Drivers\TotpParameters;
 
 /**
  * Stands in for the authenticator app a TOTP factor is enrolled in: the secret
- * and parameters a test factor is stored with, and the code the app shows for
- * a factor now or a number of time steps away.
+ * and parameters a test factor is stored with, and the code the app shows for a
+ * factor now or a number of time steps away.
  *
  * The secret is the 20-byte key of RFC 6238 Appendix B, so a code can be
  * checked against the published test vectors by hand.

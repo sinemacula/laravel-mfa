@@ -13,9 +13,9 @@ use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\TestCase;
 
 /**
- * Unit tests for `ActsAsFactor::acceptStep()`: the compare-and-set of a TOTP
- * factor's last accepted time step, on a stored row and on a factor not yet
- * stored, and that a stale copy of the factor can neither record a step
+ * Unit tests for `ActsAsFactor::storeAcceptedStep()`: the compare-and-set of a
+ * TOTP factor's last accepted time step, on a stored row and on a factor not
+ * yet stored, and that a stale copy of the factor can neither record a step
  * another copy recorded nor write an older one back over it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -24,7 +24,7 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversTrait(ActsAsFactor::class)]
-final class ActsAsFactorAcceptStepTest extends TestCase
+final class ActsAsFactorStoreAcceptedStepTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -40,11 +40,11 @@ final class ActsAsFactorAcceptStepTest extends TestCase
     {
         $factor = $this->storedFactor();
 
-        self::assertTrue($factor->acceptStep(self::STEP));
+        self::assertTrue($factor->storeAcceptedStep(self::STEP));
         self::assertSame(self::STEP, $factor->getLastAcceptedStep());
         self::assertSame(self::STEP, $this->storedStep($factor));
 
-        self::assertTrue($factor->acceptStep(self::STEP + 1));
+        self::assertTrue($factor->storeAcceptedStep(self::STEP + 1));
         self::assertSame(self::STEP + 1, $factor->getLastAcceptedStep());
         self::assertSame(self::STEP + 1, $this->storedStep($factor));
     }
@@ -59,9 +59,9 @@ final class ActsAsFactorAcceptStepTest extends TestCase
     {
         $factor = $this->storedFactor();
 
-        self::assertTrue($factor->acceptStep(self::STEP));
-        self::assertFalse($factor->acceptStep(self::STEP));
-        self::assertFalse($factor->acceptStep(self::STEP - 1));
+        self::assertTrue($factor->storeAcceptedStep(self::STEP));
+        self::assertFalse($factor->storeAcceptedStep(self::STEP));
+        self::assertFalse($factor->storeAcceptedStep(self::STEP - 1));
         self::assertSame(self::STEP, $factor->getLastAcceptedStep());
         self::assertSame(self::STEP, $this->storedStep($factor));
     }
@@ -77,10 +77,10 @@ final class ActsAsFactorAcceptStepTest extends TestCase
         $first  = $this->storedFactor();
         $second = Factor::query()->findOrFail($first->id);
 
-        self::assertTrue($first->acceptStep(self::STEP));
+        self::assertTrue($first->storeAcceptedStep(self::STEP));
 
         self::assertNull($second->getLastAcceptedStep());
-        self::assertFalse($second->acceptStep(self::STEP));
+        self::assertFalse($second->storeAcceptedStep(self::STEP));
         self::assertNull($second->getLastAcceptedStep());
         self::assertSame(self::STEP, $this->storedStep($first));
     }
@@ -96,8 +96,8 @@ final class ActsAsFactorAcceptStepTest extends TestCase
         $first  = $this->storedFactor();
         $second = Factor::query()->findOrFail($first->id);
 
-        self::assertTrue($first->acceptStep(self::STEP));
-        self::assertTrue($second->acceptStep(self::STEP + 1));
+        self::assertTrue($first->storeAcceptedStep(self::STEP));
+        self::assertTrue($second->storeAcceptedStep(self::STEP + 1));
 
         self::assertFalse($first->isDirty($first->getLastAcceptedStepName()));
 
@@ -118,13 +118,13 @@ final class ActsAsFactorAcceptStepTest extends TestCase
         $factor = $this->storedFactor();
         $other  = $this->storedFactor();
 
-        self::assertTrue($factor->acceptStep(self::STEP));
+        self::assertTrue($factor->storeAcceptedStep(self::STEP));
         self::assertNull($this->storedStep($other));
     }
 
     /**
-     * A factor not yet stored compares with its own attribute, and the step
-     * it recorded is stored with it.
+     * A factor not yet stored compares with its own attribute, and the step it
+     * recorded is stored with it.
      *
      * @return void
      */
@@ -136,10 +136,10 @@ final class ActsAsFactorAcceptStepTest extends TestCase
             'authenticatable_id'   => '1',
         ]);
 
-        self::assertTrue($factor->acceptStep(self::STEP));
-        self::assertFalse($factor->acceptStep(self::STEP));
-        self::assertFalse($factor->acceptStep(self::STEP - 1));
-        self::assertTrue($factor->acceptStep(self::STEP + 1));
+        self::assertTrue($factor->storeAcceptedStep(self::STEP));
+        self::assertFalse($factor->storeAcceptedStep(self::STEP));
+        self::assertFalse($factor->storeAcceptedStep(self::STEP - 1));
+        self::assertTrue($factor->storeAcceptedStep(self::STEP + 1));
 
         $factor->persist();
 
@@ -167,11 +167,19 @@ final class ActsAsFactorAcceptStepTest extends TestCase
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return ?int
+     *
+     * @phpstan-impure
      */
     private function storedStep(Factor $factor): ?int
     {
         $step = DB::table('mfa_factors')->where('id', $factor->id)->value('last_accepted_step');
 
-        return $step === null ? null : (int) $step;
+        if ($step === null) {
+            return null;
+        }
+
+        self::assertIsNumeric($step);
+
+        return (int) $step;
     }
 }

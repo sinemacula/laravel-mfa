@@ -224,12 +224,12 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Record the TOTP time step a code was accepted for if it is later than
-     * the stored one: one conditional `UPDATE` of the factor's row, which the
+     * Record the TOTP time step a code was accepted for if it is later than the
+     * stored one: one conditional `UPDATE` of the factor's row, which the
      * database applies to the row as committed, so a request whose copy of the
-     * factor is stale still cannot record a step another already has. A
-     * factor not yet stored compares with its own attribute, as no other
-     * request can see it.
+     * factor is stale still cannot record a step another already has. A factor
+     * not yet stored compares with its own attribute, as no other request can
+     * see it.
      *
      * The recorded step is kept as the attribute's original value, so a later
      * `persist()` does not write it again over a later step another request
@@ -238,7 +238,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
      * @param  int  $step
      * @return bool
      */
-    public function acceptStep(int $step): bool
+    public function storeAcceptedStep(int $step): bool
     {
         $column = $this->getLastAcceptedStepName();
 

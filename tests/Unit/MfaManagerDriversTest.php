@@ -51,8 +51,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the TOTP driver with no settings configured should fall back
-     * to the defaults authenticator apps expect: SHA-1, 6 digits, 30 seconds.
+     * Resolving the TOTP driver with no settings configured should fall back to
+     * the defaults authenticator apps expect: SHA-1, 6 digits, 30 seconds.
      *
      * @return void
      *

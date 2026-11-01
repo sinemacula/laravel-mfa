@@ -19,18 +19,18 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
  * output (20 for SHA-1, 32 for SHA-256, 64 for SHA-512, never under 160 bits)
  * and the algorithm, digits and period `mfa.totp` sets for new enrolments,
  * which the factor keeps. A code is checked against every time step of the
- * window, `mfa.totp.window` steps either side of the current one, each
- * compared with `hash_equals()` and none skipped when an earlier one matches,
- * so the work does not depend on which step matches or whether one does. The
- * window is read from the configuration on every call and never widens.
+ * window, `mfa.totp.window` steps either side of the current one, each compared
+ * with `hash_equals()` and none skipped when an earlier one matches, so the
+ * work does not depend on which step matches or whether one does. The window is
+ * read from the configuration on every call and never widens.
  *
- * A time step is single-use per factor (RFC 6238 §5.2): a code is accepted
- * only when its step is later than the factor's last accepted one, recorded in
- * the same compare-and-set (see `EloquentFactor::acceptStep()`), at
- * confirmation as at verification. Of two requests with the same code, only
- * one records the step, and a code for an earlier step is refused. A factor
- * that cannot record a step, one implementing only the `Factor` read surface,
- * cannot be held to single use, so it verifies nothing.
+ * A time step is single-use per factor (RFC 6238 §5.2): a code is accepted only
+ * when its step is later than the factor's last accepted one, recorded in the
+ * same compare-and-set (see `EloquentFactor::storeAcceptedStep()`), at
+ * confirmation as at verification. Of two requests with the same code, only one
+ * records the step, and a code for an earlier step is refused. A factor that
+ * cannot record a step, one implementing only the `Factor` read surface, cannot
+ * be held to single use, so it verifies nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -62,8 +62,8 @@ final readonly class TotpDriver implements FactorDriver
     }
 
     /**
-     * Verify the code against the factor's secret and parameters, recording
-     * the matched time step so it is never accepted again.
+     * Verify the code against the factor's secret and parameters, recording the
+     * matched time step so it is never accepted again.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
@@ -78,7 +78,7 @@ final readonly class TotpDriver implements FactorDriver
 
         return $step !== null
             && $factor instanceof EloquentFactor
-            && $factor->acceptStep($step);
+            && $factor->storeAcceptedStep($step);
     }
 
     /**
@@ -107,9 +107,9 @@ final readonly class TotpDriver implements FactorDriver
      * Start an enrolment with a new shared secret, which the caller stores on
      * the pending factor and shows the person once.
      *
-     * The parameters new enrolments use are stamped on an Eloquent factor,
-     * with no step accepted yet; a factor of another kind is given them by
-     * its caller, from `parameters()`.
+     * The parameters new enrolments use are stamped on an Eloquent factor, with
+     * no step accepted yet; a factor of another kind is given them by its
+     * caller, from `parameters()`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return string
@@ -168,8 +168,8 @@ final readonly class TotpDriver implements FactorDriver
      * Build the factor's provisioning URI in the `otpauth://` key URI format,
      * for an authenticator app to read from a QR code: the label
      * `issuer:account` and the secret, issuer, algorithm, digits and period.
-     * Pass the issuer and account name as they are, not encoded; neither may
-     * be empty or hold a colon, which separates them in the label.
+     * Pass the issuer and account name as they are, not encoded; neither may be
+     * empty or hold a colon, which separates them in the label.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $issuer
@@ -205,9 +205,9 @@ final readonly class TotpDriver implements FactorDriver
     }
 
     /**
-     * The latest time step of the window whose code is the one given, or
-     * `null` when none is, or the factor has no usable secret or parameters.
-     * Every step of the window is computed and compared.
+     * The latest time step of the window whose code is the one given, or `null`
+     * when none is, or the factor has no usable secret or parameters. Every
+     * step of the window is computed and compared.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
@@ -229,9 +229,11 @@ final readonly class TotpDriver implements FactorDriver
         $matched = null;
 
         for ($step = $current - $window; $step <= $current + $window; $step++) {
-            if (hash_equals($parameters->code($key, $step), $code)) {
-                $matched = $step;
+            if (!hash_equals($parameters->code($key, $step), $code)) {
+                continue;
             }
+
+            $matched = $step;
         }
 
         return $matched;

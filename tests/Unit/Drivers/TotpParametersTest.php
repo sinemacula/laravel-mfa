@@ -162,8 +162,8 @@ final class TotpParametersTest extends TestCase
     }
 
     /**
-     * A factor's parameters are read as it holds them, and none are read from
-     * a factor missing any of them.
+     * A factor's parameters are read as it holds them, and none are read from a
+     * factor missing any of them.
      *
      * @return void
      */

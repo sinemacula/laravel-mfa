@@ -79,6 +79,17 @@ final class Base32Test extends TestCase
     }
 
     /**
+     * Bits left over after the last whole byte are dropped, even when they are
+     * one short of another byte.
+     *
+     * @return void
+     */
+    public function testDropsBitsLeftOverAfterTheLastWholeByte(): void
+    {
+        self::assertSame('f', Base32::decode('MZX'));
+    }
+
+    /**
      * Text holding a character outside the alphabet, padding before the end
      * included, decodes to nothing.
      *

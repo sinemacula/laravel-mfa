@@ -10,8 +10,8 @@ namespace SineMacula\Laravel\Mfa\Drivers;
  * which is what the `otpauth://` key URI format expects.
  *
  * Decoding accepts lower case and trailing `=` padding, so a secret written
- * either way reads the same, and refuses anything else, returning `null`
- * rather than guessing at what was meant.
+ * either way reads the same, and refuses anything else, returning `null` rather
+ * than guessing at what was meant.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

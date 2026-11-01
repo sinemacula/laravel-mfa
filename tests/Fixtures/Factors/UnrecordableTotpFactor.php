@@ -7,8 +7,8 @@ namespace Tests\Fixtures\Factors;
 use Tests\Fixtures\Drivers\AuthenticatorApp;
 
 /**
- * TOTP factor fixture implementing only the `Factor` read surface: it holds
- * the authenticator app's secret and the default parameters but has nowhere to
+ * TOTP factor fixture implementing only the `Factor` read surface: it holds the
+ * authenticator app's secret and the default parameters but has nowhere to
  * record an accepted time step, so the driver cannot hold it to single use.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -32,10 +32,10 @@ final class UnrecordableTotpFactor extends AbstractFactorStub
     /**
      * Return the authenticator app's secret.
      *
-     * @return ?string
+     * @return string
      */
     #[\Override]
-    public function getSecret(): ?string
+    public function getSecret(): string
     {
         return AuthenticatorApp::SECRET;
     }
@@ -43,10 +43,10 @@ final class UnrecordableTotpFactor extends AbstractFactorStub
     /**
      * Return the default HMAC algorithm.
      *
-     * @return ?string
+     * @return string
      */
     #[\Override]
-    public function getTotpAlgorithm(): ?string
+    public function getTotpAlgorithm(): string
     {
         return 'sha1';
     }
@@ -54,10 +54,10 @@ final class UnrecordableTotpFactor extends AbstractFactorStub
     /**
      * Return the default number of digits.
      *
-     * @return ?int
+     * @return int
      */
     #[\Override]
-    public function getTotpDigits(): ?int
+    public function getTotpDigits(): int
     {
         return 6;
     }
@@ -65,10 +65,10 @@ final class UnrecordableTotpFactor extends AbstractFactorStub
     /**
      * Return the default period.
      *
-     * @return ?int
+     * @return int
      */
     #[\Override]
-    public function getTotpPeriod(): ?int
+    public function getTotpPeriod(): int
     {
         return 30;
     }

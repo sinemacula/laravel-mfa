@@ -145,7 +145,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      * @return bool
      */
     #[\Override]
-    public function acceptStep(int $step): bool
+    public function storeAcceptedStep(int $step): bool
     {
         return false;
     }

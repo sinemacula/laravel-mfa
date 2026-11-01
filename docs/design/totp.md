@@ -26,19 +26,19 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
   does. The latest matching step is the one accepted. The window is read from the configuration on every call and
   nothing widens it, failures included; the package does not resynchronise (RFC 6238 §6).
 - A time step is single-use per factor (RFC 6238 §5.2). A matching code is accepted only when
-  `EloquentFactor::acceptStep()` records its step, and it records it only when it is later than `last_accepted_step`:
-  one compare-and-set, `UPDATE ... SET last_accepted_step = :step WHERE id = :id AND (last_accepted_step IS NULL OR
-  last_accepted_step < :step)`, accepted when it changed the row. The database applies the condition to the row as
-  committed, under the row's lock, so the check and the record are one atomic step and a request whose copy of the
-  factor is stale cannot pass. Inside a transaction on the storage connection, such as `FactorStateTransaction`, it is
-  part of that transaction.
+  `EloquentFactor::storeAcceptedStep()` records its step, and it records it only when it is later than
+  `last_accepted_step`: one compare-and-set, `UPDATE ... SET last_accepted_step = :step WHERE id = :id AND
+  (last_accepted_step IS NULL OR last_accepted_step < :step)`, accepted when it changed the row. The database applies
+  the condition to the row as committed, under the row's lock, so the check and the record are one atomic step and a
+  request whose copy of the factor is stale cannot pass. Inside a transaction on the storage connection, such as
+  `FactorStateTransaction`, it is part of that transaction.
 - Confirming a pending factor checks its first code the same way, so the confirming code's step is recorded and the
   code is refused at the next verification.
 - The recorded step is kept as the model attribute's original value, so a later `persist()` of the same copy never
   writes it back over a later step another request recorded.
 - A factor that implements only the `Factor` read surface has nowhere to record a step, so it cannot be held to single
   use: the driver computes the window and then refuses it. A custom model implementing `EloquentFactor` without
-  `ActsAsFactor` must make `acceptStep()` the same atomic compare-and-set.
+  `ActsAsFactor` must make `storeAcceptedStep()` the same atomic compare-and-set.
 
 ## Success Path
 
@@ -49,8 +49,8 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - The provisioning URI is the `otpauth://` key URI format: the label `issuer:account`, each part percent-encoded once,
   and the query `secret`, `issuer`, `algorithm` (upper case), `digits` and `period`, encoded per RFC 3986.
 - Verification: `verify()` reads the factor's parameters and decodes its secret, computes the step of every moment of
-  the window and compares each code, then records the matched step through `acceptStep()`. The verification service
-  then records the outcome on the factor as for any type.
+  the window and compares each code, then records the matched step through `storeAcceptedStep()`. The verification
+  service then records the outcome on the factor as for any type.
 
 ## Failure / Edge Cases
 
@@ -74,7 +74,7 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - `src/Drivers/TotpParameters.php`: the bounds, `fromFactor()`, `secretLength()`, `stepAt()`, `code()`.
 - `src/Drivers/Base32.php`: `encode()`, `decode()`.
 - `src/Drivers/TotpSettings.php`: `parameters()`, `window()`.
-- `src/Contracts/EloquentFactor.php` and `src/Concerns/ActsAsFactor.php`: `acceptStep()`.
+- `src/Contracts/EloquentFactor.php` and `src/Concerns/ActsAsFactor.php`: `storeAcceptedStep()`.
 - `src/Drivers/DriverBindings.php`: `totp()`, the driver built over `TotpSettings`.
 
 ## Authoritative Tests
@@ -102,9 +102,9 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - `tests/Unit/Drivers/TotpDriverTest.php`
   `testTheProvisioningUriCarriesTheLabelSecretAndParameters`
 - `tests/Unit/Drivers/Base32Test.php`
-- `tests/Unit/Concerns/ActsAsFactorAcceptStepTest.php`
+- `tests/Unit/Concerns/ActsAsFactorStoreAcceptedStepTest.php`
   `testAStaleCopyCannotRecordAStepAnotherCopyRecorded`
-- `tests/Unit/Concerns/ActsAsFactorAcceptStepTest.php`
+- `tests/Unit/Concerns/ActsAsFactorStoreAcceptedStepTest.php`
   `testPersistingAfterwardsKeepsALaterStepAnotherCopyRecorded`
 - `tests/Integration/Database/TotpReplayRaceTest.php`
   `testOnlyOneOfTwoRequestsWithTheSameCodePasses`
