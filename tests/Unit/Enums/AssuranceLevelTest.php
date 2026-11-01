@@ -22,18 +22,18 @@ use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 final class AssuranceLevelTest extends TestCase
 {
     /**
-     * The levels, in order, with their stable values.
+     * The levels, in order, each case name with its stable value.
      *
      * @return void
      */
     public function testLevelsAreTheStableValues(): void
     {
         self::assertSame([
-            'aal1',
-            'aal2',
-            'aal3',
-            'unclassified',
-        ], array_map(static fn (AssuranceLevel $level): string => $level->value, AssuranceLevel::cases()));
+            'AAL1'         => 'aal1',
+            'AAL2'         => 'aal2',
+            'AAL3'         => 'aal3',
+            'UNCLASSIFIED' => 'unclassified',
+        ], array_column(AssuranceLevel::cases(), 'value', 'name'));
     }
 
     /**

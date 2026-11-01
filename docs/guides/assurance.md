@@ -20,7 +20,8 @@ $password = new Channel(ChannelKind::PASSWORD);
 $unknown  = Channel::unknown();
 ```
 
-A reference is never blank, and a password or an unknown channel takes none (`ChannelKind::takesReference()`).
+A reference is never blank, and a password or an unknown channel takes none (`ChannelKind::takesReference()`). Those
+two belong to first factors only: an enrolled factor always travels on a real channel (`ChannelKind::carriesFactor()`).
 
 ## Observed properties
 
@@ -39,7 +40,7 @@ A proof (`Proofs\Proof`) is one verified authentication event:
 |---------------|--------------------------------------------------------------------------------------------------------|
 | `kind`        | `Enums\ProofKind`: the first factor, a reauthentication with it, an additional factor, a recovery code |
 | `method`      | The method proved, such as `password`, `totp`, `sms` or `passkey`                                      |
-| `channel`     | Its `Channel`, or `null` for a recovery code, which is not a factor                                    |
+| `channel`     | Its `Channel`, or `null` for a recovery code; never a password or unknown one for an additional factor |
 | `reference`   | The factor or credential it was made with; an additional factor always names its factor                |
 | `properties`  | Its `ObservedProperties`                                                                               |
 | `provedAt`    | When it was made, as a `CarbonImmutable`                                                               |
@@ -48,8 +49,8 @@ A proof (`Proofs\Proof`) is one verified authentication event:
 | `challengeId` | The challenge it answered, when one was used                                                           |
 
 The purpose (`Enums\Purpose`: `sign_in`, `reauthenticate`, `step_up`, `enrollment`) must suit the kind: a first factor
-is proved at sign-in and a reauthentication with it carries `reauthenticate`, while an additional factor or a recovery
-code may serve any purpose.
+is proved at sign-in and a reauthentication with it carries `reauthenticate`. An additional factor may serve any
+purpose, and a recovery code any but `enrollment`, since a recovery code cannot confirm an enrolment.
 
 ```php
 use Carbon\CarbonImmutable;
@@ -74,9 +75,11 @@ $proof = new Proof(
 ```
 
 `toArray()` (and JSON) gives the proof with snake_case keys, its parts nested and its time as ISO-8601 to the
-microsecond with its offset; `Proof::fromArray()` reads that form back and refuses one with a missing, mistyped or
-unknown field. The serialised form holds the channel's full destination, so it is for storing a proof, never for an
-event, a log or a response.
+microsecond with its offset; `Proof::fromArray()` reads that form back. It refuses a required field that is missing
+or of another type, and any field it does not know, so a mistyped key is never read as a missing one; a nullable
+field (`channel`, `reference`, `challenge_id`, a channel's `reference`) may be left out and reads as `null`, and a
+missing observed property reads as not observed. The serialised form holds the channel's full destination, so it is
+for storing a proof, never for an event, a log or a response.
 
 ## Assurance levels
 
@@ -116,7 +119,8 @@ and, for the minimum level, its `level`:
 ['minimum_level' => ['level' => 'aal2', 'max_age' => 900]]
 ```
 
-`Requirement::fromArray()` reads that form back and refuses an unknown part, so a mistyped one never weakens it.
+`Requirement::fromArray()` reads that form back and refuses an unknown part, or an unknown field within a part (a
+`level` anywhere but the minimum level, or a mistyped `max_age`), so a mistyped one never weakens it.
 
 ## Evaluations
 
@@ -126,6 +130,13 @@ whether it is `restricted` (it relies on a restricted authenticator, such as an 
 reports, and the requirement parts it has `met` and left `unmet`. Accepted, multifactor and the level are separate
 answers: an email code after a password is accepted without being multifactor. `meetsRequirement()` is true when no
 part is unmet. An `amr` value is never blank or repeated, and no part is listed twice or both met and unmet.
+
+An evaluation never reports more than its own answers allow, whichever combination policy built it:
+
+- `additional_verification` is met only by an accepted or a multifactor combination;
+- `multifactor` and `phishing_resistance` are met only when the combination is multifactor or phishing-resistant;
+- `minimum_level` is never met at `unclassified`;
+- `mfa` is reported only for a multifactor combination, and `mca` only for an accepted one that is not.
 
 ## Verification results
 

@@ -294,6 +294,18 @@ final class RequirementTest extends TestCase
         yield 'an unknown level' => [['minimum_level' => ['level' => 'aal4']], 'The [level] field of the [minimum_level] part of a serialised requirement is not a known value.'];
         yield 'the unclassified level' => [['minimum_level' => ['level' => 'unclassified']], 'A requirement cannot ask for the [unclassified] level.'];
         yield 'a maximum age of zero' => [['phishing_resistance' => ['max_age' => 0]], 'The maximum age of a requirement part must be at least one second.'];
+        yield 'a mistyped maximum age' => [
+            ['multifactor' => ['maxAge' => 300]],
+            'The [maxAge] field of the [multifactor] part of a serialised requirement is not a known field.',
+        ];
+        yield 'a mistyped maximum age beside a level' => [
+            ['minimum_level' => ['level' => 'aal2', 'max-age' => 60]],
+            'The [max-age] field of the [minimum_level] part of a serialised requirement is not a known field.',
+        ];
+        yield 'a level on another part' => [
+            ['phishing_resistance' => ['level' => 'aal2']],
+            'The [level] field of the [phishing_resistance] part of a serialised requirement is not a known field.',
+        ];
     }
 
     /**

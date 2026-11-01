@@ -22,18 +22,18 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 final class ProofKindTest extends TestCase
 {
     /**
-     * The proof kinds, in order, with their stable values.
+     * The proof kinds, in order, each case name with its stable value.
      *
      * @return void
      */
     public function testProofKindsAreTheStableValues(): void
     {
         self::assertSame([
-            'first_factor',
-            'first_factor_reauthentication',
-            'additional_factor',
-            'recovery_code',
-        ], array_map(static fn (ProofKind $kind): string => $kind->value, ProofKind::cases()));
+            'FIRST_FACTOR'                  => 'first_factor',
+            'FIRST_FACTOR_REAUTHENTICATION' => 'first_factor_reauthentication',
+            'ADDITIONAL_FACTOR'             => 'additional_factor',
+            'RECOVERY_CODE'                 => 'recovery_code',
+        ], array_column(ProofKind::cases(), 'value', 'name'));
     }
 
     /**

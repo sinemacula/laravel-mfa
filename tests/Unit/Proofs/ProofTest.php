@@ -88,7 +88,8 @@ final class ProofTest extends TestCase
      */
     public static function provideInvalidProofs(): iterable
     {
-        $signIn = new ProofBinding('user', '42', 'admin', 'session-1', Purpose::SIGN_IN);
+        $signIn     = new ProofBinding('user', '42', 'admin', 'session-1', Purpose::SIGN_IN);
+        $enrollment = new ProofBinding('user', '42', 'admin', 'session-1', Purpose::ENROLLMENT);
 
         yield 'a blank method' => [['method' => ' '], 'The method of a proof must not be blank.'];
         yield 'a first factor without a channel' => [
@@ -97,6 +98,14 @@ final class ProofTest extends TestCase
         ];
         yield 'an additional factor without a channel' => [['channel' => null], 'A proof of kind [additional_factor] needs a channel.'];
         yield 'a recovery code with a channel' => [['kind' => ProofKind::RECOVERY_CODE], 'A proof of kind [recovery_code] has no channel.'];
+        yield 'an additional factor on an unknown channel' => [
+            ['channel' => Channel::unknown()],
+            'An additional factor proof cannot travel on a channel of kind [unknown].',
+        ];
+        yield 'an additional factor on a password channel' => [
+            ['channel' => new Channel(ChannelKind::PASSWORD)],
+            'An additional factor proof cannot travel on a channel of kind [password].',
+        ];
         yield 'a blank reference' => [['reference' => ''], 'The factor or credential reference of a proof must not be blank.'];
         yield 'a reference of spaces' => [['reference' => ' '], 'The factor or credential reference of a proof must not be blank.'];
         yield 'an additional factor without a reference' => [['reference' => null], 'An additional factor proof needs the reference of the factor it was made with.'];
@@ -104,6 +113,10 @@ final class ProofTest extends TestCase
         yield 'a reauthentication at sign-in' => [
             ['kind' => ProofKind::FIRST_FACTOR_REAUTHENTICATION, 'binding' => $signIn],
             'A proof of kind [first_factor_reauthentication] carries the [reauthenticate] purpose, not [sign_in].',
+        ];
+        yield 'a recovery code confirming an enrolment' => [
+            ['kind' => ProofKind::RECOVERY_CODE, 'channel' => null, 'binding' => $enrollment],
+            'A recovery code proof cannot confirm an enrolment.',
         ];
         yield 'a negative generation' => [['generation' => -1], 'The verification generation of a proof must not be negative.'];
         yield 'a blank challenge id' => [['challengeId' => ''], 'The challenge id of a proof must not be blank.'];
@@ -129,8 +142,8 @@ final class ProofTest extends TestCase
 
     /**
      * A reauthentication with the first factor carries the reauthenticate
-     * purpose, and an additional factor or a recovery code may serve any
-     * purpose.
+     * purpose, an additional factor may serve any purpose, and a recovery code
+     * any but an enrolment.
      *
      * @return void
      */
@@ -146,8 +159,31 @@ final class ProofTest extends TestCase
             $binding = new ProofBinding('user', '42', 'admin', 'session-1', $purpose);
 
             self::assertSame($purpose, self::proof(['binding' => $binding])->binding->purpose);
+        }
+
+        foreach ([Purpose::SIGN_IN, Purpose::REAUTHENTICATE, Purpose::STEP_UP] as $purpose) {
+            $binding = new ProofBinding('user', '42', 'admin', 'session-1', $purpose);
+
             self::assertSame($purpose, self::proof(['kind' => ProofKind::RECOVERY_CODE, 'channel' => null, 'binding' => $binding])->binding->purpose);
         }
+    }
+
+    /**
+     * A first factor or a reauthentication with it may travel on an unknown
+     * channel, which only an additional factor is refused.
+     *
+     * @return void
+     */
+    public function testAFirstFactorMayHaveAnUnknownChannel(): void
+    {
+        $signIn         = new ProofBinding('user', '42', 'admin', 'session-1', Purpose::SIGN_IN);
+        $reauthenticate = new ProofBinding('user', '42', 'admin', 'session-1', Purpose::REAUTHENTICATE);
+
+        $first = self::proof(['kind' => ProofKind::FIRST_FACTOR, 'channel' => Channel::unknown(), 'reference' => null, 'binding' => $signIn]);
+        $again = self::proof(['kind' => ProofKind::FIRST_FACTOR_REAUTHENTICATION, 'channel' => Channel::unknown(), 'reference' => null, 'binding' => $reauthenticate]);
+
+        self::assertSame(ChannelKind::UNKNOWN, $first->channel?->kind);
+        self::assertSame(ChannelKind::UNKNOWN, $again->channel?->kind);
     }
 
     /**
@@ -220,9 +256,15 @@ final class ProofTest extends TestCase
      */
     public static function provideMalformedProofs(): iterable
     {
-        $valid = self::proof()->toArray();
+        $valid   = self::proof()->toArray();
+        $binding = self::proof()->binding->toArray();
 
         yield 'an unknown kind' => [['kind' => 'second_factor'] + $valid, 'The [kind] field of a serialised proof is not a known value.'];
+        yield 'an unknown field' => [['challengeId' => 'challenge-9'] + $valid, 'The [challengeId] field of a serialised proof is not a known field.'];
+        yield 'an unknown field in the binding' => [
+            ['binding' => ['session' => 'session-2'] + $binding] + $valid,
+            'The [session] field of a serialised proof binding is not a known field.',
+        ];
         yield 'no method' => [array_diff_key($valid, ['method' => true]), 'The [method] field of a serialised proof must be a string.'];
         yield 'a channel that is not an array' => [['channel' => 'sms'] + $valid, 'The [channel] field of a serialised proof must be an array or null.'];
         yield 'a reference that is not a string' => [['reference' => 1] + $valid, 'The [reference] field of a serialised proof must be a string or null.'];
@@ -241,6 +283,10 @@ final class ProofTest extends TestCase
         yield 'a challenge id that is not a string' => [['challenge_id' => 9] + $valid, 'The [challenge_id] field of a serialised proof must be a string or null.'];
         yield 'a malformed channel' => [['channel' => ['kind' => 'fax']] + $valid, 'The [kind] field of a serialised channel is not a known value.'];
         yield 'a contradiction' => [['channel' => null] + $valid, 'A proof of kind [additional_factor] needs a channel.'];
+        yield 'a recovery code confirming an enrolment' => [
+            ['kind' => 'recovery_code', 'channel' => null, 'binding' => ['purpose' => 'enrollment'] + $binding] + $valid,
+            'A recovery code proof cannot confirm an enrolment.',
+        ];
     }
 
     /**

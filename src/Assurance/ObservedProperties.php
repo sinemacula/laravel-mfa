@@ -74,7 +74,7 @@ final readonly class ObservedProperties implements \JsonSerializable, Arrayable
 
     /**
      * Read the properties back from their serialised form. A missing key reads
-     * as not observed.
+     * as not observed, and an unknown one is refused.
      *
      * @param  array<array-key, mixed>  $data
      * @return self
@@ -84,6 +84,8 @@ final readonly class ObservedProperties implements \JsonSerializable, Arrayable
     public static function fromArray(array $data): self
     {
         $fields = new SerializedFields($data, 'serialised observed properties');
+
+        $fields->refuseUnknown('user_presence', 'user_verification', 'backup_eligibility', 'backup_state', 'phishing_resistance', 'key_protection');
 
         return new self(
             $fields->nullableBool('user_presence'),

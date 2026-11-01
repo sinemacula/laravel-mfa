@@ -80,6 +80,8 @@ final readonly class Channel implements \JsonSerializable, Arrayable
     {
         $fields = new SerializedFields($data, 'a serialised channel');
 
+        $fields->refuseUnknown('kind', 'reference');
+
         return new self($fields->enum('kind', ChannelKind::class), $fields->nullableString('reference'));
     }
 

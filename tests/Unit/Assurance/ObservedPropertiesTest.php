@@ -163,6 +163,7 @@ final class ObservedPropertiesTest extends TestCase
             ['phishing_resistance' => []],
             'The [phishing_resistance] field of serialised observed properties must be a boolean or null.',
         ];
+        yield 'an unknown field' => [['user_presence' => true, 'uv' => true], 'The [uv] field of serialised observed properties is not a known field.'];
         yield 'an unknown key protection' => [['key_protection' => 'quantum'], 'The [key_protection] field of serialised observed properties is not a known value.'];
         yield 'inconsistent backup flags' => [
             ['backup_eligibility' => false, 'backup_state' => true],

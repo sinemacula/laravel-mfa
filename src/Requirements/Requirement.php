@@ -18,8 +18,8 @@ use SineMacula\Laravel\Mfa\Support\SerializedFields;
  * Built from `none()` by asking for each part. `strictest()` composes several
  * requirements into one a session meets only when it meets each of them. The
  * serialised form names each part asked for, so a requirement can be stored,
- * configured or carried on an exception, and a mistyped part is refused rather
- * than dropped.
+ * configured or carried on an exception, and a mistyped part or field is
+ * refused rather than dropped.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, array<string, int|string|null>>
  *
@@ -81,7 +81,8 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     /**
      * Read a requirement back from its serialised form: each part asked for,
      * keyed by its value, with an optional `max_age` and, for the minimum
-     * level, its `level`.
+     * level, its `level`. An unknown part, or an unknown field within a part,
+     * is refused, so a mistyped one never drops a maximum age.
      *
      * @param  array<array-key, mixed>  $data
      * @return self
@@ -96,6 +97,8 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
         foreach (array_keys($data) as $key) {
             $part = RequirementPart::tryFrom((string) $key) ?? throw new \InvalidArgumentException(sprintf('The [%s] part of a serialised requirement is not a known part.', $key));
             $read = new SerializedFields($fields->array($part->value), sprintf('the [%s] part of a serialised requirement', $part->value));
+
+            $read->refuseUnknown(...self::fieldsOf($part));
 
             $requirement = $part === RequirementPart::MINIMUM_LEVEL
                 ? $requirement->withMinimumLevel($read->enum('level', AssuranceLevel::class), $read->nullableInt('max_age'))
@@ -254,6 +257,18 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
         }
 
         return new self([$part->value => $maxAge] + $this->maxAges, $this->minimumLevel);
+    }
+
+    /**
+     * The fields the serialised form of a part may hold: its maximum age and,
+     * for the minimum level, the level.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Enums\RequirementPart  $part
+     * @return list<string>
+     */
+    private static function fieldsOf(RequirementPart $part): array
+    {
+        return $part === RequirementPart::MINIMUM_LEVEL ? ['level', 'max_age'] : ['max_age'];
     }
 
     /**

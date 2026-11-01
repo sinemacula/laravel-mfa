@@ -153,6 +153,7 @@ final class ChannelTest extends TestCase
         yield 'an unknown kind' => [['kind' => 'carrier_pigeon'], 'The [kind] field of a serialised channel is not a known value.'];
         yield 'a reference that is not a string' => [['kind' => 'sms', 'reference' => 7], 'The [reference] field of a serialised channel must be a string or null.'];
         yield 'a blank reference' => [['kind' => 'sms', 'reference' => ''], 'A channel reference must not be blank.'];
+        yield 'an unknown field' => [['kind' => 'sms', 'destination' => '+447700900123'], 'The [destination] field of a serialised channel is not a known field.'];
     }
 
     /**

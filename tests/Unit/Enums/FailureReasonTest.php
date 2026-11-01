@@ -21,26 +21,26 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final class FailureReasonTest extends TestCase
 {
     /**
-     * The failure reasons, in order, with their stable values.
+     * The failure reasons, in order, each case name with its stable value.
      *
      * @return void
      */
     public function testFailureReasonsAreTheReportedValues(): void
     {
         self::assertSame([
-            'invalid_code',
-            'expired',
-            'replayed',
-            'locked',
-            'not_confirmed',
-            'not_accepted',
-            'type_not_enabled',
-            'no_factor',
-            'not_found',
-            'sending_capped',
-            'mfa_enrollment_required',
-            'identity_inactive',
-            'machine_identity',
-        ], array_map(static fn (FailureReason $reason): string => $reason->value, FailureReason::cases()));
+            'INVALID_CODE'            => 'invalid_code',
+            'EXPIRED'                 => 'expired',
+            'REPLAYED'                => 'replayed',
+            'LOCKED'                  => 'locked',
+            'NOT_CONFIRMED'           => 'not_confirmed',
+            'NOT_ACCEPTED'            => 'not_accepted',
+            'TYPE_NOT_ENABLED'        => 'type_not_enabled',
+            'NO_FACTOR'               => 'no_factor',
+            'NOT_FOUND'               => 'not_found',
+            'SENDING_CAPPED'          => 'sending_capped',
+            'MFA_ENROLLMENT_REQUIRED' => 'mfa_enrollment_required',
+            'IDENTITY_INACTIVE'       => 'identity_inactive',
+            'MACHINE_IDENTITY'        => 'machine_identity',
+        ], array_column(FailureReason::cases(), 'value', 'name'));
     }
 }

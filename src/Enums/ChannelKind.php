@@ -50,4 +50,21 @@ enum ChannelKind: string
             default       => true,
         };
     }
+
+    /**
+     * Whether an enrolled factor's proof may travel on a channel of this kind.
+     * A password and an unknown channel belong to first factors only: every
+     * factor has a real channel, and an unknown one establishes no
+     * independence.
+     *
+     * @return bool
+     */
+    public function carriesFactor(): bool
+    {
+        return match ($this) {
+            self::PASSWORD,
+            self::UNKNOWN => false,
+            default       => true,
+        };
+    }
 }

@@ -20,17 +20,17 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 final class PurposeTest extends TestCase
 {
     /**
-     * The purposes, in order, with their stable values.
+     * The purposes, in order, each case name with its stable value.
      *
      * @return void
      */
     public function testPurposesAreTheStableValues(): void
     {
         self::assertSame([
-            'sign_in',
-            'reauthenticate',
-            'step_up',
-            'enrollment',
-        ], array_map(static fn (Purpose $purpose): string => $purpose->value, Purpose::cases()));
+            'SIGN_IN'        => 'sign_in',
+            'REAUTHENTICATE' => 'reauthenticate',
+            'STEP_UP'        => 'step_up',
+            'ENROLLMENT'     => 'enrollment',
+        ], array_column(Purpose::cases(), 'value', 'name'));
     }
 }

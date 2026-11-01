@@ -21,17 +21,17 @@ use SineMacula\Laravel\Mfa\Enums\Operation;
 final class OperationTest extends TestCase
 {
     /**
-     * The operations, in order, with their stable names.
+     * The operations, in order, each case name with its stable value.
      *
      * @return void
      */
     public function testOperationsAreTheStableNames(): void
     {
         self::assertSame([
-            'mfa.add_factor',
-            'mfa.replace_factor',
-            'mfa.remove_factor',
-            'mfa.generate_recovery_codes',
-        ], array_map(static fn (Operation $operation): string => $operation->value, Operation::cases()));
+            'ADD_FACTOR'              => 'mfa.add_factor',
+            'REPLACE_FACTOR'          => 'mfa.replace_factor',
+            'REMOVE_FACTOR'           => 'mfa.remove_factor',
+            'GENERATE_RECOVERY_CODES' => 'mfa.generate_recovery_codes',
+        ], array_column(Operation::cases(), 'value', 'name'));
     }
 }

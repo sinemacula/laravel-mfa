@@ -16,11 +16,13 @@ referencing another's.
 - Nothing observed is assumed. `ObservedProperties` holds `null` for each property not observed and never defaults to
   true, so a level, an `amr` value or a context key is only derived from what a proof observed, never from a factor's
   type or from configuration.
-- A channel's reference is never blank, and a password or an unknown channel takes none.
+- A channel's reference is never blank, and a password or an unknown channel takes none; those two carry first
+  factors only, never an enrolled factor.
 - A proof's parts agree with its kind: a recovery code has no channel and every other kind has one; an additional
-  factor names the factor it was made with; a first factor carries `sign_in` and a reauthentication with it
-  `reauthenticate`; the verification generation is never negative; a binding's identity type and key, application and
-  session are never blank.
+  factor names the factor it was made with and never travels on a password or unknown channel; a first factor carries
+  `sign_in` and a reauthentication with it `reauthenticate`; a recovery code never carries `enrollment`, as it cannot
+  confirm an enrolment; the verification generation is never negative; a binding's identity type and key, application
+  and session are never blank.
 - `AssuranceLevel::meets()` orders `aal1` below `aal2` below `aal3`, and `unclassified` meets no minimum.
 - A requirement is built from `Requirement::none()` and is immutable: each `with...()` returns a new requirement. A
   maximum age is at least one second, and `unclassified` cannot be asked for. `Requirement::strictest()` asks for every
@@ -28,12 +30,19 @@ referencing another's.
   allows any; the result is the same in any order of its inputs, and a session that meets it meets each input.
 - An evaluation's `amr` values are never blank or repeated, and a requirement part is listed at most once across met
   and unmet.
+- An evaluation reports nothing its own answers rule out: `additional_verification` is met only when the combination
+  is accepted or multifactor, `multifactor` only when it is multifactor, `phishing_resistance` only when it is
+  phishing-resistant, and `minimum_level` never at `unclassified`; `mfa` is in `amr` only for a multifactor
+  combination, and `mca` only for an accepted one that is not. A replaced combination policy therefore cannot report
+  more than it found.
 - A verification result is verified (a proof and its evaluation) or failed (a reason and a non-blank detail), never
   both. Only a `locked` failure carries the time the lockout lifts, and it always does.
 - The serialised forms use snake_case keys and enum values. A proof's time is ISO-8601 to the microsecond with its
   offset. Reading a form back (`fromArray()` on `Channel`, `ObservedProperties`, `ProofBinding`, `Proof` and
-  `Requirement`) refuses a missing, mistyped or unknown field rather than building a partial value, and a
-  requirement refuses an unknown part rather than dropping it.
+  `Requirement`) refuses a required field that is missing or of another type, and any field the form does not know,
+  rather than building a partial value; a nullable field may be left out and reads as `null`, and a missing observed
+  property reads as not observed. A requirement refuses an unknown part, and an unknown field within a part, rather
+  than dropping it, so a mistyped `max_age` never removes a freshness limit.
 - The enum values are stable names: renaming a case's value is a breaking change, and each is pinned by a test.
 
 ## Success Path
@@ -87,6 +96,10 @@ referencing another's.
   `testNothingIsObservedByDefault`
 - `tests/Unit/Assurance/EvaluationTest.php`
   `testAnInconsistentEvaluationIsRefused`
+- `tests/Unit/Assurance/EvaluationTest.php`
+  `testAContradictoryEvaluationIsRefused`
+- `tests/Unit/Support/SerializedFieldsTest.php`
+  `testAnUnknownFieldIsRefused`
 - `tests/Unit/Verification/VerificationResultTest.php`
   `testALockoutWithoutItsTimeIsRefused`
 - `tests/Unit/Enums/FailureReasonTest.php`

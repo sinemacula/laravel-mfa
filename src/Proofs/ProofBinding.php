@@ -67,6 +67,8 @@ final readonly class ProofBinding implements \JsonSerializable, Arrayable
     {
         $fields = new SerializedFields($data, 'a serialised proof binding');
 
+        $fields->refuseUnknown('identity_type', 'identity_key', 'application', 'session_id', 'purpose');
+
         return new self(
             $fields->string('identity_type'),
             $fields->string('identity_key'),

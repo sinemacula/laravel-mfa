@@ -21,18 +21,18 @@ use SineMacula\Laravel\Mfa\Enums\PendingAction;
 final class PendingActionTest extends TestCase
 {
     /**
-     * The pending actions, in order, with their stable values.
+     * The pending actions, in order, each case name with its stable value.
      *
      * @return void
      */
     public function testPendingActionsAreTheStableValues(): void
     {
         self::assertSame([
-            'mfa.list_factors',
-            'mfa.send_code',
-            'mfa.verify',
-            'mfa.start_bootstrap_enrollment',
-            'mfa.confirm_bootstrap_enrollment',
-        ], array_map(static fn (PendingAction $action): string => $action->value, PendingAction::cases()));
+            'LIST_FACTORS'                 => 'mfa.list_factors',
+            'SEND_CODE'                    => 'mfa.send_code',
+            'VERIFY'                       => 'mfa.verify',
+            'START_BOOTSTRAP_ENROLLMENT'   => 'mfa.start_bootstrap_enrollment',
+            'CONFIRM_BOOTSTRAP_ENROLLMENT' => 'mfa.confirm_bootstrap_enrollment',
+        ], array_column(PendingAction::cases(), 'value', 'name'));
     }
 }

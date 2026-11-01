@@ -9,6 +9,7 @@ use Illuminate\Contracts\Support\Arrayable;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Support\SerializedFields;
 
 /**
@@ -25,10 +26,11 @@ use SineMacula\Laravel\Mfa\Support\SerializedFields;
  *
  * The rules between the parts are checked on construction: a recovery code has
  * no channel and every other kind has one; an additional factor names the
- * factor it was made with; a first factor is proved at sign-in and a
- * reauthentication with it carries the reauthenticate purpose. The serialised
- * form holds the channel's full destination, so it is for storing the proof,
- * never for an event, a log or a response.
+ * factor it was made with and travels on a factor's channel, never a password
+ * or an unknown one; a first factor is proved at sign-in and a reauthentication
+ * with it carries the reauthenticate purpose; a recovery code never confirms an
+ * enrolment. The serialised form holds the channel's full destination, so it is
+ * for storing the proof, never for an event, a log or a response.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, mixed>
  *
@@ -111,7 +113,10 @@ final readonly class Proof implements \JsonSerializable, Arrayable
      */
     public static function fromArray(array $data): self
     {
-        $fields  = new SerializedFields($data, 'a serialised proof');
+        $fields = new SerializedFields($data, 'a serialised proof');
+
+        $fields->refuseUnknown('kind', 'method', 'channel', 'reference', 'properties', 'proved_at', 'binding', 'generation', 'challenge_id');
+
         $channel = $fields->nullableArray('channel');
 
         return new self(
@@ -181,7 +186,8 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Refuse a channel the proof's kind does not travel on, or a missing one.
+     * Refuse a channel the proof's kind does not travel on, or a missing one,
+     * and an additional factor on a password or unknown channel.
      *
      * @return void
      *
@@ -195,6 +201,12 @@ final readonly class Proof implements \JsonSerializable, Arrayable
 
         if (!$this->kind->hasChannel() && $this->channel !== null) {
             throw new \InvalidArgumentException(sprintf('A proof of kind [%s] has no channel.', $this->kind->value));
+        }
+
+        $channel = $this->channel;
+
+        if ($this->kind === ProofKind::ADDITIONAL_FACTOR && $channel !== null && !$channel->kind->carriesFactor()) {
+            throw new \InvalidArgumentException(sprintf('An additional factor proof cannot travel on a channel of kind [%s].', $channel->kind->value));
         }
     }
 
@@ -218,7 +230,8 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Refuse a purpose the proof's kind does not carry.
+     * Refuse a purpose the proof's kind does not carry, and a recovery code
+     * bound to an enrolment, which a recovery code cannot confirm.
      *
      * @return void
      *
@@ -232,6 +245,10 @@ final readonly class Proof implements \JsonSerializable, Arrayable
 
         if ($required !== null && $required !== $purpose) {
             throw new \InvalidArgumentException(sprintf('A proof of kind [%s] carries the [%s] purpose, not [%s].', $this->kind->value, $required->value, $purpose->value));
+        }
+
+        if ($this->kind === ProofKind::RECOVERY_CODE && $purpose === Purpose::ENROLLMENT) {
+            throw new \InvalidArgumentException('A recovery code proof cannot confirm an enrolment.');
         }
     }
 }

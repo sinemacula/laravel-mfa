@@ -20,6 +20,11 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
  * phone-code sign-in is accepted at AAL1 only. `amr` states only what happened,
  * and is never enough on its own to carry a result.
  *
+ * An evaluation that contradicts itself is refused when it is built: a part
+ * reported met that its own answers rule out, `mfa` without a multifactor
+ * combination, or `mca` without an accepted one that is not multifactor. A
+ * replaced combination policy therefore cannot report more than it found.
+ *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, mixed>
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -27,6 +32,12 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
  */
 final readonly class Evaluation implements \JsonSerializable, Arrayable
 {
+    /** @var string The `amr` value of multifactor authentication. */
+    private const string AMR_MULTIFACTOR = 'mfa';
+
+    /** @var string The `amr` value of an accepted additional verification that is not multifactor. */
+    private const string AMR_MULTIPLE_CHANNEL = 'mca';
+
     /**
      * Constructor.
      *
@@ -69,6 +80,9 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
     ) {
         self::assertAmr($amr);
         self::assertParts($met, $unmet);
+
+        $this->assertMet();
+        $this->assertReservedAmr();
     }
 
     /**
@@ -131,6 +145,52 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
             if (array_search($value, $amr, true) !== $index) {
                 throw new \InvalidArgumentException(sprintf('The amr value [%s] is listed more than once.', $value));
             }
+        }
+    }
+
+    /**
+     * Refuse a part reported met that the evaluation's own answers rule out: an
+     * additional verification without an accepted or multifactor combination,
+     * multifactor authentication or phishing resistance the combination does
+     * not have, or a minimum level when the level is unclassified, which meets
+     * none.
+     *
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function assertMet(): void
+    {
+        foreach ($this->met as $part) {
+            $possible = match ($part) {
+                RequirementPart::ADDITIONAL_VERIFICATION => $this->accepted || $this->multifactor,
+                RequirementPart::MULTIFACTOR             => $this->multifactor,
+                RequirementPart::MINIMUM_LEVEL           => $this->level !== AssuranceLevel::UNCLASSIFIED,
+                RequirementPart::PHISHING_RESISTANCE     => $this->phishingResistant,
+            };
+
+            if (!$possible) {
+                throw new \InvalidArgumentException(sprintf('The [%s] part cannot be met by a combination that does not provide it.', $part->value));
+            }
+        }
+    }
+
+    /**
+     * Refuse `mfa` unless the combination is multifactor, and `mca` unless it
+     * is an accepted additional verification that is not.
+     *
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function assertReservedAmr(): void
+    {
+        if (in_array(self::AMR_MULTIFACTOR, $this->amr, true) && !$this->multifactor) {
+            throw new \InvalidArgumentException('The amr value [mfa] needs a multifactor combination.');
+        }
+
+        if (in_array(self::AMR_MULTIPLE_CHANNEL, $this->amr, true) && (!$this->accepted || $this->multifactor)) {
+            throw new \InvalidArgumentException('The amr value [mca] needs an accepted combination that is not multifactor.');
         }
     }
 

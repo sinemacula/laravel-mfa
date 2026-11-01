@@ -118,6 +118,7 @@ final class ProofBindingTest extends TestCase
         yield 'no session id' => [array_diff_key($valid, ['session_id' => true]), 'The [session_id] field of a serialised proof binding must be a string.'];
         yield 'an unknown purpose' => [['purpose' => 'sign_up'] + $valid, 'The [purpose] field of a serialised proof binding is not a known value.'];
         yield 'a blank session id' => [['session_id' => ''] + $valid, 'The session id of a proof binding must not be blank.'];
+        yield 'an unknown field' => [['tenant' => 'acme'] + $valid, 'The [tenant] field of a serialised proof binding is not a known field.'];
     }
 
     /**

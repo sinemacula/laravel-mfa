@@ -21,17 +21,17 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 final class RequirementPartTest extends TestCase
 {
     /**
-     * The parts, in order, with their stable values.
+     * The parts, in order, each case name with its stable value.
      *
      * @return void
      */
     public function testPartsAreTheStableValues(): void
     {
         self::assertSame([
-            'additional_verification',
-            'multifactor',
-            'minimum_level',
-            'phishing_resistance',
-        ], array_map(static fn (RequirementPart $part): string => $part->value, RequirementPart::cases()));
+            'ADDITIONAL_VERIFICATION' => 'additional_verification',
+            'MULTIFACTOR'             => 'multifactor',
+            'MINIMUM_LEVEL'           => 'minimum_level',
+            'PHISHING_RESISTANCE'     => 'phishing_resistance',
+        ], array_column(RequirementPart::cases(), 'value', 'name'));
     }
 }

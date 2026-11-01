@@ -71,6 +71,49 @@ final class SerializedFieldsTest extends TestCase
     }
 
     /**
+     * Only the known fields pass, whether they are present or not.
+     *
+     * @return void
+     */
+    public function testKnownFieldsPass(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        (new SerializedFields(['string' => 'value', 'null' => null], 'a sample'))->refuseUnknown('string', 'null', 'missing');
+        (new SerializedFields([], 'a sample'))->refuseUnknown();
+    }
+
+    /**
+     * Forms that hold a field the reader does not know.
+     *
+     * @return iterable<string, array{array<array-key, mixed>, string}>
+     */
+    public static function provideUnknownFields(): iterable
+    {
+        yield 'a mistyped key' => [['string' => 'value', 'strnig' => 'value'], 'The [strnig] field of a sample is not a known field.'];
+        yield 'a key that differs in case' => [['String' => 'value'], 'The [String] field of a sample is not a known field.'];
+        yield 'a list key' => [['value'], 'The [0] field of a sample is not a known field.'];
+        yield 'a null field' => [['extra' => null], 'The [extra] field of a sample is not a known field.'];
+    }
+
+    /**
+     * A field the reader does not know is refused, so a mistyped key is never
+     * read as a missing one.
+     *
+     * @param  array<array-key, mixed>  $data
+     * @param  string  $message
+     * @return void
+     */
+    #[DataProvider('provideUnknownFields')]
+    public function testAnUnknownFieldIsRefused(array $data, string $message): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+
+        (new SerializedFields($data, 'a sample'))->refuseUnknown('string', 'null');
+    }
+
+    /**
      * Fields that are not of the type read.
      *
      * @return iterable<string, array{callable(\SineMacula\Laravel\Mfa\Support\SerializedFields): mixed, string}>

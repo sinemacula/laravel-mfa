@@ -111,6 +111,92 @@ final class EvaluationTest extends TestCase
     }
 
     /**
+     * A part is met only when the combination provides it: an additional
+     * verification by a multifactor first factor alone, and a level that is
+     * classified.
+     *
+     * @return void
+     */
+    public function testAPartIsMetWhenTheCombinationProvidesIt(): void
+    {
+        $met        = [RequirementPart::ADDITIONAL_VERIFICATION, RequirementPart::MULTIFACTOR, RequirementPart::MINIMUM_LEVEL, RequirementPart::PHISHING_RESISTANCE];
+        $evaluation = new Evaluation(false, true, AssuranceLevel::AAL2, true, false, ['pop', 'user', 'mfa'], $met, []);
+
+        self::assertSame($met, $evaluation->met);
+        self::assertTrue($evaluation->meetsRequirement());
+        $aal1 = new Evaluation(true, false, AssuranceLevel::AAL1, false, false, ['otp', 'mca'], [RequirementPart::MINIMUM_LEVEL], []);
+
+        self::assertSame([RequirementPart::MINIMUM_LEVEL], $aal1->met);
+    }
+
+    /**
+     * Evaluations whose answers rule out a part they report met, or a reserved
+     * `amr` value they report.
+     *
+     * @return iterable<string, array{bool, bool, \SineMacula\Laravel\Mfa\Enums\AssuranceLevel, bool, list<string>, list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>, string}>
+     */
+    public static function provideContradictoryEvaluations(): iterable
+    {
+        yield 'an additional verification met without an accepted combination' => [
+            false, false, AssuranceLevel::AAL1, false, [], [RequirementPart::ADDITIONAL_VERIFICATION],
+            'The [additional_verification] part cannot be met by a combination that does not provide it.',
+        ];
+        yield 'multifactor met without multifactor' => [
+            true, false, AssuranceLevel::AAL2, false, [], [RequirementPart::MULTIFACTOR],
+            'The [multifactor] part cannot be met by a combination that does not provide it.',
+        ];
+        yield 'a minimum level met while unclassified' => [
+            true, true, AssuranceLevel::UNCLASSIFIED, false, [], [RequirementPart::MINIMUM_LEVEL],
+            'The [minimum_level] part cannot be met by a combination that does not provide it.',
+        ];
+        yield 'phishing resistance met without it' => [
+            true, true, AssuranceLevel::AAL2, false, [], [RequirementPart::PHISHING_RESISTANCE],
+            'The [phishing_resistance] part cannot be met by a combination that does not provide it.',
+        ];
+        yield 'mfa without multifactor' => [
+            true, false, AssuranceLevel::AAL1, false, ['otp', 'mfa'], [],
+            'The amr value [mfa] needs a multifactor combination.',
+        ];
+        yield 'mca with multifactor' => [
+            true, true, AssuranceLevel::AAL2, false, ['otp', 'mca'], [],
+            'The amr value [mca] needs an accepted combination that is not multifactor.',
+        ];
+        yield 'mca without an accepted combination' => [
+            false, false, AssuranceLevel::UNCLASSIFIED, false, ['mca'], [],
+            'The amr value [mca] needs an accepted combination that is not multifactor.',
+        ];
+    }
+
+    /**
+     * An evaluation that reports a part met, or a reserved `amr` value, which
+     * its own answers rule out is refused.
+     *
+     * @param  bool  $accepted
+     * @param  bool  $multifactor
+     * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
+     * @param  bool  $phishingResistant
+     * @param  list<string>  $amr
+     * @param  list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>  $met
+     * @param  string  $message
+     * @return void
+     */
+    #[DataProvider('provideContradictoryEvaluations')]
+    public function testAContradictoryEvaluationIsRefused(
+        bool $accepted,
+        bool $multifactor,
+        AssuranceLevel $level,
+        bool $phishingResistant,
+        array $amr,
+        array $met,
+        string $message,
+    ): void {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+
+        new Evaluation($accepted, $multifactor, $level, $phishingResistant, false, $amr, $met, []);
+    }
+
+    /**
      * The serialised form uses snake_case keys and the values of the level and
      * the parts.
      *

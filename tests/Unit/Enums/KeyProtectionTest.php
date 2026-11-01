@@ -20,15 +20,15 @@ use SineMacula\Laravel\Mfa\Enums\KeyProtection;
 final class KeyProtectionTest extends TestCase
 {
     /**
-     * The key protections, in order, with their stable values.
+     * The key protections, in order, each case name with its stable value.
      *
      * @return void
      */
     public function testKeyProtectionsAreTheStableValues(): void
     {
         self::assertSame([
-            'hardware',
-            'software',
-        ], array_map(static fn (KeyProtection $protection): string => $protection->value, KeyProtection::cases()));
+            'HARDWARE' => 'hardware',
+            'SOFTWARE' => 'software',
+        ], array_column(KeyProtection::cases(), 'value', 'name'));
     }
 }

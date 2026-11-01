@@ -10,7 +10,9 @@ namespace SineMacula\Laravel\Mfa\Support;
  * field is missing or of another type.
  *
  * Every refusal is an `InvalidArgumentException` naming the field and what it
- * belongs to. A nullable reader treats a missing field as `null`.
+ * belongs to. A nullable reader treats a missing field as `null`, and a field
+ * the form does not know is refused, so a mistyped key is never read as a
+ * missing one.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,6 +35,23 @@ final readonly class SerializedFields
         /** What the form is of, as the messages name it, such as `a serialised proof`. */
         private string $subject,
     ) {}
+
+    /**
+     * Refuse any field other than the given ones.
+     *
+     * @param  string  ...$known
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function refuseUnknown(string ...$known): void
+    {
+        foreach (array_keys($this->data) as $key) {
+            if (!in_array($key, $known, true)) {
+                throw $this->refuse((string) $key, 'is not a known field');
+            }
+        }
+    }
 
     /**
      * Read a field that must be a string.
