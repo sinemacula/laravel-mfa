@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -70,13 +69,13 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     }
 
     /**
-     * Test successful Eloquent verify resets the attempt counter.
+     * Test successful Eloquent verify resets the factor's failures in a row.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testVerifySuccessResetsAttemptCounter(): void
+    public function testVerifySuccessResetsConsecutiveFailures(): void
     {
         [$factor] = $this->seedEloquentVerifySuccessScenario();
 
@@ -84,7 +83,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
 
         $factor->refresh();
 
-        self::assertSame(0, $factor->getAttempts());
+        self::assertSame(0, $factor->getConsecutiveFailures());
     }
 
     /**
@@ -103,24 +102,6 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
         $factor->refresh();
 
         self::assertNotNull($factor->getLastUsedAt());
-    }
-
-    /**
-     * Test successful Eloquent verify clears the pending code.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testVerifySuccessClearsPendingCode(): void
-    {
-        [$factor] = $this->seedEloquentVerifySuccessScenario();
-
-        $this->manager()->verify('email', $factor, self::VALID_CODE);
-
-        $factor->refresh();
-
-        self::assertNull($factor->getCode());
     }
 
     /**
@@ -246,9 +227,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
             'authenticatable_id'   => (string) $user->id,
             'type'                 => 'email',
             'destination'          => 'v2@example.com',
-            'code'                 => self::VALID_CODE,
-            'expires_at'           => Carbon::now()->addMinutes(10),
-            'attempts'             => 1,
+            'consecutive_failures' => 1,
         ]);
 
         $driver = \Mockery::mock(FactorDriver::class);

@@ -35,8 +35,9 @@ A recorded proof stops counting, and is left out, when:
 - it cannot be read back.
 
 A successful `Mfa::verify()` records an additional factor proof of the factor on the driver's channel, or a recovery
-code proof for a backup code. A driver whose channel cannot carry a factor (`ChannelKind::carriesFactor()`) proves
-nothing.
+code proof for a backup code, bound to the purpose the verification was made for (`sign_in` unless you pass another).
+A driver whose channel cannot carry a factor (`ChannelKind::carriesFactor()`) proves nothing, and neither does a
+recovery code verified for an enrolment.
 
 ## Sign-ins
 

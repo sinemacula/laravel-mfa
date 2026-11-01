@@ -12,12 +12,15 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Codes\NullSmsGateway;
+use SineMacula\Laravel\Mfa\Codes\CodeService;
+use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
+use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
+use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MfaPolicy;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
-use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
@@ -96,15 +99,16 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test binds sms gateway to null sms gateway.
+     * Test binds the SMS and email senders to the null senders.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBindsSmsGatewayToNullSmsGateway(): void
+    public function testBindsTheSendersToTheNullSenders(): void
     {
-        self::assertInstanceOf(NullSmsGateway::class, $this->container()->make(SmsGateway::class));
+        self::assertInstanceOf(NullSmsSender::class, $this->container()->make(SmsSender::class));
+        self::assertInstanceOf(NullEmailSender::class, $this->container()->make(EmailSender::class));
     }
 
     /**
@@ -119,7 +123,9 @@ final class MfaServiceProviderTest extends TestCase
             EventDispatcher::class,
             FactorService::class,
             DriverResolver::class,
-            SmsGateway::class,
+            SmsSender::class,
+            EmailSender::class,
+            CodeService::class,
             MfaPolicy::class,
             RequirementService::class,
             ProofService::class,

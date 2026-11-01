@@ -138,6 +138,19 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Record nothing — the fixture keeps no time step, so no step is ever
+     * accepted.
+     *
+     * @param  int  $step
+     * @return bool
+     */
+    #[\Override]
+    public function storeAcceptedStep(int $step): bool
+    {
+        return false;
+    }
+
+    /**
      * Return the conventional status column name.
      *
      * @return string
@@ -226,96 +239,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional code column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getCodeName(): string
-    {
-        return 'code';
-    }
-
-    /**
-     * Return the conventional expires-at column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getExpiresAtName(): string
-    {
-        return 'expires_at';
-    }
-
-    /**
-     * Return the conventional attempts column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getAttemptsName(): string
-    {
-        return 'attempts';
-    }
-
-    /**
-     * Return the conventional locked-until column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getLockedUntilName(): string
-    {
-        return 'locked_until';
-    }
-
-    /**
-     * Return the conventional last-attempted-at column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getLastAttemptedAtName(): string
-    {
-        return 'last_attempted_at';
-    }
-
-    /**
-     * No-op — the fixture does not track attempts.
-     *
-     * @param  ?\Carbon\CarbonInterface  $at
-     * @return void
-     */
-    #[\Override]
-    public function recordAttempt(?CarbonInterface $at = null): void
-    {
-        // Intentionally empty — see method docblock.
-    }
-
-    /**
-     * No-op — the fixture does not track attempts.
-     *
-     * @return void
-     */
-    #[\Override]
-    public function resetAttempts(): void
-    {
-        // Intentionally empty — see method docblock.
-    }
-
-    /**
-     * No-op — the fixture does not track lockouts.
-     *
-     * @param  \Carbon\CarbonInterface  $until
-     * @return void
-     */
-    #[\Override]
-    public function applyLockout(CarbonInterface $until): void
-    {
-        // Intentionally empty — see method docblock.
-    }
-
-    /**
      * No-op — the fixture does not track verifications.
      *
      * @param  ?\Carbon\CarbonInterface  $at
@@ -335,30 +258,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      */
     #[\Override]
     public function confirm(?CarbonInterface $at = null): void
-    {
-        // Intentionally empty — see method docblock.
-    }
-
-    /**
-     * No-op — the fixture does not track issued codes.
-     *
-     * @param  string  $code
-     * @param  \Carbon\CarbonInterface  $expiresAt
-     * @return void
-     */
-    #[\Override]
-    public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void
-    {
-        // Intentionally empty — see method docblock.
-    }
-
-    /**
-     * No-op — the fixture does not track consumed codes.
-     *
-     * @return void
-     */
-    #[\Override]
-    public function consumeCode(): void
     {
         // Intentionally empty — see method docblock.
     }

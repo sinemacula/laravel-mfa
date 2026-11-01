@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Factors;
 
-use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use Tests\Fixtures\Factors\Concerns\ReportsUsableFactorDefaults;
@@ -37,10 +36,6 @@ final class InMemoryFactor implements Factor
      *
      * @param  string  $type
      * @param  ?string  $secret
-     * @param  ?string  $code
-     * @param  ?\Carbon\CarbonInterface  $expiresAt
-     * @param  int  $attempts
-     * @param  ?\Carbon\CarbonInterface  $lockedUntil
      * @param  ?string  $destination
      * @param  ?string  $label
      * @param  mixed  $identifier
@@ -54,18 +49,6 @@ final class InMemoryFactor implements Factor
 
         /** Stored secret value. */
         private readonly ?string $secret = null,
-
-        /** Pending one-time code. */
-        private readonly ?string $code = null,
-
-        /** Code expiry timestamp. */
-        private readonly ?CarbonInterface $expiresAt = null,
-
-        /** Failed verification attempt count. */
-        private int $attempts = 0,
-
-        /** Lockout expiry timestamp. */
-        private readonly ?CarbonInterface $lockedUntil = null,
 
         /** Delivery destination (email address, phone number, etc). */
         private readonly ?string $destination = null,
@@ -145,72 +128,5 @@ final class InMemoryFactor implements Factor
     public function getSecret(): ?string
     {
         return $this->secret;
-    }
-
-    /**
-     * Return the configured one-time code value.
-     *
-     * @return ?string
-     */
-    #[\Override]
-    public function getCode(): ?string
-    {
-        return $this->code;
-    }
-
-    /**
-     * Return the configured code expiry.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getExpiresAt(): ?CarbonInterface
-    {
-        return $this->expiresAt;
-    }
-
-    /**
-     * Return the configured attempt count.
-     *
-     * @return int
-     */
-    #[\Override]
-    public function getAttempts(): int
-    {
-        return $this->attempts;
-    }
-
-    /**
-     * Return the configured lock expiry.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLockedUntil(): ?CarbonInterface
-    {
-        return $this->lockedUntil;
-    }
-
-    /**
-     * Report whether the factor is currently locked (i.e. has a future lock
-     * expiry).
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isLocked(): bool
-    {
-        return $this->lockedUntil !== null && $this->lockedUntil->isFuture();
-    }
-
-    /**
-     * Always returns `null`; the fixture does not track attempt timestamps.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLastAttemptedAt(): ?CarbonInterface
-    {
-        return null;
     }
 }

@@ -11,7 +11,6 @@ use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PragmaRX\Google2FA\Google2FA;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
@@ -27,6 +26,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -55,10 +55,6 @@ final class SignInProofsTest extends TestCase
      * proof of the factor on the default guard's application.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testAVerificationOnASignedInSessionRecordsItsProof(): void
     {
@@ -78,6 +74,27 @@ final class SignInProofsTest extends TestCase
         self::assertSame($factor->getKey(), $proofs[0]->reference);
         self::assertSame(['kind' => 'authenticator_app', 'reference' => $factor->getKey()], $proofs[0]->channel?->toArray());
         self::assertSame('web', $proofs[0]->binding->application);
+        self::assertSame(Purpose::SIGN_IN, $proofs[0]->binding->purpose);
+    }
+
+    /**
+     * A proof is bound to the purpose its verification was made for.
+     *
+     * @return void
+     */
+    public function testAVerificationsProofCarriesItsPurpose(): void
+    {
+        $user = $this->createUser('alice@example.test');
+
+        Auth::login($user);
+
+        [$factor, $code] = $this->enrollTotp($user);
+
+        self::assertTrue(Mfa::verify('totp', $factor, $code, Purpose::STEP_UP));
+
+        $proofs = Mfa::proofs();
+
+        self::assertCount(1, $proofs);
         self::assertSame(Purpose::STEP_UP, $proofs[0]->binding->purpose);
     }
 
@@ -85,10 +102,6 @@ final class SignInProofsTest extends TestCase
      * Signing out forgets every proof of the sign-in.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSigningOutForgetsTheProofs(): void
     {
@@ -111,10 +124,6 @@ final class SignInProofsTest extends TestCase
      * signing out does.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSigningOutOfTheCurrentDeviceForgetsTheProofs(): void
     {
@@ -140,10 +149,6 @@ final class SignInProofsTest extends TestCase
      * and the other still records what it proves.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testSigningInToOrOutOfOneGuardLeavesAnotherAlone(): void
     {
@@ -167,7 +172,9 @@ final class SignInProofsTest extends TestCase
 
         $factor->refresh();
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        // The step just accepted is never accepted again, so the next one is
+        // proved.
+        self::assertTrue(Mfa::verify('totp', $factor, AuthenticatorApp::code($factor, 1)));
         self::assertCount(2, Mfa::proofs());
     }
 
@@ -179,9 +186,6 @@ final class SignInProofsTest extends TestCase
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testAGuardCallingNeitherHookGainsNothingFromAnotherGuardsSignIn(): void
     {
@@ -200,7 +204,7 @@ final class SignInProofsTest extends TestCase
 
         $factor->refresh();
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertTrue(Mfa::verify('totp', $factor, AuthenticatorApp::code($factor, 1)));
 
         $admin = Mfa::proofs();
 
@@ -226,10 +230,6 @@ final class SignInProofsTest extends TestCase
      * first identity signing in again starts with nothing either.
      *
      * @return void
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testANewIdentityOnAReusedSessionInheritsNothing(): void
     {
@@ -261,9 +261,6 @@ final class SignInProofsTest extends TestCase
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testAGuardCallingNeitherHookHasNoUsableProof(): void
     {
@@ -291,9 +288,6 @@ final class SignInProofsTest extends TestCase
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     public function testACustomGuardsHooksKeepItsProofs(): void
     {
@@ -388,24 +382,16 @@ final class SignInProofsTest extends TestCase
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return array{0: \SineMacula\Laravel\Mfa\Models\Factor, 1: string}
-     *
-     * @throws \PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException
-     * @throws \PragmaRX\Google2FA\Exceptions\InvalidCharactersException
-     * @throws \PragmaRX\Google2FA\Exceptions\SecretKeyTooShortException
      */
     private function enrollTotp(TestUser $user): array
     {
-        $google = new Google2FA;
-        $secret = $google->generateSecretKey();
-
         /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
+            ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'type'                 => 'totp',
-            'secret'               => $secret,
         ]);
 
-        return [$factor, $google->getCurrentOtp($secret)];
+        return [$factor, AuthenticatorApp::code($factor)];
     }
 }

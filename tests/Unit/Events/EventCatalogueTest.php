@@ -279,7 +279,6 @@ final class EventCatalogueTest extends TestCase
             'destination'          => self::DESTINATION,
             'credential_reference' => self::CREDENTIAL,
             'secret'               => self::SECRET,
-            'code'                 => self::CODE,
             'status'               => 'confirmed',
         ]);
     }

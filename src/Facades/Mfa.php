@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Facade;
  *
  * @formatter:off
  *
+ * @phpcs:disable Generic.Files.LineLength.TooLong
+ *
  * @method static \SineMacula\Laravel\Mfa\Contracts\FactorDriver driver(?string $driver = null)
  * @method static string getDefaultDriver()
  * @method static class-string<\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> factorModel()
@@ -23,11 +25,13 @@ use Illuminate\Support\Facades\Facade;
  * @method static bool isSetup()
  * @method static list<\SineMacula\Laravel\Mfa\Proofs\Proof> proofs()
  * @method static ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> getFactors()
- * @method static void challenge(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor)
- * @method static bool verify(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor, string $code)
+ * @method static ?\SineMacula\Laravel\Mfa\Codes\SendResult challenge(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor, \SineMacula\Laravel\Mfa\Enums\Purpose $purpose = \SineMacula\Laravel\Mfa\Enums\Purpose::SIGN_IN)
+ * @method static bool verify(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor, string $code, \SineMacula\Laravel\Mfa\Enums\Purpose $purpose = \SineMacula\Laravel\Mfa\Enums\Purpose::SIGN_IN)
  * @method static void enroll(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
  * @method static void disable(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
  * @method static list<string> issueBackupCodes(?int $count = null)
+ *
+ * @phpcs:enable Generic.Files.LineLength.TooLong
  *
  * @formatter:on
  *

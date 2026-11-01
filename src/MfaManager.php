@@ -6,8 +6,10 @@ namespace SineMacula\Laravel\Mfa;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Manager;
+use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
@@ -119,37 +121,42 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Issue a challenge for the given factor through the named driver.
+     * Issue a challenge for the given factor through the named driver, for the
+     * purpose given: for a type that delivers codes, the outcome of sending one
+     * bound to this session and the purpose; otherwise `null`.
      *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return ?\SineMacula\Laravel\Mfa\Codes\SendResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
+     * @throws \Throwable
      */
-    public function challenge(string $driver, Factor $factor): void
+    public function challenge(string $driver, Factor $factor, Purpose $purpose = Purpose::SIGN_IN): ?SendResult
     {
-        $this->container->make(VerificationService::class)->challenge($this, $driver, $factor);
+        return $this->container->make(VerificationService::class)->challenge($this, $driver, $factor, $purpose);
     }
 
     /**
      * Verify a submitted code against the given factor through the named
-     * driver.
+     * driver, for the purpose given.
      *
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
      */
-    public function verify(string $driver, Factor $factor, #[\SensitiveParameter] string $code): bool
+    public function verify(string $driver, Factor $factor, #[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
     {
-        return $this->container->make(VerificationService::class)->verify($this, $driver, $factor, $code);
+        return $this->container->make(VerificationService::class)->verify($this, $driver, $factor, $code, $purpose);
     }
 
     /**

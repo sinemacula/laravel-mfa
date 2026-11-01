@@ -7,7 +7,10 @@ namespace Tests\Unit;
 use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -65,8 +68,9 @@ final class MfaManagerTest extends TestCase
      */
     public static function delegations(): iterable
     {
-        $factor = new InMemoryFactor;
-        $models = new Collection;
+        $factor  = new InMemoryFactor;
+        $models  = new Collection;
+        $refused = SendResult::refused(FailureReason::SENDING_CAPPED, 30);
 
         yield 'shouldUse true' => ['shouldUse', RequirementService::class, 'shouldUse', [], true];
         yield 'shouldUse false' => ['shouldUse', RequirementService::class, 'shouldUse', [], false];
@@ -76,9 +80,10 @@ final class MfaManagerTest extends TestCase
         yield 'getFactors null' => ['getFactors', FactorService::class, 'getFactors', [], null];
         yield 'factorModel' => ['factorModel', FactorService::class, 'factorModel', [], Factor::class];
         yield 'proofs' => ['proofs', ProofService::class, 'proofs', [], []];
-        yield 'challenge' => ['challenge', VerificationService::class, 'challenge', ['totp', $factor], null, true];
-        yield 'verify true' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '123456'], true, true];
-        yield 'verify false' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '654321'], false, true];
+        yield 'challenge' => ['challenge', VerificationService::class, 'challenge', ['totp', $factor, Purpose::SIGN_IN], null, true];
+        yield 'challenge for a code' => ['challenge', VerificationService::class, 'challenge', ['email', $factor, Purpose::STEP_UP], $refused, true];
+        yield 'verify true' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '123456', Purpose::SIGN_IN], true, true];
+        yield 'verify false' => ['verify', VerificationService::class, 'verify', ['totp', $factor, '654321', Purpose::STEP_UP], false, true];
         yield 'enroll' => ['enroll', EnrollmentService::class, 'enroll', [$factor], null];
         yield 'disable' => ['disable', LifecycleService::class, 'disable', [$factor], null];
         yield 'issueBackupCodes with count' => ['issueBackupCodes', RecoveryCodeService::class, 'issueBackupCodes', [3], ['A', 'B', 'C'], true];
@@ -130,7 +135,7 @@ final class MfaManagerTest extends TestCase
 
     /**
      * A manager method called without its optional argument passes the
-     * argument's default to the service.
+     * argument's default to the service: `null`, or the sign-in purpose.
      *
      * @return void
      *
@@ -141,9 +146,17 @@ final class MfaManagerTest extends TestCase
         $codes = \Mockery::mock($this->container()->make(RecoveryCodeService::class));
         $codes->shouldReceive('issueBackupCodes')->once()->with($this->manager(), null)->andReturn([]);
 
+        $factor       = new InMemoryFactor;
+        $verification = \Mockery::mock($this->container()->make(VerificationService::class));
+        $verification->shouldReceive('challenge')->once()->with($this->manager(), 'totp', $factor, Purpose::SIGN_IN)->andReturnNull();
+        $verification->shouldReceive('verify')->once()->with($this->manager(), 'totp', $factor, '123456', Purpose::SIGN_IN)->andReturnTrue();
+
         $this->container()->instance(RecoveryCodeService::class, $codes);
+        $this->container()->instance(VerificationService::class, $verification);
 
         self::assertSame([], $this->manager()->issueBackupCodes());
+        self::assertNull($this->manager()->challenge('totp', $factor));
+        self::assertTrue($this->manager()->verify('totp', $factor, '123456'));
     }
 
     /**

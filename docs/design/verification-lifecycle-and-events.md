@@ -14,18 +14,20 @@ whose events carry summaries and a scalar context and are dispatched after the c
 ## Invariants
 
 - Events are dispatched by the package's services (verification, enrolment, lifecycle, backup codes), never by driver
-  implementations. Drivers receive `issueChallenge()` and `verify()` calls; the verification service wraps each call
-  with the corresponding event emission. Consumers who register custom drivers via `Mfa::extend(...)` automatically
-  participate in the same event contract.
-- `MfaChallengeIssued` fires after the driver's `issueChallenge()` returns without throwing. For OTP drivers the
-  code has already been minted, persisted, and handed to the transport; for TOTP and backup codes the driver is a
-  no-op and the event is purely a lifecycle signal.
+  implementations. Drivers receive `issueChallenge()` and `verify()` calls, or, for a driver that delivers codes, the
+  code service sends and checks its codes (see [Delivered Codes](delivered-codes.md)); the verification service wraps
+  each call with the corresponding event emission. Consumers who register custom drivers via `Mfa::extend(...)`
+  automatically participate in the same event contract.
+- `MfaChallengeIssued` fires after the challenge is issued without throwing. For a driver that delivers codes the code
+  has already been drawn, stored and handed to the sender, and the event does not fire when the send was refused; for
+  TOTP and backup codes the driver is a no-op and the event is purely a lifecycle signal.
 - On successful verification, `MfaVerified` fires after the proof is recorded on the identity's sign-in. A listener
   that reads `Mfa::proofs()` inside `MfaVerified` observes the new proof — there is no "event fires, state catches up"
   window.
 - `MfaVerificationFailed` always carries a `FailureReason` and an internal `detail`. The verification service emits
-  four of the reasons: `locked`, `invalid_code`, `expired` and `not_confirmed`. The detail tells apart failures that
-  share a reason, such as an expired code and a code without an expiry, and is for listeners and logs only.
+  five of the reasons: `locked`, `invalid_code`, `expired`, `replayed` and `not_confirmed`. The detail tells apart
+  failures that share a reason, such as an expired code and a challenge out of attempts, and is for listeners and logs
+  only.
 - `MfaFactorEnrolled` fires after the factor row has been persisted (`EloquentFactor::persist()` for Eloquent
   factors). Non-Eloquent factors still dispatch the event; the consumer owns their storage.
 - `MfaFactorDisabled` fires after the row has been deleted for Eloquent factors. Non-Eloquent factors still dispatch
@@ -40,12 +42,16 @@ whose events carry summaries and a scalar context and are dispatched after the c
 
 ## Success Path
 
-- `challenge()` resolves the identity, asserts factor ownership, calls `FactorDriver::issueChallenge($factor)`, then
-  dispatches `MfaChallengeIssued($identity, $factor, $driver)`.
-- `verify()` resolves the identity, asserts ownership, rejects if `$factor->isLocked()` with a `locked`
-  failure, calls `FactorDriver::verify($factor, $code)`, persists the success/failure side effects on the factor row,
-  records the proof through the bound `ProofStore` on success, then dispatches either `MfaVerified` or
-  `MfaVerificationFailed` last.
+- `challenge()` resolves the identity, asserts factor ownership, calls `FactorDriver::issueChallenge($factor)`, or
+  sends a code bound to the session and the purpose through the code service, then dispatches
+  `MfaChallengeIssued($identity, $factor, $driver)`.
+- `verify()` resolves the identity, asserts ownership, and makes the attempt through `AttemptService::attempt()`, which
+  refuses it while a lockout applies and otherwise, under the identity's factor state lock, reads the identity's
+  verification generation, checks the code against the factor as stored (through the code service, against the code
+  sent for the session and the purpose, for a driver that delivers codes; through `FactorDriver::verify()` otherwise),
+  records a success on that factor (`last_used_at`, the code used up) and counts the outcome, all in one transaction.
+  It then records the proof, for the purpose, through the bound `ProofStore` on success, and dispatches either
+  `MfaVerified` or `MfaVerificationFailed` last.
 - `enroll()` resolves the identity, stamps ownership onto brand-new Eloquent rows (or asserts ownership on pre-existing
   rows), persists, then dispatches `MfaFactorEnrolled($identity, $factor, $driver)`.
 - `disable()` resolves the identity, asserts ownership, deletes the row for Eloquent factors, forgets the factor's
@@ -55,25 +61,28 @@ whose events carry summaries and a scalar context and are dispatched after the c
 
 ## Failure / Edge Cases
 
-- `verify()` on a locked factor emits `MfaVerificationFailed` with `locked` and returns `false` without
-  calling the driver. The attempt counter is not incremented because the attempt never reached the driver.
-- On driver-level verification failure, the verification service classifies the reason from the factor's post-verify
-  state in priority order: `not_confirmed` when there is neither a pending code nor a secret, `expired` when the code's
-  expiry has passed, `expired` again when a pending code has no expiry stamp (a driver-persistence bug, not a user
-  error, told apart by its detail), and `invalid_code` otherwise, the default.
+- `verify()` refused by a lockout (the factor's, the identity's or the IP address's, or a factor disabled at the
+  failure ceiling) emits `MfaVerificationFailed` with `locked` and returns `false` without checking the code. Nothing
+  is counted because the attempt never reached the check (see [Attempts and Lockout](attempts-and-lockout.md)). A
+  factor no longer among the identity's own when the attempt is made emits `not_found`, also without the check.
+- On a verification failure, the verification service classifies the reason: for a delivered code, by what its check
+  found (`invalid_code` for a wrong code, `replayed` for a used one, `expired` for an expired code, a challenge out of
+  attempts or none at all, each with its own detail); for any other factor, `not_confirmed` when it has no secret and
+  `invalid_code` otherwise.
 - Unsupported identities short-circuit to `false` without dispatching `MfaVerificationFailed`. Unresolved drivers throw
   from `DriverResolver::resolve()` before any event is dispatched. Those branches are deliberately outside the event
   taxonomy.
-- Non-Eloquent factors participate in the lifecycle events but carry no row to mutate. `applyVerificationOutcome()`
-  is skipped for them; attempt counters and lockouts only exist on factors whose implementation persists them.
+- Non-Eloquent factors participate in the lifecycle events but carry no row to mutate: they keep no failures in a row,
+  lockout or ceiling of their own, and their attempts are counted against the identity and the IP address, whose
+  failure ceiling refuses them.
 - Backup-code rotation inside `issueBackupCodes()` runs in the identity's factor state transaction on the storage
   connection, so the "atomic replace + N events" guarantee holds wherever `mfa.storage.connection` puts the tables, and
   a listener that throws rolls the whole rotation back.
 
 ## Implementation Anchors
 
-- `src/Verification/VerificationService.php`: `challenge()`, `verify()`, `applyVerificationOutcome()`,
-  `finalizeVerification()`.
+- `src/Verification/VerificationService.php`: `challenge()`, `verify()`, `finalizeVerification()`.
+- `src/Attempts/AttemptService.php`: `attempt()`, which refuses a locked attempt and counts the outcome.
 - `src/Enrollment/EnrollmentService.php`: `enroll()`. `src/Lifecycle/LifecycleService.php`: `disable()`.
 - `src/RecoveryCodes/RecoveryCodeService.php`: `issueBackupCodes()`, `rotateBackupCodeBatch()`.
 - `src/Drivers/DriverResolver.php`: `resolve()`, `assertMatchesFactor()`. `src/Factors/FactorOwnership.php`:
@@ -112,9 +121,9 @@ whose events carry summaries and a scalar context and are dispatched after the c
 - `tests/Unit/MfaManagerClassifyFailureTest.php`
   `testClassifyFailureReturnsNotConfirmedForTotpShapedFactorWithoutSecret`
 - `tests/Unit/MfaManagerClassifyFailureTest.php`
-  `testClassifyFailureReturnsExpiredWhenPendingCodeHasExpired`
+  `testClassifyFailureReportsWhatTheDeliveredCodeCheckFound`
 - `tests/Unit/MfaManagerClassifyFailureTest.php`
-  `testClassifyFailureReturnsExpiredWhenPendingCodeHasNoExpiry`
+  `testClassifyFailureReturnsExpiredWhenNoCodeWasSent`
 - `tests/Unit/MfaManagerClassifyFailureTest.php`
   `testClassifyFailureReturnsInvalidCodeForTotpSecretMismatch`
 - `tests/Unit/Verification/VerificationServiceTest.php`

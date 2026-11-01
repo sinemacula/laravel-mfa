@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Query\Builder;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 
 /**
@@ -223,6 +224,46 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
+     * Record the TOTP time step a code was accepted for if it is later than the
+     * stored one: one conditional `UPDATE` of the factor's row, which the
+     * database applies to the row as committed, so a request whose copy of the
+     * factor is stale still cannot record a step another already has. A factor
+     * not yet stored compares with its own attribute, as no other request can
+     * see it.
+     *
+     * The recorded step is kept as the attribute's original value, so a later
+     * `persist()` does not write it again over a later step another request
+     * recorded in the meantime.
+     *
+     * @param  int  $step
+     * @return bool
+     */
+    public function storeAcceptedStep(int $step): bool
+    {
+        $column = $this->getLastAcceptedStepName();
+
+        if ($this->exists) {
+            $recorded = $this->newModelQuery()
+                ->whereKey($this->getKey())
+                ->toBase()
+                ->where(static function (Builder $query) use ($column, $step): void {
+                    $query->whereNull($column)->orWhere($column, '<', $step);
+                })
+                ->update([$column => $step]) === 1;
+        } else {
+            $last     = $this->getLastAcceptedStep();
+            $recorded = $last === null || $last < $step;
+        }
+
+        if ($recorded) {
+            $this->setAttribute($column, $step);
+            $this->syncOriginalAttribute($column);
+        }
+
+        return $recorded;
+    }
+
+    /**
      * Return where the factor is in its enrolment: pending unless the stored
      * status says confirmed, so a missing or unknown value is never usable.
      *
@@ -424,164 +465,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the currently issued one-time code, if any.
-     *
-     * @return ?string
-     */
-    public function getCode(): ?string
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getCodeName());
-
-        return is_string($value) ? $value : null;
-    }
-
-    /**
-     * Column name holding the pending one-time code.
-     *
-     * @return string
-     */
-    public function getCodeName(): string
-    {
-        return 'code';
-    }
-
-    /**
-     * Return when the currently issued one-time code expires.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getExpiresAt(): ?CarbonInterface
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getExpiresAtName());
-
-        return $value instanceof CarbonInterface ? $value : null;
-    }
-
-    /**
-     * Column name holding the expiry of the pending one-time code.
-     *
-     * @return string
-     */
-    public function getExpiresAtName(): string
-    {
-        return 'expires_at';
-    }
-
-    /**
-     * Determine whether the factor is currently locked.
-     *
-     * @return bool
-     */
-    public function isLocked(): bool
-    {
-        $until = $this->getLockedUntil();
-
-        return $until !== null && $until->isFuture();
-    }
-
-    /**
-     * Return when the factor is locked until, or `null`.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getLockedUntil(): ?CarbonInterface
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getLockedUntilName());
-
-        return $value instanceof CarbonInterface ? $value : null;
-    }
-
-    /**
-     * Column name holding the lockout expiry timestamp.
-     *
-     * @return string
-     */
-    public function getLockedUntilName(): string
-    {
-        return 'locked_until';
-    }
-
-    /**
-     * Return when verification was last attempted.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    public function getLastAttemptedAt(): ?CarbonInterface
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getLastAttemptedAtName());
-
-        return $value instanceof CarbonInterface ? $value : null;
-    }
-
-    /**
-     * Column name holding the last-attempted timestamp.
-     *
-     * @return string
-     */
-    public function getLastAttemptedAtName(): string
-    {
-        return 'last_attempted_at';
-    }
-
-    /**
-     * Increment the attempt counter and stamp the last-attempted timestamp.
-     *
-     * @param  ?\Carbon\CarbonInterface  $at
-     * @return void
-     */
-    public function recordAttempt(?CarbonInterface $at = null): void
-    {
-        $this->setAttribute(
-            $this->getAttemptsName(),
-            $this->getAttempts() + 1,
-        );
-        $this->setAttribute(
-            $this->getLastAttemptedAtName(),
-            $at ?? Carbon::now(),
-        );
-    }
-
-    /**
-     * Column name holding the failed-attempt counter.
-     *
-     * @return string
-     */
-    public function getAttemptsName(): string
-    {
-        return 'attempts';
-    }
-
-    /**
-     * Return the number of consecutive failed attempts.
-     *
-     * @return int
-     */
-    public function getAttempts(): int
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getAttemptsName());
-
-        return is_int($value) ? $value : 0;
-    }
-
-    /**
-     * Apply a lockout window deferring further verification attempts.
-     *
-     * @param  \Carbon\CarbonInterface  $until
-     * @return void
-     */
-    public function applyLockout(CarbonInterface $until): void
-    {
-        $this->setAttribute($this->getLockedUntilName(), $until);
-    }
-
-    /**
-     * Stamp a successful verification as the factor's last use, and reset the
-     * attempt state.
+     * Stamp a successful verification as the factor's last use.
      *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
@@ -589,8 +473,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     public function recordVerification(?CarbonInterface $at = null): void
     {
         $this->setAttribute($this->getLastUsedAtName(), $at ?? Carbon::now());
-        $this->resetAttempts();
-        $this->consumeCode();
     }
 
     /**
@@ -603,41 +485,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     {
         $this->setAttribute($this->getStatusName(), FactorStatus::CONFIRMED->value);
         $this->setAttribute($this->getConfirmedAtName(), $at ?? Carbon::now());
-    }
-
-    /**
-     * Reset the attempt counter and clear any active lockout.
-     *
-     * @return void
-     */
-    public function resetAttempts(): void
-    {
-        $this->setAttribute($this->getAttemptsName(), 0);
-        $this->setAttribute($this->getLockedUntilName(), null);
-    }
-
-    /**
-     * Clear any pending one-time code and its expiry.
-     *
-     * @return void
-     */
-    public function consumeCode(): void
-    {
-        $this->setAttribute($this->getCodeName(), null);
-        $this->setAttribute($this->getExpiresAtName(), null);
-    }
-
-    /**
-     * Persist a newly issued one-time code and its expiry.
-     *
-     * @param  string  $code
-     * @param  \Carbon\CarbonInterface  $expiresAt
-     * @return void
-     */
-    public function issueCode(#[\SensitiveParameter] string $code, CarbonInterface $expiresAt): void
-    {
-        $this->setAttribute($this->getCodeName(), $code);
-        $this->setAttribute($this->getExpiresAtName(), $expiresAt);
     }
 
     /**

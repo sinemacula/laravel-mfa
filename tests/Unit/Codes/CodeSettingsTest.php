@@ -34,6 +34,7 @@ final class CodeSettingsTest extends TestCase
     {
         yield 'length' => ['length', static fn (CodeSettings $settings): int => $settings->length(), 6, 6, 10];
         yield 'ttl_minutes' => ['ttl_minutes', static fn (CodeSettings $settings): int => $settings->ttlMinutes(), 10, 1, 10];
+        yield 'max_attempts' => ['max_attempts', static fn (CodeSettings $settings): int => $settings->maxAttempts(), 5, 1, 10];
         yield 'factor_send_limit' => ['factor_send_limit', static fn (CodeSettings $settings): int => $settings->factorSendLimit(), 5, 1, 50];
         yield 'identity_send_limit' => ['identity_send_limit', static fn (CodeSettings $settings): int => $settings->identitySendLimit(), 10, 1, 100];
         yield 'send_window_minutes' => ['send_window_minutes', static fn (CodeSettings $settings): int => $settings->sendWindowMinutes(), 60, 1, 1440];
@@ -118,6 +119,34 @@ final class CodeSettingsTest extends TestCase
         $this->expectExceptionMessage('mfa.codes.resend_cooldown_seconds must be an integer from 0 to 120.');
 
         $shorter->resendCooldownSeconds();
+    }
+
+    /**
+     * The challenge lifetime defaults to 30 minutes and reaches from the code
+     * lifetime, which bounds it, to 60 minutes.
+     *
+     * @return void
+     */
+    public function testTheChallengeLifetimeIsBoundedByTheCodeLifetime(): void
+    {
+        self::assertSame(30, self::settingsWith([])->challengeTtlMinutes());
+        self::assertSame(10, self::settingsWith(['challenge_ttl_minutes' => 10])->challengeTtlMinutes());
+        self::assertSame(60, self::settingsWith(['challenge_ttl_minutes' => '60'])->challengeTtlMinutes());
+        self::assertSame(2, self::settingsWith(['ttl_minutes' => 2, 'challenge_ttl_minutes' => 2])->challengeTtlMinutes());
+
+        self::assertRefused(
+            [9, 61, 'later'],
+            'challenge_ttl_minutes',
+            static fn (CodeSettings $settings): int => $settings->challengeTtlMinutes(),
+            'mfa.codes.challenge_ttl_minutes must be an integer from 10 to 60.',
+        );
+
+        $shorter = self::settingsWith(['ttl_minutes' => 5, 'challenge_ttl_minutes' => 4]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('mfa.codes.challenge_ttl_minutes must be an integer from 5 to 60.');
+
+        $shorter->challengeTtlMinutes();
     }
 
     /**

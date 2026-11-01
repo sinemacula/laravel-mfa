@@ -35,7 +35,7 @@ working.
 - Parent package provides: a `ProofStore` binding over the authentication session (lives in
   `laravel-iam`, not this repo), an opinionated `OrganisationMfaPolicy` bound against the `MfaPolicy` contract,
   cross-package event listeners (audit log), and any other opinionated defaults.
-- This repo stays clean of parent-package knowledge. The extension seams (policy, store, gateway)
+- This repo stays clean of parent-package knowledge. The extension seams (policy, store, senders)
   must be expressive enough that the parent package does not need to monkey-patch.
 
 ---
@@ -50,12 +50,16 @@ Historical record of the architectural calls made during the 1.0 cycle.
   `OrganisationMfaPolicy` at its layer. The MFA package never learns the word "organisation".
 - **D2 — Single `mfa_factors` table.** Columns include `attempts`, `locked_until`,
   `last_attempted_at`. No separate `mfa_attempts` log — audit goes through events,
-  owned by `laravel-audit-log`.
+  owned by `laravel-audit-log`. *Superseded:* failures are now counted durably on the factor and
+  identity state rows, with temporary throttles in `mfa_attempts` (see
+  [Attempts and Lockout](design/attempts-and-lockout.md)); audit still goes through events.
 - **D3 — Challenge split between manager and driver.** The verification service behind
   `MfaManager::challenge()` orchestrates (events, rate-limiting hooks, logging).
   `FactorDriver::issueChallenge(Factor): void` implements per-factor-type transport (no-op for TOTP,
   mail dispatch for email, gateway dispatch for SMS, no-op for backup codes since they are
-  pre-issued).
+  pre-issued). Since superseded for email and SMS: their codes are bound to a session and purpose
+  the factor alone does not carry, so the package sends and checks them itself and the driver only
+  delivers each one (see [Delivered Codes](design/delivered-codes.md)).
 - **D4 — Per-device verification is the default.** A session's proofs are its own. In paired
   mode they live in the authentication package's session record, through a rebound `ProofStore`;
   in standalone mode they live in the Laravel session, through `SessionProofStore` (which is
@@ -79,7 +83,8 @@ Historical record of the architectural calls made during the 1.0 cycle.
   column carries long-lived material (TOTP keys, hashed backup codes); the `code` column holds
   live OTPs during their expiry window. Encrypting both closes the read-only-DB-replay attack
   surface. Migration uses `text` for both so the encrypted ciphertext fits regardless of the
-  configured OTP length.
+  configured OTP length. Since superseded for `code`: delivered codes left the factor row for a
+  table of their own, stored only as keyed hashes (see [Delivered Codes](design/delivered-codes.md)).
 - **D8 — Test fixtures extend abstract stubs, not raw contracts.** `AbstractFactorStub` and
   `AbstractEloquentFactorStub` (in `tests/Fixtures/`) provide safe-default implementations of
   every `Factor` / `EloquentFactor` method. Anonymous test fixtures extend the relevant abstract

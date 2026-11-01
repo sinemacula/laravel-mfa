@@ -41,10 +41,11 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 - A successful verification on a signed-in session records its proof through `Proofs\ProofService::record()`: an
   additional factor proof on the driver's channel, named by the factor's destination or the factor itself, or a
   recovery code proof for a backup code, bound to the application of the request (a bound `ApplicationResolver`'s
-  answer, or the default guard's name), the current sign-in there and the `step_up` purpose. A driver whose channel
-  cannot carry a factor proves nothing.
-- The proof is stamped with the verification generation read before the driver checks the code
-  (`ProofService::generationFor()`), so a generation advanced while the code is checked leaves the proof behind.
+  answer, or the default guard's name), the current sign-in there and the purpose the verification was made for. A
+  driver whose channel cannot carry a factor proves nothing, and neither does a recovery code verified for an enrolment.
+- The proof is stamped with the verification generation read, under the attempt's lock, just before the code is
+  checked (`ProofService::generationFor()`), so a generation advanced while the code is checked leaves the proof
+  behind. The proof is recorded once the attempt has committed, so a lockout refusing the attempt records nothing.
 - Disabling a factor forgets every proof made with it on the current session, on every application. It does not yet
   advance the verification generation: no shipped flow does, so the identity's other sessions keep counting a removed
   factor's proofs until the removal flow revokes them through the session revocation seam.
@@ -58,9 +59,9 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 ## Success Path
 
 1. A person signs in through a session guard. `Login` fires and `BeginSignInOnLogin` begins a sign-in for them.
-2. They verify a factor. `VerificationService::verify()` reads the identity's generation, runs the driver, records the
-   outcome on the factor, then `ProofService::record()` binds the proof to the current sign-in, stamps it with that
-   generation and the store keeps it, before `MfaVerified` is dispatched.
+2. They verify a factor. `VerificationService::verify()` makes the attempt, which reads the identity's generation,
+   checks the code and counts the outcome, then `ProofService::record()` binds the proof to the current sign-in and the
+   purpose, stamps it with that generation and the store keeps it, before `MfaVerified` is dispatched.
 3. A later request passes through `mfa` (or `mfa:5` for a step-up route). The middleware reads `Mfa::proofs()`, takes
    the newest verification and compares its age with the window.
 4. They sign out. `Logout` (or `CurrentDeviceLogout`) fires and `ForgetSignInOnLogout` forgets the sign-in and its

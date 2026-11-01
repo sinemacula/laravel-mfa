@@ -29,42 +29,36 @@ use Tests\Fixtures\Identities\TestUser;
 final class MfaManagerDriversTest extends MfaManagerTestCase
 {
     /**
-     * Resolving the TOTP driver should honour the configured verification
-     * window from `config('mfa.totp.window')`.
+     * Resolving the TOTP driver should give a driver that reads the configured
+     * settings in `config('mfa.totp')`.
      *
      * @return void
      *
-     * @throws \ReflectionException
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testTotpDriverBuildsWithConfiguredWindow(): void
+    public function testTotpDriverReadsTheConfiguredSettings(): void
     {
         $config = app(Repository::class);
-        $config->set('mfa.totp.window', 3);
+        $config->set('mfa.totp', ['algorithm' => 'sha512', 'digits' => 8, 'period' => 60]);
 
         $driver = $this->manager()->driver('totp');
 
         self::assertInstanceOf(TotpDriver::class, $driver);
 
-        $property = new \ReflectionProperty($driver, 'window');
+        $parameters = $driver->parameters();
 
-        // Reflection on the private `window` property pins the factory-resolved
-        // value — without it the test would only observe the resolved class,
-        // not the constructor argument.
-        // @SuppressWarnings("php:S3011")
-        self::assertSame(3, $property->getValue($driver));
+        self::assertSame(['sha512', 8, 60], [$parameters->algorithm, $parameters->digits, $parameters->period]);
     }
 
     /**
-     * Resolving the TOTP driver with no `window` configured should fall back to
-     * the shipped default of 1 step.
+     * Resolving the TOTP driver with no settings configured should fall back to
+     * the defaults authenticator apps expect: SHA-1, 6 digits, 30 seconds.
      *
      * @return void
      *
-     * @throws \ReflectionException
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testTotpDriverDefaultsWindowToOneWhenUnset(): void
+    public function testTotpDriverDefaultsWhenUnset(): void
     {
         $config = app(Repository::class);
         $config->set('mfa.totp', []);
@@ -73,13 +67,9 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
 
         self::assertInstanceOf(TotpDriver::class, $driver);
 
-        $property = new \ReflectionProperty($driver, 'window');
+        $parameters = $driver->parameters();
 
-        // Reflection on the private `window` property pins the factory's
-        // default-resolution path — without it the test would only observe the
-        // resolved class, not the fall-back value of 1.
-        // @SuppressWarnings("php:S3011")
-        self::assertSame(1, $property->getValue($driver));
+        self::assertSame(['sha1', 6, 30], [$parameters->algorithm, $parameters->digits, $parameters->period]);
     }
 
     /**
@@ -99,14 +89,12 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $driver = $this->manager()->driver('email');
 
         self::assertInstanceOf(EmailDriver::class, $driver);
-        self::assertSame(6, $driver->getCodeLength());
-        self::assertSame(10, $driver->getExpiry());
         self::assertSame(MfaCodeMessage::class, $driver->getMailable());
     }
 
     /**
-     * Resolving the email driver should apply every override in the code
-     * settings — code length, lifetime and mailable.
+     * Resolving the email driver should apply the mailable override in the code
+     * settings.
      *
      * @return void
      *
@@ -116,16 +104,12 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     {
         $config = app(Repository::class);
         $config->set('mfa.codes', [
-            'length'      => 8,
-            'ttl_minutes' => 5,
-            'mailable'    => CustomMfaCodeMessage::class,
+            'mailable' => CustomMfaCodeMessage::class,
         ]);
 
         /** @var \SineMacula\Laravel\Mfa\Drivers\EmailDriver $driver */
         $driver = $this->manager()->driver('email');
 
-        self::assertSame(8, $driver->getCodeLength());
-        self::assertSame(5, $driver->getExpiry());
         self::assertSame(CustomMfaCodeMessage::class, $driver->getMailable());
     }
 
@@ -147,13 +131,11 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
 
         self::assertInstanceOf(SmsDriver::class, $driver);
         self::assertSame('Your verification code is: :code', $driver->getMessageTemplate());
-        self::assertSame(6, $driver->getCodeLength());
-        self::assertSame(10, $driver->getExpiry());
     }
 
     /**
-     * Resolving the SMS driver should apply every override in the code settings
-     * — code length, lifetime and message.
+     * Resolving the SMS driver should apply the message override in the code
+     * settings.
      *
      * @return void
      *
@@ -163,8 +145,6 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     {
         $config = app(Repository::class);
         $config->set('mfa.codes', [
-            'length'      => 7,
-            'ttl_minutes' => 5,
             'sms_message' => 'Code: :code',
         ]);
 
@@ -172,8 +152,6 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $driver = $this->manager()->driver('sms');
 
         self::assertSame('Code: :code', $driver->getMessageTemplate());
-        self::assertSame(7, $driver->getCodeLength());
-        self::assertSame(5, $driver->getExpiry());
     }
 
     /**

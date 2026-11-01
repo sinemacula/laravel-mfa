@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Factors;
 
-use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use Tests\Fixtures\Factors\Concerns\ReportsUsableFactorDefaults;
@@ -90,74 +89,6 @@ abstract class AbstractFactorStub implements Factor
      */
     #[\Override]
     public function getSecret(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * Return the stub's default pending code (none).
-     *
-     * @return ?string
-     */
-    #[\Override]
-    public function getCode(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * Return the stub's default code expiry (none).
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getExpiresAt(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
-     * Return the stub's default attempt count (zero).
-     *
-     * @return int
-     */
-    #[\Override]
-    public function getAttempts(): int
-    {
-        return 0;
-    }
-
-    /**
-     * Report whether the stub is currently locked.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isLocked(): bool
-    {
-        // Derived from the accessor so subclasses can flip the lock state by
-        // overriding `getLockedUntil()` alone.
-        return $this->getLockedUntil() !== null;
-    }
-
-    /**
-     * Return the stub's default lockout expiry (none).
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLockedUntil(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
-     * Return the stub's default last-attempted timestamp (none).
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLastAttemptedAt(): ?CarbonInterface
     {
         return null;
     }
