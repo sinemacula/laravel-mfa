@@ -16,8 +16,8 @@ use Tests\Fixtures\Identities\TestUser;
  * Shared scaffolding for the RequireMfa middleware test family.
  *
  * Centralises the middleware invocation helper and the "sign in a fresh user
- * and enrol a TOTP factor" fixture so the enforcement-matrix and
- * step-up-parser test classes stay focused on their respective subjects.
+ * and enrol a TOTP factor" fixture so the enforcement-matrix and step-up-parser
+ * test classes stay focused on their respective subjects.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -56,9 +56,9 @@ trait InteractsWithRequireMfaMiddleware
     }
 
     /**
-     * Sign a fresh user in through the session guard, which begins the
-     * sign-in its proofs are recorded on, then enrol a TOTP factor and return
-     * the [user, factor, code] triple.
+     * Sign a fresh user in through the session guard, which begins the sign-in
+     * its proofs are recorded on, then enrol a TOTP factor and return the
+     * [user, factor, code] triple.
      *
      * @param  string  $email
      * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}

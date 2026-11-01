@@ -106,8 +106,8 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * Another identity signing in on a reused session inherits nothing, and
-     * the first identity signing in again starts with nothing either.
+     * Another identity signing in on a reused session inherits nothing, and the
+     * first identity signing in again starts with nothing either.
      *
      * @return void
      *
@@ -138,9 +138,9 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * A guard that fires neither of Laravel's events nor calls the hooks
-     * leaves no sign-in: a successful verification records nothing, and the
-     * middleware still requires one.
+     * A guard that fires neither of Laravel's events nor calls the hooks leaves
+     * no sign-in: a successful verification records nothing, and the middleware
+     * still requires one.
      *
      * @return void
      *
@@ -169,8 +169,8 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * A custom guard's hooks begin a sign-in that records the first factor
-     * and keeps the proofs that follow, and signing out forgets them.
+     * A custom guard's hooks begin a sign-in that records the first factor and
+     * keeps the proofs that follow, and signing out forgets them.
      *
      * @return void
      *

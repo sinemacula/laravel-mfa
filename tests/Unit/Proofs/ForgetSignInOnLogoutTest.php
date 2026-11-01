@@ -74,6 +74,8 @@ final class ForgetSignInOnLogoutTest extends TestCase
         (new ForgetSignInOnLogout($store))(new Logout('web', new PlainUser));
 
         $store->shouldNotHaveReceived('forget');
+
+        $this->addToAssertionCount(1);
     }
 
     /**
@@ -89,5 +91,7 @@ final class ForgetSignInOnLogoutTest extends TestCase
         (new ForgetSignInOnLogout($store))(new Logout('web', new NonScalarIdentifierUser));
 
         $store->shouldHaveReceived('forget')->once();
+
+        $this->addToAssertionCount(1);
     }
 }

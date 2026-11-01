@@ -31,8 +31,8 @@ use Tests\Unit\Concerns\BuildsProofs;
 /**
  * Tests for `SessionProofStore`: sign-ins begin and end, proofs are recorded
  * only for their identity's current sign-in, and every read fails closed on a
- * proof of another identity, application, sign-in or generation, or one made
- * in the future.
+ * proof of another identity, application, sign-in or generation, or one made in
+ * the future.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -82,8 +82,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Beginning a sign-in names the session the identity's proofs are bound
-     * to.
+     * Beginning a sign-in names the session the identity's proofs are bound to.
      *
      * @return void
      */
@@ -111,8 +110,8 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A proof bound to the identity's current sign-in is recorded and read
-     * back whole.
+     * A proof bound to the identity's current sign-in is recorded and read back
+     * whole.
      *
      * @return void
      */
@@ -157,8 +156,8 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Beginning a new sign-in forgets every proof of the one before, even
-     * under the same session id.
+     * Beginning a new sign-in forgets every proof of the one before, even under
+     * the same session id.
      *
      * @return void
      */
@@ -174,9 +173,9 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * The ways a stored proof fails to count for the identity's sign-in on
-     * the application: another application, a time after now, a generation
-     * the identity has not reached. An older generation is covered by the
+     * The ways a stored proof fails to count for the identity's sign-in on the
+     * application: another application, a time after now, a generation the
+     * identity has not reached. An older generation is covered by the
      * generation bump below.
      *
      * @return iterable<string, array{0: array<string, mixed>}>
@@ -225,8 +224,8 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Advancing the identity's verification generation stops every proof of
-     * its current sign-in made before counting, while one made under the new
+     * Advancing the identity's verification generation stops every proof of its
+     * current sign-in made before counting, while one made under the new
      * generation counts.
      *
      * @return void
@@ -250,8 +249,8 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Another identity, whose type differs but whose key is the same, holds
-     * its own sign-in and sees none of the first one's proofs.
+     * Another identity, whose type differs but whose key is the same, holds its
+     * own sign-in and sees none of the first one's proofs.
      *
      * @return void
      */
@@ -414,7 +413,9 @@ final class SessionProofStoreTest extends TestCase
         $store->record($first);
 
         for ($index = 1; $index <= SessionProofStore::LIMIT; $index++) {
-            $store->record($this->proofFor($this->user(), ['reference' => 'factor-' . $index, 'provedAt' => CarbonImmutable::now()->subSeconds(SessionProofStore::LIMIT - $index)]));
+            $provedAt = CarbonImmutable::now()->subSeconds(SessionProofStore::LIMIT - $index);
+
+            $store->record($this->proofFor($this->user(), ['reference' => 'factor-' . $index, 'provedAt' => $provedAt]));
         }
 
         $proofs = $store->proofs($this->user(), self::APPLICATION);
@@ -426,8 +427,8 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A sign-in holding only first factors past the limit keeps them all
-     * rather than looping.
+     * A sign-in holding only first factors past the limit keeps them all rather
+     * than looping.
      *
      * @return void
      */
@@ -445,8 +446,8 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * An identity whose key cannot name a record is refused rather than
-     * sharing one.
+     * An identity whose key cannot name a record is refused rather than sharing
+     * one.
      *
      * @return void
      */
@@ -510,8 +511,8 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A first factor proof of the identity, made with a password at sign-in
-     * ten minutes ago.
+     * A first factor proof of the identity, made with a password at sign-in ten
+     * minutes ago.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof

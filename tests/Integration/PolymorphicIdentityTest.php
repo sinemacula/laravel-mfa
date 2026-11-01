@@ -63,9 +63,9 @@ final class PolymorphicIdentityTest extends TestCase
             'destination'          => $secondary->email,
         ]);
 
-        // Identity switches need nothing in between: the factors are read
-        // for the current identity on every call, scoped by morph class as
-        // well as identifier.
+        // Identity switches need nothing in between: the factors are read for
+        // the current identity on every call, scoped by morph class as well as
+        // identifier.
         $this->actingAs($primary);
         self::assertTrue(Mfa::shouldUse());
         self::assertTrue(Mfa::isSetup());
@@ -90,10 +90,10 @@ final class PolymorphicIdentityTest extends TestCase
     }
 
     /**
-     * Two MFA-capable identity classes that share a primary-key value (`User
-     * #1` and `Admin #1`) MUST read their own factors within the same request
-     * — without scoping by class the second identity would see the first
-     * identity's factor.
+     * Two MFA-capable identity classes that share a primary-key value
+     * (`User #1` and `Admin #1`) MUST read their own factors within the same
+     * request — without scoping by class the second identity would see the
+     * first identity's factor.
      *
      * @return void
      */

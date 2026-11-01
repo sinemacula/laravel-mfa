@@ -35,8 +35,8 @@ final class GuardHooks
     private function __construct() {}
 
     /**
-     * Begin the identity's sign-in and record the first factor it was signed
-     * in with.
+     * Begin the identity's sign-in and record the first factor it was signed in
+     * with.
      *
      * The proof must be of the first factor at sign-in, bound to the identity,
      * and made under the identity's current verification generation (see
@@ -53,17 +53,7 @@ final class GuardHooks
      */
     public static function signedIn(MultiFactorAuthenticatable $identity, Proof $firstFactor): void
     {
-        if ($firstFactor->kind !== ProofKind::FIRST_FACTOR) {
-            throw new \InvalidArgumentException(sprintf('A guard signs an identity in with a proof of kind [%s], not [%s].', ProofKind::FIRST_FACTOR->value, $firstFactor->kind->value));
-        }
-
-        if (!ProofOwner::of($identity)->owns($firstFactor->binding)) {
-            throw new \InvalidArgumentException('The first factor\'s proof is bound to another identity.');
-        }
-
-        if ($firstFactor->generation !== VerificationGeneration::current($identity)) {
-            throw new \InvalidArgumentException('The first factor\'s proof was not made under the identity\'s current verification generation.');
-        }
+        self::assertFirstFactorOf($identity, $firstFactor);
 
         $store = self::store();
 
@@ -82,6 +72,34 @@ final class GuardHooks
     public static function signedOut(MultiFactorAuthenticatable $identity): void
     {
         self::store()->forget($identity);
+    }
+
+    /**
+     * Refuse a proof that is not of the first factor at sign-in, is bound to
+     * another identity, or was not made under the identity's current
+     * verification generation.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     */
+    private static function assertFirstFactorOf(MultiFactorAuthenticatable $identity, Proof $firstFactor): void
+    {
+        if ($firstFactor->kind !== ProofKind::FIRST_FACTOR) {
+            $message = 'A guard signs an identity in with a proof of kind [%s], not [%s].';
+
+            throw new \InvalidArgumentException(sprintf($message, ProofKind::FIRST_FACTOR->value, $firstFactor->kind->value));
+        }
+
+        if (!ProofOwner::of($identity)->owns($firstFactor->binding)) {
+            throw new \InvalidArgumentException('The first factor\'s proof is bound to another identity.');
+        }
+
+        if ($firstFactor->generation !== VerificationGeneration::current($identity)) {
+            throw new \InvalidArgumentException('The first factor\'s proof was not made under the identity\'s current verification generation.');
+        }
     }
 
     /**

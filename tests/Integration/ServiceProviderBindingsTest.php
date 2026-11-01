@@ -65,8 +65,8 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `ProofStore` contract must resolve to
-     * the session-backed default.
+     * Without a consumer override the `ProofStore` contract must resolve to the
+     * session-backed default.
      *
      * @return void
      *

@@ -19,8 +19,8 @@ use Tests\TestCase;
 
 /**
  * Tests for `VerificationGeneration`: an identity starts at generation 0, each
- * advance moves only its own generation on by one, creating its row when it
- * has none, and an advance made inside the identity's factor state transaction
+ * advance moves only its own generation on by one, creating its row when it has
+ * none, and an advance made inside the identity's factor state transaction
  * rolls back with it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -69,8 +69,8 @@ final class VerificationGenerationTest extends TestCase
     }
 
     /**
-     * An identity whose row the factor state lock already created keeps its
-     * row and moves on from its generation.
+     * An identity whose row the factor state lock already created keeps its row
+     * and moves on from its generation.
      *
      * @return void
      *

@@ -40,8 +40,8 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
     ];
 
     /**
-     * Return a non-scalar auth identifier, which nothing may key a record or
-     * a lock by.
+     * Return a non-scalar auth identifier, which nothing may key a record or a
+     * lock by.
      *
      * @return mixed
      */

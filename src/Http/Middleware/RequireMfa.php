@@ -110,9 +110,11 @@ final class RequireMfa
 
             $verifies = $proof->kind === ProofKind::ADDITIONAL_FACTOR || $proof->kind === ProofKind::RECOVERY_CODE;
 
-            if ($verifies && ($verifiedAt === null || $proof->provedAt->greaterThan($verifiedAt))) {
-                $verifiedAt = $proof->provedAt;
+            if (!$verifies || ($verifiedAt !== null && !$proof->provedAt->greaterThan($verifiedAt))) {
+                continue;
             }
+
+            $verifiedAt = $proof->provedAt;
         }
 
         return $verifiedAt;

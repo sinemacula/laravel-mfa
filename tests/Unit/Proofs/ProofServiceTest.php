@@ -25,8 +25,8 @@ use Tests\Unit\Concerns\BuildsProofs;
 /**
  * Tests for `ProofService`: the current identity's proofs are read through the
  * bound store on the current application, and a proof is recorded bound to the
- * identity's current sign-in and verification generation, or not at all
- * without a sign-in.
+ * identity's current sign-in and verification generation, or not at all without
+ * a sign-in.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -94,8 +94,8 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * Without an application resolver, the application is the default
-     * guard's name.
+     * Without an application resolver, the application is the default guard's
+     * name.
      *
      * @return void
      *
@@ -199,7 +199,13 @@ final class ProofServiceTest extends TestCase
         self::assertSame('factor-1', $proof->reference);
         self::assertEquals(ObservedProperties::none(), $proof->properties);
         self::assertTrue(CarbonImmutable::now()->equalTo($proof->provedAt));
-        self::assertSame(['identity_type' => TestUser::class, 'identity_key' => '7', 'application' => 'web', 'session_id' => 'sign-in-1', 'purpose' => 'step_up'], $proof->binding->toArray());
+        self::assertSame([
+            'identity_type' => TestUser::class,
+            'identity_key'  => '7',
+            'application'   => 'web',
+            'session_id'    => 'sign-in-1',
+            'purpose'       => 'step_up',
+        ], $proof->binding->toArray());
         self::assertSame(1, $proof->generation);
         self::assertNull($proof->challengeId);
         self::assertSame([$proof->toArray()], array_map(static fn (Proof $kept): array => $kept->toArray(), $store->proofs($user, 'web')));

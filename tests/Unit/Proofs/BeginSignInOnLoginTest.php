@@ -19,8 +19,8 @@ use Tests\TestCase;
 
 /**
  * Tests for `BeginSignInOnLogin`: Laravel's `Login` event begins a new sign-in,
- * named by a fresh random id, for an identity that can hold factors, and
- * leaves every other identity alone.
+ * named by a fresh random id, for an identity that can hold factors, and leaves
+ * every other identity alone.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -81,11 +81,13 @@ final class BeginSignInOnLoginTest extends TestCase
         (new BeginSignInOnLogin($store))(new Login('web', new PlainUser, false));
 
         $store->shouldNotHaveReceived('begin');
+
+        $this->addToAssertionCount(1);
     }
 
     /**
-     * An identity whose key cannot name a record signs in without a sign-in
-     * of its own rather than failing.
+     * An identity whose key cannot name a record signs in without a sign-in of
+     * its own rather than failing.
      *
      * @return void
      */
@@ -97,6 +99,8 @@ final class BeginSignInOnLoginTest extends TestCase
         (new BeginSignInOnLogin($store))(new Login('web', new NonScalarIdentifierUser, false));
 
         $store->shouldHaveReceived('begin')->once();
+
+        $this->addToAssertionCount(1);
     }
 
     /**

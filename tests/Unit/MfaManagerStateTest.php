@@ -195,8 +195,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
     /**
      * `isSetup()` reads the identity's factors on every call, so a factor
-     * removed since the last call is gone at once and nothing is kept from
-     * one request to the next.
+     * removed since the last call is gone at once and nothing is kept from one
+     * request to the next.
      *
      * @return void
      *

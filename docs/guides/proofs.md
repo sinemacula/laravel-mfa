@@ -97,8 +97,8 @@ device:
 | `currentSession($identity)`          | The current sign-in's session id, or `null` without one                           |
 | `record($proof)`                     | Keeps a proof bound to its identity's current sign-in, refusing any other         |
 | `proofs($identity, $application)`    | The current sign-in's proofs on the application that still count, oldest first    |
-| `forgetFactor($identity, $factorId)` | Stops counting the proofs made with the factor                                   |
-| `forget($identity)`                  | Forgets the current sign-in and its proofs                                       |
+| `forgetFactor($identity, $factorId)` | Stops counting the proofs made with the factor                                    |
+| `forget($identity)`                  | Forgets the current sign-in and its proofs                                        |
 
 A store refuses a proof it cannot keep by throwing `Exceptions\ProofRefusedException`, and fails closed when it reads:
 no record, a proof in the future, another generation, identity, application or sign-in all mean not verified.

@@ -17,8 +17,8 @@ use Tests\TestCase;
 
 /**
  * Tests for `ProofOwner`: an identity is recorded by its morph class or class
- * name and its key as a string, a binding names its owner, and two owners
- * never share a slot.
+ * name and its key as a string, a binding names its owner, and two owners never
+ * share a slot.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -123,8 +123,8 @@ final class ProofOwnerTest extends TestCase
     }
 
     /**
-     * The slot carries the type's length, so a separator inside the type or
-     * the key never makes two owners share one.
+     * The slot carries the type's length, so a separator inside the type or the
+     * key never makes two owners share one.
      *
      * @return void
      */

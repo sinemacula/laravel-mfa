@@ -187,8 +187,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     }
 
     /**
-     * Test verify success without a sign-in records nothing and never asks
-     * the driver for its channel.
+     * Test verify success without a sign-in records nothing and never asks the
+     * driver for its channel.
      *
      * @return void
      *
@@ -205,8 +205,8 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     }
 
     /**
-     * Test verify success through a driver whose channel cannot carry a
-     * factor records nothing, even on a signed-in session.
+     * Test verify success through a driver whose channel cannot carry a factor
+     * records nothing, even on a signed-in session.
      *
      * @return void
      *

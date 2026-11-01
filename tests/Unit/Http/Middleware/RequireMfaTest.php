@@ -296,9 +296,9 @@ final class RequireMfaTest extends TestCase
     }
 
     /**
-     * The proofs, the route's window and whether the request passes: the
-     * newest verification is judged, whatever order the proofs come in, and
-     * one exactly at the window's edge still passes.
+     * The proofs, the route's window and whether the request passes: the newest
+     * verification is judged, whatever order the proofs come in, and one
+     * exactly at the window's edge still passes.
      *
      * @return iterable<string, array{0: list<int>, 1: string, 2: bool}>
      */
@@ -314,8 +314,8 @@ final class RequireMfaTest extends TestCase
     }
 
     /**
-     * The newest verification passes within the route's window and is
-     * expired past it, at a window of zero, or when dated in the future.
+     * The newest verification passes within the route's window and is expired
+     * past it, at a window of zero, or when dated in the future.
      *
      * @param  list<int>  $minutesAgo
      * @param  string  $window
@@ -385,7 +385,9 @@ final class RequireMfaTest extends TestCase
     }
 
     /**
-     * Bind the supplied fake manager against the container's `'mfa'` key.
+     * Bind the supplied fake manager against the container's `'mfa'` key,
+     * dropping any manager the facade resolved before, so a test that runs the
+     * middleware twice sees the second.
      *
      * @param  \Tests\Fixtures\Http\FakeMfaManager  $manager
      * @return void
@@ -393,5 +395,7 @@ final class RequireMfaTest extends TestCase
     private function bindManager(FakeMfaManager $manager): void
     {
         $this->container->instance('mfa', $manager);
+
+        Facade::clearResolvedInstance('mfa');
     }
 }

@@ -176,9 +176,8 @@ final class GuardHooksTest extends TestCase
     }
 
     /**
-     * The proof of the password the test user with the given key signed in
-     * with on the `web` application, at generation 0, bound to the guard's
-     * session.
+     * The proof of the password the test user with the given key signed in with
+     * on the `web` application, at generation 0, bound to the guard's session.
      *
      * @param  int  $id
      * @param  string  $session

@@ -42,8 +42,8 @@ final readonly class ProofService
 
     /**
      * The proofs of the current identity's sign-in on the current application
-     * that still count, oldest first: none without an MFA-capable identity or
-     * a sign-in.
+     * that still count, oldest first: none without an MFA-capable identity or a
+     * sign-in.
      *
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      *

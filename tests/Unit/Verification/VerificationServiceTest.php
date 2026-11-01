@@ -494,8 +494,8 @@ final class VerificationServiceTest extends TestCase
     }
 
     /**
-     * A valid backup code on a signed-in session records a recovery code
-     * proof, which travels on no channel and names no factor.
+     * A valid backup code on a signed-in session records a recovery code proof,
+     * which travels on no channel and names no factor.
      *
      * @return void
      *

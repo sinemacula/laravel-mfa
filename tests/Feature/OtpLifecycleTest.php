@@ -117,8 +117,8 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * Test verifying the persisted email code on a signed-in session records
-     * a proof on the email channel, named by the factor's destination.
+     * Test verifying the persisted email code on a signed-in session records a
+     * proof on the email channel, named by the factor's destination.
      *
      * @return void
      */

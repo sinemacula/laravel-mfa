@@ -41,6 +41,7 @@ interface ProofStore
      * @return void
      *
      * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     public function begin(MultiFactorAuthenticatable $identity, string $sessionId): void;
 
@@ -51,14 +52,16 @@ interface ProofStore
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return ?string
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     public function currentSession(MultiFactorAuthenticatable $identity): ?string;
 
     /**
      * Record a proof for the sign-in it is bound to.
      *
-     * A proof that is not bound to its identity's current sign-in is refused
-     * by throwing, never kept, so the change the call is part of rolls back.
+     * A proof that is not bound to its identity's current sign-in is refused by
+     * throwing, never kept, so the change the call is part of rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
@@ -74,6 +77,8 @@ interface ProofStore
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     public function proofs(MultiFactorAuthenticatable $identity, string $application): array;
 
@@ -84,6 +89,8 @@ interface ProofStore
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     public function forgetFactor(MultiFactorAuthenticatable $identity, string $factorId): void;
 
@@ -93,6 +100,8 @@ interface ProofStore
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     public function forget(MultiFactorAuthenticatable $identity): void;
 }

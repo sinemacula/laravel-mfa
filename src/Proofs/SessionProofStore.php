@@ -19,20 +19,20 @@ use SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException;
  * `GuardHooks::signedIn()` for a guard that fires none, and ends on `Logout` or
  * `GuardHooks::signedOut()`; beginning one forgets the proofs of the one
  * before. Records are kept per identity, by its type and key, so two identity
- * types sharing a key never share one, and every proof is read back against
- * the identity, the application, the sign-in and the identity's verification
+ * types sharing a key never share one, and every proof is read back against the
+ * identity, the application, the sign-in and the identity's verification
  * generation it is asked for.
  *
  * It fails closed. A proof bound to another sign-in is refused when it is
  * recorded. When the proofs are read, one is left out when it is bound to
  * another identity, application or sign-in, was made after now, was made under
- * another verification generation than the identity's current one, or cannot
- * be read back; an identity with no sign-in has none.
+ * another verification generation than the identity's current one, or cannot be
+ * read back; an identity with no sign-in has none.
  *
  * The records are bounded: an identity's sign-in keeps at most 50 proofs, and
  * recording more forgets the earliest recorded, though never the first factor.
- * The session holds each channel's full destination, so it must be stored
- * where the application keeps its other session secrets.
+ * The session holds each channel's full destination, so it must be stored where
+ * the application keeps its other session secrets.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -70,11 +70,7 @@ final readonly class SessionProofStore implements ProofStore
     #[\Override]
     public function begin(MultiFactorAuthenticatable $identity, string $sessionId): void
     {
-        if (trim($sessionId) === '') {
-            throw new \InvalidArgumentException('The session id of a sign-in must not be blank.');
-        }
-
-        $this->write(ProofOwner::of($identity), ['session' => $sessionId, 'proofs' => []]);
+        $this->write(ProofOwner::of($identity), ['session' => self::sessionId($sessionId), 'proofs' => []]);
     }
 
     /**
@@ -154,9 +150,11 @@ final readonly class SessionProofStore implements ProofStore
                 && $proof->generation           === $generation
                 && $proof->provedAt->lessThanOrEqualTo($now);
 
-            if ($counts) {
-                $proofs[] = $proof;
+            if (!$counts) {
+                continue;
             }
+
+            $proofs[] = $proof;
         }
 
         usort($proofs, static fn (Proof $a, Proof $b): int => $a->provedAt <=> $b->provedAt);
@@ -166,8 +164,8 @@ final readonly class SessionProofStore implements ProofStore
 
     /**
      * Stop counting every proof the identity made with the factor on this
-     * session. Other sessions stop counting it when the identity's
-     * verification generation is advanced.
+     * session. Other sessions stop counting it when the identity's verification
+     * generation is advanced.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
@@ -207,6 +205,23 @@ final readonly class SessionProofStore implements ProofStore
         unset($records[$slot]);
 
         $this->session->put(self::SESSION_KEY, $records);
+    }
+
+    /**
+     * The session id a sign-in is named by, refusing a blank one.
+     *
+     * @param  string  $sessionId
+     * @return string
+     *
+     * @throws \InvalidArgumentException
+     */
+    private static function sessionId(string $sessionId): string
+    {
+        if (trim($sessionId) === '') {
+            throw new \InvalidArgumentException('The session id of a sign-in must not be blank.');
+        }
+
+        return $sessionId;
     }
 
     /**

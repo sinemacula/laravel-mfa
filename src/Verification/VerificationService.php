@@ -210,12 +210,12 @@ final readonly class VerificationService
     }
 
     /**
-     * Record the proof a successful verification made on the identity's
-     * current sign-in: a recovery code proof for a backup code, which travels
-     * on no channel, and an additional factor proof on the factor's channel
+     * Record the proof a successful verification made on the identity's current
+     * sign-in: a recovery code proof for a backup code, which travels on no
+     * channel, and an additional factor proof on the factor's channel
      * otherwise, named by the factor's destination when it has one and by the
-     * factor itself when not. Without a sign-in the store knows of, nothing
-     * is recorded and the driver is not asked for its channel. A driver whose
+     * factor itself when not. Without a sign-in the store knows of, nothing is
+     * recorded and the driver is not asked for its channel. A driver whose
      * channel cannot carry a factor proves nothing, and neither does a factor
      * whose identifier cannot name it.
      *
@@ -252,8 +252,8 @@ final readonly class VerificationService
     }
 
     /**
-     * Apply the post-verify side effects: dispatch `MfaVerified` on success,
-     * or classify the failure and dispatch `MfaVerificationFailed` with a
+     * Apply the post-verify side effects: dispatch `MfaVerified` on success, or
+     * classify the failure and dispatch `MfaVerificationFailed` with a
      * machine-readable reason on failure.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
