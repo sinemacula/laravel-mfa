@@ -20,6 +20,7 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -396,7 +397,7 @@ final readonly class VerificationService
     private function finalizeVerification(MultiFactorAuthenticatable $identity, Factor $factor, string $driver, bool $valid, ?CodeCheck $check, Dispatcher $events): void
     {
         if ($valid) {
-            $events->dispatch(new MfaVerified($identity, $factor, $driver));
+            AfterStorageCommit::run($this->container, static fn () => $events->dispatch(new MfaVerified($identity, $factor, $driver)));
 
             return;
         }

@@ -47,6 +47,10 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 - The proof is stamped with the verification generation read, under the attempt's lock, just before the code is
   checked (`ProofService::generationFor()`), so a generation advanced while the code is checked leaves the proof
   behind. The proof is recorded once the attempt has committed, so a lockout refusing the attempt records nothing.
+  Bound as it was when the code was checked, it is kept only once the storage connection's open transaction, if any,
+  commits (`Database\AfterStorageCommit`, the rule events follow too): a verification made inside a transaction the
+  application rolls back leaves no proof behind, with its code and count undone. Its success event waits with it and
+  is dispatched only after the proof has been kept.
 - Disabling a factor forgets every proof made with it on the current session, on every application. It does not yet
   advance the verification generation: no shipped flow does, so the identity's other sessions keep counting a removed
   factor's proofs until the removal flow revokes them through the session revocation seam.

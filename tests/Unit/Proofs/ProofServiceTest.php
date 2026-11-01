@@ -271,6 +271,55 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
+     * A proof recorded inside a transaction on the storage connection is kept
+     * only once that transaction commits.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAProofMadeInATransactionIsKeptOnceItCommits(): void
+    {
+        $user  = $this->user();
+        $store = $this->container()->make(ProofStore::class);
+
+        $store->begin($user, 'web', 'sign-in-1');
+
+        DB::beginTransaction();
+
+        self::assertNotNull($this->service()->record($user, 0, ProofKind::RECOVERY_CODE, 'backup_code', null, null, Purpose::STEP_UP));
+        self::assertCount(0, $store->proofs($user, 'web'));
+
+        DB::commit();
+
+        self::assertCount(1, $store->proofs($user, 'web'));
+    }
+
+    /**
+     * A proof recorded inside a transaction that rolls back is never kept, so a
+     * verification undone with it leaves no proof behind.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAProofMadeInATransactionThatRollsBackIsNeverKept(): void
+    {
+        $user  = $this->user();
+        $store = $this->container()->make(ProofStore::class);
+
+        $store->begin($user, 'web', 'sign-in-1');
+
+        DB::beginTransaction();
+
+        $this->service()->record($user, 0, ProofKind::RECOVERY_CODE, 'backup_code', null, null, Purpose::STEP_UP);
+
+        DB::rollBack();
+
+        self::assertSame([], $store->proofs($user, 'web'));
+    }
+
+    /**
      * Forgetting a factor stops its proofs counting through the store.
      *
      * @return void
