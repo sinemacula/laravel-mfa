@@ -290,7 +290,9 @@ success of that factor resets it, so once it has reached the limit every further
 `identity_limit` failed attempts across an identity's factors and recovery codes within `window_seconds` lock the
 identity for `lockout_seconds`, and `ip_limit` from one IP address within `window_seconds` throttle the address until
 its window ends. `failure_ceiling` consecutive failures of one factor disable it until the person proves another factor,
-it is rebound or the identity is reset; it is at most 100, the most NIST SP 800-63B-4 allows. A refused attempt counts
+it is rebound or the identity is reset; it is at most 100, the most NIST SP 800-63B-4 allows. The identity's own
+consecutive failures, across its factors and recovery codes, meet the same ceiling: from there each failure disables
+the factor it was made against, and attempts that name no factor (recovery codes) are refused. A refused attempt counts
 nowhere, so it never extends a lockout or a throttle, and sending a code resets nothing. Every counter, what resets it
 and when it expires is set out in [Attempts and lockouts](attempts.md).
 

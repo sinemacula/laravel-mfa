@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Verification;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
@@ -109,11 +110,19 @@ final readonly class VerificationService
      *   identity, the factor and the request's IP address: refused without
      *   reaching the driver while a lockout applies, otherwise counted with its
      *   outcome under the identity's factor state lock.
-     * - On success: stamps the factor's verified-at, clears any pending code,
-     *   records the identity-level verification through the bound store,
-     *   dispatches `MfaVerified`.
-     * - On failure: dispatches `MfaVerificationFailed` with a machine-readable
-     *   reason, `locked` for an attempt a lockout refused.
+     * - The driver verifies the factor as stored under that lock, not the
+     *   instance passed in, so a secret or code replaced in the meantime is the
+     *   one checked, and a factor removed in the meantime is reported as not
+     *   found without reaching the driver.
+     * - On success, inside the same transaction: stamps the factor's
+     *   verified-at and clears its pending code, so a code is consumed with the
+     *   count and two requests with the same code cannot both pass.
+     * - Once the driver has run, the instance passed in is brought up to date
+     *   with the stored factor. On success the identity-level verification is
+     *   recorded through the bound store and `MfaVerified` dispatched; on
+     *   failure `MfaVerificationFailed` is dispatched with a machine-readable
+     *   reason, `locked` for an attempt a lockout refused and `not_found` for a
+     *   factor removed in the meantime.
      *
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account MFA-bypass
@@ -148,24 +157,43 @@ final readonly class VerificationService
 
         $events   = $this->container->make(Dispatcher::class);
         $resolved = $this->drivers->resolve($registry, $driver);
+        $verified = $factor;
 
         // The current identity's own session makes the attempt, so the identity
         // is charged for it. This entry point takes no purpose of its own, so
         // its attempts are counted as sign-in.
         $outcome = $this->container->make(AttemptService::class)->attempt(
             new Attempt($identity, $factor, Purpose::SIGN_IN, $this->ip()),
-            static fn (): bool => $resolved->verify($factor, $code),
+            static function (?Factor $stored) use ($resolved, $code, &$verified): bool {
+
+                $verified = $stored ?? $verified;
+
+                if (!$resolved->verify($verified, $code)) {
+                    return false;
+                }
+
+                if ($verified instanceof EloquentFactor) {
+                    $verified->recordVerification();
+                    $verified->persist();
+                }
+
+                return true;
+            },
         );
 
-        if ($outcome->lockout !== null) {
-            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, FailureReason::LOCKED, $outcome->lockout->detail()));
+        if ($outcome->lockout !== null || $outcome->isNotFound()) {
+
+            [$reason, $detail] = $outcome->lockout !== null
+                ? [FailureReason::LOCKED, $outcome->lockout->detail()]
+                : [FailureReason::NOT_FOUND, 'The factor is no longer among the identity\'s factors.'];
+
+            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason, $detail));
 
             return false;
         }
 
-        if ($outcome->passed && $factor instanceof EloquentFactor) {
-            $factor->recordVerification();
-            $factor->persist();
+        if ($factor instanceof Model && $verified instanceof Model && $verified !== $factor) {
+            $factor->setRawAttributes($verified->getAttributes(), true);
         }
 
         $this->finalizeVerification($identity, $factor, $driver, $outcome->passed, $events);

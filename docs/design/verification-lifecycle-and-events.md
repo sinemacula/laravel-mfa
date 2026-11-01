@@ -42,10 +42,12 @@ whose events carry summaries and a scalar context and are dispatched after the c
 
 - `challenge()` resolves the identity, asserts factor ownership, calls `FactorDriver::issueChallenge($factor)`, then
   dispatches `MfaChallengeIssued($identity, $factor, $driver)`.
-- `verify()` resolves the identity, asserts ownership, rejects if `$factor->isLocked()` with a `locked`
-  failure, calls `FactorDriver::verify($factor, $code)`, persists the success/failure side effects on the factor row,
-  writes through `MfaVerificationStore::markVerified()` on success, then dispatches either `MfaVerified` or
-  `MfaVerificationFailed` last.
+- `verify()` resolves the identity, asserts ownership, and makes the attempt through `AttemptService::attempt()`, which
+  refuses it while a lockout applies and otherwise, under the identity's factor state lock, calls
+  `FactorDriver::verify()` on the factor as stored, records a success on that factor (`verified_at`, `last_used_at`,
+  the consumed code) and counts the outcome, all in one transaction. It then writes through
+  `MfaVerificationStore::markVerified()` on success, and dispatches either `MfaVerified` or `MfaVerificationFailed`
+  last.
 - `enroll()` resolves the identity, stamps ownership onto brand-new Eloquent rows (or asserts ownership on pre-existing
   rows), persists, invalidates the setup cache, then dispatches `MfaFactorEnrolled($identity, $factor, $driver)`.
 - `disable()` resolves the identity, asserts ownership, deletes the row for Eloquent factors, invalidates the setup
@@ -57,7 +59,8 @@ whose events carry summaries and a scalar context and are dispatched after the c
 
 - `verify()` refused by a lockout (the factor's, the identity's or the IP address's, or a factor disabled at the
   failure ceiling) emits `MfaVerificationFailed` with `locked` and returns `false` without calling the driver. Nothing
-  is counted because the attempt never reached the driver (see [Attempts and Lockout](attempts-and-lockout.md)).
+  is counted because the attempt never reached the driver (see [Attempts and Lockout](attempts-and-lockout.md)). A
+  factor no longer among the identity's own when the attempt is made emits `not_found`, also without the driver.
 - On driver-level verification failure, the verification service classifies the reason from the factor's post-verify
   state in priority order: `not_confirmed` when there is neither a pending code nor a secret, `expired` when the code's
   expiry has passed, `expired` again when a pending code has no expiry stamp (a driver-persistence bug, not a user
@@ -66,7 +69,8 @@ whose events carry summaries and a scalar context and are dispatched after the c
   from `DriverResolver::resolve()` before any event is dispatched. Those branches are deliberately outside the event
   taxonomy.
 - Non-Eloquent factors participate in the lifecycle events but carry no row to mutate: they keep no failures in a row,
-  lockout or ceiling of their own, and their attempts are counted against the identity and the IP address only.
+  lockout or ceiling of their own, and their attempts are counted against the identity and the IP address, whose
+  failure ceiling refuses them.
 - Backup-code rotation inside `issueBackupCodes()` runs in the identity's factor state transaction on the storage
   connection, so the "atomic replace + N events" guarantee holds wherever `mfa.storage.connection` puts the tables, and
   a listener that throws rolls the whole rotation back.

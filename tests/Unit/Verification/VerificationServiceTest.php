@@ -26,7 +26,9 @@ use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
+use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -255,6 +257,104 @@ final class VerificationServiceTest extends TestCase
         self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
         $this->assertFailedWith(FailureReason::LOCKED, self::LOCKED);
         Event::assertNotDispatched(MfaVerified::class);
+    }
+
+    /**
+     * A factor removed after the caller read it is reported as not found,
+     * without reaching the driver or counting anything.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testARemovedFactorIsNotFoundWithoutReachingTheDriver(): void
+    {
+        $user   = $this->signIn();
+        $factor = $this->eloquentFactor($user);
+
+        Factor::query()->whereKey($factor->id)->delete();
+
+        $this->stubDriver($this->driverAnswering(null));
+
+        Event::fake();
+
+        self::assertFalse($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
+        $this->assertFailedWith(FailureReason::NOT_FOUND, 'The factor is no longer among the identity\'s factors.');
+        Event::assertNotDispatched(MfaVerified::class);
+        self::assertSame(0, (int) DB::table('mfa_attempts')->sum('hits'));
+    }
+
+    /**
+     * The driver verifies the factor as stored, not the instance passed in, and
+     * the instance passed in is brought up to date with what was stored.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTheDriverVerifiesTheFactorAsStored(): void
+    {
+        $user   = $this->signIn();
+        $factor = $this->eloquentFactor($user);
+
+        Factor::query()->whereKey($factor->id)->update(['label' => 'Replaced']);
+
+        $driver = \Mockery::mock(FactorDriver::class);
+        $driver->shouldReceive('verify')
+            ->once()
+            ->with(\Mockery::on(static fn (mixed $stored): bool => $stored instanceof Factor && $stored !== $factor && $stored->getLabel() === 'Replaced'), '123456')
+            ->andReturnTrue();
+
+        $this->stubDriver($driver);
+
+        Event::fake();
+
+        self::assertTrue($this->service()->verify($this->manager(), 'totp', $factor, '123456'));
+        self::assertSame('Replaced', $factor->getLabel());
+        self::assertNotNull($factor->getVerifiedAt());
+        self::assertFalse($factor->isDirty());
+    }
+
+    /**
+     * A success is recorded on the factor in the attempt's transaction: when
+     * counting it fails, the pending code is not consumed and the factor is not
+     * stamped as verified.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASuccessIsRecordedWithItsCount(): void
+    {
+        $user   = $this->signIn();
+        $factor = $this->eloquentFactor($user);
+
+        $factor->issueCode('123456', Carbon::now()->addMinutes(5));
+        $factor->persist();
+
+        $driver = \Mockery::mock(FactorDriver::class);
+        $driver->shouldReceive('verify')->twice()->andReturn(false, true);
+
+        $this->stubDriver($driver);
+        $this->service()->verify($this->manager(), 'totp', $factor, '000000');
+
+        IdentityState::saving(static function (): void {
+            throw new MidRotationFailureException('counting failed');
+        });
+
+        try {
+            $this->service()->verify($this->manager(), 'totp', $factor, '123456');
+
+            self::fail('The failure to count must propagate.');
+        } catch (MidRotationFailureException $exception) {
+            self::assertSame('counting failed', $exception->getMessage());
+        }
+
+        $stored = Factor::query()->findOrFail($factor->id);
+
+        self::assertSame('123456', $stored->getCode());
+        self::assertNull($stored->getVerifiedAt());
+        self::assertSame(1, $stored->getConsecutiveFailures());
     }
 
     /**

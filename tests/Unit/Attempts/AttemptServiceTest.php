@@ -405,13 +405,15 @@ final class AttemptServiceTest extends TestCase
 
     /**
      * Proving another factor enables every one of the identity's factors the
-     * failure ceiling disabled, with their failures in a row cleared.
+     * failure ceiling disabled, and keeps their failures in a row, since only a
+     * success of a factor resets its own count: the next failure of one
+     * disables it again.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testProvingAnotherFactorEnablesEveryDisabledOne(): void
+    public function testProvingAnotherFactorEnablesEveryDisabledOneAndKeepsItsCount(): void
     {
         $user     = $this->user();
         $disabled = $this->factor($user, failures: 100, disabled: true);
@@ -424,10 +426,15 @@ final class AttemptServiceTest extends TestCase
         $later    = $this->fresh($later);
 
         self::assertNull($disabled->getDisabledAt());
-        self::assertSame(0, $disabled->getConsecutiveFailures());
+        self::assertSame(100, $disabled->getConsecutiveFailures());
         self::assertNull($this->service()->lockout($user, $disabled));
         self::assertNull($later->getDisabledAt());
-        self::assertSame(0, $later->getConsecutiveFailures());
+        self::assertSame(100, $later->getConsecutiveFailures());
+
+        $this->attempt($user, $disabled, false);
+
+        self::assertTrue($this->service()->lockout($user, $disabled)?->isDisabled());
+        self::assertSame(101, $this->fresh($disabled)->getConsecutiveFailures());
     }
 
     /**
@@ -495,6 +502,28 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * Lifting the lockout of a factor that is not the identity's lifts nothing
+     * and reports nothing.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testLiftingAnotherIdentitysFactorLockoutLiftsNothing(): void
+    {
+        Event::fake([LockoutLifted::class]);
+
+        $owner  = $this->user('owner@example.com');
+        $factor = $this->factor($owner);
+
+        $this->lockFactor($factor);
+
+        self::assertFalse($this->service()->liftLockout($this->user(), $factor));
+        self::assertSame(AttemptScope::FACTOR, $this->service()->lockout($owner, $factor)?->scope);
+        Event::assertNotDispatched(LockoutLifted::class);
+    }
+
+    /**
      * Lifting a lockout leaves a factor the failure ceiling disabled disabled.
      *
      * @return void
@@ -559,6 +588,224 @@ final class AttemptServiceTest extends TestCase
         self::assertTrue($this->attempt($user, $factor, false)->isFailed());
         self::assertSame(2, $this->state($user)?->consecutive_failures);
         self::assertNull($this->service()->lockout($user, $factor));
+    }
+
+    /**
+     * From the failure ceiling on, the identity's run refuses every attempt
+     * that names no factor of its own (a recovery code, or a factor that keeps
+     * no state) without running the verification, while one of its factors may
+     * still be attempted; proving it resets the run.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheIdentityRunAtTheCeilingRefusesAttemptsWithoutAFactor(): void
+    {
+        config()->set('mfa.attempts.failure_ceiling', 3);
+
+        $user      = $this->user();
+        $factor    = $this->factor($user);
+        $stateless = new InMemoryFactor(authenticatable: $user);
+
+        $this->attempt($user, null, false);
+        $this->attempt($user, $stateless, false);
+        $this->attempt($user, null, false);
+
+        $refused = $this->service()->attempt(new Attempt($user, null, Purpose::SIGN_IN, self::IP), static function (): bool {
+            throw new MidRotationFailureException('The verification must not run.');
+        });
+
+        self::assertTrue($refused->isRefused());
+        self::assertSame(AttemptScope::IDENTITY, $refused->lockout?->scope);
+        self::assertTrue($refused->lockout->isDisabled());
+        self::assertTrue($this->attempt($user, $stateless, true)->isRefused());
+        self::assertTrue($this->service()->lockout($user)?->isDisabled());
+        self::assertTrue($this->service()->lockout($user, $stateless)?->isDisabled());
+        self::assertNull($this->service()->lockout($user, $factor));
+        self::assertSame(3, $this->state($user)?->consecutive_failures);
+        self::assertSame(3, $this->hits($this->keys()->ip(self::IP)));
+
+        self::assertTrue($this->attempt($user, $factor, true)->passed);
+        self::assertSame(0, $this->state($user)?->consecutive_failures);
+        self::assertTrue($this->attempt($user, null, true)->passed);
+    }
+
+    /**
+     * The failure that brings the identity's run to the failure ceiling, spread
+     * across its factors, disables the factor it was made against, however few
+     * failures in a row that factor has, and reports it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailureAtTheIdentityCeilingDisablesTheFactorAttempted(): void
+    {
+        config()->set('mfa.attempts.failure_ceiling', 3);
+
+        Event::fake([FactorDisabled::class]);
+
+        $user   = $this->user();
+        $first  = $this->factor($user);
+        $second = $this->factor($user);
+
+        $this->attempt($user, $first, false);
+        $this->attempt($user, null, false);
+
+        Event::assertNotDispatched(FactorDisabled::class);
+
+        $this->attempt($user, $second, false);
+
+        self::assertNotNull($this->fresh($second)->getDisabledAt());
+        self::assertSame(1, $this->fresh($second)->getConsecutiveFailures());
+        self::assertNull($this->fresh($first)->getDisabledAt());
+        self::assertTrue($this->service()->lockout($user, $second)?->isDisabled());
+        Event::assertDispatched(FactorDisabled::class, static fn (FactorDisabled $event): bool => $event->factor->id === $second->id);
+
+        $this->attempt($user, $first, false);
+
+        self::assertNotNull($this->fresh($first)->getDisabledAt());
+    }
+
+    /**
+     * Resetting the identity's failures clears its run, so attempts without a
+     * factor are made again; with no run there is nothing to reset.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testResettingTheIdentityFailuresClearsItsRun(): void
+    {
+        config()->set('mfa.attempts.failure_ceiling', 2);
+
+        $user = $this->user();
+
+        self::assertFalse($this->service()->resetIdentityFailures($user));
+
+        $this->attempt($user, null, false);
+        $this->attempt($user, null, false);
+
+        self::assertTrue($this->service()->lockout($user)?->isDisabled());
+        self::assertTrue($this->service()->resetIdentityFailures($user));
+        self::assertSame(0, $this->state($user)?->consecutive_failures);
+        self::assertNull($this->service()->lockout($user));
+        self::assertFalse($this->service()->resetIdentityFailures($user));
+        self::assertTrue($this->attempt($user, null, true)->passed);
+    }
+
+    /**
+     * A factor removed before the lock is taken is not found: the verification
+     * does not run and nothing is counted anywhere.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFactorRemovedBeforeTheLockIsNotFound(): void
+    {
+        $user   = $this->user();
+        $factor = $this->factor($user);
+
+        Factor::query()->whereKey($factor->id)->delete();
+
+        $outcome = $this->service()->attempt(new Attempt($user, $factor, Purpose::SIGN_IN, self::IP), static function (): bool {
+            throw new MidRotationFailureException('The verification must not run.');
+        });
+
+        self::assertTrue($outcome->isNotFound());
+        self::assertFalse($outcome->passed);
+        self::assertSame(0, $this->state($user)?->consecutive_failures);
+        self::assertSame(0, $this->hits($this->keys()->identity($user::class, (string) $user->id)));
+        self::assertSame(0, $this->hits($this->keys()->ip(self::IP)));
+    }
+
+    /**
+     * Another identity's factor is not among the identity's own, so it is not
+     * found either, and its own count is left alone.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnotherIdentitysFactorIsNotFound(): void
+    {
+        $user  = $this->user();
+        $other = $this->factor($this->user('other@example.com'), failures: 1);
+
+        $outcome = $this->service()->attempt(new Attempt($user, $other, Purpose::SIGN_IN, self::IP), static function (): bool {
+            throw new MidRotationFailureException('The verification must not run.');
+        });
+
+        self::assertTrue($outcome->isNotFound());
+        self::assertSame(1, $this->fresh($other)->getConsecutiveFailures());
+    }
+
+    /**
+     * The verification is handed the factor as stored under the lock, not the
+     * instance the caller read before; a factor that keeps no state is handed
+     * as it is, and an attempt without a factor is handed none.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheVerificationIsHandedTheFactorAsStored(): void
+    {
+        $user      = $this->user();
+        $factor    = $this->factor($user);
+        $stateless = new InMemoryFactor(authenticatable: $user);
+        $handed    = [];
+
+        Factor::query()->whereKey($factor->id)->update(['label' => 'Replaced']);
+
+        foreach ([$factor, $stateless, null] as $named) {
+            $this->service()->attempt(new Attempt($user, $named, Purpose::SIGN_IN), static function (?FactorContract $stored) use (&$handed): bool {
+
+                $handed[] = $stored;
+
+                return true;
+            });
+        }
+
+        self::assertInstanceOf(Factor::class, $handed[0]);
+        self::assertNotSame($factor, $handed[0]);
+        self::assertSame('Replaced', $handed[0]->getLabel());
+        self::assertSame($stateless, $handed[1]);
+        self::assertNull($handed[2]);
+    }
+
+    /**
+     * A listener that throws once the attempt has committed leaves the failure
+     * counted, the address's charge included.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAListenerThatThrowsLeavesTheFailureCounted(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 1);
+
+        Event::listen(LockoutApplied::class, static function (): void {
+            throw new MidRotationFailureException('listener failed');
+        });
+
+        $user   = $this->user();
+        $factor = $this->factor($user);
+
+        try {
+            $this->attempt($user, $factor, false);
+
+            self::fail('The listener\'s exception must propagate.');
+        } catch (MidRotationFailureException $exception) {
+            self::assertSame('listener failed', $exception->getMessage());
+        }
+
+        self::assertSame(1, $this->fresh($factor)->getConsecutiveFailures());
+        self::assertSame(1, $this->hits($this->keys()->ip(self::IP)));
+        self::assertSame(AttemptScope::FACTOR, $this->service()->lockout($user, $factor)?->scope);
     }
 
     /**

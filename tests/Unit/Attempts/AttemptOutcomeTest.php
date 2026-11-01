@@ -36,6 +36,7 @@ final class AttemptOutcomeTest extends TestCase
         self::assertNull($outcome->lockout);
         self::assertFalse($outcome->isFailed());
         self::assertFalse($outcome->isRefused());
+        self::assertFalse($outcome->isNotFound());
     }
 
     /**
@@ -51,6 +52,7 @@ final class AttemptOutcomeTest extends TestCase
         self::assertNull($outcome->lockout);
         self::assertTrue($outcome->isFailed());
         self::assertFalse($outcome->isRefused());
+        self::assertFalse($outcome->isNotFound());
     }
 
     /**
@@ -67,5 +69,23 @@ final class AttemptOutcomeTest extends TestCase
         self::assertSame($lockout, $outcome->lockout);
         self::assertFalse($outcome->isFailed());
         self::assertTrue($outcome->isRefused());
+        self::assertFalse($outcome->isNotFound());
+    }
+
+    /**
+     * An attempt on a factor that was not found neither passed nor counted, and
+     * was not refused by a lockout.
+     *
+     * @return void
+     */
+    public function testAnAttemptOnAFactorNotFound(): void
+    {
+        $outcome = AttemptOutcome::notFound();
+
+        self::assertFalse($outcome->passed);
+        self::assertNull($outcome->lockout);
+        self::assertFalse($outcome->isFailed());
+        self::assertFalse($outcome->isRefused());
+        self::assertTrue($outcome->isNotFound());
     }
 }

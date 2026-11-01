@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Attempts;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
@@ -63,8 +64,17 @@ final readonly class AttemptStore
     }
 
     /**
-     * Count one failure in the row's window, however many it already has: a row
-     * whose window has ended starts the window that ends at `$end` with it.
+     * Count one failure in the row's window, however many it already has: a
+     * missing row is created with it, and a row whose window has ended starts
+     * the window that ends at `$end` with it.
+     *
+     * It is one upsert, so it never runs an update that finds no row: inside a
+     * transaction on MySQL, such an update holds a gap lock until the commit,
+     * and two transactions recording their first failure under different keys
+     * in the same gap would then deadlock on each other's insert. The count is
+     * assigned before the window, as in `writeCount()`. The times are written
+     * into the update as literals, which is safe as the store formats them
+     * itself.
      *
      * @param  string  $key
      * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
@@ -76,11 +86,21 @@ final readonly class AttemptStore
      */
     public function record(string $key, AttemptScope $scope, int $now, int $end): void
     {
-        if ($this->writeCount($key, $now, $end) || $this->storeNewRow($key, $scope, $end)) {
-            return;
-        }
+        $grammar = $this->connection()->getQueryGrammar();
+        $table   = TableNames::of(TableNames::ATTEMPTS);
+        $hits    = $grammar->wrap($table . '.hits');
+        $window  = $grammar->wrap($table . '.window_ends_at');
+        $ended   = "{$window} <= " . $grammar->quoteString($this->format($now));
 
-        $this->writeCount($key, $now, $end);
+        $this->table()->upsert([[
+            'key'            => $key,
+            'scope'          => $scope->value,
+            'hits'           => 1,
+            'window_ends_at' => $this->format($end),
+        ]], ['key'], [
+            'hits'           => new Expression("case when {$ended} then 1 else {$hits} + 1 end"),
+            'window_ends_at' => new Expression("case when {$ended} then " . $grammar->quoteString($this->format($end)) . " else {$window} end"),
+        ]);
     }
 
     /**
@@ -221,9 +241,9 @@ final readonly class AttemptStore
 
     /**
      * Add one attempt to an existing row in one statement: the row's window
-     * restarts when it has ended, and, given a maximum, only a window that ends
-     * at `$end` and has room is counted in (any other live window is left
-     * untouched). Returns whether the row was changed.
+     * restarts when it has ended, and only a window that ends at `$end` and has
+     * room is counted in (any other live window is left untouched). Returns
+     * whether the row was changed.
      *
      * The count is assigned before the window: MySQL evaluates the assignments
      * of an UPDATE from left to right, so the count's condition must read the
@@ -232,14 +252,14 @@ final readonly class AttemptStore
      * @param  string  $key
      * @param  int  $now
      * @param  int  $end
-     * @param  ?int  $max
+     * @param  int  $max
      * @return bool
      *
      * @throws \InvalidArgumentException
      *
      * @phpstan-impure
      */
-    private function writeCount(string $key, int $now, int $end, ?int $max = null): bool
+    private function writeCount(string $key, int $now, int $end, int $max): bool
     {
         $connection = $this->connection();
         $grammar    = $connection->getQueryGrammar();
@@ -249,18 +269,10 @@ final readonly class AttemptStore
         $nowAt      = $this->format($now);
 
         $sql = "update {$table} set {$hits} = case when {$window} <= ? then 1 else {$hits} + 1 end,"
-            . " {$window} = case when {$window} <= ? then ? else {$window} end where {$grammar->wrap('key')} = ?";
+            . " {$window} = case when {$window} <= ? then ? else {$window} end where {$grammar->wrap('key')} = ?"
+            . " and ({$window} <= ? or ({$window} = ? and {$hits} < ?))";
 
-        $bindings = [$nowAt, $nowAt, $this->format($end), $key];
-
-        if ($max !== null) {
-
-            $sql .= " and ({$window} <= ? or ({$window} = ? and {$hits} < ?))";
-
-            array_push($bindings, $nowAt, $this->format($end), $max);
-        }
-
-        return $connection->update($sql, $bindings) === 1;
+        return $connection->update($sql, [$nowAt, $nowAt, $this->format($end), $key, $nowAt, $this->format($end), $max]) === 1;
     }
 
     /**

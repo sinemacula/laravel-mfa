@@ -4,14 +4,17 @@ declare(strict_types = 1);
 
 namespace Tests\Integration\Database;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Config\Repository;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
+use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
+use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -29,7 +32,8 @@ use Tests\TestCase;
  * counts: it waits for the identity's state lock and times out. Once the first
  * attempt has counted its failure, the parallel one finds the lockout it
  * applied. A parallel attempt from the same address for another identity finds
- * the slot the first attempt took, and is throttled without waiting.
+ * the slot the first attempt took, and is throttled without waiting, and two
+ * identities counting their first failure at once do not wait on each other.
  *
  * SQLite serialises every writer on the whole file, so these tests run on the
  * server databases only.
@@ -40,6 +44,7 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(AttemptService::class)]
+#[CoversClass(AttemptStore::class)]
 final class ParallelAttemptsTest extends TestCase
 {
     /** @var string The address both attempts come from. */
@@ -134,6 +139,50 @@ final class ParallelAttemptsTest extends TestCase
         self::assertInstanceOf(AttemptOutcome::class, $this->parallel);
         self::assertTrue($this->parallel->isRefused());
         self::assertSame(AttemptScope::IP, $this->parallel->lockout?->scope);
+    }
+
+    /**
+     * Two identities recording their first failure at the same time do not wait
+     * on each other: the count is one upsert, so the observer's open
+     * transaction holds no lock on the gap the second identity's row goes in.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheFirstFailuresOfTwoIdentitiesDoNotWaitOnEachOther(): void
+    {
+        $connection = DB::connection();
+
+        $connection->statement($connection->getDriverName() === 'mysql' ? 'SET SESSION innodb_lock_wait_timeout = 1' : 'SET lock_timeout = \'1s\'');
+
+        $first    = $this->user('first@example.com');
+        $other    = $this->user('other@example.com');
+        $now      = CarbonImmutable::now()->getTimestamp();
+        $observer = DB::connection('observer');
+
+        $observer->beginTransaction();
+
+        try {
+            config()->set('mfa.storage.connection', 'observer');
+
+            $this->container()->make(AttemptStore::class)->record(
+                $this->container()->make(AttemptKeys::class)->identity($other::class, (string) $other->id),
+                AttemptScope::IDENTITY,
+                $now,
+                $now + 900,
+            );
+
+            config()->set('mfa.storage.connection', null);
+
+            $outcome = $this->service()->attempt(new Attempt($first, null, Purpose::SIGN_IN), static fn (): bool => false);
+        } finally {
+            config()->set('mfa.storage.connection', null);
+
+            $observer->rollBack();
+        }
+
+        self::assertTrue($outcome->isFailed());
     }
 
     /**

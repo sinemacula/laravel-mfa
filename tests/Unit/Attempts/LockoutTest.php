@@ -70,6 +70,21 @@ final class LockoutTest extends TestCase
     }
 
     /**
+     * An identity whose run of failures reached the failure ceiling has no end
+     * either.
+     *
+     * @return void
+     */
+    public function testAnIdentityAtTheCeilingHasNoEnd(): void
+    {
+        $lockout = Lockout::disabled(AttemptScope::IDENTITY);
+
+        self::assertSame(AttemptScope::IDENTITY, $lockout->scope);
+        self::assertNull($lockout->until);
+        self::assertTrue($lockout->isDisabled());
+    }
+
+    /**
      * Each lockout and the detail it reports.
      *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Attempts\Lockout, string}>
@@ -79,6 +94,7 @@ final class LockoutTest extends TestCase
         $until = CarbonImmutable::parse('2026-11-01 12:15:00');
 
         yield 'a disabled factor' => [Lockout::disabled(), 'The factor is disabled after reaching the failure ceiling.'];
+        yield 'an identity at the ceiling' => [Lockout::disabled(AttemptScope::IDENTITY), 'The identity has reached the failure ceiling across its factors and recovery codes.'];
         yield 'a locked factor' => [Lockout::endingAt(AttemptScope::FACTOR, $until), 'The factor is locked after too many failed attempts.'];
         yield 'a locked identity' => [Lockout::endingAt(AttemptScope::IDENTITY, $until), 'The identity is locked after too many failed attempts across its factors.'];
         yield 'a throttled address' => [Lockout::endingAt(AttemptScope::IP, $until), 'The IP address is throttled after too many failed attempts.'];

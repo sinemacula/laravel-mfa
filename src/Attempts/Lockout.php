@@ -10,9 +10,11 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 /**
  * Why an attempt is refused before it reaches the driver: a factor locked by
  * its failures in a row, the identity locked by its failures within the window,
- * or the IP address throttled by its own, each until a time; or a factor
- * disabled at the failure ceiling, which has no time to end at, since only
- * proving another factor, rebinding it or a reset enables it again.
+ * or the IP address throttled by its own, each until a time; or, with no time
+ * to end at, a factor disabled at the failure ceiling, which only proving
+ * another factor, rebinding it or a reset enables again, or an identity whose
+ * run of failures reached the ceiling, which refuses every attempt that names
+ * no factor of its own until a success or a reset clears the run.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,7 +32,7 @@ final readonly class Lockout
         /** What is locked: the factor, the identity or the IP address. */
         public AttemptScope $scope,
 
-        /** When the lockout ends, or null for a factor disabled at the failure ceiling. */
+        /** When the lockout ends, or null for a factor or an identity at the failure ceiling. */
         public ?CarbonImmutable $until,
     ) {}
 
@@ -60,18 +62,20 @@ final readonly class Lockout
     }
 
     /**
-     * A factor disabled at the failure ceiling.
+     * A factor disabled at the failure ceiling, or, given the identity scope,
+     * an identity whose run of failures reached it.
      *
+     * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
      * @return self
      */
-    public static function disabled(): self
+    public static function disabled(AttemptScope $scope = AttemptScope::FACTOR): self
     {
-        return new self(AttemptScope::FACTOR, null);
+        return new self($scope, null);
     }
 
     /**
-     * The strictest of the lockouts given: a disabled factor first, otherwise
-     * the lockout that ends last, or `null` when none is given.
+     * The strictest of the lockouts given: one at the failure ceiling first,
+     * otherwise the lockout that ends last, or `null` when none is given.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Attempts\Lockout  ...$lockouts
      * @return ?self
@@ -101,7 +105,7 @@ final readonly class Lockout
     }
 
     /**
-     * Determine whether this is a factor disabled at the failure ceiling,
+     * Determine whether this is a factor or an identity at the failure ceiling,
      * rather than a lockout that ends on its own.
      *
      * @return bool
@@ -118,8 +122,13 @@ final readonly class Lockout
      */
     public function detail(): string
     {
+        if ($this->until === null) {
+            return $this->scope === AttemptScope::IDENTITY
+                ? 'The identity has reached the failure ceiling across its factors and recovery codes.'
+                : 'The factor is disabled after reaching the failure ceiling.';
+        }
+
         return match (true) {
-            $this->until === null                   => 'The factor is disabled after reaching the failure ceiling.',
             $this->scope === AttemptScope::FACTOR   => 'The factor is locked after too many failed attempts.',
             $this->scope === AttemptScope::IDENTITY => 'The identity is locked after too many failed attempts across its factors.',
             default                                 => 'The IP address is throttled after too many failed attempts.',
