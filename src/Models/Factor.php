@@ -58,7 +58,7 @@ class Factor extends Model implements EloquentFactor
         'last_attempted_at',
     ];
 
-    /** @var list<string> The attributes that should be hidden for serialization. */
+    /** @var list<string> The attributes that should be hidden for serialisation. */
     protected $hidden = [
         'secret',
         'code',
@@ -68,7 +68,7 @@ class Factor extends Model implements EloquentFactor
      * Create a new Factor bound to the package-configured table name. Reads the
      * table name lazily on each instantiation so runtime config swaps (tests,
      * tenancy) take effect immediately. It has to be applied here, before
-     * Eloquent reads it, so this is construction rather than model behavior.
+     * Eloquent reads it, so this is construction rather than model behaviour.
      *
      * @param  array<string, mixed>  $attributes
      *

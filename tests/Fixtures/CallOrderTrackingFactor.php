@@ -16,7 +16,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
  * Lives in `tests/Fixtures` so it can be referenced by name (rather than
  * defined inline as an anonymous class) — that lets PHPStan read the typed
  * `$tracker` property, which callers bind by reference from the outside so the
- * model itself carries no behavior beyond the recording overrides.
+ * model itself carries no behaviour beyond the recording overrides.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
