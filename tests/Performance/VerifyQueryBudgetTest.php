@@ -7,7 +7,10 @@ namespace Tests\Performance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
+use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
+use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -34,8 +37,11 @@ final class VerifyQueryBudgetTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * A successful TOTP verify must stay within the documented two-query
-     * budget: the accepted step's compare-and-set and the factor-row update.
+     * A successful TOTP verify must stay within the documented nine-query
+     * budget: the IP address's slot taken and given back, the identity's state
+     * lock and its factors, the identity's state and the factor's lockout read
+     * under the lock, the accepted step's compare-and-set and the factor-row
+     * update.
      *
      * @return void
      */
@@ -55,24 +61,29 @@ final class VerifyQueryBudgetTest extends TestCase
             static fn () => Mfa::verify('totp', $factor, $code),
         );
 
-        // Budget: one conditional update recording the accepted time step, and
+        // Budget: the IP slot (an update, and an insert for its first window),
+        // the identity state lock and the factors locked under it, the identity
+        // state and the factor lockout read under the lock, the slot given
+        // back, one conditional update recording the accepted time step, and
         // one update on the factor row for recordVerification. The verification
         // store is session-backed in the default binding, so its write goes
         // through the session driver, not the database.
         self::assertLessThanOrEqual(
-            2,
+            9,
             $count,
             sprintf('TOTP verify hit exceeded query budget: %d queries', $count),
         );
     }
 
     /**
-     * Rejecting a verify against a locked factor must not issue any database
-     * queries — the manager's lock check happens entirely in memory.
+     * Rejecting a verify against a locked factor reads the lockout under the
+     * identity's lock, from the write connection, and writes nothing but the IP
+     * address's slot, which it gives back.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
      */
     public function testTotpVerifyLockedBudget(): void
     {
@@ -82,24 +93,35 @@ final class VerifyQueryBudgetTest extends TestCase
             ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
-            'locked_until'         => now()->addHour(),
+            'consecutive_failures' => 5,
         ]);
+
+        $this->container()->make(AttemptStore::class)->hold(
+            $this->container()->make(AttemptKeys::class)->factor($factor->id),
+            AttemptScope::FACTOR,
+            5,
+            now()->addHour()->getTimestamp(),
+        );
 
         $count = $this->countQueries(
             static fn () => Mfa::verify('totp', $factor, '000000'),
         );
 
-        // Locked factor: the manager rejects without touching the DB.
-        self::assertSame(
-            0,
+        // Locked factor: the IP slot taken and given back, the identity state
+        // lock and its factors, and the identity state and factor lockout
+        // reads; the driver never runs and nothing is counted.
+        self::assertLessThanOrEqual(
+            7,
             $count,
             sprintf('Locked factor rejection issued queries: %d', $count),
         );
     }
 
     /**
-     * A failed TOTP verify must stay within a single query — the attempt-count
-     * update on the factor row, with no verification store write.
+     * A failed TOTP verify must stay within ten queries: the reads and locks of
+     * a hit, the identity's failure counted in its window and its state row,
+     * and the factor's failure in a row, with no step recorded and no
+     * verification store write.
      *
      * @return void
      */
@@ -117,10 +139,13 @@ final class VerifyQueryBudgetTest extends TestCase
             static fn () => Mfa::verify('totp', $factor, '000000'),
         );
 
-        // One update on the factor row for recordAttempt. No verification store
-        // write on failure.
+        // The six reads and locks of a hit before the driver, the identity's
+        // window counted in one upsert and read back, its state row and the
+        // factor row updated. No code matches, so no step is recorded, and the
+        // IP slot is kept, not given back. No verification store write on
+        // failure.
         self::assertLessThanOrEqual(
-            1,
+            10,
             $count,
             sprintf('TOTP verify miss exceeded query budget: %d queries', $count),
         );

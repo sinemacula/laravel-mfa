@@ -16,8 +16,8 @@ use Tests\TestCase;
 /**
  * Unit tests for the `ActsAsFactor` trait via the shipped `Factor` model.
  *
- * The trait implements the full `EloquentFactor` contract — 32 public methods
- * spanning column-name accessors, attribute readers, lockout state, code
+ * The trait implements the full `EloquentFactor` contract, its public methods
+ * spanning column-name accessors, attribute readers, verification state, code
  * lifecycle, and persistence. Every public surface has a paired test (and most
  * readers have separate "value present" / "value absent" cases), so the class
  * size is intrinsic to the contract's surface area, not a sign of conflated
@@ -136,36 +136,6 @@ final class ActsAsFactorTest extends TestCase
     public function testGetExpiresAtNameReturnsExpiresAtColumn(): void
     {
         self::assertSame('expires_at', (new Factor)->getExpiresAtName());
-    }
-
-    /**
-     * Test attempts column name accessor.
-     *
-     * @return void
-     */
-    public function testGetAttemptsNameReturnsAttemptsColumn(): void
-    {
-        self::assertSame('attempts', (new Factor)->getAttemptsName());
-    }
-
-    /**
-     * Test locked_until column name accessor.
-     *
-     * @return void
-     */
-    public function testGetLockedUntilNameReturnsLockedUntilColumn(): void
-    {
-        self::assertSame('locked_until', (new Factor)->getLockedUntilName());
-    }
-
-    /**
-     * Test last_attempted_at column name accessor.
-     *
-     * @return void
-     */
-    public function testGetLastAttemptedAtNameReturnsLastAttemptedAtColumn(): void
-    {
-        self::assertSame('last_attempted_at', (new Factor)->getLastAttemptedAtName());
     }
 
     /**
@@ -326,110 +296,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get attempts returns int.
-     *
-     * @return void
-     */
-    public function testGetAttemptsReturnsInt(): void
-    {
-        $factor = new Factor(['attempts' => 3]);
-
-        self::assertSame(3, $factor->getAttempts());
-    }
-
-    /**
-     * Test get attempts returns zero when unset.
-     *
-     * @return void
-     */
-    public function testGetAttemptsReturnsZeroWhenUnset(): void
-    {
-        self::assertSame(0, (new Factor)->getAttempts());
-    }
-
-    /**
-     * Test get locked until returns carbon when set.
-     *
-     * @return void
-     */
-    public function testGetLockedUntilReturnsCarbonWhenSet(): void
-    {
-        $at     = Carbon::now()->addMinutes(15);
-        $factor = new Factor(['locked_until' => $at]);
-
-        self::assertNotNull($factor->getLockedUntil());
-        self::assertSame($at->getTimestamp(), $factor->getLockedUntil()->getTimestamp());
-    }
-
-    /**
-     * Test get locked until returns null when unset.
-     *
-     * @return void
-     */
-    public function testGetLockedUntilReturnsNullWhenUnset(): void
-    {
-        self::assertNull((new Factor)->getLockedUntil());
-    }
-
-    /**
-     * Test is locked is false when not set.
-     *
-     * @return void
-     */
-    public function testIsLockedIsFalseWhenNotSet(): void
-    {
-        self::assertFalse((new Factor)->isLocked());
-    }
-
-    /**
-     * Test is locked is false when lockout is in the past.
-     *
-     * @return void
-     */
-    public function testIsLockedIsFalseWhenLockoutIsInThePast(): void
-    {
-        $factor = new Factor(['locked_until' => Carbon::now()->subMinutes(5)]);
-
-        self::assertFalse($factor->isLocked());
-    }
-
-    /**
-     * Test is locked is true when lockout is in the future.
-     *
-     * @return void
-     */
-    public function testIsLockedIsTrueWhenLockoutIsInTheFuture(): void
-    {
-        $factor = new Factor(['locked_until' => Carbon::now()->addMinutes(5)]);
-
-        self::assertTrue($factor->isLocked());
-    }
-
-    /**
-     * Test get last attempted at returns carbon when set.
-     *
-     * @return void
-     */
-    public function testGetLastAttemptedAtReturnsCarbonWhenSet(): void
-    {
-        $at     = Carbon::now();
-        $factor = new Factor(['last_attempted_at' => $at]);
-
-        self::assertNotNull($factor->getLastAttemptedAt());
-        self::assertSame($at->getTimestamp(), $factor->getLastAttemptedAt()->getTimestamp());
-    }
-
-    /**
-     * Test get last attempted at returns null when unset.
-     *
-     * @return void
-     */
-    public function testGetLastAttemptedAtReturnsNullWhenUnset(): void
-    {
-        self::assertNull((new Factor)->getLastAttemptedAt());
-    }
-
-    /**
      * Test get verified at returns carbon when set.
      *
      * @return void
@@ -541,72 +407,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test record attempt increments attempts and stamps last attempted at.
-     *
-     * @return void
-     */
-    public function testRecordAttemptIncrementsAttemptsAndStampsLastAttemptedAt(): void
-    {
-        $factor = new Factor(['attempts' => 2]);
-
-        $factor->recordAttempt();
-
-        self::assertSame(3, $factor->getAttempts());
-        self::assertNotNull($factor->getLastAttemptedAt());
-        self::assertSame(Carbon::now()->getTimestamp(), $factor->getLastAttemptedAt()->getTimestamp());
-    }
-
-    /**
-     * Test record attempt uses provided timestamp.
-     *
-     * @return void
-     */
-    public function testRecordAttemptUsesProvidedTimestamp(): void
-    {
-        $factor = new Factor;
-        $at     = Carbon::parse('2026-04-14T08:00:00+00:00');
-
-        $factor->recordAttempt($at);
-
-        self::assertNotNull($factor->getLastAttemptedAt());
-        self::assertSame($at->getTimestamp(), $factor->getLastAttemptedAt()->getTimestamp());
-    }
-
-    /**
-     * Test reset attempts zeroes counter and clears lockout.
-     *
-     * @return void
-     */
-    public function testResetAttemptsZeroesCounterAndClearsLockout(): void
-    {
-        $factor = new Factor([
-            'attempts'     => 4,
-            'locked_until' => Carbon::now()->addMinutes(10),
-        ]);
-
-        $factor->resetAttempts();
-
-        self::assertSame(0, $factor->getAttempts());
-        self::assertNull($factor->getLockedUntil());
-    }
-
-    /**
-     * Test apply lockout stamps locked until.
-     *
-     * @return void
-     */
-    public function testApplyLockoutStampsLockedUntil(): void
-    {
-        $factor = new Factor;
-        $until  = Carbon::now()->addMinutes(15);
-
-        $factor->applyLockout($until);
-
-        self::assertNotNull($factor->getLockedUntil());
-        self::assertSame($until->getTimestamp(), $factor->getLockedUntil()->getTimestamp());
-    }
-
-    /**
      * Test record verification stamps the verified_at timestamp, and the last
      * use with it.
      *
@@ -624,31 +424,18 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test record verification resets the attempt counter to zero.
+     * Test record verification leaves the failures in a row to the attempt
+     * service, which resets them under the identity's lock.
      *
      * @return void
      */
-    public function testRecordVerificationResetsAttemptCounter(): void
+    public function testRecordVerificationLeavesTheFailuresInARow(): void
     {
         $factor = $this->makeFullyPopulatedFactor();
 
         $factor->recordVerification();
 
-        self::assertSame(0, $factor->getAttempts());
-    }
-
-    /**
-     * Test record verification clears the lockout timestamp.
-     *
-     * @return void
-     */
-    public function testRecordVerificationClearsLockoutTimestamp(): void
-    {
-        $factor = $this->makeFullyPopulatedFactor();
-
-        $factor->recordVerification();
-
-        self::assertNull($factor->getLockedUntil());
+        self::assertSame(2, $factor->getConsecutiveFailures());
     }
 
     /**
@@ -768,17 +555,16 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Build a factor with attempts, lockout, code, and expiry populated.
+     * Build a factor with failures in a row, code, and expiry populated.
      *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
     private function makeFullyPopulatedFactor(): Factor
     {
         return new Factor([
-            'attempts'     => 2,
-            'locked_until' => Carbon::now()->addMinutes(5),
-            'code'         => self::SAMPLE_CODE,
-            'expires_at'   => Carbon::now()->addMinutes(5),
+            'consecutive_failures' => 2,
+            'code'                 => self::SAMPLE_CODE,
+            'expires_at'           => Carbon::now()->addMinutes(5),
         ]);
     }
 }

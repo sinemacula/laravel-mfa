@@ -117,54 +117,6 @@ abstract class AbstractFactorStub implements Factor
     }
 
     /**
-     * Return the stub's default attempt count (zero).
-     *
-     * @return int
-     */
-    #[\Override]
-    public function getAttempts(): int
-    {
-        return 0;
-    }
-
-    /**
-     * Report whether the stub is currently locked.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isLocked(): bool
-    {
-        // Derived from the accessor so subclasses can flip the lock state by
-        // overriding `getLockedUntil()` alone — and so the body is not
-        // byte-identical to `isVerified()` (radarlint S4144 flags structurally
-        // identical method bodies).
-        return $this->getLockedUntil() !== null;
-    }
-
-    /**
-     * Return the stub's default lockout expiry (none).
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLockedUntil(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
-     * Return the stub's default last-attempted timestamp (none).
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLastAttemptedAt(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
      * Report whether the stub has been verified at least once.
      *
      * @return bool

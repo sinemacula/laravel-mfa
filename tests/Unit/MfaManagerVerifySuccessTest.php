@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerVerify;
 
@@ -71,13 +72,13 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
     }
 
     /**
-     * Test successful Eloquent verify resets the attempt counter.
+     * Test successful Eloquent verify resets the factor's failures in a row.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testVerifySuccessResetsAttemptCounter(): void
+    public function testVerifySuccessResetsConsecutiveFailures(): void
     {
         [$factor] = $this->seedEloquentVerifySuccessScenario();
 
@@ -85,7 +86,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
 
         $factor->refresh();
 
-        self::assertSame(0, $factor->getAttempts());
+        self::assertSame(0, $factor->getConsecutiveFailures());
     }
 
     /**
@@ -232,7 +233,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
             'destination'          => 'v2@example.com',
             'code'                 => self::VALID_CODE,
             'expires_at'           => Carbon::now()->addMinutes(10),
-            'attempts'             => 1,
+            'consecutive_failures' => 1,
         ]);
 
         $driver = \Mockery::mock(FactorDriver::class);
@@ -269,7 +270,7 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        $factor = Factor::query()->create([
+        Factor::query()->create([
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
             'type'                 => 'totp',
@@ -287,10 +288,11 @@ final class MfaManagerVerifySuccessTest extends MfaManagerTestCase
         $manager->isSetup();
 
         // Remove the backing row so a stale cache would still report
-        // `isSetup()` true after the verify.
+        // `isSetup()` true after the verify, which proves a factor that keeps
+        // no row of its own (a removed row is not found).
         Factor::query()->where('authenticatable_id', $user->getKey())->delete();
 
-        $manager->verify('totp', $factor, self::WRONG_CODE);
+        $manager->verify('totp', new InMemoryFactor(secret: 'JBSWY3DPEHPK3PXP', authenticatable: $user), self::WRONG_CODE);
 
         return $manager;
     }

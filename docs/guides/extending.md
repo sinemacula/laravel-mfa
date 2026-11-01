@@ -94,7 +94,7 @@ registers it with the container, and the classes only it uses:
 | `Enrollment`    | `enroll()` and `EnrollmentSettings`                                                                 |
 | `Lifecycle`     | `disable()`, `ForgetIdentity` and `LifecycleSettings`                                               |
 | `RecoveryCodes` | Backup codes: `issueBackupCodes()`, `BackupCodeDriver` and `RecoveryCodeSettings`                   |
-| `Attempts`      | `AttemptSettings`, the attempt caps and lockouts                                                    |
+| `Attempts`      | `AttemptService`: attempts counted, lockouts applied and lifted, `AttemptSettings`                  |
 | `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
 | `Http`          | The `mfa` and `mfa.skip` middleware, `RequireMfa` and `SkipMfa`                                     |
 | `Testing`       | Test doubles for applications: `FakeSmsGateway`                                                     |

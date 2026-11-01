@@ -44,10 +44,7 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
 
     /**
      * The manager should hand the Eloquent factor through to the driver
-     * unchanged — the per-driver attempt-state policy lives in
-     * `FactorDriver::issueChallenge()` (OTP drivers reset alongside minting a
-     * fresh code; TOTP and backup-code drivers preserve the lockout because
-     * they cannot rotate any secret of their own).
+     * unchanged: sending a code resets no count, whatever the driver.
      *
      * @return void
      *
@@ -64,7 +61,7 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
             'authenticatable_id'   => (string) $user->id,
             'type'                 => 'email',
             'destination'          => 'c1@example.com',
-            'attempts'             => 4,
+            'consecutive_failures' => 4,
         ]);
 
         $driver = \Mockery::mock(FactorDriver::class);
@@ -81,8 +78,8 @@ final class MfaManagerChallengeTest extends MfaManagerTestCase
         $factor->refresh();
 
         // The mock driver is a no-op; the manager must NOT have wiped the
-        // attempt counter on its own behalf.
-        self::assertSame(4, $factor->getAttempts());
+        // factor's failures in a row on its own behalf.
+        self::assertSame(4, $factor->getConsecutiveFailures());
 
         Event::assertDispatched(
             MfaChallengeIssued::class,

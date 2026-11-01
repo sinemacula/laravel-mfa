@@ -4,17 +4,20 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Verification;
 
-use Carbon\Carbon;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Manager;
-use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
+use SineMacula\Laravel\Mfa\Attempts\Attempt;
+use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MfaVerificationStore;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
@@ -90,13 +93,9 @@ final readonly class VerificationService
         $this->drivers->assertMatchesFactor($driver, $factor);
         FactorOwnership::assert($factor, $identity);
 
-        // OTP-issuing drivers (email, SMS) reset the attempt counter and
-        // persist the freshly minted code from inside `issueChallenge()`: the
-        // reset is paired with a fresh secret and so cannot be used to wipe a
-        // lockout without rotating credentials. TOTP and backup codes have no
-        // per-challenge secret to mint and no state to persist, so their
-        // `issueChallenge()` is a no-op and their lockout state is preserved
-        // across challenge calls.
+        // Sending a code resets no count and lifts no lockout: only a success
+        // of the factor resets its failures in a row, so a resend cannot be
+        // used to wipe a lockout.
         $this->drivers->resolve($registry, $driver)->issueChallenge($factor);
 
         $events = $this->container->make(Dispatcher::class);
@@ -107,19 +106,29 @@ final readonly class VerificationService
      * Verify a submitted code against the given factor through the named
      * driver.
      *
-     * - Rejects the attempt when the factor is locked.
-     * - Runs the driver's verification logic.
-     * - On success: resets attempts, stamps the factor's verified-at, clears
-     *   any pending code, records the identity-level verification through the
-     *   bound store, dispatches `MfaVerified`.
-     * - On failure: increments attempts, applies a lockout once the configured
-     *   per-driver threshold is reached, dispatches `MfaVerificationFailed`
-     *   with a machine-readable reason.
+     * - The attempt is made through the attempt service, charged to the current
+     *   identity, the factor and the request's IP address: refused without
+     *   reaching the driver while a lockout applies, otherwise counted with its
+     *   outcome under the identity's factor state lock.
+     * - The driver verifies the factor as stored under that lock, not the
+     *   instance passed in, so a secret or code replaced in the meantime is the
+     *   one checked, and a factor removed in the meantime is reported as not
+     *   found without reaching the driver.
+     * - On success, inside the same transaction: stamps the factor's
+     *   verified-at and clears its pending code, so a code is consumed with the
+     *   count and two requests with the same code cannot both pass.
+     * - Once the driver has run, the instance passed in is brought up to date
+     *   with the stored factor. On success the identity-level verification is
+     *   recorded through the bound store and `MfaVerified` dispatched; on
+     *   failure `MfaVerificationFailed` is dispatched with a machine-readable
+     *   reason, `locked` for an attempt a lockout refused and `not_found` for a
+     *   factor removed in the meantime.
      *
      * Throws `FactorOwnershipMismatchException` when the supplied factor does
      * not belong to the current identity, closing the cross-account MFA-bypass
-     * primitive. Throws `FactorDriverMismatchException` when the requested
-     * driver name does not match the factor's own `getType()`.
+     * primitive, before anything is counted. Throws
+     * `FactorDriverMismatchException` when the requested driver name does not
+     * match the factor's own `getType()`.
      *
      * The driver is resolved from the given registry: the manager the
      * verification was called on.
@@ -133,6 +142,7 @@ final readonly class VerificationService
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
+     * @throws \Throwable
      */
     public function verify(Manager $registry, string $driver, Factor $factor, #[\SensitiveParameter] string $code): bool
     {
@@ -145,59 +155,65 @@ final readonly class VerificationService
         $this->drivers->assertMatchesFactor($driver, $factor);
         FactorOwnership::assert($factor, $identity);
 
-        $events = $this->container->make(Dispatcher::class);
+        $events   = $this->container->make(Dispatcher::class);
+        $resolved = $this->drivers->resolve($registry, $driver);
+        $verified = $factor;
 
-        if ($factor->isLocked()) {
-            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, FailureReason::LOCKED, 'The factor is locked after too many failed attempts.'));
+        // The current identity's own session makes the attempt, so the identity
+        // is charged for it. This entry point takes no purpose of its own, so
+        // its attempts are counted as sign-in.
+        $outcome = $this->container->make(AttemptService::class)->attempt(
+            new Attempt($identity, $factor, Purpose::SIGN_IN, $this->ip()),
+            static function (?Factor $stored) use ($resolved, $code, &$verified): bool {
+
+                $verified = $stored ?? $verified;
+
+                if (!$resolved->verify($verified, $code)) {
+                    return false;
+                }
+
+                if ($verified instanceof EloquentFactor) {
+                    $verified->recordVerification();
+                    $verified->persist();
+                }
+
+                return true;
+            },
+        );
+
+        if ($outcome->lockout !== null || $outcome->isNotFound()) {
+
+            [$reason, $detail] = $outcome->lockout !== null
+                ? [FailureReason::LOCKED, $outcome->lockout->detail()]
+                : [FailureReason::NOT_FOUND, 'The factor is no longer among the identity\'s factors.'];
+
+            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason, $detail));
 
             return false;
         }
 
-        $valid = $this->drivers->resolve($registry, $driver)->verify($factor, $code);
-
-        if ($factor instanceof EloquentFactor) {
-            $this->applyVerificationOutcome($factor, $valid);
+        if ($factor instanceof Model && $verified instanceof Model && $verified !== $factor) {
+            $factor->setRawAttributes($verified->getAttributes(), true);
         }
 
-        $this->finalizeVerification($identity, $factor, $driver, $valid, $events);
+        $this->finalizeVerification($identity, $factor, $driver, $outcome->passed, $events);
 
-        return $valid;
+        return $outcome->passed;
     }
 
     /**
-     * Persist the post-driver verification outcome on the factor row.
+     * The IP address of the request being served, as resolved through the
+     * application's trusted proxies, or `null` outside a request.
      *
-     * Successful verification stamps `verified_at`, resets attempts, and clears
-     * any pending OTP code; failure increments the attempt counter and, once it
-     * reaches `mfa.attempts.factor_limit`, locks the factor for
-     * `mfa.attempts.lockout_seconds`. Non-Eloquent factors carry no row to
-     * mutate and skip both branches before this method is even called.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
-     * @param  bool  $valid
-     * @return void
+     * @return ?string
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
      */
-    private function applyVerificationOutcome(EloquentFactor $factor, bool $valid): void
+    private function ip(): ?string
     {
-        if ($valid) {
-            $factor->recordVerification();
-            $factor->persist();
+        $request = $this->container->bound('request') ? $this->container->make('request') : null;
 
-            return;
-        }
-
-        $factor->recordAttempt();
-
-        $attempts = new AttemptSettings($this->container->make('config'));
-
-        if ($factor->getAttempts() >= $attempts->factorLimit()) {
-            $factor->applyLockout(Carbon::now()->addSeconds($attempts->lockoutSeconds()));
-        }
-
-        $factor->persist();
+        return $request instanceof Request ? $request->ip() : null;
     }
 
     /**

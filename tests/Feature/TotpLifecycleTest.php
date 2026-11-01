@@ -9,7 +9,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
+use SineMacula\Laravel\Mfa\Attempts\AttemptService;
+use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
+use SineMacula\Laravel\Mfa\Attempts\Lockout;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
+use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
@@ -76,7 +81,8 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * The same code is refused at a second verification, as an invalid code.
+     * The same code is refused at a second verification, as an invalid code,
+     * and counted as a failed attempt.
      *
      * @return void
      */
@@ -89,6 +95,7 @@ final class TotpLifecycleTest extends TestCase
         Event::fake([MfaVerificationFailed::class]);
 
         self::assertFalse(Mfa::verify('totp', $factor->refresh(), $code));
+        self::assertSame(1, $factor->refresh()->getConsecutiveFailures());
 
         Event::assertDispatched(
             MfaVerificationFailed::class,
@@ -187,7 +194,7 @@ final class TotpLifecycleTest extends TestCase
         $factor->refresh();
 
         self::assertNotNull($factor->getVerifiedAt());
-        self::assertSame(0, $factor->getAttempts());
+        self::assertSame(0, $factor->getConsecutiveFailures());
     }
 
     /**
@@ -214,8 +221,8 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * A failed TOTP verification must increment the attempt counter and
-     * dispatch an `invalid_code` failure event.
+     * A failed TOTP verification must count a failure in a row and dispatch an
+     * `invalid_code` failure event.
      *
      * @return void
      */
@@ -230,7 +237,7 @@ final class TotpLifecycleTest extends TestCase
         self::assertFalse($verified);
 
         $factor->refresh();
-        self::assertSame(1, $factor->getAttempts());
+        self::assertSame(1, $factor->getConsecutiveFailures());
         self::assertNull($factor->getVerifiedAt());
 
         Event::assertDispatched(
@@ -240,8 +247,8 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test crossing `mfa.attempts.factor_limit` records the configured attempts
-     * count.
+     * Test crossing `mfa.attempts.factor_limit` records the configured failures
+     * in a row.
      *
      * @return void
      */
@@ -249,20 +256,24 @@ final class TotpLifecycleTest extends TestCase
     {
         $factor = $this->enrollAndBurnAttempts();
 
-        self::assertSame(3, $factor->getAttempts());
+        self::assertSame(3, $factor->getConsecutiveFailures());
     }
 
     /**
-     * Test crossing `mfa.attempts.factor_limit` stamps a future locked_until.
+     * Test crossing `mfa.attempts.factor_limit` locks the factor until a future
+     * time.
      *
      * @return void
      */
-    public function testThresholdCrossingStampsFutureLockedUntil(): void
+    public function testThresholdCrossingLocksTheFactorUntilAFutureTime(): void
     {
         $factor = $this->enrollAndBurnAttempts();
 
-        self::assertNotNull($factor->getLockedUntil());
-        self::assertTrue($factor->isLocked());
+        $lockout = $this->lockoutOf($factor);
+
+        self::assertNotNull($lockout);
+        self::assertSame(AttemptScope::FACTOR, $lockout->scope);
+        self::assertTrue($lockout->until?->isFuture());
     }
 
     /**
@@ -297,10 +308,9 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test challenge preserves the attempts count after lockout.
+     * Test challenge preserves the failures in a row after lockout.
      *
-     * `challenge()` must NOT clear an active TOTP lockout — TOTP has no
-     * per-challenge secret to rotate, so wiping the attempt counter on every
+     * `challenge()` must NOT clear an active lockout: wiping the count on every
      * "start MFA" call would let any consumer-side resend endpoint act as a
      * free unlock against the configured `mfa.attempts.factor_limit` defence.
      *
@@ -314,26 +324,24 @@ final class TotpLifecycleTest extends TestCase
 
         $factor->refresh();
 
-        self::assertSame(3, $factor->getAttempts());
+        self::assertSame(3, $factor->getConsecutiveFailures());
     }
 
     /**
-     * Test challenge preserves the locked_until timestamp after lockout.
+     * Test challenge preserves the time the lockout ends.
      *
      * @return void
      */
-    public function testChallengePreservesLockedUntilTimestampAfterLockout(): void
+    public function testChallengePreservesTheLockoutEndAfterLockout(): void
     {
         $factor = $this->enrollAndBurnAttempts();
 
-        $lockedUntilBefore = $factor->getLockedUntil();
+        $lockedUntilBefore = $this->lockoutOf($factor)?->until;
         self::assertNotNull($lockedUntilBefore);
 
         Mfa::challenge('totp', $factor);
 
-        $factor->refresh();
-
-        $lockedUntilAfter = $factor->getLockedUntil();
+        $lockedUntilAfter = $this->lockoutOf($factor)?->until;
         self::assertNotNull($lockedUntilAfter);
         self::assertSame(
             $lockedUntilBefore->getTimestamp(),
@@ -352,9 +360,7 @@ final class TotpLifecycleTest extends TestCase
 
         Mfa::challenge('totp', $factor);
 
-        $factor->refresh();
-
-        self::assertTrue($factor->isLocked());
+        self::assertNotNull($this->lockoutOf($factor));
     }
 
     /**
@@ -397,18 +403,24 @@ final class TotpLifecycleTest extends TestCase
             'authenticatable_id'   => (string) $user->id,
             'type'                 => 'backup_code',
             'secret'               => hash('sha256', 'PLAIN12345'),
-            'attempts'             => 5,
-            'locked_until'         => Carbon::now()->addMinutes(15),
+            'consecutive_failures' => 5,
         ]);
 
-        self::assertTrue($factor->isLocked());
+        $this->container()->make(AttemptStore::class)->hold(
+            $this->container()->make(AttemptKeys::class)->factor($factor->id),
+            AttemptScope::FACTOR,
+            5,
+            Carbon::now()->addMinutes(15)->getTimestamp(),
+        );
+
+        self::assertNotNull($this->lockoutOf($factor));
 
         Mfa::challenge('backup_code', $factor);
 
         $factor->refresh();
 
-        self::assertSame(5, $factor->getAttempts());
-        self::assertTrue($factor->isLocked());
+        self::assertSame(5, $factor->getConsecutiveFailures());
+        self::assertNotNull($this->lockoutOf($factor));
     }
 
     /**
@@ -434,6 +446,21 @@ final class TotpLifecycleTest extends TestCase
         ]);
 
         return [$user, $factor, AuthenticatorApp::code($factor)];
+    }
+
+    /**
+     * The lockout the factor's owner's attempts against it are refused by now.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
+     * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function lockoutOf(Factor $factor): ?Lockout
+    {
+        $user = TestUser::query()->findOrFail($factor->authenticatable_id);
+
+        return $this->container()->make(AttemptService::class)->lockout($user, $factor);
     }
 
     /**

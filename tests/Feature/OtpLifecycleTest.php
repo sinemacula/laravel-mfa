@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Contracts\SmsGateway;
 use SineMacula\Laravel\Mfa\Drivers\AbstractOtpDriver;
@@ -264,40 +265,40 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * The OTP driver path must reset the attempt counter when it issues a fresh
-     * code — paired with a transport hop the user has to receive, so an
-     * attacker cannot use it as a free unlock the way an unconditional
-     * manager-side reset would have allowed.
+     * Sending a fresh code resets nothing: the factor's failures in a row and
+     * its lockout survive the send, so a resend is never a free unlock.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
-    public function testEmailChallengeResetsAttemptsAlongsideFreshCode(): void
+    public function testEmailChallengeResetsNothing(): void
     {
         Mail::fake();
 
-        [, $factor] = $this->enrollEmail();
+        config()->set('mfa.attempts.factor_limit', 3);
 
-        // Stage a previously-locked-out factor: max attempts burned and a
-        // future lockout still active.
-        $factor->forceFill([
-            'attempts'     => 3,
-            'locked_until' => now()->addMinutes(15),
-        ])->save();
+        [$user, $factor] = $this->enrollEmail();
 
-        self::assertTrue($factor->isLocked());
+        self::assertFalse(Mfa::verify('email', $factor, '000000'));
+        self::assertFalse(Mfa::verify('email', $factor, '000000'));
+        self::assertFalse(Mfa::verify('email', $factor, '000000'));
+
+        $attempts = $this->container()->make(AttemptService::class);
+        $before   = $attempts->lockout($user, $factor);
+
+        self::assertNotNull($before);
 
         Mfa::challenge('email', $factor);
 
         $factor->refresh();
 
-        // OTP rotation closes the bypass risk: a brand-new code lands in the
-        // user's inbox alongside the cleared lockout, so an attacker without
-        // inbox access cannot exploit the reset.
-        self::assertSame(0, $factor->getAttempts());
-        self::assertNull($factor->getLockedUntil());
-        self::assertFalse($factor->isLocked());
+        $after = $attempts->lockout($user, $factor);
+
+        self::assertSame(3, $factor->getConsecutiveFailures());
+        self::assertNotNull($after);
+        self::assertEquals($before->until, $after->until);
         self::assertNotNull($factor->getCode());
     }
 

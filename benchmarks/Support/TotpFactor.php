@@ -158,50 +158,6 @@ final readonly class TotpFactor implements Factor
     }
 
     /**
-     * No failed attempts.
-     *
-     * @return int
-     */
-    #[\Override]
-    public function getAttempts(): int
-    {
-        return 0;
-    }
-
-    /**
-     * No lockout.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLockedUntil(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
-     * Never locked.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isLocked(): bool
-    {
-        return false;
-    }
-
-    /**
-     * Never attempted.
-     *
-     * @return ?\Carbon\CarbonInterface
-     */
-    #[\Override]
-    public function getLastAttemptedAt(): ?CarbonInterface
-    {
-        return null;
-    }
-
-    /**
      * Never verified.
      *
      * @return ?\Carbon\CarbonInterface

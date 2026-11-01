@@ -60,7 +60,8 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - No secret, an empty secret or one that is not Base32, no parameters or parameters out of bounds: refused before the
   window is computed, as nothing secret depends on it.
 - The same code twice, or a code for a step at or before the last accepted one, though still in the window: the
-  compare-and-set changes no row and the code is refused. A replay is reported as an invalid code.
+  compare-and-set changes no row and the code is refused. A replay is reported as an invalid code and counted as a
+  failed attempt.
 - Two requests with the same code: both match, both issue the compare-and-set, and the database serialises them on the
   row; the second waits for the first to commit, then finds the step recorded and changes nothing. On MySQL this holds
   although the second request's transaction read the factor from a snapshot taken before the first committed, because an
@@ -70,8 +71,9 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - An application that sets no `totp_window`, or one nobody configured, gets `mfa.totp.window`; so does a request when
   no `ApplicationResolver` is bound, which is the case until an authentication layer or the application binds one.
 - The driver opens no transaction of its own. The compare-and-set needs none to be atomic, and the transaction that
-  also holds the identity's lock and records the outcome belongs to the verification flow, which calls the driver
-  inside it.
+  also holds the identity's lock and records the outcome belongs to the verification flow: the attempt service calls
+  the driver inside its `FactorStateTransaction`, on the factor as stored under the lock, so the recorded step commits
+  with the attempt's count and is undone with it (see [Attempts and Lockout](attempts-and-lockout.md)).
 
 ## Implementation Anchors
 
@@ -123,6 +125,8 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
   `testOnlyOneOfTwoRequestsWithTheSameCodePasses`
 - `tests/Integration/Database/TotpReplayRaceTest.php`
   `testOfTwoOverlappingRequestsWithTheSameCodeOnlyOnePasses`
+- `tests/Feature/TotpLifecycleTest.php`
+  `testTheSameCodeIsRefusedAtTheSecondVerification`
 - `tests/Feature/TotpLifecycleTest.php`
   `testTheConfirmingCodeIsRefusedAtTheNextVerification`
 

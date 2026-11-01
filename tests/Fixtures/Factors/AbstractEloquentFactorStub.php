@@ -261,39 +261,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional attempts column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getAttemptsName(): string
-    {
-        return 'attempts';
-    }
-
-    /**
-     * Return the conventional locked-until column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getLockedUntilName(): string
-    {
-        return 'locked_until';
-    }
-
-    /**
-     * Return the conventional last-attempted-at column name.
-     *
-     * @return string
-     */
-    #[\Override]
-    public function getLastAttemptedAtName(): string
-    {
-        return 'last_attempted_at';
-    }
-
-    /**
      * Return the conventional verified-at column name.
      *
      * @return string
@@ -302,41 +269,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     public function getVerifiedAtName(): string
     {
         return 'verified_at';
-    }
-
-    /**
-     * No-op — the fixture does not track attempts.
-     *
-     * @param  ?\Carbon\CarbonInterface  $at
-     * @return void
-     */
-    #[\Override]
-    public function recordAttempt(?CarbonInterface $at = null): void
-    {
-        // Intentionally empty — see method docblock.
-    }
-
-    /**
-     * No-op — the fixture does not track attempts.
-     *
-     * @return void
-     */
-    #[\Override]
-    public function resetAttempts(): void
-    {
-        // Intentionally empty — see method docblock.
-    }
-
-    /**
-     * No-op — the fixture does not track lockouts.
-     *
-     * @param  \Carbon\CarbonInterface  $until
-     * @return void
-     */
-    #[\Override]
-    public function applyLockout(CarbonInterface $until): void
-    {
-        // Intentionally empty — see method docblock.
     }
 
     /**

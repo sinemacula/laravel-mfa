@@ -174,7 +174,9 @@ return [
     | the window (60 to 86400 seconds) lock or throttle them, how long a
     | lockout lasts (60 to 86400 seconds), and how many consecutive failures
     | disable a factor (1 to 100), and the table the temporary throttles are
-    | counted in.
+    | counted in. Only a success resets a factor's failures in a row, so once
+    | they reach the limit each further failure locks it again; sending a code
+    | resets nothing.
     |
     */
 
