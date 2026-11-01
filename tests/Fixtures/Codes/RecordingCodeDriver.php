@@ -11,7 +11,8 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 /**
  * A code delivery driver for tests: records every code it is asked to deliver,
  * with its destination and expiry, and throws instead when told to fail, so a
- * test can read the code sent and prove a failed delivery keeps nothing.
+ * test can read the code sent and prove a failed delivery keeps nothing. A
+ * callback given runs at each delivery, while the send still holds its locks.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,6 +26,9 @@ final class RecordingCodeDriver extends AbstractCodeDriver
 
     /** @var bool Whether the next delivery throws instead. */
     public bool $fail = false;
+
+    /** @var (\Closure(): void)|null Run at each delivery, before anything else. */
+    public ?\Closure $onSend = null;
 
     /**
      * A code sent by email, as the fixture's channel.
@@ -60,6 +64,10 @@ final class RecordingCodeDriver extends AbstractCodeDriver
     #[\Override]
     protected function send(string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
     {
+        if ($this->onSend !== null) {
+            ($this->onSend)();
+        }
+
         if ($this->fail) {
             throw new \RuntimeException('The transport failed.');
         }

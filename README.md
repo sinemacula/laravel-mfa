@@ -39,7 +39,7 @@ whatever UI you like.
   shipped `authenticatable_type` / `authenticatable_id` morph.
 - **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; backup codes hash to SHA-256 before
   persistence; email and SMS codes are stored only as keyed hashes bound to their factor, session, application and
-  purpose, and never queued in clear.
+  purpose, and the package's email code message encrypts its payload whenever it is queued.
 - **Per-factor lockouts**: `attempts.factor_limit` failures in a row lock a factor of any type for
   `attempts.lockout_seconds`.
 - **Zero ecosystem coupling**: depends only on Laravel and the standard `Authenticatable` contract.

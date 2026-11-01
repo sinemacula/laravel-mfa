@@ -6,6 +6,7 @@ namespace Tests\Unit\Config;
 
 use Illuminate\Config\Repository;
 use Illuminate\Container\Container;
+use Illuminate\Contracts\Mail\Factory;
 use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -321,6 +322,29 @@ final class ConfigurationValidatorTest extends TestCase
         $this->configureApplication(['types' => ['totp'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
         self::assertSame([], (new ConfigurationValidator(new Container, $this->config()))->report()['applications.web']);
+    }
+
+    /**
+     * Checking an email application with the package's mailer sender bound
+     * looks up no mailer, so the check that runs on every request builds no
+     * mail transport.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTheEmailCheckBuildsNoMailTransport(): void
+    {
+        $this->configureApplication(['types' => ['email'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        /** @var \Illuminate\Contracts\Mail\Factory&\Mockery\MockInterface $mail */
+        $mail = \Mockery::mock(Factory::class);
+        $mail->shouldNotReceive('mailer');
+
+        $this->container()->instance('mail.manager', $mail);
+        $this->container()->singleton(EmailSender::class, MailEmailSender::class);
+
+        self::assertSame([], $this->validator()->report()['applications.web']);
     }
 
     /**

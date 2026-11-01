@@ -31,10 +31,11 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * `FactorStateTransaction`), so the sends of one identity are serialised and
  * the caps on them cannot be overrun by parallel requests; the factor is read
  * again under the lock, and one a concurrent change removed is `not_found`. The
- * code is stored, then delivered by the factor's driver inside the same
- * transaction, so a delivery that throws keeps no code and spends no cooldown
- * or cap; `CodeSent` is dispatched once the transaction commits. Neither
- * sending nor checking resets a failure count or lifts a lockout.
+ * time of a send is read once the locks are held, never before. The code is
+ * stored, then delivered by the factor's driver inside the same transaction, so
+ * a delivery that throws keeps no code and spends no cooldown or cap;
+ * `CodeSent` is dispatched once the transaction commits. Neither sending nor
+ * checking resets a failure count or lifts a lockout.
  *
  * A delivered code needs a stored factor and a binding naming the factor's
  * owner: anything else is refused before anything is read.
@@ -77,10 +78,12 @@ final readonly class CodeService
         $stored = self::stored($factor, $binding);
         $codes  = $this->container->make(DeliveredCodes::class);
         $events = $this->container->make(EventDispatcher::class);
-        $now    = CarbonImmutable::now()->startOfSecond();
 
-        return FactorStateTransaction::forFactor($stored, static function (Collection $factors) use ($stored, $identity, $binding, $driver, $codes, $events, $now): SendResult {
+        return FactorStateTransaction::forFactor($stored, static function (Collection $factors) use ($stored, $identity, $binding, $driver, $codes, $events): SendResult {
 
+            // Read once the locks are held, so a send that waited for them is
+            // timed, and its cooldown and expiry run, from when it was made
+            $now    = CarbonImmutable::now()->startOfSecond();
             $locked = $factors->first(static fn (Model $candidate): bool => $candidate->is($stored));
 
             if ($locked === null) {

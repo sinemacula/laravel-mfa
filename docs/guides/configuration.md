@@ -261,9 +261,15 @@ codes one factor and one identity, across its factors and sessions, are sent wit
 included. `sms_message` is the SMS text, which must carry the `:code` placeholder the code replaces, and `mailable` the
 email message class, `Codes\MfaCodeMessage` or a subclass of it, whose queued payload is always encrypted.
 
-A refused send answers `sending_capped` with the seconds until another may be sent (see
-[Delivered codes](../design/delivered-codes.md)). Codes are stored as keyed hashes of the code and its binding, with a
-key derived from `app.key`; rotating the application key only invalidates the codes outstanding.
+Each send counts towards the caps for `send_window_minutes` from when it was made, and a refused send answers
+`sending_capped` with the seconds until another may be sent (see [Delivered codes](../design/delivered-codes.md)).
+Codes are stored as keyed hashes of the code and its binding, with a key derived from `app.key`; rotating the
+application key only invalidates the codes outstanding.
+
+A code is sent and checked within the request's Laravel session, whose id it is bound to: the challenge and the
+verification must run in the same started session (the `StartSession` middleware), so stateless requests, such as a
+token-authenticated API, cannot use email or SMS codes. A session regenerated between the two, as at sign-in, leaves the
+code behind, and the check answers `expired`.
 
 ## Recovery codes
 

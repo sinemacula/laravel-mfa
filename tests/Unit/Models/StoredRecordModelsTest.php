@@ -180,7 +180,7 @@ final class StoredRecordModelsTest extends TestCase
 
         self::assertSame(['factor_id', ...$owner, 'grant_hash', 'application', 'session_id', 'expires_at', 'attempts'], (new Enrollment)->getFillable());
         self::assertSame(
-            ['factor_id', ...$owner, 'purpose', 'application', 'session_id', 'code_hash', 'attempts', 'sends', 'sent_at', 'expires_at', 'consumed_at'],
+            ['factor_id', ...$owner, 'purpose', 'application', 'session_id', 'code_hash', 'attempts', 'sends', 'sent_at', 'sent_times', 'expires_at', 'consumed_at'],
             (new Code)->getFillable(),
         );
         self::assertSame(
@@ -229,6 +229,7 @@ final class StoredRecordModelsTest extends TestCase
             'attempts'             => 'integer',
             'sends'                => 'integer',
             'sent_at'              => 'datetime',
+            'sent_times'           => 'array',
             'expires_at'           => 'datetime',
             'consumed_at'          => 'datetime',
         ]];

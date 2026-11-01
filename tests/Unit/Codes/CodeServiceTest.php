@@ -164,6 +164,41 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
+     * A send that waits for the locks is timed from when it holds them: its
+     * code's lifetime and its cooldown run from then, not from when it began
+     * waiting.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASendIsTimedOnceItHoldsTheLocks(): void
+    {
+        [$user, $factor] = $this->factor();
+
+        $waited = false;
+
+        Factor::retrieved(function () use (&$waited): void {
+
+            if ($waited) {
+                return;
+            }
+
+            $waited = true;
+
+            $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00:50'));
+        });
+
+        $result = $this->service()->send($user, $factor, self::binding($user), new RecordingCodeDriver);
+
+        self::assertSame(CarbonImmutable::parse('2026-11-01 12:10:50')->getTimestamp(), $result->expiresAt?->getTimestamp());
+
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00:59'));
+
+        self::assertSame(51, $this->service()->send($user, $factor, self::binding($user), new RecordingCodeDriver)->retryAfter);
+    }
+
+    /**
      * A factor a concurrent change removed is not found under the lock, and
      * nothing is sent.
      *

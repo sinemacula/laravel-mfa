@@ -60,7 +60,7 @@ final class MigrationSmokeTest extends TestCase
         ]];
         yield 'mfa_codes' => ['mfa_codes', [
             'id', 'factor_id', ...$owner, 'purpose', 'application', 'session_id', 'code_hash', 'attempts', 'sends', 'sent_at',
-            'expires_at', 'consumed_at', 'created_at', 'updated_at',
+            'sent_times', 'expires_at', 'consumed_at', 'created_at', 'updated_at',
         ]];
         yield 'mfa_recovery_codes' => ['mfa_recovery_codes', [
             'id', ...$owner, 'code_hash', 'generation', 'used_at', 'replaced_at', 'created_at', 'updated_at',

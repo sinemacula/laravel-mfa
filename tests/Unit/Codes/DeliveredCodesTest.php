@@ -152,6 +152,7 @@ final class DeliveredCodesTest extends TestCase
         self::assertSame('sign_in', $first->purpose);
         self::assertSame('web', $first->application);
         self::assertSame(1, $first->sends);
+        self::assertSame([$now->getTimestamp()], $first->sent_times);
         self::assertSame(0, $first->attempts);
         self::assertNull($first->consumed_at);
     }
@@ -253,6 +254,29 @@ final class DeliveredCodesTest extends TestCase
         $codes->issue(self::FACTOR, self::binding(), self::now());
         $codes->issue(self::FACTOR, self::binding(), $now);
 
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
+        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now));
+    }
+
+    /**
+     * A resend never sends the previous code's digits again, which would still
+     * match under the new issue: it draws again until they differ.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testAResendNeverRepeatsThePreviousCode(): void
+    {
+        $codes = $this->codes([], [self::CODE, self::CODE, self::NEXT_CODE]);
+        $now   = self::now()->addSeconds(60);
+
+        $codes->issue(self::FACTOR, self::binding(), self::now());
+
+        $resent = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+
+        self::assertSame(self::NEXT_CODE, $resent->code);
+        self::assertSame([], $this->draws);
         self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
         self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now));
     }
@@ -401,13 +425,40 @@ final class DeliveredCodesTest extends TestCase
      */
     public function testEveryResendCountsTowardsTheCaps(): void
     {
-        $codes = $this->codes(['factor_send_limit' => 2, 'resend_cooldown_seconds' => 0], [self::CODE, self::NEXT_CODE, '111111']);
+        $codes = $this->codes(['factor_send_limit' => 3, 'resend_cooldown_seconds' => 0], [self::CODE, self::NEXT_CODE, '111111', '222222']);
         $now   = self::now();
 
         self::issued($codes->issue(self::FACTOR, self::binding(), $now));
         self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
+        $last = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+
+        self::assertSame(array_fill(0, 3, $now->getTimestamp()), self::row($last)->sent_times);
         self::assertSame(3600, $codes->issue(self::FACTOR, self::binding(), $now));
+    }
+
+    /**
+     * Each send leaves the send window on its own, a window after it was made:
+     * a challenge's first send stops counting while its resend still does, and
+     * a refusal waits only until enough sends have left for one more.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testEachSendLeavesTheWindowOnItsOwn(): void
+    {
+        $codes = $this->codes(['factor_send_limit' => 2, 'send_window_minutes' => 5], ['111111', '222222', '333333']);
+        $now   = self::now();
+
+        self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+
+        $resent = self::issued($codes->issue(self::FACTOR, self::binding(), $now->addMinutes(4)));
+
+        self::assertSame([$now->getTimestamp(), $now->addMinutes(4)->getTimestamp()], self::row($resent)->sent_times);
+        self::assertSame(59, $codes->issue(self::FACTOR, self::binding(session: 'session-b'), $now->addSeconds(241)));
+        self::assertInstanceOf(IssuedCode::class, $codes->issue(self::FACTOR, self::binding(session: 'session-b'), $now->addMinutes(5)));
+        self::assertSame(180, $codes->issue(self::FACTOR, self::binding(session: 'session-c'), $now->addMinutes(6)));
     }
 
     /**

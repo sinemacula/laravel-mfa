@@ -28,8 +28,8 @@ factors starts with.
   confirmation `attempts`.
 - `mfa_codes`, one row per challenge of a code sent by SMS or email: `factor_id`, owner, the `purpose`, `application`
   and session the code is bound to (`session_id`, a keyed digest of the session's id), its keyed `code_hash`, the
-  challenge's `attempts`, how many codes it was `sends` and the last `sent_at`, `expires_at` and `consumed_at` (see
-  [Delivered Codes](delivered-codes.md)).
+  challenge's `attempts`, how many codes it was `sends`, the last `sent_at` and every send's time (`sent_times`),
+  `expires_at` and `consumed_at` (see [Delivered Codes](delivered-codes.md)).
 - `mfa_recovery_codes`: owner, the salted `code_hash`, the set's `generation`, `used_at` and `replaced_at`.
 - `mfa_attempts`, the temporary throttles: `key` (a keyed hash of the scope and subject), `scope`, `hits` and
   `window_ends_at`.

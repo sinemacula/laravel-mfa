@@ -146,9 +146,10 @@ is what a caller may be told, and a detail, which stays in events and logs. A `l
 the lockout lifts (`lockedUntil`), and no other failure does.
 
 Today `Mfa::verify()` answers `true` or `false`, and a failure is reported by the `MfaVerificationFailed` event, which
-carries the same `FailureReason` as `$event->reason` and the detail as `$event->detail`: `locked`, `invalid_code`,
-`expired` (for an expired code, and for a pending code without an expiry, told apart by the detail) and
-`not_confirmed` (a factor with neither a pending code nor a secret).
+carries the same `FailureReason` as `$event->reason` and the detail as `$event->detail`. A locked factor fails as
+`locked`. A delivered code fails as what its check found: `invalid_code` for a wrong code, `replayed` for a used one,
+and `expired` for an expired code, a challenge out of attempts or no code at all, told apart by the detail. Any other
+factor fails as `not_confirmed` when it has no secret, and as `invalid_code` otherwise.
 
 ## Stable names
 

@@ -12,7 +12,8 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 /**
  * A code sent by SMS or email for a factor: the keyed hash of the code and its
  * binding (factor, purpose, application and session), the attempts made against
- * it, how often and when it was sent, when it expires and when it was used.
+ * it, how often and when it was sent (last, and each time), when it expires and
+ * when it was used.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,6 +29,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property int $attempts
  * @property int $sends
  * @property \Carbon\CarbonInterface $sent_at
+ * @property list<int> $sent_times
  * @property \Carbon\CarbonInterface $expires_at
  * @property ?\Carbon\CarbonInterface $consumed_at
  * @property \Carbon\CarbonInterface $created_at
@@ -51,6 +53,7 @@ final class Code extends Model
         'attempts',
         'sends',
         'sent_at',
+        'sent_times',
         'expires_at',
         'consumed_at',
     ];
@@ -109,6 +112,7 @@ final class Code extends Model
             'attempts'             => 'integer',
             'sends'                => 'integer',
             'sent_at'              => 'datetime',
+            'sent_times'           => 'array',
             'expires_at'           => 'datetime',
             'consumed_at'          => 'datetime',
         ];

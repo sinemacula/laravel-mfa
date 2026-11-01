@@ -161,6 +161,31 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
+     * A code sent before the session is regenerated, as a stateless request or
+     * a sign-in would, is never found after it.
+     *
+     * @return void
+     */
+    public function testACodeIsLeftBehindByARegeneratedSession(): void
+    {
+        $sender = FakeEmailSender::fake($this->container());
+        $factor = $this->enroll('email', self::ADDRESS);
+
+        Mfa::challenge('email', $factor);
+
+        $code = $sender->lastCodeTo(self::ADDRESS);
+
+        self::assertNotNull($code);
+
+        $this->container()->make(Session::class)->regenerate();
+
+        Event::fake([MfaVerificationFailed::class]);
+
+        self::assertFalse(Mfa::verify('email', $factor, $code));
+        Event::assertDispatched(MfaVerificationFailed::class, static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::EXPIRED);
+    }
+
+    /**
      * A code matches only the purpose it was sent for.
      *
      * @return void

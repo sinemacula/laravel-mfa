@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Codes;
 
+use Illuminate\Contracts\Mail\Factory;
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Mail\PendingMail;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
@@ -13,8 +14,8 @@ use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 
 /**
- * Unit tests for `MailEmailSender`: the message goes to the address through
- * Laravel's mailer.
+ * Unit tests for `MailEmailSender`: the message goes to the address through the
+ * mail manager's default mailer, which is looked up only to send.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,7 +28,21 @@ final class MailEmailSenderTest extends TestCase
     use MockeryPHPUnitIntegration;
 
     /**
-     * The message is sent to the address through the mailer, once.
+     * Building the sender looks up no mailer, so it builds no mail transport.
+     *
+     * @return void
+     */
+    public function testBuildingTheSenderLooksUpNoMailer(): void
+    {
+        /** @var \Illuminate\Contracts\Mail\Factory&\Mockery\MockInterface $mail */
+        $mail = \Mockery::mock(Factory::class);
+        $mail->shouldNotReceive('mailer');
+
+        self::assertInstanceOf(MailEmailSender::class, new MailEmailSender($mail));
+    }
+
+    /**
+     * The message is sent to the address through the default mailer, once.
      *
      * @return void
      */
@@ -43,6 +58,10 @@ final class MailEmailSenderTest extends TestCase
         $mailer = \Mockery::mock(Mailer::class);
         $mailer->shouldReceive('to')->once()->with('ada@example.test')->andReturn($pending);
 
-        (new MailEmailSender($mailer))->send('ada@example.test', $message);
+        /** @var \Illuminate\Contracts\Mail\Factory&\Mockery\MockInterface $mail */
+        $mail = \Mockery::mock(Factory::class);
+        $mail->shouldReceive('mailer')->once()->withNoArgs()->andReturn($mailer);
+
+        (new MailEmailSender($mail))->send('ada@example.test', $message);
     }
 }

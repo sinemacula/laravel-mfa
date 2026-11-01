@@ -28,10 +28,12 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * not yet used, sent less than `challenge_ttl_minutes` ago) is a resend: a new
  * code replaces the previous one, which stops working at once, the attempt
  * count is kept, and the new code expires at the code lifetime or the end of
- * the challenge, whichever is sooner. A resend waits out the cooldown since the
- * last code, and a challenge that has used up its attempts sends no more until
- * it ends. Every issue is refused while the factor or the identity has been
- * sent its cap of codes within the send window, across every session.
+ * the challenge, whichever is sooner; its digits are never the previous code's.
+ * A resend waits out the cooldown since the last code, and a challenge that has
+ * used up its attempts sends no more until it ends. Every issue is refused
+ * while the factor or the identity has been sent its cap of codes within the
+ * send window, across every session; each send is counted for the window from
+ * its own time, which the challenge records.
  *
  * A check counts an attempt against the issue it read before it compares
  * anything, so concurrent checks never exceed `max_attempts`, and uses the code
@@ -87,6 +89,7 @@ final readonly class DeliveredCodes
      *
      * @throws \InvalidArgumentException
      * @throws \Random\RandomException
+     * @throws \JsonException
      *
      * @phpstan-impure
      */
@@ -220,8 +223,8 @@ final readonly class DeliveredCodes
 
     /**
      * The seconds until the factor and the identity are both under their caps
-     * on codes sent within the send window, across every session; zero when
-     * they are now.
+     * on codes sent within the send window, across every session; zero or less
+     * when they are now.
      *
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -263,6 +266,7 @@ final readonly class DeliveredCodes
      *
      * @throws \InvalidArgumentException
      * @throws \Random\RandomException
+     * @throws \JsonException
      */
     private function start(string $factorId, ProofBinding $binding, string $session, CarbonImmutable $now): IssuedCode
     {
@@ -284,6 +288,7 @@ final readonly class DeliveredCodes
             'attempts'             => 0,
             'sends'                => 1,
             'sent_at'              => $at,
+            'sent_times'           => json_encode([$now->getTimestamp()], JSON_THROW_ON_ERROR),
             'expires_at'           => $model->fromDateTime($expires),
             'consumed_at'          => null,
             'created_at'           => $at,
@@ -295,8 +300,10 @@ final readonly class DeliveredCodes
 
     /**
      * Send the open challenge a new code, which replaces its last, keeping its
-     * attempts and never working past the end of the challenge. Returns the
-     * code, or 1 second when a concurrent change got to the challenge first.
+     * attempts and never working past the end of the challenge. The new code is
+     * drawn again until its digits differ from the last code's, which would
+     * otherwise still match under the new issue. Returns the code, or 1 second
+     * when a concurrent change got to the challenge first.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $open
      * @param  string  $factorId
@@ -306,11 +313,16 @@ final readonly class DeliveredCodes
      *
      * @throws \InvalidArgumentException
      * @throws \Random\RandomException
+     * @throws \JsonException
      */
     private function resend(Code $open, string $factorId, ProofBinding $binding, CarbonImmutable $now): int|IssuedCode
     {
-        $issue    = $open->sends + 1;
-        $code     = $this->draw();
+        $issue = $open->sends + 1;
+
+        do {
+            $code = $this->draw();
+        } while ($this->matches($open, $factorId, $binding, $code));
+
         $lifetime = $now->addMinutes($this->settings->ttlMinutes());
         $deadline = $this->deadline($open);
         $expires  = $lifetime->greaterThan($deadline) ? $deadline : $lifetime;
@@ -324,6 +336,7 @@ final readonly class DeliveredCodes
                 'code_hash'  => $this->keys->code($open->id, $issue, $factorId, $binding, $code),
                 'sends'      => $issue,
                 'sent_at'    => $at,
+                'sent_times' => json_encode([...$open->sent_times, $now->getTimestamp()], JSON_THROW_ON_ERROR),
                 'expires_at' => $open->fromDateTime($expires),
                 'updated_at' => $at,
             ]);
@@ -521,9 +534,10 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * The seconds until the sends counted in the rows fall under the limit:
-     * zero while they are under it, otherwise until the oldest of them leaves
-     * the window, at least 1.
+     * The seconds until fewer than the limit of the rows' sends are within the
+     * window: until the send that must leave it for one more to fit has left, a
+     * window after it was made. Each send leaves the window on its own, and one
+     * already outside it gives no wait. Zero or less means now.
      *
      * @param  \Illuminate\Database\Eloquent\Collection<int, \SineMacula\Laravel\Mfa\Models\Code>  $rows
      * @param  int  $limit
@@ -533,19 +547,18 @@ final readonly class DeliveredCodes
      */
     private static function windowWait(Collection $rows, int $limit, int $window, CarbonImmutable $now): int
     {
-        $sends  = 0;
-        $oldest = null;
+        $times = [];
 
         foreach ($rows as $row) {
-            $sends += $row->sends;
-            $sent   = $row->sent_at->getTimestamp();
-            $oldest = $oldest === null ? $sent : min($oldest, $sent);
+            array_push($times, ...$row->sent_times);
         }
 
-        if ($oldest === null || $sends < $limit) {
+        if (count($times) < $limit) {
             return 0;
         }
 
-        return max(1, $oldest + $window - $now->getTimestamp());
+        sort($times);
+
+        return $times[count($times) - $limit] + $window - $now->getTimestamp();
     }
 }

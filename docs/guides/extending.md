@@ -75,9 +75,14 @@ use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 $this->app->singleton(EmailSender::class, MailEmailSender::class);
 ```
 
+An `SmsSender` is handed the message with the code in clear. One that queues it must encrypt the queued payload, for
+example with a job that implements `ShouldBeEncrypted`, and none may log it. The package's `MfaCodeMessage` encrypts its
+own queued payload, so an `EmailSender` that queues it needs nothing more.
+
 In tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` bind a sender that keeps the messages
 the drivers send instead of delivering them, and returns it, so a test can read the code it was sent
-(`lastMessageTo()`, `lastCodeTo()`).
+(`lastMessageTo()`, `lastCodeTo()`). Faking also makes the manager build its drivers again, so a driver resolved before
+the fake sends through it too.
 
 ## Where the classes live
 

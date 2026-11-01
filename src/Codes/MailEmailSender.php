@@ -4,8 +4,8 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Codes;
 
+use Illuminate\Contracts\Mail\Factory;
 use Illuminate\Contracts\Mail\Mailable;
-use Illuminate\Contracts\Mail\Mailer;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 
 /**
@@ -13,6 +13,10 @@ use SineMacula\Laravel\Mfa\Contracts\EmailSender;
  * `EmailSender`: the message goes to the address through the default mailer,
  * queued when the message class is queueable. The package's `MfaCodeMessage`
  * encrypts its payload whenever it is queued.
+ *
+ * The mailer is looked up from the mail manager only when a message is sent, so
+ * building the sender, as the configuration check does on every request, builds
+ * no mail transport.
  *
  * @api
  *
@@ -24,12 +28,12 @@ final readonly class MailEmailSender implements EmailSender
     /**
      * Constructor.
      *
-     * @param  \Illuminate\Contracts\Mail\Mailer  $mailer
+     * @param  \Illuminate\Contracts\Mail\Factory  $mail
      */
     public function __construct(
 
-        /** The mailer the message is sent through. */
-        private Mailer $mailer,
+        /** The mail manager whose default mailer the message is sent through. */
+        private Factory $mail,
     ) {}
 
     /**
@@ -42,6 +46,6 @@ final readonly class MailEmailSender implements EmailSender
     #[\Override]
     public function send(string $address, Mailable $message): void
     {
-        $this->mailer->to($address)->send($message);
+        $this->mail->mailer()->to($address)->send($message);
     }
 }

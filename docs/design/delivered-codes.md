@@ -19,17 +19,21 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   The factor row holds no code and no expiry, and the `Code` model hides the hash and the session digest.
 - A challenge is open while its code is unused and it started less than `challenge_ttl_minutes` ago. Sending for a
   binding with an open challenge is a resend: the same row gets a new code under the next issue number, which makes the
-  previous code stop matching at once, even when the new code has the same digits. The attempt count is kept, and the
-  new code expires at `ttl_minutes` or the end of the challenge, whichever is sooner. With no open challenge, a send
-  starts a new one.
+  previous code stop matching at once. The new code is drawn again until its digits differ from the previous code's,
+  which would otherwise still match under the new issue. The attempt count is kept, and the new code expires at
+  `ttl_minutes` or the end of the challenge, whichever is sooner. With no open challenge, a send starts a new one.
 - A resend waits out `resend_cooldown_seconds` since the challenge's last code. A challenge that has used up its
   `max_attempts` sends no more codes until it ends, so asking for a new code never brings new guesses.
 - Every send, resends included, is refused while the factor has been sent `factor_send_limit` codes, or the identity
-  `identity_send_limit` across its factors, within `send_window_minutes`, across every session. A refusal answers
-  `sending_capped` with the seconds until another code may be sent.
+  `identity_send_limit` across its factors, within `send_window_minutes`, across every session. A challenge records the
+  time of each of its sends (`sent_times`), and each send leaves the window on its own, a window after it was made, so
+  a challenge's earlier sends stop counting while its later ones still do. A refusal answers `sending_capped` with the
+  seconds until enough sends have left the window for one more.
 - Sending runs in the identity's factor state transaction (see [Storage and Transactions](storage-and-transactions.md)),
   so the sends of one identity are serialised and the counts the caps read cannot be overrun by parallel requests. The
-  factor is read again under the lock; one a concurrent change removed answers `not_found`.
+  factor is read again under the lock; one a concurrent change removed answers `not_found`. The send's time is read
+  once the locks are held, so a send that waited for them starts its cooldown and its code's lifetime from when it was
+  made, not from when it began waiting.
 - The code is stored first, then delivered by the factor's driver (`Contracts\CodeDeliveryDriver::deliver()`) inside
   the same transaction, so a delivery that throws keeps no code and spends no cooldown or cap. `CodeSent` is dispatched
   once the transaction commits, with the factor's summary (its masked destination), the purpose and the challenge's id.
@@ -46,6 +50,9 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   failure event.
 - Neither a send nor a check resets a factor's failure count or lifts its lockout.
 - Every time is a whole second, and one `now` is used per operation.
+- A code is bound to the request's Laravel session id. Sending and checking must run in the same started session: a
+  stateless request has a new id each time, so a code sent in one is never found in the next, and a session
+  regenerated between the send and the check leaves its code behind. Either answers `expired`.
 - Delivery goes through contracts the application binds: `Contracts\SmsSender` (a phone number and the message, the
   configured `sms_message` with `:code` replaced) and `Contracts\EmailSender` (an address and the configured
   `MfaCodeMessage` class, with the whole minutes the code has left). The package ships no provider: the defaults,
@@ -65,8 +72,9 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   session's id, the purpose); `CodeService::send()`: the factor state transaction, the identity's and the factor's
   sends counted, a challenge started or resent, the code delivered through the bound `EmailSender`, `CodeSent` queued
   for the commit; `MfaChallengeIssued`; a `Codes\SendResult` with the challenge's id and expiry.
-- `Mfa::verify('email', $factor, $code)` with the same purpose: `CodeService::check()`: the read, the counting
-  `UPDATE`, the comparison and the using `UPDATE`; then the factor's verification is recorded as for any type.
+- `Mfa::verify('email', $factor, $code)` with the same purpose, in the same session: `CodeService::check()`: the
+  read, the counting `UPDATE`, the comparison and the using `UPDATE`; then the factor's verification is recorded as
+  for any type.
 
 ## Failure / Edge Cases
 
@@ -78,8 +86,10 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 - A factor that is not a stored Eloquent factor: `UnsupportedFactorException`. A binding that names another identity
   than the factor's owner: `InvalidArgumentException`. Neither reads anything.
 - A code sent inside a transaction that rolls back is gone with it, and `CodeSent` is never dispatched.
-- Expired and used challenges stay in the table, for pruning to remove past `lifecycle.prune_after_days`; they still
-  count towards the caps while their last send is inside the send window.
+- Expired and used challenges stay in the table, for pruning to remove past `lifecycle.prune_after_days`; their sends
+  still count towards the caps while they are inside the send window.
+- A verification in a session other than the one the code was sent in (a stateless request, or a regenerated session)
+  finds no challenge and answers `expired`.
 
 ## Implementation Anchors
 
@@ -89,7 +99,7 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   `src/Drivers/SmsDriver.php`.
 - `src/Contracts/SmsSender.php`, `src/Contracts/EmailSender.php`, `src/Codes/NullSmsSender.php`,
   `src/Codes/NullEmailSender.php`, `src/Codes/MailEmailSender.php`, `src/Codes/MfaCodeMessage.php`.
-- `src/Testing/FakeSmsSender.php`, `src/Testing/FakeEmailSender.php`.
+- `src/Testing/FakeSmsSender.php`, `src/Testing/FakeEmailSender.php`, `src/Testing/FakeSenderBinding.php`.
 - `src/Verification/VerificationService.php`: the binding of a request and the routing of delivered codes.
 
 ## Authoritative Tests

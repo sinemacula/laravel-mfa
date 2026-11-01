@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing;
 
-use Illuminate\Container\Container;
 use Illuminate\Contracts\Container\Container as ContainerContract;
 use Illuminate\Contracts\Mail\Mailable;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
@@ -15,7 +14,8 @@ use SineMacula\Laravel\Mfa\Contracts\EmailSender;
  * delivering it, so a test can read the code a request sent and verify with it.
  *
  * `FakeEmailSender::fake()` binds a fresh instance as the application's sender
- * and returns it. Not for production use.
+ * and returns it; the manager builds its drivers again, so one resolved before
+ * sends through the fake too. Not for production use.
  *
  * @api
  *
@@ -33,12 +33,14 @@ final class FakeEmailSender implements EmailSender
      *
      * @param  ?\Illuminate\Contracts\Container\Container  $container
      * @return self
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public static function fake(?ContainerContract $container = null): self
     {
         $fake = new self;
 
-        ($container ?? Container::getInstance())->instance(EmailSender::class, $fake);
+        FakeSenderBinding::bind($container, EmailSender::class, $fake);
 
         return $fake;
     }
