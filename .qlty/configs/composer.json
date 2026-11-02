@@ -15,7 +15,6 @@
         "phpstan/phpstan-phpunit": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpunit/phpunit": "^12.5",
-        "pragmarx/google2fa": "^9.0",
         "sinemacula/coding-standards-laravel": "^1.6.2",
         "slevomat/coding-standard": "^8.28"
     },
