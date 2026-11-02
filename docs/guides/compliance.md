@@ -19,9 +19,9 @@ by itself. It is guidance for your own assessment, which remains yours.
 | AAL2                | Enable TOTP or a passkey, and offer a phishing-resistant option through a bound gateway  | [Factor types](#factor-types), [Phishing resistance](#phishing-resistance)        |
 | AAL3                | Bind a combination policy of your own, with evidence of hardware-protected keys          | [AAL3](#aal3)                                                                     |
 | Any level           | Set session lifetimes, and require reauthentication at the limits yourself               | [Session lifetimes and reauthentication](#session-lifetimes-and-reauthentication) |
-| Any level           | Keep the failure ceiling at or below 100                                                 | [Failure ceiling](#failure-ceiling)                                               |
+| Any level           | Keep the failure ceiling at or below 100, and have a disabled factor bound again         | [Failure ceiling](#failure-ceiling)                                               |
 | Any level           | Hold a new factor to the account's level, and notify the person from the events          | [Binding a factor](#binding-a-factor)                                             |
-| Recovery codes      | Lengthen the codes, replace a set after use, and notify the person from the events       | [Recovery codes](#recovery-codes)                                                 |
+| Recovery codes      | Lengthen the codes, take one only after a bound factor, replace a set, notify the person | [Recovery codes](#recovery-codes)                                                 |
 
 ## Unclassified evidence
 
@@ -115,8 +115,9 @@ freshness), so your application must itself require reauthentication at the limi
 
 Standalone, Laravel's `session.lifetime` is an inactivity limit only, so you enforce the overall limit yourself.
 
-A named operation with a maximum age is one way to hold a route to the overall limit, as a proof's age is measured from
-when it was made and a refresh renews nothing:
+A named operation with a maximum age bounds how long ago the person last proved a further factor on a route, as a
+proof's age is measured from when it was made and a refresh renews nothing. Ending the session at the limit remains your
+application's job:
 
 ```php
 'freshness' => [
@@ -130,15 +131,41 @@ Route::middleware('mfa:operation=session.reauthenticated')->group(function () {
 });
 ```
 
-A maximum age says how old a proof may be. It cannot measure inactivity, it does not end the session, and it applies
-only to the routes that carry it.
+A maximum age says how old a proof may be, and the proof is the one that completes the combination, usually the further
+proof. A fresh further proof over an old first factor still passes, so a TOTP step-up made every day keeps this example
+met on a password months old. It cannot measure inactivity, it does not end the session, and it applies only to the
+routes that carry it.
 
 ## Failure ceiling
 
 You may allow at most 100 consecutive failures, by disabling the authenticator past them (3.2.2). That is
 `attempts.failure_ceiling`, default 100, and also the most the package allows; lowering it is fine. The other caps sit
-far below it (see [Attempts and lockouts](attempts.md)). A factor at the ceiling stays disabled until another factor is
-proved, it is rebound or the identity is reset.
+far below it (see [Attempts and lockouts](attempts.md)).
+
+The setting is not all of it. A disabled authenticator must also be bound again (4.1) to be usable, and a reset of a
+retry count may not reach past the session making it: the level of the authenticator being reset may not exceed the
+session's (3.2.2). The package does not meet these by itself, and no configuration changes that. Proving any other of
+the identity's factors enables a factor the ceiling disabled, with nothing bound again and whatever that proof's level
+(see [The counters](attempts.md#the-counters)), so an email code, at AAL1, enables a TOTP factor.
+
+To claim a level, your application takes this on:
+
+- **Record it.** From `FactorDisabled`, record `$event->factor->id` as needing to be bound again. The factor's own
+  disabled state does not last, so your record decides.
+- **Refuse it.** While the record stands, your routes leave the factor out of what they offer and refuse to send for or
+  verify it. The package does not know of your record, so nothing else stops it.
+- **Bind it again.** The person authenticates at the level [binding a factor](#binding-a-factor) asks for, enrols a
+  replacement and removes the disabled factor (see [Replacing a factor](enrollment.md#replacing-a-factor)). Then clear
+  the record.
+- **Recover when they cannot.** A person who cannot reach that level goes through account recovery (3.2.2, 4.2; see
+  [Recovery codes](#recovery-codes)), not another binding.
+- **Hold resets to the session's level.** `Attempts\AttemptService::enableFactor()` clears a factor's count, so call it
+  only from a session whose level reaches the factor's, and only with the record cleared.
+
+Do not delete the factor from the listener. `Mfa::removeFactor()` serves only an active session fresh enough for it,
+which a failing sign-in is not. Deleting the row yourself skips the last factor policy, and under `requirement =>
+'enrolled'` an identity left with no factor owes nothing, so someone guessing with a stolen password would turn the
+requirement off.
 
 ## Binding a factor
 
@@ -177,11 +204,18 @@ so for this:
   replaces the whole set, and only on a session fresh enough for it, so prompt for it from `RecoveryCodeUsed` and
   `RecoveryCodesLow`.
 - Send the notification, from `RecoveryCodeUsed`, `RecoveryCodesGenerated` and `FactorsReset`. The package sends none.
+- Take a code only after a bound factor. An account that can reach AAL2 recovers with two recovery codes from different
+  methods, one recovery code plus authentication with a bound single-factor authenticator, or repeated identity proofing
+  (4.2). A code redeemed after a password meets the second. A code redeemed after an email code does not, as email is
+  not an authenticator (3.1.3.1), and nor does one after a first factor that is not bound to the account. The default
+  policy still accepts both as an additional verification, so an application claiming AAL2 must not treat them as
+  recovery: the two reach AAL1 at most, so `mfa:level=aal2` and an `aal2` entry for `mfa.add_factor` refuse them, while
+  bare `mfa` does not.
 
-`recovery_codes.level` is the level a session needs to be issued a set, `aal2` by default. Lowering it is your decision
-to record, and has a consequence: by default a recovery code after a password reaches AAL2, so a session below AAL2
-could then issue itself what reaches AAL2, and an email code would be enough to obtain it. Claim no more than that
-weakest path supports.
+The application's `recovery_codes.level` is the level a session needs to be issued a set, `aal2` by default. Lowering it
+is your decision to record, and has a consequence: by default a recovery code after a password reaches AAL2, so a
+session below AAL2 could then issue itself what reaches AAL2, and an email code would be enough to obtain it. Claim no
+more than that weakest path supports.
 
 Lost-factor recovery by someone else (`Mfa::resetIdentity()`) leaves the identity proofing to you (see
 [Resetting an identity](lifecycle.md#resetting-an-identity)).

@@ -131,6 +131,7 @@ Verify on routes of your own, through the `Mfa` facade:
 ```php
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 
@@ -138,13 +139,16 @@ Route::middleware(['web', 'auth', 'mfa.exempt'])->post('/mfa/verify', function (
     $result = Mfa::verify(Submission::factor(
         $request->string('factor')->toString(),
         $request->string('code')->toString(),
-    ));
+    ), Purpose::SIGN_IN);
 
     return $result->isFailed()
         ? response()->json(['reason' => $result->reason->value], 422)
         : response()->noContent();
 });
 ```
+
+This form is for TOTP. Email and SMS factors use `Mfa::sendCode()` and then `Submission::challenge()`, and a step-up
+leaves the purpose out (see [Verification](docs/guides/verification.md#sending-a-code)).
 
 Gate the rest with the middleware, asking for more where a route needs it:
 

@@ -76,9 +76,33 @@ Event::listen(MfaEvent::class, function (MfaEvent $event): void {
 });
 ```
 
-To audit them with `sinemacula/laravel-audit-log`, register a mapper for the `Contracts\MfaEvent` contract through that
-package's mapping seam, which gives each event an explicit code on its record, rather than listening. `laravel-iam` does
-this itself. That package's own documentation has the mapping API.
+To audit them with `sinemacula/laravel-audit-log`, map the contract rather than listening. `laravel-iam` does this
+itself. Without it, register an `EventMapper` that sets an explicit code on the record, because an audit code is never
+derived from a class name:
+
+```php
+use SineMacula\Laravel\AuditLog\Contracts\EventMapper;
+use SineMacula\Laravel\AuditLog\Facades\AuditLog;
+use SineMacula\Laravel\AuditLog\Records\PendingRecord;
+use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
+use SineMacula\Laravel\Mfa\Events\VerificationPassed;
+
+final class MfaAuditMapper implements EventMapper
+{
+    public function map(object $event, PendingRecord $record): ?PendingRecord
+    {
+        return match (true) {
+            $event instanceof VerificationPassed => $record->event('mfa.verification_passed'),
+            default                              => null,
+        };
+    }
+}
+
+AuditLog::map(MfaEvent::class, MfaAuditMapper::class);
+```
+
+This is the mapping that package has agreed, ahead of its first release, so check the namespaces against its own
+documentation once it is released.
 
 The context is read through `Contracts\EventContextResolver`. Alone, the package's default gives the identity, the
 application a bound `Contracts\ApplicationResolver` names, and the request's IP address and user agent; it never gives

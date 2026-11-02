@@ -54,7 +54,8 @@ Three things never reset a count or lift a lockout:
   does not extend its lockout.
 - **A success of another factor.** It resets the counts of the factor proved and the identity's run, and enables the
   identity's factors the failure ceiling disabled; it resets no other factor's count and lifts no lockout or throttle.
-  A factor enabled this way keeps its failures in a row, so its next failure disables it again.
+  A factor enabled this way keeps its failures in a row, so its next failure disables it again. An application claiming
+  an assurance level needs more than this (see [Failure ceiling](compliance.md#failure-ceiling)).
 
 ## Who is charged
 

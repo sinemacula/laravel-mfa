@@ -113,8 +113,9 @@ $this->app->bind(SmsSender::class, static fn ($app): TwilioSmsSender => new Twil
 The contracts expose only the destination and the message: the package owns drawing, hashing, binding and checking the
 code, the resend cooldown, the delivery caps and the lockouts, so a sender stays thin. A sender that queues the message
 must encrypt the queued payload, and none may log it (see [Factor drivers](extending.md#factor-drivers)). Sending for a
-factor answers a `Codes\SendResult`: sent, with the challenge's id and expiry, or refused with `sending_capped` and the
-seconds to wait. In tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` keep the messages
+factor answers a `Codes\SendResult`: sent, with the challenge's id and expiry, or refused with a failure reason, such as
+`sending_capped`, and the seconds to wait when there are any (see [Sending a code](verification.md#sending-a-code)). In
+tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` keep the messages
 instead (see [Testing](testing.md)).
 
 The `passkey` type needs a `Contracts\PasskeyGateway` the same way, as this package stores no WebAuthn credentials and
@@ -144,9 +145,10 @@ Behind any Laravel guard (session, Sanctum, Passport or your own) whose `Auth::u
 
 The same model implements `Identity` from that package and `Contracts\MultiFactorAuthenticatable` from this one: both
 extend Laravel's `Authenticatable`, so one class satisfies both. An adapter of yours implements this package's contracts
-with that package's, and binds them in a service provider, so proofs live on the authentication session, a sign-in waits
-pending with `mfa` outstanding, and a step-up returns a new access token. [Seams with an authentication
-layer](extending.md#seams-with-an-authentication-layer) names what each contract meets.
+with that package's, and binds them in a service provider, so proofs live on the authentication session through a
+rebound `Contracts\ProofStore`, a sign-in waits pending with `mfa` outstanding, and a step-up returns a new access
+token. [Seams with an authentication layer](extending.md#seams-with-an-authentication-layer) names what each contract
+meets and what a seam still needs from the layer, and warns against enabling `passkey` without it.
 
 ### Within `laravel-iam`
 
