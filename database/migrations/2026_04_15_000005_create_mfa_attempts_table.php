@@ -12,8 +12,8 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
  * Create the MFA attempts table: the temporary throttles, one counter per scope
- * (a factor, an identity or an IP address) and subject, counted with atomic
- * upserts so no cache is needed.
+ * (an identity or an IP address) and subject, counted atomically so no cache is
+ * needed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -41,8 +41,8 @@ return new class extends Migration {
             // back.
             $blueprint->char('key', 64)->primary();
 
-            // The scope the counter counts within: a factor, an identity or an
-            // IP address.
+            // The scope the counter counts within: an identity or an IP
+            // address.
             $blueprint->string('scope', 16);
 
             $blueprint->unsignedInteger('hits');

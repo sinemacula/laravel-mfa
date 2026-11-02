@@ -364,6 +364,28 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
+     * Return when the factor's temporary lockout ends, as held on this
+     * instance. The column must be cast as a datetime: a value of any other
+     * type reads as no deadline.
+     *
+     * @return ?\Carbon\CarbonInterface
+     */
+    public function getLockedUntil(): ?CarbonInterface
+    {
+        return $this->readFactorTime($this->getLockedUntilName());
+    }
+
+    /**
+     * Column name holding when the factor's temporary lockout ends.
+     *
+     * @return string
+     */
+    public function getLockedUntilName(): string
+    {
+        return 'locked_until';
+    }
+
+    /**
      * Return the application the factor was enrolled through.
      *
      * @return ?string

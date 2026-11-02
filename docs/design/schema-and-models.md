@@ -17,7 +17,8 @@ factors starts with.
   (SMS and email, captured at enrolment), `credential_reference` (passkey), `secret` (encrypted), the TOTP
   `totp_algorithm`, `totp_digits` and `totp_period` stored with the factor, `last_accepted_step`, `status` (`pending`
   until confirmed, by the table's default and the model's), `preferred`, the durable `consecutive_failures` and
-  `disabled_at` of the failure ceiling, the `application` it was enrolled through, `confirmed_at` and `last_used_at`.
+  `disabled_at` of the failure ceiling, `locked_until`, when its temporary lockout ends, the `application` it was
+  enrolled through, `confirmed_at` and `last_used_at`.
   A delivered code is never on the factor: it lives in `mfa_codes`. A successful verification is recorded as a proof
   on the session (see the proof store note), not on the factor.
 - `mfa_identity_states`, one row per owner and the lock of every serialised change: `verification_generation`,
@@ -34,9 +35,8 @@ factors starts with.
   (`sent_times`), `expires_at` and `consumed_at` (see [Delivered Codes](delivered-codes.md)).
 - `mfa_recovery_codes`: owner, the salted `code_hash`, the set's `generation`, `used_at` and `replaced_at`.
 - `mfa_attempts`, the temporary throttles: `key` (a keyed hash of the scope and subject), `scope`, `hits` and
-  `window_ends_at`. An identity's and an IP address's rows count failures within a window; a factor's row records the
-  lockout its failures in a row applied, ending when its window does (see [Attempts and
-  Lockout](attempts-and-lockout.md)).
+  `window_ends_at`. An identity's and an IP address's rows count failures within a window. A lockout's deadline is not
+  here: it is on the factor's or the identity's own row (see [Attempts and Lockout](attempts-and-lockout.md)).
 - `mfa_passkey_associations`: the `factor_id` (unique), owner, and the credential by the SHA-256 `credential_id_hash`
   of its canonical unpadded base64url id (unique: one association per credential, whoever holds it) with the
   `credential_id` in full. A passkey factor's `credential_reference` holds the same id; the two are written and deleted

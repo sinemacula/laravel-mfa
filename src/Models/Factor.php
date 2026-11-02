@@ -42,6 +42,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property bool $preferred
  * @property int $consecutive_failures
  * @property ?\Carbon\CarbonInterface $disabled_at
+ * @property ?\Carbon\CarbonInterface $locked_until
  * @property ?string $application
  * @property ?\Carbon\CarbonInterface $confirmed_at
  * @property ?\Carbon\CarbonInterface $last_used_at
@@ -69,6 +70,7 @@ class Factor extends Model implements EloquentFactor
         'preferred',
         'consecutive_failures',
         'disabled_at',
+        'locked_until',
         'application',
         'confirmed_at',
         'last_used_at',
@@ -148,6 +150,7 @@ class Factor extends Model implements EloquentFactor
             'preferred'            => 'boolean',
             'consecutive_failures' => 'integer',
             'disabled_at'          => 'datetime',
+            'locked_until'         => 'datetime',
             'application'          => 'string',
             'confirmed_at'         => 'datetime',
             'last_used_at'         => 'datetime',

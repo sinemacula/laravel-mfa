@@ -8,15 +8,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
-use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
-use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
@@ -240,17 +237,14 @@ final class ResettingIdentityTest extends TestCase
         $user   = $this->signedInPerson();
         $locked = $this->confirmedFactor($user);
         $ended  = $this->confirmedFactor($user);
-        $store  = $this->container()->make(AttemptStore::class);
-        $keys   = $this->container()->make(AttemptKeys::class);
-        $now    = CarbonImmutable::now()->getTimestamp();
         $actor  = self::actor();
 
         [$pending] = $this->pendingEnrollmentOf($user);
 
         $this->recoveryCodesOf($user);
 
-        $store->hold($keys->factor($locked->id), AttemptScope::FACTOR, 5, $now + 600);
-        $store->hold($keys->factor($ended->id), AttemptScope::FACTOR, 5, $now - 600);
+        $locked->update(['locked_until' => CarbonImmutable::now()->addMinutes(10)]);
+        $ended->update(['locked_until' => CarbonImmutable::now()->subMinutes(10)]);
 
         IdentityState::query()->where('authenticatable_id', (string) $user->id)->update(['locked_until' => CarbonImmutable::now()->addHour()]);
 

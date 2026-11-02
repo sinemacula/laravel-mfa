@@ -6,10 +6,7 @@ namespace Tests\Feature\Lifecycle;
 
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
-use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
-use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -199,17 +196,10 @@ final class UnlockingTest extends TestCase
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     private function lockFactor(Factor $factor): void
     {
-        $this->container()->make(AttemptStore::class)->hold(
-            $this->container()->make(AttemptKeys::class)->factor($factor->id),
-            AttemptScope::FACTOR,
-            5,
-            CarbonImmutable::now()->getTimestamp() + 3600,
-        );
+        $factor->update(['locked_until' => CarbonImmutable::now()->addHour()]);
     }
 
     /**

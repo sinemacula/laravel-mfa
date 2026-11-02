@@ -195,6 +195,28 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
+     * Return no lockout deadline: a stub holds none.
+     *
+     * @return ?\Carbon\CarbonInterface
+     */
+    #[\Override]
+    public function getLockedUntil(): ?CarbonInterface
+    {
+        return null;
+    }
+
+    /**
+     * Return the conventional locked-until column name.
+     *
+     * @return string
+     */
+    #[\Override]
+    public function getLockedUntilName(): string
+    {
+        return 'locked_until';
+    }
+
+    /**
      * Return the conventional application column name.
      *
      * @return string

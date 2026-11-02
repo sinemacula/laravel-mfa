@@ -59,6 +59,7 @@ final class ActsAsFactorStateTest extends TestCase
         yield 'preferred' => [static fn (Factor $factor): string => $factor->getPreferredName(), 'preferred'];
         yield 'consecutive failures' => [static fn (Factor $factor): string => $factor->getConsecutiveFailuresName(), 'consecutive_failures'];
         yield 'disabled at' => [static fn (Factor $factor): string => $factor->getDisabledAtName(), 'disabled_at'];
+        yield 'locked until' => [static fn (Factor $factor): string => $factor->getLockedUntilName(), 'locked_until'];
         yield 'application' => [static fn (Factor $factor): string => $factor->getApplicationName(), 'application'];
         yield 'confirmed at' => [static fn (Factor $factor): string => $factor->getConfirmedAtName(), 'confirmed_at'];
         yield 'last used at' => [static fn (Factor $factor): string => $factor->getLastUsedAtName(), 'last_used_at'];
@@ -94,6 +95,7 @@ final class ActsAsFactorStateTest extends TestCase
             'preferred'            => true,
             'consecutive_failures' => 4,
             'disabled_at'          => '2026-04-15 09:00:00',
+            'locked_until'         => '2026-04-15 09:15:00',
             'application'          => 'web',
             'confirmed_at'         => '2026-04-15 08:00:00',
             'last_used_at'         => '2026-04-15 09:30:00',
@@ -109,6 +111,7 @@ final class ActsAsFactorStateTest extends TestCase
         self::assertTrue($factor->isPreferred());
         self::assertSame(4, $factor->getConsecutiveFailures());
         self::assertSame('2026-04-15 09:00:00', $factor->getDisabledAt()?->format('Y-m-d H:i:s'));
+        self::assertSame('2026-04-15 09:15:00', $factor->getLockedUntil()?->format('Y-m-d H:i:s'));
         self::assertSame('web', $factor->getApplication());
         self::assertSame('2026-04-15 08:00:00', $factor->getConfirmedAt()?->format('Y-m-d H:i:s'));
         self::assertSame('2026-04-15 09:30:00', $factor->getLastUsedAt()?->format('Y-m-d H:i:s'));
@@ -134,6 +137,7 @@ final class ActsAsFactorStateTest extends TestCase
         self::assertFalse($factor->isPreferred());
         self::assertSame(0, $factor->getConsecutiveFailures());
         self::assertNull($factor->getDisabledAt());
+        self::assertNull($factor->getLockedUntil());
         self::assertNull($factor->getApplication());
         self::assertNull($factor->getConfirmedAt());
         self::assertNull($factor->getLastUsedAt());
@@ -198,6 +202,7 @@ final class ActsAsFactorStateTest extends TestCase
             'totp_digits'          => '6',
             'consecutive_failures' => '3',
             'disabled_at'          => '2026-04-15 09:00:00',
+            'locked_until'         => '2026-04-15 09:15:00',
             'preferred'            => 1,
         ]);
 
@@ -205,6 +210,7 @@ final class ActsAsFactorStateTest extends TestCase
         self::assertNull($factor->getTotpDigits());
         self::assertSame(0, $factor->getConsecutiveFailures());
         self::assertNull($factor->getDisabledAt());
+        self::assertNull($factor->getLockedUntil());
         self::assertFalse($factor->isPreferred());
     }
 

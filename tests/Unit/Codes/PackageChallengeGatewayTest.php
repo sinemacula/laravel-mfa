@@ -6,14 +6,11 @@ namespace Tests\Unit\Codes;
 
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
-use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
-use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -250,9 +247,7 @@ final class PackageChallengeGatewayTest extends TestCase
 
         self::assertNotNull($challenge);
 
-        $key = $this->container()->make(AttemptKeys::class)->factor($this->factor->id);
-
-        $this->container()->make(AttemptStore::class)->hold($key, AttemptScope::FACTOR, 5, $until->getTimestamp());
+        $this->factor->update(['locked_until' => $until]);
 
         self::assertSame($until->getTimestamp(), $this->gateway()->verify($this->factor, $binding, $challenge, '000000')->lockedUntil?->getTimestamp());
         self::assertSame(300, $this->gateway()->send($this->factor, $binding)->retryAfter);

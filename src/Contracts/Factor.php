@@ -20,9 +20,10 @@ use SineMacula\Laravel\Mfa\Enums\FactorStatus;
  * double.
  *
  * The last verification time is still read here until the proof store replaces
- * it with a record of its own. Delivered codes have a record of their own, and
- * lockouts are not a property of the factor: the attempt service reads them
- * (see `Attempts\AttemptService::lockout()`).
+ * it with a record of its own. Delivered codes have a record of their own. A
+ * lockout is not read here: only a factor with a row of its own can hold a
+ * deadline (see `EloquentFactor`), and the attempt service answers for every
+ * scope (see `Attempts\AttemptService::lockout()`).
  *
  * Persistence-capable implementations also implement the narrower
  * `EloquentFactor` boundary, which adds the owner relation, the column names

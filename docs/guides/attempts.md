@@ -33,7 +33,7 @@ itself, an IPv6 address by its /64 network.
 | Counter                                    | Where                                      | Reset or expiry                                                                              |
 |--------------------------------------------|--------------------------------------------|----------------------------------------------------------------------------------------------|
 | A factor's failures in a row               | `consecutive_failures` on the factor's row | Reset only by a success of that factor, or when the factor is enabled again; never expires   |
-| A factor's lockout                         | A row of `mfa_attempts`, scope `factor`    | Expires `lockout_seconds` after the failure that applied it; lifted early only by an action  |
+| A factor's lockout                         | `locked_until` on the factor's row         | Expires `lockout_seconds` after the failure that applied it; lifted early only by an action  |
 | A factor disabled at the failure ceiling   | `disabled_at` on the factor's row          | Ends when another of the identity's factors is proved, or when the factor is enabled again   |
 | The identity's run of failures             | `consecutive_failures` on its state row    | Reset by a success of any of its factors or recovery codes, or a reset; never expires        |
 | The identity at the failure ceiling        | `consecutive_failures` on its state row    | Ends when its run is reset, by a success of any of its factors or by a reset                 |
@@ -42,10 +42,11 @@ itself, an IPv6 address by its /64 network.
 | An IP address's failures within the window | A row of `mfa_attempts`, scope `ip`        | Expires with its window, `window_seconds` after the first attempt in it                      |
 | A sent code's challenge's attempts         | A row of `mfa_codes`, its `attempts`       | Kept across resends and capped at `codes.max_attempts`; ends with the challenge              |
 
-Durable counts are kept on the factor and identity state rows and only a success resets them; the throttles in
-`mfa_attempts` expire on their own. The two are kept apart on purpose: a factor's lockout ending does not forgive its
-failures, so once a factor has reached `factor_limit`, each further failure locks it again, one guess per lockout
-period, until a success resets the count or the failure ceiling disables the factor.
+Durable counts are kept on the factor and identity state rows and only a success resets them; a lockout's deadline sits
+beside them and ends on its own, and the rate windows in `mfa_attempts` expire on their own. They are kept apart on
+purpose: a factor's lockout ending does not forgive its failures, so once a factor has reached `factor_limit`, each
+further failure locks it again, one guess per lockout period, until a success resets the count or the failure ceiling
+disables the factor.
 
 Three things never reset a count or lift a lockout:
 
@@ -75,9 +76,15 @@ transaction, so its use commits with the count and two requests with the same co
 slot is taken before the lock, in one statement, and given back unless the attempt fails and is counted, so parallel
 guesses from one address across many identities cannot overrun its cap either.
 
-Call `Mfa::verify()` outside a transaction of your own on the storage connection. On MySQL, whose default isolation
-level is `REPEATABLE READ`, a transaction that has already read answers later plain reads from that first snapshot,
-so a temporary lockout another request applied while this one waited for the lock could be read as it was before.
+Both lockouts are on rows the transaction locks, so an attempt finds one another request committed even when you call
+`Mfa::verify()` inside a transaction of your own on the storage connection, after it has read. MySQL answers a locking
+read with the row as committed, also under its default `REPEATABLE READ`, and PostgreSQL's default `READ COMMITTED` reads
+afresh for every statement, so the attempt is refused. Under PostgreSQL's `REPEATABLE READ`, locking a row changed since
+your snapshot raises a serialisation failure instead: retry your whole transaction, and the attempt is then refused.
+
+The reads that take no lock can still answer from your snapshot, which is another reason to verify outside a transaction
+of your own. `lockout()` is advisory, as below. The IP address's refusal or retry time may be stale, though a slot is
+only ever taken by a conditional update, so it never admits past the cap.
 
 ## Lifting and enabling
 
@@ -98,12 +105,15 @@ $attempts->resetIdentityFailures($user);                  // clear the identity'
 ```
 
 - `lockout($identity, $factor, $ip)` answers the lockout an attempt would be refused by now, or `null`: its scope, and
-  when it ends, or no time at all for a factor disabled at the ceiling or an identity at it. It takes no lock, so it
-  answers for that moment only.
+  when it ends, or no time at all for a factor disabled at the ceiling or an identity at it. It takes no lock, so it is
+  advisory: it answers for that moment only, and inside a transaction of your own may answer from that transaction's
+  snapshot. Use it to tell someone what to expect, not to decide anything; every attempt reads the lockouts again under
+  the lock.
 - `liftLockout($identity, $factor, $actor)` lifts the factor's lockout, or the identity's when no factor is given. It
   keeps the factor's failures in a row and the identity's, so the next failure locks again, and leaves a disabled
   factor disabled. A factor that is not the identity's lifts nothing. It dispatches `LockoutLifted`, naming the actor,
-  when a live lockout was lifted, and answers whether one was.
+  when a live lockout was lifted, and answers whether one was: a deadline that has already passed is cleared without
+  either.
 - `enableFactor($factor)` enables a factor the failure ceiling disabled and clears its failures in a row, leaving any
   lockout to end on its own.
 - `resetIdentityFailures($identity)` clears the identity's failures in a row, so attempts that name no factor of its

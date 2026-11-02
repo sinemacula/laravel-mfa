@@ -283,18 +283,39 @@ final class PruningTest extends TestCase
     public function testThrottleRowsGoWhenTheirWindowEnds(): void
     {
         $store = $this->container()->make(AttemptStore::class);
-        $now   = CarbonImmutable::now()->getTimestamp();
+        $now   = CarbonImmutable::now();
 
         // Full length, as the column is fixed width and PostgreSQL pads it.
         [$ended, $edge, $counting] = array_map(static fn (string $letter): string => str_repeat($letter, 64), ['a', 'b', 'c']);
 
-        $store->hold($ended, AttemptScope::IP, 3, $now - 1);
-        $store->hold($edge, AttemptScope::IP, 3, $now);
-        $store->hold($counting, AttemptScope::IP, 3, $now + 1);
+        DB::table('mfa_attempts')->insert(array_map(static fn (string $key, CarbonImmutable $ends): array => [
+            'key'            => $key,
+            'scope'          => AttemptScope::IP->value,
+            'hits'           => 3,
+            'window_ends_at' => $ends->format('Y-m-d H:i:s'),
+        ], [$ended, $edge, $counting], [$now->subSecond(), $now, $now->addSecond()]));
 
         self::assertSame(2, Mfa::prune()->attempts);
         self::assertSame([], $store->read([$ended, $edge]));
         self::assertArrayHasKey($counting, $store->read([$counting]));
+    }
+
+    /**
+     * A factor's deadline is not a throttle row: pruning leaves one that has
+     * passed where it is, inert until it is overwritten or cleared.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFactorsEndedDeadlineIsLeftByPruning(): void
+    {
+        $factor = $this->confirmedFactor($this->signedInPerson());
+
+        $factor->update(['locked_until' => CarbonImmutable::now()->subHour()]);
+
+        self::assertSame(0, Mfa::prune()->attempts);
+        self::assertNotNull($factor->fresh()?->getLockedUntil());
     }
 
     /**

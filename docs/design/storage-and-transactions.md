@@ -104,10 +104,8 @@ transaction that only refuses may lock nothing. The challenge gateway is at chal
 The default `Proofs\GenerationSessionRevoker` advances the owner's own generation as part of its call; nothing
 orchestrating it writes after it.
 
-Three things hold no second lock or are outside the order, and are kept as they are:
+Two things hold no second lock or are outside the order, and are kept as they are:
 
-- A factor's temporary lockout is a plain read of its `mfa_attempts` row, from the writer, for the reason given in
-  [Attempts and Lockout](attempts-and-lockout.md). It is a recorded trade-off, not an oversight.
 - An address's slot in `Attempts\IpThrottle` is taken outside the transaction, in one statement, and given back after
   it.
 - The pruners delete in bounded, unlocked statements, touching only rows no flow reads as live; a deadlock victim is a

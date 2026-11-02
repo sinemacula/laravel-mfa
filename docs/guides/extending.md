@@ -37,6 +37,11 @@ A custom factor or recovery code model lives on the storage connection with the 
 [Storage](configuration.md#storage)): one on another connection is refused when the package boots. The recovery code
 model is set with `mfa.recovery_codes.model`. Identity models are described in [Identity models](identity-models.md).
 
+A custom factor model keeps its temporary lockout on its own row, in the column `getLockedUntilName()` names
+(`locked_until` by default). `Concerns\ActsAsFactor` reads only a time from it, so the model must cast that column as a
+`datetime`, as it must `disabled_at`: left uncast, a stored deadline reads as none, and the factor is never refused by
+it. A factor implementing only `Contracts\Factor` has no row, and so no lockout of its own.
+
 A custom factor model that implements `Contracts\EloquentFactor` itself, rather than through `Concerns\ActsAsFactor`,
 must make `storeAcceptedStep()` a compare-and-set on its stored row: record the TOTP time step only when it is later
 than the stored one, in one atomic statement, and report whether it did. The TOTP driver accepts a code only when the

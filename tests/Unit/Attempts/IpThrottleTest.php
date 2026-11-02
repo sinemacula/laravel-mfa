@@ -6,6 +6,7 @@ namespace Tests\Unit\Attempts;
 
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
@@ -217,7 +218,12 @@ final class IpThrottleTest extends TestCase
     {
         $ends ??= CarbonImmutable::now()->addMinute();
 
-        $this->store()->hold($this->key(), AttemptScope::IP, $hits, $ends->getTimestamp());
+        DB::table('mfa_attempts')->insert([
+            'key'            => $this->key(),
+            'scope'          => AttemptScope::IP->value,
+            'hits'           => $hits,
+            'window_ends_at' => $ends->format('Y-m-d H:i:s'),
+        ]);
     }
 
     /**

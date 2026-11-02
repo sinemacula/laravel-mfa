@@ -11,9 +11,10 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * Explicit persistence boundary for Eloquent-backed factors.
  *
  * Extends the generic `Factor` read surface with the relation and column-name
- * accessors the services use when counting failures, disabling a factor at the
- * failure ceiling, or marking verification — operations that write through to
- * the underlying row and therefore require a persistable implementation.
+ * accessors the services use when counting failures, locking a factor for a
+ * while, disabling it at the failure ceiling, or marking verification —
+ * operations that write through to the underlying row and therefore require a
+ * persistable implementation.
  *
  * Non-Eloquent implementations (in-memory test doubles, API-backed adapters)
  * satisfy `Factor` alone; the shipped `Factor` model and any consumer subclass
@@ -137,6 +138,25 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
      * @return string
      */
     public function getDisabledAtName(): string;
+
+    /**
+     * Return when the factor's temporary lockout ends, as held on this
+     * instance, or `null` when none was applied; the time may have passed. It
+     * is one authoritative deadline, on the factor's own row, so only a factor
+     * with a row can hold one, and only what is read under the factor state
+     * lock is current (see `Attempts\AttemptService`).
+     *
+     * @return ?\Carbon\CarbonInterface
+     */
+    public function getLockedUntil(): ?CarbonInterface;
+
+    /**
+     * Column name holding when the factor's temporary lockout ends. A datetime
+     * column, cast as one by the model.
+     *
+     * @return string
+     */
+    public function getLockedUntilName(): string;
 
     /**
      * Column name holding the application the factor was enrolled through.

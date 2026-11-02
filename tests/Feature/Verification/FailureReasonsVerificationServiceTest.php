@@ -10,8 +10,6 @@ use Illuminate\Contracts\Hashing\Hasher;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
-use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
-use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
@@ -20,7 +18,6 @@ use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
-use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\VerificationFailed;
@@ -392,10 +389,8 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     public function testATimedLockoutCarriesItsTime(): void
     {
         $user   = $this->signedInPerson();
-        $factor = $this->totpFactor($user, ['consecutive_failures' => 5]);
         $until  = CarbonImmutable::now()->addHour();
-
-        $this->container()->make(AttemptStore::class)->hold($this->container()->make(AttemptKeys::class)->factor($factor->id), AttemptScope::FACTOR, 5, $until->getTimestamp());
+        $factor = $this->totpFactor($user, ['consecutive_failures' => 5, 'locked_until' => $until]);
 
         $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
