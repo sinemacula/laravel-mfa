@@ -83,6 +83,8 @@ The current note set is:
 - `secrets-in-responses-and-logs.md`: the value secrets are meant to be returned in and what it refuses, the response
   helper and `mfa.no-store` middleware that send them uncached, the redaction of secrets, codes and destinations from
   logs, exception messages and traces, delivery failures included, and TOTP secrets surviving a key rotation.
+- `budgets-and-benchmarks.md`: the exact query budgets and what they count, on which drivers, the benchmarks and what
+  each measures and leaves out, and why a benchmark proves its outcome and never fails on time.
 
 These documents are secondary to the code and tests, not a replacement for them. If a note and a cited test disagree,
 the test should be treated as authoritative until the mismatch is resolved.
