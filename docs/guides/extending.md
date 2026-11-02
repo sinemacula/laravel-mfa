@@ -97,8 +97,11 @@ Laravel's mailer, bind the package's own sender:
 use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 
-$this->app->singleton(EmailSender::class, MailEmailSender::class);
+$this->app->bind(EmailSender::class, MailEmailSender::class);
 ```
+
+Bind a sender with `bind()`, as above, unless it is one with no request state: under Octane or in a queue worker a
+`singleton()` is kept for the life of the process (see [Operations](operations.md#octane)).
 
 An `SmsSender` is handed the message with the code in clear. One that queues it must encrypt the queued payload, for
 example with a job that implements `ShouldBeEncrypted`, and none may log it. The package's `MfaCodeMessage` encrypts its

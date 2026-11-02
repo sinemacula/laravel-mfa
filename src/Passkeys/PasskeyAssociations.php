@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Passkeys;
 use Illuminate\Database\UniqueConstraintViolationException;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
@@ -23,10 +24,12 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  * mismatch between them leaves the factor unusable, as if it did not exist. A
  * credential is associated at most once, whoever holds it: the unique index on
  * its digest refuses a second association, a concurrent one included. Records
- * are read from the write connection. The reads made under the identity's
- * factor state lock lock the row they find, through that unique index, so they
- * wait on that identity's lock first; `exists()` and `associates()` take no
- * lock, for the checks made before it.
+ * are read from the write connection. `ownedCredential()` names its owner in
+ * the locking query, so another identity's association is never returned or
+ * acted on, and `forFactor()` locks the association of a factor its caller
+ * holds. The one locking read that names no owner is the lookup `save()` makes
+ * after a unique violation. `exists()` and `associates()` take no lock, for the
+ * checks made before the identity's factor state lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,15 +39,30 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 final readonly class PasskeyAssociations
 {
     /**
-     * The association of the canonical credential id, whoever holds it, or
-     * `null` when it is associated with nobody.
+     * The owner's association of the canonical credential id, or `null` when
+     * the owner holds no association of it, locked as it is read under the
+     * owner's factor state lock. The owner and the id are matched in the query
+     * and again here, exactly, since a column's collation may ignore case.
      *
      * @param  string  $credentialId
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @return ?\SineMacula\Laravel\Mfa\Models\PasskeyAssociation
      */
-    public function forCredential(#[\SensitiveParameter] string $credentialId): ?PasskeyAssociation
+    public function ownedCredential(#[\SensitiveParameter] string $credentialId, ProofOwner $owner): ?PasskeyAssociation
     {
-        return self::find($credentialId, true);
+        $association = WriteConnection::query(PasskeyAssociation::query())
+            ->where('credential_id_hash', CredentialId::hash($credentialId))
+            ->where('authenticatable_type', $owner->type)
+            ->where('authenticatable_id', $owner->key)
+            ->lockForUpdate()
+            ->first();
+
+        return $association instanceof PasskeyAssociation
+            && $association->credential_id        === $credentialId
+            && $association->authenticatable_type === $owner->type
+            && $association->authenticatable_id   === $owner->key
+                ? $association
+                : null;
     }
 
     /**
@@ -170,17 +188,35 @@ final readonly class PasskeyAssociations
 
     /**
      * Save the association: `false` when a model event cancels it, and `null`
-     * when the unique index refuses it because another change associated the
-     * credential first and committed, with this identity or another.
+     * when a unique index refuses it and the credential turns out to be
+     * associated, because another change associated it first and committed,
+     * with this identity or another.
+     *
+     * The insert runs in a nested transaction, as a statement's failure aborts
+     * the whole of a PostgreSQL transaction unless a savepoint contains it, and
+     * a violation leaves it masked with its class unchanged. The credential is
+     * looked up again with a locking read, as a plain read in a
+     * MySQL transaction reads its snapshot, which can miss the row that was
+     * committed after it. Finding it establishes the conflict, not which index
+     * fired; finding nothing means the failure is something else, which is a
+     * database error like any other and is thrown.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\PasskeyAssociation  $association
      * @return ?bool
+     *
+     * @throws \Illuminate\Database\UniqueConstraintViolationException
+     * @throws \Throwable
      */
     private static function save(PasskeyAssociation $association): ?bool
     {
         try {
-            return $association->save();
-        } catch (UniqueConstraintViolationException) { // @phpstan-ignore catch.neverThrown
+            return StorageTransaction::run(static fn (): bool => $association->save());
+        } catch (UniqueConstraintViolationException $violation) {
+
+            if (self::find($association->credential_id, true) === null) {
+                throw $violation;
+            }
+
             return null;
         }
     }

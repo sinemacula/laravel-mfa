@@ -25,8 +25,8 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use Tests\TestCase;
 
 /**
- * Tests for `RequirementBindings`: the requirement service is shared, and each
- * requirement seam is bound to its default, shared.
+ * Tests for `RequirementBindings`: the requirement service is built afresh, and
+ * each requirement seam is bound to its default, built afresh.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,16 +37,17 @@ use Tests\TestCase;
 final class RequirementBindingsTest extends TestCase
 {
     /**
-     * The requirement service is a singleton.
+     * The requirement service is built on every resolution.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testRegistersTheServiceAsASingleton(): void
+    public function testBuildsTheServiceOnEveryResolution(): void
     {
-        self::assertTrue($this->container()->isShared(RequirementService::class));
-        self::assertSame($this->container()->make(RequirementService::class), $this->container()->make(RequirementService::class));
+        self::assertFalse($this->container()->isShared(RequirementService::class));
+        self::assertTrue($this->container()->bound(RequirementService::class));
+        self::assertNotSame($this->container()->make(RequirementService::class), $this->container()->make(RequirementService::class));
     }
 
     /**
@@ -66,7 +67,7 @@ final class RequirementBindingsTest extends TestCase
     }
 
     /**
-     * Each seam is bound to its default, and shared.
+     * Each seam is bound to its default, and built afresh.
      *
      * @param  class-string  $seam
      * @param  class-string  $default
@@ -75,9 +76,9 @@ final class RequirementBindingsTest extends TestCase
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     #[DataProvider('seams')]
-    public function testBindsEachSeamToItsDefaultAsASingleton(string $seam, string $default): void
+    public function testBindsEachSeamToItsDefaultAfreshOnEveryResolution(string $seam, string $default): void
     {
         self::assertInstanceOf($default, $this->container()->make($seam));
-        self::assertSame($this->container()->make($seam), $this->container()->make($seam));
+        self::assertNotSame($this->container()->make($seam), $this->container()->make($seam));
     }
 }

@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
+use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
@@ -731,8 +732,7 @@ final readonly class AttemptService
      */
     private function identityState(array $subject, bool $locked = false): ?IdentityState
     {
-        $query = IdentityState::query()
-            ->useWritePdo()
+        $query = WriteConnection::query(IdentityState::query())
             ->where('authenticatable_type', $subject[0])
             ->where('authenticatable_id', $subject[1]);
 
@@ -753,7 +753,7 @@ final readonly class AttemptService
         }
 
         /** @var (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null */
-        return $factor->newQuery()->useWritePdo()->whereKey($factor->getKey())->first();
+        return WriteConnection::query($factor->newQuery())->whereKey($factor->getKey())->first();
     }
 
     /**

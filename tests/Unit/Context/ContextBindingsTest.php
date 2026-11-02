@@ -15,7 +15,8 @@ use Tests\TestCase;
 
 /**
  * Tests for `ContextBindings`: no pending sessions and the identity contract's
- * subject type are the defaults, shared, and an application may rebind either.
+ * subject type are the defaults, built afresh, and an application may rebind
+ * either.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,7 +38,7 @@ final class ContextBindingsTest extends TestCase
     }
 
     /**
-     * Each seam is bound to its default, shared, and a binding of the
+     * Each seam is bound to its default, built afresh, and a binding of the
      * application's own replaces it.
      *
      * @param  class-string  $seam
@@ -50,7 +51,7 @@ final class ContextBindingsTest extends TestCase
     public function testBindsEachSeamToItsDefault(string $seam, string $default): void
     {
         self::assertInstanceOf($default, $this->container()->make($seam));
-        self::assertSame($this->container()->make($seam), $this->container()->make($seam));
+        self::assertNotSame($this->container()->make($seam), $this->container()->make($seam));
 
         $own = \Mockery::mock($seam);
 

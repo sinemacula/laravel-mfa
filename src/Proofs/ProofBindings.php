@@ -23,10 +23,10 @@ use SineMacula\Laravel\Mfa\Contracts\StepUp;
  * (`ProofStoreCompletion`), and the listeners that begin a sign-in on Laravel's
  * `Login` event and forget it on `Logout` and `CurrentDeviceLogout`.
  *
- * The store is built on every resolution, from the session of the request at
- * hand, so no singleton holds one request's session into the next. An
- * application on a stateless guard rebinds the `ProofStore` contract in its own
- * service provider.
+ * Like every package service, each is built when it is asked for, the store
+ * from the session of the request at hand, so nothing the container keeps holds
+ * one request's session into the next. An application on a stateless guard
+ * rebinds the `ProofStore` contract in its own service provider.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -56,10 +56,10 @@ final class ProofBindings
             static fn (Application $app): ProofStore => new SessionProofStore($app->make(Session::class)),
         );
 
-        $app->singleton(ProofService::class);
-        $app->singleton(SessionRevoker::class, GenerationSessionRevoker::class);
-        $app->singleton(PendingCompletion::class, ProofStoreCompletion::class);
-        $app->singleton(StepUp::class, ProofStoreCompletion::class);
+        $app->bind(ProofService::class);
+        $app->bind(SessionRevoker::class, GenerationSessionRevoker::class);
+        $app->bind(PendingCompletion::class, ProofStoreCompletion::class);
+        $app->bind(StepUp::class, ProofStoreCompletion::class);
 
         $events = $app->make(Dispatcher::class);
 

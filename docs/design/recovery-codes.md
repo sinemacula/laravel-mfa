@@ -74,7 +74,8 @@ moment when both work or neither exists, and what a redemption leaves behind.
   `statusOfCaller()`): one statement on the write connection, the state row left-joined to the usable codes of its
   current generation, gives the remaining count, the generation and the time, so the count and the generation are always
   of the same set. No lock is taken.
-- Removal (`RecoveryCodeService::removeSet()`): inside the transaction that removes the identity's last confirmed
+- Removal (`RecoveryCodeService::removeSet()`, or `deleteSet()` and `reportSetRemoved()` for a removal with more to do
+  before it reports): inside the transaction that removes the identity's last confirmed
   factor, every code row is deleted and the set's time cleared; the generation is kept. `RecoveryCodesRemoved` is
   queued when there was a set, used up or not, or any code row. `Lifecycle\FactorRemoval::remove()` deletes the
   factor as stored under the lock and calls it when none of the factors left there is confirmed: a pending factor does

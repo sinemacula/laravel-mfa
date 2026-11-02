@@ -67,7 +67,7 @@ nothing is stored in their place.
   keeps the records and their times, a first-factor reauthentication renews only what it provides on its own, and
   nothing but a successful proof records a proof.
 - Every default keeps no state between calls and resolves the configuration, the store and its collaborators on each
-  call, so each is shared.
+  call, and each is built when it is asked for, on the application serving at the time.
 
 ## Success Path
 

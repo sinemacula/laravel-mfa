@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Database\BoundedDelete;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
+use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 
 /**
@@ -187,7 +188,7 @@ final readonly class AttemptStore
     {
         $rows = [];
 
-        foreach ($this->table()->useWritePdo()->whereIn('key', $keys)->get(['key', 'hits', 'window_ends_at']) as $row) {
+        foreach (WriteConnection::query($this->table())->whereIn('key', $keys)->get(['key', 'hits', 'window_ends_at']) as $row) {
 
             if (!is_string($row->key)) {
                 continue;

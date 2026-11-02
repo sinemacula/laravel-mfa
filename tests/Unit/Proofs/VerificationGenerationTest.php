@@ -4,7 +4,9 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Proofs;
 
+use Illuminate\Database\Connection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -84,6 +86,39 @@ final class VerificationGenerationTest extends TestCase
 
         self::assertSame(1, VerificationGeneration::advance($user));
         self::assertSame(1, IdentityState::query()->count());
+    }
+
+    /**
+     * An advance that changes no row is refused rather than answered: the row
+     * goes between the lock and the increment here, standing in for a key the
+     * database coerced so the increment matches nothing. It rolls back whole.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnAdvanceThatChangesNoRowIsRefused(): void
+    {
+        $user = $this->user(7);
+
+        DB::connection()->beforeExecuting(static function (string $query, array $bindings, Connection $connection): void {
+
+            if (!str_contains($query, 'verification_generation') || !str_starts_with($query, 'update')) {
+                return;
+            }
+
+            $connection->getPdo()->exec('delete from mfa_identity_states');
+        });
+
+        try {
+            VerificationGeneration::advance($user);
+
+            self::fail('An advance that changes no row must be refused.');
+        } catch (\LogicException $refusal) {
+            self::assertStringContainsString('not advanced', $refusal->getMessage());
+        }
+
+        self::assertSame(0, IdentityState::query()->count());
     }
 
     /**

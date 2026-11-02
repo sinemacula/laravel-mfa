@@ -22,9 +22,10 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `ProofBindings`: the proof service is shared, the default proof
- * store keeps proofs in the session and is built afresh on every resolution,
- * and Laravel's sign-in and sign-out events begin and forget a sign-in.
+ * Tests for `ProofBindings`: the proof service is built afresh, the default
+ * proof store keeps proofs in the session and is built afresh on every
+ * resolution, and Laravel's sign-in and sign-out events begin and forget a
+ * sign-in.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,21 +36,22 @@ use Tests\TestCase;
 final class ProofBindingsTest extends TestCase
 {
     /**
-     * The proof service is a singleton.
+     * The proof service is built on every resolution.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testRegistersTheServiceAsASingleton(): void
+    public function testBuildsTheServiceOnEveryResolution(): void
     {
-        self::assertTrue($this->container()->isShared(ProofService::class));
-        self::assertSame($this->container()->make(ProofService::class), $this->container()->make(ProofService::class));
+        self::assertFalse($this->container()->isShared(ProofService::class));
+        self::assertTrue($this->container()->bound(ProofService::class));
+        self::assertNotSame($this->container()->make(ProofService::class), $this->container()->make(ProofService::class));
     }
 
     /**
      * The default proof store keeps proofs in the session, and is not shared,
-     * so no singleton holds one request's session into the next.
+     * so nothing the container keeps holds one request's session into the next.
      *
      * @return void
      *
@@ -106,7 +108,7 @@ final class ProofBindingsTest extends TestCase
 
     /**
      * The session revoker defaults to advancing the verification generation,
-     * shared.
+     * built afresh.
      *
      * @return void
      *
@@ -115,6 +117,6 @@ final class ProofBindingsTest extends TestCase
     public function testBindsTheGenerationRevokerByDefault(): void
     {
         self::assertInstanceOf(GenerationSessionRevoker::class, $this->container()->make(SessionRevoker::class));
-        self::assertTrue($this->container()->isShared(SessionRevoker::class));
+        self::assertFalse($this->container()->isShared(SessionRevoker::class));
     }
 }

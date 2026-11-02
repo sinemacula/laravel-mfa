@@ -27,6 +27,10 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  * the credential with another identity first, which needs no arrangement of the
  * session.
  *
+ * The path must call the gate before it takes its own session rows, so that the
+ * package's rows are locked first in every change. These assertions cannot see
+ * that order; the path's own tests must.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *

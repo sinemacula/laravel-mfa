@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Database;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
@@ -39,6 +40,43 @@ final class IdentityStateRowTest extends TestCase
             ['authenticatable_type', 'authenticatable_id'],
             array_column($query->wheres, 'column'),
         );
+    }
+
+    /**
+     * Locking creates the owner's row when it has none, and touches the row
+     * that is there without adding one, leaving every other owner's alone.
+     *
+     * @return void
+     */
+    public function testLockingCreatesTheRowOnceAndTouchesIt(): void
+    {
+        $owner      = new ProofOwner('users', '42');
+        $connection = DB::connection();
+
+        Carbon::setTestNow('2026-11-01 12:00:00');
+
+        IdentityStateRow::lock($owner, $connection);
+
+        $row = IdentityStateRow::of($owner)->sole();
+
+        self::assertIsString($row->id);
+        self::assertSame(strtolower($row->id), $row->id);
+        self::assertSame('2026-11-01 12:00:00', (string) $row->created_at);
+        self::assertSame('2026-11-01 12:00:00', (string) $row->updated_at);
+
+        Carbon::setTestNow('2026-11-01 13:00:00');
+
+        IdentityStateRow::lock($owner, $connection);
+        IdentityStateRow::lock(new ProofOwner('users', '43'), $connection);
+
+        $again = IdentityStateRow::of($owner)->sole();
+
+        self::assertSame($row->id, $again->id);
+        self::assertSame('2026-11-01 12:00:00', (string) $again->created_at);
+        self::assertSame('2026-11-01 13:00:00', (string) $again->updated_at);
+        self::assertSame(1, IdentityStateRow::of(new ProofOwner('users', '43'))->count());
+
+        Carbon::setTestNow();
     }
 
     /**

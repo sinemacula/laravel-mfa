@@ -229,7 +229,7 @@ final class DeliveredCodeContentionTest extends TestCase
             self::fail('A competing send must not take the lock while another send holds it.');
         } catch (\Throwable $exception) {
             self::assertInstanceOf(QueryException::class, $exception);
-            self::assertStringContainsString('database is locked', $exception->getMessage());
+            self::assertSame(5, $exception->errorInfo[1] ?? null, 'SQLite answers with SQLITE_BUSY.');
         }
 
         // The refused statement keeps the observer's read lock on the file

@@ -112,9 +112,15 @@ final readonly class PendingEnrollments
      */
     public function granted(string $grantHash, ProofBinding $binding, Caller $caller, Collection $factors): ?array
     {
-        $enrollment = self::locked(Enrollment::query()->where('grant_hash', $grantHash))->first();
-        $id         = $enrollment?->factor_id;
-        $factor     = $factors->first(static fn (EloquentFactor&Model $candidate): bool => LockedFactors::idOf($candidate) === $id);
+        $owner      = ProofOwner::of($caller->identity);
+        $enrollment = self::locked(
+            Enrollment::query()
+                ->where('grant_hash', $grantHash)
+                ->where('authenticatable_type', $owner->type)
+                ->where('authenticatable_id', $owner->key),
+        )->first();
+        $id     = $enrollment?->factor_id;
+        $factor = $factors->first(static fn (EloquentFactor&Model $candidate): bool => LockedFactors::idOf($candidate) === $id);
 
         return $enrollment !== null && $factor !== null && $this->isBound($enrollment, $binding, $caller->pending !== null)
             ? [$enrollment, $factor]

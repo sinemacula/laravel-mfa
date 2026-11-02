@@ -145,6 +145,37 @@ package's own exceptions carry factor summaries, never factors.
 
 Set `MFA_SECRETS_REDACT=false` only when the application redacts its logs and error reports itself.
 
+## Failed queries
+
+Laravel writes a query's bindings into a `QueryException`'s message and keeps them on the exception, and a driver's own
+message can quote a stored value, so a failed write could carry a destination or a credential id in plaintext.
+`Secrets\QueryExceptionMask` takes them out in place, keeping the class and the code, so a
+`UniqueConstraintViolationException` is still caught as one:
+
+- the message becomes the SQLSTATE, the driver error number, the connection's name and the SQL with placeholders;
+- every previous exception's message becomes the SQLSTATE and the driver error number alone: no value is searched for
+  and cut out, which an escaped or truncated copy would survive;
+- the bindings are emptied, `errorInfo` keeps its SQLSTATE and number and loses the driver's text;
+- the arguments its trace recorded are scrubbed as above, with the bindings among the values known;
+- a `DeadlockException` above it, which is how Laravel raises a concurrency failure inside a nested transaction, loses
+  the message it copied, keeping the words Laravel recognises it by and the query's summary.
+
+This applies whatever `mfa.secrets.redact` says, where a failure leaves the package: a transaction it opened, a factor's
+`persist()`, and `Database\WriteConnection::during()`, which route binding runs in. While redaction is on, the report
+path masks too, for any chain whose SQL names one of the package's tables.
+
+Its limits:
+
+- A literal an application writes into its own raw SQL stays in the SQL. The queries the package builds bind every
+  value.
+- The plain reads a failure can come from outside those three places bind only hashes and owner keys. That holds because
+  of what they are, not because of the mask: `tests/Integration/Database/QueryFailureSweepTest.php` keeps it true.
+- Laravel's own retry in a transaction of yours, `DB::transaction($callback, $attempts)`, recognises a failure by
+  SQLSTATE `40001` or by words in its message. A `DeadlockException` from a transaction the package opened inside yours
+  keeps the words, so it is retried. A `QueryException` does not: of those only SQLSTATE `40001`, a MySQL deadlock, is
+  still recognised. A PostgreSQL deadlock (`40P01`), a lock wait timeout and SQLite's locked database are recognised only
+  by message, so retry those yourself, checking the SQLSTATE or the driver error number the exception keeps.
+
 ## Rotating the application key
 
 TOTP secrets are encrypted with Laravel's encrypter, under `APP_KEY`. To rotate the key, set the new key as `APP_KEY`

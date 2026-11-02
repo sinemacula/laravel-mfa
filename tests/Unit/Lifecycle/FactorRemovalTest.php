@@ -9,18 +9,21 @@ use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
+use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
+use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
-use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
+use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\TestCase;
 
 /**
  * Tests for `FactorRemoval`, the removal every entry point shares: it runs only
- * inside the identity's factor state transaction, and removes a factor by its
- * id.
+ * inside the identity's factor state transaction, removes a factor by its id,
+ * and takes the recovery code set with the last confirmed factor and with no
+ * other, reporting its removal after the factor's, only when there was a set.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,7 +33,7 @@ use Tests\TestCase;
 #[CoversClass(FactorRemoval::class)]
 final class FactorRemovalTest extends TestCase
 {
-    use ArrangesPasskeys;
+    use ArrangesLifecycle;
 
     /**
      * A removal outside a transaction is refused, and removes nothing.
@@ -108,6 +111,75 @@ final class FactorRemovalTest extends TestCase
         $proofs = $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION);
 
         self::assertSame([$other->id], array_map(static fn (Proof $proof): ?string => $proof->reference, $proofs));
+    }
+
+    /**
+     * Removing the last confirmed factor deletes the set and reports both.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheLastFactorTakesTheSetWithIt(): void
+    {
+        $this->arrangeLifecycle();
+
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+
+        $this->stepUpWith($user, $factor);
+        $this->recoveryCodesOf($user);
+
+        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertSame(0, RecoveryCode::query()->count());
+        self::assertSame(['FactorRemoved', 'RecoveryCodesRemoved'], $this->reportedNames());
+    }
+
+    /**
+     * Removing a factor while another confirmed one remains leaves the set, and
+     * reports only the factor.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnotherConfirmedFactorKeepsTheSet(): void
+    {
+        $this->arrangeLifecycle();
+
+        $user   = $this->signedInPerson();
+        $kept   = $this->confirmedFactor($user);
+        $factor = $this->confirmedFactor($user);
+
+        $this->stepUpWith($user, $kept);
+        $this->recoveryCodesOf($user);
+
+        $stored = RecoveryCode::query()->count();
+
+        self::assertGreaterThan(0, $stored);
+        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertSame($stored, RecoveryCode::query()->count());
+        self::assertSame(['FactorRemoved'], $this->reportedNames());
+    }
+
+    /**
+     * Removing the last factor with no set reports only the factor.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testNoSetIsReportedWhereThereWasNone(): void
+    {
+        $this->arrangeLifecycle();
+
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+
+        $this->stepUpWith($user, $factor);
+
+        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertSame(['FactorRemoved'], $this->reportedNames());
     }
 
     /**

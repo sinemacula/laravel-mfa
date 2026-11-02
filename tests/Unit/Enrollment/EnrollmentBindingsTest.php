@@ -10,7 +10,7 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use Tests\TestCase;
 
 /**
- * Tests for `EnrollmentBindings`: the enrolment service is shared.
+ * Tests for `EnrollmentBindings`: the enrolment service is built afresh.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,15 +21,16 @@ use Tests\TestCase;
 final class EnrollmentBindingsTest extends TestCase
 {
     /**
-     * The enrolment service is a singleton.
+     * The enrolment service is built on every resolution.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testRegistersTheServiceAsASingleton(): void
+    public function testBuildsTheServiceOnEveryResolution(): void
     {
-        self::assertTrue($this->container()->isShared(EnrollmentService::class));
-        self::assertSame($this->container()->make(EnrollmentService::class), $this->container()->make(EnrollmentService::class));
+        self::assertFalse($this->container()->isShared(EnrollmentService::class));
+        self::assertTrue($this->container()->bound(EnrollmentService::class));
+        self::assertNotSame($this->container()->make(EnrollmentService::class), $this->container()->make(EnrollmentService::class));
     }
 }

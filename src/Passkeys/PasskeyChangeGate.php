@@ -330,19 +330,21 @@ final readonly class PasskeyChangeGate
         }
 
         $identity    = $caller->identity;
-        $association = $this->associations->forCredential($credentialId);
+        $association = $this->associations->ownedCredential($credentialId, ProofOwner::of($identity));
 
         if ($association === null) {
+
+            // The locking query names the owner, so another identity's
+            // association is not returned or acted on: only this unlocked read
+            // tells it apart from a credential nobody holds.
+            OperationRefusedException::unless(
+                !$this->associations->exists($credentialId),
+                FailureReason::NOT_FOUND,
+                'The credential is associated with another identity.',
+            );
+
             return;
         }
-
-        $owner = ProofOwner::of($identity);
-
-        OperationRefusedException::unless(
-            $association->authenticatable_type === $owner->type && $association->authenticatable_id === $owner->key,
-            FailureReason::NOT_FOUND,
-            'The credential is associated with another identity.',
-        );
 
         $factor = $factors->first(static fn (EloquentFactor&Model $candidate): bool => LockedFactors::idOf($candidate) === $association->factor_id);
 

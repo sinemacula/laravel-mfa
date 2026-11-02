@@ -24,11 +24,11 @@ use Tests\TestCase;
 final class EventBindingsTest extends TestCase
 {
     /**
-     * The default resolver and the dispatcher are shared.
+     * The default resolver and the dispatcher are built afresh.
      *
      * @return void
      */
-    public function testRegistersTheResolverAndTheDispatcherAsShared(): void
+    public function testBuildsTheResolverAndTheDispatcherOnEveryResolution(): void
     {
         $app = $this->container();
 
@@ -38,7 +38,8 @@ final class EventBindingsTest extends TestCase
         EventBindings::register($app);
 
         self::assertInstanceOf(DefaultEventContextResolver::class, $app->make(EventContextResolver::class));
-        self::assertSame($app->make(EventContextResolver::class), $app->make(EventContextResolver::class));
-        self::assertSame($app->make(EventDispatcher::class), $app->make(EventDispatcher::class));
+        self::assertNotSame($app->make(EventContextResolver::class), $app->make(EventContextResolver::class));
+        self::assertTrue($app->bound(EventDispatcher::class));
+        self::assertNotSame($app->make(EventDispatcher::class), $app->make(EventDispatcher::class));
     }
 }

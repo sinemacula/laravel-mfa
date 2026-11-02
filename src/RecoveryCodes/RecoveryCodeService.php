@@ -431,6 +431,33 @@ final readonly class RecoveryCodeService
      */
     public function removeSet(MultiFactorAuthenticatable $identity, ?Actor $actor = null): bool
     {
+        $existed = $this->deleteSet($identity);
+
+        if ($existed) {
+            $this->reportSetRemoved($identity, $actor);
+        }
+
+        return $existed;
+    }
+
+    /**
+     * Delete the identity's recovery codes and clear when they were generated,
+     * under the lock of its state row, reporting nothing, and return whether it
+     * had a set: for a caller with more to do before the removal is reported,
+     * which then calls `reportSetRemoved()`. Refused and rolled back as
+     * `removeSet()` is.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @return bool
+     *
+     * @throws \LogicException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \Throwable
+     *
+     * @imperative
+     */
+    public function deleteSet(MultiFactorAuthenticatable $identity): bool
+    {
         self::requireTransaction();
 
         $owner   = ProofOwner::of($identity);
@@ -443,11 +470,22 @@ final readonly class RecoveryCodeService
             self::save($state);
         }
 
-        if ($existed) {
-            $this->events->dispatch(new RecoveryCodesRemoved($this->events->context($identity, $this->proofs->application()), $actor));
-        }
-
         return $existed;
+    }
+
+    /**
+     * Report that the identity's recovery code set was removed, once the
+     * storage connection commits.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function reportSetRemoved(MultiFactorAuthenticatable $identity, ?Actor $actor = null): void
+    {
+        $this->events->dispatch(new RecoveryCodesRemoved($this->events->context($identity, $this->proofs->application()), $actor));
     }
 
     /**

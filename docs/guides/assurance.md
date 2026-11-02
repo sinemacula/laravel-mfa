@@ -297,15 +297,16 @@ final class NoSmsAfterPhoneCode implements CombinationPolicy
     }
 }
 
-$this->app->singleton(CombinationPolicy::class, NoSmsAfterPhoneCode::class);
+$this->app->bind(CombinationPolicy::class, NoSmsAfterPhoneCode::class);
 ```
 
-A stricter `accepts()` must be applied in `evaluate()` too, as above: the default's `evaluate()` asks its own
-`accepts()`, so without the filter a proof the stricter policy refuses, recorded before it was bound or passed in by an
-adapter, would still count. The flows never offer or verify a factor the policy does not accept, so the filter guards
-only against proofs that reached the session another way. Whatever policy is bound, an `Evaluation` refuses to report
-more than its own answers allow (see [Evaluations](#evaluations)). How the default reaches its answers is described in
-[the combination policy design note](../design/combination-policy.md).
+A `singleton()` is kept for the life of a long-running process, so it must hold no request state (see
+[Operations](operations.md#octane)). A stricter `accepts()` must be applied in `evaluate()` too, as above: the default's
+`evaluate()` asks its own `accepts()`, so without the filter a proof the stricter policy refuses, recorded before it was
+bound or passed in by an adapter, would still count. The flows never offer or verify a factor the policy does not
+accept, so the filter guards only against proofs that reached the session another way. Whatever policy is bound, an
+`Evaluation` refuses to report more than its own answers allow (see [Evaluations](#evaluations)). How the default
+reaches its answers is described in [the combination policy design note](../design/combination-policy.md).
 
 ## Verification results
 

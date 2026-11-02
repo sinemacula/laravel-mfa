@@ -20,8 +20,8 @@ in [Factor lifecycle](../guides/lifecycle.md).
   the same way, so its refusals match: no sign-in is `not_fresh`, and one that changed is `not_found`.
 - The check order is fixed: identity inactive, not found (unknown, someone else's, or another application's), not
   confirmed, not fresh, last factor. An application never deletes a factor enrolled through another, a passkey's
-  included: the credential being identity-level makes no exception, and the refusal rolls authentication's own credential
-  removal back.
+  included: the credential being identity-level makes no exception, and the refusal rolls authentication's own
+  credential removal back.
 - `LastFactorPolicy` receives the factors. It may be asked before the identity's lock inside a caller's transaction,
   where taking a factor's lock would break the lock order. `RequiredFactorPolicy` therefore takes no lock, and reads a
   passkey's association without one: an association changes only with its factor under that lock, so a read older than
@@ -37,9 +37,12 @@ in [Factor lifecycle](../guides/lifecycle.md).
   `RefusedUnderLockException::carrying()`. The mutation is outside that wrapper, so a revoker or a transition throwing
   one propagates and rolls back: it failed, it was not refused. An exception a listener throws after the commit is not
   one of these either, so what committed is never reported as refused.
-- `FactorRemoved` is queued after the synchronous security work, and before `removeSet()`, which queues its own event.
-  Moving it ahead of `revokeOthers()` would put its listener ahead of the default revoker's after-commit restoration of
-  the proofs the current session keeps.
+- A removal's order is the lock order: the factor and its association, with the last confirmed factor the recovery code
+  set (`deleteSet()`), then what the session keeps is read and `revokeOthers()` runs, the requirement is evaluated again
+  and a shortfall goes to the transition. Every package row has changed before a session seam runs, so a package row is
+  never locked after a session row. `FactorRemoved` is queued after that synchronous security work, then
+  `reportSetRemoved()` queues `RecoveryCodesRemoved`. Moving them ahead of `revokeOthers()` would put their listeners
+  ahead of the default revoker's after-commit restoration of the proofs the current session keeps.
 - Proofs forgotten on the session are not restored if the transaction rolls back, as a snapshot put back could undo a
   later invalidation. The failure is closed: the session verifies again.
 - A reset's order is the lock order: lockouts and counts, every factor and enrolment, the recovery set, the obligation,

@@ -28,7 +28,8 @@ use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
  * service provider.
  *
  * Every default keeps no state between calls and resolves what it reads on each
- * one, so each is shared.
+ * one, and is built when it is asked for, on the application serving at the
+ * time.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -50,13 +51,13 @@ final class RequirementBindings
      */
     public static function register(Application $app): void
     {
-        $app->singleton(RequirementService::class);
-        $app->singleton(RequirementPolicy::class, ConfiguredRequirementPolicy::class);
-        $app->singleton(IdentityRequirement::class, IdentityContractRequirement::class);
-        $app->singleton(TenantRequirement::class, NoTenantRequirement::class);
-        $app->singleton(ActiveTenantResolver::class, NoActiveTenant::class);
-        $app->singleton(RequirementCheck::class, ProofRequirementCheck::class);
-        $app->singleton(FreshnessGate::class, ConfiguredFreshnessGate::class);
-        $app->singleton(FirstFactorResolver::class, DeclaredFirstFactorResolver::class);
+        $app->bind(RequirementService::class);
+        $app->bind(RequirementPolicy::class, ConfiguredRequirementPolicy::class);
+        $app->bind(IdentityRequirement::class, IdentityContractRequirement::class);
+        $app->bind(TenantRequirement::class, NoTenantRequirement::class);
+        $app->bind(ActiveTenantResolver::class, NoActiveTenant::class);
+        $app->bind(RequirementCheck::class, ProofRequirementCheck::class);
+        $app->bind(FreshnessGate::class, ConfiguredFreshnessGate::class);
+        $app->bind(FirstFactorResolver::class, DeclaredFirstFactorResolver::class);
     }
 }

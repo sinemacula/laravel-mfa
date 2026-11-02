@@ -4,15 +4,12 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Proofs;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\StorageTransaction;
-use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 
 /**
@@ -64,11 +61,14 @@ final class VerificationGeneration
     /**
      * Advance the identity's verification generation, creating its row when it
      * has none, and return the new generation. Every proof recorded under an
-     * earlier generation stops counting.
+     * earlier generation stops counting. An advance that changes no row is
+     * refused with a `LogicException`, as answering it would let those proofs
+     * count.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return int
      *
+     * @throws \LogicException
      * @throws \Throwable
      */
     public static function advance(Authenticatable $identity): int
@@ -78,17 +78,13 @@ final class VerificationGeneration
 
         return StorageTransaction::run(static function () use ($connection, $owner): int {
 
-            $now = CarbonImmutable::now();
+            IdentityStateRow::lock($owner, $connection);
 
-            $connection->table(TableNames::of(TableNames::IDENTITY_STATES))->insertOrIgnore([
-                'id'                   => Str::lower((string) Str::ulid()),
-                'authenticatable_type' => $owner->type,
-                'authenticatable_id'   => $owner->key,
-                'created_at'           => $now,
-                'updated_at'           => $now,
-            ]);
+            $changed = IdentityStateRow::of($owner, $connection)->increment(self::COLUMN);
 
-            IdentityStateRow::of($owner, $connection)->increment(self::COLUMN, 1, ['updated_at' => $now]);
+            if ($changed !== 1) {
+                throw new \LogicException('The identity\'s verification generation was not advanced: its state row was not found once locked.');
+            }
 
             $generation = IdentityStateRow::of($owner, $connection)->value(self::COLUMN);
 

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Laravel\Sanctum\HasApiTokens;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
@@ -124,7 +125,7 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
      */
     private static function countFactors(Builder $builder): int
     {
-        return $builder->toBase()->count();
+        return WriteConnection::query($builder)->toBase()->count();
     }
 
     /**

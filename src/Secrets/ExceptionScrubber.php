@@ -36,7 +36,8 @@ namespace SineMacula\Laravel\Mfa\Secrets;
  * redacted from every message and every frame, whatever their length, and do
  * not depend on PHP recording arguments at all. The exception and every
  * previous one are scrubbed in place, and what one of them passed on is
- * redacted in all of them.
+ * redacted in all of them. A failed query on one of the package's tables is
+ * masked first (see `QueryExceptionMask`), so nothing it was given stays.
  *
  * The package scrubs every exception the application's exception handler
  * reports, and every exception in a log record's context, unless
@@ -87,11 +88,34 @@ final class ExceptionScrubber
      */
     public static function scrubWith(\Throwable $throwable, #[\SensitiveParameter] SensitiveValues $sensitive): void
     {
+        QueryExceptionMask::maskPackageQueries($throwable);
+
         $chain  = self::chain($throwable);
         $values = self::collect($chain)->with($sensitive);
 
         foreach ($chain as $current) {
             self::scrubMessage($current, $values);
+            self::scrubTrace($current, $values);
+        }
+    }
+
+    /**
+     * Scrub only the trace of the exception and of every previous one,
+     * redacting the sensitive values given too, for a caller that rewrites the
+     * messages itself.
+     *
+     * @param  \Throwable  $throwable
+     * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $sensitive
+     * @return void
+     *
+     * @internal
+     */
+    public static function scrubTraces(\Throwable $throwable, #[\SensitiveParameter] SensitiveValues $sensitive): void
+    {
+        $chain  = self::chain($throwable);
+        $values = self::collect($chain)->with($sensitive);
+
+        foreach ($chain as $current) {
             self::scrubTrace($current, $values);
         }
     }

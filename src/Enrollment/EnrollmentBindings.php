@@ -29,6 +29,6 @@ final class EnrollmentBindings
      */
     public static function register(Application $app): void
     {
-        $app->singleton(EnrollmentService::class);
+        $app->bind(EnrollmentService::class);
     }
 }

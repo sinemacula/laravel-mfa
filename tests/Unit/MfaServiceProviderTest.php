@@ -136,7 +136,8 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test registers each capability's services and defaults as singletons.
+     * Test registers each capability's services and defaults, built on every
+     * resolution.
      *
      * @return void
      */
@@ -177,7 +178,7 @@ final class MfaServiceProviderTest extends TestCase
         ];
 
         foreach ($abstracts as $abstract) {
-            self::assertTrue($this->container()->isShared($abstract), $abstract . ' is not registered as a singleton.');
+            self::assertFalse($this->container()->isShared($abstract), $abstract . ' must be built on every resolution.');
         }
     }
 

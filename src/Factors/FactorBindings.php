@@ -30,6 +30,6 @@ final class FactorBindings
      */
     public static function register(Application $app): void
     {
-        $app->singleton(FactorService::class);
+        $app->bind(FactorService::class);
     }
 }

@@ -289,7 +289,7 @@ package's own sender:
 use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 
-$this->app->singleton(EmailSender::class, MailEmailSender::class);
+$this->app->bind(EmailSender::class, MailEmailSender::class);
 ```
 
 An SMS sender wraps the application's provider:
@@ -318,7 +318,7 @@ final readonly class TwilioSmsSender implements SmsSender
 Bind it in a service provider:
 
 ```php
-$this->app->singleton(SmsSender::class, static fn ($app): TwilioSmsSender => new TwilioSmsSender(
+$this->app->bind(SmsSender::class, static fn ($app): TwilioSmsSender => new TwilioSmsSender(
     twilio: new Client(config('services.twilio.sid'), config('services.twilio.token')),
     fromNumber: config('services.twilio.from'),
 ));
@@ -395,6 +395,9 @@ All concrete classes in this package are `final` unless explicitly designed for 
 | Event context              | Implement `EventContextResolver` and bind it via the container |
 | SMS delivery               | Implement `SmsSender` and bind it via the container            |
 | Email delivery             | Bind `MailEmailSender`, or your own `EmailSender`              |
+
+Running it under Octane or in a queue worker, with read replicas, and what a database failure does: see
+[Operations](docs/guides/operations.md).
 
 The security and lifecycle contracts behind the package, for maintainers and reviewers, are in
 [docs/design](docs/design/README.md).

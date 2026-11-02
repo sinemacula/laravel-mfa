@@ -14,7 +14,8 @@ use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
  * association records built on it. The package refuses to boot with an
  * application that enables the `passkey` type while the default is bound.
  *
- * Nothing here keeps state between calls, so each is shared.
+ * Nothing here keeps state between calls, and each is built when it is asked
+ * for, on the application serving at the time.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,9 +38,9 @@ final class PasskeyBindings
      */
     public static function register(Application $app): void
     {
-        $app->singleton(PasskeyGateway::class, UnavailablePasskeyGateway::class);
-        $app->singleton(PasskeyAssociations::class);
-        $app->singleton(PasskeyAssertions::class);
-        $app->singleton(PasskeyChangeGate::class);
+        $app->bind(PasskeyGateway::class, UnavailablePasskeyGateway::class);
+        $app->bind(PasskeyAssociations::class);
+        $app->bind(PasskeyAssertions::class);
+        $app->bind(PasskeyChangeGate::class);
     }
 }

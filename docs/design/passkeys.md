@@ -48,10 +48,11 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   credential rolls back with it; the bound `FreshnessGate` must find the session fresh for `mfa.remove_factor` and,
   while another confirmed factor remains, what it holds the session to must be met on the proofs made without the
   factor; and the bound `LastFactorPolicy` must allow it. `Lifecycle\FactorRemoval` then deletes the factor and its
-  association, forgets the factor's proofs on the current session at once, revokes the identity's other sessions through
-  the bound `SessionRevoker`, evaluates the current session's requirement again on the proofs it kept and hands a
-  shortfall to the bound `SessionTransition`, and reports `FactorRemoved`, removing the recovery codes with the last
-  confirmed factor.
+  association, forgets the factor's proofs on the current session at once, deletes the recovery codes with the last
+  confirmed factor, revokes the identity's other sessions through the bound `SessionRevoker`, evaluates the current
+  session's requirement again on the proofs it kept and hands a shortfall to the bound `SessionTransition`, and reports
+  `FactorRemoved`, then the recovery codes' removal. The locking query names the owner, so another identity's association
+  is never returned or acted on: the unlocked `exists()` finds it, and it is answered `not_found`.
 - The default `LastFactorPolicy` (`Lifecycle\RequiredFactorPolicy`) counts a remaining passkey only while its
   association matches it, so an unusable passkey never lets the last usable factor go.
 - A change to what an associated credential proves (its id, key, owner or relying party) is refused outright: it is a

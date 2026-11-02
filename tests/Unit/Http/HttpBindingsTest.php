@@ -52,7 +52,7 @@ final class HttpBindingsTest extends TestCase
 
     /**
      * The session transition defaults to leaving the session to the `mfa`
-     * middleware, shared.
+     * middleware, built afresh.
      *
      * @return void
      *
@@ -61,7 +61,7 @@ final class HttpBindingsTest extends TestCase
     public function testBindsTheMiddlewareSessionTransitionByDefault(): void
     {
         self::assertInstanceOf(MiddlewareSessionTransition::class, $this->container()->make(SessionTransition::class));
-        self::assertTrue($this->container()->isShared(SessionTransition::class));
+        self::assertFalse($this->container()->isShared(SessionTransition::class));
     }
 
     /**

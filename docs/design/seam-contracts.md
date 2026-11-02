@@ -22,7 +22,7 @@ that call them, so the flows can be built against one fixed set.
   `OperationRefusedException` with a reason, which rolls the verification back and is answered as a failed result;
   anything else they throw propagates. Returning means the proof was accepted, a session still pending included, and
   what they return is opaque to this package and reaches the caller as `VerificationResult::completion()`, so an
-  authentication layer's tokens need no request state in a singleton and no reference to a sibling class. Turning that
+  authentication layer's tokens need no request state kept anywhere and no reference to a sibling class. Turning that
   layer's refused result into a throw is the adapter's job. The rollback holds only when the adapter's writes share the
   storage connection.
 - Results cross the seams as structured values, never reduced to `amr`.
@@ -145,8 +145,9 @@ own transaction on the storage connection:
 | `Passkeys\PasskeyChangeGate::changing()`              | Before changing what a passkey proves: refused for an associated one                  |
 
 Both refuse with a `LogicException` outside a transaction, so their locks are held until the caller commits; the lock
-order is the identity's state, then its factors, then the caller's own challenge or credential. A refusal is an
-exception that rolls the caller's change back with it.
+order is the identity's state, then its factors, then the caller's own challenge or credential. The caller therefore
+calls the gate before it takes its session rows, which this repository cannot test for it. A refusal is an exception
+that rolls the caller's change back with it.
 
 - `Context\PendingContext` holds a pending session: the identity, the application, the session's public id, the first
   factor's proof, the outstanding requirement and the `PendingAction` cases the pending credential allows. It refuses a

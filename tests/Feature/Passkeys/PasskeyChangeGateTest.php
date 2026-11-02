@@ -395,9 +395,10 @@ final class PasskeyChangeGateTest extends TestCase
 
         $user = $this->signedInPerson();
 
-        PasskeyAssociation::creating(static function (): void {
+        Factor::created(static function (): void {
             // Stands in for another identity's registration committing the same
-            // credential between this one's check and its insert.
+            // credential between this one's check and its insert, outside the
+            // savepoint the insert runs in, as a commit elsewhere is.
             DB::table(TableNames::of(TableNames::PASSKEY_ASSOCIATIONS))->insert([
                 'id'                   => (string) Str::ulid(),
                 'factor_id'            => 'concurrent-factor',

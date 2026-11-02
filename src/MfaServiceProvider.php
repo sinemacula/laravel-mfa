@@ -42,6 +42,10 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
  * once the application has booted, which also refuses a factor model off the
  * storage connection.
  *
+ * Only `mfa` is shared: every service and default is built when it is asked
+ * for, on the application serving at the time (see the long-running processes
+ * design note).
+ *
  * Consumers with their own requirement policy, stateless proof store, or SMS
  * and email senders rebind the matching contracts in their own service
  * provider; `laravel-iam` ships an opinionated set of bindings for paired-mode

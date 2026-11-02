@@ -32,7 +32,10 @@ The current note set is:
   the settings classes that read and check each block on every call, the bounds they enforce, and the check of the
   whole configuration and the bindings it needs at boot, at manager resolution and from `mfa:check`.
 - `storage-and-transactions.md`: the storage connection every table and shipped model uses, the refusal of a model on
-  another connection, and the one transaction and lock order of every change to an identity's whole factor state.
+  another connection, the one transaction and lock order of every change to an identity's whole factor state, the lock
+  order of each flow, and what the evidence for it does and does not show.
+- `long-running-processes.md`: what the container keeps under Octane and in a queue worker, how the listeners reach the
+  request at hand, why nothing is `scoped()`, and what the tests prove and do not.
 - `schema-and-models.md`: every table and column, the models and the two an application may replace, the identity
   contract and its trait, forgetting a deleted identity, and the guard every operation on a factor starts with.
 - `event-catalogue.md`: the events the flows dispatch, their payloads and context, and their dispatch after the commit.

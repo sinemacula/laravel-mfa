@@ -4,20 +4,18 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Support;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
+use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\StorageTransaction;
-use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
  * The one transaction, and the one lock order, of every change that depends on
@@ -38,11 +36,9 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
  * the owner exactly: a database's collation may read and lock another owner's
  * too, differing only in case, and those are not handed over.
  *
- * The identity's row is locked by an insert that updates the existing row on a
- * conflict, which takes the row's exclusive lock in one statement on MySQL and
- * PostgreSQL, also when two first changes race to create it; SQLite serialises
- * its writers anyway. A factor model on another connection is refused before
- * the transaction opens, as two connections cannot commit as one.
+ * The identity's row is locked through `IdentityStateRow::lock()`, the one way
+ * it is locked. A factor model on another connection is refused before the
+ * transaction opens, as two connections cannot commit as one.
  *
  * Calls the change makes to another package that must be atomic with it, such
  * as revoking sessions, belong inside the callback; an adapter whose own
@@ -201,7 +197,7 @@ final class FactorStateTransaction
 
         return StorageTransaction::run(static function () use ($connection, $type, $key, $factorModel, $callback): mixed {
 
-            self::lockIdentityState($connection, $type, $key);
+            IdentityStateRow::lock(new ProofOwner($type, $key), $connection);
 
             return $callback(self::owned($factorModel->newQuery()->lockForUpdate(), $type, $key, $factorModel));
         });
@@ -230,28 +226,6 @@ final class FactorStateTransaction
             ->get()
             ->filter(static fn (EloquentFactor&Model $factor): bool => FactorOwnerColumns::owns($factor, $type, $key))
             ->values();
-    }
-
-    /**
-     * Lock the identity's state row until the transaction ends, creating it
-     * when the identity has none yet.
-     *
-     * @param  \Illuminate\Database\ConnectionInterface  $connection
-     * @param  string  $type
-     * @param  string  $key
-     * @return void
-     */
-    private static function lockIdentityState(ConnectionInterface $connection, string $type, string $key): void
-    {
-        $now = CarbonImmutable::now();
-
-        $connection->table(TableNames::of(TableNames::IDENTITY_STATES))->upsert([[
-            'id'                   => Str::lower((string) Str::ulid()),
-            'authenticatable_type' => $type,
-            'authenticatable_id'   => $key,
-            'created_at'           => $now,
-            'updated_at'           => $now,
-        ]], ['authenticatable_type', 'authenticatable_id'], ['updated_at']);
     }
 
     /**

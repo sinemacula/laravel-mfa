@@ -100,7 +100,10 @@ are described here.
   upsert, and its run, then the factor's failures in a row, its lockout or its disablement.
 - The identity's state row is read `FOR UPDATE`, a lock the transaction already holds, so a lockout committed while the
   attempt waited is never answered from an older snapshot. The throttle rows are read with plain reads: a locking read
-  of a missing key would take a gap lock on MySQL and let two identities' first failures deadlock.
+  of a missing key would take a gap lock on MySQL and let two identities' first failures deadlock. That is why a
+  factor's temporary lockout stays a plain read from the writer; a new row's `insertOrIgnore` keeps the same reasoning,
+  with a fixed-width hash for its key, an enum for its scope and a window bounded by the settings, so nothing a database
+  could coerce can land on another row.
 - After the commit, the address's slot is given back unless the attempt failed and was counted: a success or a refusal
   is not a failure of the address. The events the attempt raised run with the commit (see [Event
   Catalogue](event-catalogue.md)); a listener that throws leaves the count standing, and gives the address's slot back,

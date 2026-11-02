@@ -33,7 +33,7 @@ final class EventBindings
      */
     public static function register(Application $app): void
     {
-        $app->singleton(EventContextResolver::class, DefaultEventContextResolver::class);
-        $app->singleton(EventDispatcher::class);
+        $app->bind(EventContextResolver::class, DefaultEventContextResolver::class);
+        $app->bind(EventDispatcher::class);
     }
 }

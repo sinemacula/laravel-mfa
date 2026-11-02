@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Proofs;
 
 use Illuminate\Auth\Events\Login;
+use Illuminate\Container\Container;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 
@@ -20,24 +21,17 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
  * An identity whose key cannot name a record holds no proofs, so it is left
  * alone rather than failing the sign-in.
  *
+ * The event dispatcher builds a class listener on the application it was booted
+ * with and keeps no copy of a request's, so the proof service is resolved from
+ * the application serving when the event fires, and acts on its session.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
-final readonly class BeginSignInOnLogin
+final class BeginSignInOnLogin
 {
-    /**
-     * Constructor.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
-     */
-    public function __construct(
-
-        /** The proof service the sign-in is begun through. */
-        private ProofService $proofs,
-    ) {}
-
     /**
      * Handle the `Login` event.
      *
@@ -53,7 +47,7 @@ final readonly class BeginSignInOnLogin
         }
 
         try {
-            $this->proofs->beginSignIn($event->user, $event->guard);
+            Container::getInstance()->make(ProofService::class)->beginSignIn($event->user, $event->guard);
         } catch (UnsupportedIdentifierException) {
             return;
         }

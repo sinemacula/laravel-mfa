@@ -7,6 +7,8 @@ namespace SineMacula\Laravel\Mfa\Database;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
+use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 
 /**
  * Pins the package's reads to the write connection.
@@ -54,7 +56,9 @@ final class WriteConnection
      * Run the callback with every read on the model's connection routed to the
      * write connection, its own eager loads included, and put the connection's
      * earlier mode back afterwards: for a query the package does not build,
-     * such as Eloquent's route binding. A relation on another connection is not
+     * such as Eloquent's route binding, which can bind what it is given as it
+     * is, so a failure leaves with nothing it was given (see
+     * `Secrets\QueryExceptionMask`). A relation on another connection is not
      * routed.
      *
      * @template TReturn
@@ -62,6 +66,8 @@ final class WriteConnection
      * @param  \Illuminate\Database\Eloquent\Model  $model
      * @param  \Closure(): TReturn  $callback
      * @return TReturn
+     *
+     * @throws \Illuminate\Database\QueryException
      *
      * @param-immediately-invoked-callable $callback
      */
@@ -74,6 +80,10 @@ final class WriteConnection
 
         try {
             return $callback();
+        } catch (QueryException $failure) {
+            QueryExceptionMask::mask($failure);
+
+            throw $failure;
         } finally {
             $connection->useWriteConnectionWhenReading($previous);
         }

@@ -41,9 +41,9 @@ use Tests\TestCase;
  * application current at the time, and the manager's own fields hold nothing
  * that copy gave them.
  *
- * What these show is the manager's own fields. A singleton service the booted
- * application itself resolved keeps the booted container, which is out of the
- * manager's reach.
+ * What these show is the manager's own fields, the cheap layer beneath the
+ * requests and jobs served for real in `Integration\Octane` and
+ * `Integration\Process`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

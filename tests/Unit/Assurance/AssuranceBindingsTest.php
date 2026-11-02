@@ -12,7 +12,7 @@ use Tests\TestCase;
 
 /**
  * Tests for `AssuranceBindings`: the default combination policy is bound and
- * shared.
+ * built afresh.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,16 +23,16 @@ use Tests\TestCase;
 final class AssuranceBindingsTest extends TestCase
 {
     /**
-     * The default combination policy is bound, and is shared.
+     * The default combination policy is bound, and is built afresh.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBindsTheDefaultPolicyAsASingleton(): void
+    public function testBindsTheDefaultPolicyAfreshOnEveryResolution(): void
     {
-        self::assertTrue($this->container()->isShared(CombinationPolicy::class));
+        self::assertFalse($this->container()->isShared(CombinationPolicy::class));
         self::assertInstanceOf(DefaultCombinationPolicy::class, $this->container()->make(CombinationPolicy::class));
-        self::assertSame($this->container()->make(CombinationPolicy::class), $this->container()->make(CombinationPolicy::class));
+        self::assertNotSame($this->container()->make(CombinationPolicy::class), $this->container()->make(CombinationPolicy::class));
     }
 }
