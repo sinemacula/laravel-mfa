@@ -41,7 +41,7 @@ between requests.
 | `codes.send_window_minutes`     | `60`                               | 1 to 1440 minutes                      | `MFA_CODES_SEND_WINDOW_MINUTES`     |
 | `codes.mailable`                | `Codes\MfaCodeMessage`             | `MfaCodeMessage` or a subclass         |                                     |
 | `recovery_codes.count`          | `10`                               | 1 to 50                                | `MFA_RECOVERY_CODES_COUNT`          |
-| `recovery_codes.length`         | `12`                               | 1 to 64, and 40 bits with the alphabet | `MFA_RECOVERY_CODES_LENGTH`         |
+| `recovery_codes.length`         | `13`                               | 1 to 64, and 40 bits with the alphabet | `MFA_RECOVERY_CODES_LENGTH`         |
 | `recovery_codes.alphabet`       | `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` | see [Recovery codes](#recovery-codes)  | `MFA_RECOVERY_CODES_ALPHABET`       |
 | `recovery_codes.low_count`      | `3`                                | 0 to the set's size                    | `MFA_RECOVERY_CODES_LOW_COUNT`      |
 | `attempts.factor_limit`         | `5`                                | 1 to 20                                | `MFA_ATTEMPTS_FACTOR_LIMIT`         |
@@ -316,7 +316,7 @@ use email or SMS codes (see [Stateless guards](proofs.md#stateless-guards)).
 ```php
 'recovery_codes' => [
     'count'     => env('MFA_RECOVERY_CODES_COUNT', 10),
-    'length'    => env('MFA_RECOVERY_CODES_LENGTH', 12),
+    'length'    => env('MFA_RECOVERY_CODES_LENGTH', 13),
     'alphabet'  => env('MFA_RECOVERY_CODES_ALPHABET', '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'),
     'low_count' => env('MFA_RECOVERY_CODES_LOW_COUNT', 3),
 ],
@@ -324,8 +324,8 @@ use email or SMS codes (see [Stateless guards](proofs.md#stateless-guards)).
 
 A set holds `count` codes of `length` characters drawn from `alphabet`. A code is normalised before it is checked: case
 is folded, and spaces and hyphens are removed. Its entropy is therefore measured on what is left, as the length times
-the bits of each character, and it must be at least 40 bits. The default, 12 characters from 32 (digits and capitals
-without `0`, `1`, `I` and `O`), gives 60. The alphabet is at least two printable ASCII characters, without spaces or
+the bits of each character, and it must be at least 40 bits. The default, 13 characters from 32 (digits and capitals
+without `0`, `1`, `I` and `O`), gives 65. The alphabet is at least two printable ASCII characters, without spaces or
 hyphens, which normalisation would remove, and no character may appear twice, counting two that differ only in case as
 the same: a repeated character would be drawn more often than the others, so the codes would carry less entropy than the
 measure says. `low_count` is how few unused codes count as running low, from 0 (never) to the set's size; left unset it

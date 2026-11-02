@@ -30,7 +30,7 @@ final class RecoveryCodeSettingsTest extends TestCase
     public static function settings(): iterable
     {
         yield 'count' => ['count', static fn (RecoveryCodeSettings $settings): int => $settings->count(), 10, 1, 50];
-        yield 'length' => ['length', static fn (RecoveryCodeSettings $settings): int => $settings->length(), 12, 1, 64];
+        yield 'length' => ['length', static fn (RecoveryCodeSettings $settings): int => $settings->length(), 13, 1, 64];
     }
 
     /**
@@ -161,15 +161,26 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
+     * The default code reaches the 64 bits NIST SP 800-63B-4 asks of a saved
+     * recovery code.
+     *
+     * @return void
+     */
+    public function testTheDefaultCodeReachesTheBitsOfASavedRecoveryCode(): void
+    {
+        self::assertGreaterThanOrEqual(64.0, self::settingsWith([])->entropyBits());
+    }
+
+    /**
      * Entropy is the length times the bits of each character of the alphabet,
-     * every one a distinct symbol once case is folded: the default gives 60
+     * every one a distinct symbol once case is folded: the default gives 65
      * bits.
      *
      * @return void
      */
     public function testEntropyIsMeasuredAfterNormalization(): void
     {
-        self::assertEqualsWithDelta(60.0, self::settingsWith([])->entropyBits(), 0.0001);
+        self::assertEqualsWithDelta(65.0, self::settingsWith([])->entropyBits(), 0.0001);
         self::assertEqualsWithDelta(16.0, self::settingsWith(['alphabet' => 'abcd', 'length' => 8])->entropyBits(), 0.0001);
         self::assertEqualsWithDelta(8.0, self::settingsWith(['alphabet' => 'aB', 'length' => 8])->entropyBits(), 0.0001);
     }

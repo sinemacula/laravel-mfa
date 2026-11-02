@@ -62,7 +62,7 @@ final class RecoveryCodeGenerationTest extends TestCase
         self::assertCount(10, $codes);
 
         foreach (self::plaintexts($codes) as $code) {
-            self::assertMatchesRegularExpression('/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{12}$/', $code);
+            self::assertMatchesRegularExpression('/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{13}$/', $code);
         }
 
         self::assertCount(10, array_unique(self::plaintexts($codes)));
