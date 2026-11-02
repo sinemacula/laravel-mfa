@@ -46,7 +46,7 @@ final class SmsDriverTest extends TestCase
      *
      * @return void
      */
-    public function testAPhoneNumberIsNormalised(): void
+    public function testAPhoneNumberIsNormalized(): void
     {
         $driver = new SmsDriver(new FakeSmsSender);
 

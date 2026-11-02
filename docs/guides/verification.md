@@ -210,8 +210,8 @@ On success, once the transaction commits and in this order: the default seams' p
 `Mfa::proofs()` sees the new proof, and a rollback dispatches none of them. A failure's `VerificationFailed` is
 dispatched once the transaction has ended. `CodeSent`, `VerificationPassed` and `VerificationFailed` carry the challenge
 id when one was used. A passkey's challenge id is the one its gateway reports with a verified assertion, so it is on
-`VerificationPassed` and on the `VerificationFailed` of a seam's refusal after it, but not on that of a failed assertion,
-which names none.
+`VerificationPassed` and on the `VerificationFailed` of a seam's refusal after it, but not on that of a failed
+assertion, which names none.
 
 A listener that throws reaches the caller of `verify()` or `sendCode()`, whatever it throws, and the change has
 committed: it is not reported as a failure. See [Events](events.md).

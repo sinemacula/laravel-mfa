@@ -74,7 +74,7 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
      *
      * @return void
      */
-    public function testALabelIsNormalised(): void
+    public function testALabelIsNormalized(): void
     {
         $factor = $this->totpFactor($this->signedInPerson(), ['application' => self::APPLICATION, 'label' => 'Old']);
 

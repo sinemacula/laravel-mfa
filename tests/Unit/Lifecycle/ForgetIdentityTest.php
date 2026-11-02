@@ -166,13 +166,14 @@ final class ForgetIdentityTest extends TestCase
         ]);
         Code::query()->create([
             ...$owner,
-            'factor_id'   => $factor->id,
-            'purpose'     => 'sign_in',
-            'application' => 'web',
-            'code_hash'   => hash('sha256', 'c' . $factor->id),
-            'sent_at'     => $now,
-            'sent_times'  => [$now->getTimestamp()],
-            'expires_at'  => $now,
+            'factor_id'        => $factor->id,
+            'purpose'          => 'sign_in',
+            'application'      => 'web',
+            'destination_hash' => hash('sha256', 'd' . $factor->id),
+            'code_hash'        => hash('sha256', 'c' . $factor->id),
+            'sent_at'          => $now,
+            'sent_times'       => [$now->getTimestamp()],
+            'expires_at'       => $now,
         ]);
         RecoveryCode::query()->create([...$owner, 'code_hash' => 'hash', 'generation' => 1]);
         PasskeyAssociation::query()->create([

@@ -206,7 +206,7 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledDeletionPropagates(): void
+    public function testACanceledDeletionPropagates(): void
     {
         config()->set('mfa.enrollment.max_attempts', 1);
 

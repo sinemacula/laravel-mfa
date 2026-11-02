@@ -34,7 +34,21 @@ for the session. The API is in [Enrolment](../guides/enrollment.md).
   of the secrets.
 - Restarting discards any pending enrolment of the same identity, application and type, from any session, and expired
   ones of this application only; another application's belong to pruning. Delivered code rows of a discarded factor
-  stay, since the send caps read them, so restarting and sending cannot bypass those caps.
+  stay, and carry a keyed digest of the owner and the destination (`destination_hash`), which outlives the factor. The
+  destination's cap counts by it, and a new enrolment challenge waits out `resend_cooldown_seconds` since the last
+  enrolment code to it, so restarting and sending bypasses neither. A refused restart rolls back and leaves the
+  enrolment under way. A new destination has its own count and cooldown, so a mistyped one can be corrected at once, and
+  the identity's cap bounds that. An adapter's `ChallengeGateway` owns its own caps and sees a new factor id on a
+  restart, so it must key them on what a restart keeps.
+- Every write the flow needs fails closed. A model event that cancels the factor's save, the row's save or deletion, the
+  count of an attempt or the record of a challenge throws `WriteCancelledException`, so the whole transaction rolls back
+  and no confirmation, recovery code, event or usable grant comes of what was not stored.
+- A row and a factor are matched to their owner exactly before anything acts on them. `FactorStateTransaction` hands
+  over only the owner's own factors and `PendingEnrollments::ofApplication()` only its own rows, so on a
+  case-insensitive collation a restart, a rename or a choice of preferred factor cannot reach another owner, and another
+  owner's factor neither closes the bootstrap path nor counts towards a limit.
+- A failure is reported with the factor as it was found. A refusal after a valid code rolls back a confirmation made on
+  the same instance, so `VerificationFailed` carries a summary taken before it and never reads `confirmed`.
 - A binding whose purpose is `enrollment` inverts the admission in `Attempts\ChallengeCounters`: only a pending factor
   holding a live enrolment bound to the binding and the caller, of an enabled type, with no question of the combination
   policy, refused while the identity's lockout is live. A confirmed factor under `enrollment`, and a pending factor
@@ -117,8 +131,9 @@ for the session. The API is in [Enrolment](../guides/enrollment.md).
 
 - `tests/Feature/Enrollment/GrantLifetimeEnrollmentStarterTest.php`
   `testAGrantThatOutlivedItsFreshnessStaysRefusedAfterANewerStepUp`, `testNothingMovesTheStoredExpiry`,
-  `testAPolicyThatCannotSayRefusesTheEnrolment`, `testADeadlineIsFlooredToTheSecond`
-- `tests/Feature/Enrollment/GrantBindingEnrollmentConfirmerTest.php`
+  `testAPolicyThatCannotSayRefusesTheEnrollment`, `testADeadlineIsFlooredToTheSecond`
+- `tests/Feature/Enrollment/GrantBindingEnrollmentConfirmerTest.php`, `OwnerCollationEnrollmentStarterTest.php`,
+  `CanceledWriteEnrollmentConfirmerTest.php`, `ProvisionedTypeEnrollmentStarterTest.php`
 - `tests/Feature/Enrollment/GatesEnrollmentStarterTest.php`
 - `tests/Feature/Enrollment/RechecksEnrollmentConfirmerTest.php`
 - `tests/Feature/Enrollment/OutcomeEnrollmentConfirmerTest.php` `testACompletionsRefusalRollsEverythingBack`,

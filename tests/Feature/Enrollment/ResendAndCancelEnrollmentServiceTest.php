@@ -342,7 +342,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
      *
      * @return void
      */
-    public function testCancellingDeletesTheEnrollment(): void
+    public function testCancelingDeletesTheEnrollment(): void
     {
         $this->reauthenticatedPerson();
 
@@ -366,7 +366,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
      *
      * @return void
      */
-    public function testCancellingWorksDuringALockoutAndOnlyWithItsGrant(): void
+    public function testCancelingWorksDuringALockoutAndOnlyWithItsGrant(): void
     {
         self::assertFalse($this->mfa()->cancelEnrollment('any'));
 
@@ -388,7 +388,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
      *
      * @return void
      */
-    public function testCancellingNeedsTheStartAction(): void
+    public function testCancelingNeedsTheStartAction(): void
     {
         $user  = $this->bootstrapPerson();
         $start = $this->startedTotp();

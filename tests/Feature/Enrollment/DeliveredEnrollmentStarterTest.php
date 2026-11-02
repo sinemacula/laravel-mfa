@@ -124,7 +124,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
      *
      * @return void
      */
-    public function testAnEmailAddressIsNormalisedAndProved(): void
+    public function testAnEmailAddressIsNormalizedAndProved(): void
     {
         $this->reauthenticatedPerson();
 
@@ -145,7 +145,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
      *
      * @return void
      */
-    public function testAPhoneNumberIsNormalised(): void
+    public function testAPhoneNumberIsNormalized(): void
     {
         $this->enableApplication(['types' => ['sms']]);
         $this->reauthenticatedPerson();
@@ -243,6 +243,59 @@ final class DeliveredEnrollmentStarterTest extends TestCase
         self::assertSame([], $this->reported);
         self::assertSame(1, Enrollment::query()->count());
         self::assertSame(1, Code::query()->count());
+    }
+
+    /**
+     * Restarting leaves the sends to a destination counted, although each
+     * restart makes a new factor: the cap on them refuses, keeping the
+     * enrolment under way, while another destination may still be sent to.
+     *
+     * @return void
+     */
+    public function testARestartDoesNotResetTheCapOnADestination(): void
+    {
+        config()->set('mfa.codes.factor_send_limit', 2);
+        config()->set('mfa.codes.resend_cooldown_seconds', 0);
+
+        $this->reauthenticatedPerson();
+
+        $this->startedEmail();
+
+        $second = $this->startedEmail();
+        $third  = $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS));
+
+        self::assertSame(FailureReason::SENDING_CAPPED, $third->reason);
+        self::assertSame(3600, $third->retryAfter);
+        self::assertTrue($this->rowOf($second)->exists);
+        self::assertTrue($this->startedEmail('other@example.test')->hasStarted());
+    }
+
+    /**
+     * Restarting waits out the cooldown since the last code to the destination,
+     * as a resend does, keeping the enrolment under way, and cancelling first
+     * makes no difference; another destination need not wait.
+     *
+     * @return void
+     */
+    public function testARestartWaitsOutTheCooldownOfADestination(): void
+    {
+        $this->reauthenticatedPerson();
+
+        $first   = $this->startedEmail();
+        $restart = $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS));
+
+        self::assertSame(FailureReason::SENDING_CAPPED, $restart->reason);
+        self::assertSame(60, $restart->retryAfter);
+        self::assertTrue($this->rowOf($first)->exists);
+        self::assertTrue($this->mfa()->cancelEnrollment($this->grantOf($first)));
+        self::assertSame(60, $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS))->retryAfter);
+        self::assertTrue($this->startedEmail('other@example.test')->hasStarted());
+
+        Carbon::setTestNow(CarbonImmutable::now()->addSeconds(60));
+
+        $this->reauthenticatedPerson();
+
+        self::assertTrue($this->startedEmail()->hasStarted());
     }
 
     /**

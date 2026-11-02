@@ -21,6 +21,7 @@ use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
 use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
@@ -97,6 +98,31 @@ final class ChallengeCountersContractTest extends TestCase
 
         $this->expectException(AssertionFailedError::class);
         $this->expectExceptionMessage('A pending factor with no live enrolment must not be challenged.');
+
+        ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->user, $this->factor, $pending, $binding);
+    }
+
+    /**
+     * The kit rejects an enrolment challenge that changes the identity's count.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRejectsAnEnrollmentChallengeThatChargesTheIdentity(): void
+    {
+        $pending = $this->pendingFactor();
+        $binding = $this->countedBinding();
+
+        Factor::retrieved(static function () use ($binding): void {
+            IdentityState::query()
+                ->where('authenticatable_type', $binding->identityType)
+                ->where('authenticatable_id', $binding->identityKey)
+                ->update(['consecutive_failures' => 1]);
+        });
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('An enrolment challenge\'s outcome must change no identity\'s count.');
 
         ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->user, $this->factor, $pending, $binding);
     }

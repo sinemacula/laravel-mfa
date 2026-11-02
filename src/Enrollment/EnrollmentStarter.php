@@ -482,7 +482,7 @@ final readonly class EnrollmentStarter
             $factor = $factors->first(static fn (EloquentFactor&Model $candidate): bool => LockedFactors::idOf($candidate) === $enrollment->factor_id);
 
             if ($factor === null) {
-                $enrollment->delete();
+                $this->enrollments->forget($enrollment);
 
                 continue;
             }
@@ -589,7 +589,7 @@ final readonly class EnrollmentStarter
     {
         $challengeId = self::challengeOf($this->container->make(ChallengeGateway::class)->send($factor, $binding));
 
-        $row->update(['challenge_id' => $challengeId]);
+        $this->enrollments->recordChallenge($row, $challengeId);
 
         $this->events->dispatch(new CodeSent($context, $summary, Purpose::ENROLLMENT, $challengeId));
     }

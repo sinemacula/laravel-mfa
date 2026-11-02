@@ -35,6 +35,9 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
  * while its stored expiry is still ahead and the identity's verification
  * generation has not moved since it started.
  *
+ * A model event that cancels a write this flow needs throws, so the transaction
+ * it is part of rolls back rather than reporting what was not stored.
+ *
  * Stateless: the key is read from the configuration on every call.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -68,11 +71,11 @@ final readonly class PendingEnrollments
      * @param  \Carbon\CarbonImmutable  $expiresAt
      * @return \SineMacula\Laravel\Mfa\Models\Enrollment
      *
-     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      */
     public function create(string $factorId, string $grantHash, ProofBinding $binding, int $generation, EnrollmentAuthorization $authority, CarbonImmutable $expiresAt): Enrollment
     {
-        return Enrollment::query()->create([
+        $enrollment = Enrollment::query()->create([
             'factor_id'            => $factorId,
             'authenticatable_type' => $binding->identityType,
             'authenticatable_id'   => $binding->identityKey,
@@ -84,6 +87,10 @@ final readonly class PendingEnrollments
             'expires_at'           => $expiresAt,
             'attempts'             => 0,
         ]);
+
+        return $enrollment->exists
+            ? $enrollment
+            : throw new WriteCancelledException('A model event cancelled the enrolment\'s save, so it did not start.');
     }
 
     /**
@@ -126,7 +133,9 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * The owner's enrolments through the application, as stored under the lock.
+     * The owner's enrolments through the application, as stored under the lock,
+     * matched exactly: a database's collation may let another owner's through,
+     * and the caller is about to delete some of them.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @param  string  $application
@@ -136,7 +145,7 @@ final readonly class PendingEnrollments
     {
         return self::locked(Enrollment::query()->where('authenticatable_type', $owner->type)->where('authenticatable_id', $owner->key))
             ->get()
-            ->filter(static fn (Enrollment $enrollment): bool => $enrollment->application === $application)
+            ->filter(static fn (Enrollment $enrollment): bool => self::belongsTo($enrollment, $owner->type, $owner->key, $application))
             ->values();
     }
 
@@ -153,10 +162,11 @@ final readonly class PendingEnrollments
      */
     public function isBound(Enrollment $enrollment, ProofBinding $binding, bool $pending): bool
     {
-        return $enrollment->authenticatable_type === $binding->identityType
-            && $enrollment->authenticatable_id   === $binding->identityKey
-            && $enrollment->application          === $binding->application
-            && hash_equals($enrollment->session_id, $this->keys->session($binding->sessionId))
+        if (!self::belongsTo($enrollment, $binding->identityType, $binding->identityKey, $binding->application)) {
+            return false;
+        }
+
+        return hash_equals($enrollment->session_id, $this->keys->session($binding->sessionId))
             && ($enrollment->authority === EnrollmentAuthorization::BOOTSTRAP) === $pending;
     }
 
@@ -193,7 +203,73 @@ final readonly class PendingEnrollments
             throw new WriteCancelledException('A model event cancelled the pending factor\'s deletion, so its enrolment stays.');
         }
 
-        $enrollment->delete();
+        $this->forget($enrollment);
+    }
+
+    /**
+     * Delete the enrolment alone, which ends its grant.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     */
+    public function forget(Enrollment $enrollment): void
+    {
+        if ($enrollment->delete() === false) {
+            throw new WriteCancelledException('A model event cancelled the enrolment\'s deletion, so its grant would have stayed usable.');
+        }
+    }
+
+    /**
+     * Record the challenge the enrolment's latest code went out under.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
+     * @param  string  $challengeId
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     */
+    public function recordChallenge(Enrollment $enrollment, string $challengeId): void
+    {
+        if (!$enrollment->update(['challenge_id' => $challengeId])) {
+            throw new WriteCancelledException('A model event cancelled the enrolment\'s save, so its code could not be confirmed.');
+        }
+    }
+
+    /**
+     * Count one attempt against the enrolment's own cap, and answer the count.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
+     * @return int
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     *
+     * @phpstan-impure
+     */
+    public function countAttempt(Enrollment $enrollment): int
+    {
+        if ($enrollment->increment('attempts') === false) {
+            throw new WriteCancelledException('A model event cancelled counting the enrolment\'s attempt.');
+        }
+
+        return $enrollment->attempts;
+    }
+
+    /**
+     * Whether the enrolment is, exactly, the owner's through the application.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
+     * @param  string  $type
+     * @param  string  $key
+     * @param  string  $application
+     * @return bool
+     */
+    private static function belongsTo(Enrollment $enrollment, string $type, string $key, string $application): bool
+    {
+        return $enrollment->authenticatable_type === $type
+            && $enrollment->authenticatable_id   === $key
+            && $enrollment->application          === $application;
     }
 
     /**

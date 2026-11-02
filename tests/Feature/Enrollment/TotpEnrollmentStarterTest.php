@@ -323,7 +323,7 @@ final class TotpEnrollmentStarterTest extends TestCase
      *
      * @return void
      */
-    public function testALabelIsNormalised(): void
+    public function testALabelIsNormalized(): void
     {
         self::assertNull(EnrollmentRequest::totp(self::ACCOUNT, '   ')->label);
         self::assertNull(EnrollmentRequest::of('custom')->label);

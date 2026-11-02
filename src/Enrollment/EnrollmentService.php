@@ -256,7 +256,7 @@ final readonly class EnrollmentService
         $challengeId = $result->challengeId;
 
         if ($challengeId !== null) {
-            $enrollment->update(['challenge_id' => $challengeId]);
+            $this->enrollments->recordChallenge($enrollment, $challengeId);
 
             $context = $this->events->context($caller->identity, $binding->application);
 

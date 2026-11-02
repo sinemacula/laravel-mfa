@@ -10,6 +10,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Query\Builder;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
 
 /**
  * Default implementation of the `Factor` contract for Eloquent models.
@@ -488,13 +489,19 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Persist pending mutations to the underlying storage.
+     * Persist pending mutations to the underlying storage, throwing when a
+     * model event cancels the save, so the change it is part of never reports a
+     * state that was not stored.
      *
      * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      */
     public function persist(): void
     {
-        $this->save();
+        if (!$this->save()) {
+            throw new WriteCancelledException('A model event cancelled the factor\'s save, so the change it is part of was not made.');
+        }
     }
 
     /**

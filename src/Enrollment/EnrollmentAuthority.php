@@ -231,8 +231,9 @@ final readonly class EnrollmentAuthority
     }
 
     /**
-     * Refuse unless the application allows bootstrap for the type and the
-     * identity has no confirmed factor.
+     * Refuse an identity with a confirmed factor, which must verify rather than
+     * enrol whatever the application allows, then unless the application allows
+     * bootstrap for the type.
      *
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $settings
      * @param  string  $type
@@ -244,6 +245,8 @@ final readonly class EnrollmentAuthority
      */
     private static function assertBootstrap(ApplicationSettings $settings, string $type, bool $none): void
     {
+        OperationRefusedException::unless($none, FailureReason::NOT_FRESH, 'The identity has a confirmed factor, so the pending session must verify it.');
+
         OperationRefusedException::unless(
             $settings->allowsBootstrap(),
             FailureReason::MFA_ENROLLMENT_REQUIRED,
@@ -255,8 +258,6 @@ final readonly class EnrollmentAuthority
             FailureReason::TYPE_NOT_ENABLED,
             sprintf('The application does not allow bootstrap enrolment of [%s].', $type),
         );
-
-        OperationRefusedException::unless($none, FailureReason::NOT_FRESH, 'The identity has a confirmed factor, so the pending session must verify it.');
     }
 
     /**

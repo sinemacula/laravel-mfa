@@ -170,22 +170,22 @@ final readonly class EnrollmentConfirmer
     private function attempt(Caller $caller, ProofBinding $binding, string $grantHash, #[\SensitiveParameter] string $code): EnrollmentConfirmation
     {
         $settled = EnrollmentConfirmation::failed(FailureReason::NOT_FOUND);
-        $factor  = null;
+        $summary = null;
 
         try {
             $outcome = $this->attempts->throttled(
                 RequestIp::resolve($this->container),
-                function () use ($caller, $binding, $grantHash, $code, &$settled, &$factor): AttemptOutcome {
+                function () use ($caller, $binding, $grantHash, $code, &$settled, &$summary): AttemptOutcome {
 
                     $settled = FactorStateTransaction::forIdentity(
                         $caller->identity,
                         new (ConfiguredModels::factor($this->config)),
-                        function (Collection $factors) use ($binding, $grantHash, $code, &$factor): EnrollmentConfirmation {
+                        function (Collection $factors) use ($binding, $grantHash, $code, &$summary): EnrollmentConfirmation {
 
                             $current = $this->callers->still(PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT, $binding)
                                 ?? throw new SignInChangedException('The sign-in changed before the identity\'s lock was held.');
 
-                            return $this->underLock($current, $binding, $grantHash, $code, $factors, $factor);
+                            return $this->underLock($current, $binding, $grantHash, $code, $factors, $summary);
                         },
                     );
 
@@ -195,16 +195,18 @@ final readonly class EnrollmentConfirmer
         } catch (SignInChangedException) {
             return EnrollmentConfirmation::failed(FailureReason::NOT_FOUND);
         } catch (RefusedUnderLockException $exception) {
-            return $this->failed($caller, $binding, $factor, $exception->refusal->reason, $exception->challengeId);
+            return $this->failed($caller, $binding, $summary, $exception->refusal->reason, $exception->challengeId);
         }
 
-        return $outcome->lockout === null ? $settled : $this->failed($caller, $binding, $factor, FailureReason::LOCKED, null, $outcome->lockout->until);
+        return $outcome->lockout === null ? $settled : $this->failed($caller, $binding, $summary, FailureReason::LOCKED, null, $outcome->lockout->until);
     }
 
     /**
      * Under the lock, for the caller as it stands now: find the enrolment the
      * grant holds, answering one not bound to the caller as `not_found`, and
-     * settle it, leaving its factor for what a refusal reports.
+     * settle it, leaving the factor as it was found for what a refusal reports:
+     * the instance goes on to change with a confirmation the refusal rolls
+     * back.
      *
      * @formatter:off
      *
@@ -213,7 +215,7 @@ final readonly class EnrollmentConfirmer
      * @param  string  $grantHash
      * @param  string  $code
      * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
-     * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
+     * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $summary
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation
      *
      * @formatter:on
@@ -226,9 +228,9 @@ final readonly class EnrollmentConfirmer
         string $grantHash,
         #[\SensitiveParameter] string $code,
         Collection $factors,
-        (EloquentFactor&Model)|null &$factor,
+        ?FactorSummary &$summary,
     ): EnrollmentConfirmation {
-        return RefusedUnderLockException::carrying(function () use ($caller, $binding, $grantHash, $code, $factors, &$factor): EnrollmentConfirmation {
+        return RefusedUnderLockException::carrying(function () use ($caller, $binding, $grantHash, $code, $factors, &$summary): EnrollmentConfirmation {
 
             $granted = $this->enrollments->granted($grantHash, $binding, $caller, $factors);
 
@@ -237,6 +239,8 @@ final readonly class EnrollmentConfirmer
             }
 
             [$enrollment, $factor] = $granted;
+
+            $summary = FactorSummary::fromFactor($factor);
 
             return $this->settle($caller, $binding, $enrollment, $factor, $factors, $code);
         });
@@ -279,7 +283,7 @@ final readonly class EnrollmentConfirmer
         $lockout = $this->attempts->lockedOut($identity, null);
 
         if ($lockout !== null) {
-            return $this->failed($caller, $binding, $factor, FailureReason::LOCKED, null, $lockout->until);
+            return $this->failed($caller, $binding, FactorSummary::fromFactor($factor), FailureReason::LOCKED, null, $lockout->until);
         }
 
         $type = $factor->getType();
@@ -373,7 +377,7 @@ final readonly class EnrollmentConfirmer
         $factor->confirm($now);
         $factor->persist();
 
-        $enrollment->delete();
+        $this->enrollments->forget($enrollment);
 
         $proof = new Proof(
             kind      : ProofKind::ADDITIONAL_FACTOR,
@@ -458,9 +462,11 @@ final readonly class EnrollmentConfirmer
     {
         $this->enrollments->discard($enrollment, $factor);
 
-        $this->events->dispatch(new EnrollmentExpired($this->events->context($caller->identity, $binding->application), FactorSummary::fromFactor($factor)));
+        $summary = FactorSummary::fromFactor($factor);
 
-        return $this->failed($caller, $binding, $factor, FailureReason::EXPIRED);
+        $this->events->dispatch(new EnrollmentExpired($this->events->context($caller->identity, $binding->application), $summary));
+
+        return $this->failed($caller, $binding, $summary, FailureReason::EXPIRED);
     }
 
     /**
@@ -481,33 +487,32 @@ final readonly class EnrollmentConfirmer
      */
     private function count(Caller $caller, ProofBinding $binding, Enrollment $enrollment, EloquentFactor&Model $factor, CheckOutcome $check): EnrollmentConfirmation
     {
-        $reason = $check->reason ?? FailureReason::INVALID_CODE;
-        $failed = $this->failed($caller, $binding, $factor, $reason, $enrollment->challenge_id, $check->lockedUntil);
+        $reason  = $check->reason ?? FailureReason::INVALID_CODE;
+        $summary = FactorSummary::fromFactor($factor);
+        $failed  = $this->failed($caller, $binding, $summary, $reason, $enrollment->challenge_id, $check->lockedUntil);
 
         if (!in_array($reason, self::COUNTED, true)) {
             return $failed;
         }
 
-        $enrollment->increment('attempts');
-
-        if ($enrollment->attempts < (new EnrollmentSettings($this->config))->maxAttempts()) {
+        if ($this->enrollments->countAttempt($enrollment) < (new EnrollmentSettings($this->config))->maxAttempts()) {
             return $failed;
         }
 
         $this->enrollments->discard($enrollment, $factor);
 
-        $this->events->dispatch(new EnrollmentAbandoned($this->events->context($caller->identity, $binding->application), FactorSummary::fromFactor($factor)));
+        $this->events->dispatch(new EnrollmentAbandoned($this->events->context($caller->identity, $binding->application), $summary));
 
         return EnrollmentConfirmation::failed($reason, abandoned: true);
     }
 
     /**
-     * Report one failed attempt, naming the factor only when the grant was
-     * bound to the caller, and answer it.
+     * Report one failed attempt, naming the factor as it was found only when
+     * the grant was bound to the caller, and answer it.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
+     * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $summary
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  ?string  $challengeId
      * @param  ?\Carbon\CarbonImmutable  $lockedUntil
@@ -519,15 +524,15 @@ final readonly class EnrollmentConfirmer
     private function failed(
         Caller $caller,
         ProofBinding $binding,
-        (EloquentFactor&Model)|null $factor,
+        ?FactorSummary $summary,
         FailureReason $reason,
         ?string $challengeId = null,
         ?CarbonImmutable $lockedUntil = null,
     ): EnrollmentConfirmation {
         $this->events->dispatch(new VerificationFailed(
             $this->events->context($caller->identity, $binding->application),
-            $factor === null ? null : FactorSummary::fromFactor($factor),
-            $factor?->getType(),
+            $summary,
+            $summary?->type,
             Purpose::ENROLLMENT,
             $reason,
             $challengeId,

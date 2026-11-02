@@ -28,6 +28,7 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStarter;
 use SineMacula\Laravel\Mfa\Enrollment\GrantAuthority;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException;
@@ -255,7 +256,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
      *
      * @return void
      */
-    public function testAConfirmedFactorAppearingRefusesWhatHavingNoneAuthorised(): void
+    public function testAConfirmedFactorAppearingRefusesWhatHavingNoneAuthorized(): void
     {
         $user  = $this->bootstrapPerson();
         $start = $this->startedTotp();
@@ -328,6 +329,8 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
         self::assertFalse($this->pendingFactorOf($start)->isConfirmed());
         self::assertTrue($this->rowOf($start)->exists);
         self::assertSame(FailureReason::NOT_ACCEPTED, $this->failureReported()->reason);
+        self::assertSame(FactorStatus::PENDING, $this->failureReported()->factor?->status);
+        self::assertSame('email', $this->failureReported()->type);
         self::assertSame($this->rowOf($start)->challenge_id, $this->failureReported()->challengeId);
         self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
     }

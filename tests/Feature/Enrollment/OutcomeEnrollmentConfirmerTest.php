@@ -36,6 +36,7 @@ use SineMacula\Laravel\Mfa\Enrollment\GrantAuthority;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -228,6 +229,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
         self::assertSame([], $confirmation->recoveryCodes);
         self::assertNull($confirmation->verification);
         self::assertSame(['VerificationFailed'], $this->reportedNames());
+        self::assertSame(FactorStatus::PENDING, $this->failureReported()->factor?->status);
 
         $factor = $this->pendingFactorOf($start);
 

@@ -36,7 +36,7 @@ person who loses them starts again. The person's authenticator app reads the URI
 code:
 
 ```php
-$confirmation = Mfa::confirmEnrollment($request->string('grant'), $request->string('code'));
+$confirmation = Mfa::confirmEnrollment($request->string('grant')->toString(), $request->string('code')->toString());
 
 if (! $confirmation->isConfirmed()) {
     return response()->json(['reason' => $confirmation->reason->value], 422);
@@ -51,10 +51,14 @@ return SecretResponse::json([
 A delivered type names the destination to prove instead, and its first code goes out as the enrolment starts:
 
 ```php
-Mfa::startEnrollment(EnrollmentRequest::delivered('email', $request->string('email')));
+Mfa::startEnrollment(EnrollmentRequest::delivered('email', $request->string('email')->toString()));
 Mfa::startEnrollment(EnrollmentRequest::delivered('sms', '+44 7700 900123', label: 'Work phone'));
+Mfa::startEnrollment(EnrollmentRequest::provisioned('your_app_type', $request->user()->email));
 Mfa::startEnrollment(EnrollmentRequest::of('your_own_type'));
 ```
+
+`provisioned()` is for your own type whose driver implements `Contracts\ProvisioningDriver`: it starts as TOTP does,
+under the account name and optional issuer the app shows.
 
 `EnrollmentRequest::totp()` also takes the `issuer` the app shows. Without one, `mfa.totp.issuer` applies, or the
 application's name. Neither the issuer nor the account name may hold a colon, and a label is trimmed, a blank one being
@@ -85,8 +89,11 @@ Then the application's limits apply (see [Applications](configuration.md#applica
 enrolled through this application: `limits.confirmed`, `limits.confirmed_per_type` and `limits.pending`.
 
 Starting again replaces. Any pending factor of the same type through this application is discarded, from any session,
-with its secret and its grant, and expired ones through this application go with it. Its delivered codes stay, because
-the send caps read them, so a restart cannot reset those caps.
+with its secret and its grant, and expired ones through this application go with it. Its delivered codes stay: the send
+caps count what a destination and an identity were sent, and a new first code waits out the cooldown since the last
+enrolment code to that destination, so a restart resets neither. A refused restart leaves the enrolment under way as it
+was. Another destination has its own count and cooldown, so a person who mistyped one can correct it at once, within the
+identity's cap.
 
 A factor the combination policy would not accept after the session's first factor is refused as `not_accepted`: always
 on a pending session, and on an active one only for the identity's first additional factor while the first factor is
@@ -131,8 +138,9 @@ code cannot be used again. A delivered code goes through the bound `ChallengeGat
 
 Only a wrong or replayed code counts, against the enrolment's own `mfa.enrollment.max_attempts`, default 5. At the cap
 the pending factor and its grant are deleted, and `abandoned` is `true` on the result. It keeps the address's throttle
-slot. A factor's and an identity's failure counts are not charged, and neither a resend nor a restart of the code resets
-the count. A code that has expired answers `expired` and counts nothing, so the person may send another.
+slot. A factor's and an identity's failure counts are not charged. A resend keeps the count; a restart begins a new
+enrolment, with a new secret or code and a count of its own. A code that has expired answers `expired` and counts
+nothing, so the person may send another.
 
 Starting, resending and confirming are refused as `locked` while the identity's lockout is live. Cancelling is not,
 since it only gives something up.
@@ -161,6 +169,9 @@ identity has already verified still gets a code, as that code is the proof.
 A delivery that throws, or a sending cap (`sending_capped`, with `retryAfter`), leaves no factor, grant or event. A code
 already sent cannot be recalled: a later failure of the transaction leaves one that nothing can confirm, and nothing
 retries the transaction. `resendEnrollmentCode()` goes through the delivered-code cooldown and caps.
+
+A model event that cancels a write the flow needs throws `WriteCancelledException` and rolls the whole change back, so
+nothing is reported, issued or left usable for what was not stored.
 
 ## Replacing a factor
 

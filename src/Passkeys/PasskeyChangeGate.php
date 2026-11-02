@@ -44,6 +44,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\Requirements\OperationRequirements;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
@@ -67,9 +68,11 @@ use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
  *   application enables the type, confirmed by the registration ceremony's own
  *   evidence, with the fresh step-up, reauthentication or bootstrap exemption
  *   and the limits an enrolment needs, and recovery codes with the first
- *   additional factor. A confirmed factor ends a re-enrolment obligation, and
- *   on a pending session its proof goes to the bound `PendingCompletion`, whose
- *   refusal rolls the registration back. A credential associated already, with
+ *   additional factor. A confirmed factor ends a re-enrolment obligation. On a
+ *   pending session its proof goes to the bound `PendingCompletion`; on an
+ *   active one the requirement is evaluated again on the proofs the session
+ *   holds, and a shortfall goes to the bound `SessionTransition`; a refusal of
+ *   either rolls the registration back. A credential associated already, with
  *   this identity or another, is refused.
  * - `removing()` removes the factor an associated credential is, with the fresh
  *   step-up a removal needs (proved without that factor while another remains),
@@ -219,7 +222,8 @@ final readonly class PasskeyChangeGate
      * credential associated already and an enrolment the caller may not make
      * now, then store the confirmed factor and its association, end any
      * re-enrolment obligation, issue recovery codes with the identity's first
-     * additional factor, and hand a pending session's proof over.
+     * additional factor, and hand a pending session's proof over or evaluate an
+     * active session's requirement again.
      *
      * @formatter:off
      *
@@ -279,7 +283,15 @@ final readonly class PasskeyChangeGate
         $result     = $caller->pending === null ? null : $acceptance->evaluate($caller, $proof, [], PasskeyAssertions::TYPE);
         $codes      = $first ? $this->container->make(RecoveryCodeIssuance::class)->withFirstFactor($identity, $application, $proof) : [];
 
-        return new PasskeyAssociationResult($summary, $codes, $result?->withCompletion($acceptance->handOver($caller, $result)));
+        if ($result !== null) {
+            return new PasskeyAssociationResult($summary, $codes, $result->withCompletion($acceptance->handOver($caller, $result)));
+        }
+
+        $proofs = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
+
+        $this->container->make(SessionReevaluation::class)->reevaluate($identity, $application, $proofs);
+
+        return new PasskeyAssociationResult($summary, $codes);
     }
 
     /**

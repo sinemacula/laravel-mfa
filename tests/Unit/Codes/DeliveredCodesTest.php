@@ -35,6 +35,9 @@ final class DeliveredCodesTest extends TestCase
     /** @var string The factor the codes are sent for. */
     private const string FACTOR = '01jfactor0000000000000000a1';
 
+    /** @var string The destination the codes are sent to. */
+    private const string DESTINATION = 'person@example.test';
+
     /** @var string The first code drawn. */
     private const string CODE = '123456';
 
@@ -393,6 +396,61 @@ final class DeliveredCodesTest extends TestCase
         self::assertSame(3580, $codes->issue(self::FACTOR, self::binding(session: 'session-c'), $now->addSeconds(20)));
         self::assertSame(1, $codes->issue(self::FACTOR, self::binding(session: 'session-c'), $now->addSeconds(3599)));
         self::assertInstanceOf(IssuedCode::class, $codes->issue(self::FACTOR, self::binding(session: 'session-c'), $now->addSeconds(3600)));
+    }
+
+    /**
+     * The cap counts what a destination was sent, whichever factor held it, so
+     * a pending factor discarded for a new one leaves its sends counted, while
+     * another destination, another identity's, and a factor with none are
+     * apart.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testTheFactorCapCountsADestinationAcrossItsFactors(): void
+    {
+        $codes = $this->codes(['factor_send_limit' => 1], ['111111', '222222', '333333', '444444', '555555', '666666']);
+        $now   = self::now();
+
+        self::issued($codes->issue(self::FACTOR, self::binding(), $now, self::DESTINATION));
+
+        self::assertSame(3600, $codes->issue('another-factor', self::binding(session: 'session-b'), $now, self::DESTINATION));
+
+        self::issued($codes->issue('another-factor', self::binding(session: 'session-b'), $now, 'other@example.test'));
+        self::issued($codes->issue('another-factor', self::binding(session: 'session-c', identity: '2'), $now, self::DESTINATION));
+        self::issued($codes->issue('third-factor', self::binding(session: 'session-b'), $now));
+
+        self::assertSame(3600, $codes->issue('third-factor', self::binding(session: 'session-c'), $now));
+
+        self::issued($codes->issue('fourth-factor', self::binding(session: 'session-c'), $now));
+    }
+
+    /**
+     * A new enrolment challenge waits out the cooldown since the last enrolment
+     * code to the destination, though its factor is a new one; a new challenge
+     * of any other purpose does not, and neither does one to another
+     * destination.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testANewEnrollmentChallengeWaitsOutTheCooldownOfItsDestination(): void
+    {
+        $codes = $this->codes(['resend_cooldown_seconds' => 60], ['111111', '222222', '333333', '444444', '555555']);
+        $now   = self::now();
+
+        self::issued($codes->issue(self::FACTOR, self::binding(purpose: Purpose::ENROLLMENT), $now, self::DESTINATION));
+
+        self::assertSame(50, $codes->issue('another-factor', self::binding(purpose: Purpose::ENROLLMENT), $now->addSeconds(10), self::DESTINATION));
+
+        self::issued($codes->issue('another-factor', self::binding(), $now->addSeconds(10), self::DESTINATION));
+        self::issued($codes->issue('third-factor', self::binding(purpose: Purpose::ENROLLMENT), $now->addSeconds(10), 'other@example.test'));
+
+        self::assertSame(1, $codes->issue('another-factor', self::binding(purpose: Purpose::ENROLLMENT), $now->addSeconds(59), self::DESTINATION));
+
+        self::issued($codes->issue('another-factor', self::binding(purpose: Purpose::ENROLLMENT), $now->addSeconds(60), self::DESTINATION));
     }
 
     /**

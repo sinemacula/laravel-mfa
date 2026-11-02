@@ -28,9 +28,10 @@ factors starts with.
   sign-in's id) and verification `generation` the grant is bound to, the `authority` that authorised it, the
   `challenge_id` its last code went out under, `expires_at`, set once, and its confirmation `attempts`.
 - `mfa_codes`, one row per challenge of a code sent by SMS or email: `factor_id`, owner, the `purpose`, `application`
-  and session the code is bound to (`session_id`, a keyed digest of the session's id), its keyed `code_hash`, the
-  challenge's `attempts`, how many codes it was `sends`, the last `sent_at` and every send's time (`sent_times`),
-  `expires_at` and `consumed_at` (see [Delivered Codes](delivered-codes.md)).
+  and session the code is bound to (`session_id`, a keyed digest of the session's id), what it was sent to
+  (`destination_hash`, a keyed digest of the owner and the destination, which the send caps count by), its keyed
+  `code_hash`, the challenge's `attempts`, how many codes it was `sends`, the last `sent_at` and every send's time
+  (`sent_times`), `expires_at` and `consumed_at` (see [Delivered Codes](delivered-codes.md)).
 - `mfa_recovery_codes`: owner, the salted `code_hash`, the set's `generation`, `used_at` and `replaced_at`.
 - `mfa_attempts`, the temporary throttles: `key` (a keyed hash of the scope and subject), `scope`, `hits` and
   `window_ends_at`. An identity's and an IP address's rows count failures within a window; a factor's row records the

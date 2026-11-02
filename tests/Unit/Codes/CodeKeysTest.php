@@ -48,6 +48,25 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
+     * What a code was sent to is a keyed digest of the owner and the
+     * destination, or the factor when it holds none, of its own derivation.
+     *
+     * @return void
+     */
+    public function testADestinationIsAKeyedDigestOfItsOwner(): void
+    {
+        $digest = self::keys()->destination(self::binding(), 'factor', 'person@example.test');
+        $key    = hash_hmac('sha256', 'sinemacula/laravel-mfa delivered code destinations', self::APP_KEY, true);
+        $parts  = [self::binding()->identityType, self::binding()->identityKey, 'destination', 'person@example.test'];
+
+        self::assertSame(hash_hmac('sha256', implode("\0", $parts), $key), $digest);
+        self::assertSame($digest, self::keys()->destination(self::binding(), 'another factor', 'person@example.test'));
+        self::assertNotSame($digest, self::keys()->destination(self::binding(), 'factor', 'other@example.test'));
+        self::assertNotSame(self::keys()->destination(self::binding(), 'factor', null), self::keys()->destination(self::binding(), 'another factor', null));
+        self::assertNotSame(self::keys()->destination(self::binding(), 'person@example.test', null), $digest);
+    }
+
+    /**
      * The digests are pinned: a code's hash is the HMAC of its labelled,
      * NUL-joined parts, and a session's the HMAC of its id, each under its own
      * key derived from the application key. A change to either would make every

@@ -108,10 +108,10 @@ nothing is stored in their place.
 ## How Long An Answer Lasts
 
 - `FreshnessGate::freshUntil()` asks what `isFresh()` asks and says how long the answer lasts: the instant the session
-  stops being fresh on the proofs it holds now, `null` when it is not fresh or the gate cannot say, so a grant taken from
-  it lives no longer than the proof that authorised it (see [Enrolment](enrollment.md)). `Evaluation::$metUntil` is how
-  the default gate reads it: for each part with a maximum age, the latest evidence time among the combinations providing
-  it plus that age, and the earliest across the parts.
+  stops being fresh on the proofs it holds now, `null` when it is not fresh or the gate cannot say, so a grant taken
+  from it lives no longer than the proof that authorised it (see [Enrolment](enrollment.md)). `Evaluation::$metUntil` is
+  how the default gate reads it: for each part with a maximum age, the latest evidence time among the combinations
+  providing it plus that age, and the earliest across the parts.
 
 ## Seams Left
 
@@ -121,8 +121,8 @@ nothing is stored in their place.
 - Nothing yet sets the re-enrolment obligation; a reset will. Confirming a factor ends it
   (`ReenrollmentObligation::end()`, see [Enrolment](enrollment.md)).
 - Starting an enrolment and the passkey change gate ask the gate for `mfa.add_factor`, the gate for `mfa.remove_factor`
-  (see [Passkeys](passkeys.md)) and issuing recovery codes for `mfa.generate_recovery_codes`; the lifecycle flow will ask
-  it for the rest.
+  (see [Passkeys](passkeys.md)) and issuing recovery codes for `mfa.generate_recovery_codes`; the lifecycle flow will
+  ask it for the rest.
 
 ## Implementation Anchors
 

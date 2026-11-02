@@ -61,6 +61,8 @@ use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
+use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
@@ -386,6 +388,11 @@ final class GatesEnrollmentStarterTest extends TestCase
         $this->totpFactor($user);
 
         self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS))->reason);
+
+        // Having a factor to verify, it is told to, whatever bootstrap allows.
+        $this->enableApplication();
+
+        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
     }
 
     /**
@@ -446,6 +453,8 @@ final class GatesEnrollmentStarterTest extends TestCase
      */
     public function testAnActiveSessionRefusesACombinationOnlyForItsFirstFactor(): void
     {
+        config()->set('mfa.codes.resend_cooldown_seconds', 0);
+
         $user  = $this->signedInPerson();
         $store = $this->container()->make(ProofStore::class);
 
@@ -542,7 +551,7 @@ final class GatesEnrollmentStarterTest extends TestCase
      *
      * @return void
      */
-    public function testACancelledSaveStopsTheStart(): void
+    public function testACanceledSaveStopsTheStart(): void
     {
         $this->steppedUpPerson();
 
@@ -651,8 +660,36 @@ final class GatesEnrollmentStarterTest extends TestCase
         $this->recordFirstFactor($user);
         $this->forgetReports();
 
+        config()->set('mfa.codes.resend_cooldown_seconds', 0);
+
         $this->startedEmail();
 
         self::assertSame(['EnrollmentExpired', 'EnrollmentStarted', 'CodeSent'], $this->reportedNames());
+    }
+
+    /**
+     * Replacing a factor is enrolling the new one and then removing the old:
+     * the old one keeps verifying while the new one is pending, which is
+     * refused until it is confirmed, and after that both verify.
+     *
+     * @return void
+     */
+    public function testAFactorBeingReplacedStaysUsableUntilTheNewOneIsConfirmed(): void
+    {
+        $user = $this->steppedUpPerson();
+        $old  = $user->authFactors()->sole();
+
+        self::assertInstanceOf(Factor::class, $old);
+
+        $start = $this->startedTotp();
+        $new   = $this->pendingFactorOf($start);
+
+        self::assertTrue($this->mfa()->verify(Submission::factor($old->id, AuthenticatorApp::code($old, -1)))->isVerified());
+        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->verify(Submission::factor($new->id, $this->appCode($start, -1)))->reason);
+
+        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->isConfirmed());
+
+        self::assertTrue($this->mfa()->verify(Submission::factor($old->id, AuthenticatorApp::code($old)))->isVerified());
+        self::assertTrue($this->mfa()->verify(Submission::factor($new->id, $this->appCode($start, 1)))->isVerified());
     }
 }

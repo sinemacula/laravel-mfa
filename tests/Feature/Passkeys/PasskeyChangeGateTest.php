@@ -14,6 +14,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
+use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -905,6 +906,80 @@ final class PasskeyChangeGateTest extends TestCase
         self::assertFalse(ReenrollmentObligation::isRequired($user));
 
         Event::assertNotDispatched(BootstrapEnrollmentCompleted::class);
+    }
+
+    /**
+     * A first passkey on an active session is evaluated as any other first
+     * factor: on an application requiring a verification of an identity with a
+     * factor, the shortfall goes to the bound transition.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnActiveFirstPasskeyLeavingTheSessionShortGoesToTheTransition(): void
+    {
+        $this->enablePasskeys(['requirement' => 'enrolled']);
+
+        $transition = new RecordingSessionTransition;
+
+        $this->container()->instance(SessionTransition::class, $transition);
+
+        $user = $this->signedInPerson();
+
+        $this->reauthenticate();
+
+        $result = $this->registrar()->register($user, self::APPLICATION, $this->registration($user));
+
+        self::assertNotNull($result);
+        self::assertNull($result->verification);
+        self::assertCount(1, $transition->returned);
+        self::assertSame(self::APPLICATION, $transition->returned[0][0]);
+    }
+
+    /**
+     * The transition's refusal rolls the registration back with its factor.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testATransitionsRefusalRollsTheRegistrationBack(): void
+    {
+        $this->enablePasskeys(['requirement' => 'enrolled']);
+
+        $this->container()->instance(SessionTransition::class, new class implements SessionTransition {
+            /**
+             * Refuse the return.
+             *
+             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+             * @param  string  $application
+             * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $outstanding
+             * @return void
+             *
+             * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+             */
+            #[\Override]
+            public function returnToPending(MultiFactorAuthenticatable $identity, string $application, Requirement $outstanding): void
+            {
+                throw new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'The session refused it.');
+            }
+        });
+
+        $user = $this->signedInPerson();
+
+        $this->reauthenticate();
+
+        try {
+            $this->registrar()->register($user, self::APPLICATION, $this->registration($user));
+
+            self::fail('The refusal was expected to propagate.');
+        } catch (OperationRefusedException $exception) {
+            self::assertSame(FailureReason::NOT_ACCEPTED, $exception->reason);
+        }
+
+        self::assertSame(0, Factor::query()->count());
+        self::assertSame(0, PasskeyAssociation::query()->count());
     }
 
     /**

@@ -161,10 +161,10 @@ exception that rolls the caller's change back with it.
   `mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`. A helper that names no action
   (generating recovery codes, renaming or preferring a factor, `disable()`, `isSetup()` and `proofs()`) serves active
   sessions only; `recoveryCodes()` needs `mfa.list_factors`, as `getFactors()` does.
-- `FreshnessGate::freshUntil()` answers how long `isFresh()`'s answer lasts, or `null`, which refuses what depends on it.
-  `PendingContext::$expiresAt` is the pending session's expiry, which a bootstrap grant lives no longer than. Under a
-  binding whose purpose is `enrollment`, `ChallengeGateway` is handed a pending factor, `ChallengeCounters::isUsable()`
-  admits only that, and `report()` changes no count (see [Enrolment](enrollment.md)).
+- `FreshnessGate::freshUntil()` answers how long `isFresh()`'s answer lasts, or `null`, which refuses what depends on
+  it. `PendingContext::$expiresAt` is the pending session's expiry, which a bootstrap grant lives no longer than. Under
+  a binding whose purpose is `enrollment`, `ChallengeGateway` is handed a pending factor,
+  `ChallengeCounters::isUsable()` admits only that, and `report()` changes no count (see [Enrolment](enrollment.md)).
 - `Testing\Seams` holds a contract kit per seam: a trait of tests with abstract hooks, in `Testing\Seams\Concerns`,
   delegating each check to a `*Contract` class of static assertions. This package's tests use the traits to prove its
   defaults and call the assertions on deliberately faulty implementations to prove the kit rejects them; an adapter's

@@ -29,9 +29,11 @@ cannot interleave.
 - `Support\FactorStateTransaction` is the one transaction of those changes: confirming an identity's first additional
   factor, replacing its recovery codes, removing a factor, a reset, and a verification racing any of them. It opens a
   transaction on the storage connection, locks the identity's row in `mfa_identity_states` first, then the identity's
-  factors, read `FOR UPDATE` from the write connection, and hands the callback those factors as stored under the lock.
-  Every change takes the locks in that order, so two changes for one identity never wait on each other in opposite
-  orders: the second waits for the first to commit, then sees what it left, and checks its preconditions again on it.
+  factors, read `FOR UPDATE` from the write connection, and hands the callback those factors as stored under the lock,
+  matched to the owner exactly: a case-insensitive collation may read and lock another owner's too, and those are not
+  handed over. Every change takes the locks in that order, so two changes for one identity never wait on each other in
+  opposite orders: the second waits for the first to commit, then sees what it left, and checks its preconditions again
+  on it.
 - The identity's row is one per owner (a unique index on `authenticatable_type` and `authenticatable_id`), created by
   the first change that needs it. The lock is an insert that updates the existing row's `updated_at` on a conflict,
   which takes the row's exclusive lock in one statement on MySQL and PostgreSQL, also when two first changes race to

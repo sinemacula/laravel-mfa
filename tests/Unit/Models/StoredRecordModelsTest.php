@@ -184,7 +184,21 @@ final class StoredRecordModelsTest extends TestCase
             (new Enrollment)->getFillable(),
         );
         self::assertSame(
-            ['factor_id', ...$owner, 'purpose', 'application', 'session_id', 'code_hash', 'attempts', 'sends', 'sent_at', 'sent_times', 'expires_at', 'consumed_at'],
+            [
+                'factor_id',
+                ...$owner,
+                'purpose',
+                'application',
+                'session_id',
+                'destination_hash',
+                'code_hash',
+                'attempts',
+                'sends',
+                'sent_at',
+                'sent_times',
+                'expires_at',
+                'consumed_at',
+            ],
             (new Code)->getFillable(),
         );
         self::assertSame(
@@ -229,7 +243,7 @@ final class StoredRecordModelsTest extends TestCase
             'expires_at'           => 'datetime',
             'attempts'             => 'integer',
         ]];
-        yield 'code' => [Code::class, 'mfa.codes.table', 'mfa_codes', ['code_hash', 'session_id'], [
+        yield 'code' => [Code::class, 'mfa.codes.table', 'mfa_codes', ['code_hash', 'session_id', 'destination_hash'], [
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',
             'attempts'             => 'integer',

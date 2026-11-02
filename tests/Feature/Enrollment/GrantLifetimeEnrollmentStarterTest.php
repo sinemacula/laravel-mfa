@@ -246,7 +246,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
      *
      * @return void
      */
-    public function testAPolicyThatCannotSayRefusesTheEnrolment(): void
+    public function testAPolicyThatCannotSayRefusesTheEnrollment(): void
     {
         $this->container()->instance(CombinationPolicy::class, new UndatedCombinationPolicy);
 

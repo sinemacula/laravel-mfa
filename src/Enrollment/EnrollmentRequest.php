@@ -7,10 +7,11 @@ namespace SineMacula\Laravel\Mfa\Enrollment;
 use SineMacula\Laravel\Mfa\Factors\FactorLabel;
 
 /**
- * What a person asks to enrol: an authenticator app under an account name, a
- * delivered type with its destination, or an application's own type; with the
- * label they chose. The destination is hidden from dumps, as it stays until the
- * driver has normalised it.
+ * What a person asks to enrol: an authenticator app, or an application's own
+ * type provisioned the same way, under an account name; a delivered type with
+ * its destination; or any other type; with the label they chose. The
+ * destination is hidden from dumps, as it stays until the driver has normalised
+ * it.
  *
  * @api
  *
@@ -64,7 +65,25 @@ final readonly class EnrollmentRequest
      */
     public static function totp(string $accountName, ?string $label = null, ?string $issuer = null): self
     {
-        return new self('totp', FactorLabel::normalize($label), null, $accountName, $issuer);
+        return self::provisioned('totp', $accountName, $label, $issuer);
+    }
+
+    /**
+     * A type whose driver provisions an authenticator app (see
+     * `Contracts\ProvisioningDriver`), under the account name and issuer it
+     * shows.
+     *
+     * @param  string  $type
+     * @param  string  $accountName
+     * @param  ?string  $label
+     * @param  ?string  $issuer
+     * @return self
+     *
+     * @throws \InvalidArgumentException
+     */
+    public static function provisioned(string $type, string $accountName, ?string $label = null, ?string $issuer = null): self
+    {
+        return new self($type, FactorLabel::normalize($label), null, $accountName, $issuer);
     }
 
     /**

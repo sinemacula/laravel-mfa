@@ -123,6 +123,26 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
+     * A pending session whose identity has a confirmed factor is told to verify
+     * it, even where the application does not allow bootstrap, since it has
+     * nothing to enrol to get through.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAConfirmedFactorIsReportedBeforeBootstrapBeingOff(): void
+    {
+        $this->enablePasskeys();
+
+        $user = $this->signedInPerson();
+
+        $this->confirmedFactor($user);
+
+        self::assertSame(FailureReason::NOT_FRESH, $this->refusal($this->pending($user), 'totp'));
+    }
+
+    /**
      * An active session may add only a type the application enables, and each
      * path says what authorised it and until when.
      *
@@ -130,7 +150,7 @@ final class EnrollmentAuthorityTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEachPathSaysWhatAuthorisedItAndUntilWhen(): void
+    public function testEachPathSaysWhatAuthorizedItAndUntilWhen(): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::now()->startOfSecond());
 

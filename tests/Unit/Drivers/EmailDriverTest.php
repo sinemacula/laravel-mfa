@@ -62,7 +62,7 @@ final class EmailDriverTest extends TestCase
      *
      * @return void
      */
-    public function testAnAddressIsNormalised(): void
+    public function testAnAddressIsNormalized(): void
     {
         $driver = new EmailDriver(new FakeEmailSender);
 

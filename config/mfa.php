@@ -133,8 +133,8 @@ return [
     | minutes), how many attempts one challenge allows (1 to 10), how long a
     | challenge's resends may run from its first code (the lifetime to 60
     | minutes), the cooldown before a resend (up to the lifetime), the caps on
-    | how many one factor and one identity are sent within the send window,
-    | across every session, the SMS message (which must carry `:code`) and the
+    | how many one factor's destination and one identity are sent within the
+    | send window, across every session, the SMS message (which must carry `:code`) and the
     | email message class (`MfaCodeMessage` or a subclass), and the table the
     | codes are stored in, as keyed hashes. An application that enables `sms`
     | or `email` must bind an `SmsSender` or `EmailSender` to deliver them.
