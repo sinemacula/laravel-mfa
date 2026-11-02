@@ -41,9 +41,11 @@ A custom factor model keeps its temporary lockout on its own row, in the column 
 (`locked_until` by default), and when the failure ceiling disabled it in the column `getDisabledAtName()` names
 (`disabled_at` by default). `Concerns\ActsAsFactor` casts both columns as a `datetime` itself, whatever they are named,
 so the model need declare no cast for them, and any cast it does declare is left as it is. A stored value in either
-that does not read as a time throws rather than reads as unlocked or enabled. A model implementing
-`Contracts\EloquentFactor` without the trait must do the same. A factor implementing only `Contracts\Factor` has no row,
-and so no lockout of its own.
+that does not read as a time throws rather than reads as unlocked or enabled. So does a status, in the column
+`getStatusName()` names, that is neither `pending` nor `confirmed` (or the `FactorStatus` case for either): it is never
+read as pending, as a factor read as not confirmed can let a weaker proof through, and only a new factor not yet given a
+status reads as pending. A model implementing `Contracts\EloquentFactor` without the trait must do the same. A factor
+implementing only `Contracts\Factor` has no row, and so no lockout of its own.
 
 A custom factor model that implements `Contracts\EloquentFactor` itself, rather than through `Concerns\ActsAsFactor`,
 must make `storeAcceptedStep()` a compare-and-set on its stored row: record the TOTP time step only when it is later

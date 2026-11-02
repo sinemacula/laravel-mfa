@@ -26,6 +26,7 @@ use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -259,6 +260,37 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $other);
 
         self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+    }
+
+    /**
+     * Another factor whose stored status is none the package knows is not read
+     * as pending, which would let the factor being removed prove its own
+     * removal: the removal throws, and the factor stays.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnotherFactorWithAnUnknownStatusStopsTheRemoval(): void
+    {
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+        $other  = $this->confirmedFactor($user, 'sms');
+
+        Factor::query()->whereKey($other->id)->toBase()->update(['status' => 'CONFIRMED']);
+
+        $this->stepUpWith($user, $factor);
+
+        try {
+            Mfa::removeFactor($factor->id);
+
+            self::fail('An unknown status must not read as pending.');
+        } catch (InvalidModelException $exception) {
+            self::assertStringContainsString('[status]', $exception->getMessage());
+        }
+
+        self::assertTrue($this->isStored($factor));
+        self::assertTrue($this->isStored($other));
     }
 
     /**

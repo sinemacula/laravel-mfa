@@ -40,6 +40,7 @@ use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorChannel;
@@ -349,6 +350,35 @@ final class GatesEnrollmentStarterTest extends TestCase
         $start = $this->startedTotp();
 
         self::assertSame(EnrollmentAuthorization::REAUTHENTICATION, $this->rowOf($start)->authority);
+    }
+
+    /**
+     * A stored factor whose status is none the package knows is not read as
+     * pending, which would let a first factor's reauthentication stand in for
+     * the step-up a confirmed one needs: the start throws, and nothing is
+     * written.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFactorWithAnUnknownStatusStopsTheStart(): void
+    {
+        $user   = $this->reauthenticatedPerson();
+        $stored = $this->totpFactor($user, ['application' => self::APPLICATION]);
+
+        Factor::query()->whereKey($stored->id)->toBase()->update(['status' => 'CONFIRMED']);
+
+        try {
+            $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
+
+            self::fail('An unknown status must not read as pending.');
+        } catch (InvalidModelException $exception) {
+            self::assertStringContainsString('[status]', $exception->getMessage());
+        }
+
+        self::assertSame([$stored->id], Factor::query()->pluck('id')->all());
+        self::assertSame(0, Enrollment::query()->count());
     }
 
     /**

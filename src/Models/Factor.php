@@ -23,6 +23,11 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * persistence boundary. An implicit route binding of it finds only the caller's
  * own factors (see `Concerns\ResolvesFactorRouteBinding`).
  *
+ * The class-level suppression is for one method: the model-behaviour rule
+ * reports a trait's public methods at the class that imports them, and its list
+ * of framework hooks does not include Eloquent's trait initialiser,
+ * `initializeActsAsFactor()`, which only sets casts.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *

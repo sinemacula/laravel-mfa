@@ -118,7 +118,9 @@ interface Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethod
     public function getLastAcceptedStep(): ?int;
 
     /**
-     * Return where the factor is in its enrolment.
+     * Return where the factor is in its enrolment. A stored value that is none
+     * of the statuses must throw, never read as pending, since a factor read as
+     * not confirmed can let a weaker path through.
      *
      * @return \SineMacula\Laravel\Mfa\Enums\FactorStatus
      */

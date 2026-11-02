@@ -16,6 +16,11 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * cast for it or for `disabled_at`: the trait casts the columns it is told hold
  * the deadline and the time the factor was disabled.
  *
+ * The class-level suppression is for one method: the model-behaviour rule
+ * reports a trait's public methods at the class that imports them, and its list
+ * of framework hooks does not include Eloquent's trait initialiser,
+ * `initializeActsAsFactor()`, which only sets casts.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *

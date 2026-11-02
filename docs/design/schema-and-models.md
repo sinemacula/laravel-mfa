@@ -49,8 +49,11 @@ factors starts with.
   through `Concerns\ActsAsRecoveryCode`), resolved by `Database\ConfiguredModels`. Each exposes its columns through
   `get*Name()` methods so a model can remap one. The models of the other records (`Enrollment`, `Code`,
   `IdentityState`, `PasskeyAssociation`) are the package's own.
-- A factor's status reads as pending unless the stored value says `confirmed`, so a missing or unknown value is never
-  usable. `confirm()` marks it confirmed with its time; a verification stamps `last_used_at`.
+- A factor's status reads as `pending` or `confirmed` only when it is stored as one of them, and as pending on a new
+  factor not yet given one. Any other value, or none on a stored factor, throws rather than reads as pending: a factor
+  read as not confirmed would let an enrolment start on a first factor's reauthentication rather than a step-up, and a
+  removal be proved by the factor being removed. `confirm()` marks it confirmed with its time; a verification stamps
+  `last_used_at`.
 - The identity contract, `Contracts\MultiFactorAuthenticatable`, asks whether the identity may hold factors
   (`canHoldFactors()`, people only), whether it is active (`isMfaActive()`) and what it requires of its own sign-ins
   (`requiresAdditionalFactor()`, a `Requirements\Requirement` or `null`). `Concerns\HasFactors` answers a person,

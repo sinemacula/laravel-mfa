@@ -16,6 +16,11 @@ use Tests\Fixtures\Identities\TestUser;
  * hashed route key has: the value in a URL is encoded, and the value `stranger`
  * finds a model of another class altogether.
  *
+ * The class-level suppression is for one method: the model-behaviour rule
+ * reports a trait's public methods at the class that imports them, and its list
+ * of framework hooks does not include Eloquent's trait initialiser,
+ * `initializeActsAsFactor()`, which only sets casts.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *

@@ -289,21 +289,34 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return where the factor is in its enrolment: pending unless the stored
-     * status says confirmed, so a missing or unknown value is never usable.
+     * Return where the factor is in its enrolment: one of the statuses the
+     * package knows, as the enum or its exact value, and pending for a new
+     * factor not yet given one. Anything else throws rather than reads as
+     * pending, a stored factor with no status included: a factor read as not
+     * confirmed can let through a path that a confirmed one would hold to a
+     * stronger proof.
      *
      * @return \SineMacula\Laravel\Mfa\Enums\FactorStatus
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function getStatus(): FactorStatus
     {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getStatusName());
+        $column = $this->getStatusName();
 
-        if ($value instanceof FactorStatus) {
-            return $value;
+        /** @var mixed $value */
+        $value  = $this->getAttribute($column);
+        $status = is_string($value) ? FactorStatus::tryFrom($value) : $value;
+
+        if ($status instanceof FactorStatus) {
+            return $status;
         }
 
-        return $value === FactorStatus::CONFIRMED->value ? FactorStatus::CONFIRMED : FactorStatus::PENDING;
+        if ($value === null && !$this->exists) {
+            return FactorStatus::PENDING;
+        }
+
+        throw new InvalidModelException(sprintf('The factor\'s column [%s] holds no status the package knows, so whether it is confirmed cannot be told.', $column));
     }
 
     /**
@@ -320,6 +333,8 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
      * Determine whether the factor is confirmed, and so usable.
      *
      * @return bool
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function isConfirmed(): bool
     {
