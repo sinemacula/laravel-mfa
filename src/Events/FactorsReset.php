@@ -18,7 +18,7 @@ final readonly class FactorsReset extends ContextEvent
      *
      * @param  array<string, int|string|null>  $context
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
-     * @param  ?string  $reason
+     * @param  string  $reason
      * @param  bool  $reenrollmentRequired
      */
     public function __construct(
@@ -29,8 +29,8 @@ final readonly class FactorsReset extends ContextEvent
         /** Who reset the factors. */
         public Actor $actor,
 
-        /** The reason the actor gave, if any. */
-        public ?string $reason = null,
+        /** The reason the actor gave. */
+        public string $reason,
 
         /** Whether the identity must enrol again at its next sign-in. */
         public bool $reenrollmentRequired = true,

@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
@@ -15,9 +14,12 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Factors\FactorChange;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
+use SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult;
+use SineMacula\Laravel\Mfa\Lifecycle\IdentityReset;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -35,6 +37,7 @@ use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -85,7 +88,6 @@ final class MfaManagerTest extends TestCase
     public static function delegations(): iterable
     {
         $factor      = new InMemoryFactor;
-        $models      = new Collection;
         $refused     = SendResult::refused(FailureReason::SENDING_CAPPED, 30);
         $requirement = Requirement::none()->withAdditionalVerification(300);
         $summary     = FactorSummary::fromFactor($factor);
@@ -94,10 +96,9 @@ final class MfaManagerTest extends TestCase
         yield 'requirement empty' => ['requirement', RequirementService::class, 'requirement', [], Requirement::none()];
         yield 'isFresh true' => ['isFresh', RequirementService::class, 'isFresh', ['mfa.add_factor', $requirement], true];
         yield 'isFresh false' => ['isFresh', RequirementService::class, 'isFresh', ['billing.change_plan', null], false];
-        yield 'isSetup true' => ['isSetup', FactorService::class, 'isSetup', [], true];
-        yield 'isSetup false' => ['isSetup', FactorService::class, 'isSetup', [], false];
-        yield 'getFactors' => ['getFactors', FactorService::class, 'getFactors', [], $models];
-        yield 'getFactors null' => ['getFactors', FactorService::class, 'getFactors', [], null];
+        yield 'factors' => ['factors', FactorService::class, 'factors', [], [$summary]];
+        yield 'factor' => ['factor', FactorService::class, 'factor', ['factor-1'], $summary];
+        yield 'factor missing' => ['factor', FactorService::class, 'factor', ['factor-1'], null];
         yield 'factorModel' => ['factorModel', FactorService::class, 'factorModel', [], Factor::class];
         yield 'proofs' => ['proofs', ProofService::class, 'proofs', [], []];
         yield 'offeredFactors' => ['offeredFactors', FactorOffers::class, 'offered', [], [$summary]];
@@ -118,7 +119,14 @@ final class MfaManagerTest extends TestCase
         yield 'cancelEnrollment' => ['cancelEnrollment', EnrollmentService::class, 'cancel', [$grant], false];
         yield 'renameFactor' => ['renameFactor', FactorService::class, 'rename', ['factor-1', 'Work phone'], FactorChange::refused(FailureReason::NOT_FOUND)];
         yield 'setPreferredFactor' => ['setPreferredFactor', FactorService::class, 'setPreferred', ['factor-1'], FactorChange::refused(FailureReason::NOT_FOUND)];
-        yield 'disable' => ['disable', LifecycleService::class, 'disable', [$factor], null];
+
+        $identity = new NonEloquentIdentity('plain-1');
+        $actor    = new Actor('admin', '9');
+
+        yield 'removeFactor' => ['removeFactor', LifecycleService::class, 'removeFactor', ['factor-1'], FactorRemovalResult::refused(FailureReason::NOT_FOUND)];
+        yield 'unlockFactor' => ['unlockFactor', LifecycleService::class, 'unlockFactor', [$identity, 'factor-1', $actor], true];
+        yield 'unlockIdentity' => ['unlockIdentity', LifecycleService::class, 'unlockIdentity', [$identity, $actor], false];
+        yield 'resetIdentity' => ['resetIdentity', IdentityReset::class, 'reset', [$identity, $actor, 'Lost phone.', false], null];
     }
 
     /**
@@ -158,6 +166,27 @@ final class MfaManagerTest extends TestCase
         $returned = $call(...$arguments);
 
         self::assertSame($result, $returned);
+    }
+
+    /**
+     * A reset obliges the identity to enrol again unless it says otherwise.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAResetObligesReenrollmentByDefault(): void
+    {
+        $identity = new NonEloquentIdentity('plain-1');
+        $actor    = new Actor('admin', '9');
+        $manager  = $this->manager();
+        $reset    = \Mockery::mock($this->container()->make(IdentityReset::class));
+
+        $reset->shouldReceive('reset')->once()->with($identity, $actor, 'Lost phone.', true);
+
+        $this->container()->instance(IdentityReset::class, $reset);
+
+        $manager->resetIdentity($identity, $actor, 'Lost phone.');
     }
 
     /**

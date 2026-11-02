@@ -4,10 +4,12 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Testing\Seams;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Context\DefaultEventContextResolver;
 use SineMacula\Laravel\Mfa\Context\IdentityContractSubjectType;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
@@ -42,6 +44,7 @@ use SineMacula\Laravel\Mfa\Testing\Seams\SubjectTypeResolverContract;
 use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Lifecycle\FixedFreshnessGate;
 use Tests\Fixtures\Requirements\FreshOnceGate;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\FaultySeams;
@@ -86,6 +89,77 @@ final class SeamsWithoutStateContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
 
         FreshnessGateContract::assertANameThatIsNoOperationIsNeverFresh(new FaultySeams);
+    }
+
+    /**
+     * The gates the kit rejects: one that always asks for nothing; one with a
+     * requirement where neither side has any, however strict; one with none for
+     * a caller who asks; and one that asks less than the caller.
+     *
+     * @return iterable<string, array{\SineMacula\Laravel\Mfa\Contracts\FreshnessGate}>
+     */
+    public static function gatesAskingTheWrongThing(): iterable
+    {
+        yield 'asks for nothing' => [new FaultySeams];
+        yield 'has a requirement of its own for anything' => [new FixedFreshnessGate(Requirement::none()->withAdditionalVerification(60))];
+        yield 'has none for a caller who asks' => [new FixedFreshnessGate(null)];
+        yield 'asks less than the caller' => [
+            new class implements FreshnessGate {
+                /**
+                 * Fresh.
+                 *
+                 * @param  string  $operation
+                 * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+                 * @return bool
+                 */
+                #[\Override]
+                public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool
+                {
+                    return true;
+                }
+
+                /**
+                 * No deadline.
+                 *
+                 * @param  string  $operation
+                 * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+                 * @return ?\Carbon\CarbonImmutable
+                 */
+                #[\Override]
+                public function freshUntil(string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
+                {
+                    return null;
+                }
+
+                /**
+                 * Nothing for no caller, and less than a caller asks.
+                 *
+                 * @param  string  $operation
+                 * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+                 * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
+                 */
+                #[\Override]
+                public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement
+                {
+                    return $callerRequirement === null ? null : Requirement::none();
+                }
+            },
+        ];
+    }
+
+    /**
+     * The kit rejects a gate that says it holds a session to anything but what
+     * the operation and the caller ask.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @return void
+     */
+    #[DataProvider('gatesAskingTheWrongThing')]
+    public function testRejectsAGateThatAsksTheWrongThing(FreshnessGate $gate): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        FreshnessGateContract::assertTheRequirementAsksWhatTheCallerAsks($gate);
     }
 
     /**

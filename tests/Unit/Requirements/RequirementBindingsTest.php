@@ -7,6 +7,7 @@ namespace Tests\Unit\Requirements;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactorResolver;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
@@ -16,6 +17,7 @@ use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredRequirementPolicy;
 use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
+use SineMacula\Laravel\Mfa\Requirements\NoActiveTenant;
 use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
 use SineMacula\Laravel\Mfa\Requirements\ProofRequirementCheck;
 use SineMacula\Laravel\Mfa\Requirements\RequirementBindings;
@@ -56,6 +58,7 @@ final class RequirementBindingsTest extends TestCase
     {
         yield 'the requirement policy' => [RequirementPolicy::class, ConfiguredRequirementPolicy::class];
         yield 'the identity requirement' => [IdentityRequirement::class, IdentityContractRequirement::class];
+        yield 'the active tenant' => [ActiveTenantResolver::class, NoActiveTenant::class];
         yield 'the tenant requirement' => [TenantRequirement::class, NoTenantRequirement::class];
         yield 'the requirement check' => [RequirementCheck::class, ProofRequirementCheck::class];
         yield 'the freshness gate' => [FreshnessGate::class, ConfiguredFreshnessGate::class];

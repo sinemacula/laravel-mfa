@@ -28,9 +28,9 @@ that call them, so the flows can be built against one fixed set.
 - Results cross the seams as structured values, never reduced to `amr`.
 - Every seam has a default that works without an authentication layer and fails closed, bound by the `*Bindings` class
   of the capability whose state it reads (or `Seams\SeamBindings` for one that reads nothing of the package), so a
-  binding made after the package's provider replaces it. The exception is `SelfServiceRecovery`, whose default comes
-  with the lifecycle flows; nothing resolves it yet. `ApplicationResolver` has no binding either: without one, the
-  application is the guard's name.
+  binding made after the package's provider replaces it. `SelfServiceRecovery` is bound to
+  `Lifecycle\NoSelfServiceRecovery`, which offers none; nothing in the package resolves it, and an application's own
+  flow does. `ApplicationResolver` has no binding: without one, the application is the guard's name.
 - `PendingCompletion` and `StepUp` are both bound to `Proofs\ProofStoreCompletion`, which records the proof in the bound
   proof store once the transaction commits, refusing a binding that is not the store's current sign-in, and for a
   pending session the pending context's as well, as `not_accepted` (see [Proof Store](proof-store.md)).
@@ -42,7 +42,8 @@ that call them, so the flows can be built against one fixed set.
   [Combination Policy](combination-policy.md)); the default `RequirementCheck` calls it.
 - The requirement seams are bound since `Mfa::requirement()`, `Mfa::isFresh()` and the `mfa` middleware call them:
   `RequirementPolicy` to `Requirements\ConfiguredRequirementPolicy`, `IdentityRequirement` to
-  `Requirements\IdentityContractRequirement`, `TenantRequirement` to `Requirements\NoTenantRequirement`,
+  `Requirements\IdentityContractRequirement`, `ActiveTenantResolver` to `Requirements\NoActiveTenant`,
+  `TenantRequirement` to `Requirements\NoTenantRequirement`,
   `RequirementCheck` to `Requirements\ProofRequirementCheck` and `FreshnessGate` to
   `Requirements\ConfiguredFreshnessGate` (see [Requirements and Freshness](requirements-and-freshness.md)). A
   `FreshnessGate` bound in its place is handed this package's own setting for the operation as part of the caller's
@@ -79,9 +80,10 @@ that call them, so the flows can be built against one fixed set.
 - `PasskeyGateway` is bound to `Passkeys\UnavailablePasskeyGateway`: no passkey is registered, verifying is refused with
   an `OperationRefusedException` that counts nothing, and starting a ceremony is a `LogicException`. The configuration
   check refuses an application that enables `passkey` while it is bound (see [Passkeys](passkeys.md)).
-- `LastFactorPolicy` is bound to `Lifecycle\RequiredFactorPolicy`: while the identity's own contract, or any configured
-  application set to `always`, requires a factor, the last factor some configured application accepts (confirmed, of a
-  type an application enables) may not be removed.
+- `LastFactorPolicy` is bound to `Lifecycle\RequiredFactorPolicy`: while the bound `IdentityRequirement`, or any
+  configured application set to `always`, requires a factor, the last factor some configured application accepts
+  (confirmed, not disabled at the ceiling, of a type an application enables) may not be removed. The caller hands it the
+  factor state, so it takes no factor lock of its own (see [Factor Lifecycle](factor-lifecycle.md)).
 - Authentication's activation fires Laravel's `Login`, on which `Proofs\BeginSignInOnLogin` calls
   `ProofStore::begin()`. An adapter over authoritative session rows makes `begin()` a no-op for them: activation
   preserves that row's sign-in and proofs, and an actual new sign-in uses a new row. Its transaction order is the
@@ -111,6 +113,7 @@ that call them, so the flows can be built against one fixed set.
 | `RequirementPolicy`      | What a sign-in must prove after its first factor                            | Its additional-factor requirement, mapped          |
 | `IdentityRequirement`    | What the identity itself requires                                           | Nothing: the identity contract                     |
 | `TenantRequirement`      | What the active tenant requires                                             | Its tenant policy's requirement                    |
+| `ActiveTenantResolver`   | Which tenant applies to the session, from validated session context         | The session's validated tenant, by the adapter     |
 | `RequirementCheck`       | Whether a session's proofs meet a requirement                               | Nothing: it calls this package's check             |
 | `FreshnessGate`          | Whether the session is fresh enough for a named operation                   | Its freshness policy                               |
 | `Reauthenticator`        | The first factor proved again on an active session, or none                 | Its reauthentication with the first factor         |
@@ -159,12 +162,14 @@ exception that rolls the caller's change back with it.
   serves: a pending session only for the `PendingAction` the helper needs, as its own identity, and otherwise the
   guard's signed-in person; only a person either way. Starting, resending and cancelling an enrolment need
   `mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`. A helper that names no action
-  (generating recovery codes, renaming or preferring a factor, `disable()`, `isSetup()` and `proofs()`) serves active
-  sessions only; `recoveryCodes()` needs `mfa.list_factors`, as `getFactors()` does.
-- `FreshnessGate::freshUntil()` answers how long `isFresh()`'s answer lasts, or `null`, which refuses what depends on
-  it. `PendingContext::$expiresAt` is the pending session's expiry, which a bootstrap grant lives no longer than. Under
-  a binding whose purpose is `enrollment`, `ChallengeGateway` is handed a pending factor,
-  `ChallengeCounters::isUsable()` admits only that, and `report()` changes no count (see [Enrolment](enrollment.md)).
+  (generating recovery codes, renaming, preferring or removing a factor and `proofs()`) serves active sessions only;
+  `recoveryCodes()` needs `mfa.list_factors`, as `factors()` and `factor()` do.
+- `FreshnessGate::requirement()` answers what the gate holds a session to, so a removal can judge it on the proofs made
+  without the factor; `null` refuses that removal while another factor remains. `FreshnessGate::freshUntil()` answers
+  how long `isFresh()`'s answer lasts, or `null`, which refuses what depends on it. `PendingContext::$expiresAt` is the
+  pending session's expiry, which a bootstrap grant lives no longer than. Under a binding whose purpose is `enrollment`,
+  `ChallengeGateway` is handed a pending factor, `ChallengeCounters::isUsable()` admits only that, and `report()`
+  changes no count (see [Enrolment](enrollment.md)).
 - `Testing\Seams` holds a contract kit per seam: a trait of tests with abstract hooks, in `Testing\Seams\Concerns`,
   delegating each check to a `*Contract` class of static assertions. This package's tests use the traits to prove its
   defaults and call the assertions on deliberately faulty implementations to prove the kit rejects them; an adapter's

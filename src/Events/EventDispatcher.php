@@ -68,6 +68,22 @@ final readonly class EventDispatcher
     }
 
     /**
+     * The context of an event about a stored owner, for a change made with no
+     * identity to hand, such as pruning: only what its row says, so nothing of
+     * whichever session or tenant the request or process happens to serve is
+     * attributed to it.
+     *
+     * @param  string  $type
+     * @param  string  $key
+     * @param  string  $application
+     * @return array<string, int|string|null>
+     */
+    public function ownerContext(string $type, string $key, string $application): array
+    {
+        return EventContext::allowlist(['identity_type' => $type, 'identity_id' => $key, 'application' => $application]);
+    }
+
+    /**
      * Dispatch the event once the storage connection's open transaction, if
      * any, commits.
      *

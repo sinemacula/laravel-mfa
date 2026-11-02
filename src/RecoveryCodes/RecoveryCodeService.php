@@ -22,6 +22,7 @@ use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RecoveryCode;
+use SineMacula\Laravel\Mfa\Database\BoundedDelete;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\OpenTransaction;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
@@ -384,7 +385,8 @@ final readonly class RecoveryCodeService
     /**
      * Delete every code used, or replaced by a newer set, before the given
      * time, and return how many. A code still usable is never deleted, and the
-     * identity's state row is left as it is. Dispatches nothing.
+     * identity's state row is left as it is. Deleted a limited batch at a time,
+     * as a mass delete, so no model event fires. Dispatches nothing.
      *
      * @param  \Carbon\CarbonInterface  $before
      * @return int
@@ -397,13 +399,12 @@ final readonly class RecoveryCodeService
     {
         $code = $this->codeModel();
 
-        return $code->newQuery()
+        return BoundedDelete::run($code->newQuery()
             ->toBase()
             ->where(static function (QueryBuilder $query) use ($code, $before): void {
                 $query->where($code->getUsedAtName(), '<', $before)
                     ->orWhere($code->getReplacedAtName(), '<', $before);
-            })
-            ->delete();
+            }));
     }
 
     /**

@@ -52,6 +52,24 @@ final class ReenrollmentObligation
     }
 
     /**
+     * Record whether the identity is obliged to enrol again, as a reset states:
+     * `false` clears an obligation an earlier reset left. Called inside the
+     * identity's factor state transaction, whose lock holds the row, it commits
+     * or rolls back with the reset.
+     *
+     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
+     * @param  bool  $required
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public static function record(Authenticatable $identity, bool $required): void
+    {
+        IdentityStateRow::of(ProofOwner::of($identity))->update([self::COLUMN => $required]);
+    }
+
+    /**
      * End the identity's obligation, as confirming a factor does. Called inside
      * the identity's factor state transaction, it commits or rolls back with
      * the confirmation.
@@ -64,6 +82,6 @@ final class ReenrollmentObligation
      */
     public static function end(Authenticatable $identity): void
     {
-        IdentityStateRow::of(ProofOwner::of($identity))->update([self::COLUMN => false]);
+        self::record($identity, false);
     }
 }

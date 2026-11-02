@@ -20,12 +20,14 @@ nothing is stored in their place.
   - an additional verification while the identity's re-enrolment obligation (`reenrollment_required` on its row in the
     identity states table) is set, in every application, read from the write connection
     (`Requirements\ReenrollmentObligation`);
-  - where a tenant is active, the tenant's requirement, from the bound `Contracts\TenantRequirement`, whose default
-    (`Requirements\NoTenantRequirement`) asks for nothing. The tenant is never part of `RequirementPolicy`, which is
-    asked at the identity level before any principal is chosen.
+  - where the bound `Contracts\ActiveTenantResolver` names a tenant, from validated session context, the tenant's
+    requirement, from the bound `Contracts\TenantRequirement`, whose default (`Requirements\NoTenantRequirement`) asks
+    for nothing. The resolver's default (`Requirements\NoActiveTenant`) names none, and a session has none before any
+    principal is chosen, so nothing is added at the identity level. `EventContextResolver`'s `tenant_id` is descriptive
+    metadata and plays no part: omitted audit data must never drop a requirement.
 - `Mfa::requirement()` is the current identity's sign-in requirement on the current application (the application a
-  bound `ApplicationResolver` names, or the default guard's name), with no tenant; it is empty without an MFA-capable
-  identity. The `mfa` middleware enforces nothing when it is empty.
+  bound `ApplicationResolver` names, or the default guard's name), with the active tenant's where one applies; it is
+  empty without an MFA-capable identity. The `mfa` middleware enforces nothing when it is empty.
 - The default `Contracts\RequirementPolicy`, `Requirements\ConfiguredRequirementPolicy`, answers with that requirement,
   or with none when the first factor meets all of it on its own, as a passkey whose assertion observed user verification
   meets an additional verification. The first factor is judged by the bound `RequirementCheck` like any proof, so one
@@ -72,8 +74,8 @@ nothing is stored in their place.
 1. The `mfa` middleware asks `Mfa::requirement()`; with an empty requirement the request passes.
 2. An adapter's sign-in asks `RequirementPolicy::requirementFor($identity, $application, $firstFactor)` and puts `mfa`
    in the pending session's `requires` when the answer is not empty.
-3. Where a tenant becomes active, the adapter composes the tenant's requirement with `TenantRequirement` and checks the
-   session's proofs against it with `RequirementCheck`.
+3. Where a tenant becomes active, the adapter names it through `ActiveTenantResolver`; the tenant's requirement is then
+   part of what the session is held to, and of what a factor change evaluates it against again.
 4. Before a sensitive operation, the package or the application asks `Mfa::isFresh('mfa.remove_factor')`; the gate
    reads the sign-in's proofs and the check judges them against the operation's requirement.
 
@@ -118,18 +120,21 @@ nothing is stored in their place.
 - The `mfa` middleware still judges the newest additional factor or recovery code against `proofs.max_age_minutes`
   once the requirement is not empty; it does not yet check the structured requirement, so it can refuse a passkey that
   verified the person and accept evidence below a requested level.
-- Nothing yet sets the re-enrolment obligation; a reset will. Confirming a factor ends it
-  (`ReenrollmentObligation::end()`, see [Enrolment](enrollment.md)).
+- A reset sets the re-enrolment obligation as it states (`ReenrollmentObligation::record()`, see
+  [Factor Lifecycle](factor-lifecycle.md)); confirming a factor ends it (`ReenrollmentObligation::end()`, see
+  [Enrolment](enrollment.md)).
 - Starting an enrolment and the passkey change gate ask the gate for `mfa.add_factor`, the gate for `mfa.remove_factor`
-  (see [Passkeys](passkeys.md)) and issuing recovery codes for `mfa.generate_recovery_codes`; the lifecycle flow will
-  ask it for the rest.
+  (see [Passkeys](passkeys.md)), removing a factor for `mfa.remove_factor` and issuing recovery codes for
+  `mfa.generate_recovery_codes`.
 
 ## Implementation Anchors
 
-- `src/Contracts/RequirementPolicy.php`, `IdentityRequirement.php`, `TenantRequirement.php`, `RequirementCheck.php`,
+- `src/Contracts/RequirementPolicy.php`, `IdentityRequirement.php`, `ActiveTenantResolver.php`,
+  `TenantRequirement.php`, `RequirementCheck.php`,
   `FreshnessGate.php`.
 - `src/Requirements/RequirementService.php`, `ConfiguredRequirementPolicy.php`, `IdentityContractRequirement.php`,
-  `NoTenantRequirement.php`, `ReenrollmentObligation.php`, `ProofRequirementCheck.php`, `ConfiguredFreshnessGate.php`,
+  `NoActiveTenant.php`, `NoTenantRequirement.php`, `ReenrollmentObligation.php`, `ProofRequirementCheck.php`,
+  `ConfiguredFreshnessGate.php`,
   `OperationRequirements.php`, `FreshnessBounds.php`, `RequirementBindings.php`.
 - `src/Database/IdentityStateRow.php`, the identity's row the obligation is read from, shared with
   `Proofs\VerificationGeneration`.

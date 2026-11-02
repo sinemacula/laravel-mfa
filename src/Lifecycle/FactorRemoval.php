@@ -10,38 +10,41 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
-use SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Database\OpenTransaction;
-use SineMacula\Laravel\Mfa\Enums\FailureReason;
-use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
-use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 
 /**
  * Removes one of an identity's factors as one serialised change, inside the
- * identity's factor state transaction, after the caller has checked that the
- * session is fresh enough to.
+ * identity's factor state transaction, once `RemovalGuard` has allowed it under
+ * the same lock. Every entry point shares it, so an application's own removal
+ * and a passkey's gate behave alike.
  *
- * In order: the bound `LastFactorPolicy` is asked again, under the lock; the
- * factor and its passkey association are deleted, and with the last confirmed
- * factor the recovery code set; every proof made with the factor stops
- * counting, the current session's at once; the identity's other sessions are
- * revoked through the bound `SessionRevoker`; the current session's requirement
- * is evaluated again on the proofs it still holds, and a shortfall is handed to
- * the bound `SessionTransition`; `FactorRemoved` is dispatched once the change
- * commits. A refusal throws, so the caller's whole change rolls back; the
- * proofs already forgotten on the current session stay forgotten, which leaves
- * it to verify again.
+ * In order: the factor and its passkey association are deleted; every proof
+ * made with it stops counting, the current session's at once; the identity's
+ * other sessions are revoked through the bound `SessionRevoker`; the current
+ * session's requirement is evaluated again on the proofs it still holds, and a
+ * shortfall goes to the bound `SessionTransition`; with that security work done
+ * `FactorRemoved` is queued, then with the last confirmed factor the recovery
+ * code set goes, reporting its own removal after it. So the default revoker's
+ * kept proofs are recorded again before any listener runs.
+ *
+ * A failure rolls the caller's whole change back. The proofs already forgotten
+ * on the current session stay forgotten, which leaves it to verify again; they
+ * are never restored, as that could undo a later invalidation. Nothing is
+ * promoted when the preferred factor goes: that is the person's choice to make.
+ *
+ * `erase()` is what a reset does for each factor, with none of the rest.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -79,7 +82,8 @@ final readonly class FactorRemoval
 
     /**
      * Remove the factor, as stored under the identity's lock, from the
-     * identity, acting on the application.
+     * identity, acting on the application, and return the requirement the
+     * session no longer meets, if any.
      *
      * @formatter:off
      *
@@ -87,37 +91,24 @@ final readonly class FactorRemoval
      * @param  string  $application
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
-     * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
-     * @return void
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      *
      * @formatter:on
      *
      * @throws \LogicException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      * @throws \Throwable
      */
-    public function remove(MultiFactorAuthenticatable $identity, string $application, EloquentFactor&Model $factor, Collection $factors, ?Actor $actor = null): void
+    public function remove(MultiFactorAuthenticatable $identity, string $application, EloquentFactor&Model $factor, Collection $factors): ?Requirement
     {
         OpenTransaction::assertOpen('A factor is removed only inside the identity\'s factor state transaction.');
 
-        $allowed = $this->container->make(LastFactorPolicy::class)->allowsRemoval($identity, $application, $factor);
-
-        OperationRefusedException::unless($allowed, FailureReason::LAST_FACTOR, 'The factor is the last one keeping a required factor covered.');
-
         $id      = self::idOf($factor);
         $summary = FactorSummary::fromFactor($factor);
+        $context = $this->events->context($identity, $application);
 
-        $this->associations->forget($id);
-
-        self::delete($factor);
-
-        if (!$factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $id && $other->isConfirmed())) {
-            $this->recoveryCodes->removeSet($identity, $actor);
-        }
-
-        $this->proofs->forgetFactor($identity, $id);
+        $this->erase($identity, $factor);
 
         // What the current session still holds is read before the revocation,
         // which hides every proof it does not record again once committed.
@@ -125,9 +116,39 @@ final readonly class FactorRemoval
 
         $this->container->make(SessionRevoker::class)->revokeOthers($identity);
 
-        $this->container->make(SessionReevaluation::class)->reevaluate($identity, $application, $kept);
+        $outstanding = $this->container->make(SessionReevaluation::class)->reevaluate($identity, $application, $kept);
 
-        $this->events->dispatch(new FactorRemoved($this->events->context($identity, $application), $summary, $actor));
+        $this->events->dispatch(new FactorRemoved($context, $summary));
+
+        if (!$factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $id && $other->isConfirmed())) {
+            $this->recoveryCodes->removeSet($identity);
+        }
+
+        return $outstanding;
+    }
+
+    /**
+     * Delete the factor and its passkey association, and stop every proof made
+     * with it counting.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     */
+    public function erase(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor): void
+    {
+        $id = self::idOf($factor);
+
+        $this->associations->forget($id);
+
+        if ($factor->delete() === false) {
+            throw new WriteCancelledException('A model event cancelled the factor\'s deletion, so it was not removed.');
+        }
+
+        $this->proofs->forgetFactor($identity, $id);
     }
 
     /**
@@ -141,21 +162,5 @@ final readonly class FactorRemoval
     private static function idOf(EloquentFactor&Model $factor): string
     {
         return LockedFactors::idOf($factor) ?? throw new UnsupportedFactorException('A factor is removed by its id.');
-    }
-
-    /**
-     * Delete the factor, and throw when a model event cancels the deletion, so
-     * the removal it is part of rolls back.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
-     */
-    private static function delete(EloquentFactor&Model $factor): void
-    {
-        if ($factor->delete() === false) {
-            throw new WriteCancelledException('A model event cancelled the factor\'s deletion, so it was not removed.');
-        }
     }
 }

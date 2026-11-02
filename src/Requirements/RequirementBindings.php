@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Requirements;
 
 use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactorResolver;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
@@ -17,13 +18,14 @@ use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
  * Registers the requirement service and the defaults of the requirement seams:
  * the sign-in requirement from the application's configured mode
  * (`ConfiguredRequirementPolicy`), the identity's own from its model
- * (`IdentityContractRequirement`), no tenant requirement
- * (`NoTenantRequirement`), the check of a session's proofs through the
- * combination policy (`ProofRequirementCheck`), the freshness of a named
- * operation from the proof store (`ConfiguredFreshnessGate`), and the first
- * factor the application declares (`Applications\DeclaredFirstFactorResolver`),
- * which the freshness gate reads. An adapter, or the application, rebinds any
- * of the contracts in its own service provider.
+ * (`IdentityContractRequirement`), no active tenant (`NoActiveTenant`) and no
+ * tenant requirement (`NoTenantRequirement`), the check of a session's proofs
+ * through the combination policy (`ProofRequirementCheck`), the freshness of a
+ * named operation from the proof store (`ConfiguredFreshnessGate`), and the
+ * first factor the application declares
+ * (`Applications\DeclaredFirstFactorResolver`), which the freshness gate reads.
+ * An adapter, or the application, rebinds any of the contracts in its own
+ * service provider.
  *
  * Every default keeps no state between calls and resolves what it reads on each
  * one, so each is shared.
@@ -52,6 +54,7 @@ final class RequirementBindings
         $app->singleton(RequirementPolicy::class, ConfiguredRequirementPolicy::class);
         $app->singleton(IdentityRequirement::class, IdentityContractRequirement::class);
         $app->singleton(TenantRequirement::class, NoTenantRequirement::class);
+        $app->singleton(ActiveTenantResolver::class, NoActiveTenant::class);
         $app->singleton(RequirementCheck::class, ProofRequirementCheck::class);
         $app->singleton(FreshnessGate::class, ConfiguredFreshnessGate::class);
         $app->singleton(FirstFactorResolver::class, DeclaredFirstFactorResolver::class);

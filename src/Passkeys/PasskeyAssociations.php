@@ -25,8 +25,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  * its digest refuses a second association, a concurrent one included. Records
  * are read from the write connection. The reads made under the identity's
  * factor state lock lock the row they find, through that unique index, so they
- * wait on that identity's lock first; `exists()` takes no lock, for the checks
- * made before it.
+ * wait on that identity's lock first; `exists()` and `associates()` take no
+ * lock, for the checks made before it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -62,7 +62,11 @@ final readonly class PasskeyAssociations
 
     /**
      * Whether the factor has an association that matches it (see `matches()`),
-     * read with a lock.
+     * read without a lock, so it may be asked before the identity's factor
+     * state lock is held. An association changes only with its factor, under
+     * that lock, so what this reads cannot outlive the factor it was read for,
+     * and a read older than the lock can only miss one, which counts as no
+     * association.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
@@ -72,7 +76,13 @@ final readonly class PasskeyAssociations
     {
         $id = LockedFactors::idOf($factor);
 
-        return $id !== null && self::matches($factor, $owner, $this->forFactor($id));
+        if ($id === null) {
+            return false;
+        }
+
+        $association = WriteConnection::query(PasskeyAssociation::query())->where('factor_id', $id)->first();
+
+        return self::matches($factor, $owner, $association instanceof PasskeyAssociation ? $association : null);
     }
 
     /**

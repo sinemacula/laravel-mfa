@@ -8,14 +8,12 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection as BaseCollection;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
-use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
@@ -24,11 +22,11 @@ use SineMacula\Laravel\Mfa\Events\PreferredFactorChanged;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Reads the current identity's factors and resolves the configured factor
- * model, and changes what a person says about a factor: its label and whether
- * it is the preferred one. Neither changes what the factor proves, so neither
- * needs a step-up; both serve active sessions only, under the identity's factor
- * state lock, and are reported once they commit.
+ * Lists and gets the identity's factors as summaries and resolves the
+ * configured factor model, and changes what a person says about a factor: its
+ * label and whether it is the preferred one. Neither changes what the factor
+ * proves, so neither needs a step-up; both serve active sessions only, under
+ * the identity's factor state lock, and are reported once they commit.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -49,54 +47,47 @@ final readonly class FactorService
     ) {}
 
     /**
-     * Determine whether the signed-in person has at least one registered
-     * authentication factor; `false` on a pending session, and without an
-     * MFA-capable person (see `Context\CallerContextResolver`).
+     * The factors of the identity the request serves for listing them (see
+     * `Context\CallerContextResolver`), as summaries: a pending session's when
+     * its credential allows listing them, otherwise the signed-in person's, and
+     * none when it serves nobody. The preferred one comes first, then by id.
      *
-     * @return bool
+     * Every factor is listed, pending ones and those enrolled through another
+     * application included, since no application hides another's. The factors
+     * are read from the write connection (see `Database\WriteConnection`), as
+     * they decide verification and lockout, matched to the owner exactly, and
+     * on every call, so nothing is kept from one request to the next.
+     *
+     * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function isSetup(): bool
+    public function factors(): array
     {
-        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
-
-        if ($identity === null) {
-            return false;
-        }
-
-        return $identity->isMfaEnabled();
+        /** @var list<\SineMacula\Laravel\Mfa\Factors\FactorSummary> */
+        return $this->listed()
+            ->sortBy(static fn (EloquentFactor&Model $factor): array => [!$factor->isPreferred(), LockedFactors::idOf($factor)])
+            ->map(static fn (EloquentFactor&Model $factor): FactorSummary => FactorSummary::fromFactor($factor))
+            ->values()
+            ->all();
     }
 
     /**
-     * Get the authentication factors of the identity the request serves for
-     * listing factors (see `Context\CallerContextResolver`): a pending
-     * session's when its credential allows listing them, otherwise the
-     * signed-in person's.
+     * One factor of the identity the request serves for listing them, as a
+     * summary; `null` when it serves nobody, and for an id that is not one of
+     * its factors, so another person's cannot be told from one that does not
+     * exist.
      *
-     * Returns null when the request serves nobody for listing factors: a
-     * pending session that does not allow it, no MFA-capable identity, or one
-     * that is not a person. The factors are read from the write connection (see
-     * `Database\WriteConnection`), as they decide verification and lockout, and
-     * on every call, so nothing is kept from one request to the next.
-     *
-     * @formatter:off
-     *
-     * @return ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
-     *
-     * @formatter:on
+     * @param  mixed  $factorId
+     * @return ?\SineMacula\Laravel\Mfa\Factors\FactorSummary
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function getFactors(): ?BaseCollection
+    public function factor(mixed $factorId): ?FactorSummary
     {
-        $caller = $this->container->make(CallerContextResolver::class)->resolve(PendingAction::LIST_FACTORS);
+        $factor = LockedFactors::withId($factorId, $this->listed());
 
-        if ($caller === null) {
-            return null;
-        }
-
-        return WriteConnection::query($caller->identity->authFactors())->get()->toBase();
+        return $factor === null ? null : FactorSummary::fromFactor($factor);
     }
 
     /**
@@ -123,7 +114,7 @@ final readonly class FactorService
         return FactorStateTransaction::forIdentity(
             $caller->identity,
             new ($this->factorModel()),
-            fn (Collection $factors): FactorChange => $this->renameUnderLock($caller, self::found($factorId, $factors), $label),
+            fn (Collection $factors): FactorChange => $this->renameUnderLock($caller, LockedFactors::withId($factorId, $factors), $label),
         );
     }
 
@@ -150,7 +141,7 @@ final readonly class FactorService
         return FactorStateTransaction::forIdentity(
             $caller->identity,
             new ($this->factorModel()),
-            fn (Collection $factors): FactorChange => $this->preferUnderLock($caller, self::found($factorId, $factors), $factors),
+            fn (Collection $factors): FactorChange => $this->preferUnderLock($caller, LockedFactors::withId($factorId, $factors), $factors),
         );
     }
 
@@ -287,23 +278,22 @@ final readonly class FactorService
     }
 
     /**
-     * The factor with the given id among those stored under the lock, or
-     * `null`. An id that is neither a string nor an integer finds nothing.
+     * The stored factors of the identity the request serves for listing them,
+     * and none when it serves nobody.
      *
      * @formatter:off
      *
-     * @param  mixed  $factorId
-     * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
-     * @return (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null
+     * @return \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
      * @formatter:on
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private static function found(mixed $factorId, Collection $factors): (EloquentFactor&Model)|null
+    private function listed(): Collection
     {
-        if (!is_string($factorId) && !is_int($factorId)) {
-            return null;
-        }
+        $model  = new ($this->factorModel());
+        $caller = $this->container->make(CallerContextResolver::class)->resolve(PendingAction::LIST_FACTORS);
 
-        return $factors->first(static fn (EloquentFactor&Model $factor): bool => LockedFactors::idOf($factor) === (string) $factorId);
+        return $caller === null ? $model->newCollection() : FactorStateTransaction::snapshot($caller->identity, $model);
     }
 }

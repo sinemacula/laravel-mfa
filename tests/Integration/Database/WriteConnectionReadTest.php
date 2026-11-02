@@ -14,6 +14,7 @@ use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use Tests\Fixtures\Identities\FactorHolder;
@@ -104,15 +105,12 @@ final class WriteConnectionReadTest extends TestCase
 
         self::assertSame(0, $user->authFactors()->count());
 
-        $factors = Mfa::getFactors();
-
-        self::assertNotNull($factors);
-        self::assertSame([$factor->getKey()], $factors->map(static fn (Factor $read): mixed => $read->getKey())->all());
+        self::assertSame([$factor->getKey()], array_map(static fn (FactorSummary $read): string => $read->id, Mfa::factors()));
     }
 
     /**
      * A factor confirmed on the writer and not yet on the reader enables MFA
-     * for an identity using the shipped trait, and the setup state agrees.
+     * for an identity using the shipped trait, and the listing agrees.
      *
      * @return void
      */
@@ -130,12 +128,12 @@ final class WriteConnectionReadTest extends TestCase
         ]);
 
         self::assertTrue($holder->isMfaEnabled());
-        self::assertTrue(Mfa::isSetup());
+        self::assertCount(1, Mfa::factors());
     }
 
     /**
      * A factor removed on the writer and still on the reader no longer enables
-     * MFA, and the setup state agrees.
+     * MFA, and the listing agrees.
      *
      * @return void
      */
@@ -158,7 +156,7 @@ final class WriteConnectionReadTest extends TestCase
         ]);
 
         self::assertFalse($holder->isMfaEnabled());
-        self::assertFalse(Mfa::isSetup());
+        self::assertSame([], Mfa::factors());
     }
 
     /**

@@ -633,6 +633,35 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
+     * A passkey factor enrolled through another application is not removed: it
+     * is not found, and the caller's own removal of the credential rolls back
+     * with it, since an application never deletes another's factor.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFactorOfAnotherApplicationIsNotRemoved(): void
+    {
+        $this->enablePasskeys();
+
+        $user    = $this->signedInPerson();
+        $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        $passkey->update(['application' => 'another-application']);
+
+        DB::table(StandInRegistrar::TABLE)->insert(['owner' => ProofOwner::of($user)->key, 'credential_id' => self::CREDENTIAL]);
+
+        $this->stepUpWith($user, $passkey);
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(function () use ($user): void {
+            $this->registrar()->remove($user, self::APPLICATION, self::CREDENTIAL);
+        }));
+        self::assertTrue(Factor::query()->whereKey($passkey->id)->exists());
+        self::assertTrue(StandInRegistrar::stores($user, self::CREDENTIAL));
+    }
+
+    /**
      * Removing a passkey stops the identity's other sessions counting, and the
      * current session keeps its proofs but the removed factor's.
      *

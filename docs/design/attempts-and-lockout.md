@@ -13,8 +13,8 @@ are described here.
 - Every attempt goes through `Attempts\AttemptService::attempt()`, with an `Attempts\Attempt` naming the identity whose
   own pending or active session made it, the identity's factor (or none, for a recovery code), the purpose, the
   request's address as resolved through the trusted proxies (`$request->ip()`) and the application. The caller checks
-  the session and the factor's owner first: `VerificationService::verify()` verifies only the current identity's own
-  factor and refuses another's with `FactorOwnershipMismatchException` before anything is counted, so nobody is charged
+  the session and the factor's owner first: `VerificationService::verify()` finds a factor only among the current
+  identity's own, and answers any other id as `not_found` before anything is counted, so nobody is charged
   for an attempt someone else made.
 - Confirming an enrolment is not one of these attempts: it takes an IP address slot, and counts a wrong or replayed code
   against the enrolment's own cap, never the factor's or the identity's run (see [Enrolment](enrollment.md)). A live

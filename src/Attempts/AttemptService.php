@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\Events\FactorDisabled;
 use SineMacula\Laravel\Mfa\Events\LockoutApplied;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
@@ -254,7 +255,9 @@ final readonly class AttemptService
      * a factor disabled at the failure ceiling stays disabled (see
      * `enableFactor()`). A factor that is not among the identity's stored
      * factors lifts nothing. Returns whether a live lockout was lifted, and
-     * reports it when one was.
+     * reports it when one was: `false` does not mean nothing changed, since
+     * lifting the identity's clears its throttle window even with no lockout
+     * live. A model event that cancels the save throws.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -338,11 +341,14 @@ final readonly class AttemptService
      * codes: the step a reset of the identity takes, after which an attempt
      * that names no factor of its own is no longer refused at the failure
      * ceiling. No lockout is lifted, no factor is enabled and no factor's own
-     * failures in a row are reset. Returns whether there was a run to reset.
+     * failures in a row are reset. Returns whether there was a run to reset; a
+     * model event that cancels the save throws, so it is never reported as
+     * reset.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
      *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      * @throws \Throwable
      *
      * @imperative
@@ -361,7 +367,7 @@ final readonly class AttemptService
 
             $state->consecutive_failures = 0;
 
-            $state->save();
+            self::saveState($state, 'the identity\'s failures in a row');
 
             return true;
         });
@@ -596,6 +602,8 @@ final readonly class AttemptService
      * @param  array{0: string, 1: string}  $subject
      * @return bool
      *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     *
      * @imperative
      */
     private function unlockIdentity(array $subject): bool
@@ -609,9 +617,26 @@ final readonly class AttemptService
 
         $state->locked_until = null;
 
-        $state->save();
+        self::saveState($state, 'the identity\'s lockout');
 
         return $until->isFuture();
+    }
+
+    /**
+     * Save the identity's state, and throw when a model event cancels the save,
+     * so a change that needed it rolls back rather than leaving it in place.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\IdentityState  $state
+     * @param  string  $what
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     */
+    private static function saveState(IdentityState $state, string $what): void
+    {
+        if (!$state->save()) {
+            throw new WriteCancelledException(sprintf('A model event cancelled the save of %s.', $what));
+        }
     }
 
     /**

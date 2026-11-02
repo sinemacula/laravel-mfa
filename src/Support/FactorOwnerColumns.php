@@ -42,4 +42,23 @@ final class FactorOwnerColumns
 
         return [$relation->getMorphType(), $relation->getForeignKeyName()];
     }
+
+    /**
+     * Whether the factor's owner columns hold exactly the owner's type and key:
+     * a database's collation may match another owner's too, differing only in
+     * case.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  string  $type
+     * @param  string  $key
+     * @return bool
+     */
+    public static function owns(EloquentFactor&Model $factor, string $type, string $key): bool
+    {
+        [$typeColumn, $keyColumn] = self::of($factor);
+
+        $stored = $factor->getAttribute($keyColumn);
+
+        return $factor->getAttribute($typeColumn) === $type && (is_string($stored) || is_int($stored)) && (string) $stored === $key;
+    }
 }

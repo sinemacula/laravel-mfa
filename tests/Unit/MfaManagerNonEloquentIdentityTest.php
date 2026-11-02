@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
@@ -19,8 +20,7 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 /**
  * Coverage for the FQCN-fallback paths behind the manager.
  *
- * `Support\CurrentIdentity::typeOf()`, which
- * `Factors\FactorOwnership::assert()`, the proof store and recovery code
+ * `Support\CurrentIdentity::typeOf()`, which the proof store and recovery code
  * generation all use, branches on whether the identity is a `Model` — Eloquent
  * identities use `getMorphClass()`, non-Eloquent identities fall back to a
  * strict FQCN comparison. The shipped test identities (`TestUser`,
@@ -52,21 +52,30 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * `isSetup()` must complete without throwing when invoked against a
-     * non-Eloquent identity — the cache-prefix builder's FQCN fallback path is
-     * exercised on the way in. The behaviour proved here is "non-Eloquent
-     * identities do not break the cached read"; the FQCN composition itself is
-     * private to the manager.
+     * Listing factors must complete without throwing for a non-Eloquent
+     * identity, and finds only what is stored under its class name and key.
      *
      * @return void
      */
-    public function testIsSetupCompletesForNonEloquentIdentityWithoutThrowing(): void
+    public function testListingFactorsCompletesForNonEloquentIdentity(): void
     {
         $identity = new NonEloquentIdentity('plain-1', mfaEnabled: false);
 
         Auth::shouldReceive('user')->andReturn($identity);
 
-        self::assertFalse($this->manager()->isSetup());
+        $factor = Factor::query()->create([
+            'authenticatable_type' => NonEloquentIdentity::class,
+            'authenticatable_id'   => 'plain-1',
+            'type'                 => 'totp',
+        ]);
+
+        Factor::query()->create([
+            'authenticatable_type' => NonEloquentIdentity::class,
+            'authenticatable_id'   => 'plain-2',
+            'type'                 => 'totp',
+        ]);
+
+        self::assertSame([$factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors()));
     }
 
     /**

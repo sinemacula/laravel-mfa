@@ -8,11 +8,11 @@ use Carbon\CarbonImmutable;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
-use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Proofs\ProofSettings;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -78,13 +78,9 @@ final class RequireMfa
 
         $expiresAfter = $this->parseMaxAgeMinutes($maxAgeMinutes);
 
-        $summaries = $this->resolveFactorSummaries();
+        $summaries = Mfa::factors();
 
-        if (!Mfa::isSetup()) {
-            throw new MfaRequiredException($summaries);
-        }
-
-        $verifiedAt = $this->lastVerifiedAt();
+        $verifiedAt = self::hasConfirmedFactor($summaries) ? $this->lastVerifiedAt() : null;
 
         if ($verifiedAt === null) {
             throw new MfaRequiredException($summaries);
@@ -182,22 +178,20 @@ final class RequireMfa
     }
 
     /**
-     * Build the factor-summary payload for exception dispatch.
+     * Whether any of the factors listed is confirmed, which is what being set
+     * up means: a pending factor proves nothing yet.
      *
-     * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
+     * @param  list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>  $summaries
+     * @return bool
      */
-    private function resolveFactorSummaries(): array
+    private static function hasConfirmedFactor(array $summaries): bool
     {
-        $factors = Mfa::getFactors();
-
-        if ($factors === null) {
-            return [];
+        foreach ($summaries as $summary) {
+            if ($summary->status === FactorStatus::CONFIRMED) {
+                return true;
+            }
         }
 
-        /** @var list<\SineMacula\Laravel\Mfa\Factors\FactorSummary> */
-        return $factors
-            ->map(static fn ($factor): FactorSummary => FactorSummary::fromFactor($factor))
-            ->values()
-            ->all();
+        return false;
     }
 }

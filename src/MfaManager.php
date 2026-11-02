@@ -4,20 +4,25 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa;
 
-use Illuminate\Support\Collection;
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
-use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Factors\FactorChange;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
+use SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult;
+use SineMacula\Laravel\Mfa\Lifecycle\IdentityReset;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
+use SineMacula\Laravel\Mfa\Lifecycle\PruneResult;
+use SineMacula\Laravel\Mfa\Lifecycle\RecordPruner;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
@@ -43,7 +48,7 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  *   (`requirement()`) and whether it is fresh enough for an operation
  *   (`isFresh()`).
  * - `Factors\FactorService`: the identity's factors and the factor model,
- *   `renameFactor()` and `setPreferredFactor()`.
+ *   `factors()`, `factor()`, `renameFactor()` and `setPreferredFactor()`.
  * - `Proofs\ProofService`: the proofs the current sign-in has recorded
  *   (`proofs()`).
  * - `Verification\VerificationService`: `verify()`.
@@ -51,7 +56,10 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  * - `Verification\FactorOffers`: `offeredFactors()`.
  * - `Enrollment\EnrollmentService`: `startEnrollment()`, `confirmEnrollment()`,
  *   `resendEnrollmentCode()` and `cancelEnrollment()`.
- * - `Lifecycle\LifecycleService`: `disable()`.
+ * - `Lifecycle\LifecycleService`: `removeFactor()`, `unlockFactor()` and
+ *   `unlockIdentity()`.
+ * - `Lifecycle\IdentityReset`: `resetIdentity()`.
+ * - `Lifecycle\RecordPruner`: `prune()`.
  * - `RecoveryCodes\RecoveryCodeIssuance`: `generateRecoveryCodes()`.
  * - `RecoveryCodes\RecoveryCodeService`: `recoveryCodes()`.
  *
@@ -117,19 +125,6 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Determine whether the signed-in person has at least one registered
-     * authentication factor; `false` on a pending session.
-     *
-     * @return bool
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function isSetup(): bool
-    {
-        return $this->container->make(FactorService::class)->isSetup();
-    }
-
-    /**
      * The proofs of the signed-in person's sign-in on the current application
      * that still count, oldest first: none without an MFA-capable person or a
      * sign-in, and none on a pending session.
@@ -144,21 +139,34 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Get the authentication factors of the identity the request serves for
-     * listing factors: a pending session's when its credential allows it,
-     * otherwise the signed-in person's; `null` when it serves nobody.
+     * The factors of the identity the request serves for listing them, as
+     * summaries, the preferred one first: a pending session's when its
+     * credential allows it, otherwise the signed-in person's; none when it
+     * serves nobody. Every factor is listed, pending ones and those enrolled
+     * through another application included.
      *
-     * @formatter:off
-     *
-     * @return ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
-     *
-     * @formatter:on
+     * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function getFactors(): ?Collection
+    public function factors(): array
     {
-        return $this->container->make(FactorService::class)->getFactors();
+        return $this->container->make(FactorService::class)->factors();
+    }
+
+    /**
+     * One factor of the identity the request serves for listing them, as a
+     * summary; `null` when it serves nobody or the id is not one of its
+     * factors, whoever else's it may be.
+     *
+     * @param  mixed  $factorId
+     * @return ?\SineMacula\Laravel\Mfa\Factors\FactorSummary
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function factor(mixed $factorId): ?FactorSummary
+    {
+        return $this->container->make(FactorService::class)->factor($factorId);
     }
 
     /**
@@ -324,18 +332,93 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Disable a previously-enrolled factor for the signed-in person; a no-op on
-     * a pending session.
+     * Remove the signed-in person's factor enrolled through the current
+     * application, with a fresh step-up, or say why not.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  mixed  $factorId
+     * @return \SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function removeFactor(mixed $factorId): FactorRemovalResult
+    {
+        return $this->container->make(LifecycleService::class)->removeFactor($factorId);
+    }
+
+    /**
+     * Reset an identity that has lost its factors, for someone else, with a
+     * reason: every factor, enrolment, recovery code, lockout, proof and
+     * session goes, and whether it must enrol again is recorded. Who may reset
+     * whom is the application's authorisation.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  string  $reason
+     * @param  bool  $requireReenrollment
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
+     * @throws \InvalidArgumentException
      */
-    public function disable(Factor $factor): void
+    public function resetIdentity(MultiFactorAuthenticatable $identity, Actor $actor, string $reason, bool $requireReenrollment = true): void
     {
-        $this->container->make(LifecycleService::class)->disable($factor);
+        $this->container->make(IdentityReset::class)->reset($identity, $actor, $reason, $requireReenrollment);
+    }
+
+    /**
+     * Lift the factor's temporary lockout, for the actor: whether a live one
+     * was lifted. Failures in a row stay, and a factor disabled at the failure
+     * ceiling stays disabled.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  mixed  $factorId
+     * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     *
+     * @imperative
+     */
+    public function unlockFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor): bool
+    {
+        return $this->container->make(LifecycleService::class)->unlockFactor($identity, $factorId, $actor);
+    }
+
+    /**
+     * Lift the identity's temporary lockout, for the actor: whether a live one
+     * was lifted. Failures in a row stay.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     *
+     * @imperative
+     */
+    public function unlockIdentity(MultiFactorAuthenticatable $identity, Actor $actor): bool
+    {
+        return $this->container->make(LifecycleService::class)->unlockIdentity($identity, $actor);
+    }
+
+    /**
+     * Delete abandoned enrolments, expired codes, used or replaced recovery
+     * codes and ended throttle windows, and say how many of each went.
+     *
+     * @return \SineMacula\Laravel\Mfa\Lifecycle\PruneResult
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \Throwable
+     *
+     * @imperative
+     */
+    public function prune(): PruneResult
+    {
+        return ($this->container->make(RecordPruner::class))();
     }
 
     /**

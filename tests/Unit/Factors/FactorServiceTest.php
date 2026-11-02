@@ -4,10 +4,14 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Factors;
 
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\CustomFactor;
 use Tests\Fixtures\Factors\TotpStubFactor;
@@ -16,8 +20,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `FactorService`: the current identity's setup state and factors,
- * read on every call, and the configured factor model.
+ * Tests for `FactorService`: the current identity's factors as summaries, read
+ * on every call, and the configured factor model.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,57 +32,96 @@ use Tests\TestCase;
 final class FactorServiceTest extends TestCase
 {
     /**
-     * A guest is not set up and has no factors.
+     * A guest has no factors, and finds none.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAGuestIsNotSetUpAndHasNoFactors(): void
+    public function testAGuestHasNoFactors(): void
     {
-        self::assertFalse($this->service()->isSetup());
-        self::assertNull($this->service()->getFactors());
+        self::assertSame([], $this->service()->factors());
+        self::assertNull($this->service()->factor('anything'));
     }
 
     /**
-     * An identity with a factor is set up, and its factors are listed.
+     * Every factor is listed as a summary with its status: pending ones and
+     * those enrolled through another application included, and one disabled at
+     * the failure ceiling saying so.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAnIdentityWithAFactorIsSetUp(): void
+    public function testEveryFactorIsListedWithItsStatus(): void
     {
-        $user   = $this->signIn();
-        $factor = $this->addFactor($user);
+        $user      = $this->signIn();
+        $confirmed = $this->addFactor($user, ['status' => 'confirmed', 'application' => 'web']);
+        $pending   = $this->addFactor($user, ['status' => 'pending', 'application' => 'web']);
+        $elsewhere = $this->addFactor($user, ['status' => 'confirmed', 'application' => 'another']);
+        $disabled  = $this->addFactor($user, ['status' => 'confirmed', 'application' => 'web', 'disabled_at' => CarbonImmutable::now()]);
 
-        self::assertTrue($this->service()->isSetup());
+        $summaries = [];
 
-        $factors = $this->service()->getFactors();
+        foreach ($this->service()->factors() as $summary) {
+            $summaries[$summary->id] = $summary;
+        }
 
-        self::assertNotNull($factors);
-        self::assertCount(1, $factors);
-        self::assertTrue($factor->is($factors->first()));
+        self::assertCount(4, $summaries);
+        self::assertSame(FactorStatus::CONFIRMED, $summaries[$confirmed->id]->status);
+        self::assertSame(FactorStatus::PENDING, $summaries[$pending->id]->status);
+        self::assertArrayHasKey($elsewhere->id, $summaries);
+        self::assertFalse($summaries[$confirmed->id]->disabled);
+        self::assertTrue($summaries[$disabled->id]->disabled);
+        self::assertTrue($summaries[$disabled->id]->jsonSerialize()['disabled']);
     }
 
     /**
-     * An identity without a factor is not set up and has an empty list.
+     * The preferred factor comes first, then the others by id.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAnIdentityWithoutAFactorIsNotSetUp(): void
+    public function testThePreferredFactorComesFirstThenById(): void
     {
-        $this->signIn();
+        $user = $this->signIn();
 
-        self::assertFalse($this->service()->isSetup());
-        self::assertCount(0, $this->service()->getFactors() ?? collect([1]));
+        foreach (['01c', '01a', '01b'] as $id) {
+            $factor = $this->addFactor($user, ['status' => 'confirmed']);
+
+            DB::table('mfa_factors')->where('id', $factor->id)->update(['id' => $id, 'preferred' => $id === '01b']);
+        }
+
+        self::assertSame(['01b', '01a', '01c'], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->service()->factors()));
     }
 
     /**
-     * The setup state and the factors are read on every call, so nothing is
-     * kept from one read, or one request, to the next.
+     * One factor is found by its id; another person's, an unknown id and an id
+     * of any other shape are not, and an integer id finds nothing it does not
+     * name exactly.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testOneFactorIsFoundOnlyByItsOwnersExactId(): void
+    {
+        $user    = $this->signIn();
+        $factor  = $this->addFactor($user);
+        $another = TestUser::query()->create(['email' => 'another@example.test']);
+        $theirs  = $this->addFactor($another);
+
+        self::assertSame($factor->id, $this->service()->factor($factor->id)?->id);
+        self::assertNull($this->service()->factor($theirs->id));
+        self::assertNull($this->service()->factor('missing'));
+        self::assertNull($this->service()->factor(strtoupper($factor->id)));
+        self::assertNull($this->service()->factor(['id' => $factor->id]));
+    }
+
+    /**
+     * The factors are read on every call, so nothing is kept from one read, or
+     * one request, to the next.
      *
      * @return void
      *
@@ -88,13 +131,11 @@ final class FactorServiceTest extends TestCase
     {
         $user = $this->signIn();
 
-        self::assertFalse($this->service()->isSetup());
-        self::assertCount(0, $this->service()->getFactors() ?? collect([1]));
+        self::assertCount(0, $this->service()->factors());
 
         $this->addFactor($user);
 
-        self::assertTrue($this->service()->isSetup());
-        self::assertCount(1, $this->service()->getFactors() ?? collect());
+        self::assertCount(1, $this->service()->factors());
     }
 
     /**
@@ -194,9 +235,10 @@ final class FactorServiceTest extends TestCase
      * Add a TOTP factor for the user.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @param  array<string, mixed>  $attributes
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
-    private function addFactor(TestUser $user): Factor
+    private function addFactor(TestUser $user, array $attributes = []): Factor
     {
         /** @var \SineMacula\Laravel\Mfa\Models\Factor */
         return Factor::query()->create([
@@ -204,6 +246,7 @@ final class FactorServiceTest extends TestCase
             'authenticatable_id'   => (string) $user->id,
             'type'                 => 'totp',
             'secret'               => 'JBSWY3DPEHPK3PXP',
+            ...$attributes,
         ]);
     }
 }

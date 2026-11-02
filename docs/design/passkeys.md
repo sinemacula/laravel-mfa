@@ -42,13 +42,16 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   by credential reads the unique index, so it locks one row, never the table.
 - With the identity's first additional factor, recovery codes are generated when the application accepts them and the
   session's first factor followed by the registration's own evidence meets the level the application issues them at.
-- Removing an associated credential needs the bound `FreshnessGate` to find the session fresh for `mfa.remove_factor`
-  and, while another confirmed factor remains, the operation's requirement met on the session's proofs without those
-  made with the factor being removed. `Lifecycle\FactorRemoval` then asks the bound `LastFactorPolicy` again under the
-  lock, deletes the factor and its association (and the recovery codes with the last confirmed factor), forgets the
-  factor's proofs on the current session at once, revokes the identity's other sessions through the bound
-  `SessionRevoker`, evaluates the current session's requirement again on the proofs it kept and hands a shortfall to
-  the bound `SessionTransition`, and reports `FactorRemoved`.
+- Removing an associated credential goes through the same checks as every removal (`Lifecycle\RemovalGuard`, see
+  [Factor Lifecycle](factor-lifecycle.md)), under the lock only, as the gate is already in its caller's transaction: the
+  factor must have been enrolled through the application acting, or it is `not_found` and the caller's removal of the
+  credential rolls back with it; the bound `FreshnessGate` must find the session fresh for `mfa.remove_factor` and,
+  while another confirmed factor remains, what it holds the session to must be met on the proofs made without the
+  factor; and the bound `LastFactorPolicy` must allow it. `Lifecycle\FactorRemoval` then deletes the factor and its
+  association, forgets the factor's proofs on the current session at once, revokes the identity's other sessions through
+  the bound `SessionRevoker`, evaluates the current session's requirement again on the proofs it kept and hands a
+  shortfall to the bound `SessionTransition`, and reports `FactorRemoved`, removing the recovery codes with the last
+  confirmed factor.
 - The default `LastFactorPolicy` (`Lifecycle\RequiredFactorPolicy`) counts a remaining passkey only while its
   association matches it, so an unusable passkey never lets the last usable factor go.
 - A change to what an associated credential proves (its id, key, owner or relying party) is refused outright: it is a
@@ -94,17 +97,13 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   still bound; a gateway of the application's own that reports itself unavailable at run time is not refused, and lists
   nothing to offer.
 
-## Seams Left
-
-- The removal and recovery code flows of the package's own do not yet share `Lifecycle\FactorRemoval`; the lifecycle
-  flow will.
-
 ## Implementation Anchors
 
 - `src/Passkeys/PasskeyChangeGate.php`, `PasskeyAssertions.php`, `PasskeyAssociations.php`, `CredentialId.php`,
   `PasskeyRegistration.php`, `PasskeyAssociationResult.php`, `UnavailablePasskeyGateway.php`.
 - `src/Drivers/PasskeyDriver.php`: states the channel, and refuses every code.
-- `src/Enrollment/EnrollmentAuthority.php`, `src/Lifecycle/FactorRemoval.php`, `src/Lifecycle/RequiredFactorPolicy.php`.
+- `src/Enrollment/EnrollmentAuthority.php`, `src/Lifecycle/RemovalGuard.php`, `src/Lifecycle/FactorRemoval.php`,
+  `src/Lifecycle/RequiredFactorPolicy.php`.
 
 ## Authoritative Tests
 

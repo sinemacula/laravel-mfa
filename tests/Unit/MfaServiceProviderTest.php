@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
 use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
@@ -30,6 +31,7 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
+use SineMacula\Laravel\Mfa\Contracts\SelfServiceRecovery;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
@@ -170,6 +172,8 @@ final class MfaServiceProviderTest extends TestCase
             PasskeyGateway::class,
             PasskeyChangeGate::class,
             LastFactorPolicy::class,
+            ActiveTenantResolver::class,
+            SelfServiceRecovery::class,
         ];
 
         foreach ($abstracts as $abstract) {

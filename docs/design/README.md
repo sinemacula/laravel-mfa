@@ -45,6 +45,8 @@ The current note set is:
 - `requirements-and-freshness.md`: how a sign-in's requirement is composed from the application's mode, the identity,
   a re-enrolment obligation and an active tenant, how a session's proofs are checked against a requirement, and how a
   named operation's freshness is judged, the stricter of the package's and the caller's setting applying.
+- `factor-lifecycle.md`: what happens to a factor after it is enrolled: how it is listed, what a removal checks before
+  and under the lock, what a reset does and in which order, what unlocking leaves alone, and what pruning may delete.
 - `enrollment.md`: how a factor is enrolled: what authorises a start, why a grant's expiry is taken once from what
   authorised it, what a grant is bound to, what a confirmation checks again inside its transaction, and what it does for
   the session.

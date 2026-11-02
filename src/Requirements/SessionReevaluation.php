@@ -36,25 +36,29 @@ final readonly class SessionReevaluation
 
     /**
      * Evaluate the session's requirement again on the proofs given, and hand a
-     * shortfall to the bound session transition.
+     * shortfall to the bound session transition. Returns the requirement the
+     * session does not meet, whole and not what is left of it, or `null` when
+     * it meets it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
-     * @return void
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function reevaluate(MultiFactorAuthenticatable $identity, string $application, array $proofs): void
+    public function reevaluate(MultiFactorAuthenticatable $identity, string $application, array $proofs): ?Requirement
     {
         $requirement = $this->container->make(RequirementService::class)->requirementFor($identity, $application);
 
         if ($this->container->make(RequirementCheck::class)->check($requirement, ...$proofs)->meetsRequirement()) {
-            return;
+            return null;
         }
 
         $this->container->make(SessionTransition::class)->returnToPending($identity, $application, $requirement);
+
+        return $requirement;
     }
 }

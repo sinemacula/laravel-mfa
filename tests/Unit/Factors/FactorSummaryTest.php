@@ -51,6 +51,30 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
+     * A summary says whether the failure ceiling disabled the factor, and shows
+     * it in its JSON.
+     *
+     * @return void
+     */
+    public function testSaysWhetherTheFactorIsDisabled(): void
+    {
+        $disabled = self::createStub(Factor::class);
+        $disabled->method('getFactorIdentifier')->willReturn('01H');
+        $disabled->method('getType')->willReturn('totp');
+        $disabled->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
+        $disabled->method('getDisabledAt')->willReturn(Carbon::now());
+
+        $usable = self::createStub(Factor::class);
+        $usable->method('getFactorIdentifier')->willReturn('01J');
+        $usable->method('getType')->willReturn('totp');
+        $usable->method('getStatus')->willReturn(FactorStatus::CONFIRMED);
+
+        self::assertTrue(FactorSummary::fromFactor($disabled)->disabled);
+        self::assertTrue(FactorSummary::fromFactor($disabled)->jsonSerialize()['disabled']);
+        self::assertFalse(FactorSummary::fromFactor($usable)->disabled);
+    }
+
+    /**
      * Test implements json serializable.
      *
      * @return void
@@ -336,6 +360,7 @@ final class FactorSummaryTest extends TestCase
             'status'             => 'confirmed',
             'preferred'          => true,
             'last_used_at'       => self::LAST_USED_AT_ISO,
+            'disabled'           => false,
         ], $summary->jsonSerialize());
     }
 
@@ -364,6 +389,7 @@ final class FactorSummaryTest extends TestCase
             'status'             => 'confirmed',
             'preferred'          => false,
             'last_used_at'       => null,
+            'disabled'           => false,
         ], $summary->jsonSerialize());
     }
 
@@ -385,7 +411,7 @@ final class FactorSummaryTest extends TestCase
         );
 
         self::assertJsonStringEqualsJsonString(
-            '{"id":"01H","type":"totp","label":null,"masked_destination":null,"status":"confirmed","preferred":false,"last_used_at":null}',
+            '{"id":"01H","type":"totp","label":null,"masked_destination":null,"status":"confirmed","preferred":false,"last_used_at":null,"disabled":false}',
             (string) json_encode($summary),
         );
     }

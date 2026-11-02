@@ -138,14 +138,14 @@ registers it with the container, and the classes only it uses:
 | `Passkeys`      | The change gate, `PasskeyRegistration`, `CredentialId`, assertions and the unavailable gateway      |
 | `Seams`         | Defaults that read nothing of the package: `RefusingReauthenticator`                                |
 | `Enrollment`    | `startEnrollment()`, `confirmEnrollment()`, what they answer and `EnrollmentSettings`               |
-| `Lifecycle`     | `disable()`, `ForgetIdentity` and `LifecycleSettings`                                               |
+| `Lifecycle`     | Removing, resetting, unlocking and pruning, `ForgetIdentity` and `LifecycleSettings`                |
 | `RecoveryCodes` | `generateRecoveryCodes()`, `recoveryCodes()` and `RecoveryCodeSettings`                             |
 | `Attempts`      | `AttemptService`, and `ChallengeCounters`, the counts a challenge owner reports into                |
 | `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
 | `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction             |
 | `Http`          | The `mfa` and `mfa.skip` middleware, `RequireMfa` and `SkipMfa`                                     |
 | `Testing`       | `FakeSmsSender`, `FakeEmailSender`, and the seam contract kit in `Testing\Seams`                    |
-| `Console`       | The `mfa:check` command                                                                             |
+| `Console`       | The `mfa:check` and `mfa:prune` commands                                                            |
 
 `Contracts`, `Concerns`, `Models`, `Events`, `Exceptions`, `Enums` and `Facades` hold what their names say for every
 capability (the events and how they are dispatched are in [Events](events.md), and the values and enums assurance is
@@ -156,8 +156,7 @@ and `Config`, `Database` and `Support` the internal helpers the capabilities sha
 capability reads its own block of `config/mfa.php` through its `*Settings` class, on every call.
 `Contracts` also declares the seams the requirement, verification, enrolment and lifecycle flows are built against,
 listed in [the seam contracts design note](../design/seam-contracts.md). Each has a default that works without an
-authentication layer and fails closed (see [Seam defaults](#seam-defaults)), but for `SelfServiceRecovery`, which comes
-with the lifecycle flows. The `Mfa` facade and
+authentication layer and fails closed (see [Seam defaults](#seam-defaults)). The `Mfa` facade and
 `MfaManager` stay the entry point: each manager method hands its call to the service of its capability, so nothing you
 call changes with the layout. The services and `*Bindings` classes are internal; extend the package through the points
 in the table above. How the layout works is described in
@@ -182,19 +181,21 @@ service provider:
 | `StepUp`                 | `Proofs\ProofStoreCompletion`               | An active session's proof goes in the proof store                       |
 | `PasskeyGateway`         | `Passkeys\UnavailablePasskeyGateway`        | Passkeys are unavailable                                                |
 | `LastFactorPolicy`       | `Lifecycle\RequiredFactorPolicy`            | The last acceptable factor stays while one is required                  |
+| `SelfServiceRecovery`    | `Lifecycle\NoSelfServiceRecovery`           | None is offered; a person is reset by someone else                      |
+| `ActiveTenantResolver`   | `Requirements\NoActiveTenant`               | No session has an active tenant                                         |
 
 The refusing reauthenticator means an identity cannot add its first additional factor on an active session until
 something proves its first factor again: bind a `Contracts\Reauthenticator` that asks the person for their password, for
 example, and returns a `first_factor_reauthentication` proof bound to their current sign-in.
 
 Every helper that returns summaries, sends a code or reveals a secret asks the bound `PendingSessionResolver` first. On
-a pending session it serves only the action it needs (`mfa.list_factors` for `getFactors()`, `offeredFactors()` and
-`recoveryCodes()`, `mfa.send_code` for `sendCode()`, `mfa.verify` for `verify()` and `requestAssertion()`), as the
+a pending session it serves only the action it needs (`mfa.list_factors` for `factors()`, `factor()`, `offeredFactors()`
+and `recoveryCodes()`, `mfa.send_code` for `sendCode()`, `mfa.verify` for `verify()` and `requestAssertion()`), as the
 pending session's own identity; anything else gets nothing, never the guard's user in its place. Starting, resending and
 cancelling an enrolment need `mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`.
-Generating recovery codes, renaming or preferring a factor, `disable()`, `isSetup()` and `proofs()` serve active
-sessions only. A code is sent or checked only for a binding that is exactly the caller's own, on its application and its
-session. A resolver reports a pending credential that does not validate by throwing.
+Generating recovery codes, renaming, preferring or removing a factor and `proofs()` serve active sessions only. A code
+is sent or checked only for a binding that is exactly the caller's own, on its application and its session. A resolver
+reports a pending credential that does not validate by throwing.
 
 ## Challenge counters
 

@@ -102,7 +102,7 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
   stop counting a removed factor's proofs when the generation is advanced. A stateless guard rebinds `ProofStore`,
   keyed by an id that names one sign-in, not merely a device.
 - Laravel writes the whole session back when a request ends, and does not serialise a session's requests unless a
-  route asks it to (`Route::block()`). A request that loaded the session before a factor was disabled on it can save
+  route asks it to (`Route::block()`). A request that loaded the session before a factor was removed on it can save
   its older copy afterwards, putting the forgotten proofs back. Forgetting a factor on the current session is
   therefore only as strong as the serialisation of its requests; advancing the generation is what holds whatever
   copy of the session is saved last.
@@ -117,7 +117,7 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 - `src/Proofs/GuardHooks.php`, `src/Proofs/BeginSignInOnLogin.php`, `src/Proofs/ForgetSignInOnLogout.php`.
 - `src/Proofs/ProofService.php` (`proofs()`, `beginSignIn()`, `endSignIn()`, `forgetFactor()`, `application()`,
   `applicationFor()`), `src/Proofs/ProofStoreCompletion.php`, `src/Proofs/ProofBindings.php`.
-- `src/Verification/VerificationService.php` (`verify()`); `src/Lifecycle/LifecycleService.php` (`disable()`).
+- `src/Verification/VerificationService.php` (`verify()`); `src/Lifecycle/FactorRemoval.php` (`erase()`).
 - `src/Http/Middleware/RequireMfa.php` (`lastVerifiedAt()`, `hasExpired()`, `parseMaxAgeMinutes()`),
   `src/Http/Middleware/SkipMfa.php`; `config/mfa.php` (`proofs.max_age_minutes`), `src/Proofs/ProofSettings.php`.
 
@@ -130,7 +130,7 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
   `tests/Unit/Proofs/ForgetSignInOnLogoutTest.php`, `tests/Unit/Proofs/ProofBindingsTest.php`.
 - `tests/Unit/Proofs/ProofServiceTest.php`; `tests/Unit/Proofs/ProofStoreCompletionTest.php` and
   `tests/Feature/Verification/CompletionVerificationServiceTest.php` (the proof each verification hands over);
-  `tests/Unit/Lifecycle/LifecycleServiceTest.php` (a disabled factor's proofs).
+  `tests/Feature/Lifecycle/RemovingFactorTest.php` (a removed factor's proofs).
 - `tests/Feature/Proofs/SignInProofsTest.php`: a reused session, sign-out and current-device sign-out, two guards on
   one session, a guard calling neither hook, a custom guard's hooks, a generation bump across sessions.
 - `tests/Unit/Http/Middleware/RequireMfaTest.php`, `tests/Feature/RequireMfaMiddlewareTest.php`,

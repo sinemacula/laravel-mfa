@@ -6,8 +6,10 @@ namespace Tests\Unit\Lifecycle;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy;
+use SineMacula\Laravel\Mfa\Contracts\SelfServiceRecovery;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleBindings;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
+use SineMacula\Laravel\Mfa\Lifecycle\NoSelfServiceRecovery;
 use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
 use Tests\TestCase;
 
@@ -55,5 +57,18 @@ final class LifecycleBindingsTest extends TestCase
         $this->container()->instance(LastFactorPolicy::class, $own);
 
         self::assertSame($own, $this->container()->make(LastFactorPolicy::class));
+    }
+
+    /**
+     * Self-service recovery defaults to none, shared.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBindsNoSelfServiceRecoveryByDefault(): void
+    {
+        self::assertInstanceOf(NoSelfServiceRecovery::class, $this->container()->make(SelfServiceRecovery::class));
+        self::assertTrue($this->container()->isShared(SelfServiceRecovery::class));
     }
 }

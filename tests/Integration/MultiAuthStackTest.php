@@ -56,8 +56,7 @@ final class MultiAuthStackTest extends TestCase
         $this->actingAs($user);
 
         self::assertFalse(Mfa::requirement()->isEmpty());
-        self::assertTrue(Mfa::isSetup());
-        self::assertCount(1, Mfa::getFactors() ?? collect());
+        self::assertCount(1, Mfa::factors());
     }
 
     /**
@@ -84,8 +83,7 @@ final class MultiAuthStackTest extends TestCase
         $this->container()->forgetInstance('mfa');
 
         self::assertFalse(Mfa::requirement()->isEmpty());
-        self::assertTrue(Mfa::isSetup());
-        self::assertCount(1, Mfa::getFactors() ?? collect());
+        self::assertCount(1, Mfa::factors());
     }
 
     /**
@@ -114,8 +112,7 @@ final class MultiAuthStackTest extends TestCase
         // GenericUser does not implement MultiFactorAuthenticatable, so the
         // manager must short-circuit cleanly rather than throw.
         self::assertTrue(Mfa::requirement()->isEmpty());
-        self::assertFalse(Mfa::isSetup());
-        self::assertNull(Mfa::getFactors());
+        self::assertSame([], Mfa::factors());
     }
 
     /**
@@ -153,12 +150,10 @@ final class MultiAuthStackTest extends TestCase
         Sanctum::actingAs($user, ['*']);
 
         self::assertFalse(Mfa::requirement()->isEmpty());
-        self::assertTrue(Mfa::isSetup());
 
-        $factors = Mfa::getFactors();
-        self::assertNotNull($factors);
+        $factors = Mfa::factors();
         self::assertCount(1, $factors);
-        self::assertSame('totp', $factors->first()?->getType());
+        self::assertSame('totp', $factors[0]->type);
     }
 
     /**

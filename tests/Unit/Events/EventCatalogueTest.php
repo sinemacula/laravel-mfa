@@ -231,8 +231,8 @@ final class EventCatalogueTest extends TestCase
         $removed = new FactorRemoved(self::CONTEXT, $factor);
         self::assertNull($removed->actor);
 
-        $reset = new FactorsReset(self::CONTEXT, $actor);
-        self::assertSame([$actor, null, true], [$reset->actor, $reset->reason, $reset->reenrollmentRequired]);
+        $reset = new FactorsReset(self::CONTEXT, $actor, 'Lost phone');
+        self::assertSame([$actor, 'Lost phone', true], [$reset->actor, $reset->reason, $reset->reenrollmentRequired]);
 
         $applied = new LockoutApplied(self::CONTEXT, null, $until, Purpose::SIGN_IN);
         self::assertSame([null, $until, Purpose::SIGN_IN], [$applied->factor, $applied->lockedUntil, $applied->purpose]);

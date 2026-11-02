@@ -4,25 +4,43 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Lifecycle;
 
-use Illuminate\Contracts\Container\Container;
-use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
-use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
-use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
-use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
-use SineMacula\Laravel\Mfa\Proofs\ProofService;
-use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Events\Actor;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Removes the current identity's factors.
+ * Removes the signed-in person's factors, and lifts an identity's lockouts for
+ * someone acting on it.
+ *
+ * A removal serves active sessions only. It is decided twice by the same checks
+ * (see `RemovalGuard`): on the factors as they stand, taking no lock, so what
+ * is refused anyway waits for nothing; then in the identity's factor state
+ * transaction on the factors as stored under its lock, with the caller resolved
+ * again and compared, so two removals cannot each see the other factor and a
+ * sign-in that changed meanwhile is not acted on. Only those checks become a
+ * refusal, carried out of the transaction so it rolls back: whatever the change
+ * itself throws propagates, a revoker's or a transition's included, as does
+ * anything a listener throws once it has committed.
+ *
+ * Unlocking resolves the factor under the identity's lock, and lifts temporary
+ * lockouts only: failures in a row stay, and a factor disabled at the failure
+ * ceiling stays disabled until another factor is proved, it is rebound or the
+ * identity is reset.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,133 +52,218 @@ final readonly class LifecycleService
     /**
      * Constructor.
      *
-     * @param  \Illuminate\Contracts\Container\Container  $container
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
-     * @param  \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService  $recoveryCodes
-     * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations  $associations
+     * @param  \Illuminate\Contracts\Config\Repository  $config
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
+     * @param  \SineMacula\Laravel\Mfa\Lifecycle\RemovalGuard  $guard
+     * @param  \SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval  $removal
+     * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptService  $attempts
      */
     public function __construct(
 
-        /** The container the event dispatcher is read from. */
-        private Container $container,
+        /** The configuration the factor model is read from. */
+        private Repository $config,
 
-        /** The proofs the removed factor made, which stop counting. */
-        private ProofService $proofs,
+        /** The resolver of who the request serves. */
+        private CallerContextResolver $callers,
 
-        /** The recovery codes removed with the identity's last confirmed factor. */
-        private RecoveryCodeService $recoveryCodes,
+        /** The checks every removal makes. */
+        private RemovalGuard $guard,
 
-        /** The passkey associations removed with their factor. */
-        private PasskeyAssociations $associations,
+        /** The removal every entry point shares. */
+        private FactorRemoval $removal,
+
+        /** The lockouts. */
+        private AttemptService $attempts,
     ) {}
 
     /**
-     * Disable a previously-enrolled factor for the current identity.
+     * Remove the signed-in person's factor enrolled through the current
+     * application, or say why not.
      *
-     * Deletes the underlying row when the factor is an Eloquent model. An
-     * `EloquentFactor` is deleted as stored, in the identity's factor state
-     * transaction, and with it its passkey association and the identity's
-     * recovery codes when no confirmed factor remains (a pending one does not
-     * count; one disabled at the failure ceiling does); any other model is
-     * deleted on its own. Then stops counting
-     * every proof made with the factor on the current session, and dispatches
-     * `MfaFactorDisabled`. Non-Eloquent factors are left for the consumer to
-     * discard, with the recovery codes; their proofs stop counting and the
-     * event still fires.
+     * @param  mixed  $factorId
+     * @return \SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult
      *
-     * Throws `FactorOwnershipMismatchException` when the factor does not belong
-     * to the current identity, and `WriteCancelledException` when a model event
-     * cancels the deletion, which then removes, forgets and reports nothing.
-     * No-op when no MFA-capable person is signed in, and on a pending session
-     * (see `Context\CallerContextResolver`).
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      * @throws \Throwable
      */
-    public function disable(Factor $factor): void
+    public function removeFactor(mixed $factorId): FactorRemovalResult
     {
-        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
+        $caller = $this->callers->resolve(null);
 
-        if ($identity === null) {
-            return;
-        }
-
-        FactorOwnership::assert($factor, $identity);
-
-        if (LockedFactors::keepsState($factor)) {
-            $this->remove($identity, $factor);
-        } elseif ($factor instanceof Model) {
-            self::delete($factor);
-        }
-
-        $identifier = $factor->getFactorIdentifier();
-
-        if (is_string($identifier) || is_int($identifier)) {
-            $this->proofs->forgetFactor($identity, (string) $identifier);
-        }
-
-        $events = $this->container->make(Dispatcher::class);
-        $events->dispatch(new MfaFactorDisabled($identity, $factor, $factor->getType()));
+        return $caller === null ? FactorRemovalResult::refused(FailureReason::NOT_FOUND) : $this->removeFor($caller, $factorId);
     }
 
     /**
-     * Delete the factor as stored under the identity's lock, in its factor
-     * state transaction, with its passkey association, and the identity's
-     * recovery codes with it when none of the factors left under the lock is
-     * confirmed. A factor already gone is not deleted again; the caller's
-     * instance is marked as no longer stored.
+     * Lift the factor's temporary lockout, as an action the actor took. `false`
+     * for an id that finds none of the identity's factors, reporting nothing,
+     * and when no live lockout was lifted.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
-     * @return void
+     * @param  mixed  $factorId
+     * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @return bool
      *
      * @throws \Throwable
+     *
+     * @imperative
      */
-    private function remove(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor): void
+    public function unlockFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor): bool
     {
-        FactorStateTransaction::forIdentity($identity, $factor, function (Collection $factors) use ($identity, $factor): void {
+        return FactorStateTransaction::forIdentity($identity, $this->factorModel(), function (Collection $factors) use ($identity, $factorId, $actor): bool {
 
-            $stored  = LockedFactors::find($factor, $factors);
-            $removed = LockedFactors::idOf($factor);
+            $factor = LockedFactors::withId($factorId, $factors);
 
-            if ($stored !== null) {
-                self::delete($stored);
-            }
-
-            if ($removed !== null) {
-                $this->associations->forget($removed);
-            }
-
-            $factor->exists = false;
-            $remains        = $factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $removed && $other->isConfirmed());
-
-            if ($remains) {
-                return;
-            }
-
-            $this->recoveryCodes->removeSet($identity);
+            return $factor !== null && $this->attempts->liftLockout($identity, $factor, $actor);
         });
     }
 
     /**
-     * Delete the factor's row, and throw when a model event cancels the
-     * deletion, so nothing is removed, forgotten or reported for a factor that
-     * stays.
+     * Lift the identity's temporary lockout, as an action the actor took.
+     * `false` when no live lockout was lifted, though its count within the
+     * window may still have been cleared.
      *
-     * @param  \Illuminate\Database\Eloquent\Model  $factor
-     * @return void
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @return bool
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \Throwable
+     *
+     * @imperative
      */
-    private static function delete(Model $factor): void
+    public function unlockIdentity(MultiFactorAuthenticatable $identity, Actor $actor): bool
     {
-        if ($factor->delete() === false) {
-            throw new WriteCancelledException('A model event cancelled the factor\'s deletion, so it was not disabled.');
+        return $this->attempts->liftLockout($identity, null, $actor);
+    }
+
+    /**
+     * Check the caller's removal on the factors as they stand, and make it
+     * under the lock when nothing refuses it. Without a sign-in there is
+     * nothing a step-up could have been made on, or to compare under the lock,
+     * whatever a bound gate answered.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
+     * @param  mixed  $factorId
+     * @return \SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult
+     *
+     * @throws \Throwable
+     */
+    private function removeFor(Caller $caller, mixed $factorId): FactorRemovalResult
+    {
+        $identity    = $caller->identity;
+        $application = $this->callers->application($caller);
+        $binding     = $this->callers->binding($caller, Purpose::STEP_UP);
+        $model       = $this->factorModel();
+        $refusal     = $this->refusalBeforeTheLock($identity, $application, $factorId, FactorStateTransaction::snapshot($identity, $model));
+
+        if ($refusal !== null || $binding === null) {
+            return FactorRemovalResult::refused($refusal ?? FailureReason::NOT_FRESH);
         }
+
+        try {
+            return FactorStateTransaction::forIdentity(
+                $identity,
+                $model,
+                fn (Collection $factors): FactorRemovalResult => $this->removeUnderLock($binding, $application, $factorId, $factors),
+            );
+        } catch (RefusedUnderLockException $exception) {
+            return FactorRemovalResult::refused($exception->refusal->reason);
+        }
+    }
+
+    /**
+     * Why the removal is refused on the factors given, taking no lock, or
+     * `null` when nothing refuses it.
+     *
+     * @formatter:off
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  mixed  $factorId
+     * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
+     * @return ?\SineMacula\Laravel\Mfa\Enums\FailureReason
+     *
+     * @formatter:on
+     */
+    private function refusalBeforeTheLock(MultiFactorAuthenticatable $identity, string $application, mixed $factorId, Collection $factors): ?FailureReason
+    {
+        try {
+            $this->removable($identity, $application, $factorId, $factors);
+        } catch (OperationRefusedException $exception) {
+            return $exception->reason;
+        }
+
+        return null;
+    }
+
+    /**
+     * Under the lock: resolve the caller again and check the removal again on
+     * the factors as stored, carrying out only those refusals, then make the
+     * change.
+     *
+     * @formatter:off
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  string  $application
+     * @param  mixed  $factorId
+     * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
+     * @return \SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult
+     *
+     * @formatter:on
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException
+     * @throws \Throwable
+     */
+    private function removeUnderLock(ProofBinding $binding, string $application, mixed $factorId, Collection $factors): FactorRemovalResult
+    {
+        [$identity, $factor] = RefusedUnderLockException::carrying(function () use ($binding, $application, $factorId, $factors): array {
+
+            $caller = $this->callers->still(null, $binding);
+
+            if ($caller === null) {
+                throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The sign-in changed before the identity\'s lock was held.');
+            }
+
+            return [$caller->identity, $this->removable($caller->identity, $application, $factorId, $factors)];
+        });
+
+        $summary = FactorSummary::fromFactor($factor);
+
+        return FactorRemovalResult::made($summary, $this->removal->remove($identity, $application, $factor, $factors));
+    }
+
+    /**
+     * The factor with the id among those given, refusing an inactive identity
+     * and anything `RemovalGuard` refuses.
+     *
+     * @formatter:off
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  mixed  $factorId
+     * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
+     * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
+     *
+     * @formatter:on
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     */
+    private function removable(MultiFactorAuthenticatable $identity, string $application, mixed $factorId, Collection $factors): EloquentFactor&Model
+    {
+        OperationRefusedException::unless($identity->isMfaActive(), FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.');
+
+        return $this->guard->assertRemovable($identity, $application, LockedFactors::withId($factorId, $factors), $factors);
+    }
+
+    /**
+     * A new instance of the configured factor model.
+     *
+     * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     */
+    private function factorModel(): EloquentFactor&Model
+    {
+        $model = ConfiguredModels::factor($this->config);
+
+        return new $model;
     }
 }

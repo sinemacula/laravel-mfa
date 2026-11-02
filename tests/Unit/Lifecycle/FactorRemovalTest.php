@@ -7,9 +7,13 @@ namespace Tests\Unit\Lifecycle;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\TestCase;
 
@@ -70,6 +74,40 @@ final class FactorRemovalTest extends TestCase
         $this->expectExceptionMessage('A factor is removed by its id.');
 
         DB::transaction(fn () => $this->removal()->remove($user, self::APPLICATION, $factor, new Collection([$factor])));
+    }
+
+    /**
+     * Erasing deletes the factor and its association and stops its proofs
+     * counting, with none of the rest of a removal: another factor, the
+     * recovery codes and the other sessions are left alone.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testErasingDeletesOnlyTheFactorsOwnRecords(): void
+    {
+        $this->enablePasskeys();
+
+        $user    = $this->signedInPerson();
+        $other   = $this->confirmedFactor($user);
+        $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        $this->stepUpWith($user, $other);
+        $this->stepUpWith($user, $passkey);
+
+        $generation = VerificationGeneration::current($user);
+
+        $this->removal()->erase($user, $passkey);
+
+        self::assertFalse(Factor::query()->whereKey($passkey->id)->exists());
+        self::assertTrue(Factor::query()->whereKey($other->id)->exists());
+        self::assertSame(0, PasskeyAssociation::query()->where('factor_id', $passkey->id)->count());
+        self::assertSame($generation, VerificationGeneration::current($user));
+
+        $proofs = $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION);
+
+        self::assertSame([$other->id], array_map(static fn (Proof $proof): ?string => $proof->reference, $proofs));
     }
 
     /**

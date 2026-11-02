@@ -9,6 +9,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
+use SineMacula\Laravel\Mfa\Database\BoundedDelete;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
@@ -156,6 +157,21 @@ final readonly class AttemptStore
     public function forget(string $key): void
     {
         $this->table()->where('key', $key)->delete();
+    }
+
+    /**
+     * Delete the rows whose window has ended, and return how many. The end is
+     * part of each delete, so a row a concurrent attempt has just started a new
+     * window on stays.
+     *
+     * @param  int  $now
+     * @return int
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function prune(int $now): int
+    {
+        return BoundedDelete::run($this->table()->where('window_ends_at', '<=', $this->format($now)));
     }
 
     /**

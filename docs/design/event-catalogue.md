@@ -16,8 +16,9 @@ event carries is built, and why every event is dispatched only after the change 
   and `null` for a change made outside any verification (renames, preferred factor, removal, reset, lifted lockouts,
   recovery code sets generated or removed).
 - An event carries a factor as a `Factors\FactorSummary` (id, type, label, masked destination, status, preferred, last
-  use), never the model, a secret, a code, a provisioning URI, a credential reference or a full destination, so a queued
-  listener can serialise it. Who took an action on someone else's factors is an `Events\Actor`, a type and an id.
+  use, disabled), never the model, a secret, a code, a provisioning URI, a credential reference or a full destination,
+  so a queued listener can serialise it. Who took an action on someone else's factors is an `Events\Actor`, a type and
+  an id.
 - Verification events carry the purpose and, when the attempt went through a challenge or a passkey's gateway reported
   one, its id, as `CodeSent` does for the challenge it sent. A failure carries the machine-readable
   `Enums\FailureReason`. There is one verification event per attempt, and a check against the whole recovery code set is

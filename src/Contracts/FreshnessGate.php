@@ -38,6 +38,12 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  * not bring an expired grant back. A gate that cannot say answers `null`, and
  * what depends on it is refused.
  *
+ * `requirement()` says what the gate holds the session to, so a caller that
+ * must judge that requirement on only some of the session's proofs (removing a
+ * factor, on the proofs made without it) judges the gate's own, stricter one
+ * and not merely the package's setting. A gate with no requirement for the
+ * operation answers `null`, and what depends on it is refused.
+ *
  * @api
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -55,6 +61,19 @@ interface FreshnessGate
      * @throws \InvalidArgumentException
      */
     public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool;
+
+    /**
+     * The requirement the gate holds the current session to for the operation:
+     * the stricter of its own setting and the caller's, either alone when the
+     * other is absent, and `null` with neither.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement;
 
     /**
      * The instant the current session stops being fresh for the operation on

@@ -186,10 +186,9 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * The polymorphic lookup path (`Mfa::getFactors()` and the manager cache)
-     * reads `WHERE authenticatable_type = ? AND authenticatable_id = ?` on
-     * every request. The index that backs that query must exist, regardless of
-     * engine.
+     * The polymorphic lookup path (`Mfa::factors()`) reads `WHERE
+     * authenticatable_type = ? AND authenticatable_id = ?` on every request. The
+     * index that backs that query must exist, regardless of engine.
      *
      * @return void
      */

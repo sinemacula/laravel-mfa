@@ -143,9 +143,25 @@ final readonly class PendingEnrollments
      */
     public function ofApplication(ProofOwner $owner, string $application): Collection
     {
+        return $this->ofOwner($owner)
+            ->filter(static fn (Enrollment $enrollment): bool => $enrollment->application === $application)
+            ->values();
+    }
+
+    /**
+     * Every one of the owner's enrolments, through any application, as stored
+     * under the lock, matched exactly and in a stable order, for a change that
+     * ends them all.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
+     * @return \Illuminate\Database\Eloquent\Collection<int, \SineMacula\Laravel\Mfa\Models\Enrollment>
+     */
+    public function ofOwner(ProofOwner $owner): Collection
+    {
         return self::locked(Enrollment::query()->where('authenticatable_type', $owner->type)->where('authenticatable_id', $owner->key))
+            ->orderBy('id')
             ->get()
-            ->filter(static fn (Enrollment $enrollment): bool => self::belongsTo($enrollment, $owner->type, $owner->key, $application))
+            ->filter(static fn (Enrollment $enrollment): bool => $enrollment->authenticatable_type === $owner->type && $enrollment->authenticatable_id === $owner->key)
             ->values();
     }
 

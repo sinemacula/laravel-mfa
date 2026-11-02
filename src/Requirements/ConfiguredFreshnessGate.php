@@ -87,6 +87,25 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
     }
 
     /**
+     * The requirement the application configures for the operation, with the
+     * caller's: the stricter of the two, either alone when the other is absent.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    #[\Override]
+    public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement
+    {
+        $application = $this->container->make(ProofService::class)->application();
+
+        return (new OperationRequirements($this->container->make(Repository::class)))->effective($application, $operation, $callerRequirement);
+    }
+
+    /**
      * What the session's recorded proofs add up to against the operation's
      * requirement, or `null` without an identity or a requirement.
      *
@@ -101,8 +120,7 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
     private function evaluation(string $operation, ?Requirement $callerRequirement): ?Evaluation
     {
         $application = $this->container->make(ProofService::class)->application();
-        $operations  = new OperationRequirements($this->container->make(Repository::class));
-        $requirement = $operations->effective($application, $operation, $callerRequirement);
+        $requirement = $this->requirement($operation, $callerRequirement);
         $identity    = CurrentIdentity::resolve();
 
         if ($requirement === null || $identity === null) {

@@ -75,6 +75,17 @@ trait FreshnessGateTests
     }
 
     /**
+     * The requirement the gate holds a session to asks at least what the caller
+     * asks.
+     *
+     * @return void
+     */
+    public function testFreshnessGateHoldsASessionToWhatTheCallerAsks(): void
+    {
+        FreshnessGateContract::assertTheRequirementAsksWhatTheCallerAsks($this->freshnessGate());
+    }
+
+    /**
      * The gate under test, asked on behalf of a signed-in identity.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate

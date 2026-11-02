@@ -22,14 +22,14 @@ $requirement->parts();     // [RequirementPart::ADDITIONAL_VERIFICATION, ...]
 The requirement is the strictest of these parts, so the same inputs always give the same answer. The identity's own
 requirement and a re-enrolment obligation count in every application, whatever its mode:
 
-| Source                                 | Asks for                                                                              |
-|----------------------------------------|---------------------------------------------------------------------------------------|
-| The application, `never` (the default) | Nothing                                                                               |
-| The application, `enrolled`            | An additional verification once the identity has a confirmed factor, nothing before   |
-| The application, `always`              | An additional verification                                                            |
-| The identity                           | What `requiresAdditionalFactor()` returns (see [Identity models](identity-models.md)) |
-| A re-enrolment obligation              | An additional verification while a reset obliges the identity to enrol again          |
-| The active tenant                      | What the bound `Contracts\TenantRequirement` answers, only where a tenant is active   |
+| Source                                 | Asks for                                                                                     |
+|----------------------------------------|----------------------------------------------------------------------------------------------|
+| The application, `never` (the default) | Nothing                                                                                      |
+| The application, `enrolled`            | An additional verification once the identity has a confirmed factor, nothing before          |
+| The application, `always`              | An additional verification                                                                   |
+| The identity                           | What `requiresAdditionalFactor()` returns (see [Identity models](identity-models.md))        |
+| A re-enrolment obligation              | An additional verification while a reset obliges the identity to enrol again                 |
+| The active tenant                      | What the bound `Contracts\TenantRequirement` answers, where `ActiveTenantResolver` names one |
 
 An application nobody configured counts as `never`. Each part asks for its strictest: every part any source asks for,
 the highest minimum level, and for each part the shortest maximum age. The mode is set per application (see
@@ -42,9 +42,11 @@ the highest minimum level, and for each part the shortest maximum age. The mode 
 ],
 ```
 
-The tenant's requirement is not part of `Mfa::requirement()`: the sign-in's requirement is decided before any principal
-or tenant is chosen. An adapter, or the application, composes it where a tenant becomes active and checks the session
-against it (see [Checking a session](#checking-a-session)). The package never sees a tenant tree; the default
+The bound `Contracts\ActiveTenantResolver` says which tenant applies, from validated session context, as an opaque id:
+never what a request merely claims, and never an event's descriptive context. Its default,
+`Requirements\NoActiveTenant`, names none, so the tenant's requirement adds nothing until an adapter binds one, and a
+sign-in has none before any principal or tenant is chosen. The same answer is used by `Mfa::requirement()` and whenever
+a factor change evaluates the session again. The package never sees a tenant tree; the default
 `Requirements\NoTenantRequirement` asks for nothing.
 
 ### A multi-factor first factor
@@ -81,8 +83,8 @@ them. Replacing a factor is enrolling then removing, so it asks `mfa.add_factor`
 the package's, in its `freshness` block (see [Applications](configuration.md#applications)): seconds for an additional
 verification within that age, or a requirement whose every part has a `max_age`. Starting an enrolment asks this for
 `mfa.add_factor`, and its grant lives no longer than the answer (see [Enrolment](enrollment.md)); generating recovery
-codes asks it for `mfa.generate_recovery_codes`. `Mfa::disable()` does not ask yet; until the lifecycle flow does, an
-application calls `Mfa::isFresh()` itself before calling it.
+codes asks it for `mfa.generate_recovery_codes`; removing a factor asks it for `mfa.remove_factor` (see
+[Factor lifecycle](lifecycle.md#the-step-up)).
 
 A caller may pass a requirement of its own; the stricter of it and the configured one applies, either alone when the
 other is absent:
@@ -139,18 +141,21 @@ $evaluation->unmet;   // the parts still to prove
 
 Each part is a contract with a default, bound in the container; bind your own from a service provider:
 
-| Contract              | Default                                    | Answers                                                   |
-|-----------------------|--------------------------------------------|-----------------------------------------------------------|
-| `RequirementPolicy`   | `Requirements\ConfiguredRequirementPolicy` | What a sign-in must still prove after its first factor    |
-| `IdentityRequirement` | `Requirements\IdentityContractRequirement` | What the identity requires of its own sign-ins            |
-| `TenantRequirement`   | `Requirements\NoTenantRequirement`         | What an active tenant requires                            |
-| `RequirementCheck`    | `Requirements\ProofRequirementCheck`       | Whether a session's proofs meet a requirement             |
-| `FreshnessGate`       | `Requirements\ConfiguredFreshnessGate`     | Whether the session is fresh enough for a named operation |
+| Contract               | Default                                    | Answers                                                   |
+|------------------------|--------------------------------------------|-----------------------------------------------------------|
+| `RequirementPolicy`    | `Requirements\ConfiguredRequirementPolicy` | What a sign-in must still prove after its first factor    |
+| `IdentityRequirement`  | `Requirements\IdentityContractRequirement` | What the identity requires of its own sign-ins            |
+| `ActiveTenantResolver` | `Requirements\NoActiveTenant`              | Which tenant applies to the session, if any               |
+| `TenantRequirement`    | `Requirements\NoTenantRequirement`         | What an active tenant requires                            |
+| `RequirementCheck`     | `Requirements\ProofRequirementCheck`       | Whether a session's proofs meet a requirement             |
+| `FreshnessGate`        | `Requirements\ConfiguredFreshnessGate`     | Whether the session is fresh enough for a named operation |
 
 `Mfa::isFresh()` hands the bound gate this package's own requirement for the operation as part of the caller's
 requirement. A gate bound in place of the default, such as an adapter over an authentication layer's freshness check,
 must apply the stricter of that and its own setting for the operation, never either alone, answer "not fresh" when it
-has neither, and keep no state between calls. It is asked with the operation's own name (`mfa.add_factor`, never a
+has neither, and keep no state between calls. Its `requirement()` says what it holds a session to, which removing a
+factor judges on the proofs made without that factor, so it must ask at least what the caller asks. It is asked with the
+operation's own name (`mfa.add_factor`, never a
 name of the authentication layer's), so the layer's own setting for that name is the one that applies; configure it
 there. It may be stricter than the package: a setting that takes only an additional factor or a recovery code refuses
 a fresh passkey reauthentication that the package alone would accept.

@@ -29,10 +29,7 @@ final class InMemoryFactor implements Factor
 
     /**
      * Build an in-memory factor double with the provided immutable state. The
-     * optional `$authenticatable` argument lets the fixture report ownership to
-     * the manager's cross-account guard — leaving it null mirrors the pre-guard
-     * "owner unknown" shape and trips the `FactorOwnershipMismatchException`
-     * path.
+     * optional `$authenticatable` argument lets the fixture report its owner.
      *
      * @param  string  $type
      * @param  ?string  $secret

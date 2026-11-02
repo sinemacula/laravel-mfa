@@ -10,6 +10,7 @@ use SineMacula\Laravel\Mfa\Assurance\AssuranceBindings;
 use SineMacula\Laravel\Mfa\Codes\CodeBindings;
 use SineMacula\Laravel\Mfa\Config\ConfigurationBindings;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
+use SineMacula\Laravel\Mfa\Console\PruneCommand;
 use SineMacula\Laravel\Mfa\Context\ContextBindings;
 use SineMacula\Laravel\Mfa\Drivers\DriverBindings;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentBindings;
@@ -131,7 +132,7 @@ final class MfaServiceProvider extends ServiceProvider
             return;
         }
 
-        $this->commands([CheckConfigurationCommand::class]);
+        $this->commands([CheckConfigurationCommand::class, PruneCommand::class]);
     }
 
     /**

@@ -33,15 +33,14 @@ attempt (see [Verification](verification.md)). `LockoutApplied`, `LockoutLifted`
 the attempt caps (see [Attempts and lockouts](attempts.md)), and the recovery code events by the set's own flows (see
 [Recovery codes](recovery-codes.md)).
 
-The enrolment flow dispatches its events in the order [Enrolment](enrollment.md#events) sets out. The lifecycle flow
-builds on the same catalogue. Until it ships, its catalogue events are declared but not yet dispatched, and
-`MfaFactorDisabled` is dispatched in their place; it carries the factor model and is not an `MfaEvent`.
+The enrolment flow dispatches its events in the order [Enrolment](enrollment.md#events) sets out, and the lifecycle flow
+in the order [Factor lifecycle](lifecycle.md#events) sets out.
 
 The names of the events and of their fields are stable. `factor` is a `Factors\FactorSummary` (id, type, label, masked
-destination, status, preferred, last use), `previous` another; `purpose` is an `Enums\Purpose` (`sign_in`, `step_up`,
-`enrollment` and `reauthenticate`); `reason` an `Enums\FailureReason`; `actor` an `Events\Actor` (type and id), set when
-someone other than the identity took the action; `challengeId` the challenge a code or an attempt went through,
-when it went through one; `type` the type proved or tried (`recovery_code` for a recovery code).
+destination, status, preferred, last use, disabled), `previous` another; `purpose` is an `Enums\Purpose` (`sign_in`,
+`step_up`, `enrollment` and `reauthenticate`); `reason` an `Enums\FailureReason`; `actor` an `Events\Actor` (type and
+id), set when someone other than the identity took the action; `challengeId` the challenge a code or an attempt went
+through, when it went through one; `type` the type proved or tried (`recovery_code` for a recovery code).
 
 Every event also says what it was for through `$event->purpose()`: the purpose of the attempt, code or proof behind it
 for the events that carry a `purpose` field, `enrollment` for the enrolment events (from `EnrollmentStarted` to

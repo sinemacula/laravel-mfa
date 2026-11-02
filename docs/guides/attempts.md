@@ -108,6 +108,9 @@ $attempts->resetIdentityFailures($user);                  // clear the identity'
 - `resetIdentityFailures($identity)` clears the identity's failures in a row, so attempts that name no factor of its
   own are made again. It lifts no lockout and enables no factor.
 
+`Mfa::unlockFactor()` and `Mfa::unlockIdentity()` lift a lockout for an actor, with the factor found by its id under the
+identity's lock, and `Mfa::resetIdentity()` clears the lot (see [Factor lifecycle](lifecycle.md)).
+
 Who may call these, and what they report, is the application's to decide; the package checks only that the factor is
 the identity's.
 
