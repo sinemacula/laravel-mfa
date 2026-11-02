@@ -407,8 +407,12 @@ final class RecoveryCodeRedemptionTest extends TestCase
     /**
      * A valid code is refused when the only factor's stored status is not
      * exactly `confirmed`, even where the column's collation matches it to
-     * `confirmed`: a case and padding insensitive one is MySQL's default, and
-     * SQLite is given the same here, so the check is shown to be made in PHP.
+     * `confirmed`, so the check is shown to be made in PHP. SQLite is given a
+     * case or a padding insensitive collation, and the test first asserts that
+     * SQL does match the stored status to `confirmed` under it. On MySQL, whose
+     * default collation ignores case but not trailing spaces, and PostgreSQL,
+     * which ignores neither, the column keeps its own collation, so there only
+     * the refusal is checked.
      *
      * @param  string  $status
      * @param  string  $collation
@@ -422,13 +426,19 @@ final class RecoveryCodeRedemptionTest extends TestCase
         $holder = $this->signInHolder();
         $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
 
-        if (DB::connection()->getDriverName() === 'sqlite') {
+        $sqlite = DB::connection()->getDriverName() === 'sqlite';
+
+        if ($sqlite) {
             Schema::table('mfa_factors', static function (Blueprint $table) use ($collation): void {
                 $table->string('status', 16)->default('pending')->collation($collation)->change();
             });
         }
 
         Factor::query()->toBase()->update(['status' => $status]);
+
+        if ($sqlite) {
+            self::assertSame(1, Factor::query()->toBase()->where('status', 'confirmed')->count(), 'SQL does not match the stored status to `confirmed` under the collation.');
+        }
 
         $this->assertRefusedRedemption($code, FailureReason::NO_FACTOR);
     }

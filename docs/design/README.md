@@ -83,6 +83,8 @@ The current note set is:
 - `secrets-in-responses-and-logs.md`: the value secrets are meant to be returned in and what it refuses, the response
   helper and `mfa.no-store` middleware that send them uncached, the redaction of secrets, codes and destinations from
   logs, exception messages and traces, delivery failures included, and TOTP secrets surviving a key rotation.
+- `stable-names.md`: the names that stay stable once released (enum values, events, context keys, configuration and
+  application keys, manager methods), where each is documented, and the test that holds the documentation to the code.
 - `budgets-and-benchmarks.md`: the exact query budgets and what they count, on which drivers, the benchmarks and what
   each measures and leaves out, and why a benchmark proves its outcome and never fails on time.
 
