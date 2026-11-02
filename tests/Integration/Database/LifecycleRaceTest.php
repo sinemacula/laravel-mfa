@@ -64,15 +64,7 @@ final class LifecycleRaceTest extends TestCase
 {
     use ArrangesPasskeys;
 
-    /**
-     * How long to wait for the worker, in microseconds, between looks.
-     *
-     * InnoDB refreshes what `innodb_trx` reports only once nothing has read it
-     * for 100 milliseconds, so looking any more often than that would keep
-     * returning the first answer, and never see the worker start waiting.
-     *
-     * @var int
-     */
+    /** @var int How long to wait for the worker, in microseconds, between looks. */
     private const int POLL_INTERVAL = 150000;
 
     /** @var int How many times to look for the worker waiting on the lock. */
@@ -427,6 +419,10 @@ final class LifecycleRaceTest extends TestCase
     /**
      * Wait until the database reports the worker's connection waiting for a row
      * lock, failing when it never does.
+     *
+     * InnoDB refreshes what `innodb_trx` reports only once nothing has read it
+     * for 100 milliseconds, so looking any more often than that would keep
+     * returning the first answer, and never see the worker start waiting.
      *
      * @param  string  $backend
      * @return void
