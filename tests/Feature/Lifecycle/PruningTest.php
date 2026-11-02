@@ -16,7 +16,7 @@ use SineMacula\Laravel\Mfa\Database\BoundedDelete;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Events\EnrollmentExpired;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Lifecycle\PruneResult;
 use SineMacula\Laravel\Mfa\Lifecycle\RecordPruner;
@@ -214,7 +214,7 @@ final class PruningTest extends TestCase
         try {
             Mfa::prune();
             self::fail('A cancelled deletion was expected to throw.');
-        } catch (WriteCancelledException $exception) {
+        } catch (WriteCanceledException $exception) {
             self::assertStringContainsString('cancelled the enrolment\'s deletion', $exception->getMessage());
         } finally {
             Enrollment::flushEventListeners();

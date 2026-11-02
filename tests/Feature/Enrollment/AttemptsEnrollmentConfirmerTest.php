@@ -28,7 +28,7 @@ use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned;
 use SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorChannel;
 use SineMacula\Laravel\Mfa\Factors\FactorLabel;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -221,7 +221,7 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
             $this->mfa()->confirmEnrollment($this->grantOf($start), $wrong);
 
             self::fail('A cancelled deletion was expected to propagate.');
-        } catch (WriteCancelledException) {
+        } catch (WriteCanceledException) {
             self::assertSame(1, Enrollment::query()->count());
             self::assertSame(0, $this->addressHits('127.0.0.1'));
         }

@@ -480,7 +480,7 @@ final class DeliveredCodesTest extends TestCase
      *
      * @throws \Random\RandomException
      */
-    public function testEveryResendCountsTowardsTheCaps(): void
+    public function testEveryResendCountsTowardTheCaps(): void
     {
         $codes = $this->codes(['factor_send_limit' => 3, 'resend_cooldown_seconds' => 0], [self::CODE, self::NEXT_CODE, '111111', '222222']);
         $now   = self::now();

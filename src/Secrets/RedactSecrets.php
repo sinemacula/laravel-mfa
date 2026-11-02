@@ -15,7 +15,7 @@ use Monolog\Processor\ProcessorInterface;
  * and every sensitive value the context and the extra data hold.
  *
  * The context and the extra data are normalised first, each object turned into
- * what Monolog would log for it (see `Redactor::normalise()`), and the values
+ * what Monolog would log for it (see `Redactor::normalize()`), and the values
  * are collected from that same form before anything is redacted (see
  * `SensitiveValues`): a value marked as sensitive, a value under a key naming a
  * secret, a code or a destination, in an object's form too, a code message's
@@ -47,14 +47,14 @@ final class RedactSecrets implements ProcessorInterface
     #[\Override]
     public function __invoke(LogRecord $record): LogRecord
     {
-        $context = Redactor::normalise($record->context);
-        $extra   = Redactor::normalise($record->extra);
+        $context = Redactor::normalize($record->context);
+        $extra   = Redactor::normalize($record->extra);
         $values  = SensitiveValues::inLogValues($context)->with(SensitiveValues::inLogValues($extra));
 
         return $record->with(
             message: Redactor::redactMessage($record->message, $values),
-            context: Redactor::redactNormalised($context, $values),
-            extra: Redactor::redactNormalised($extra, $values),
+            context: Redactor::redactNormalized($context, $values),
+            extra: Redactor::redactNormalized($extra, $values),
         );
     }
 }

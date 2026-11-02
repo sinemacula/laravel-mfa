@@ -41,7 +41,7 @@ for the session. The API is in [Enrolment](../guides/enrollment.md).
   the identity's cap bounds that. An adapter's `ChallengeGateway` owns its own caps and sees a new factor id on a
   restart, so it must key them on what a restart keeps.
 - Every write the flow needs fails closed. A model event that cancels the factor's save, the row's save or deletion, the
-  count of an attempt or the record of a challenge throws `WriteCancelledException`, so the whole transaction rolls back
+  count of an attempt or the record of a challenge throws `WriteCanceledException`, so the whole transaction rolls back
   and no confirmation, recovery code, event or usable grant comes of what was not stored.
 - A row and a factor are matched to their owner exactly before anything acts on them. `FactorStateTransaction` hands
   over only the owner's own factors and `PendingEnrollments::ofApplication()` only its own rows, so on a

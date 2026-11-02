@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace Benchmarks\Support;
 
 use Benchmarks\Support\Concerns\ReportsUsableFactorDefaults;
-use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 
 /**
@@ -108,17 +107,6 @@ final readonly class TotpFactor implements Factor
      */
     #[\Override]
     public function getDestination(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * No owner.
-     *
-     * @return ?\Illuminate\Contracts\Auth\Authenticatable
-     */
-    #[\Override]
-    public function getAuthenticatable(): ?Authenticatable
     {
         return null;
     }

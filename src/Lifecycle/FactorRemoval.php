@@ -16,7 +16,7 @@ use SineMacula\Laravel\Mfa\Database\OpenTransaction;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
@@ -99,7 +99,7 @@ final readonly class FactorRemoval
      *
      * @throws \LogicException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      */
     public function remove(MultiFactorAuthenticatable $identity, string $application, EloquentFactor&Model $factor, Collection $factors): ?Requirement
@@ -141,7 +141,7 @@ final readonly class FactorRemoval
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     public function erase(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor): void
     {
@@ -150,7 +150,7 @@ final readonly class FactorRemoval
         $this->associations->forget($id);
 
         if ($factor->delete() === false) {
-            throw new WriteCancelledException('A model event cancelled the factor\'s deletion, so it was not removed.');
+            throw new WriteCanceledException('A model event cancelled the factor\'s deletion, so it was not removed.');
         }
 
         $this->proofs->forgetFactor($identity, $id);

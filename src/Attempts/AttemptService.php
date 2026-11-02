@@ -20,7 +20,7 @@ use SineMacula\Laravel\Mfa\Events\FactorDisabled;
 use SineMacula\Laravel\Mfa\Events\LockoutApplied;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
@@ -349,7 +349,7 @@ final readonly class AttemptService
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      *
      * @imperative
@@ -603,7 +603,7 @@ final readonly class AttemptService
      * @param  array{0: string, 1: string}  $subject
      * @return bool
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      *
      * @imperative
      */
@@ -631,12 +631,12 @@ final readonly class AttemptService
      * @param  string  $what
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private static function saveState(IdentityState $state, string $what): void
     {
         if (!$state->save()) {
-            throw new WriteCancelledException(sprintf('A model event cancelled the save of %s.', $what));
+            throw new WriteCanceledException(sprintf('A model event cancelled the save of %s.', $what));
         }
     }
 

@@ -76,9 +76,8 @@ final class ActsAsRecoveryCodeTest extends TestCase
 
         $code = RecoveryCode::query()->findOrFail($stored->id);
 
-        self::assertSame($stored->id, $code->getRecoveryCodeIdentifier());
         self::assertSame('$2y$hash', $code->getCodeHash());
-        self::assertSame(3, $code->getGeneration());
+        self::assertSame(3, $code->getAttribute($code->getGenerationName()));
         self::assertNull($code->getUsedAt());
         self::assertNull($code->getReplacedAt());
         self::assertTrue($code->isUsable());
@@ -87,7 +86,7 @@ final class ActsAsRecoveryCodeTest extends TestCase
     }
 
     /**
-     * Using a code, or replacing its set, ends it, at the given time or now.
+     * Using a code, at the given time or now, or replacing its set, ends it.
      *
      * @return void
      */
@@ -102,16 +101,11 @@ final class ActsAsRecoveryCodeTest extends TestCase
         self::assertFalse($used->isUsable());
 
         $replaced = new RecoveryCode;
-        $replaced->markReplaced(Carbon::parse('2026-04-14T08:00:00+00:00'));
+        $replaced->setAttribute($replaced->getReplacedAtName(), Carbon::parse('2026-04-14T08:00:00+00:00'));
 
         self::assertSame('2026-04-14T08:00:00+00:00', $replaced->getReplacedAt()?->toIso8601String());
         self::assertNull($replaced->getUsedAt());
         self::assertFalse($replaced->isUsable());
-
-        $replacedNow = new RecoveryCode;
-        $replacedNow->markReplaced();
-
-        self::assertSame('2026-04-15T10:00:00+00:00', $replacedNow->getReplacedAt()?->toIso8601String());
 
         $usedThen = new RecoveryCode;
         $usedThen->markUsed(Carbon::parse('2026-04-14T08:00:00+00:00'));
@@ -139,10 +133,9 @@ final class ActsAsRecoveryCodeTest extends TestCase
             }
         };
 
-        $code->setRawAttributes(['code_hash' => 5, 'generation' => '3', 'used_at' => '2026-04-15', 'replaced_at' => '2026-04-15']);
+        $code->setRawAttributes(['code_hash' => 5, 'used_at' => '2026-04-15', 'replaced_at' => '2026-04-15']);
 
         self::assertNull($code->getCodeHash());
-        self::assertSame(0, $code->getGeneration());
         self::assertNull($code->getUsedAt());
         self::assertNull($code->getReplacedAt());
         self::assertTrue($code->isUsable());

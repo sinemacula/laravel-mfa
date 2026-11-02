@@ -38,7 +38,7 @@ The current note set is:
   request at hand, why nothing is `scoped()`, and what the tests prove and do not.
 - `schema-and-models.md`: every table and column, the models and the two an application may replace, the identity
   contract and its trait, forgetting a deleted identity, and the guard every operation on a factor starts with.
-- `event-catalogue.md`: the events the flows dispatch, their payloads and context, and their dispatch after the commit.
+- `event-catalog.md`: the events the flows dispatch, their payloads and context, and their dispatch after the commit.
 - `seam-contracts.md`: the contracts declared for the seams with an authentication layer and the application, what
   each answers, its fail-closed default, what the authentication layer provides for it, the calls that layer makes back
   into this package (the challenge counters and the passkey change gate), the helpers' pending-action checks, and the

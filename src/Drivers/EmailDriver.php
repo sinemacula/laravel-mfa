@@ -65,16 +65,6 @@ final class EmailDriver extends AbstractCodeDriver
     }
 
     /**
-     * Get the configured message class.
-     *
-     * @return class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>
-     */
-    public function getMailable(): string
-    {
-        return $this->mailable;
-    }
-
-    /**
      * Deliver the code to the address in the message class, with the whole
      * minutes, at least 1, it has left.
      *

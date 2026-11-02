@@ -13,7 +13,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Passkeys\CredentialId;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
@@ -289,7 +289,7 @@ final class PasskeyAssociationsTest extends TestCase
     {
         PasskeyAssociation::saving(static fn (): false => false);
 
-        $this->expectException(WriteCancelledException::class);
+        $this->expectException(WriteCanceledException::class);
 
         (new PasskeyAssociations)->associate($this->owner(), 'factor-1', self::CREDENTIAL);
     }

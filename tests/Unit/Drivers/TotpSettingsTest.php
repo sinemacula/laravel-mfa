@@ -175,8 +175,8 @@ final class TotpSettingsTest extends TestCase
 
     /**
      * An application's window is its own `totp_window`, and the package-wide
-     * one when it sets none, is not configured or none is named; one out of
-     * bounds is refused, naming the application's key.
+     * one when it sets none or is not configured; one out of bounds is refused,
+     * naming the application's key.
      *
      * @return void
      */
@@ -194,7 +194,6 @@ final class TotpSettingsTest extends TestCase
         self::assertSame(0, $settings->windowFor('strict'));
         self::assertSame(2, $settings->windowFor('default'));
         self::assertSame(2, $settings->windowFor('unconfigured'));
-        self::assertSame(2, $settings->windowFor(null));
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('mfa.applications.broken.totp_window must be an integer from 0 to 3.');

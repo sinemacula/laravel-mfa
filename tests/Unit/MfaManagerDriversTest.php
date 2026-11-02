@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Config\Repository;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -14,8 +15,10 @@ use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Codes\CustomMfaCodeMessage;
+use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
@@ -86,11 +89,14 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $config = app(Repository::class);
         $config->set('mfa.codes', []);
 
-        /** @var \SineMacula\Laravel\Mfa\Drivers\EmailDriver $driver */
+        $sender = FakeEmailSender::fake($this->container());
         $driver = $this->manager()->driver('email');
 
         self::assertInstanceOf(EmailDriver::class, $driver);
-        self::assertSame(MfaCodeMessage::class, $driver->getMailable());
+
+        $driver->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), '123456', CarbonImmutable::now()->addMinutes(5));
+
+        self::assertSame(MfaCodeMessage::class, $sender->sent()[0]['message']::class);
     }
 
     /**
@@ -108,10 +114,14 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
             'mailable' => CustomMfaCodeMessage::class,
         ]);
 
-        /** @var \SineMacula\Laravel\Mfa\Drivers\EmailDriver $driver */
+        $sender = FakeEmailSender::fake($this->container());
         $driver = $this->manager()->driver('email');
 
-        self::assertSame(CustomMfaCodeMessage::class, $driver->getMailable());
+        self::assertInstanceOf(EmailDriver::class, $driver);
+
+        $driver->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), '123456', CarbonImmutable::now()->addMinutes(5));
+
+        self::assertInstanceOf(CustomMfaCodeMessage::class, $sender->sent()[0]['message']);
     }
 
     /**

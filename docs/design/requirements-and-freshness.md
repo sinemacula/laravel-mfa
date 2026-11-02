@@ -68,6 +68,12 @@ nothing is stored in their place.
   nothing but a successful proof records a proof.
 - Every default keeps no state between calls and resolves the configuration, the store and its collaborators on each
   call, and each is built when it is asked for, on the application serving at the time.
+- A reset sets the re-enrolment obligation as it states (`ReenrollmentObligation::record()`, see
+  [Factor Lifecycle](factor-lifecycle.md)); confirming a factor ends it (`ReenrollmentObligation::end()`, see
+  [Enrolment](enrollment.md)).
+- Starting an enrolment and the passkey change gate ask the gate for `mfa.add_factor`, the gate for `mfa.remove_factor`
+  (see [Passkeys](passkeys.md)), removing a factor for `mfa.remove_factor` and issuing recovery codes for
+  `mfa.generate_recovery_codes`.
 
 ## Success Path
 
@@ -119,15 +125,6 @@ nothing is stored in their place.
   user in their place.
 - The `mfa` middleware judges this requirement, with any level or operation its route asks (see
   [Route Gate](route-gate.md)).
-
-## Seams Left
-
-- A reset sets the re-enrolment obligation as it states (`ReenrollmentObligation::record()`, see
-  [Factor Lifecycle](factor-lifecycle.md)); confirming a factor ends it (`ReenrollmentObligation::end()`, see
-  [Enrolment](enrollment.md)).
-- Starting an enrolment and the passkey change gate ask the gate for `mfa.add_factor`, the gate for `mfa.remove_factor`
-  (see [Passkeys](passkeys.md)), removing a factor for `mfa.remove_factor` and issuing recovery codes for
-  `mfa.generate_recovery_codes`.
 
 ## Implementation Anchors
 

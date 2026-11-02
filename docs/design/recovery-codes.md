@@ -88,7 +88,7 @@ moment when both work or neither exists, and what a redemption leaves behind.
 - Generation is refused with `OperationRefusedException`: `machine_identity`, `identity_inactive`, `type_not_enabled`
   when the application does not accept recovery codes, and `no_factor` without a confirmed factor, before the lock or
   under it. A failure partway through the replacement, a save a model event cancels included (it throws
-  `WriteCancelledException`), rolls all of it back: the previous set is untouched and still
+  `WriteCanceledException`), rolls all of it back: the previous set is untouched and still
   redeems, the generation is unchanged and nothing is reported.
 - With an identity's first additional factor, `RecoveryCodeIssuance::withFirstFactor()` generates a set in the change
   that confirms it, when the application accepts them and the session's known first factor followed by the
@@ -108,7 +108,7 @@ moment when both work or neither exists, and what a redemption leaves behind.
 - A sign-in that ended while the code was being checked leaves no sign-in to record the proof on: the redemption throws
   `ProofRefusedException`, so the code's use rolls back, nothing is counted and nothing is reported. A redemption never
   passes without its proof.
-- A factor deletion a model event cancels throws `WriteCancelledException` and keeps the set.
+- A factor deletion a model event cancels throws `WriteCanceledException` and keeps the set.
 - No set, or every code used: one counted attempt, `invalid_code`, no hash checked.
 - Two redemptions of one code: the lock serialises them, and the second finds the code used; a redemption that read the
   set before another used or replaced its code finds, when it marks it, that no row changed, and fails `invalid_code`.

@@ -1,7 +1,7 @@
 {
     "name": "sinemacula/laravel-mfa",
     "type": "library",
-    "description": "Driver-based multi-factor authentication (TOTP, email, SMS, backup codes) for Laravel 12 and 13.",
+    "description": "Driver-based multi-factor authentication (TOTP, email, SMS, passkeys and recovery codes) for Laravel 12 and 13.",
     "keywords": [
         "sine macula",
         "laravel",

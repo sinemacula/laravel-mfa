@@ -106,7 +106,7 @@ are described here.
   could coerce can land on another row.
 - After the commit, the address's slot is given back unless the attempt failed and was counted: a success or a refusal
   is not a failure of the address. The events the attempt raised run with the commit (see [Event
-  Catalogue](event-catalogue.md)); a listener that throws leaves the count standing, and gives the address's slot back,
+  Catalogue](event-catalog.md)); a listener that throws leaves the count standing, and gives the address's slot back,
   since the exception reaches the throttle.
 
 ## Failure / Edge Cases

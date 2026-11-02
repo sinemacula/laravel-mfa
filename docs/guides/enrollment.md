@@ -170,7 +170,7 @@ A delivery that throws, or a sending cap (`sending_capped`, with `retryAfter`), 
 already sent cannot be recalled: a later failure of the transaction leaves one that nothing can confirm, and nothing
 retries the transaction. `resendEnrollmentCode()` goes through the delivered-code cooldown and caps.
 
-A model event that cancels a write the flow needs throws `WriteCancelledException` and rolls the whole change back, so
+A model event that cancels a write the flow needs throws `WriteCanceledException` and rolls the whole change back, so
 nothing is reported, issued or left usable for what was not stored.
 
 ## Replacing a factor

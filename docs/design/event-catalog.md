@@ -64,7 +64,7 @@ event carries is built, and why every event is dispatched only after the change 
 
 ## Authoritative Tests
 
-- `tests/Unit/Events/EventCatalogueTest.php` `testNoEventCarriesASecretACodeAUriOrAFullDestination`,
+- `tests/Unit/Events/EventCatalogTest.php` `testNoEventCarriesASecretACodeAUriOrAFullDestination`,
   `testEveryEventSaysWhatItWasFor`
 - `tests/Unit/Events/EventDispatcherTest.php` `testARollbackDispatchesNothing`
 - `tests/Unit/Events/EventContextTest.php`

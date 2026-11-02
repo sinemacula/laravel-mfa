@@ -23,7 +23,7 @@ use Illuminate\Contracts\Support\Arrayable;
  * In a log's values, an exception is scrubbed in place by `ExceptionScrubber`,
  * of the sensitive values the record holds too, a date or an enum is kept, and
  * any other object is first turned into what Monolog would log for it, keyed by
- * its class (see `normalise()`), so a secret held in an object cannot slip
+ * its class (see `normalize()`), so a secret held in an object cannot slip
  * past. In a trace's arguments, other objects are kept as they are, and a
  * string that is, or contains, a sensitive value collected for the scrub is
  * redacted too (see `SensitiveValues`).
@@ -80,21 +80,7 @@ final class Redactor
     private function __construct() {}
 
     /**
-     * A log's values with every secret, code and full destination in them
-     * redacted, each exception in them scrubbed of the sensitive values given
-     * too.
-     *
-     * @param  array<array-key, mixed>  $values
-     * @param  ?\SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $sensitive
-     * @return array<array-key, mixed>
-     */
-    public static function redact(array $values, ?SensitiveValues $sensitive = null): array
-    {
-        return self::redactNormalised(self::normalise($values), $sensitive ?? SensitiveValues::none());
-    }
-
-    /**
-     * A log's values already normalised (see `normalise()`), with every secret,
+     * A log's values already normalised (see `normalize()`), with every secret,
      * code and full destination in them redacted, each exception in them
      * scrubbed of the sensitive values given too.
      *
@@ -102,22 +88,9 @@ final class Redactor
      * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $sensitive
      * @return array<array-key, mixed>
      */
-    public static function redactNormalised(array $values, SensitiveValues $sensitive): array
+    public static function redactNormalized(array $values, SensitiveValues $sensitive): array
     {
         return self::redactArray($values, 0, false, $sensitive);
-    }
-
-    /**
-     * A log's value with every secret in it redacted: a secret value itself,
-     * provisioning URIs in a string, the secrets of an array or an object; an
-     * exception is scrubbed in place.
-     *
-     * @param  mixed  $value
-     * @return mixed
-     */
-    public static function value(mixed $value): mixed
-    {
-        return self::redactValue(self::normaliseValue($value, 0), 0, false, SensitiveValues::none());
     }
 
     /**
@@ -133,9 +106,9 @@ final class Redactor
      * @param  array<array-key, mixed>  $values
      * @return array<array-key, mixed>
      */
-    public static function normalise(array $values): array
+    public static function normalize(array $values): array
     {
-        return self::normaliseArray($values, 0);
+        return self::normalizeArray($values, 0);
     }
 
     /**
@@ -267,24 +240,24 @@ final class Redactor
      * @param  int  $depth
      * @return array<array-key, mixed>
      */
-    private static function normaliseArray(array $values, int $depth): array
+    private static function normalizeArray(array $values, int $depth): array
     {
-        $normalised = [];
+        $normalized = [];
         $count      = 0;
 
         foreach ($values as $key => $value) {
             if (++$count > self::MAX_ITEMS) {
-                $normalised['...'] = self::TRUNCATED;
+                $normalized['...'] = self::TRUNCATED;
 
                 break;
             }
 
-            $normalised[$key] = is_string($key) && self::namesASecret($key)
+            $normalized[$key] = is_string($key) && self::namesASecret($key)
                 ? $value
-                : self::normaliseValue($value, $depth + 1);
+                : self::normalizeValue($value, $depth + 1);
         }
 
-        return $normalised;
+        return $normalized;
     }
 
     /**
@@ -295,10 +268,10 @@ final class Redactor
      * @param  int  $depth
      * @return mixed
      */
-    private static function normaliseValue(mixed $value, int $depth): mixed
+    private static function normalizeValue(mixed $value, int $depth): mixed
     {
         return match (true) {
-            is_array($value) => $depth > self::MAX_DEPTH ? self::TRUNCATED : self::normaliseArray($value, $depth),
+            is_array($value) => $depth > self::MAX_DEPTH ? self::TRUNCATED : self::normalizeArray($value, $depth),
             !is_object($value),
             $value instanceof RevealedSecret,
             $value instanceof \SensitiveParameterValue,
@@ -306,7 +279,7 @@ final class Redactor
             $value instanceof \Throwable,
             $value instanceof \DateTimeInterface,
             $value instanceof \UnitEnum => $value,
-            default                     => self::normaliseObject($value, $depth),
+            default                     => self::normalizeObject($value, $depth),
         };
     }
 
@@ -319,7 +292,7 @@ final class Redactor
      * @param  int  $depth
      * @return mixed
      */
-    private static function normaliseObject(object $value, int $depth): mixed
+    private static function normalizeObject(object $value, int $depth): mixed
     {
         if ($depth > self::MAX_DEPTH) {
             return self::TRUNCATED;
@@ -332,6 +305,6 @@ final class Redactor
             default                             => get_object_vars($value),
         };
 
-        return [get_debug_type($value) => self::normaliseValue($form, $depth + 1)];
+        return [get_debug_type($value) => self::normalizeValue($form, $depth + 1)];
     }
 }

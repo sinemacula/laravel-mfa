@@ -37,16 +37,6 @@ trait ActsAsRecoveryCode
     }
 
     /**
-     * Return the code's opaque identifier.
-     *
-     * @return mixed
-     */
-    public function getRecoveryCodeIdentifier(): mixed
-    {
-        return $this->getKey();
-    }
-
-    /**
      * Return the salted hash of the code.
      *
      * @return ?string
@@ -67,19 +57,6 @@ trait ActsAsRecoveryCode
     public function getCodeHashName(): string
     {
         return 'code_hash';
-    }
-
-    /**
-     * Return the generation of the set the code belongs to.
-     *
-     * @return int
-     */
-    public function getGeneration(): int
-    {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getGenerationName());
-
-        return is_int($value) ? $value : 0;
     }
 
     /**
@@ -157,16 +134,5 @@ trait ActsAsRecoveryCode
     public function markUsed(?CarbonInterface $at = null): void
     {
         $this->setAttribute($this->getUsedAtName(), $at ?? Carbon::now());
-    }
-
-    /**
-     * Mark the code replaced by a newer set at the given time or now.
-     *
-     * @param  ?\Carbon\CarbonInterface  $at
-     * @return void
-     */
-    public function markReplaced(?CarbonInterface $at = null): void
-    {
-        $this->setAttribute($this->getReplacedAtName(), $at ?? Carbon::now());
     }
 }

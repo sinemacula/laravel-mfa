@@ -27,7 +27,7 @@ use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult;
@@ -913,7 +913,7 @@ final class RemovingFactorTest extends TestCase
         try {
             Mfa::removeFactor($factor->id);
             self::fail('A cancelled deletion was expected to throw.');
-        } catch (WriteCancelledException $exception) {
+        } catch (WriteCanceledException $exception) {
             self::assertStringContainsString('cancelled the factor\'s deletion', $exception->getMessage());
         } finally {
             Factor::flushEventListeners();

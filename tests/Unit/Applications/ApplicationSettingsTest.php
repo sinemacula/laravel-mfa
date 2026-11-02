@@ -93,7 +93,6 @@ final class ApplicationSettingsTest extends TestCase
     {
         $settings = new ApplicationSettings(new Repository, 'unknown');
 
-        self::assertSame('unknown', $settings->name);
         self::assertSame([], $settings->types());
         self::assertFalse($settings->enables('totp'));
         self::assertSame(RequirementMode::NEVER, $settings->requirement());

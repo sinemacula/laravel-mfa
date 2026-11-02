@@ -98,11 +98,9 @@ return [
 ```
 
 Every setting has a production-safe default and enforced bounds. The package checks the whole configuration when it
-boots, and `php artisan mfa:check` reports every problem for a deploy pipeline. Not every setting is applied yet: of an
-application's block, only its `requirement`, `totp_window` and `freshness` are read so far, so listing a type there
-enforces nothing for now. See [Configuration](docs/guides/configuration.md) for every key, its default, its bounds and
-whether it is applied yet, and [Requirements and step-up](docs/guides/requirements.md) for what a sign-in and a
-sensitive operation must prove.
+boots, and `php artisan mfa:check` reports every problem for a deploy pipeline. See
+[Configuration](docs/guides/configuration.md) for every key, its default and its bounds, and
+[Requirements and step-up](docs/guides/requirements.md) for what a sign-in and a sensitive operation must prove.
 
 > **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so when you rotate
 > `APP_KEY`, list the old key in `APP_PREVIOUS_KEYS` for as long as factors enrolled under it exist: a plain swap

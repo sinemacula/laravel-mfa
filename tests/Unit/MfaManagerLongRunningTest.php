@@ -30,6 +30,7 @@ use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use Tests\Fixtures\Codes\CustomMfaCodeMessage;
 use Tests\Fixtures\Context\RequestAttributePendingSessionResolver;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
+use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
@@ -125,8 +126,8 @@ final class MfaManagerLongRunningTest extends TestCase
 
         $this->container()->make(Repository::class)->set('mfa.totp.digits', 6);
 
-        FakeEmailSender::fake($this->container());
-        $bootedSms = FakeSmsSender::fake($this->container());
+        $bootedEmail = FakeEmailSender::fake($this->container());
+        $bootedSms   = FakeSmsSender::fake($this->container());
 
         $sandbox = $this->sandbox();
         $config  = clone $sandbox->make(Repository::class);
@@ -147,8 +148,12 @@ final class MfaManagerLongRunningTest extends TestCase
         $emailDriver = $manager->driver('email');
 
         self::assertInstanceOf(EmailDriver::class, $emailDriver);
-        self::assertSame(CustomMfaCodeMessage::class, $emailDriver->getMailable());
-        self::assertSame($email, (fn () => $this->sender)->call($emailDriver));
+
+        $factor = new InMemoryFactor(type: 'email', destination: 'ada@example.test');
+
+        $emailDriver->deliver($factor, '123456', CarbonImmutable::now()->addMinutes(5));
+
+        self::assertInstanceOf(CustomMfaCodeMessage::class, $email->sent()[0]['message']);
 
         $smsDriver = $manager->driver('sms');
 
@@ -161,7 +166,12 @@ final class MfaManagerLongRunningTest extends TestCase
         $booted = $manager->driver('email');
 
         self::assertInstanceOf(EmailDriver::class, $booted);
-        self::assertSame(MfaCodeMessage::class, $booted->getMailable());
+
+        $booted->deliver($factor, '654321', CarbonImmutable::now()->addMinutes(5));
+
+        self::assertCount(1, $bootedEmail->sent());
+        self::assertSame(MfaCodeMessage::class, $bootedEmail->sent()[0]['message']::class);
+        self::assertCount(1, $email->sent());
     }
 
     /**

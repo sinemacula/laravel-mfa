@@ -80,6 +80,7 @@ final class DriverBindingsTest extends TestCase
         config()->set('mfa.totp.digits', 8);
         config()->set('mfa.codes.mailable', CustomMfaCodeMessage::class);
 
+        $sender  = FakeEmailSender::fake($this->container());
         $manager = new MfaManager($this->app());
 
         DriverBindings::extend($manager);
@@ -91,8 +92,11 @@ final class DriverBindingsTest extends TestCase
         self::assertInstanceOf(TotpDriver::class, $totp);
         self::assertSame(8, $totp->parameters()->digits);
         self::assertInstanceOf(EmailDriver::class, $email);
-        self::assertSame(CustomMfaCodeMessage::class, $email->getMailable());
         self::assertInstanceOf(SmsDriver::class, $sms);
+
+        $email->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), '123456', CarbonImmutable::now()->addMinutes(5));
+
+        self::assertInstanceOf(CustomMfaCodeMessage::class, $sender->sent()[0]['message']);
     }
 
     /**
@@ -125,9 +129,12 @@ final class DriverBindingsTest extends TestCase
      */
     public function testEmailFactoryAppliesTheDefaults(): void
     {
+        $sender = FakeEmailSender::fake($this->container());
         $driver = DriverBindings::email($this->app(), new Repository);
 
-        self::assertSame(MfaCodeMessage::class, $driver->getMailable());
+        $driver->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), '123456', CarbonImmutable::now()->addMinutes(5));
+
+        self::assertSame(MfaCodeMessage::class, $sender->sent()[0]['message']::class);
     }
 
     /**
@@ -148,7 +155,6 @@ final class DriverBindingsTest extends TestCase
 
         $driver->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), '123456', CarbonImmutable::now()->addMinutes(5));
 
-        self::assertSame(CustomMfaCodeMessage::class, $driver->getMailable());
         self::assertCount(1, $sender->sentTo('ada@example.test'));
         self::assertInstanceOf(CustomMfaCodeMessage::class, $sender->sentTo('ada@example.test')[0]['message']);
         self::assertSame('123456', $sender->lastCodeTo('ada@example.test'));

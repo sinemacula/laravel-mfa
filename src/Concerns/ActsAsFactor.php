@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 
 /**
@@ -479,7 +479,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
      * @return void
      *
      * @throws \Illuminate\Database\QueryException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     public function persist(): void
     {
@@ -492,7 +492,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
         }
 
         if (!$saved) {
-            throw new WriteCancelledException('A model event cancelled the factor\'s save, so the change it is part of was not made.');
+            throw new WriteCanceledException('A model event cancelled the factor\'s save, so the change it is part of was not made.');
         }
     }
 

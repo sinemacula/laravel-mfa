@@ -4,12 +4,13 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
-use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
+use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\TestCase;
 
 /**
  * Assertions against the email driver's constructor default values.
@@ -27,8 +28,6 @@ use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 #[CoversClass(EmailDriver::class)]
 final class DefaultsTest extends TestCase
 {
-    use MockeryPHPUnitIntegration;
-
     /**
      * `EmailDriver`'s constructor default, the `MfaCodeMessage` Mailable, must
      * be preserved.
@@ -37,8 +36,10 @@ final class DefaultsTest extends TestCase
      */
     public function testEmailDriverDefaults(): void
     {
-        $driver = new EmailDriver(sender: new FakeEmailSender);
+        $sender = new FakeEmailSender;
 
-        self::assertSame(MfaCodeMessage::class, $driver->getMailable());
+        (new EmailDriver(sender: $sender))->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), '123456', CarbonImmutable::now()->addMinutes(5));
+
+        self::assertSame(MfaCodeMessage::class, $sender->sent()[0]['message']::class);
     }
 }

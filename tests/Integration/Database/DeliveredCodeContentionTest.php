@@ -255,16 +255,6 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * The identity the codes are sent to.
-     *
-     * @return \Tests\Fixtures\Identities\NonEloquentIdentity
-     */
-    private static function identity(): NonEloquentIdentity
-    {
-        return new NonEloquentIdentity(self::IDENTITY_KEY);
-    }
-
-    /**
      * The identity's factor, read on the connection the package is pointed at.
      *
      * @return \SineMacula\Laravel\Mfa\Models\Factor

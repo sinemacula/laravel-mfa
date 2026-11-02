@@ -37,7 +37,7 @@ use SineMacula\Laravel\Mfa\Events\RecoveryCodesLow;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -134,7 +134,7 @@ final readonly class RecoveryCodeService
      * yet replaced is marked replaced, the new codes are stored under the next
      * generation, and the generation and its time are recorded on the
      * identity's state row, so all of it commits or none does: a save a model
-     * event cancels throws `WriteCancelledException` and rolls it all back.
+     * event cancels throws `WriteCanceledException` and rolls it all back.
      * `RecoveryCodesGenerated` is dispatched once it has committed. The codes
      * are returned unformatted, in the order they were drawn. The application
      * is the current request's unless the caller names the one it acts on.
@@ -150,7 +150,7 @@ final readonly class RecoveryCodeService
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      */
     public function generate(MultiFactorAuthenticatable $identity, ?Actor $actor = null, ?string $application = null, ?\Closure $gate = null): array
@@ -179,7 +179,7 @@ final readonly class RecoveryCodeService
      * @return array{codes: list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>, generation: int}
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      */
     public function replaceSet(MultiFactorAuthenticatable $identity, string $application, ?\Closure $gate = null): array
@@ -417,14 +417,14 @@ final readonly class RecoveryCodeService
      * lock, as part of the change that removes the factor; a call with no
      * transaction open on the storage connection is refused with a
      * `LogicException`, and a save of the state row a model event cancels
-     * throws `WriteCancelledException`, which rolls the removal back with it.
+     * throws `WriteCanceledException`, which rolls the removal back with it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @return bool
      *
      * @throws \LogicException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      *
      * @imperative
@@ -451,7 +451,7 @@ final readonly class RecoveryCodeService
      * @return bool
      *
      * @throws \LogicException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      *
      * @imperative
@@ -573,7 +573,7 @@ final readonly class RecoveryCodeService
      * @return int
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private function replace(ProofOwner $owner, array $hashes): int
     {
@@ -651,12 +651,12 @@ final readonly class RecoveryCodeService
      * @param  \Illuminate\Database\Eloquent\Model  $model
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private static function save(Model $model): void
     {
         if (!$model->save()) {
-            throw new WriteCancelledException(sprintf('A model event cancelled the save of a [%s], so the change it is part of was rolled back.', $model::class));
+            throw new WriteCanceledException(sprintf('A model event cancelled the save of a [%s], so the change it is part of was rolled back.', $model::class));
         }
     }
 

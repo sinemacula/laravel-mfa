@@ -194,7 +194,7 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
      *
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     public function persist(): void;
 }

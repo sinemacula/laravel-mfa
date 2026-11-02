@@ -55,7 +55,7 @@ in [Factor lifecycle](../guides/lifecycle.md).
   `SessionReevaluation`: every session is revoked.
 - A failure ceiling's `disabled_at` and failures in a row survive unlocking. Only temporary lockouts lift, and a
   factor's lives in `mfa_attempts`.
-- Saves of the identity's state that a model event cancels throw (`WriteCancelledException`), so a reset cannot commit
+- Saves of the identity's state that a model event cancels throw (`WriteCanceledException`), so a reset cannot commit
   with its lockout or failures intact, and an unlock cannot report a lockout lifted that stays in force.
 - `ActiveTenantResolver` is authoritative: it is what requirements are composed with, read from validated session
   context, and `RequirementService::requirementFor()` is the one place that asks it, so re-evaluation after any factor

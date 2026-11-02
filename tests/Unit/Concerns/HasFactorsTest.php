@@ -124,7 +124,7 @@ final class HasFactorsTest extends TestCase
      *
      * @return void
      */
-    public function testACancelledDeleteKeepsTheFactors(): void
+    public function testACanceledDeleteKeepsTheFactors(): void
     {
         $identity = $this->createHolder('one@example.test');
         $factor   = $this->createFactor($identity, 'confirmed');

@@ -41,7 +41,7 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorChannel;
 use SineMacula\Laravel\Mfa\Factors\FactorLabel;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -66,6 +66,7 @@ use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
+use Tests\Fixtures\Factors\UnwrittenFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -557,7 +558,25 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         Factor::creating(static fn (): bool => false);
 
-        $this->expectException(WriteCancelledException::class);
+        $this->expectException(WriteCanceledException::class);
+
+        $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
+    }
+
+    /**
+     * A persistence seam that neither writes the factor nor throws stops the
+     * start all the same.
+     *
+     * @return void
+     */
+    public function testAFactorThatWasNotWrittenStopsTheStart(): void
+    {
+        $this->steppedUpPerson();
+
+        config()->set('mfa.factor.model', UnwrittenFactor::class);
+
+        $this->expectException(WriteCanceledException::class);
+        $this->expectExceptionMessage('its enrolment did not start');
 
         $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
     }

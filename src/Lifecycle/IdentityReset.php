@@ -182,7 +182,7 @@ final readonly class IdentityReset
      * @formatter:on
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private function removeFactors(MultiFactorAuthenticatable $identity, Collection $factors, Actor $actor, array $context): void
     {
