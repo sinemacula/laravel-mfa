@@ -23,8 +23,10 @@ use Tests\Fixtures\Identities\TestUser;
  * every limiter key is separate. Building the harness runs the branch on the
  * first, which warms the path, as the CLI has no opcache and a first call would
  * time the autoloader, and proves it reaches its outcome. `run()` makes the
- * same call for the second, so it makes exactly the statements of a first
- * window that the query budget's ledger counts.
+ * same call for the second, so it makes exactly the statements the query
+ * budget's ledger counts for the branch: those of an address's first window for
+ * a TOTP or a recovery code, and those of the window its send began for a
+ * delivered code, which takes its slot by the update alone.
  *
  * A step or a code is used up by its verification and a miss counts, so a call
  * is never repeated: there is no pool of fixtures and the clock never moves,
@@ -57,7 +59,7 @@ final class VerificationBenchHarness
     /** @var int How many steps away a wrong TOTP code is taken from. */
     private const int WRONG_STEPS = 5;
 
-    /** @var string A code no recovery code can be. */
+    /** @var string A code submitted that matches none of the set. */
     private const string NO_RECOVERY_CODE = 'ZZZZ-ZZZZ-ZZZZ';
 
     /** @var array<string, true> @managed-static The branches already run in this process, outside anything set-up resets. */

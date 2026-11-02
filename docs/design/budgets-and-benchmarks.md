@@ -43,8 +43,10 @@ and assert nothing about it.
 - A verification uses up its code or counts its failure, so each subject runs once in a process. PHPBench starts one
   process for each iteration, which gives each a fresh database. `VerificationBenchHarness` seeds two people with their
   own sign-ins, factors and addresses, so every limiter key is separate; it runs the branch on the first, which warms
-  the path and proves its outcome, and times the same call for the second, so the call makes exactly the first-window
-  statements the budget's ledger counts.
+  the path and proves its outcome, and times the same call for the second, so the call makes exactly the statements the
+  budget's ledger counts for that branch. For a TOTP or a recovery code those are an address's first window; a delivered
+  code's send has already begun the window, so its call takes the slot by the update alone. The application is in the
+  budgets' requirement mode, `never`, so a hit evaluates the same requirement they do.
 - `RecoveryCodeBench`, `TotpDriverBench`, `CombinationEvaluationBench`, `DeliveredCodeHashBench` and
   `FactorSummaryBench` time their parts with no database. `RequirementCheckBench` times `ProofRequirementCheck::check()`
   with no database and the `mfa` middleware on `BenchApplication`; the middleware only reads, so it is measured over
@@ -69,7 +71,7 @@ and assert nothing about it.
   `INVALID`: it times the comparison of the window with a code in it and a code outside it. `ACCEPTED`, with the
   compare-and-set, is timed only by `VerificationBench`.
 - A timing has no opcache on the command line and shares its machine, so only a large or repeated change means anything.
-  The scheduled CI job keeps the report as an artifact and compares nothing.
+  The scheduled CI job uploads the report and compares nothing.
 
 ## Implementation Anchors
 

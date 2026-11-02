@@ -13,8 +13,9 @@ use PhpBench\Attributes\Revs;
 /**
  * A whole verification through `Mfa::verify()`, hit and miss, for a TOTP code,
  * a delivered code and a recovery code: the statements, the locks and the
- * evaluation that the database-free benches leave out, on the first-window
- * statements the query budgets count.
+ * evaluation that the database-free benches leave out, on the statements the
+ * query budgets count for each branch, in an address's first window for a TOTP
+ * or a recovery code and in the window its send began for a delivered code.
  *
  * The results are measurements on in-memory SQLite with bcrypt at its cheapest
  * cost, with the application booted and the path warmed outside the timing;

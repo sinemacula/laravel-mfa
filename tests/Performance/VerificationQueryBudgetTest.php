@@ -63,7 +63,7 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
 {
     use ArrangesVerification;
 
-    /** @var string A code no recovery code can be. */
+    /** @var string A code submitted that matches none of the set. */
     private const string NO_RECOVERY_CODE = 'ZZZZ-ZZZZ-ZZZZ';
 
     /**

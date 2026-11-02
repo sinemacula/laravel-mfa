@@ -44,12 +44,13 @@ final class BenchApplication
     private function __construct() {}
 
     /**
-     * Build and migrate the application, with the requirement mode given.
+     * Build and migrate the application, with the requirement mode given; the
+     * default is the one the query budgets run in.
      *
      * @param  string  $requirement
      * @return \Illuminate\Contracts\Foundation\Application
      */
-    public static function create(string $requirement = 'enrolled'): Application
+    public static function create(string $requirement = 'never'): Application
     {
         $root = dirname(__DIR__, 2);
         $app  = Testbench::create(options: ['extra' => ['providers' => [MfaServiceProvider::class], 'dont-discover' => ['*']]]);
