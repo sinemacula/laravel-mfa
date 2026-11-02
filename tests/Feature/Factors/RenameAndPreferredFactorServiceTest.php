@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorLabel;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
+use Tests\Fixtures\Factors\IntegerKeyedFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\TestCase;
 
@@ -107,19 +108,19 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
     }
 
     /**
-     * An integer id is matched as a string, and finds only the factor it names.
+     * An application's own model may key its factors by integer: such an id is
+     * matched as a string, and finds only the factor it names.
      *
      * @return void
      */
     public function testAnIntegerIdIsMatchedAsAString(): void
     {
+        config()->set('mfa.factor.model', IntegerKeyedFactor::class);
+        config()->set('mfa.factor.table', 'test_integer_keyed_factors');
+
         $user = $this->signedInPerson();
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor(12, 'New')->reason);
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor(12)->reason);
-
-        Factor::query()->forceCreate([
-            'id'                   => '12',
+        $factor = IntegerKeyedFactor::query()->forceCreate([
             'authenticatable_type' => $user->getMorphClass(),
             'authenticatable_id'   => (string) $user->id,
             'type'                 => 'totp',
@@ -127,8 +128,15 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
             'application'          => self::APPLICATION,
         ]);
 
-        self::assertSame('New', $this->mfa()->renameFactor(12, 'New')->factor?->label);
-        self::assertTrue($this->mfa()->setPreferredFactor(12)->factor?->preferred);
+        $id = $factor->getKey();
+
+        self::assertIsInt($id);
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor($id + 1, 'New')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor($id + 1)->reason);
+
+        self::assertSame('New', $this->mfa()->renameFactor($id, 'New')->factor?->label);
+        self::assertTrue($this->mfa()->setPreferredFactor($id)->factor?->preferred);
     }
 
     /**
