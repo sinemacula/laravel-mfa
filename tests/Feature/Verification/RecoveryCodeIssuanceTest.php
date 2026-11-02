@@ -5,20 +5,33 @@ declare(strict_types = 1);
 namespace Tests\Feature\Verification;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
+use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
+use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Assurance\RefusingCombinationPolicy;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FreshOnceGate;
+use Tests\Fixtures\Requirements\RefusingFreshnessGate;
 use Tests\Fixtures\Seams\InterruptingProofStore;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
@@ -35,6 +48,7 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(RecoveryCodeIssuance::class)]
+#[CoversClass(RecoveryCodeGeneration::class)]
 #[CoversClass(RecoveryCodeService::class)]
 final class RecoveryCodeIssuanceTest extends TestCase
 {
@@ -63,6 +77,8 @@ final class RecoveryCodeIssuanceTest extends TestCase
     {
         Carbon::setTestNow();
 
+        \Mockery::close();
+
         parent::tearDown();
     }
 
@@ -75,9 +91,14 @@ final class RecoveryCodeIssuanceTest extends TestCase
     {
         $user = $this->steppedUpPerson();
 
-        self::assertCount(10, $this->mfa()->generateRecoveryCodes());
+        $generation = $this->mfa()->generateRecoveryCodes();
+
+        self::assertTrue($generation->wasGenerated());
+        self::assertNull($generation->reason);
+        self::assertCount(10, $generation->codes);
         self::assertSame(10, RecoveryCode::query()->whereNull('replaced_at')->count());
         self::assertTrue($user->isMfaEnabled());
+        self::assertCount(1, array_filter($this->reported, static fn (MfaEvent $event): bool => $event instanceof RecoveryCodesGenerated));
     }
 
     /**
@@ -129,7 +150,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
         [$challenge, $code] = $this->sentCode($factor);
 
         self::assertTrue($this->mfa()->verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
-        self::assertCount(10, $this->mfa()->generateRecoveryCodes());
+        self::assertCount(10, $this->mfa()->generateRecoveryCodes()->codes);
     }
 
     /**
@@ -164,19 +185,19 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         $this->pendingSession($user, Requirement::none(), [PendingAction::LIST_FACTORS, PendingAction::SEND_CODE, PendingAction::VERIFY]);
 
-        self::assertSame([], $this->mfa()->generateRecoveryCodes());
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->generateRecoveryCodes()->reason);
         self::assertSame(0, RecoveryCode::query()->count());
     }
 
     /**
-     * A person with no sign-in is refused, and so is nobody at all served
-     * nothing.
+     * A person with no sign-in is refused as not fresh, and nobody at all as
+     * not found.
      *
      * @return void
      */
     public function testNoSignInIsRefused(): void
     {
-        self::assertSame([], $this->mfa()->generateRecoveryCodes());
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->generateRecoveryCodes()->reason);
 
         $user = $this->person();
 
@@ -209,7 +230,8 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A sign-in that changes under the generation is refused.
+     * A sign-in that changes under the generation is refused, whatever the gate
+     * says of it.
      *
      * @return void
      */
@@ -218,8 +240,200 @@ final class RecoveryCodeIssuanceTest extends TestCase
         $this->steppedUpPerson();
 
         $this->container()->instance(ProofStore::class, new InterruptingProofStore($this->container()->make(ProofStore::class)));
+        $this->container()->instance(FreshnessGate::class, new RefusingFreshnessGate(0));
 
-        $this->assertRefused('The session is no longer the one the recovery codes were asked for on.');
+        $this->assertRefused();
+    }
+
+    /**
+     * Each of the package's own reasons on this path is an answer, not an
+     * exception, leaving the old set in place.
+     *
+     * @return void
+     */
+    public function testThePackagesOwnReasonsAreAnswers(): void
+    {
+        $user = $this->steppedUpPerson();
+
+        config()->set('mfa.applications.' . self::APPLICATION . '.recovery_codes.enabled', false);
+
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->generateRecoveryCodes()->reason);
+
+        config()->set('mfa.applications.' . self::APPLICATION . '.recovery_codes.enabled', true);
+
+        Factor::query()->update(['status' => 'pending']);
+
+        self::assertSame(FailureReason::NO_FACTOR, $this->mfa()->generateRecoveryCodes()->reason);
+        self::assertSame(0, RecoveryCode::query()->count());
+        self::assertTrue($user->exists);
+    }
+
+    /**
+     * An inactive person is told so, with nothing stored.
+     *
+     * @return void
+     */
+    public function testAnInactivePersonIsRefused(): void
+    {
+        $identity = new NonEloquentIdentity('inactive', mfaEnabled: true, active: false);
+
+        Auth::shouldReceive('user')->andReturn($identity);
+        Auth::shouldReceive('getDefaultDriver')->andReturn('web');
+
+        $this->container()->make(ProofStore::class)->begin($identity, self::APPLICATION, self::SESSION);
+
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->generateRecoveryCodes()->reason);
+        self::assertSame(0, RecoveryCode::query()->count());
+    }
+
+    /**
+     * A person the subject type resolver says is not one is served nothing, and
+     * a resolver that throws is not read as a refusal.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheSubjectTypeResolverDecidesOrPropagates(): void
+    {
+        $this->steppedUpPerson();
+
+        $resolver = \Mockery::mock(SubjectTypeResolver::class);
+
+        $resolver->shouldReceive('isPerson')->once()->andReturnFalse();
+        $resolver->shouldReceive('isPerson')->once()->andThrow(new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'The resolver refused.'));
+
+        $this->container()->instance(SubjectTypeResolver::class, $resolver);
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->generateRecoveryCodes()->reason);
+
+        try {
+            $this->mfa()->generateRecoveryCodes();
+
+            self::fail('The resolver\'s refusal must propagate.');
+        } catch (OperationRefusedException $exception) {
+            self::assertFalse($exception->byPackage);
+        }
+
+        self::assertSame(0, RecoveryCode::query()->count());
+    }
+
+    /**
+     * A freshness gate's own refusal stays an exception wherever it is thrown:
+     * before the lock or under it, with the old set intact and working.
+     *
+     * @return void
+     */
+    public function testAFreshnessGatesOwnRefusalPropagatesAndRollsBack(): void
+    {
+        $user = $this->steppedUpPerson();
+        $old  = $this->recoveryCode($user);
+
+        foreach ([1, 2] as $read) {
+            $this->container()->instance(FreshnessGate::class, new RefusingFreshnessGate($read));
+
+            $this->assertPropagates();
+        }
+
+        $this->container()->forgetInstance(FreshnessGate::class);
+
+        self::assertTrue($this->mfa()->verify(Submission::recoveryCode($old))->isVerified());
+    }
+
+    /**
+     * A combination policy's own refusal stays an exception at every call it is
+     * asked to make, before the lock and under it.
+     *
+     * @return void
+     */
+    public function testACombinationPolicysOwnRefusalPropagatesAndRollsBack(): void
+    {
+        $user = $this->steppedUpPerson();
+
+        $this->recoveryCode($user);
+
+        $real   = $this->container()->make(CombinationPolicy::class);
+        $policy = new RefusingCombinationPolicy($real, 0);
+
+        $this->container()->instance(CombinationPolicy::class, $policy);
+
+        self::assertTrue($this->mfa()->generateRecoveryCodes()->wasGenerated());
+
+        $calls = $policy->calls;
+
+        self::assertGreaterThan(1, $calls);
+
+        for ($call = 1; $call <= $calls; $call++) {
+            $this->container()->instance(CombinationPolicy::class, new RefusingCombinationPolicy($real, $call));
+
+            $this->assertPropagates();
+        }
+    }
+
+    /**
+     * Rows of what a listener may throw: a refusal marked as the package's own,
+     * and one not.
+     *
+     * @return iterable<string, array{\SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException}>
+     */
+    public static function listenerRefusals(): iterable
+    {
+        yield 'marked' => [OperationRefusedException::byPackage(FailureReason::NOT_ACCEPTED, 'A listener refused.')];
+        yield 'unmarked' => [new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'A listener refused.')];
+    }
+
+    /**
+     * A listener's failure once the set has committed is not a refusal of it,
+     * whichever kind of refusal it throws: it propagates, with the set stored.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException  $refusal
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('listenerRefusals')]
+    public function testAListenersRefusalIsNeverAReasonForACommittedSet(OperationRefusedException $refusal): void
+    {
+        $this->steppedUpPerson();
+
+        Event::listen(RecoveryCodesGenerated::class, static function () use ($refusal): void {
+            throw $refusal;
+        });
+
+        try {
+            $this->mfa()->generateRecoveryCodes();
+
+            self::fail('The listener\'s refusal must propagate.');
+        } catch (OperationRefusedException $exception) {
+            self::assertSame($refusal, $exception);
+        }
+
+        self::assertSame(10, RecoveryCode::query()->whereNull('replaced_at')->count());
+    }
+
+    /**
+     * Inside an application's transaction the set is reported when that
+     * transaction commits, and not before.
+     *
+     * @return void
+     */
+    public function testAnOuterTransactionDefersTheEventToItsCommit(): void
+    {
+        $this->steppedUpPerson();
+        $this->forgetReports();
+
+        $connection = DB::connection((new Factor)->getConnectionName());
+
+        $generation = $connection->transaction(function (): RecoveryCodeGeneration {
+            $generation = $this->mfa()->generateRecoveryCodes();
+
+            self::assertSame([], $this->reported);
+
+            return $generation;
+        });
+
+        self::assertTrue($generation->wasGenerated());
+        self::assertCount(1, array_filter($this->reported, static fn (MfaEvent $event): bool => $event instanceof RecoveryCodesGenerated));
     }
 
     /**
@@ -247,24 +461,36 @@ final class RecoveryCodeIssuanceTest extends TestCase
     /**
      * Generating is refused as not fresh, leaving what was there.
      *
-     * @param  ?string  $detail
      * @return void
-     *
-     * @throws \Throwable
      */
-    private function assertRefused(?string $detail = null): void
+    private function assertRefused(): void
     {
-        $before = RecoveryCode::query()->whereNull('replaced_at')->count();
+        $before     = RecoveryCode::query()->whereNull('replaced_at')->count();
+        $generation = $this->mfa()->generateRecoveryCodes();
+
+        self::assertFalse($generation->wasGenerated());
+        self::assertSame(FailureReason::NOT_FRESH, $generation->reason);
+        self::assertSame([], $generation->codes);
+        self::assertSame($before, RecoveryCode::query()->whereNull('replaced_at')->count());
+    }
+
+    /**
+     * Generating throws a seam's refusal, unmarked, leaving what was there.
+     *
+     * @return void
+     */
+    private function assertPropagates(): void
+    {
+        $generation = RecoveryCode::query()->whereNull('replaced_at')->max('generation');
 
         try {
             $this->mfa()->generateRecoveryCodes();
 
-            self::fail('Generating must be refused.');
+            self::fail('A seam\'s refusal must propagate.');
         } catch (OperationRefusedException $exception) {
-            self::assertSame(FailureReason::NOT_FRESH, $exception->reason);
-            self::assertSame($detail ?? $exception->getMessage(), $exception->getMessage());
+            self::assertFalse($exception->byPackage);
         }
 
-        self::assertSame($before, RecoveryCode::query()->whereNull('replaced_at')->count());
+        self::assertSame($generation, RecoveryCode::query()->whereNull('replaced_at')->max('generation'));
     }
 }

@@ -322,7 +322,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         self::assertSame(0, $hasher->checks());
         self::assertSame(FailureReason::NOT_ACCEPTED, $this->failureReported()->reason);
         self::assertSame(0, $this->identityRun($user));
-        self::assertSame(10, $this->mfa()->recoveryCodes()?->remaining);
+        self::assertSame(10, $this->mfa()->recoveryCodeStatus()?->remaining);
     }
 
     /**
@@ -381,7 +381,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $result = $this->mfa()->verify(Submission::recoveryCode($code), Purpose::ENROLLMENT);
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
-        self::assertSame(10, $this->mfa()->recoveryCodes()?->remaining);
+        self::assertSame(10, $this->mfa()->recoveryCodeStatus()?->remaining);
     }
 
     /**
@@ -444,7 +444,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         self::assertNull($result->lockedUntil);
         self::assertSame(FailureReason::LOCKED, $this->failureReported()->reason);
         self::assertSame('recovery_code', $this->failureReported()->type);
-        self::assertSame(10, $this->mfa()->recoveryCodes()?->remaining);
+        self::assertSame(10, $this->mfa()->recoveryCodeStatus()?->remaining);
 
         self::assertTrue($this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
         self::assertSame(0, $this->identityRun($user));

@@ -97,7 +97,7 @@ final class IdentityOffStorageConnectionTest extends TestCase
 
         self::assertTrue(Mfa::verify(Submission::recoveryCode($codes[0]->reveal()))->isVerified());
         self::assertTrue(Mfa::verify(Submission::recoveryCode($codes[0]->reveal()))->isFailed());
-        self::assertSame(9, Mfa::recoveryCodes()?->remaining);
+        self::assertSame(9, Mfa::recoveryCodeStatus()?->remaining);
     }
 
     /**

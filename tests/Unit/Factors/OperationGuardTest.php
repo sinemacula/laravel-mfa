@@ -6,15 +6,19 @@ namespace Tests\Unit\Factors;
 
 use Illuminate\Config\Repository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
+use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Factors\IntegerKeyedFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -219,6 +223,79 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
+     * The columns of an owner or id that may differ only in case from what is
+     * asked for.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function differentCases(): iterable
+    {
+        yield 'the owner type' => ['authenticatable_type'];
+        yield 'the owner key' => ['authenticatable_id'];
+        yield 'the factor id' => ['id'];
+    }
+
+    /**
+     * What a case-insensitive collation matches differing only in case is not
+     * what was asked for: the row found must hold exactly the owner and the id.
+     *
+     * @param  string  $column
+     * @return void
+     */
+    #[DataProvider('differentCases')]
+    public function testACollationMatchDifferingOnlyInCaseIsNotFound(string $column): void
+    {
+        $this->makeCaseInsensitive();
+
+        $identity = new NonEloquentIdentity('plain-key');
+        $factor   = $this->createFactor(NonEloquentIdentity::class, 'plain-key');
+        $stored   = $factor->getAttribute($column);
+
+        self::assertIsString($stored);
+
+        $changed = strtoupper($stored);
+
+        self::assertNotSame($stored, $changed);
+
+        if ($column !== 'id') {
+            Factor::query()->whereKey($factor->id)->update([$column => $changed]);
+        }
+
+        $id = $column === 'id' ? $changed : $factor->id;
+
+        $matches = Factor::query()->whereKey($id)->where('authenticatable_type', NonEloquentIdentity::class)->where('authenticatable_id', 'plain-key');
+
+        self::assertSame(1, $matches->count(), 'The collation must match the row.');
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->guard()->factor($identity, $id, self::APPLICATION)));
+    }
+
+    /**
+     * An integer key is the same id as its string form.
+     *
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     */
+    public function testAnIntegerAndAStringFormOfOneIdAreEqual(): void
+    {
+        config()->set('mfa.factor.model', IntegerKeyedFactor::class);
+        config()->set('mfa.factor.table', 'test_integer_keyed_factors');
+
+        $identity = new NonEloquentIdentity('plain-key');
+
+        $factor = IntegerKeyedFactor::query()->forceCreate([
+            'authenticatable_type' => NonEloquentIdentity::class,
+            'authenticatable_id'   => 'plain-key',
+            'type'                 => 'totp',
+            'status'               => FactorStatus::CONFIRMED->value,
+        ]);
+
+        self::assertIsInt($factor->getKey());
+        self::assertSame($factor->getKey(), $this->guard()->factor($identity, $factor->getKey(), self::APPLICATION)->getKey());
+        self::assertSame($factor->getKey(), $this->guard()->factor($identity, (string) $factor->getKey(), self::APPLICATION)->getKey());
+    }
+
+    /**
      * A pending factor is refused where the operation needs a confirmed one,
      * and returned where it takes a pending one.
      *
@@ -292,6 +369,29 @@ final class OperationGuardTest extends TestCase
         }
 
         return null;
+    }
+
+    /**
+     * Give the factor table a collation that matches its owner columns and its
+     * key whatever their case, as a case-insensitive database does.
+     *
+     * @return void
+     */
+    private function makeCaseInsensitive(): void
+    {
+        $connection = DB::connection(StorageConnection::name());
+        $table      = TableNames::of(TableNames::FACTORS);
+
+        if ($connection->getDriverName() !== 'sqlite') {
+            self::markTestSkipped('The collation is changed through SQLite\'s own schema.');
+        }
+
+        $statement = $connection->scalar('select sql from sqlite_master where type = ? and name = ?', ['table', $table]);
+
+        self::assertIsString($statement);
+
+        $connection->statement(sprintf('drop table "%s"', $table));
+        $connection->statement(preg_replace('/"(id|authenticatable_type|authenticatable_id)" (varchar|char\(\d+\)) not null/', '$0 collate nocase', $statement) ?? $statement);
     }
 
     /**

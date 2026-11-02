@@ -81,7 +81,7 @@ final class DriverBindingsTest extends TestCase
 
         $manager = new MfaManager($this->app());
 
-        DriverBindings::extend($manager, $this->app());
+        DriverBindings::extend($manager);
 
         $totp  = $manager->driver('totp');
         $email = $manager->driver('email');

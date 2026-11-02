@@ -59,8 +59,10 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
 - `Passkeys\PasskeyAssertions` holds the ceremony's checks for one factor at a time, allowing exactly its associated
   credential, and only while the factor is a confirmed passkey of the caller's of an enabled type, not disabled, its
   association matches, the gateway still lists the credential, and the combination policy accepts it after the session's
-  first factor. No ceremony starts with an empty or wider allowlist. `Mfa::requestAssertion()` starts one; verifying is
-  `Mfa::verify(Submission::assertion(...))`, an attempt through `Attempts\AttemptService`, so a reason the gateway
+  first factor. No ceremony starts with an empty or wider allowlist. `Mfa::requestAssertion()` starts one, and answers
+  with a `Passkeys\AssertionRequest`: the options, or the package's reason for refusing, nobody served being
+  `not_found`. A gateway's own exception propagates, and `PasskeyAssertions::options()` itself stays throwing. Verifying
+  is `Mfa::verify(Submission::assertion(...))`, an attempt through `Attempts\AttemptService`, so a reason the gateway
   returns counts against the factor and the identity, and an assertion verified for another credential fails as
   `invalid_code`. A gateway that cannot verify at all refuses with an `OperationRefusedException`, which counts nothing.
   A pending session needs `mfa.verify`.

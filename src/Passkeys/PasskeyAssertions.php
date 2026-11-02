@@ -152,7 +152,7 @@ final readonly class PasskeyAssertions
     {
         $credential = $factor->getCredentialReference();
 
-        OperationRefusedException::unless(
+        OperationRefusedException::byPackageUnless(
             $credential !== null && $this->isAssociated($identity, $factor),
             FailureReason::NOT_FOUND,
             'The factor is not a passkey associated with the identity.',
@@ -160,7 +160,7 @@ final readonly class PasskeyAssertions
 
         $this->refuseUnusable($factor, $binding);
 
-        OperationRefusedException::unless(
+        OperationRefusedException::byPackageUnless(
             in_array($credential, $this->registered($identity), true),
             FailureReason::NOT_FOUND,
             'The passkey gateway no longer lists the factor\'s credential.',
@@ -169,7 +169,7 @@ final readonly class PasskeyAssertions
         $firstFactor = $this->firstFactors->forBinding($identity, $binding);
         $accepted    = $firstFactor !== null && $this->container->make(CombinationPolicy::class)->accepts($firstFactor, new Channel(ChannelKind::PASSKEY, $credential));
 
-        OperationRefusedException::unless($accepted, FailureReason::NOT_ACCEPTED, 'The combination policy does not accept the passkey after the session\'s first factor.');
+        OperationRefusedException::byPackageUnless($accepted, FailureReason::NOT_ACCEPTED, 'The combination policy does not accept the passkey after the session\'s first factor.');
 
         return $credential;
     }
@@ -206,12 +206,12 @@ final readonly class PasskeyAssertions
      */
     private function refuseUnusable(Factor $factor, ProofBinding $binding): void
     {
-        OperationRefusedException::unless($factor->isConfirmed(), FailureReason::NOT_CONFIRMED, 'The passkey factor is pending.');
-        OperationRefusedException::unless($factor->getDisabledAt() === null, FailureReason::LOCKED, 'The passkey factor is disabled after reaching the failure ceiling.');
+        OperationRefusedException::byPackageUnless($factor->isConfirmed(), FailureReason::NOT_CONFIRMED, 'The passkey factor is pending.');
+        OperationRefusedException::byPackageUnless($factor->getDisabledAt() === null, FailureReason::LOCKED, 'The passkey factor is disabled after reaching the failure ceiling.');
 
         $settings = new ApplicationSettings($this->container->make(Repository::class), $binding->application);
 
-        OperationRefusedException::unless($settings->enables(self::TYPE), FailureReason::TYPE_NOT_ENABLED, 'The application does not enable passkeys.');
+        OperationRefusedException::byPackageUnless($settings->enables(self::TYPE), FailureReason::TYPE_NOT_ENABLED, 'The application does not enable passkeys.');
     }
 
     /**

@@ -70,11 +70,11 @@ final readonly class OperationGuard
     public function identity(MultiFactorAuthenticatable $identity): void
     {
         if (!$this->container->make(SubjectTypeResolver::class)->isPerson($identity)) {
-            throw new OperationRefusedException(FailureReason::MACHINE_IDENTITY, 'The identity is not a person, so it cannot hold factors.');
+            throw OperationRefusedException::byPackage(FailureReason::MACHINE_IDENTITY, 'The identity is not a person, so it cannot hold factors.');
         }
 
         if (!$identity->isMfaActive()) {
-            throw new OperationRefusedException(FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.');
+            throw OperationRefusedException::byPackage(FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.');
         }
     }
 
@@ -96,14 +96,14 @@ final readonly class OperationGuard
     {
         $this->identity($identity);
 
-        $factor = $this->find($identity, $factorId) ?? throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The identity has no factor with that id.');
+        $factor = $this->find($identity, $factorId) ?? throw OperationRefusedException::byPackage(FailureReason::NOT_FOUND, 'The identity has no factor with that id.');
 
         if ($confirmed && !$factor->isConfirmed()) {
-            throw new OperationRefusedException(FailureReason::NOT_CONFIRMED, 'The factor is pending, and the operation needs a confirmed one.');
+            throw OperationRefusedException::byPackage(FailureReason::NOT_CONFIRMED, 'The factor is pending, and the operation needs a confirmed one.');
         }
 
         if (!(new ApplicationSettings($this->config, $application))->enables($factor->getType())) {
-            throw new OperationRefusedException(FailureReason::TYPE_NOT_ENABLED, sprintf('The application does not enable the factor\'s type [%s].', $factor->getType()));
+            throw OperationRefusedException::byPackage(FailureReason::TYPE_NOT_ENABLED, sprintf('The application does not enable the factor\'s type [%s].', $factor->getType()));
         }
 
         return $factor;
@@ -112,7 +112,8 @@ final readonly class OperationGuard
     /**
      * The identity's factor with the given id, looked up within the identity
      * only, or `null`. An id that is neither a string nor an integer finds
-     * nothing.
+     * nothing. A database's collation may match an owner or an id differing
+     * only in case, so the row found must hold exactly what was asked for.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  mixed  $factorId
@@ -133,11 +134,22 @@ final readonly class OperationGuard
 
         [$typeColumn, $keyColumn] = FactorOwnerColumns::of($blank);
 
-        /** @var (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null */
-        return WriteConnection::query($blank->newQuery())
-            ->where($typeColumn, CurrentIdentity::typeOf($identity))
+        $type = CurrentIdentity::typeOf($identity);
+
+        /** @var (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null $factor */
+        $factor = WriteConnection::query($blank->newQuery())
+            ->where($typeColumn, $type)
             ->where($keyColumn, (string) $key)
             ->whereKey($factorId)
             ->first();
+
+        if ($factor === null || !FactorOwnerColumns::owns($factor, $type, (string) $key)) {
+            return null;
+        }
+
+        /** @var int|string $stored A row found by its key has one of these. */
+        $stored = $factor->getKey();
+
+        return (string) $stored === (string) $factorId ? $factor : null;
     }
 }

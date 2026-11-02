@@ -10,12 +10,30 @@ the provider or another capability.
 ## Invariants
 
 - `MfaManager` is the factor driver registry (Laravel's `Manager`, so `Mfa::extend()`, `Mfa::driver()` and
-  `getDefaultDriver()` behave as for any manager) and the single entry point the `Mfa` facade exposes. Every other
-  public method is a one-line delegation to the service of its capability, with its arguments passed through and the
-  service's answer returned unchanged; the recovery code methods first resolve the current identity, and answer
-  nothing without one.
-- The manager resolves the service from the container on each call, so a service bound or rebound after the manager
-  was resolved is the one used.
+  `getDefaultDriver()` take the names they take on any manager) and the single entry point the `Mfa` facade exposes.
+  Every other public method is a one-line delegation to the service of its capability, with its arguments passed
+  through and the service's answer returned unchanged.
+- The surface is flat: one method per flow, listed in [Helpers](../guides/helpers.md), with the facade annotating
+  exactly those methods and a test holding the two equal. An annotation is documentation, not an allowlist:
+  `getDrivers()`, `getContainer()` and `forgetDrivers()` stay callable as inherited infrastructure.
+- The manager holds nothing a request gave it. It declares no property, resolves every service from
+  `Container::getInstance()` rather than `$this->container`, so a service bound or rebound after the manager was
+  resolved is the one used and a sandbox's service is the one answering, and `setContainer()` refuses. `$config` stays
+  the one the constructor read, which nothing reads.
+- No driver is cached: `driver()` builds on every call, keeping Laravel's normalisation of the name, and
+  `callCustomCreator()` hands a creator the current application. `Manager::$drivers` stays empty for the manager's whole
+  life, and `extend()` needs no eviction, so the most recent registration wins however late it is made. Each shipped
+  factory takes the container it is handed and captures nothing. A driver keeps no state between calls.
+  `Mfa::driver('totp') === Mfa::driver('totp')` is not true.
+- A method the manager does not declare is refused (`BadMethodCallException`, naming the method and no argument).
+  Laravel's `Manager::__call` would forward it to the default driver, reaching a raw check outside attempts, proofs and
+  events.
+- A helper a person can be refused by answers with a value holding the reason, never a plain exception
+  (`RecoveryCodes\RecoveryCodeGeneration`, `Passkeys\AssertionRequest`, as `Factors\FactorChange` does). On
+  `generateRecoveryCodes()` and `requestAssertion()`, a refusal becomes a value only when marked as the package's own
+  (`OperationRefusedException::byPackage()`): a seam's stays an exception. The mark says who refused, not when, so
+  nothing that runs after a commit is converted. The other helpers do not read it: a seam's refusal inside what they
+  guard is their reason.
 - Services resolve the seams a consumer rebinds (`FreshnessGate`, `ProofStore`, the event dispatcher and the
   configuration) from the container when they need them, never at construction, so a rebinding (`Event::fake()`, a
   store bound mid-test, a policy bound by a sibling package) reaches a service that is already resolved.
@@ -23,7 +41,7 @@ the provider or another capability.
   default guard when it implements `MultiFactorAuthenticatable`. Without one, every service answers as it always has: no
   setup, no factors, no proofs, and nothing written or dispatched.
 - A factor runs through the driver of its type, resolved by `Drivers\DriverResolver` from the `mfa` manager the
-  container holds, whichever manager the call was made on. Recovery codes are not a factor and have no driver. A factor
+  container holds. Recovery codes are not a factor and have no driver. A factor
   is only looked up within the identity the request serves (`Factors\OperationGuard`).
 - No service keeps request state: the reads (`factors()`, `factor()`, `proofs()`) go to the identity, the
   database or the bound proof store on every call, so a singleton service never carries one request's identity or
@@ -88,8 +106,16 @@ the provider or another capability.
   `testExtendRegistersDriversThatReadTheConfig`
 - `tests/Unit/Drivers/DriverResolverTest.php`
   `testResolvesTheManagersDriver`
-- `tests/Unit/Drivers/DriverResolverTest.php`
-  `testResolvesFromTheRegistryPassedIn`
+- `tests/Unit/MfaManagerTest.php`
+  `testAnUndeclaredMethodIsRefusedAndNeverReachesTheDriver`
+- `tests/Unit/MfaManagerLongRunningTest.php`
+  `testADelegationAnswersFromTheCurrentApplication`
+- `tests/Unit/MfaManagerLongRunningTest.php`
+  `testShippedDriversAreBuiltFromTheCurrentApplication`
+- `tests/Unit/MfaManagerLongRunningTest.php`
+  `testTheManagersOwnFieldsKeepNothingOfACopy`
+- `tests/Unit/Facades/MfaTest.php`
+  `testTheFacadeAnnotatesEveryManagerMethodAsDeclared`
 - `tests/Unit/Factors/FactorServiceTest.php`
   `testReadsTheFactorsOnEveryCall`
 - `tests/Integration/CustomDriverExtensionTest.php`
@@ -98,15 +124,15 @@ the provider or another capability.
   `testContainerExtenderOverrideOfTotpWins`
 - `tests/Integration/CustomDriverExtensionTest.php`
   `testResolvingCallbackOverrideOfTotpWins`
-- `tests/Integration/CustomDriverExtensionTest.php`
-  `testASeparateManagerVerifiesThroughItsOwnDriver`
 
 ## Change Triggers
 
 Update this note when any of the following change:
 
 - a capability gains, loses or moves a namespace, a service or a `*Bindings` class
-- the manager does more than delegate, or a method moves to another capability's service
+- the manager does more than delegate, keeps anything, or a method moves to another capability's service
+- the facade's surface changes
 - the rule that services resolve the seams consumers rebind when they need them, not at construction
-- how or when the shipped drivers are registered against the manager, or which registry a service runs drivers from
+- how or when the shipped drivers are registered against the manager, whether a driver is cached, or which manager a
+  service runs drivers from
 - a service starts keeping request state between calls

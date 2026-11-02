@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
+use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
@@ -16,16 +17,20 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
+use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorChange;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult;
+use SineMacula\Laravel\Mfa\Lifecycle\ForgetIdentity;
 use SineMacula\Laravel\Mfa\Lifecycle\IdentityReset;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\Passkeys\AssertionRequest;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus;
@@ -45,9 +50,7 @@ use Tests\TestCase;
 /**
  * Pins the manager as a thin entry point: every method hands its arguments to
  * the service of its capability, resolved from the container, and returns that
- * service's answer unchanged. The methods that run a factor through its driver
- * also hand the service the manager itself, as the driver registry, and the
- * recovery code methods hand it the current identity.
+ * service's answer unchanged.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -105,11 +108,20 @@ final class MfaManagerTest extends TestCase
         yield 'proofs' => ['proofs', ProofService::class, 'proofs', [], []];
         yield 'offeredFactors' => ['offeredFactors', FactorOffers::class, 'offered', [], [$summary]];
         yield 'sendCode' => ['sendCode', ChallengeRequests::class, 'sendCode', [$factor->getFactorIdentifier(), Purpose::STEP_UP], $refused];
-        yield 'requestAssertion' => ['requestAssertion', ChallengeRequests::class, 'requestAssertion', ['factor-1', Purpose::SIGN_IN], ['challenge' => 'options']];
+
+        $started = AssertionRequest::started(['challenge' => 'options']);
+
+        yield 'requestAssertion' => ['requestAssertion', ChallengeRequests::class, 'requestAssertion', ['factor-1', Purpose::SIGN_IN], $started];
+
         $failed = VerificationResult::failed(FailureReason::INVALID_CODE, 'The code did not match.');
 
         yield 'verify' => ['verify', VerificationService::class, 'verify', [Submission::factor('factor-1', '123456'), Purpose::STEP_UP], $failed];
-        yield 'generateRecoveryCodes' => ['generateRecoveryCodes', RecoveryCodeIssuance::class, 'generate', [], [new RevealedSecret('ABCDEFGHJKLM')]];
+
+        $generated = RecoveryCodeGeneration::generated([new RevealedSecret('ABCDEFGHJKLM')]);
+
+        yield 'generateRecoveryCodes' => ['generateRecoveryCodes', RecoveryCodeIssuance::class, 'generate', [], $generated];
+        yield 'recoveryCodeStatus' => ['recoveryCodeStatus', RecoveryCodeService::class, 'statusOfCaller', [], new RecoveryCodeStatus(4, 2, CarbonImmutable::now())];
+        yield 'recoveryCodeStatus of nobody' => ['recoveryCodeStatus', RecoveryCodeService::class, 'statusOfCaller', [], null];
 
         $grant = new RevealedSecret('grant');
 
@@ -129,6 +141,7 @@ final class MfaManagerTest extends TestCase
         yield 'unlockFactor' => ['unlockFactor', LifecycleService::class, 'unlockFactor', [$identity, 'factor-1', $actor], true];
         yield 'unlockIdentity' => ['unlockIdentity', LifecycleService::class, 'unlockIdentity', [$identity, $actor], false];
         yield 'resetIdentity' => ['resetIdentity', IdentityReset::class, 'reset', [$identity, $actor, 'Lost phone.', false], null];
+        yield 'forgetIdentity' => ['forgetIdentity', ForgetIdentity::class, 'forget', [$identity], null];
     }
 
     /**
@@ -204,13 +217,14 @@ final class MfaManagerTest extends TestCase
         $submission = Submission::factor('factor-1', '123456');
         $result     = VerificationResult::failed(FailureReason::INVALID_CODE, 'The code did not match.');
         $refused    = SendResult::refused(FailureReason::NOT_FOUND);
+        $assertion  = AssertionRequest::refused(FailureReason::NOT_FOUND);
 
         $verification = \Mockery::mock($this->container()->make(VerificationService::class));
         $verification->shouldReceive('verify')->once()->with($submission, null)->andReturn($result);
 
         $requests = \Mockery::mock($this->container()->make(ChallengeRequests::class));
         $requests->shouldReceive('sendCode')->once()->with('factor-1', null)->andReturn($refused);
-        $requests->shouldReceive('requestAssertion')->once()->with('factor-1', null)->andReturn([]);
+        $requests->shouldReceive('requestAssertion')->once()->with('factor-1', null)->andReturn($assertion);
 
         $requirements = \Mockery::mock($this->container()->make(RequirementService::class));
         $requirements->shouldReceive('isFresh')->once()->with('mfa.add_factor', null)->andReturnFalse();
@@ -221,54 +235,82 @@ final class MfaManagerTest extends TestCase
 
         self::assertSame($result, $this->manager()->verify($submission));
         self::assertSame($refused, $this->manager()->sendCode('factor-1'));
-        self::assertSame([], $this->manager()->requestAssertion('factor-1'));
+        self::assertSame($assertion, $this->manager()->requestAssertion('factor-1'));
         self::assertFalse($this->manager()->isFresh('mfa.add_factor'));
     }
 
     /**
-     * The recovery code status hands the identity the request serves to the
-     * recovery code service, and returns its answer.
+     * The recovery code status is that of the identity the request serves.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testRecoveryCodeStatusDelegatesForTheCurrentIdentity(): void
+    public function testRecoveryCodeStatusIsTheCurrentIdentitys(): void
     {
-        $user = TestUser::query()->create(['email' => 'codes@example.com']);
+        $this->actingAs(TestUser::query()->create(['email' => 'codes@example.com']));
 
-        $this->actingAs($user);
+        $status = $this->manager()->recoveryCodeStatus();
 
-        $status = new RecoveryCodeStatus(4, 2, CarbonImmutable::now());
-        $codes  = \Mockery::mock($this->container()->make(RecoveryCodeService::class));
-
-        $codes->shouldReceive('status')->once()->with($user)->andReturn($status);
-
-        $this->container()->instance(RecoveryCodeService::class, $codes);
-
-        self::assertSame($status, $this->manager()->recoveryCodes());
+        self::assertNotNull($status);
+        self::assertFalse($status->exists());
+        self::assertSame(0, $status->remaining);
     }
 
     /**
-     * Without an MFA-capable identity the recovery code methods answer nothing
-     * without calling the service: no codes and no status.
+     * Without an MFA-capable identity the recovery code methods change and read
+     * nothing: generating is refused, and there is no status.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testRecoveryCodeMethodsAnswerNothingWithoutAnIdentity(): void
+    public function testRecoveryCodeMethodsServeNobodyWithoutAnIdentity(): void
     {
-        self::assertSame([], $this->manager()->generateRecoveryCodes());
+        $generation = $this->manager()->generateRecoveryCodes();
+
+        self::assertFalse($generation->wasGenerated());
+        self::assertSame(FailureReason::NOT_FOUND, $generation->reason);
         self::assertSame(0, RecoveryCode::query()->count());
+        self::assertNull($this->manager()->recoveryCodeStatus());
+    }
 
-        $codes = \Mockery::mock($this->container()->make(RecoveryCodeService::class));
+    /**
+     * A method neither the manager nor Laravel's declares is refused, not
+     * forwarded to the default driver, whose raw check runs outside attempts,
+     * proofs and events. Neither the method's arguments nor the driver are
+     * reached.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAnUndeclaredMethodIsRefusedAndNeverReachesTheDriver(): void
+    {
+        $driver = \Mockery::mock(FactorDriver::class);
 
-        $codes->shouldNotReceive('status');
+        $driver->shouldNotReceive('confirm');
 
-        $this->container()->instance(RecoveryCodeService::class, $codes);
+        $manager = $this->manager();
 
-        self::assertNull($this->manager()->recoveryCodes());
+        $manager->extend('totp', fn (): FactorDriver => $driver);
+
+        $calls = [
+            // @phpstan-ignore method.notFound
+            static fn () => $manager->confirm('secret-code'),
+            // @phpstan-ignore staticMethod.notFound
+            static fn () => Mfa::confirm('secret-code'),
+        ];
+
+        foreach ($calls as $call) {
+            try {
+                $call();
+
+                self::fail('The method must be refused.');
+            } catch (\BadMethodCallException $exception) {
+                self::assertSame(sprintf('Method %s::confirm() does not exist.', MfaManager::class), $exception->getMessage());
+            }
+        }
     }
 
     /**

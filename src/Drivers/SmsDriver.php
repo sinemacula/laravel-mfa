@@ -13,8 +13,8 @@ use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
  * SMS factor driver.
  *
  * Delivers each code to the factor's phone number through the application's
- * `SmsSender`, in the words of the locale it is sent in: a cached driver holds
- * no wording, so it follows the request. The default sender throws until the
+ * `SmsSender`, in the words of the locale it is sent in: the driver holds no
+ * wording, so it follows the request. The default sender throws until the
  * application binds one, so a code is never dropped silently.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>

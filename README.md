@@ -149,7 +149,7 @@ Mfa::factor($factorId);                 // ?FactorSummary
 Mfa::offeredFactors();                  // list<FactorSummary>, the preferred first
 
 Mfa::sendCode($factorId);               // SendResult: the challenge's id, or why none was sent
-Mfa::requestAssertion($factorId);       // the options of a passkey's assertion request
+Mfa::requestAssertion($factorId);       // AssertionRequest: a passkey's options, or why there are none
 
 Mfa::verify(Submission::factor($factorId, $code));                  // TOTP, or a driver of your own
 Mfa::verify(Submission::challenge($factorId, $challengeId, $code)); // an email or SMS code
@@ -166,10 +166,14 @@ Mfa::removeFactor($factorId);           // FactorRemovalResult, on a fresh sessi
 Mfa::resetIdentity($user, $actor, $reason); // everything gone, every session revoked, re-enrolment obliged
 Mfa::unlockFactor($user, $factorId, $actor); // bool: a live temporary lockout was lifted
 Mfa::unlockIdentity($user, $actor);     // bool: a live temporary lockout was lifted
+Mfa::forgetIdentity($user);             // everything held for a deleted identity; `HasFactors` does it for a model
 Mfa::prune();                           // PruneResult; `mfa:prune` is the same from the console
-Mfa::generateRecoveryCodes();           // list<RevealedSecret>, returned once, on a fresh session at the level
-Mfa::recoveryCodes();                   // RecoveryCodeStatus|null: remaining, generation, generatedAt
+Mfa::generateRecoveryCodes();           // RecoveryCodeGeneration: the codes, once, or why not
+Mfa::recoveryCodeStatus();              // RecoveryCodeStatus|null: remaining, generation, generatedAt
 ```
+
+Every flow is one call: [Helpers](docs/guides/helpers.md) lists what each returns, who it serves and which pending
+action it needs, and how a route binds a factor, which it finds only within the caller's identity.
 
 `Mfa::verify()` answers with a `VerificationResult`: the proof and the evaluation of the whole requirement with it, or a
 machine-readable failure reason. Factors are looked up by id within the identity the request serves, so an id that does
@@ -253,13 +257,18 @@ accepted once per factor, also when two requests race with the same code. See
 
 Recovery codes are a fallback for lost factors, not a factor. An application accepts them once its block enables them
 (`'recovery_codes' => ['enabled' => true]`), and only an identity with a confirmed factor can have a set.
-`Mfa::generateRecoveryCodes()` replaces any earlier set atomically, keeps only a salted hash of each code, and returns
-the codes **exactly once**, as `RevealedSecret` values for a response no cache keeps:
+`Mfa::generateRecoveryCodes()` replaces any earlier set atomically, keeps only a salted hash of each code, and answers
+with the codes **exactly once**, as `RevealedSecret` values for a response no cache keeps, or with the reason it
+refused:
 
 ```php
 use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
 
-return SecretResponse::json(['recovery_codes' => Mfa::generateRecoveryCodes()]);
+$generation = Mfa::generateRecoveryCodes();
+
+return $generation->wasGenerated()
+    ? SecretResponse::json(['recovery_codes' => $generation->codes])
+    : response()->json(['reason' => $generation->reason->value], 403);
 ```
 
 Generating a set needs a session fresh enough for `mfa.generate_recovery_codes` that reaches the level the application
@@ -327,10 +336,10 @@ Mfa::extend('webauthn', fn ($app) => new WebAuthnDriver(/* ... */));
 ```
 
 Custom drivers must implement `SineMacula\Laravel\Mfa\Contracts\FactorDriver`, which also states the type's channel
-kind and `amr` values (see [Factor drivers](docs/guides/extending.md#factor-drivers)). Register the driver **before**
-any request code calls `Mfa::driver(...)`: Laravel's manager caches resolved drivers per request, so an
-`extend()` call made after the driver is already resolved silently has no effect. Bind in a service
-provider's `register()` / `boot()` rather than mid-request.
+kind and `amr` values (see [Factor drivers](docs/guides/extending.md#factor-drivers)). The manager builds a driver on
+every call rather than caching it, so a driver keeps no state between calls, and the most recent registration is the one
+used. Register it in a service provider's `register()` or `boot()` rather than mid-request, as a closure registered from
+inside a request stays on the shared manager.
 
 ## Security Model
 

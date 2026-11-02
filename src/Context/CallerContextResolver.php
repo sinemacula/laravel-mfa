@@ -72,9 +72,32 @@ final readonly class CallerContextResolver
                 : null;
         }
 
-        $identity = CurrentIdentity::resolve();
+        return $this->guardCaller();
+    }
 
-        return $identity !== null && $this->isPerson($identity) ? new Caller($identity) : null;
+    /**
+     * The caller a bound factor route parameter is held to: a pending session
+     * whose credential allows one of the actions that name an existing factor,
+     * otherwise, with no pending session, the identity the guard signed in. A
+     * pending session allowing none of them is served nothing, and the guard's
+     * user is never used in its place. It says whose factors bind, not that the
+     * route may run: each helper asks for its own action.
+     *
+     * @return ?\SineMacula\Laravel\Mfa\Context\Caller
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function forFactorBinding(): ?Caller
+    {
+        $pending = $this->pending();
+
+        if ($pending !== null) {
+            return $this->allowsNamingAFactor($pending) && $this->isPerson($pending->identity)
+                ? new Caller($pending->identity, $pending)
+                : null;
+        }
+
+        return $this->guardCaller();
     }
 
     /**
@@ -156,6 +179,34 @@ final readonly class CallerContextResolver
         return $request instanceof Request
             ? $this->container->make(PendingSessionResolver::class)->resolve($request)
             : null;
+    }
+
+    /**
+     * The identity the guard signed in, when it is a person.
+     *
+     * @return ?\SineMacula\Laravel\Mfa\Context\Caller
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function guardCaller(): ?Caller
+    {
+        $identity = CurrentIdentity::resolve();
+
+        return $identity !== null && $this->isPerson($identity) ? new Caller($identity) : null;
+    }
+
+    /**
+     * Whether the pending credential allows an action that names an existing
+     * factor.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @return bool
+     */
+    private function allowsNamingAFactor(PendingContext $pending): bool
+    {
+        return $pending->allows(PendingAction::LIST_FACTORS)
+            || $pending->allows(PendingAction::SEND_CODE)
+            || $pending->allows(PendingAction::VERIFY);
     }
 
     /**

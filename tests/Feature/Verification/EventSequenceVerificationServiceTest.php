@@ -226,7 +226,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
         self::assertCount(1, $this->reported);
         self::assertInstanceOf(VerificationFailed::class, $this->reported[0]);
         self::assertSame('recovery_code', $this->reported[0]->type);
-        self::assertSame(10, $this->mfa()->recoveryCodes()?->remaining);
+        self::assertSame(10, $this->mfa()->recoveryCodeStatus()?->remaining);
     }
 
     /**

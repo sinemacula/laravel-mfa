@@ -115,8 +115,8 @@ final class PendingActionsTest extends TestCase
         self::assertSame(FailureReason::NOT_FOUND, $this->manager()->sendCode($this->factor->id)->reason);
         self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Submission::challenge($this->factor->id, 'any', '123456'))->reason);
         self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
-        self::assertSame([], $this->manager()->generateRecoveryCodes());
-        self::assertNull($this->manager()->recoveryCodes());
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->generateRecoveryCodes()->reason);
+        self::assertNull($this->manager()->recoveryCodeStatus());
         self::assertSame([], $this->manager()->proofs());
         self::assertSame(FailureReason::NOT_FOUND, $this->manager()->removeFactor($this->guardedFactor->id)->reason);
         self::assertTrue(Factor::query()->whereKey($this->guardedFactor->id)->exists());
@@ -134,7 +134,7 @@ final class PendingActionsTest extends TestCase
      */
     public function testWithoutAPendingSessionTheGuardsUserIsServed(): void
     {
-        self::assertNotNull($this->manager()->recoveryCodes());
+        self::assertNotNull($this->manager()->recoveryCodeStatus());
         self::assertCount(1, $this->manager()->proofs());
         self::assertSame([$this->guardedFactor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors()));
     }
@@ -154,7 +154,7 @@ final class PendingActionsTest extends TestCase
         self::assertSame([$this->factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors()));
         self::assertSame($this->factor->id, $this->manager()->factor($this->factor->id)?->id);
         self::assertNull($this->manager()->factor($this->guardedFactor->id));
-        self::assertNotNull($this->manager()->recoveryCodes());
+        self::assertNotNull($this->manager()->recoveryCodeStatus());
     }
 
     /**

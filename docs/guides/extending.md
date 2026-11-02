@@ -24,8 +24,14 @@ models and the `Codes\MfaCodeMessage` mailable. Extension is through **compositi
 Every class name above is relative to `SineMacula\Laravel\Mfa`. Bind your own implementations from a service provider: a
 binding made after the package's provider has registered replaces the package's default, and `Mfa::extend()` replaces a
 shipped driver of the same name. So does a driver registered on the manager from a container extender or a resolving
-callback on `mfa`, since the shipped drivers are registered before either runs. Register drivers before any code calls
-`Mfa::driver(...)`, since the manager keeps a driver once it is built.
+callback on `mfa`, since the shipped drivers are registered before either runs. The manager builds a driver on every
+call rather than caching it, so the most recent registration is the one used, but call `extend()` from a service
+provider: a closure registered from inside a request stays on the shared manager.
+
+A driver keeps no state between calls, as it is built for each one, a few small objects for the shipped ones, and two
+resolutions are two objects. A driver that is expensive to build is registered as
+`Mfa::extend('mine', fn ($app) => $app->make(MyDriver::class))` and bound as it likes. A creator is handed the
+application current at the time, not the one it was registered on, so it reads its configuration and sender from there.
 
 A custom factor or recovery code model lives on the storage connection with the package's other tables (see
 [Storage](configuration.md#storage)): one on another connection is refused when the package boots. The recovery code
@@ -137,8 +143,8 @@ registers it with the container, and the classes only it uses:
 | `Passkeys`      | The change gate, `PasskeyRegistration`, `CredentialId`, assertions and the unavailable gateway      |
 | `Seams`         | Defaults that read nothing of the package: `RefusingReauthenticator`                                |
 | `Enrollment`    | `startEnrollment()`, `confirmEnrollment()`, what they answer and `EnrollmentSettings`               |
-| `Lifecycle`     | Removing, resetting, unlocking and pruning, `ForgetIdentity` and `LifecycleSettings`                |
-| `RecoveryCodes` | `generateRecoveryCodes()`, `recoveryCodes()` and `RecoveryCodeSettings`                             |
+| `Lifecycle`     | Removing, resetting, unlocking, forgetting and pruning, and `LifecycleSettings`                     |
+| `RecoveryCodes` | `generateRecoveryCodes()`, `recoveryCodeStatus()` and `RecoveryCodeSettings`                        |
 | `Attempts`      | `AttemptService`, and `ChallengeCounters`, the counts a challenge owner reports into                |
 | `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
 | `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction             |
@@ -189,12 +195,12 @@ example, and returns a `first_factor_reauthentication` proof bound to their curr
 
 Every helper that returns summaries, sends a code or reveals a secret asks the bound `PendingSessionResolver` first. On
 a pending session it serves only the action it needs (`mfa.list_factors` for `factors()`, `factor()`, `offeredFactors()`
-and `recoveryCodes()`, `mfa.send_code` for `sendCode()`, `mfa.verify` for `verify()` and `requestAssertion()`), as the
-pending session's own identity; anything else gets nothing, never the guard's user in its place. Starting, resending and
-cancelling an enrolment need `mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`.
-Generating recovery codes, renaming, preferring or removing a factor and `proofs()` serve active sessions only. A code
-is sent or checked only for a binding that is exactly the caller's own, on its application and its session. A resolver
-reports a pending credential that does not validate by throwing.
+and `recoveryCodeStatus()`, `mfa.send_code` for `sendCode()`, `mfa.verify` for `verify()` and `requestAssertion()`), as
+the pending session's own identity; anything else gets nothing, never the guard's user in its place. Starting, resending
+and cancelling an enrolment need `mfa.start_bootstrap_enrollment`, and confirming one
+`mfa.confirm_bootstrap_enrollment`. Generating recovery codes, renaming, preferring or removing a factor and `proofs()`
+serve active sessions only. A code is sent or checked only for a binding that is exactly the caller's own, on its
+application and its session. A resolver reports a pending credential that does not validate by throwing.
 
 ## Challenge counters
 

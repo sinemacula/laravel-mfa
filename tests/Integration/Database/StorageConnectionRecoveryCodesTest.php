@@ -92,7 +92,7 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
         self::assertTrue(Mfa::verify(Submission::recoveryCode($code))->isFailed());
         self::assertSame(1, DB::connection('secondary')->table('mfa_recovery_codes')->whereNotNull('used_at')->count());
         self::assertSame(0, DB::connection('secondary')->transactionLevel());
-        self::assertSame(9, Mfa::recoveryCodes()?->remaining);
+        self::assertSame(9, Mfa::recoveryCodeStatus()?->remaining);
     }
 
     /**
@@ -125,7 +125,7 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
 
         self::assertSame(0, DB::connection('secondary')->transactionLevel());
         self::assertSame(10, RecoveryCode::query()->where('authenticatable_id', (string) $user->id)->whereNull('replaced_at')->count());
-        self::assertSame(1, Mfa::recoveryCodes()?->generation);
+        self::assertSame(1, Mfa::recoveryCodeStatus()?->generation);
         self::assertTrue(Mfa::verify(Submission::recoveryCode($prior[9]->reveal()))->isVerified());
     }
 

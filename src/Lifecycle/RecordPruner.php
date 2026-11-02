@@ -31,8 +31,8 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * replaced; and, with no retention, throttle rows whose window has ended, which
  * count nothing.
  *
- * Invokable, so `$schedule->call(RecordPruner::class)` runs it; the package
- * schedules nothing itself. `mfa:prune` is the same from the console.
+ * `Mfa::prune()` runs it; the package schedules nothing itself. `mfa:prune` is
+ * the same from the console.
  *
  * Delivered codes outlive the send window they count towards, whose longest is
  * a day, the shortest retention. Those, recovery codes and throttle rows go in
@@ -43,10 +43,10 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * `EnrollmentExpired` reports each pending factor discarded, once its change
  * commits, with only what the stored row says in its context.
  *
- * @api
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
+ *
+ * @internal
  */
 final readonly class RecordPruner
 {

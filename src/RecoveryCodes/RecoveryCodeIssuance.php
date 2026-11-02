@@ -26,12 +26,16 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
  * level the application sets for issuing them.
  *
  * A pending session is served nothing here, and neither is a request that
- * serves nobody. The session is captured when the call begins, and checked
- * before the codes are drawn and again under the identity's lock, so what was
- * proved and the sign-in it was proved on still hold when the old set is
- * replaced; a refusal leaves the old set intact. A session that has changed,
- * one that is not fresh and one below the level are all refused as `not_fresh`,
- * since the remedy is the same stronger step-up.
+ * serves nobody: both are `not_found`. The session is captured when the call
+ * begins, and checked before the codes are drawn and again under the identity's
+ * lock, so what was proved and the sign-in it was proved on still hold when the
+ * old set is replaced; a refusal leaves the old set intact. A session that has
+ * changed, one that is not fresh and one below the level are all refused as
+ * `not_fresh`, since the remedy is the same stronger step-up.
+ *
+ * Only the package's own refusals become a refused result. A seam's exception
+ * propagates, and the event is reported outside the conversion, so a listener's
+ * failure is never read as a refusal of a set that committed.
  *
  * With an identity's first additional factor a set is issued as part of the
  * change that confirms it, not through that gate: the factor's own confirmation
@@ -70,28 +74,31 @@ final readonly class RecoveryCodeIssuance
     ) {}
 
     /**
-     * Generate a new set for the person the request serves, and return its
-     * codes, once, as secrets for the response; none without a person signed
-     * in, or on a pending session.
+     * Generate a new set for the person the request serves, and answer with its
+     * codes, once, as secrets for the response, or the reason it was refused.
      *
-     * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
+     * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    public function generate(): array
+    public function generate(): RecoveryCodeGeneration
     {
-        $caller = $this->callers->resolve(null);
+        $caller  = $this->callers->resolve(null);
+        $binding = $caller === null ? null : $this->callers->binding($caller, Purpose::STEP_UP);
 
-        if ($caller === null) {
-            return [];
+        if ($caller === null || $binding === null) {
+            return RecoveryCodeGeneration::refused($caller === null ? FailureReason::NOT_FOUND : FailureReason::NOT_FRESH);
         }
 
-        $binding = $this->callers->binding($caller, Purpose::STEP_UP);
+        try {
+            ['codes' => $codes, 'generation' => $generation] = $this->codes->replaceSet($caller->identity, $binding->application, fn () => $this->assertMayIssue($binding));
+        } catch (OperationRefusedException $exception) {
+            return self::refusedBy($exception);
+        }
 
-        OperationRefusedException::unless($binding !== null, FailureReason::NOT_FRESH, 'The identity has no sign-in to issue recovery codes on.');
+        $this->codes->reportGenerated($caller->identity, $binding->application, count($codes), $generation);
 
-        return $this->codes->generate($caller->identity, null, $binding->application, fn () => $this->assertMayIssue($binding));
+        return RecoveryCodeGeneration::generated($codes);
     }
 
     /**
@@ -126,6 +133,19 @@ final readonly class RecoveryCodeIssuance
     }
 
     /**
+     * The refused answer of a refusal the package made; a seam's is thrown on.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException  $refusal
+     * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     */
+    private static function refusedBy(OperationRefusedException $refusal): RecoveryCodeGeneration
+    {
+        return $refusal->byPackage ? RecoveryCodeGeneration::refused($refusal->reason) : throw $refusal;
+    }
+
+    /**
      * Refuse issuing on a session that is no longer the one captured, is not
      * fresh enough for the operation, or does not reach the level.
      *
@@ -140,16 +160,20 @@ final readonly class RecoveryCodeIssuance
     {
         $caller = $this->callers->still(null, $binding);
 
-        OperationRefusedException::unless($caller !== null, FailureReason::NOT_FRESH, 'The session is no longer the one the recovery codes were asked for on.');
+        OperationRefusedException::byPackageUnless($caller !== null, FailureReason::NOT_FRESH, 'The session is no longer the one the recovery codes were asked for on.');
 
         $fresh = $this->container->make(RequirementService::class)->isFresh(Operation::GENERATE_RECOVERY_CODES->value);
 
-        OperationRefusedException::unless($fresh, FailureReason::NOT_FRESH, 'The session is not fresh enough to issue recovery codes.');
+        OperationRefusedException::byPackageUnless($fresh, FailureReason::NOT_FRESH, 'The session is not fresh enough to issue recovery codes.');
 
         $proofs   = $this->firstFactors->proofs($caller->identity, $binding->application);
         $level    = $this->container->make(RequirementCheck::class)->check(Requirement::none(), ...$proofs)->level;
         $settings = new ApplicationSettings($this->container->make(Repository::class), $binding->application);
 
-        OperationRefusedException::unless($level->meets($settings->recoveryCodeLevel()), FailureReason::NOT_FRESH, 'The session is below the level for issuing recovery codes.');
+        OperationRefusedException::byPackageUnless(
+            $level->meets($settings->recoveryCodeLevel()),
+            FailureReason::NOT_FRESH,
+            'The session is below the level for issuing recovery codes.',
+        );
     }
 }

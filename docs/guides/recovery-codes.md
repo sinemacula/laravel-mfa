@@ -19,16 +19,23 @@ The set's size, each code's length and the alphabet it is drawn from are in `rec
 
 ## Generating a set
 
-`Mfa::generateRecoveryCodes()` generates a new set for the signed-in identity and returns its codes, once, as
-`Secrets\RevealedSecret` values. Send them with `Secrets\SecretResponse::json()`, on a route behind the `mfa.no-store`
-middleware, so neither the browser nor a proxy keeps them (see [Secrets](secrets.md)):
+`Mfa::generateRecoveryCodes()` generates a new set for the signed-in identity and answers with a
+`RecoveryCodes\RecoveryCodeGeneration` holding its codes, once, as `Secrets\RevealedSecret` values. Send them with
+`Secrets\SecretResponse::json()`, on a route behind the `mfa.no-store` middleware, so neither the browser nor a proxy
+keeps them (see [Secrets](secrets.md)):
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
 
 Route::post('/mfa/recovery-codes', function () {
-    return SecretResponse::json(['recovery_codes' => Mfa::generateRecoveryCodes()]);
+    $generation = Mfa::generateRecoveryCodes();
+
+    if (! $generation->wasGenerated()) {
+        return response()->json(['reason' => $generation->reason->value], 403);
+    }
+
+    return SecretResponse::json(['recovery_codes' => $generation->codes]);
 })->middleware(['auth', 'mfa.no-store']);
 ```
 
@@ -37,19 +44,22 @@ spaces and hyphens are ignored when a code is redeemed. The package keeps only a
 has returned can never be shown again: a person who lost theirs generates a new one.
 
 A new set replaces the old one in one transaction: the old codes stop working as the new ones start, and a redemption
-racing the replacement sees one set or the other, never both and never neither. Generation is refused with an
-`Exceptions\OperationRefusedException` carrying its reason:
+racing the replacement sees one set or the other, never both and never neither. A refusal answers with its `reason`,
+no codes, and `wasGenerated()` false:
 
-| Reason              | When                                                                |
-|---------------------|---------------------------------------------------------------------|
-| `machine_identity`  | The identity is not a person                                        |
-| `identity_inactive` | The identity is inactive                                            |
-| `type_not_enabled`  | The application does not accept recovery codes                      |
-| `no_factor`         | The identity has no confirmed factor (a pending one does not count) |
-| `not_fresh`         | The session is not fresh enough, or below the level                 |
+| Reason              | When                                                                                  |
+|---------------------|---------------------------------------------------------------------------------------|
+| `not_found`         | No signed-in identity that can hold factors, or a pending session: nobody is served   |
+| `identity_inactive` | The identity is inactive                                                              |
+| `type_not_enabled`  | The application does not accept recovery codes                                        |
+| `no_factor`         | The identity has no confirmed factor (a pending one does not count)                   |
+| `not_fresh`         | The session has no sign-in, is not fresh enough, or is below the level                |
 
-`RecoveryCodesGenerated` is dispatched once the new set is stored, with its size and generation, never a code. Without
-a signed-in identity that can hold factors, and on a pending session, `generateRecoveryCodes()` returns an empty list.
+An `Exceptions\OperationRefusedException` that a seam of your own throws, a freshness gate or a combination policy,
+is not one of these: it propagates, leaving the old set. So does a listener's exception once the set has committed,
+which is not a refusal of it.
+
+`RecoveryCodesGenerated` is dispatched once the new set is stored, with its size and generation, never a code.
 
 Generating a set needs a session fresh enough for `mfa.generate_recovery_codes` that also reaches the assurance level
 the application sets for it (`recovery_codes.level`, `aal2` by default). Both are checked before the codes are drawn and
@@ -105,10 +115,10 @@ the code already used.
 
 ## Remaining codes
 
-`Mfa::recoveryCodes()` reports where the identity's set stands, without a code:
+`Mfa::recoveryCodeStatus()` reports where the identity's set stands, without a code:
 
 ```php
-$status = Mfa::recoveryCodes();
+$status = Mfa::recoveryCodeStatus();
 
 $status?->remaining;    // unused codes of the current set
 $status?->generation;   // 0 before the first set

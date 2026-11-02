@@ -9,13 +9,10 @@ use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 
 /**
- * Resolves factor drivers from a manager's driver registry for the services
- * that run a factor through its driver.
- *
- * The registry is passed in on every call: it is the manager the operation was
- * called on, so the drivers registered against that manager with `extend()` are
- * the ones used, whether it is the `mfa` singleton or a manager built
- * separately.
+ * Resolves factor drivers for the services that run a factor through its
+ * driver: a factor runs through the driver of the `mfa` manager the container
+ * holds, which builds it on every call. A driver registered there with
+ * `extend()` is the one used, and a driver keeps no state between calls.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
