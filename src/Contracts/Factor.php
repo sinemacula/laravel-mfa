@@ -149,7 +149,8 @@ interface Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethod
 
     /**
      * Return when the factor was disabled for reaching the failure ceiling, or
-     * `null` while it is not.
+     * `null` while it is not. A stored value that does not read as a time must
+     * throw, never read as `null`, since that would enable the factor.
      *
      * @return ?\Carbon\CarbonInterface
      */

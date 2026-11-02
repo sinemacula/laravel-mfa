@@ -134,6 +134,8 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
 
     /**
      * Column name holding when the factor was disabled at the failure ceiling.
+     * A datetime column; `Concerns\ActsAsFactor` casts it, so a model using the
+     * trait need declare no cast for it.
      *
      * @return string
      */

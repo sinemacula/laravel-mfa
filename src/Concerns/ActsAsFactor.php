@@ -29,23 +29,25 @@ use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
     /**
-     * Cast the column holding the lockout's deadline as a datetime, so a model
-     * that declares no cast for it still reads it back from storage as a time.
+     * Cast the columns a refusal reads, the lockout's deadline and when the
+     * factor was disabled at the failure ceiling, as datetimes, so a model that
+     * declares no cast for them still reads them back from storage as times.
      * Eloquent calls this as it builds the model. A cast the model declares for
-     * the column is left as it is, whichever order the two are applied in, and
-     * so are its other casts.
+     * either column is left as it is, whichever order the two are applied in,
+     * and so are its other casts.
      *
      * @return void
      */
     public function initializeActsAsFactor(): void
     {
-        $column = $this->getLockedUntilName();
+        foreach ([$this->getLockedUntilName(), $this->getDisabledAtName()] as $column) {
 
-        if ($this->hasCast($column)) {
-            return;
+            if ($this->hasCast($column)) {
+                continue;
+            }
+
+            $this->mergeCasts([$column => 'datetime']);
         }
-
-        $this->mergeCasts([$column => 'datetime']);
     }
 
     /**
@@ -365,13 +367,17 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return when the factor was disabled at the failure ceiling.
+     * Return when the factor was disabled at the failure ceiling. It fails
+     * closed, as `getLockedUntil()` does: a stored value that does not read as
+     * a time throws, as reading it as never disabled would enable the factor.
      *
      * @return ?\Carbon\CarbonInterface
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function getDisabledAt(): ?CarbonInterface
     {
-        return $this->readFactorTime($this->getDisabledAtName());
+        return $this->readRefusalTime($this->getDisabledAtName(), 'disabled');
     }
 
     /**
@@ -387,8 +393,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     /**
      * Return when the factor's temporary lockout ends, as held on this
      * instance. It fails closed: a stored value that does not read as a time
-     * throws, as reading it as no deadline would unlock the factor. A blank is
-     * caught here, as a datetime cast would read it as the current time.
+     * throws, as reading it as no deadline would unlock the factor.
      *
      * @return ?\Carbon\CarbonInterface
      *
@@ -396,20 +401,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
      */
     public function getLockedUntil(): ?CarbonInterface
     {
-        $column = $this->getLockedUntilName();
-        $stored = $this->getAttributes()[$column] ?? null;
-
-        if ($stored === null) {
-            return null;
-        }
-
-        $until = is_string($stored) && trim($stored) === '' ? null : $this->getAttribute($column);
-
-        if ($until instanceof CarbonInterface) {
-            return $until;
-        }
-
-        throw new InvalidModelException(sprintf('The factor\'s lockout column [%s] does not read as a time, so whether it is locked cannot be told.', $column));
+        return $this->readRefusalTime($this->getLockedUntilName(), 'locked');
     }
 
     /**
@@ -581,6 +573,36 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
         $value = $this->getAttribute($column);
 
         return is_int($value) ? $value : null;
+    }
+
+    /**
+     * Read a time column a refusal depends on: `null` only when nothing is
+     * stored, and otherwise the time, or a throw. A blank is refused here, as a
+     * datetime cast would read it as the current time; text that is not a time
+     * throws from the cast, and anything else that does not read as a time
+     * throws here, naming the column but not the value.
+     *
+     * @param  string  $column
+     * @param  string  $state
+     * @return ?\Carbon\CarbonInterface
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     */
+    private function readRefusalTime(string $column, string $state): ?CarbonInterface
+    {
+        $stored = $this->getAttributes()[$column] ?? null;
+
+        if ($stored === null) {
+            return null;
+        }
+
+        $time = is_string($stored) && trim($stored) === '' ? null : $this->getAttribute($column);
+
+        if ($time instanceof CarbonInterface) {
+            return $time;
+        }
+
+        throw new InvalidModelException(sprintf('The factor\'s column [%s] does not read as a time, so whether it is %s cannot be told.', $column, $state));
     }
 
     /**

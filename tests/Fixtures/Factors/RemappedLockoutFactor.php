@@ -13,7 +13,8 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 /**
  * An application's own factor model, not built on the shipped one, that keeps
  * its lockout deadline in a column of its own, `held_until`, and declares no
- * cast for it: the trait casts the column it is told holds the deadline.
+ * cast for it or for `disabled_at`: the trait casts the columns it is told hold
+ * the deadline and the time the factor was disabled.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -63,7 +64,6 @@ final class RemappedLockoutFactor extends Model implements EloquentFactor
     {
         return [
             'consecutive_failures' => 'integer',
-            'disabled_at'          => 'datetime',
         ];
     }
 }

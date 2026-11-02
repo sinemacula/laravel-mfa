@@ -71,28 +71,47 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * The trait casts the deadline's column itself, a remapped one included and
-     * with no cast declared, and leaves the model's other casts alone.
+     * The trait casts the deadline's and the disabled time's columns itself,
+     * remapped ones included and with no cast declared, and leaves the model's
+     * other casts alone.
      *
      * @return void
      */
-    public function testTheTraitCastsTheDeadlinesColumn(): void
+    public function testTheTraitCastsTheColumnsARefusalReads(): void
     {
         $factor = new RemappedLockoutFactor;
 
         self::assertSame('datetime', $factor->getCasts()['held_until']);
-        self::assertSame('integer', $factor->getCasts()['consecutive_failures']);
         self::assertSame('datetime', $factor->getCasts()['disabled_at']);
+        self::assertSame('integer', $factor->getCasts()['consecutive_failures']);
         self::assertArrayNotHasKey('locked_until', $factor->getCasts());
+        self::assertArrayNotHasKey('confirmed_at', $factor->getCasts());
 
-        $factor->setRawAttributes(['held_until' => '2026-04-15 09:15:00']);
+        $factor->setRawAttributes(['held_until' => '2026-04-15 09:15:00', 'disabled_at' => '2026-04-15 09:00:00']);
 
         self::assertSame('2026-04-15 09:15:00', $factor->getLockedUntil()?->format('Y-m-d H:i:s'));
+        self::assertSame('2026-04-15 09:00:00', $factor->getDisabledAt()?->format('Y-m-d H:i:s'));
+
+        $remapped = new class extends Factor {
+            /**
+             * Name a column of its own for when the factor was disabled.
+             *
+             * @return string
+             */
+            #[\Override]
+            public function getDisabledAtName(): string
+            {
+                return 'switched_off_at';
+            }
+        };
+
+        self::assertSame('datetime', $remapped->getCasts()['switched_off_at']);
     }
 
     /**
      * A model that casts the column itself keeps its own cast, declared either
-     * way, and a time it reads to is a deadline whatever its class.
+     * way, and a time it reads to is a deadline whatever its class; the
+     * disabled time it does not cast is cast all the same.
      *
      * @return void
      */
@@ -133,80 +152,104 @@ final class ActsAsFactorTest extends TestCase
 
             self::assertInstanceOf(CarbonImmutable::class, $factor->getLockedUntil());
             self::assertSame('2026-04-15 09:15:00', $factor->getLockedUntil()->format('Y-m-d H:i:s'));
+            self::assertSame('datetime', $factor->getCasts()['disabled_at']);
         }
     }
 
     /**
-     * Stored deadlines that do not read as a time, on a model with no cast of
-     * its own for the column.
+     * Stored times that do not read as a time, in either column a refusal
+     * reads, on a model with no cast of its own for it.
      *
-     * @return iterable<string, array{mixed, class-string<\Throwable>}>
+     * @return iterable<string, array{string, mixed, class-string<\Throwable>}>
      */
-    public static function unreadableDeadlines(): iterable
+    public static function unreadableTimes(): iterable
     {
-        yield 'not a time' => ['not a time', InvalidFormatException::class];
-        yield 'empty' => ['', InvalidModelException::class];
-        yield 'blank' => [" \t", InvalidModelException::class];
+        foreach (['the deadline' => 'held_until', 'the disabled time' => 'disabled_at'] as $name => $column) {
+            yield $name . ', not a time' => [$column, 'not a time', InvalidFormatException::class];
+            yield $name . ', empty' => [$column, '', InvalidModelException::class];
+            yield $name . ', blank' => [$column, " \t", InvalidModelException::class];
+        }
     }
 
     /**
-     * A deadline that cannot be read as a time throws, and never reads as no
-     * lockout.
+     * A deadline or a disabled time that cannot be read as a time throws, and
+     * never reads as no lockout or as enabled.
      *
+     * @param  string  $column
      * @param  mixed  $stored
      * @param  class-string<\Throwable>  $exception
      * @return void
      */
-    #[DataProvider('unreadableDeadlines')]
-    public function testAnUnreadableDeadlineThrows(mixed $stored, string $exception): void
+    #[DataProvider('unreadableTimes')]
+    public function testAnUnreadableTimeThrows(string $column, mixed $stored, string $exception): void
     {
         $factor = new RemappedLockoutFactor;
 
-        $factor->setRawAttributes(['held_until' => $stored]);
+        $factor->setRawAttributes([$column => $stored]);
 
         $this->expectException($exception);
 
-        $factor->getLockedUntil();
+        $column === 'held_until' ? $factor->getLockedUntil() : $factor->getDisabledAt();
     }
 
     /**
-     * A model whose own cast makes the deadline anything but a time throws,
+     * A model whose own cast makes either time anything but a time throws,
      * naming the column and not the value.
      *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function timesCastAsStrings(): iterable
+    {
+        yield 'the deadline' => ['locked_until', 'locked'];
+        yield 'the disabled time' => ['disabled_at', 'disabled'];
+    }
+
+    /**
+     * A model whose own cast makes either time anything but a time throws,
+     * naming the column and not the value.
+     *
+     * @param  string  $column
+     * @param  string  $state
      * @return void
      */
-    public function testACastThatIsNotATimeThrows(): void
+    #[DataProvider('timesCastAsStrings')]
+    public function testACastThatIsNotATimeThrows(string $column, string $state): void
     {
         $factor = new class extends Factor {
             /**
-             * Cast the deadline as a string.
+             * Cast both times as strings.
              *
              * @return array<string, string>
              */
             #[\Override]
             protected function casts(): array
             {
-                return ['locked_until' => 'string'];
+                return ['locked_until' => 'string', 'disabled_at' => 'string'];
             }
         };
 
-        $factor->setRawAttributes(['locked_until' => '2026-04-15 09:15:00']);
+        $factor->setRawAttributes([$column => '2026-04-15 09:15:00']);
 
         $this->expectException(InvalidModelException::class);
-        $this->expectExceptionMessage('The factor\'s lockout column [locked_until] does not read as a time, so whether it is locked cannot be told.');
+        $this->expectExceptionMessage(sprintf('The factor\'s column [%s] does not read as a time, so whether it is %s cannot be told.', $column, $state));
 
-        $factor->getLockedUntil();
+        $column === 'locked_until' ? $factor->getLockedUntil() : $factor->getDisabledAt();
     }
 
     /**
-     * No deadline stored reads as none, on a model with or without a row.
+     * No time stored reads as none, on a model with or without a row.
      *
      * @return void
      */
-    public function testNoDeadlineReadsAsNone(): void
+    public function testNoTimeReadsAsNone(): void
     {
-        self::assertNull((new RemappedLockoutFactor)->getLockedUntil());
-        self::assertNull((new RemappedLockoutFactor)->setRawAttributes(['held_until' => null])->getLockedUntil());
+        $empty  = new RemappedLockoutFactor;
+        $absent = (new RemappedLockoutFactor)->setRawAttributes(['held_until' => null, 'disabled_at' => null]);
+
+        self::assertNull($empty->getLockedUntil());
+        self::assertNull($empty->getDisabledAt());
+        self::assertNull($absent->getLockedUntil());
+        self::assertNull($absent->getDisabledAt());
     }
 
     /**

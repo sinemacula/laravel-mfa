@@ -396,6 +396,48 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * An independent model with no cast on `disabled_at`, disabled at the
+     * failure ceiling, is read back from storage as disabled and refused as
+     * disabled without running the verification.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnUncastCustomModelDisabledAtTheCeilingIsRefusedAsDisabled(): void
+    {
+        config()->set('mfa.attempts.failure_ceiling', 1);
+        config()->set('mfa.factor.model', RemappedLockoutFactor::class);
+
+        Schema::table('mfa_factors', static function (Blueprint $table): void {
+            $table->timestamp('held_until')->nullable();
+        });
+
+        $user   = $this->user();
+        $factor = RemappedLockoutFactor::query()->create([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'totp',
+            'status'               => 'confirmed',
+        ]);
+
+        $this->attempt($user, $factor, false);
+
+        /** @var \Tests\Fixtures\Factors\RemappedLockoutFactor $stored */
+        $stored = RemappedLockoutFactor::query()->findOrFail($factor->getKey());
+
+        self::assertNotNull($stored->getDisabledAt());
+
+        $refused = $this->service()->attempt(new Attempt($user, $stored, Purpose::SIGN_IN), static function (): bool {
+            throw new MidRotationFailureException('The verification must not run.');
+        });
+
+        self::assertTrue($refused->isRefused());
+        self::assertTrue($refused->lockout?->isDisabled());
+        self::assertTrue($this->service()->lockout($user, $stored)?->isDisabled());
+    }
+
+    /**
      * The factor's failures in a row outlive its lockout: once it ends, the
      * next failure locks the factor again.
      *
