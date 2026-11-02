@@ -36,7 +36,7 @@ Branch from `master` using the appropriate prefix:
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). Prefix your commit messages accordingly:
 
 ```text
-feat: add backup code factor driver
+feat: add passkey factor driver
 fix: prevent expired codes from passing verification
 test: add verification expiry edge-case tests
 chore: update qlty configuration
