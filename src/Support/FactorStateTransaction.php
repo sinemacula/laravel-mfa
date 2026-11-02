@@ -30,7 +30,9 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
  * opposite orders: the second waits for the first to commit, then finds what it
  * left. The callback is handed the factors as stored under the lock, so it
  * checks its preconditions again on them rather than on what its caller read
- * before (a factor a concurrent change removed is gone).
+ * before (a factor a concurrent change removed is gone). They are matched to
+ * the owner exactly: a database's collation may read and lock another owner's
+ * too, differing only in case, and those are not handed over.
  *
  * The identity's row is locked by an insert that updates the existing row on a
  * conflict, which takes the row's exclusive lock in one statement on MySQL and
@@ -149,7 +151,9 @@ final class FactorStateTransaction
                 ->where($typeColumn, $type)
                 ->where($keyColumn, $key)
                 ->lockForUpdate()
-                ->get();
+                ->get()
+                ->filter(static fn (Model $factor): bool => $factor->getAttribute($typeColumn) === $type && self::keyOf($factor->getAttribute($keyColumn)) === $key)
+                ->values();
 
             return $callback($factors);
         });

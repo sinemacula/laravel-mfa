@@ -45,6 +45,7 @@ final class FailureReasonTest extends TestCase
             'LAST_FACTOR'             => 'last_factor',
             'LIMIT_REACHED'           => 'limit_reached',
             'CREDENTIAL_ASSOCIATED'   => 'credential_associated',
+            'INVALID_DESTINATION'     => 'invalid_destination',
         ], array_column(FailureReason::cases(), 'value', 'name'));
     }
 }

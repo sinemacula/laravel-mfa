@@ -75,10 +75,9 @@ Historical record of the architectural calls made during the 1.0 cycle.
   most-recent registration. Pinned by
   `tests/Integration/CustomDriverExtensionTest::testConsumerCanOverrideBuiltInTotpDriver`.
 - **D6 — Lifecycle events are dispatched by the package's services behind the manager, not by
-  consumer code.** Factor enrolment goes through `Mfa::enroll(Factor)`; factor removal goes through
-  `Mfa::disable(Factor)`. Both finish their change and dispatch
-  `MfaFactorEnrolled` / `MfaFactorDisabled` so audit subscribers do not have to rely on consumer
-  cooperation. Verification reports through the catalogue instead (see
+  consumer code.** Factor removal goes through `Mfa::disable(Factor)`, which finishes its change and
+  dispatches `MfaFactorDisabled` so audit subscribers do not have to rely on consumer cooperation.
+  Enrolment and verification report through the catalogue instead (see
   [Event Catalogue](design/event-catalogue.md)).
 - **D7 — Both `Factor::$secret` and `Factor::$code` are encrypted at rest.** The `secret`
   column carries long-lived material (TOTP keys); the `code` column holds

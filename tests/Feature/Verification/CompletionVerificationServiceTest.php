@@ -43,6 +43,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
 use SineMacula\Laravel\Mfa\Verification\CheckOutcome;
+use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\SubmissionRoutes;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
@@ -70,6 +71,7 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(VerificationService::class)]
+#[CoversClass(ProofAcceptance::class)]
 #[CoversClass(ProofStoreCompletion::class)]
 #[CoversClass(VerificationResult::class)]
 #[CoversClass(SubmissionRoutes::class)]

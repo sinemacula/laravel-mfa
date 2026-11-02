@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
+use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Http\MiddlewareSessionTransition;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
@@ -41,6 +42,7 @@ use SineMacula\Laravel\Mfa\Testing\Seams\SubjectTypeResolverContract;
 use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Requirements\FreshOnceGate;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\FaultySeams;
 use Tests\TestCase;
@@ -84,6 +86,27 @@ final class SeamsWithoutStateContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
 
         FreshnessGateContract::assertANameThatIsNoOperationIsNeverFresh(new FaultySeams);
+    }
+
+    /**
+     * The kit rejects a gate whose deadline has already passed, and one that
+     * names a deadline for an operation it does not find fresh.
+     *
+     * @return void
+     */
+    public function testRejectsAGateWithADeadlineThatIsNoDeadline(): void
+    {
+        try {
+            FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new FaultySeams, Operation::ADD_FACTOR->value);
+
+            self::fail('A deadline already past was expected to be rejected.');
+        } catch (AssertionFailedError $failure) {
+            self::assertStringContainsString('must not be in the past', $failure->getMessage());
+        }
+
+        $this->expectException(AssertionFailedError::class);
+
+        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new FreshOnceGate, Operation::ADD_FACTOR->value);
     }
 
     /**
@@ -241,6 +264,38 @@ final class SeamsWithoutStateContractTest extends TestCase
         $this->actingAs($this->transitionIdentity());
 
         return $this->container()->make(FreshnessGate::class);
+    }
+
+    /**
+     * The bound default, asked for a person with a step-up just recorded.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
+     */
+    #[\Override]
+    protected function freshGate(): FreshnessGate
+    {
+        $identity = TestUser::query()->create(['email' => 'fresh@example.test']);
+        $store    = $this->container()->make(ProofStore::class);
+        $proofs   = SignInProofs::of($identity);
+
+        $this->actingAs($identity);
+
+        $store->begin($identity, SignInProofs::APPLICATION, SignInProofs::SESSION);
+        $store->record($proofs->password(60));
+        $store->record($proofs->totp(30));
+
+        return $this->container()->make(FreshnessGate::class);
+    }
+
+    /**
+     * The package's operation every application has a freshness for.
+     *
+     * @return string
+     */
+    #[\Override]
+    protected function freshOperation(): string
+    {
+        return Operation::ADD_FACTOR->value;
     }
 
     /**

@@ -230,7 +230,7 @@ final class PendingActionsTest extends TestCase
         $first = SignInProofs::of($this->pending)->inSession('pending-1')->password();
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(
-            new PendingContext($this->pending, 'web', 'pending-1', $first, Requirement::none()->withAdditionalVerification(), $actions),
+            new PendingContext($this->pending, 'web', 'pending-1', $first, Requirement::none()->withAdditionalVerification(), $actions, CarbonImmutable::now()->addMinutes(10)),
         ));
     }
 

@@ -132,6 +132,18 @@ trait ChallengeCountersTests
     }
 
     /**
+     * A challenge for enrolling is not one for signing in, or the reverse.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testChallengeCountersKeepAnEnrollmentChallengeApart(): void
+    {
+        ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->countedIdentity(), $this->countedFactor(), $this->pendingFactor(), $this->countedBinding());
+    }
+
+    /**
      * The identity whose challenges are counted.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
@@ -144,6 +156,13 @@ trait ChallengeCountersTests
      * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
      */
     abstract protected function countedFactor(): EloquentFactor&Model;
+
+    /**
+     * A pending factor of the identity's, as stored, holding no enrolment.
+     *
+     * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
+     */
+    abstract protected function pendingFactor(): EloquentFactor&Model;
 
     /**
      * What the identity's challenges are bound to.

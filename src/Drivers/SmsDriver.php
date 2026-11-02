@@ -24,6 +24,9 @@ final class SmsDriver extends AbstractCodeDriver
     /** @var string Placeholder in the message template, replaced with the code. */
     private const string CODE_PLACEHOLDER = CodeSettings::CODE_PLACEHOLDER;
 
+    /** @var string The form a phone number takes: E.164, with its country code. */
+    private const string E164 = '/^\+[1-9]\d{7,14}$/D';
+
     /**
      * Constructor.
      *
@@ -63,6 +66,21 @@ final class SmsDriver extends AbstractCodeDriver
     public function amr(): array
     {
         return ['sms'];
+    }
+
+    /**
+     * The number in E.164, once spaces, dashes and parentheses are stripped, or
+     * `null` when it is not one: a country code is never assumed.
+     *
+     * @param  string  $destination
+     * @return ?string
+     */
+    #[\Override]
+    public function normalizeDestination(#[\SensitiveParameter] string $destination): ?string
+    {
+        $number = str_replace([' ', '-', '(', ')'], '', $destination);
+
+        return preg_match(self::E164, $number) === 1 ? $number : null;
     }
 
     /**

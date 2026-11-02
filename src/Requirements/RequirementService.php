@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Requirements;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
@@ -38,7 +39,7 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  * judges. This package's own setting for the operation is passed to the gate as
  * part of the caller's requirement, so a gate an adapter binds over an
  * authentication layer always receives it and applies the stricter of it and
- * its own.
+ * its own, and `freshUntil()` asks it the same way how long that answer lasts.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -129,10 +130,46 @@ final readonly class RequirementService
             return false;
         }
 
-        $application = $this->container->make(ProofService::class)->application();
-        $caller      = (new OperationRequirements($this->config()))->effective($application, $operation, $requirement);
+        return $this->container->make(FreshnessGate::class)->isFresh($operation, $this->effective($operation, $requirement));
+    }
 
-        return $this->container->make(FreshnessGate::class)->isFresh($operation, $caller);
+    /**
+     * When the current session stops being fresh for the operation on the
+     * proofs it holds now, asked of the bound `FreshnessGate` as `isFresh()`
+     * asks it; `null` when it is not fresh or the gate cannot say.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
+     * @return ?\Carbon\CarbonImmutable
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    public function freshUntil(string $operation, ?Requirement $requirement = null): ?CarbonImmutable
+    {
+        if (!Operation::isName($operation)) {
+            return null;
+        }
+
+        return $this->container->make(FreshnessGate::class)->freshUntil($operation, $this->effective($operation, $requirement));
+    }
+
+    /**
+     * The strictest of this package's setting for the operation on the current
+     * application and the caller's requirement.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    private function effective(string $operation, ?Requirement $requirement): ?Requirement
+    {
+        $application = $this->container->make(ProofService::class)->application();
+
+        return (new OperationRequirements($this->config()))->effective($application, $operation, $requirement);
     }
 
     /**

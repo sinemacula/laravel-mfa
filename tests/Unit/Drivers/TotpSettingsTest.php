@@ -141,6 +141,39 @@ final class TotpSettingsTest extends TestCase
     }
 
     /**
+     * The issuer is the configured one, or the application's name without one;
+     * one that is not a non-empty string is refused, as it is read and when
+     * every setting is validated, and nothing to show at all is refused only
+     * when it is read.
+     *
+     * @return void
+     */
+    public function testTheIssuerIsTheConfiguredOneOrTheApplicationsName(): void
+    {
+        self::assertSame('Acme', (new TotpSettings(new Repository(['app' => ['name' => 'Acme']])))->issuer());
+        self::assertSame('Own', (new TotpSettings(new Repository(['app' => ['name' => 'Acme'], 'mfa' => ['totp' => ['issuer' => 'Own']]])))->issuer());
+
+        foreach (['', '  ', 12] as $issuer) {
+            $settings = self::settingsWith(['issuer' => $issuer]);
+
+            foreach ([$settings->issuer(...), $settings->validate(...)] as $read) {
+                try {
+                    $read();
+
+                    self::fail('An issuer that is no name was expected to be refused.');
+                } catch (\InvalidArgumentException $exception) {
+                    self::assertSame('mfa.totp.issuer must be a non-empty string.', $exception->getMessage());
+                }
+            }
+        }
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Set mfa.totp.issuer or app.name: an authenticator app must show an issuer.');
+
+        self::settingsWith([])->issuer();
+    }
+
+    /**
      * An application's window is its own `totp_window`, and the package-wide
      * one when it sets none, is not configured or none is named; one out of
      * bounds is refused, naming the application's key.

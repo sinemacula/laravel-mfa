@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Context;
 
+use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
@@ -165,7 +166,7 @@ final class SessionFirstFactorTest extends TestCase
         $owner = ProofOwner::of($user);
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(
-            new PendingContext($user, 'web', 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY]),
+            new PendingContext($user, 'web', 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY], CarbonImmutable::now()->addHour()),
         ));
 
         self::assertSame($first, $this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', 'pending-1', Purpose::SIGN_IN)));
@@ -187,7 +188,15 @@ final class SessionFirstFactorTest extends TestCase
         $proofs = SignInProofs::of($user)->inSession('pending-1');
         $owner  = ProofOwner::of($user);
 
-        $pending = static fn (Proof $first): PendingContext => new PendingContext($user, 'web', 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY]);
+        $pending = static fn (Proof $first): PendingContext => new PendingContext(
+            $user,
+            'web',
+            'pending-1',
+            $first,
+            Requirement::none(),
+            [PendingAction::VERIFY],
+            CarbonImmutable::now()->addHour(),
+        );
 
         $current = $pending($proofs->password());
         $future  = $pending($proofs->password(-300));
@@ -222,7 +231,7 @@ final class SessionFirstFactorTest extends TestCase
         $first = SignInProofs::of($user)->onApplication('admin')->inSession('pending-1')->password();
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(
-            new PendingContext($user, 'admin', 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY]),
+            new PendingContext($user, 'admin', 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY], CarbonImmutable::now()->addHour()),
         ));
 
         self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP)));

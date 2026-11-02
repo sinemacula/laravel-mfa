@@ -9,8 +9,8 @@ use SineMacula\Laravel\Mfa\Testing\Seams\FreshnessGateContract;
 
 /**
  * The `FreshnessGate` contract kit: a name that is not an operation's, and an
- * operation with no requirement, are never fresh, and a caller's requirement
- * with no maximum age is refused.
+ * operation with no requirement, are never fresh, a caller's requirement with
+ * no maximum age is refused, and a deadline is ahead and means fresh.
  *
  * A test case proves its implementation by using this trait and implementing
  * the hooks; each check delegates to `FreshnessGateContract`.
@@ -55,9 +55,44 @@ trait FreshnessGateTests
     }
 
     /**
+     * An operation that is not fresh has no deadline.
+     *
+     * @return void
+     */
+    public function testFreshnessGateGivesAnOperationThatIsNotFreshNoDeadline(): void
+    {
+        FreshnessGateContract::assertAnOperationThatIsNotFreshHasNoDeadline($this->freshnessGate());
+    }
+
+    /**
+     * A session fresh for an operation has a deadline ahead of it.
+     *
+     * @return void
+     */
+    public function testFreshnessGateGivesAFreshOperationADeadlineAhead(): void
+    {
+        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh($this->freshGate(), $this->freshOperation());
+    }
+
+    /**
      * The gate under test, asked on behalf of a signed-in identity.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
      */
     abstract protected function freshnessGate(): FreshnessGate;
+
+    /**
+     * The gate under test, asked on behalf of a session fresh for the operation
+     * `freshOperation()` names.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
+     */
+    abstract protected function freshGate(): FreshnessGate;
+
+    /**
+     * An operation the session `freshGate()` asks for is fresh for.
+     *
+     * @return string
+     */
+    abstract protected function freshOperation(): string;
 }

@@ -15,7 +15,6 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
-use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
@@ -26,9 +25,8 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 /**
  * Unit tests for `MfaManager` lifecycle mutations.
  *
- * Covers `enroll()` and `disable()`. Split out from the broader state-test
- * family so each subject stays under the project's max-methods-per-class
- * threshold.
+ * Covers `disable()`. Split out from the broader state-test family so each
+ * subject stays under the project's max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -39,88 +37,6 @@ use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 final class MfaManagerLifecycleTest extends MfaManagerTestCase
 {
     use InteractsWithMfaManagerState;
-
-    /**
-     * Without an identity `enroll()` must not persist the factor or dispatch
-     * the lifecycle event.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testEnrollIsNoopWhenNoIdentity(): void
-    {
-        Event::fake([MfaFactorEnrolled::class]);
-
-        $factor = $this->makeUnpersistedTotpFactor();
-
-        $this->manager()->enroll($factor);
-
-        Event::assertNotDispatched(MfaFactorEnrolled::class);
-        self::assertFalse($factor->exists);
-    }
-
-    /**
-     * Test enroll() persists the supplied factor row.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testEnrollPersistsFactor(): void
-    {
-        $user    = $this->makeEnrollUser();
-        $factor  = $this->makeUnpersistedTotpFactor($user);
-        $manager = $this->manager();
-
-        $manager->enroll($factor);
-
-        self::assertTrue($factor->exists, 'enroll() must persist the factor row');
-    }
-
-    /**
-     * Test enroll() dispatches the MfaFactorEnrolled event.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testEnrollDispatchesEnrolledEvent(): void
-    {
-        Event::fake([MfaFactorEnrolled::class]);
-
-        $user    = $this->makeEnrollUser();
-        $factor  = $this->makeUnpersistedTotpFactor($user);
-        $manager = $this->manager();
-
-        $manager->enroll($factor);
-
-        Event::assertDispatched(
-            MfaFactorEnrolled::class,
-            static fn (MfaFactorEnrolled $event): bool => $event->identity === $user
-                && $event->factor                                          === $factor
-                && $event->driver                                          === 'totp',
-        );
-    }
-
-    /**
-     * Test isSetup() sees a factor enroll() persisted at once.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testEnrollIsSeenByIsSetupAtOnce(): void
-    {
-        $user    = $this->makeEnrollUser();
-        $manager = $this->manager();
-
-        self::assertFalse($manager->isSetup());
-
-        $manager->enroll($this->makeUnpersistedTotpFactor($user));
-
-        self::assertTrue($manager->isSetup(), 'isSetup() must see the enrolled factor');
-    }
 
     /**
      * Without an identity `disable()` must not delete the factor or dispatch
@@ -247,45 +163,6 @@ final class MfaManagerLifecycleTest extends MfaManagerTestCase
         $manager->disable($factor);
 
         self::assertSame(['another-factor'], array_map(static fn (Proof $proof): ?string => $proof->reference, $manager->proofs()));
-    }
-
-    /**
-     * Build a fresh TOTP `Factor` model that is NOT yet persisted — the
-     * consumer-side shape that `enroll()` is intended to receive.
-     *
-     * @param  ?\Tests\Fixtures\Identities\TestUser  $user
-     * @return \SineMacula\Laravel\Mfa\Models\Factor
-     */
-    private function makeUnpersistedTotpFactor(?TestUser $user = null): Factor
-    {
-        $factor         = new Factor;
-        $factor->type   = 'totp';
-        $factor->secret = 'JBSWY3DPEHPK3PXP';
-
-        if ($user !== null) {
-            $factor->authenticatable_type = $user::class;
-            $factor->authenticatable_id   = (string) $user->id;
-        }
-
-        return $factor;
-    }
-
-    /**
-     * Create an MFA-enabled user and authenticate as them, returning the user
-     * for enrol-flow tests.
-     *
-     * @return \Tests\Fixtures\Identities\TestUser
-     */
-    private function makeEnrollUser(): TestUser
-    {
-        $user = TestUser::query()->create([
-            'email'       => 'enroll@example.test',
-            'mfa_enabled' => true,
-        ]);
-
-        $this->actingAs($user);
-
-        return $user;
     }
 
     /**

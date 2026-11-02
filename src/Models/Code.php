@@ -11,9 +11,9 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
  * A code sent by SMS or email for a factor: the keyed hash of the code and its
- * binding (factor, purpose, application and session), the attempts made against
- * it, how often and when it was sent (last, and each time), when it expires and
- * when it was used.
+ * binding (factor, purpose, application and session), a keyed digest of what it
+ * was sent to, the attempts made against it, how often and when it was sent
+ * (last, and each time), when it expires and when it was used.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,6 +25,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property string $purpose
  * @property string $application
  * @property ?string $session_id
+ * @property string $destination_hash
  * @property string $code_hash
  * @property int $attempts
  * @property int $sends
@@ -49,6 +50,7 @@ final class Code extends Model
         'purpose',
         'application',
         'session_id',
+        'destination_hash',
         'code_hash',
         'attempts',
         'sends',
@@ -62,6 +64,7 @@ final class Code extends Model
     protected $hidden = [
         'code_hash',
         'session_id',
+        'destination_hash',
     ];
 
     /**
@@ -106,6 +109,7 @@ final class Code extends Model
             'purpose'              => 'string',
             'application'          => 'string',
             'session_id'           => 'string',
+            'destination_hash'     => 'string',
             'code_hash'            => 'string',
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',

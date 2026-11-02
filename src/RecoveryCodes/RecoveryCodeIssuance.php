@@ -9,11 +9,13 @@ use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
+use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
@@ -30,6 +32,10 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
  * replaced; a refusal leaves the old set intact. A session that has changed,
  * one that is not fresh and one below the level are all refused as `not_fresh`,
  * since the remedy is the same stronger step-up.
+ *
+ * With an identity's first additional factor a set is issued as part of the
+ * change that confirms it, not through that gate: the factor's own confirmation
+ * proof is what shows the session would reach the level.
  *
  * Stateless: the request and the seams are resolved on every call.
  *
@@ -86,6 +92,37 @@ final readonly class RecoveryCodeIssuance
         OperationRefusedException::unless($binding !== null, FailureReason::NOT_FRESH, 'The identity has no sign-in to issue recovery codes on.');
 
         return $this->codes->generate($caller->identity, null, $binding->application, fn () => $this->assertMayIssue($binding));
+    }
+
+    /**
+     * Generate a set with the identity's first additional factor, inside the
+     * change that confirms it, and return its codes, once, as secrets for the
+     * response: none when the application does not accept recovery codes, the
+     * session's first factor is not known, or that first factor followed by the
+     * confirmation's own proof does not reach the application's level.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+     * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     * @throws \Throwable
+     */
+    public function withFirstFactor(MultiFactorAuthenticatable $identity, string $application, Proof $proof): array
+    {
+        $settings    = new ApplicationSettings($this->container->make(Repository::class), $application);
+        $firstFactor = $this->firstFactors->forBinding($identity, $proof->binding);
+
+        if (!$settings->acceptsRecoveryCodes() || $firstFactor === null) {
+            return [];
+        }
+
+        $requirement = Requirement::none()->withMinimumLevel($settings->recoveryCodeLevel());
+
+        return $this->container->make(RequirementCheck::class)->check($requirement, $firstFactor, $proof)->meetsRequirement()
+            ? $this->codes->generate($identity, null, $application)
+            : [];
     }
 
     /**

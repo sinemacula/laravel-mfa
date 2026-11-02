@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Testing\Seams;
 
+use Carbon\CarbonImmutable;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
@@ -102,7 +103,15 @@ final class CompletionContractTest extends TestCase
     {
         $identity = new NonEloquentIdentity;
 
-        return new PendingContext($identity, 'web', 'pending-1', SignInProofs::of($identity)->inSession('pending-1')->password(), Requirement::none(), [PendingAction::VERIFY]);
+        return new PendingContext(
+            $identity,
+            'web',
+            'pending-1',
+            SignInProofs::of($identity)->inSession('pending-1')->password(),
+            Requirement::none(),
+            [PendingAction::VERIFY],
+            CarbonImmutable::now()->addHour(),
+        );
     }
 
     /**

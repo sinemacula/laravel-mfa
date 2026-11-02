@@ -11,12 +11,9 @@ traces, and the rotation of the key TOTP secrets are encrypted with.
 
 `Secrets\RevealedSecret` is the type secrets are returned in, revealed explicitly, and only for the response to the
 client and for storing the factor. `Mfa::generateRecoveryCodes()` returns each recovery code as one (see
-[Recovery codes](recovery-codes.md)); the planned enrolment flow will return the TOTP secret and the provisioning URI
-in it. Until that flow ships, the TOTP driver's `startEnrollment()` and `provisioningUri()` return plain strings, and
-nothing stops a caller leaking them (the log redaction below only catches one under a key such as `secret`, or an
-`otpauth://` URI): never log, dump or serialise them (in a session, a cache or a queued job), and send them only in a
-response that is not stored (see [Sending a secret](#sending-a-secret)). Wrapping one yourself,
-`new RevealedSecret($secret)`, gives it the protection below.
+[Recovery codes](recovery-codes.md)), and `Mfa::startEnrollment()` returns the TOTP secret, the provisioning URI and
+the enrolment grant as them (see [Enrolment](enrollment.md)), as the TOTP driver's `startEnrollment()` and
+`provisioningUri()` do. Wrapping a secret of your own, `new RevealedSecret($secret)`, gives it the protection below.
 
 A `RevealedSecret`'s plaintext leaves it only through `reveal()`; every other way out refuses:
 
@@ -75,8 +72,8 @@ codes and full destinations out of the application's logs and error reports:
   - a code message, `Codes\MfaCodeMessage` or a queued job sending one, which becomes `[redacted]`;
   - the value of any key naming a secret, a code or a destination: `secret`, `totp_secret`, `code`, `codes`, `otp`,
     `one_time_code`, `recovery_code`, `recovery_codes`, `destination`, `address`, `email`, `phone`, `phone_number`,
-    `to`, `recipient`, `provisioning_uri` and `otpauth_uri`, compared without case, underscores, hyphens or spaces, so
-    `recoveryCodes` and `phoneNumber` count, at any depth;
+    `to`, `recipient`, `provisioning_uri`, `otpauth_uri`, `grant` and `enrollment_grant`, compared without case,
+    underscores, hyphens or spaces, so `recoveryCodes` and `phoneNumber` count, at any depth;
   - an `otpauth://` provisioning URI anywhere in the message or in a string value;
   - in the message, and in the message of every exception in the context and of its previous ones, every sensitive
     value the context and the extra data hold: one marked as sensitive, one under a key above, in an object's logged

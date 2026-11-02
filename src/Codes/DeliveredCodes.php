@@ -12,6 +12,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
@@ -31,9 +32,12 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * the challenge, whichever is sooner; its digits are never the previous code's.
  * A resend waits out the cooldown since the last code, and a challenge that has
  * used up its attempts sends no more until it ends. Every issue is refused
- * while the factor or the identity has been sent its cap of codes within the
- * send window, across every session; each send is counted for the window from
- * its own time, which the challenge records.
+ * while the factor's destination or the identity has been sent its cap of codes
+ * within the send window, across every session; each send is counted for the
+ * window from its own time, which the challenge records. The destination is
+ * counted by a keyed digest that outlives its factor, and a new enrolment
+ * challenge waits out the cooldown since the last enrolment code to it, so
+ * discarding a pending factor and starting again resets neither.
  *
  * A check counts an attempt against the issue it read before it compares
  * anything, so concurrent checks never exceed `max_attempts`, and uses the code
@@ -85,6 +89,7 @@ final readonly class DeliveredCodes
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \Carbon\CarbonImmutable  $now
+     * @param  ?string  $destination
      * @return int|\SineMacula\Laravel\Mfa\Codes\IssuedCode
      *
      * @throws \InvalidArgumentException
@@ -93,22 +98,22 @@ final readonly class DeliveredCodes
      *
      * @phpstan-impure
      */
-    public function issue(string $factorId, ProofBinding $binding, CarbonImmutable $now): int|IssuedCode
+    public function issue(string $factorId, ProofBinding $binding, CarbonImmutable $now, #[\SensitiveParameter] ?string $destination = null): int|IssuedCode
     {
         $session = $this->keys->session($binding->sessionId);
+        $target  = $this->keys->destination($binding, $factorId, $destination);
         $open    = $this->open($factorId, $binding, $session, $now);
-        $wait    = $this->capWait($factorId, $binding, $now);
-
-        if ($open !== null) {
-            $wait = max($wait, $this->resendWait($open, $now));
-        }
+        $wait    = max(
+            $this->capWait($target, $binding, $now),
+            $open === null ? $this->restartWait($target, $binding, $now) : $this->resendWait($open, $now),
+        );
 
         if ($wait > 0) {
             return $wait;
         }
 
         return $open === null
-            ? $this->start($factorId, $binding, $session, $now)
+            ? $this->start($factorId, $binding, $session, $target, $now)
             : $this->resend($open, $factorId, $binding, $now);
     }
 
@@ -220,24 +225,52 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * The seconds until the factor and the identity are both under their caps
-     * on codes sent within the send window, across every session; zero or less
-     * when they are now.
+     * The seconds until a new enrolment challenge may send to the destination:
+     * until the cooldown since the last enrolment code to it has passed, whose
+     * factor a restart has discarded. Zero or less means now, as it is for any
+     * other purpose, whose new challenge has no code before it to wait out.
      *
-     * @param  string  $factorId
+     * @param  string  $target
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \Carbon\CarbonImmutable  $now
      * @return int
      *
      * @throws \InvalidArgumentException
      */
-    private function capWait(string $factorId, ProofBinding $binding, CarbonImmutable $now): int
+    private function restartWait(string $target, ProofBinding $binding, CarbonImmutable $now): int
+    {
+        if ($binding->purpose !== Purpose::ENROLLMENT) {
+            return 0;
+        }
+
+        $last = WriteConnection::query(Code::query())
+            ->where('destination_hash', $target)
+            ->where('purpose', Purpose::ENROLLMENT->value)
+            ->orderByDesc('sent_at')
+            ->first();
+
+        return $last === null ? 0 : $last->sent_at->getTimestamp() + $this->settings->resendCooldownSeconds() - $now->getTimestamp();
+    }
+
+    /**
+     * The seconds until the factor's destination and the identity are both
+     * under their caps on codes sent within the send window, across every
+     * session; zero or less when they are now.
+     *
+     * @param  string  $target
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  \Carbon\CarbonImmutable  $now
+     * @return int
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function capWait(string $target, ProofBinding $binding, CarbonImmutable $now): int
     {
         $window = $this->settings->sendWindowMinutes() * 60;
         $since  = (new Code)->fromDateTime($now->subSeconds($window));
 
-        $factor = WriteConnection::query(Code::query())
-            ->where('factor_id', $factorId)
+        $destination = WriteConnection::query(Code::query())
+            ->where('destination_hash', $target)
             ->where('sent_at', '>', $since)
             ->get();
 
@@ -248,7 +281,7 @@ final readonly class DeliveredCodes
             ->get();
 
         return max(
-            self::windowWait($factor, $this->settings->factorSendLimit(), $window, $now),
+            self::windowWait($destination, $this->settings->factorSendLimit(), $window, $now),
             self::windowWait($identity, $this->settings->identitySendLimit(), $window, $now),
         );
     }
@@ -259,6 +292,7 @@ final readonly class DeliveredCodes
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $session
+     * @param  string  $target
      * @param  \Carbon\CarbonImmutable  $now
      * @return \SineMacula\Laravel\Mfa\Codes\IssuedCode
      *
@@ -266,7 +300,7 @@ final readonly class DeliveredCodes
      * @throws \Random\RandomException
      * @throws \JsonException
      */
-    private function start(string $factorId, ProofBinding $binding, string $session, CarbonImmutable $now): IssuedCode
+    private function start(string $factorId, ProofBinding $binding, string $session, string $target, CarbonImmutable $now): IssuedCode
     {
         $model   = new Code;
         $id      = Str::lower((string) Str::ulid());
@@ -282,6 +316,7 @@ final readonly class DeliveredCodes
             'purpose'              => $binding->purpose->value,
             'application'          => $binding->application,
             'session_id'           => $session,
+            'destination_hash'     => $target,
             'code_hash'            => $this->keys->code($id, 1, $factorId, $binding, $code),
             'attempts'             => 0,
             'sends'                => 1,

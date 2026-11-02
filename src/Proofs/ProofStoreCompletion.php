@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
@@ -55,7 +56,8 @@ final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
 
     /**
      * Record a successful verification on the pending session, whose sign-in
-     * the store must hold under the pending session's public id.
+     * the store must hold under the pending session's public id: a proof made
+     * for the sign-in, or an additional factor confirmed by its enrolment.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
@@ -70,8 +72,11 @@ final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
     {
         $proof = self::proofOf($result);
 
+        $purpose = $proof->binding->purpose;
+
         OperationRefusedException::unless(
-            $proof->binding->purpose === Purpose::SIGN_IN && ProofOwner::of($pending->identity)->ownsSignIn($proof->binding, $pending->application, $pending->sessionId),
+            ($purpose === Purpose::SIGN_IN || ($purpose === Purpose::ENROLLMENT && $proof->kind === ProofKind::ADDITIONAL_FACTOR))
+                && ProofOwner::of($pending->identity)->ownsSignIn($proof->binding, $pending->application, $pending->sessionId),
             FailureReason::NOT_ACCEPTED,
             'The proof is not bound to the pending session.',
         );

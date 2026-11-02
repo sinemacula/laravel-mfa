@@ -55,6 +55,12 @@ return new class extends Migration {
             $blueprint->string('session_id')->nullable();
             $blueprint->index(['factor_id', 'purpose', 'session_id'], IndexName::for($table, '_binding_index'));
 
+            // What the code was sent to, as a keyed digest of the owner and the
+            // factor's destination, which the send caps count by: it outlives
+            // the factor, so a restarted enrolment's sends stay counted.
+            $blueprint->char('destination_hash', 64);
+            $blueprint->index(['destination_hash', 'sent_at'], IndexName::for($table, '_destination_index'));
+
             // HMAC-SHA256 hex digest of the code and its binding, keyed from
             // the application key, never the code.
             $blueprint->char('code_hash', 64);

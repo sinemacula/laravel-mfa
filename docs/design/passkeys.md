@@ -61,7 +61,14 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   returns counts against the factor and the identity, and an assertion verified for another credential fails as
   `invalid_code`. A gateway that cannot verify at all refuses with an `OperationRefusedException`, which counts nothing.
   A pending session needs `mfa.verify`.
-- The legacy direct enrolment refuses a passkey: only the gate associates one.
+- Starting an enrolment of the `passkey` type is refused as `not_accepted`: only the gate associates one.
+- Under the lock the gate resolves the caller again, so a sign-in that changed is refused (`not_found`). A confirmed
+  factor ends a re-enrolment obligation; on the bootstrap path `BootstrapEnrollmentCompleted` is reported, and the proof
+  goes through `Verification\ProofAcceptance` to the bound `PendingCompletion` as the last write, its result on
+  `PasskeyAssociationResult::$verification`. On an active session the requirement is evaluated again on the proofs the
+  session holds, as for any other factor, and a shortfall goes to the bound `SessionTransition`. A refusal rolls back
+  the whole registration, and whatever the completion returned must not leave before the caller's commit. Recovery codes
+  come through `RecoveryCodes\RecoveryCodeIssuance::withFirstFactor()`, as for any other factor.
 
 ## Success Path
 

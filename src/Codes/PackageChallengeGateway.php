@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
@@ -36,13 +37,15 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * checks the code against the named challenge, consuming it when it matches,
  * and reports the outcome through the counters in the same transaction. A
  * delivery is never reported. The caller is served only when the request's
- * pending session allows sending or verifying, or it has no pending session and
- * its signed-in person is served, and only for a binding that is exactly the
- * caller's own (see `Context\CallerContextResolver::binding()`): its identity,
- * its application, its session (the pending session's, or the current
- * sign-in's) and the binding's purpose. A binding of another application or
- * session of the same identity is refused, so a pending credential never
- * reaches an active sign-in elsewhere.
+ * pending session allows sending or verifying (or, for a binding whose purpose
+ * is `enrollment`, starting or confirming a bootstrap enrolment, whatever else
+ * it allows), or it has no pending session and its signed-in person is served,
+ * and only for a binding that is exactly the caller's own (see
+ * `Context\CallerContextResolver::binding()`): its identity, its application,
+ * its session (the pending session's, or the current sign-in's) and the
+ * binding's purpose. A binding of another application or session of the same
+ * identity is refused, so a pending credential never reaches an active sign-in
+ * elsewhere.
  *
  * Stateless: the request, the driver and the connection are resolved on every
  * call.
@@ -88,7 +91,7 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     #[\Override]
     public function send(Factor $factor, ProofBinding $binding): SendResult
     {
-        $identity = $this->identity(PendingAction::SEND_CODE, $binding);
+        $identity = $this->identity(self::actionOf($binding, PendingAction::SEND_CODE, PendingAction::START_BOOTSTRAP_ENROLLMENT), $binding);
 
         if ($identity === null) {
             return SendResult::refused(FailureReason::NOT_FOUND);
@@ -120,7 +123,7 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     #[\Override]
     public function verify(Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): ChallengeOutcome
     {
-        $identity = $this->identity(PendingAction::VERIFY, $binding);
+        $identity = $this->identity(self::actionOf($binding, PendingAction::VERIFY, PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT), $binding);
 
         if ($identity === null) {
             return ChallengeOutcome::refused(FailureReason::NOT_FOUND, 'The binding does not name the identity the request serves.');
@@ -165,6 +168,20 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
         }
 
         return $this->callers->binding($caller, $binding->purpose)?->toArray() === $binding->toArray() ? $caller->identity : null;
+    }
+
+    /**
+     * The pending action a call under the binding needs: the enrolling one for
+     * a binding whose purpose is `enrollment`, the other for any other.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  \SineMacula\Laravel\Mfa\Enums\PendingAction  $action
+     * @param  \SineMacula\Laravel\Mfa\Enums\PendingAction  $enrolling
+     * @return \SineMacula\Laravel\Mfa\Enums\PendingAction
+     */
+    private static function actionOf(ProofBinding $binding, PendingAction $action, PendingAction $enrolling): PendingAction
+    {
+        return $binding->purpose === Purpose::ENROLLMENT ? $enrolling : $action;
     }
 
     /**

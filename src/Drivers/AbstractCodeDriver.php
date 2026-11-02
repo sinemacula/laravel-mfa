@@ -10,6 +10,7 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
  * Base class for the drivers whose codes are delivered to a destination (email,
@@ -49,25 +50,24 @@ abstract class AbstractCodeDriver implements CodeDeliveryDriver
      * @return null
      */
     #[\Override]
-    public function startEnrollment(Factor $factor): ?string
+    public function startEnrollment(Factor $factor): ?RevealedSecret
     {
         return null;
     }
 
     /**
      * Refuse: a pending factor is confirmed with a code checked under its
-     * binding, through the code service.
+     * binding, through the challenge gateway.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @return bool
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      *
      * @throws \LogicException
-     *
-     * @imperative
      */
     #[\Override]
-    public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool
+    public function confirm(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck
     {
         throw self::unbound('confirmed');
     }

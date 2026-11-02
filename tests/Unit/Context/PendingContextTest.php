@@ -46,7 +46,15 @@ final class PendingContextTest extends TestCase
         $firstFactor = self::firstFactor();
         $requirement = Requirement::none()->withAdditionalVerification();
 
-        $context = new PendingContext($identity, 'admin', 'session-1', $firstFactor, $requirement, [PendingAction::LIST_FACTORS, PendingAction::VERIFY]);
+        $context = new PendingContext(
+            $identity,
+            'admin',
+            'session-1',
+            $firstFactor,
+            $requirement,
+            [PendingAction::LIST_FACTORS, PendingAction::VERIFY],
+            CarbonImmutable::now()->addHour(),
+        );
 
         self::assertSame($identity, $context->identity);
         self::assertSame('admin', $context->application);
@@ -169,6 +177,7 @@ final class PendingContextTest extends TestCase
             'firstFactor' => self::firstFactor(),
             'requirement' => Requirement::none(),
             'actions'     => [],
+            'expiresAt'   => CarbonImmutable::now()->addMinutes(10),
         ], $overrides));
     }
 

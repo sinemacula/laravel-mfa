@@ -82,6 +82,11 @@ moment when both work or neither exists, and what a redemption leaves behind.
   under it. A failure partway through the replacement, a save a model event cancels included (it throws
   `WriteCancelledException`), rolls all of it back: the previous set is untouched and still
   redeems, the generation is unchanged and nothing is reported.
+- With an identity's first additional factor, `RecoveryCodeIssuance::withFirstFactor()` generates a set in the change
+  that confirms it, when the application accepts them and the session's known first factor followed by the
+  confirmation's own proof reaches the level, without the freshness gate. `RecoveryCodesGenerated` is dispatched from
+  outside the set's nested transaction, so it keeps its place among that change's events (see
+  [Enrolment](enrollment.md)).
 - A redemption is refused before any attempt, counted nowhere, with one `VerificationFailed` and nothing checked or
   spent: `machine_identity` or `identity_inactive`; `not_accepted` for an enrolment, which a recovery code cannot
   confirm; `type_not_enabled` when the application does not accept recovery codes; `no_factor` without a confirmed

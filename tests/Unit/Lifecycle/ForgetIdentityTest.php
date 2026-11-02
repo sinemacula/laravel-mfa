@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Database\TableNames;
+use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 use SineMacula\Laravel\Mfa\Lifecycle\ForgetIdentity;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Enrollment;
@@ -153,16 +154,26 @@ final class ForgetIdentityTest extends TestCase
 
         $factor = Factor::query()->create([...$owner, 'type' => 'totp']);
 
-        Enrollment::query()->create([...$owner, 'factor_id' => $factor->id, 'grant_hash' => hash('sha256', $factor->id), 'application' => 'web', 'expires_at' => $now]);
-        Code::query()->create([
+        Enrollment::query()->create([
             ...$owner,
             'factor_id'   => $factor->id,
-            'purpose'     => 'sign_in',
+            'grant_hash'  => hash('sha256', $factor->id),
             'application' => 'web',
-            'code_hash'   => hash('sha256', 'c' . $factor->id),
-            'sent_at'     => $now,
-            'sent_times'  => [$now->getTimestamp()],
+            'session_id'  => 'sign-in-digest',
+            'generation'  => 0,
+            'authority'   => EnrollmentAuthorization::STEP_UP,
             'expires_at'  => $now,
+        ]);
+        Code::query()->create([
+            ...$owner,
+            'factor_id'        => $factor->id,
+            'purpose'          => 'sign_in',
+            'application'      => 'web',
+            'destination_hash' => hash('sha256', 'd' . $factor->id),
+            'code_hash'        => hash('sha256', 'c' . $factor->id),
+            'sent_at'          => $now,
+            'sent_times'       => [$now->getTimestamp()],
+            'expires_at'       => $now,
         ]);
         RecoveryCode::query()->create([...$owner, 'code_hash' => 'hash', 'generation' => 1]);
         PasskeyAssociation::query()->create([

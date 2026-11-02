@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Requirements;
 
+use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
@@ -32,5 +33,18 @@ final class FreshOnceGate implements FreshnessGate
     public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool
     {
         return ++$this->reads === 1;
+    }
+
+    /**
+     * An hour on, the first time only.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+     * @return ?\Carbon\CarbonImmutable
+     */
+    #[\Override]
+    public function freshUntil(string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
+    {
+        return ++$this->reads === 1 ? CarbonImmutable::now()->addHour() : null;
     }
 }

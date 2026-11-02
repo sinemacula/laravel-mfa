@@ -12,9 +12,7 @@ use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
-use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Database\OpenTransaction;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\Actor;
@@ -27,7 +25,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
-use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 
 /**
  * Removes one of an identity's factors as one serialised change, inside the
@@ -127,33 +125,9 @@ final readonly class FactorRemoval
 
         $this->container->make(SessionRevoker::class)->revokeOthers($identity);
 
-        $this->reevaluate($identity, $application, $kept);
+        $this->container->make(SessionReevaluation::class)->reevaluate($identity, $application, $kept);
 
         $this->events->dispatch(new FactorRemoved($this->events->context($identity, $application), $summary, $actor));
-    }
-
-    /**
-     * Evaluate the session's requirement again on the proofs it kept, and hand
-     * a shortfall to the bound session transition.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $kept
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
-     */
-    private function reevaluate(MultiFactorAuthenticatable $identity, string $application, array $kept): void
-    {
-        $requirement = $this->container->make(RequirementService::class)->requirementFor($identity, $application);
-
-        if ($this->container->make(RequirementCheck::class)->check($requirement, ...$kept)->meetsRequirement()) {
-            return;
-        }
-
-        $this->container->make(SessionTransition::class)->returnToPending($identity, $application, $requirement);
     }
 
     /**

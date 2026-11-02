@@ -9,7 +9,6 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use SineMacula\Laravel\Mfa\Assurance\Authenticator;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
@@ -18,14 +17,9 @@ use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Attempts\RequestIp;
 use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
-use SineMacula\Laravel\Mfa\Context\PendingContext;
-use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
-use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
-use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -46,8 +40,6 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
-use SineMacula\Laravel\Mfa\Requirements\Requirement;
-use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
@@ -66,7 +58,8 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * read under the lock, which must itself be accepted after the session's first
  * factor; the whole requirement is evaluated again with it; the result goes to
  * `PendingCompletion` or `StepUp` as the last write of the transaction, so
- * their refusal rolls back the code's use and the count.
+ * their refusal rolls back the code's use and the count (see
+ * `ProofAcceptance`).
  *
  * A failure is a result, carrying a reason a caller may be told, with one
  * `VerificationFailed` once the transaction has ended, except where the request
@@ -427,31 +420,11 @@ final readonly class VerificationService
      */
     private function accept(Caller $caller, Proof $proof, CheckOutcome $check, array $driverAmr, ?FactorSummary $summary, string $type): VerificationResult
     {
-        $requirements = $this->container->make(RequirementCheck::class);
-        $binding      = $proof->binding;
-        $pending      = $caller->pending;
-        $proofs       = $pending === null
-            ? $this->container->make(SessionFirstFactor::class)->proofs($caller->identity, $binding->application)
-            : [$pending->firstFactor, ...self::counting($pending, $proof->generation)];
-        $firstFactor = self::firstFactorOf($proofs);
-
-        OperationRefusedException::unless(
-            $firstFactor !== null && $requirements->check(Requirement::none(), $firstFactor, $proof)->accepted,
-            FailureReason::NOT_ACCEPTED,
-            'The proof is not accepted after the session\'s first factor.',
-        );
-
-        $requirement = $pending->requirement ?? $this->container->make(RequirementService::class)->requirementFor($caller->identity, $binding->application);
-        $evaluation  = $requirements->check($requirement, ...$proofs, ...[$proof]);
-
-        $amr    = array_values(array_unique(array_diff([...Authenticator::of($proof)->amr, ...$driverAmr], ['mfa'])));
-        $result = VerificationResult::verified($proof, $evaluation, $amr, $type);
-
-        $completion = $pending === null
-            ? $this->container->make(StepUp::class)->stepUp($result)
-            : $this->container->make(PendingCompletion::class)->complete($pending, $result);
-
-        $context = $this->events->context($caller->identity, $binding->application);
+        $acceptance = $this->container->make(ProofAcceptance::class);
+        $binding    = $proof->binding;
+        $result     = $acceptance->evaluate($caller, $proof, $driverAmr, $type);
+        $completion = $acceptance->handOver($caller, $result);
+        $context    = $this->events->context($caller->identity, $binding->application);
 
         $this->events->dispatch(new VerificationPassed($context, $summary, $type, $binding->purpose, $proof->challengeId));
 
@@ -534,38 +507,6 @@ final readonly class VerificationService
             $settled->counted                      => AttemptOutcome::fail(),
             default                                => AttemptOutcome::uncounted(),
         };
-    }
-
-    /**
-     * The pending session's further proofs that still count: those of the
-     * current verification generation, made by now.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
-     * @param  int  $generation
-     * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
-     */
-    private static function counting(PendingContext $pending, int $generation): array
-    {
-        $now = CarbonImmutable::now();
-
-        return array_values(array_filter($pending->proofs, static fn (Proof $proof): bool => $proof->generation === $generation && $proof->provedAt->lessThanOrEqualTo($now)));
-    }
-
-    /**
-     * The session's first factor among its proofs, if it has one.
-     *
-     * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
-     * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
-     */
-    private static function firstFactorOf(array $proofs): ?Proof
-    {
-        foreach ($proofs as $proof) {
-            if ($proof->kind === ProofKind::FIRST_FACTOR) {
-                return $proof;
-            }
-        }
-
-        return null;
     }
 
     /**

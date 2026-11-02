@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Context;
 
+use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
@@ -17,8 +18,8 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  * A pending session, a sign-in still owing a requirement, as resolved from a
  * pending credential the authentication layer has validated: the identity, the
  * application, the session's public id, the first factor's proof, the
- * outstanding requirement, the actions the credential allows, and the further
- * proofs the session already holds.
+ * outstanding requirement, the actions the credential allows, when the pending
+ * session expires, and the further proofs the session already holds.
  *
  * The rules between the parts are checked on construction: the first factor's
  * proof is a first factor made at sign-in, bound to this identity, application
@@ -40,6 +41,7 @@ final readonly class PendingContext
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
+     * @param  \Carbon\CarbonImmutable  $expiresAt
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      *
      * @throws \InvalidArgumentException
@@ -63,6 +65,9 @@ final readonly class PendingContext
 
         /** The actions the pending credential allows. */
         public array $actions,
+
+        /** When the pending session expires: a bootstrap enrolment grant lives no longer. */
+        public CarbonImmutable $expiresAt,
 
         /** The further proofs the session already holds, oldest first. */
         public array $proofs = [],

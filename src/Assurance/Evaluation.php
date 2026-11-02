@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Assurance;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Support\Arrayable;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\RequirementPart;
@@ -24,6 +25,11 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
  * reported met that its own answers rule out, `mfa` without a multifactor
  * combination, or `mca` without an accepted one that is not multifactor. A
  * replaced combination policy therefore cannot report more than it found.
+ *
+ * When every part is met, `metUntil` says when the evidence stops meeting them:
+ * the instant the first part bounded by a maximum age falls out of it. It is
+ * what an enrolment grant's lifetime is taken from, and an answer about now, so
+ * neither `toArray()` nor JSON shows it.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, mixed>
  *
@@ -49,6 +55,7 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
      * @param  list<string>  $amr
      * @param  list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>  $met
      * @param  list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>  $unmet
+     * @param  ?\Carbon\CarbonImmutable  $metUntil
      *
      * @throws \InvalidArgumentException
      */
@@ -77,9 +84,16 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
 
         /** The parts of the requirement the combination does not meet. */
         public array $unmet,
+
+        /** When the evidence stops meeting the whole requirement, if a maximum age bounds it. */
+        public ?CarbonImmutable $metUntil = null,
     ) {
         self::assertAmr($amr);
         self::assertParts($met, $unmet);
+
+        if ($metUntil !== null && $unmet !== []) {
+            throw new \InvalidArgumentException('An evaluation with an unmet part cannot say when it stops meeting the requirement.');
+        }
 
         $this->assertMet();
         $this->assertReservedAmr();

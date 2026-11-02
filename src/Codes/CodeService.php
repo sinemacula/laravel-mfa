@@ -95,7 +95,7 @@ final readonly class CodeService
                 return SendResult::refused(FailureReason::NOT_FOUND);
             }
 
-            $issued = $codes->issue(self::idOf($stored), $binding, $now);
+            $issued = $codes->issue(self::idOf($stored), $binding, $now, $locked->getDestination());
 
             if (is_int($issued)) {
                 return SendResult::refused(FailureReason::SENDING_CAPPED, $issued);

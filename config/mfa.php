@@ -111,7 +111,8 @@ return [
     |
     | The algorithm (sha1, sha256 or sha512), digits (6 to 8) and period (15 to
     | 120 seconds) new enrolments use, and the window (0 to 3 steps either side
-    | of the current one) of an application that sets no window of its own.
+    | of the current one) of an application that sets no window of its own, and
+    | the issuer an authenticator app shows, the application's name without one.
     |
     */
 
@@ -120,6 +121,7 @@ return [
         'digits'    => env('MFA_TOTP_DIGITS', 6),
         'period'    => env('MFA_TOTP_PERIOD', 30),
         'window'    => env('MFA_TOTP_WINDOW', 1),
+        'issuer'    => env('MFA_TOTP_ISSUER'),
     ],
 
     /*
@@ -131,8 +133,8 @@ return [
     | minutes), how many attempts one challenge allows (1 to 10), how long a
     | challenge's resends may run from its first code (the lifetime to 60
     | minutes), the cooldown before a resend (up to the lifetime), the caps on
-    | how many one factor and one identity are sent within the send window,
-    | across every session, the SMS message (which must carry `:code`) and the
+    | how many one factor's destination and one identity are sent within the
+    | send window, across every session, the SMS message (which must carry `:code`) and the
     | email message class (`MfaCodeMessage` or a subclass), and the table the
     | codes are stored in, as keyed hashes. An application that enables `sms`
     | or `email` must bind an `SmsSender` or `EmailSender` to deliver them.
@@ -211,13 +213,16 @@ return [
     |---------------------------------------------------------------------------
     |
     | How long a pending factor can be confirmed after its enrolment starts (1
-    | to 60 minutes), and the table each enrolment in progress is held in.
+    | to 60 minutes), which the freshness that authorised it may shorten; how
+    | many wrong codes abandon it (1 to 10); and the table each enrolment in
+    | progress is held in.
     |
     */
 
     'enrollment' => [
-        'table'       => env('MFA_ENROLLMENT_TABLE', 'mfa_enrollments'),
-        'ttl_minutes' => env('MFA_ENROLLMENT_TTL_MINUTES', 15),
+        'table'        => env('MFA_ENROLLMENT_TABLE', 'mfa_enrollments'),
+        'ttl_minutes'  => env('MFA_ENROLLMENT_TTL_MINUTES', 15),
+        'max_attempts' => env('MFA_ENROLLMENT_MAX_ATTEMPTS', 5),
     ],
 
     /*

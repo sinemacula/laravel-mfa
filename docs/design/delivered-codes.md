@@ -11,24 +11,32 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 - A code belongs to a challenge: one row of the codes table, bound to the factor and to a binding, a
   `Proofs\ProofBinding` of the identity (type and key), the application, the session and the purpose (`sign_in`,
   `reauthenticate`, `step_up` or `enrollment`). A code checked against any other factor, identity, application,
-  session or purpose is `missing`, even when its challenge is named, and such a check counts no attempt against it.
+  session or purpose is `missing`, even when its challenge is named, and such a check counts no attempt against it. A
+  challenge with the `enrollment` purpose is of a pending factor, and is admitted and counted apart (see
+  [Enrolment](enrollment.md)).
 - The code is `length` digits, each drawn with `random_int()`, stored only as `HMAC-SHA256(key', "code\0challenge
   id\0issue\0factor id\0identity type\0identity key\0application\0session id\0purpose\0code")`, compared with
   `hash_equals()`. The session is stored as `HMAC-SHA256(key'', session id)`, never the id itself, which is a bearer
-  secret. `key'` and `key''` are separate derivations of `app.key`; rotating it only invalidates the codes outstanding.
-  The factor row holds no code and no expiry, and the `Code` model hides the hash and the session digest.
+  secret. `key'` and `key''` are separate derivations of `app.key`; rotating it invalidates the codes outstanding and
+  starts each destination's count afresh, while the identity's cap stands. The factor row holds no code and no expiry,
+  and the `Code` model hides the hash and the digests of the session and the destination.
 - A challenge is open while its code is unused and it started less than `challenge_ttl_minutes` ago. Sending for a
   binding with an open challenge is a resend: the same row gets a new code under the next issue number, which makes the
   previous code stop matching at once. The new code is drawn again until its digits differ from the previous code's,
   which would otherwise still match under the new issue. The attempt count is kept, and the new code expires at
   `ttl_minutes` or the end of the challenge, whichever is sooner. With no open challenge, a send starts a new one.
 - A resend waits out `resend_cooldown_seconds` since the challenge's last code. A challenge that has used up its
-  `max_attempts` sends no more codes until it ends, so asking for a new code never brings new guesses.
-- Every send, resends included, is refused while the factor has been sent `factor_send_limit` codes, or the identity
-  `identity_send_limit` across its factors, within `send_window_minutes`, across every session. A challenge records the
-  time of each of its sends (`sent_times`), and each send leaves the window on its own, a window after it was made, so
-  a challenge's earlier sends stop counting while its later ones still do. A refusal answers `sending_capped` with the
-  seconds until enough sends have left the window for one more.
+  `max_attempts` sends no more codes until it ends, so asking for a new code never brings new guesses. A new challenge
+  whose purpose is `enrollment` waits out the same cooldown since the last enrolment code to its destination, whichever
+  factor held it, so restarting an enrolment is no way round it. A new challenge of any other purpose has no code before
+  it to wait out.
+- Every send, resends included, is refused while the factor's destination has been sent `factor_send_limit` codes, or
+  the identity `identity_send_limit` across its factors, within `send_window_minutes`, across every session. A
+  destination is counted by `destination_hash`, a keyed digest of the owner and the destination (or of the factor, for
+  one with none), so its count outlives a pending factor discarded for a new one, and two factors of one identity on one
+  destination share it. A challenge records the time of each of its sends (`sent_times`), and each send leaves the
+  window on its own, a window after it was made, so a challenge's earlier sends stop counting while its later ones still
+  do. A refusal answers `sending_capped` with the seconds until enough sends have left the window for one more.
 - Sending runs in the identity's factor state transaction (see [Storage and Transactions](storage-and-transactions.md)),
   so the sends of one identity are serialised and the counts the caps read cannot be overrun by parallel requests. The
   factor is read again under the lock; one a concurrent change removed answers `not_found`. The send's time is read

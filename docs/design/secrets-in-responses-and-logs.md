@@ -13,17 +13,16 @@ it.
 
 - `Secrets\RevealedSecret` is the type secrets are returned in, revealed explicitly only for the response to the client
   and for storing the factor. `RecoveryCodes\RecoveryCodeService::generate()` returns each recovery code of a new set
-  as one; the planned enrolment flow will return the TOTP secret and provisioning URI in it. Until then
-  `TotpDriver::startEnrollment()` and `provisioningUri()` return plain strings, which the caller must not log, dump or
-  serialise.
+  as one, and the enrolment flow returns the TOTP secret, the provisioning URI and the grant as them (see
+  [Enrolment](enrollment.md)), from `TotpDriver::startEnrollment()` and `provisioningUri()` up.
 - A `RevealedSecret` holds its plaintext as a `\SensitiveParameterValue`. The
   plaintext leaves it only through `reveal()`. `__toString()`, `jsonSerialize()`, `__serialize()` and
   `__unserialize()` throw `Exceptions\SecretNotRevealedException`, a `LogicException`; `__debugInfo()` gives a
   `[redacted]` marker, and the `\SensitiveParameterValue` gives `print_r`, `var_dump`, `var_export`, array casts and
   Symfony's VarDumper nothing. The class is final and readonly.
-- A value that holds a secret but is not returned to show it keeps to the same standard: `Verification\Submission`'s code
-  and response, `Verification\VerificationResult`'s completion and `Assurance\Channel`'s reference are each held as a
-  `\SensitiveParameterValue` behind an accessor, so no dump shows them.
+- A value that holds a secret but is not returned to show it keeps to the same standard: `Verification\Submission`'s
+  code and response, `Verification\VerificationResult`'s completion and `Assurance\Channel`'s reference are each held as
+  a `\SensitiveParameterValue` behind an accessor, so no dump shows them.
 - `Secrets\SecretResponse::json()` is the one helper that reveals: it replaces every `RevealedSecret` in the data, at
   any depth of nested arrays, by its plaintext, and sends the response with `Cache-Control: no-store` and
   `Pragma: no-cache`. A `RevealedSecret` inside another object is not revealed, so encoding it throws.
@@ -42,9 +41,9 @@ it.
   `RevealedSecret`, `\SensitiveParameterValue` or code message (`Codes\MfaCodeMessage`, or a `SendQueuedMailable`
   sending one) anywhere; the whole value of a string key that names a secret, a code or a destination (`secret`,
   `totp_secret`, `code`, `codes`, `otp`, `one_time_code`, `recovery_code`, `recovery_codes`, `destination`, `address`,
-  `email`, `phone`, `phone_number`, `to`, `recipient`, `provisioning_uri`, `otpauth_uri`, compared without case,
-  underscores, hyphens or spaces); every `otpauth://` or `otpauth-migration://` URI in a string. Integer keys are never
-  read as names. Everything else is kept, masked destinations included.
+  `email`, `phone`, `phone_number`, `to`, `recipient`, `provisioning_uri`, `otpauth_uri`, `grant`, `enrollment_grant`,
+  compared without case, underscores, hyphens or spaces); every `otpauth://` or `otpauth-migration://` URI in a string.
+  Integer keys are never read as names. Everything else is kept, masked destinations included.
 - `RedactSecrets` first normalises the context and the extra data once (`Redactor::normalise()`): every object other
   than a secret value, a code message, an exception, a date or an enum becomes its logged form keyed by its class,
   within the same bounds as the redaction. A value under a key above is left as it is, with no method of an object in
@@ -107,9 +106,9 @@ it.
 
 ## Success Path
 
-- Once the planned enrolment flow returns the TOTP secret and provisioning URI as `RevealedSecret` values, the
-  application's controller returns `SecretResponse::json([...])`; the body carries the plaintext, the response carries
-  `no-store`, and the route's `mfa.no-store` middleware sets the same headers again on the way out.
+- The enrolment flow returns the TOTP secret and provisioning URI as `RevealedSecret` values; the application's
+  controller returns `SecretResponse::json([...])`; the body carries the plaintext, the response carries `no-store`,
+  and the route's `mfa.no-store` middleware sets the same headers again on the way out.
 - A log call anywhere in the application writes `['code' => $code]`, or Laravel's shared context holds a code, or a
   channel's own processor adds one; the channel's `RedactSecrets` processor runs after every other processor of the
   logger and before any handler, and the record written holds `[redacted]`.

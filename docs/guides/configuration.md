@@ -30,6 +30,7 @@ between requests.
 | `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   | yes     |
 | `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   | yes     |
 | `totp.window`                   | `1`                                | 0 to 3 steps                           | `MFA_TOTP_WINDOW`                   | yes     |
+| `totp.issuer`                   | the application's name             | a non-empty string                     | `MFA_TOTP_ISSUER`                   | yes     |
 | `codes.length`                  | `6`                                | 6 to 10 digits                         | `MFA_CODES_LENGTH`                  | yes     |
 | `codes.ttl_minutes`             | `10`                               | 1 to 10 minutes                        | `MFA_CODES_TTL_MINUTES`             | yes     |
 | `codes.max_attempts`            | `5`                                | 1 to 10                                | `MFA_CODES_MAX_ATTEMPTS`            | yes     |
@@ -50,7 +51,8 @@ between requests.
 | `attempts.window_seconds`       | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_WINDOW_SECONDS`       | yes     |
 | `attempts.lockout_seconds`      | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_LOCKOUT_SECONDS`      | yes     |
 | `attempts.failure_ceiling`      | `100`                              | 1 to 100                               | `MFA_ATTEMPTS_FAILURE_CEILING`      | yes     |
-| `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        | not yet |
+| `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        | yes     |
+| `enrollment.max_attempts`       | `5`                                | 1 to 10                                | `MFA_ENROLLMENT_MAX_ATTEMPTS`       | yes     |
 | `proofs.max_age_minutes`        | `20160`                            | 0 to 525600 minutes                    | `MFA_PROOFS_MAX_AGE_MINUTES`        | yes     |
 | `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    | not yet |
 | `secrets.redact`                | `true`                             | off only for a false value             | `MFA_SECRETS_REDACT`                | yes     |
@@ -91,8 +93,9 @@ applied, and `limits` and `bootstrap` so far only by the passkey change gate (se
 `freshness` is what `Mfa::isFresh()` judges a step-up against (see [Requirements and step-up](requirements.md)). A
 factor is sent a code and verified only where the application enables its type (see [Verification](verification.md)), a
 TOTP code is checked within the window of the application the verification is bound to, and recovery codes are generated
-and redeemed only where the application accepts them, a new set only at `recovery_codes.level`. The limits are enforced
-only on passkeys until the enrolment flow ships.
+and redeemed only where the application accepts them, a new set only at `recovery_codes.level`. The limits and
+`bootstrap` are enforced whenever a factor is enrolled, a passkey's registration included (see
+[Enrolment](enrollment.md)).
 
 | Key                         | Default                   | Meaning                                                                                                                                |
 |-----------------------------|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
@@ -136,12 +139,14 @@ another.
 
 The package's own operations (`mfa.add_factor`, `mfa.replace_factor`, `mfa.remove_factor` and
 `mfa.generate_recovery_codes`) ask for an additional verification within 900 seconds; an application's entry replaces
-that default whole, and the application adds its own operations by name. Names are the block's keys, read whole rather
-than as a dotted path, and must be lower-case segments of letters, digits and underscores, each starting with a letter,
-separated by dots; any other name is refused. An operation neither the package nor the application names is never
-fresh unless the caller asks for a requirement of its own. The passkey change gate asks it for `mfa.add_factor` and
-`mfa.remove_factor`; the package's other enrolment, removal and recovery-code calls run without asking, so until the
-enrolment and lifecycle flows do, an application calls `Mfa::isFresh()` itself before calling them.
+that default whole, and the application adds its own operations by name. The package's replacement flow, enrolling then
+removing, asks `mfa.add_factor` and `mfa.remove_factor`; `mfa.replace_factor` applies only where an application asks for
+it itself. Names are the block's keys, read whole rather than as a dotted path, and must be lower-case segments of
+letters, digits and underscores, each starting with a letter, separated by dots; any other name is refused. An operation
+neither the package nor the application names is never fresh unless the caller asks for a requirement of its own.
+Starting an enrolment and the passkey change gate ask it for `mfa.add_factor`, the gate for `mfa.remove_factor` and
+generating recovery codes for `mfa.generate_recovery_codes`; `Mfa::disable()` runs without asking, so until the
+lifecycle flow does, an application calls `Mfa::isFresh()` itself before calling it.
 
 `first_factor` is how the package knows, without an authentication layer, what started the sign-in: its `method` (any
 name, such as `password`) and its `channel`, one of the channel kinds (`password`, `sms`, `email`,
@@ -254,15 +259,17 @@ replaced.
     'digits'    => env('MFA_TOTP_DIGITS', 6),
     'period'    => env('MFA_TOTP_PERIOD', 30),
     'window'    => env('MFA_TOTP_WINDOW', 1),
+    'issuer'    => env('MFA_TOTP_ISSUER'),
 ],
 ```
 
 `algorithm`, `digits` and `period` are the parameters new TOTP enrolments use. The defaults (SHA-1, 6 digits, 30
 seconds) are what authenticator apps expect; some apps ignore other values and show codes that never match, so change
 them only for apps you know honour them. Each factor stores the parameters it was enrolled with, so changing them
-affects only enrolments started afterwards: existing factors keep working as they were. A period is at most 120
-seconds. A new factor's secret is random and as long as the algorithm's output: 20 bytes for SHA-1, 32 for SHA-256 and
-64 for SHA-512.
+affects only enrolments started afterwards: existing factors keep working as they were. A period is at most 120 seconds.
+A new factor's secret is random and as long as the algorithm's output: 20 bytes for SHA-1, 32 for SHA-256 and 64 for
+SHA-512. `issuer` is what an authenticator app shows for a new factor when the enrolment names none of its own, and the
+application's name without one; it may not hold a colon.
 
 `window` is the number of time steps either side of the current one a code is accepted for, absorbing clock skew and
 entry delay, for an application that sets no `totp_window` of its own, and for every request when no
@@ -295,15 +302,17 @@ against one challenge; a resend sends a new code for the same challenge and keep
 for another code never brings more guesses. `challenge_ttl_minutes` is how long a challenge's resends may run from its
 first code, at least the code lifetime and at most 60 minutes: no code of the challenge works past it, and the next send
 after it starts a new challenge. `resend_cooldown_seconds` is how long after a code is sent another may be sent for the
-same challenge, never longer than the code's lifetime, and `factor_send_limit` and `identity_send_limit` cap how many
-codes one factor and one identity, across its factors and sessions, are sent within `send_window_minutes`, resends
-included. `sms_message` is the SMS text, which must carry the `:code` placeholder the code replaces, and `mailable` the
-email message class, `Codes\MfaCodeMessage` or a subclass of it, whose queued payload is always encrypted.
+same challenge, never longer than the code's lifetime, and before a restarted enrolment's first code to the same
+destination, and `factor_send_limit` and `identity_send_limit` cap how many codes one factor's destination and one
+identity, across its factors and sessions, are sent within `send_window_minutes`, resends included. `sms_message` is the
+SMS text, which must carry the `:code` placeholder the code replaces, and `mailable` the email message class,
+`Codes\MfaCodeMessage` or a subclass of it, whose queued payload is always encrypted.
 
 Each send counts towards the caps for `send_window_minutes` from when it was made, and a refused send answers
 `sending_capped` with the seconds until another may be sent (see [Delivered codes](../design/delivered-codes.md)).
 Codes are stored as keyed hashes of the code and its binding, with a key derived from `app.key`; rotating the
-application key only invalidates the codes outstanding.
+application key invalidates the codes outstanding and starts each destination's count afresh, while the identity's cap
+stands.
 
 A code is sent and checked within the request's Laravel session, whose id it is bound to: the challenge and the
 verification must run in the same started session (the `StartSession` middleware), so stateless requests, such as a
@@ -360,12 +369,14 @@ and when it expires is set out in [Attempts and lockouts](attempts.md).
 
 ```php
 'enrollment' => [
-    'ttl_minutes' => env('MFA_ENROLLMENT_TTL_MINUTES', 15),
+    'ttl_minutes'  => env('MFA_ENROLLMENT_TTL_MINUTES', 15),
+    'max_attempts' => env('MFA_ENROLLMENT_MAX_ATTEMPTS', 5),
 ],
 ```
 
-A pending factor is to be confirmable for `ttl_minutes` after its enrolment starts, at most 60, and abandoned after
-that. It is checked but not applied yet.
+A pending factor can be confirmed for `ttl_minutes` after its enrolment starts, at most 60, or until what authorised it
+stops being fresh, whichever is sooner. `max_attempts` wrong or replayed codes, at most 10, abandon it. See
+[Enrolment](enrollment.md).
 
 ## Proofs
 

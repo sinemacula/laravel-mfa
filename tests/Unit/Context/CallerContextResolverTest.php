@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Context;
 
+use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
@@ -284,6 +285,7 @@ final class CallerContextResolverTest extends TestCase
             SignInProofs::of($identity)->onApplication('admin')->inSession('pending-1')->password(),
             Requirement::none()->withAdditionalVerification(),
             $actions,
+            CarbonImmutable::now()->addMinutes(10),
         );
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver($pending));

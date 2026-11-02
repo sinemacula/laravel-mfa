@@ -48,6 +48,8 @@ final class RedactorTest extends TestCase
         yield 'one-time password' => ['otp'];
         yield 'one-time code' => ['one_time_code'];
         yield 'recovery code' => ['recovery_code'];
+        yield 'grant' => ['grant'];
+        yield 'enrolment grant' => ['enrollment_grant'];
         yield 'recovery codes' => ['recovery_codes'];
         yield 'recovery codes in camel case' => ['recoveryCodes'];
         yield 'recovery codes with hyphens' => ['recovery-codes'];

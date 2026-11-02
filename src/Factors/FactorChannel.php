@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Factors;
 
+use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
@@ -45,5 +46,21 @@ final class FactorChannel
         }
 
         return new Channel($kind, $factor->getDestination() ?? $factor->getCredentialReference() ?? (string) $identifier);
+    }
+
+    /**
+     * The channel of a kind that can carry a factor, for a factor not yet
+     * stored: its destination when it has one, and otherwise a reference no
+     * other channel shares, as its own id will be.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
+     * @param  ?string  $destination
+     * @return \SineMacula\Laravel\Mfa\Assurance\Channel
+     *
+     * @throws \InvalidArgumentException
+     */
+    public static function prospective(ChannelKind $kind, #[\SensitiveParameter] ?string $destination): Channel
+    {
+        return new Channel($kind, $destination ?? (string) Str::ulid());
     }
 }

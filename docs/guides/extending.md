@@ -48,13 +48,13 @@ later says.
 
 A driver is one factor type behind `Contracts\FactorDriver`, registered under the type's name:
 
-| Method                                    | Answers                                                                                        |
-|-------------------------------------------|------------------------------------------------------------------------------------------------|
-| `channelKind()`                           | The `Enums\ChannelKind` the type's factors travel on, which the combination policy reads       |
-| `amr()`                                   | The RFC 8176 `amr` values a proof by the type adds on its own, such as `otp` or `sms`          |
-| `startEnrollment(Factor $factor)`         | The secret to store on the pending factor and show the person once, or `null` when it has none |
-| `confirm(Factor $factor, $code)`          | Whether the first code the person submits confirms the pending factor                          |
-| `verify(Factor $factor, $code, $binding)` | `CodeCheck::ACCEPTED`, `INVALID`, or `REPLAYED` for a code that matches but was already used   |
+| Method                                     | Answers                                                                                        |
+|--------------------------------------------|------------------------------------------------------------------------------------------------|
+| `channelKind()`                            | The `Enums\ChannelKind` the type's factors travel on, which the combination policy reads       |
+| `amr()`                                    | The RFC 8176 `amr` values a proof by the type adds on its own, such as `otp` or `sms`          |
+| `startEnrollment(Factor $factor)`          | The secret, as a `RevealedSecret`, to store on the pending factor and show once, or `null`     |
+| `confirm(Factor $factor, $code, $binding)` | The `CodeCheck` of the first code the person submits, as `verify()` answers                    |
+| `verify(Factor $factor, $code, $binding)`  | `CodeCheck::ACCEPTED`, `INVALID`, or `REPLAYED` for a code that matches but was already used   |
 
 The type fixes the channel kind, so the combination policy never infers a channel from a type's name. A driver claims
 only the `amr` values its method always adds: values that depend on what a proof observed, such as user presence, are
@@ -103,6 +103,23 @@ the drivers send instead of delivering them, and returns it, so a test can read 
 (`lastMessageTo()`, `lastCodeTo()`). Faking also makes the manager build its drivers again, so a driver resolved before
 the fake sends through it too.
 
+A driver whose secret an authenticator app reads from a QR code also implements `Contracts\ProvisioningDriver`:
+`provisioningUri(Factor $factor, $issuer, $accountName, RevealedSecret $secret)` returns the URI as a `RevealedSecret`,
+and a start then needs an account name, which `EnrollmentRequest::provisioned($type, $accountName)` supplies. A driver
+delivering codes implements `Contracts\CodeDeliveryDriver`: `normalizeDestination($destination)` returns the one form
+the factor keeps, and independence is compared in, or `null` for a destination it cannot deliver to
+(`invalid_destination`).
+
+An adapter's `FreshnessGate` answers `freshUntil()` as well as `isFresh()`: the instant the session stops being fresh
+for the operation on the proofs it holds now, or `null` when it is not fresh or it cannot say, which refuses the
+enrolment it would have authorised. Where the gate cannot express a minimum level or independently aged parts in its own
+terms, it evaluates the package's requirement too and answers the earlier of the two deadlines.
+`PendingContext::$expiresAt` is the pending session's own expiry, which a bootstrap enrolment grant lives no longer
+than. Under a binding whose purpose is `enrollment`, a `ChallengeGateway` is handed a pending factor;
+`Attempts\ChallengeCounters` admits it and `report()` is silent, so the enrolment's own cap is what counts. A restart
+makes a new factor, so a gateway whose send caps or cooldown are keyed on the factor must carry them across, by keying
+them on what a restart keeps, such as the owner and the destination.
+
 ## Where the classes live
 
 The package is organised by capability. Each capability's namespace holds its service, the `*Bindings` class that
@@ -120,7 +137,7 @@ registers it with the container, and the classes only it uses:
 | `Context`       | `PendingContext`, who a request serves, and the pending session and subject type defaults           |
 | `Passkeys`      | The change gate, `PasskeyRegistration`, `CredentialId`, assertions and the unavailable gateway      |
 | `Seams`         | Defaults that read nothing of the package: `RefusingReauthenticator`                                |
-| `Enrollment`    | `enroll()` and `EnrollmentSettings`                                                                 |
+| `Enrollment`    | `startEnrollment()`, `confirmEnrollment()`, what they answer and `EnrollmentSettings`               |
 | `Lifecycle`     | `disable()`, `ForgetIdentity` and `LifecycleSettings`                                               |
 | `RecoveryCodes` | `generateRecoveryCodes()`, `recoveryCodes()` and `RecoveryCodeSettings`                             |
 | `Attempts`      | `AttemptService`, and `ChallengeCounters`, the counts a challenge owner reports into                |
@@ -170,13 +187,14 @@ The refusing reauthenticator means an identity cannot add its first additional f
 something proves its first factor again: bind a `Contracts\Reauthenticator` that asks the person for their password, for
 example, and returns a `first_factor_reauthentication` proof bound to their current sign-in.
 
-Every helper that returns summaries, sends a code or reveals a secret asks the bound `PendingSessionResolver` first.
-On a pending session it serves only the action it needs (`mfa.list_factors` for `getFactors()`, `offeredFactors()` and
+Every helper that returns summaries, sends a code or reveals a secret asks the bound `PendingSessionResolver` first. On
+a pending session it serves only the action it needs (`mfa.list_factors` for `getFactors()`, `offeredFactors()` and
 `recoveryCodes()`, `mfa.send_code` for `sendCode()`, `mfa.verify` for `verify()` and `requestAssertion()`), as the
-pending session's own identity; anything else gets nothing, never the guard's user in its place. Generating recovery
-codes, enrolling a factor directly, `disable()`, `isSetup()` and `proofs()` serve active sessions only. A code is sent
-or checked only for a binding that is exactly the caller's own, on its application and its session. A resolver reports
-a pending credential that does not validate by throwing.
+pending session's own identity; anything else gets nothing, never the guard's user in its place. Starting, resending and
+cancelling an enrolment need `mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`.
+Generating recovery codes, renaming or preferring a factor, `disable()`, `isSetup()` and `proofs()` serve active
+sessions only. A code is sent or checked only for a binding that is exactly the caller's own, on its application and its
+session. A resolver reports a pending credential that does not validate by throwing.
 
 ## Challenge counters
 
@@ -233,10 +251,13 @@ DB::transaction(function () use ($gate, $identity, $application, $credential, $p
 checks an enrolment needs: a fresh step-up for a further factor, the first factor proved again for the first one, or the
 bootstrap path on a pending session that allows `mfa.confirm_bootstrap_enrollment`; then the application's limits. It
 returns `null` when the application does not enable the type, and recovery codes with the identity's first additional
-factor. `removing()` removes the factor with a fresh step-up made with another factor where the identity has one,
-under the last factor policy, and stops the identity's other sessions counting. `changing()` refuses any change to an
-associated credential: register the new one and remove the old. A refusal throws an `OperationRefusedException`; let it
-roll back your own change, since catching it and committing breaks the gate.
+factor. On a pending session its proof then goes to the bound `PendingCompletion`, and `verification` on the result
+holds what came back, whose refusal rolls your registration back; reveal it only once your transaction has committed. On
+an active session the requirement is evaluated again, and a shortfall goes to the bound `SessionTransition`, whose
+refusal rolls it back too. `removing()` removes the factor with a fresh step-up made with another factor where the
+identity has one, under the last factor policy, and stops the identity's other sessions counting. `changing()` refuses
+any change to an associated credential: register the new one and remove the old. A refusal throws an
+`OperationRefusedException`; let it roll back your own change, since catching it and committing breaks the gate.
 
 ## Proving an adapter
 

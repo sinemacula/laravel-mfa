@@ -46,9 +46,11 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 ## Success Path
 
 - Enrolment: `TotpDriver::startEnrollment($factor)` reads the parameters `mfa.totp` sets for new enrolments, stamps
-  them on an Eloquent factor with `last_accepted_step` cleared, and returns a new secret. The caller stores the secret
-  on the factor, shows it once with `provisioningUri($factor, $issuer, $accountName, $secret)`, and confirms the factor
-  with the first code the app shows through `confirm()`, which records its step.
+  them on an Eloquent factor with `last_accepted_step` cleared, and returns a new secret as a `RevealedSecret`. The
+  enrolment stores it encrypted on the factor, returns it once with `provisioningUri($factor, $issuer, $accountName,
+  $secret)`, also a `RevealedSecret`, and confirms the factor with the first code the app shows through
+  `confirm($factor, $code, $binding)`, which is `verify()`: the window is that of the application the grant's binding
+  names, and the step is recorded.
 - The provisioning URI is the `otpauth://` key URI format: the label `issuer:account`, each part percent-encoded once,
   and the query `secret`, `issuer`, `algorithm` (upper case), `digits` and `period`, encoded per RFC 3986.
 - Verification: `verify()` reads the factor's parameters and decodes its secret, computes the step of every moment of
@@ -77,8 +79,8 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 
 ## Implementation Anchors
 
-- `src/Drivers/TotpDriver.php`: `startEnrollment()`, `confirm()`, `verify()`, `matchedStep()`, `application()`,
-  `parameters()`, `provisioningUri()`.
+- `src/Drivers/TotpDriver.php`: `startEnrollment()`, `confirm()`, `verify()`, `matchedStep()`, `parameters()`,
+  `provisioningUri()`.
 - `src/Drivers/TotpParameters.php`: the bounds, `fromFactor()`, `secretLength()`, `stepAt()`, `code()`.
 - `src/Drivers/Base32.php`: `encode()`, `decode()`.
 - `src/Drivers/TotpSettings.php`: `parameters()`, `window()`, `windowFor()`.

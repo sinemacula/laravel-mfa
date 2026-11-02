@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Testing\Seams;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -64,6 +65,7 @@ final class PendingSessionResolverContractTest extends TestCase
             SignInProofs::of($identity)->inSession('pending-1')->password(),
             Requirement::none(),
             [PendingAction::VERIFY],
+            CarbonImmutable::now()->addMinutes(10),
         );
 
         $this->expectException(AssertionFailedError::class);
@@ -100,6 +102,7 @@ final class PendingSessionResolverContractTest extends TestCase
             SignInProofs::of($identity)->inSession('pending-1')->password(),
             Requirement::none(),
             [PendingAction::VERIFY],
+            CarbonImmutable::now()->addMinutes(10),
         );
 
         $this->expectException(AssertionFailedError::class);

@@ -165,7 +165,7 @@ final readonly class RecoveryCodeService
 
         $factorModel = ConfiguredModels::factor($this->config);
 
-        FactorStateTransaction::forIdentity($identity, new $factorModel, function (Collection $factors) use ($identity, $application, $hashes, $actor, $gate): void {
+        $generation = FactorStateTransaction::forIdentity($identity, new $factorModel, function (Collection $factors) use ($identity, $application, $hashes, $gate): int {
 
             if ($gate !== null) {
                 $gate();
@@ -177,10 +177,13 @@ final readonly class RecoveryCodeService
 
             self::requireConfirmedFactor($confirmed, 'The identity no longer has a confirmed factor.');
 
-            $generation = $this->replace(ProofOwner::of($identity), $hashes);
-
-            $this->events->dispatch(new RecoveryCodesGenerated($this->events->context($identity, $application), count($hashes), $generation, $actor));
+            return $this->replace(ProofOwner::of($identity), $hashes);
         });
+
+        // Dispatched from out here, so inside a caller's transaction it keeps
+        // its place among the caller's events rather than running ahead of them
+        // with this nested transaction's.
+        $this->events->dispatch(new RecoveryCodesGenerated($this->events->context($identity, $application), count($hashes), $generation, $actor));
 
         return array_map(static fn (string $code): RevealedSecret => new RevealedSecret($code), $codes);
     }

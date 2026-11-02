@@ -189,9 +189,12 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
     /**
      * Persist any pending mutations to the underlying storage. The shipped
      * Eloquent model delegates to `save()`; consumer implementations can route
-     * through their preferred persistence seam.
+     * through their preferred persistence seam. Anything that stops the write
+     * must throw, so the change it is part of rolls back.
      *
      * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      */
     public function persist(): void;
 }

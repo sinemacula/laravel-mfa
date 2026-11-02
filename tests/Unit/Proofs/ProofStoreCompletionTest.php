@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Proofs;
 
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
@@ -229,7 +230,15 @@ final class ProofStoreCompletionTest extends TestCase
     #[\Override]
     protected function pendingContext(): PendingContext
     {
-        return new PendingContext($this->user, 'web', 'pending-1', SignInProofs::of($this->user)->inSession('pending-1')->password(), Requirement::none(), [PendingAction::VERIFY]);
+        return new PendingContext(
+            $this->user,
+            'web',
+            'pending-1',
+            SignInProofs::of($this->user)->inSession('pending-1')->password(),
+            Requirement::none(),
+            [PendingAction::VERIFY],
+            CarbonImmutable::now()->addHour(),
+        );
     }
 
     /**

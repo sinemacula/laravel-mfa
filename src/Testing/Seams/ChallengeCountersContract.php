@@ -18,6 +18,7 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
@@ -27,9 +28,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * counts nothing, a nested one included, and the caller's transaction is left
  * as it was found; the identity's limit locks it, after which a failure counts
  * nothing more; a factor disabled at the failure ceiling is not challenged; a
- * consumed challenge answered again is never a success; and the counters
- * themselves refuse a call outside a transaction and a binding of another
- * identity.
+ * consumed challenge answered again is never a success; the counters themselves
+ * refuse a call outside a transaction and a binding of another identity; and a
+ * challenge for enrolling admits no confirmed factor and counts nothing.
  *
  * The closure given fails one challenge of the identity's factor through the
  * owner's own path, as a person submitting a wrong code would.
@@ -45,6 +46,41 @@ final class ChallengeCountersContract
      * Disallow instantiation; utility container only.
      */
     private function __construct() {}
+
+    /**
+     * Under a binding whose purpose is `enrollment`, a confirmed factor is
+     * refused and a pending one with no live enrolment too; and an outcome
+     * reported for one changes no failure count of the factor or the identity.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $confirmed
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $pending
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public static function assertAnEnrollmentChallengeIsItsOwn(
+        MultiFactorAuthenticatable $identity,
+        EloquentFactor&Model $confirmed,
+        EloquentFactor&Model $pending,
+        ProofBinding $binding,
+    ): void {
+        $enrolling      = new ProofBinding($binding->identityType, $binding->identityKey, $binding->application, $binding->sessionId, Purpose::ENROLLMENT);
+        $before         = self::failures($confirmed);
+        $identityBefore = self::identityFailures($binding);
+
+        DB::connection(StorageConnection::name())->transaction(static function () use ($identity, $confirmed, $pending, $enrolling): void {
+
+            Assert::assertFalse(self::admission($identity, $confirmed, $enrolling)->isAdmitted(), 'A confirmed factor must not be challenged for enrolling.');
+            Assert::assertFalse(self::admission($identity, $pending, $enrolling)->isAdmitted(), 'A pending factor with no live enrolment must not be challenged.');
+
+            self::counters()->report($identity, $confirmed, $enrolling, false);
+        });
+
+        Assert::assertSame($before, self::failures($confirmed), 'An enrolment challenge\'s outcome must change no factor\'s count.');
+        Assert::assertSame($identityBefore, self::identityFailures($binding), 'An enrolment challenge\'s outcome must change no identity\'s count.');
+    }
 
     /**
      * A failed challenge adds one to the factor's failures in a row.
@@ -331,6 +367,22 @@ final class ChallengeCountersContract
     private static function failures(EloquentFactor&Model $factor): int
     {
         $count = WriteConnection::query($factor->newQuery())->whereKey($factor->getKey())->value($factor->getConsecutiveFailuresName());
+
+        return is_numeric($count) ? (int) $count : 0;
+    }
+
+    /**
+     * The failures in a row, as stored, of the identity the binding names.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return int
+     */
+    private static function identityFailures(ProofBinding $binding): int
+    {
+        $count = WriteConnection::query(IdentityState::query())
+            ->where('authenticatable_type', $binding->identityType)
+            ->where('authenticatable_id', $binding->identityKey)
+            ->value('consecutive_failures');
 
         return is_numeric($count) ? (int) $count : 0;
     }

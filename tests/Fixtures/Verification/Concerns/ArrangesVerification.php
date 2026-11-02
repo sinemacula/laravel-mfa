@@ -167,6 +167,7 @@ trait ArrangesVerification
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @param  string  $session
      * @param  ?\SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
+     * @param  ?\Carbon\CarbonImmutable  $expiresAt
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
      */
     protected function pendingSession(
@@ -176,9 +177,11 @@ trait ArrangesVerification
         array $proofs = [],
         string $session = self::PENDING,
         ?Proof $firstFactor = null,
+        ?CarbonImmutable $expiresAt = null,
     ): PendingContext {
         $firstFactor ??= SignInProofs::of($user)->inSession($session)->password(60);
-        $pending = new PendingContext($user, self::APPLICATION, $session, $firstFactor, $requirement ?? Requirement::none(), $actions, $proofs);
+        $expiresAt   ??= CarbonImmutable::now()->addMinutes(10);
+        $pending = new PendingContext($user, self::APPLICATION, $session, $firstFactor, $requirement ?? Requirement::none(), $actions, $expiresAt, $proofs);
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver($pending));
 

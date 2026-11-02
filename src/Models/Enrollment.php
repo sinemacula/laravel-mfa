@@ -8,11 +8,14 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
+use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 
 /**
  * An enrolment in progress: the pending factor it confirms, the hash of the
- * grant that may confirm it, the application and session that grant is bound
- * to, when it expires and the confirmation attempts made against it.
+ * grant that may confirm it, the application, sign-in and verification
+ * generation that grant is bound to, what authorised it, the challenge its last
+ * code went out under, when it expires and the confirmation attempts made
+ * against it. It never holds the grant or the sign-in's id.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,7 +26,10 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property string $authenticatable_id
  * @property string $grant_hash
  * @property string $application
- * @property ?string $session_id
+ * @property string $session_id
+ * @property int $generation
+ * @property \SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization $authority
+ * @property ?string $challenge_id
  * @property \Carbon\CarbonInterface $expires_at
  * @property int $attempts
  *
@@ -41,6 +47,9 @@ final class Enrollment extends Model
         'grant_hash',
         'application',
         'session_id',
+        'generation',
+        'authority',
+        'challenge_id',
         'expires_at',
         'attempts',
     ];
@@ -93,6 +102,9 @@ final class Enrollment extends Model
             'grant_hash'           => 'string',
             'application'          => 'string',
             'session_id'           => 'string',
+            'generation'           => 'integer',
+            'authority'            => EnrollmentAuthorization::class,
+            'challenge_id'         => 'string',
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',
             'expires_at'           => 'datetime',

@@ -9,9 +9,13 @@ use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Factors\FactorChange;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
@@ -20,6 +24,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
 use SineMacula\Laravel\Mfa\Verification\FactorOffers;
 use SineMacula\Laravel\Mfa\Verification\Submission;
@@ -37,13 +42,15 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  * - `Requirements\RequirementService`: what the current sign-in must prove
  *   (`requirement()`) and whether it is fresh enough for an operation
  *   (`isFresh()`).
- * - `Factors\FactorService`: the identity's factors and the factor model.
+ * - `Factors\FactorService`: the identity's factors and the factor model,
+ *   `renameFactor()` and `setPreferredFactor()`.
  * - `Proofs\ProofService`: the proofs the current sign-in has recorded
  *   (`proofs()`).
  * - `Verification\VerificationService`: `verify()`.
  * - `Verification\ChallengeRequests`: `sendCode()` and `requestAssertion()`.
  * - `Verification\FactorOffers`: `offeredFactors()`.
- * - `Enrollment\EnrollmentService`: `enroll()`.
+ * - `Enrollment\EnrollmentService`: `startEnrollment()`, `confirmEnrollment()`,
+ *   `resendEnrollmentCode()` and `cancelEnrollment()`.
  * - `Lifecycle\LifecycleService`: `disable()`.
  * - `RecoveryCodes\RecoveryCodeIssuance`: `generateRecoveryCodes()`.
  * - `RecoveryCodes\RecoveryCodeService`: `recoveryCodes()`.
@@ -221,17 +228,99 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Enrol a freshly-built factor against the current identity.
+     * Start an enrolment for the person the request serves: a pending factor, a
+     * grant that may confirm it, and by type a secret and its provisioning URI,
+     * or a first code to the destination; or the reason it may not start.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
+     * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
+     * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
+     * @throws \Throwable
      */
-    public function enroll(Factor $factor): void
+    public function startEnrollment(#[\SensitiveParameter] EnrollmentRequest $request): EnrollmentStart
     {
-        $this->container->make(EnrollmentService::class)->enroll($factor);
+        return $this->container->make(EnrollmentService::class)->start($request);
+    }
+
+    /**
+     * Confirm the enrolment the grant holds with the first valid code, in the
+     * session that started it: the factor, with any recovery codes that come
+     * with it; or the reason it was not confirmed.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
+     * @param  string  $code
+     * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function confirmEnrollment(#[\SensitiveParameter] RevealedSecret|string $grant, #[\SensitiveParameter] string $code): EnrollmentConfirmation
+    {
+        return $this->container->make(EnrollmentService::class)->confirm($grant, $code);
+    }
+
+    /**
+     * Send the code of the enrolment the grant holds again, renewing nothing.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
+     * @return \SineMacula\Laravel\Mfa\Codes\SendResult
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function resendEnrollmentCode(#[\SensitiveParameter] RevealedSecret|string $grant): SendResult
+    {
+        return $this->container->make(EnrollmentService::class)->resend($grant);
+    }
+
+    /**
+     * Cancel the enrolment the grant holds; `false` for a grant that is not the
+     * caller's.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
+     * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     *
+     * @imperative
+     */
+    public function cancelEnrollment(#[\SensitiveParameter] RevealedSecret|string $grant): bool
+    {
+        return $this->container->make(EnrollmentService::class)->cancel($grant);
+    }
+
+    /**
+     * Give the signed-in person's factor, enrolled through the current
+     * application, a new label, with no step-up; a blank label is none.
+     *
+     * @param  mixed  $factorId
+     * @param  ?string  $label
+     * @return \SineMacula\Laravel\Mfa\Factors\FactorChange
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \Throwable
+     */
+    public function renameFactor(mixed $factorId, ?string $label): FactorChange
+    {
+        return $this->container->make(FactorService::class)->rename($factorId, $label);
+    }
+
+    /**
+     * Make the signed-in person's confirmed factor their preferred one, which
+     * is offered first, with no step-up.
+     *
+     * @param  mixed  $factorId
+     * @return \SineMacula\Laravel\Mfa\Factors\FactorChange
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function setPreferredFactor(mixed $factorId): FactorChange
+    {
+        return $this->container->make(FactorService::class)->setPreferred($factorId);
     }
 
     /**
