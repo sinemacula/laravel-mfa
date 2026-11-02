@@ -36,17 +36,21 @@ public function handle(): void
 ```
 
 An application on plain Laravel guards clears them before each job, ahead of any identity the job sets, so a job that
-sets none does not act as the last job's person. Leave `sync` jobs out: they run inside the request that dispatched
-them, and clearing its guards would sign that request out.
+sets none does not act as the last job's person. It clears the session too: the default proof store keeps its records
+in the session, and a worker's session lives in memory for as long as the worker does, so without this a job would read
+the proofs an earlier job made for the same person. Leave `sync` jobs out: they run inside the request that dispatched
+them, and clearing its guards and its session would sign that request out.
 
 ```php
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Session;
 
 Queue::before(static function (JobProcessing $event): void {
     if ($event->connectionName !== 'sync') {
         Auth::forgetGuards();
+        Session::flush();
     }
 });
 ```
@@ -68,9 +72,10 @@ as must any read a seam of yours makes that decides who may do what.
 ## When the database fails
 
 A failing query is a server error, never a wrong code, a missing factor or "not set up": a failover neither locks people
-out nor lets them skip a factor. Each helper throws the `QueryException`, which Laravel answers with a 500. A
-transaction runs once and is not retried, as running it again would run the driver again and could deliver a second
-code, so a deadlock is a 500 too, for the client to retry.
+out nor lets them skip a factor. Each helper throws the `QueryException`, or Laravel's `DeadlockException` for a
+concurrency failure inside a nested transaction, and Laravel answers either with a 500. A transaction runs once and is
+not retried, as running it again would run the driver again and could deliver a second code, so a deadlock is a 500 too,
+for the client to retry.
 
 The one database error answered as a refusal is a passkey's credential already being associated. A registration that
 meets a unique violation looks the credential up with a locking read: finding it answers `credential_associated`, and

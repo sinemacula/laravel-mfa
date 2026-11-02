@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Database;
 
 use Illuminate\Container\Container;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 
@@ -47,9 +46,7 @@ final class StorageTransaction
         } catch (\Throwable $failure) {
             AfterStorageCommit::forgetFailedCommit(Container::getInstance());
 
-            if ($failure instanceof QueryException) {
-                QueryExceptionMask::mask($failure);
-            }
+            QueryExceptionMask::maskChain($failure);
 
             throw $failure;
         }

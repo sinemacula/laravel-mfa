@@ -9,8 +9,9 @@ use Illuminate\Cache\Repository;
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Cache;
-use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\MfaManager;
 use Tests\Fixtures\Hardening\Concerns\FlowCatalogue;
 use Tests\TestCase;
 
@@ -24,7 +25,7 @@ use Tests\TestCase;
  *
  * @internal
  */
-#[CoversNothing]
+#[CoversClass(MfaManager::class)]
 final class CacheIndependenceTest extends TestCase
 {
     use FlowCatalogue;

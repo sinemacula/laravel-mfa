@@ -334,8 +334,9 @@ final readonly class PasskeyChangeGate
 
         if ($association === null) {
 
-            // Another identity's association is never locked here: that would
-            // hold a row of its under this identity's lock.
+            // The locking query names the owner, so another identity's
+            // association is not returned or acted on: only this unlocked read
+            // tells it apart from a credential nobody holds.
             OperationRefusedException::unless(
                 !$this->associations->exists($credentialId),
                 FailureReason::NOT_FOUND,

@@ -15,12 +15,14 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
  * A queued job that sets its own identity when it names one, and only then,
- * optionally renames a factor or sends it a code, and notes what the package
- * answered, whether anything was written, or fails when told to.
+ * with the sign-in event or without it, optionally renames a factor, sends it a
+ * code or verifies it, and notes what the package answered, whether anything
+ * was written, or fails when told to.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -39,6 +41,9 @@ final class ActsForAPersonJob implements ShouldQueue
      * @param  ?string  $renames
      * @param  ?string  $sendsTo
      * @param  bool  $fails
+     * @param  ?string  $verifies
+     * @param  ?string  $code
+     * @param  bool  $signsIn
      */
     public function __construct(
 
@@ -56,6 +61,15 @@ final class ActsForAPersonJob implements ShouldQueue
 
         /** Whether the job fails once it has set its identity. */
         public bool $fails = false,
+
+        /** The factor the job verifies, if any. */
+        public ?string $verifies = null,
+
+        /** The code it verifies that factor with. */
+        public ?string $code = null,
+
+        /** Whether setting its identity fires `Login`, which begins a sign-in. */
+        public bool $signsIn = true,
     ) {}
 
     /**
@@ -71,26 +85,13 @@ final class ActsForAPersonJob implements ShouldQueue
     {
         $before = $this->stored();
 
-        if ($this->person !== null) {
-
-            $user = TestUser::query()->findOrFail($this->person);
-
-            Auth::guard('web')->setUser($user);
-
-            $events->dispatch(new Login('web', $user, false));
-        }
+        $this->identify($events);
 
         if ($this->fails) {
             throw new \RuntimeException('The job failed.');
         }
 
-        if ($this->renames !== null) {
-            Mfa::renameFactor($this->renames, 'Renamed by ' . $this->name);
-        }
-
-        if ($this->sendsTo !== null) {
-            Mfa::sendCode($this->sendsTo);
-        }
+        $this->act();
 
         $observations->seen[] = [
             'job'      => $this->name,
@@ -99,6 +100,51 @@ final class ActsForAPersonJob implements ShouldQueue
             'proofs'   => count(Mfa::proofs()),
             'changed'  => $before !== $this->stored(),
         ];
+    }
+
+    /**
+     * Set the job's identity when it names one.
+     *
+     * @param  \Illuminate\Contracts\Events\Dispatcher  $events
+     * @return void
+     */
+    private function identify(Dispatcher $events): void
+    {
+        if ($this->person === null) {
+            return;
+        }
+
+        $user = TestUser::query()->findOrFail($this->person);
+
+        Auth::guard('web')->setUser($user);
+
+        if (!$this->signsIn) {
+            return;
+        }
+
+        $events->dispatch(new Login('web', $user, false));
+    }
+
+    /**
+     * Do what the job was told to.
+     *
+     * @return void
+     */
+    private function act(): void
+    {
+        if ($this->renames !== null) {
+            Mfa::renameFactor($this->renames, 'Renamed by ' . $this->name);
+        }
+
+        if ($this->sendsTo !== null) {
+            Mfa::sendCode($this->sendsTo);
+        }
+
+        if ($this->verifies === null) {
+            return;
+        }
+
+        Mfa::verify(Submission::factor($this->verifies, (string) $this->code));
     }
 
     /**

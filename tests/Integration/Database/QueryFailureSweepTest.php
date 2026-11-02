@@ -6,6 +6,7 @@ namespace Tests\Integration\Database;
 
 use Illuminate\Config\Repository;
 use Illuminate\Database\Connection;
+use Illuminate\Database\DeadlockException;
 use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
@@ -30,7 +31,9 @@ use Tests\TestCase;
  * failing, the second, and so on. A database failure is never answered as a
  * wrong code, a missing factor or a refusal: it is thrown, or a server error
  * through the kernel. A transaction it happened in leaves no row changed and no
- * event reported, and nothing the flow was given stays in the failure.
+ * event reported, and nothing the flow was given stays in the failure. Each
+ * statement fails again as a deadlock, which Laravel raises as a wrapper with
+ * the message copied when the transaction it happened in is a nested one.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -83,45 +86,21 @@ final class QueryFailureSweepTest extends TestCase
     #[DataProvider('flowNames')]
     public function testEveryStatementOfTheFlowFailsAsAServerError(string $flow): void
     {
-        $seed   = $this->flows()[$flow];
-        $failer = new FailsTheNthQuery($this->storage());
-        $act    = $seed();
+        $this->sweep($flow, false);
+    }
 
-        $failer->arm();
-
-        self::assertTrue($act(), 'The healthy flow must reach its branch.');
-
-        $statements = $failer->seen;
-
-        self::assertGreaterThan(0, $statements);
-
-        for ($statement = 1; $statement <= $statements; $statement++) {
-
-            $failer->arm();
-            $this->resetFlows();
-
-            $act = $seed();
-
-            $failer->arm($statement);
-
-            $failure = $this->failureOf($act, $failer, $statement);
-
-            self::assertTrue($failer->fired, sprintf('Statement %d of %d must have failed.', $statement, $statements));
-            self::assertSame(0, $this->storage()->transactionLevel(), 'No transaction may be left open.');
-
-            $this->assertItHoldsNothingItWasGiven($failure, $failer);
-
-            if (!$failer->firedInTransaction) {
-                continue;
-            }
-
-            $failed = $failer->failed;
-
-            $failer->arm();
-
-            self::assertSame($this->atBegin, $this->tables(), sprintf('Statement %d [%s] left a row changed.', $statement, $failed));
-            self::assertCount($this->reportsAtBegin, $this->reported, 'A transaction that rolled back must report nothing.');
-        }
+    /**
+     * Whichever statement of the flow deadlocks, the failure reaches the caller
+     * with nothing it was given, and as Laravel's wrapper in a nested
+     * transaction.
+     *
+     * @param  string  $flow
+     * @return void
+     */
+    #[DataProvider('flowNames')]
+    public function testEveryStatementOfTheFlowDeadlocksAsAServerError(string $flow): void
+    {
+        $this->sweep($flow, true);
     }
 
     /**
@@ -149,6 +128,61 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
+     * Seed the flow, run it healthy to count its statements, then fail each in
+     * turn, seeding it again first.
+     *
+     * @param  string  $flow
+     * @param  bool  $deadlock
+     * @return void
+     */
+    private function sweep(string $flow, bool $deadlock): void
+    {
+        $seed   = $this->flows()[$flow];
+        $failer = new FailsTheNthQuery($this->storage());
+        $act    = $seed();
+
+        $failer->arm();
+
+        self::assertTrue($act(), 'The healthy flow must reach its branch.');
+
+        $statements = $failer->seen;
+
+        self::assertGreaterThan(0, $statements);
+
+        for ($statement = 1; $statement <= $statements; $statement++) {
+
+            $failer->arm();
+            $this->resetFlows();
+
+            $act = $seed();
+
+            $failer->arm($statement, $deadlock);
+
+            $failure = $this->failureOf($act, $failer, $statement);
+
+            self::assertTrue($failer->fired, sprintf('Statement %d of %d must have failed.', $statement, $statements));
+            self::assertSame(0, $this->storage()->transactionLevel(), 'No transaction may be left open.');
+
+            if ($deadlock && $failer->firedNested) {
+                self::assertNotInstanceOf(QueryException::class, $failure, 'A deadlock in a nested transaction must leave as Laravel\'s wrapper.');
+            }
+
+            $this->assertItHoldsNothingItWasGiven($failure, $failer);
+
+            if (!$failer->firedInTransaction) {
+                continue;
+            }
+
+            $failed = $failer->failed;
+
+            $failer->arm();
+
+            self::assertSame($this->atBegin, $this->tables(), sprintf('Statement %d [%s] left a row changed.', $statement, $failed));
+            self::assertCount($this->reportsAtBegin, $this->reported, 'A transaction that rolled back must report nothing.');
+        }
+    }
+
+    /**
      * The failure the flow ended in, failing the test if it answered instead.
      *
      * @param  \Closure(): bool  $act
@@ -160,7 +194,7 @@ final class QueryFailureSweepTest extends TestCase
     {
         try {
             $answer = $act();
-        } catch (CodeDeliveryFailedException|QueryException|ServerErrorAnswered $failure) {
+        } catch (CodeDeliveryFailedException|DeadlockException|QueryException|ServerErrorAnswered $failure) {
             return $failure;
         }
 

@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Secrets;
 
+use Illuminate\Database\DeadlockException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -348,6 +349,165 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
+     * A deadlock exception above a failed query loses the message it copied and
+     * keeps what Laravel recognises it by, and the query under it is masked.
+     *
+     * @return void
+     */
+    public function testADeadlockAboveAFailedQueryLosesWhatItCopied(): void
+    {
+        $query    = $this->failure();
+        $deadlock = new DeadlockException($query->getMessage(), 0, $query);
+
+        QueryExceptionMask::maskChain($deadlock);
+
+        self::assertSame('deadlock detected: SQLSTATE[23000]: driver error 1062 (Connection: testing, SQL: ' . self::SQL . ')', $deadlock->getMessage());
+        self::assertSame([], $query->getBindings());
+        self::assertStringNotContainsString(self::SECRET, $query->getMessage());
+    }
+
+    /**
+     * Each deadlock exception a chain holds above a failed query is rewritten,
+     * as a transaction nested twice wraps the wrapper.
+     *
+     * @return void
+     */
+    public function testEveryDeadlockAboveAFailedQueryIsRewritten(): void
+    {
+        $query = $this->failure();
+        $inner = new DeadlockException($query->getMessage(), 0, $query);
+        $outer = new DeadlockException($inner->getMessage(), 0, $inner);
+
+        QueryExceptionMask::maskChain($outer);
+
+        self::assertStringNotContainsString(self::SECRET, $inner->getMessage());
+        self::assertStringNotContainsString(self::SECRET, $outer->getMessage());
+    }
+
+    /**
+     * A deadlock exception with no failed query under it has nothing to lose.
+     *
+     * @return void
+     */
+    public function testADeadlockWithoutAFailedQueryIsLeftAlone(): void
+    {
+        $deadlock = new DeadlockException('Lock wait timeout exceeded', 0, new \PDOException('Lock wait timeout exceeded'));
+
+        QueryExceptionMask::maskChain($deadlock);
+
+        self::assertSame('Lock wait timeout exceeded', $deadlock->getMessage());
+    }
+
+    /**
+     * The arguments a deadlock exception's trace recorded lose what the query
+     * under it was given, every binding in the chain among them.
+     *
+     * @return void
+     */
+    public function testADeadlocksTraceLosesWhatTheQueryWasGiven(): void
+    {
+        $deadlock = $this->deadlockThrough('prefix ' . self::SECRET . ' suffix');
+
+        self::assertStringContainsString(self::SECRET, serialize($this->arguments($deadlock)));
+
+        QueryExceptionMask::maskChain($deadlock);
+
+        self::assertStringNotContainsString(self::SECRET, serialize($this->arguments($deadlock)));
+    }
+
+    /**
+     * What a deadlock exception wraps may hold more than one failed query, and
+     * what each was given is known in its trace.
+     *
+     * @return void
+     */
+    public function testEveryBindingBelowADeadlockIsKnownInItsTrace(): void
+    {
+        $deadlock = $this->deadlockAboveBoth('prefix alpha-value suffix', 'prefix beta-value suffix');
+
+        QueryExceptionMask::maskChain($deadlock);
+
+        $arguments = serialize($this->arguments($deadlock));
+
+        self::assertStringNotContainsString('alpha-value', $arguments);
+        self::assertStringNotContainsString('beta-value', $arguments);
+    }
+
+    /**
+     * Something other than a query exception between two does not hide what the
+     * deeper one was given from the trace.
+     *
+     * @return void
+     */
+    public function testABindingBehindSomethingElseIsKnownInTheTrace(): void
+    {
+        $outer = $this->throughSomethingElse('prefix beta-value suffix');
+
+        QueryExceptionMask::mask($outer);
+
+        self::assertStringNotContainsString('beta-value', serialize($this->arguments($outer)));
+    }
+
+    /**
+     * The scrubber rewrites a deadlock exception above a failure on one of the
+     * package's tables.
+     *
+     * @return void
+     */
+    public function testTheScrubberMasksADeadlockAboveAPackageFailure(): void
+    {
+        $query    = $this->failure();
+        $deadlock = new DeadlockException($query->getMessage(), 0, $query);
+
+        ExceptionScrubber::scrub($deadlock);
+
+        self::assertStringStartsWith('deadlock detected: SQLSTATE[23000]', $deadlock->getMessage());
+        self::assertSame([], $query->getBindings());
+    }
+
+    /**
+     * The scrubber leaves a deadlock exception above an application's own
+     * failure as it does the failure.
+     *
+     * @return void
+     */
+    public function testTheScrubberLeavesADeadlockAboveAnApplicationsOwnFailure(): void
+    {
+        $query    = new QueryException('testing', 'insert into "orders" ("reference") values (?)', ['order-reference-1'], $this->driverFailure());
+        $deadlock = new DeadlockException($query->getMessage(), 0, $query);
+
+        ExceptionScrubber::scrub($deadlock);
+
+        self::assertStringContainsString('order-reference-1', $deadlock->getMessage());
+        self::assertSame(['order-reference-1'], $query->getBindings());
+    }
+
+    /**
+     * A deadlock exception leaving a package transaction is masked, whatever
+     * `mfa.secrets.redact` says.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testADeadlockLeavingATransactionIsMasked(): void
+    {
+        config()->set('mfa.secrets.redact', false);
+
+        $query    = $this->failure();
+        $deadlock = new DeadlockException($query->getMessage(), 0, $query);
+
+        try {
+            StorageTransaction::run(static fn (): never => throw $deadlock);
+        } catch (DeadlockException $caught) {
+            self::assertSame($deadlock, $caught);
+        }
+
+        self::assertStringNotContainsString(self::SECRET, $deadlock->getMessage());
+        self::assertSame([], $query->getBindings());
+    }
+
+    /**
      * A failure leaving a pin on the write connection is masked, and the pin is
      * released.
      *
@@ -464,6 +624,50 @@ final class QueryExceptionMaskTest extends TestCase
         $inner = new QueryException('testing', self::SQL, ['beta-value'], $this->driverFailure());
 
         return new QueryException('testing', self::SQL, ['alpha-value'], $inner);
+    }
+
+    /**
+     * A failure wrapping something else that wraps another failure, bound to a
+     * value this frame holds, which the outer failure was not given.
+     *
+     * @param  string  $value
+     * @return \Illuminate\Database\QueryException
+     */
+    private function throughSomethingElse(string $value): QueryException
+    {
+        $inner = new QueryException('testing', self::SQL, ['beta-value'], $this->driverFailure());
+
+        return new QueryException('testing', self::SQL, [], new \RuntimeException('Passed on', 0, $inner));
+    }
+
+    /**
+     * A deadlock above a failure bound to the secret, whose trace records the
+     * value in a frame outside the package that received it.
+     *
+     * @param  string  $value
+     * @return \Illuminate\Database\DeadlockException
+     */
+    private function deadlockThrough(string $value): DeadlockException
+    {
+        $query = $this->failure();
+
+        return new DeadlockException($query->getMessage(), 0, $query);
+    }
+
+    /**
+     * A deadlock above a failure wrapping another, each bound to its own value,
+     * with both values in this frame.
+     *
+     * @param  string  $first
+     * @param  string  $second
+     * @return \Illuminate\Database\DeadlockException
+     */
+    private function deadlockAboveBoth(string $first, string $second): DeadlockException
+    {
+        $inner = new QueryException('testing', self::SQL, ['beta-value'], $this->driverFailure());
+        $outer = new QueryException('testing', self::SQL, ['alpha-value'], $inner);
+
+        return new DeadlockException($outer->getMessage(), 0, $outer);
     }
 
     /**

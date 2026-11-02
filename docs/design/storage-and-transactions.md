@@ -39,7 +39,8 @@ cannot interleave.
   cookie) ends with it. Laravel 13 discards that work itself; Laravel 12 keeps it and runs it on the connection's next
   commit, which would record the proof of a verification that never committed. It runs once: a deadlock is a server
   error for the caller to retry, as running it again would run a driver again and could deliver a second code. A failed
-  query leaves it masked (see [Secrets in responses and logs](secrets-in-responses-and-logs.md)).
+  query leaves it masked, and a concurrency failure in a nested transaction leaves it as Laravel's `DeadlockException`,
+  masked too (see [Secrets in responses and logs](secrets-in-responses-and-logs.md)).
 - The identity's row is one per owner (a unique index on `authenticatable_type` and `authenticatable_id`), created by
   the first change that needs it. The lock is an insert that updates the existing row's `updated_at` on a conflict,
   which takes the row's exclusive lock in one statement on MySQL and PostgreSQL, also when two first changes race to
@@ -66,11 +67,18 @@ cannot interleave.
 - Calls to another package that must be atomic with the change (revoking sessions, reporting a challenge's outcome, a
   passkey change gate) run inside the callback. An adapter whose own storage is on another connection cannot be atomic
   with it and must say so.
-- Locking lookups are scoped to their owner: a grant by its hash and a credential by its hash, each with the owner's
-  columns in the same query. A credential someone else holds is found by the unlocked `exists()` and answered
-  `not_found`.
+- A locking lookup by a grant's hash or a credential's hash names the owner's columns in the same query, so another
+  identity's row is never returned or acted on. A credential someone else holds is found by the unlocked `exists()` and
+  answered `not_found`. The one locking read that names no owner is a passkey association's lookup after a unique
+  violation, when the credential is the question.
 - Package rows change before a session seam runs (`SessionRevoker`, `SessionTransition`, `PendingCompletion`, `StepUp`),
   so a package row is never locked after a session row.
+- Recovery codes run on it: a new set replaces the old one inside the transaction, a redemption uses its code inside
+  the attempt's transaction, and the set is removed inside the transaction that removes the last confirmed factor (see
+  [Recovery Codes](recovery-codes.md)).
+- Every verification runs on it too: `Attempts\AttemptService::attempt()` reads the lockouts, runs the driver and counts
+  the outcome in the identity's transaction, so a driver's own transaction nests in it (see
+  [Attempts and Lockout](attempts-and-lockout.md)).
 
 ## Lock Order
 
@@ -109,13 +117,6 @@ package's order, so it is stated in the [seam contracts](seam-contracts.md) and 
 What proves this is the order of the statements (`tests/Integration/Database/LockOrderTest.php`), not their contention,
 which stays with the tests CI runs on MySQL and PostgreSQL (`tests/Integration/Database/*Race*`,
 `ParallelAttemptsTest`). SQLite cannot show the absence of a gap or next-key deadlock.
-
-- Recovery codes run on it: a new set replaces the old one inside the transaction, a redemption uses its code inside
-  the attempt's transaction, and the set is removed inside the transaction that removes the last confirmed factor (see
-  [Recovery Codes](recovery-codes.md)).
-- Every verification runs on it too: `Attempts\AttemptService::attempt()` reads the lockouts, runs the driver and counts
-  the outcome in the identity's transaction, so a driver's own transaction nests in it (see
-  [Attempts and Lockout](attempts-and-lockout.md)).
 
 ## Success Path
 

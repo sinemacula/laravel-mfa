@@ -31,6 +31,10 @@ what is not.
   Laravel guards clears them with `Queue::before()` (see [Operations](../guides/operations.md#queue-workers)). A
   listener of the package's own calling `Auth::forgetGuards()` was rejected: it would reach into guards the package does
   not own.
+- The default proof store keeps its records in the Laravel session, and Laravel's worker does not reset the session
+  between jobs: `session.store` is a singleton, and `$resetScope` leaves it alone. So the records live in the worker's
+  session until they are cleared, and a job for the same person would read an earlier job's proofs. The session is the
+  application's as the guards are, so the same `Queue::before()` flushes it, for jobs that are not `sync`.
 - No cache is used anywhere, so nothing depends on a cache's contents or its being up.
 
 ## Success Path

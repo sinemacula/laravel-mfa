@@ -240,12 +240,12 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * Someone else's credential is never locked by the person removing it, and
-     * is refused all the same.
+     * The lookup that locks a credential names who is removing it, so someone
+     * else's is never returned or acted on, and is refused all the same.
      *
      * @return void
      */
-    public function testAForeignCredentialIsNotLocked(): void
+    public function testTheCredentialsLockingLookupNamesItsOwner(): void
     {
         $act = $this->flows()['passkey removing foreign']();
 

@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Passkeys;
 use Illuminate\Database\UniqueConstraintViolationException;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
@@ -23,9 +24,12 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  * mismatch between them leaves the factor unusable, as if it did not exist. A
  * credential is associated at most once, whoever holds it: the unique index on
  * its digest refuses a second association, a concurrent one included. Records
- * are read from the write connection. The reads made under the identity's
- * factor state lock lock the row they find and are scoped to that identity;
- * `exists()` and `associates()` take no lock, for the checks made before it.
+ * are read from the write connection. `ownedCredential()` names its owner in
+ * the locking query, so another identity's association is never returned or
+ * acted on, and `forFactor()` locks the association of a factor its caller
+ * holds. The one locking read that names no owner is the lookup `save()` makes
+ * after a unique violation. `exists()` and `associates()` take no lock, for the
+ * checks made before the identity's factor state lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -189,8 +193,9 @@ final readonly class PasskeyAssociations
      * with this identity or another.
      *
      * The insert runs in a nested transaction, as a statement's failure aborts
-     * the whole of a PostgreSQL transaction unless a savepoint contains it. The
-     * credential is looked up again with a locking read, as a plain read in a
+     * the whole of a PostgreSQL transaction unless a savepoint contains it, and
+     * a violation leaves it masked with its class unchanged. The credential is
+     * looked up again with a locking read, as a plain read in a
      * MySQL transaction reads its snapshot, which can miss the row that was
      * committed after it. Finding it establishes the conflict, not which index
      * fired; finding nothing means the failure is something else, which is a
@@ -205,7 +210,7 @@ final readonly class PasskeyAssociations
     private static function save(PasskeyAssociation $association): ?bool
     {
         try {
-            return $association->getConnection()->transaction(static fn (): bool => $association->save());
+            return StorageTransaction::run(static fn (): bool => $association->save());
         } catch (UniqueConstraintViolationException $violation) {
 
             if (self::find($association->credential_id, true) === null) {

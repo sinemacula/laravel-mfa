@@ -5,6 +5,8 @@ declare(strict_types = 1);
 namespace Tests\Unit\Passkeys;
 
 use Illuminate\Database\Connection;
+use Illuminate\Database\DeadlockException;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -225,6 +227,60 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
+     * A deadlock on the insert leaves a nested transaction as Laravel's
+     * wrapper, which copied the query's message, with no credential id anywhere
+     * in what can be read off it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testADeadlockOnTheInsertLeavesNoCredentialId(): void
+    {
+        $this->deadlockTheNextInsert(1);
+
+        try {
+            DB::transaction(fn (): PasskeyAssociation => (new PasskeyAssociations)->associate($this->owner(), 'factor-1', self::CREDENTIAL));
+
+            self::fail('The deadlock must reach the caller.');
+        } catch (DeadlockException $failure) {
+            self::assertStringStartsWith('deadlock detected: SQLSTATE[40001]: driver error 1213', $failure->getMessage());
+            self::assertInstanceOf(QueryException::class, $failure->getPrevious());
+            $this->assertHoldsNoCredential($failure);
+        }
+
+        self::assertSame(0, DB::connection()->transactionLevel());
+        self::assertSame(0, PasskeyAssociation::query()->count());
+    }
+
+    /**
+     * Once masked, the deadlock is still one to the transactions around it, so
+     * each level hands it on rather than rolling back to a savepoint a MySQL
+     * deadlock has discarded, and the application's own retry runs.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAMaskedDeadlockIsStillADeadlockToTheTransactionsAroundIt(): void
+    {
+        $this->deadlockTheNextInsert(1);
+
+        $attempts = 0;
+
+        DB::transaction(function () use (&$attempts): void {
+
+            $attempts++;
+
+            DB::transaction(fn (): PasskeyAssociation => (new PasskeyAssociations)->associate($this->owner(), 'factor-1', self::CREDENTIAL));
+        }, 2);
+
+        self::assertSame(2, $attempts);
+        self::assertSame(0, DB::connection()->transactionLevel());
+        self::assertSame(1, PasskeyAssociation::query()->count());
+    }
+
+    /**
      * A model event cancelling the save is told apart from a conflict.
      *
      * @return void
@@ -236,6 +292,63 @@ final class PasskeyAssociationsTest extends TestCase
         $this->expectException(WriteCancelledException::class);
 
         (new PasskeyAssociations)->associate($this->owner(), 'factor-1', self::CREDENTIAL);
+    }
+
+    /**
+     * Fail the given number of inserts from now, as a driver reporting a
+     * deadlock does, quoting what each bound.
+     *
+     * @param  int  $failures
+     * @return void
+     */
+    private function deadlockTheNextInsert(int $failures): void
+    {
+        $connection = DB::connection();
+
+        self::assertInstanceOf(Connection::class, $connection);
+
+        $connection->beforeExecuting(static function (string $query, array $bindings, Connection $connection) use (&$failures): void {
+
+            if ($failures === 0 || !str_starts_with($query, 'insert')) {
+                return;
+            }
+
+            $failures--;
+
+            $quoted = implode(', ', array_filter($bindings, is_string(...)));
+            $driver = new \PDOException('SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock (' . $quoted . ')');
+
+            $driver->errorInfo = ['40001', 1213, 'Deadlock found when trying to get lock (' . $quoted . ')'];
+
+            (new \ReflectionProperty(\Exception::class, 'code'))->setValue($driver, '40001');
+
+            throw new QueryException((string) $connection->getName(), $query, $bindings, $driver);
+        });
+    }
+
+    /**
+     * Assert no message, binding or driver text in the failure's chain holds
+     * the credential id.
+     *
+     * @param  \Throwable  $failure
+     * @return void
+     */
+    private function assertHoldsNoCredential(\Throwable $failure): void
+    {
+        for ($current = $failure; $current !== null; $current = $current->getPrevious()) {
+
+            self::assertStringNotContainsString(self::CREDENTIAL, $current->getMessage());
+
+            if ($current instanceof QueryException) {
+                self::assertSame([], $current->getBindings());
+            }
+
+            if (!$current instanceof \PDOException) {
+                continue;
+            }
+
+            self::assertStringNotContainsString(self::CREDENTIAL, serialize($current->errorInfo));
+        }
     }
 
     /**

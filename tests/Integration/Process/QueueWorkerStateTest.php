@@ -8,12 +8,14 @@ use Carbon\CarbonImmutable;
 use Illuminate\Config\Repository;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Worker;
 use Illuminate\Queue\WorkerOptions;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Session;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
@@ -28,13 +30,13 @@ use Tests\Integration\Process\Fixtures\JobObservations;
 use Tests\TestCase;
 
 /**
- * One worker's loop over queued jobs for different people, with the guards
- * forgotten before each through `Queue::before()`, as the operations guide
- * documents: the package owns no guard, and Laravel's worker does not forget
- * guards between jobs. Each job sees only what its own identity holds, a job
- * that sets none sees and writes nothing, a job failing changes nothing for the
- * next, and a fake sender installed at boot survives the scope reset the worker
- * runs between jobs.
+ * One worker's loop over queued jobs for different people, with the guards and
+ * the session cleared before each through `Queue::before()`, as the operations
+ * guide documents: the package owns neither, and Laravel's worker clears
+ * neither between jobs. Each job sees only what its own identity holds, a job
+ * that sets none sees and writes nothing, a proof does not outlive the job that
+ * made it, a job failing changes nothing for the next, and a fake sender
+ * installed at boot survives the scope reset the worker runs between jobs.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -49,9 +51,12 @@ final class QueueWorkerStateTest extends TestCase
     /** @var string The address the email factor delivers to. */
     private const string ADDRESS = 'alice@example.test';
 
+    /** @var bool Whether the session is cleared before each job, as the guide documents. */
+    private bool $clearsTheSession = true;
+
     /**
      * Create the queue's table, bind what the jobs write to and clear the
-     * guards before each job.
+     * guards and the session before each job, as the guide documents.
      *
      * @return void
      */
@@ -72,8 +77,19 @@ final class QueueWorkerStateTest extends TestCase
 
         $this->container()->instance(JobObservations::class, new JobObservations);
 
-        Queue::before(static function (): void {
+        Queue::before(function (JobProcessing $event): void {
+
+            if ($event->connectionName === 'sync') {
+                return;
+            }
+
             Auth::forgetGuards();
+
+            if (!$this->clearsTheSession) {
+                return;
+            }
+
+            Session::flush();
         });
     }
 
@@ -119,6 +135,7 @@ final class QueueWorkerStateTest extends TestCase
 
         self::assertSame($hersKey, $first['identity']);
         self::assertSame([$hers->id], $first['factors']);
+        self::assertSame(0, $first['proofs']);
         self::assertTrue($first['changed']);
         self::assertSame('Renamed by alice', Factor::query()->whereKey($hers->id)->value('label'));
 
@@ -131,11 +148,40 @@ final class QueueWorkerStateTest extends TestCase
 
         self::assertSame($hisKey, $second['identity']);
         self::assertSame([$his->id], $second['factors']);
+        self::assertSame(0, $second['proofs']);
 
         self::assertSame($hersKey, $firstAgain['identity']);
         self::assertSame([$hers->id], $firstAgain['factors']);
+        self::assertSame(0, $firstAgain['proofs']);
 
         self::assertNull(Factor::query()->whereKey($his->id)->value('label'));
+    }
+
+    /**
+     * A proof one job makes is gone for the next, for the same person or
+     * another, with no sign-in event to forget it: the session is cleared
+     * before each job.
+     *
+     * @return void
+     */
+    public function testAProofDoesNotOutliveTheJobThatMadeIt(): void
+    {
+        self::assertSame([1, 0, 0], $this->proofsAcrossJobs());
+    }
+
+    /**
+     * Without the session cleared, the default proof store's records live on in
+     * the worker's session, which is why the guide clears it: the next job for
+     * the same person reads what the last one proved, and another person's job
+     * still reads nothing.
+     *
+     * @return void
+     */
+    public function testAProofLivesInAWorkersSessionUntilItIsCleared(): void
+    {
+        $this->clearsTheSession = false;
+
+        self::assertSame([1, 1, 0], $this->proofsAcrossJobs());
     }
 
     /**
@@ -196,6 +242,31 @@ final class QueueWorkerStateTest extends TestCase
             'types'        => ['totp', 'email'],
             'first_factor' => ['method' => 'password', 'channel' => 'password'],
         ]);
+    }
+
+    /**
+     * How many proofs each job saw: one that signs in and verifies, then one
+     * for the same person and one for another, each setting its identity alone.
+     *
+     * @return list<int>
+     */
+    private function proofsAcrossJobs(): array
+    {
+        $alice = $this->person(self::ADDRESS);
+        $bob   = $this->person('bob@example.test');
+        $hers  = $this->factorOf($alice, AuthenticatorApp::FACTOR);
+
+        $this->factorOf($bob, AuthenticatorApp::FACTOR);
+
+        dispatch(new ActsForAPersonJob('verifies', $alice->id, verifies: $hers->id, code: AuthenticatorApp::code($hers)));
+        dispatch(new ActsForAPersonJob('same person', $alice->id, signsIn: false));
+        dispatch(new ActsForAPersonJob('another person', $bob->id, signsIn: false));
+
+        $this->work();
+
+        self::assertSame(['verifies', 'same person', 'another person'], array_column($this->seen(), 'job'));
+
+        return array_column($this->seen(), 'proofs');
     }
 
     /**

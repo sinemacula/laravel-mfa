@@ -110,10 +110,15 @@ it.
   code: the message becomes the SQLSTATE, the driver error number, the connection's name and the SQL with placeholders,
   each previous message the SQLSTATE and number alone, the bindings are emptied and `errorInfo`'s driver text cleared.
   No substring is redacted, so an escaped or truncated value, or a stored value in a driver's diagnostics, goes too.
+- In a nested transaction Laravel raises a concurrency failure as a `DeadlockException` wrapping the `QueryException`,
+  with the message copied. `maskChain()` and `maskPackageQueries()` walk the chain, masking each `QueryException` and
+  rewriting the message of any `DeadlockException` above it to the words Laravel recognises and the query's summary. The
+  words stay so that the transactions around it treat it as a deadlock: one that took it for something else would roll
+  back to a savepoint a MySQL deadlock has already discarded, and leave the connection's transaction level wrong.
 - It runs unconditionally at `Database\StorageTransaction::run()`, `Concerns\ActsAsFactor::persist()` and
   `Database\WriteConnection::during()`, and in `ExceptionScrubber` on the report path for a chain whose SQL names a
-  package table, while redaction is on. A passkey's unique violation is handled inside the transaction, before the mask,
-  and its re-read uses the credential, not the exception.
+  package table, while redaction is on. A passkey's unique violation leaves its own nested transaction masked with its
+  class unchanged, and its re-read uses the credential, not the exception.
 - A literal an application writes into its own raw SQL stays in `getSql()`; the promise covers the queries the package
   builds, which bind every value (the attempts `Expression` quotes only timestamps). The audited plain reads bind only
   hashes and owner keys: an exemption based on the inventory, not a general guarantee, which the sweep's plaintext

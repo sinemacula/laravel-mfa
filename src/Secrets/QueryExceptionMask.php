@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Secrets;
 
+use Illuminate\Database\DeadlockException;
 use Illuminate\Database\QueryException;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
@@ -26,6 +27,13 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * - the arguments its trace recorded are scrubbed as `ExceptionScrubber` scrubs
  *   them, with the bindings among the values it knows.
  *
+ * Inside a nested transaction Laravel raises a concurrency failure as a
+ * `DeadlockException` wrapping the query's, with the query's message copied
+ * into it. That copy goes too, and the words Laravel looks for stay in its
+ * place, so the transactions around it still treat it as what it is: one that
+ * took it for something else would roll back to a savepoint a MySQL deadlock
+ * has already discarded.
+ *
  * A literal an application writes into its own raw SQL stays in the SQL, as
  * nothing can tell it from the query. The queries the package builds bind every
  * value.
@@ -37,6 +45,9 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  */
 final class QueryExceptionMask
 {
+    /** @var string What Laravel recognises a concurrency failure by, as nothing else of a wrapper's message can stay. */
+    private const string DEADLOCK = 'deadlock detected';
+
     /**
      * Disallow instantiation; utility container only.
      */
@@ -60,6 +71,10 @@ final class QueryExceptionMask
 
             self::rewriteMessage($current, $current === $exception ? self::summary($exception, $reason) : $reason);
 
+            if ($current instanceof QueryException) {
+                (new \ReflectionProperty(QueryException::class, 'bindings'))->setValue($current, []); // NOSONAR
+            }
+
             if (!$current instanceof \PDOException) {
                 continue;
             }
@@ -69,22 +84,74 @@ final class QueryExceptionMask
     }
 
     /**
+     * Mask every query exception in the chain, and every deadlock exception
+     * above one: what leaves a transaction the package opened, whatever it is.
+     *
+     * @param  \Throwable  $throwable
+     * @return void
+     */
+    public static function maskChain(\Throwable $throwable): void
+    {
+        self::maskQueries($throwable, static fn (): bool => true);
+    }
+
+    /**
      * Mask every query exception in the chain whose SQL names one of the
-     * package's tables, and leave the rest as they are: the report path sees an
-     * application's own failures too.
+     * package's tables, and every deadlock exception above one, and leave the
+     * rest as they are: the report path sees an application's own failures too.
      *
      * @param  \Throwable  $throwable
      * @return void
      */
     public static function maskPackageQueries(\Throwable $throwable): void
     {
+        self::maskQueries($throwable, static fn (QueryException $query): bool => self::namesAPackageTable($query->getSql()));
+    }
+
+    /**
+     * Mask the query exceptions the check picks, and the deadlock exceptions
+     * above each of them.
+     *
+     * @param  \Throwable  $throwable
+     * @param  \Closure(\Illuminate\Database\QueryException): bool  $picks
+     * @return void
+     */
+    private static function maskQueries(\Throwable $throwable, \Closure $picks): void
+    {
+        $deadlocks = [];
+
         foreach (self::chain($throwable) as $current) {
 
-            if (!$current instanceof QueryException || !self::namesAPackageTable($current->getSql())) {
+            if ($current instanceof DeadlockException) {
+                $deadlocks[] = $current;
+            }
+
+            if (!$current instanceof QueryException || !$picks($current)) {
                 continue;
             }
 
+            self::maskDeadlocks($deadlocks, $current);
             self::mask($current);
+        }
+    }
+
+    /**
+     * Rewrite the message of each deadlock exception above the query exception,
+     * before that is masked, and scrub its trace with the bindings, as it
+     * records the same callers and so the same values.
+     *
+     * @param  list<\Illuminate\Database\DeadlockException>  $deadlocks
+     * @param  \Illuminate\Database\QueryException  $query
+     * @return void
+     */
+    private static function maskDeadlocks(array $deadlocks, QueryException $query): void
+    {
+        $sensitive = SensitiveValues::known(...self::bindingsIn(self::chain($query)));
+        $message   = sprintf('%s: %s', self::DEADLOCK, self::summary($query, self::reason($query)));
+
+        foreach ($deadlocks as $deadlock) {
+            ExceptionScrubber::scrubTraces($deadlock, $sensitive);
+            self::rewriteMessage($deadlock, $message);
         }
     }
 
@@ -126,7 +193,7 @@ final class QueryExceptionMask
     }
 
     /**
-     * The string bindings of every query exception in the chain, emptying them.
+     * The string bindings of every query exception in the chain.
      *
      * @param  list<\Throwable>  $chain
      * @return array<string>
@@ -142,8 +209,6 @@ final class QueryExceptionMask
             }
 
             $bindings = [...$bindings, ...array_filter($current->getBindings(), is_string(...))];
-
-            (new \ReflectionProperty(QueryException::class, 'bindings'))->setValue($current, []); // NOSONAR
         }
 
         return $bindings;

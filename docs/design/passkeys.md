@@ -51,8 +51,8 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   association, forgets the factor's proofs on the current session at once, deletes the recovery codes with the last
   confirmed factor, revokes the identity's other sessions through the bound `SessionRevoker`, evaluates the current
   session's requirement again on the proofs it kept and hands a shortfall to the bound `SessionTransition`, and reports
-  `FactorRemoved`, then the recovery codes' removal. The association is found within the identity's own rows, so another
-  identity's is never locked: the unlocked `exists()` finds it, and it is answered `not_found`.
+  `FactorRemoved`, then the recovery codes' removal. The locking query names the owner, so another identity's association
+  is never returned or acted on: the unlocked `exists()` finds it, and it is answered `not_found`.
 - The default `LastFactorPolicy` (`Lifecycle\RequiredFactorPolicy`) counts a remaining passkey only while its
   association matches it, so an unusable passkey never lets the last usable factor go.
 - A change to what an associated credential proves (its id, key, owner or relying party) is refused outright: it is a
