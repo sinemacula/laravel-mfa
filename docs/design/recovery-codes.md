@@ -15,8 +15,8 @@ moment when both work or neither exists, and what a redemption leaves behind.
 - A set is `count` codes, each `length` characters drawn with `random_int()` from `alphabet`, which samples uniformly
   without modulo bias, upper-cased as drawn and distinct within the set (a repeated code is drawn again). The settings
   give every code at least 40 bits measured after normalisation (see
-  [Application configuration](application-configuration.md)); the defaults, 12 characters from a 32-character
-  alphabet, give 60.
+  [Application configuration](application-configuration.md)); the defaults, 13 characters from a 32-character
+  alphabet, give 65, which meets the 64 bits NIST SP 800-63B-4 asks of a saved recovery code.
 - A code is stored only as a hash made with the application's Laravel hasher (`Illuminate\Contracts\Hashing\Hasher`,
   bcrypt by default), salted, as NIST SP 800-63B-4 requires of a look-up secret below 112 bits. The hasher is the one
   the application checks passwords with, so its driver and cost apply; there is no package-specific hash.

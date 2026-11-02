@@ -41,7 +41,7 @@ Route::post('/mfa/recovery-codes', function () {
 })->middleware(['auth', 'mfa.no-store']);
 ```
 
-Each code is 12 characters by default, with no separator; group it for display (`XXXX-XXXX-XXXX`) as you like, since
+Each code is 13 characters by default, with no separator; group it for display (`XXXX-XXXX-XXXXX`) as you like, since
 spaces and hyphens are ignored when a code is redeemed. The package keeps only a salted hash of each code, so a set it
 has returned can never be shown again: a person who lost theirs generates a new one.
 
@@ -144,7 +144,7 @@ It is `null` without a signed-in identity that can hold factors.
 ## Hashing cost
 
 Codes are hashed with your application's Laravel hasher (`config/hashing.php`), bcrypt by default, the same way as
-passwords, because codes of 60 bits need a salted, slow hash to resist an offline attack on a stolen table. A
+passwords, because codes of 65 bits need a salted, slow hash to resist an offline attack on a stolen table. A
 redemption costs one hash check per unused code, so at bcrypt's default cost a full set of 10 takes about as long as
 ten password checks; lower `recovery_codes.count`, or the hashing cost, if that is too slow for you. Generating a set
 hashes each code once, before the identity's lock is taken.

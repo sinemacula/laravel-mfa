@@ -173,7 +173,7 @@ return [
         'model'     => env('MFA_RECOVERY_CODES_MODEL', RecoveryCode::class),
         'table'     => env('MFA_RECOVERY_CODES_TABLE', 'mfa_recovery_codes'),
         'count'     => env('MFA_RECOVERY_CODES_COUNT', 10),
-        'length'    => env('MFA_RECOVERY_CODES_LENGTH', 12),
+        'length'    => env('MFA_RECOVERY_CODES_LENGTH', 13),
         'alphabet'  => env('MFA_RECOVERY_CODES_ALPHABET', '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'),
         'low_count' => env('MFA_RECOVERY_CODES_LOW_COUNT', 3),
     ],

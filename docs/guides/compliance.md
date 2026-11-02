@@ -199,12 +199,12 @@ bits requires. Choose a generator and a hashing driver your assessment accepts (
 [Hashing cost](recovery-codes.md#hashing-cost)).
 
 Used for account recovery, a saved recovery code has at least 64 bits, is hashed, is invalidated after use with a new
-one issued, and recovery notifies the person (4.2). The default code of 12 characters from an alphabet of 32 is 60 bits,
-so for this:
+one issued, and recovery notifies the person (4.2). The default code of 13 characters from an alphabet of 32 is 65 bits,
+which meets the first of these, but only part of it is the package's to do:
 
-- Hold the code to 64 bits: `recovery_codes.length` of 13 or more with the default alphabet of 32 gives 65 bits. With a
-  custom alphabet, `length × log2(alphabet size)` must reach 64, as the configuration check enforces only 40 bits (13
-  decimal digits pass it at about 43). That is necessary but not sufficient.
+- Keep the code at 64 bits. If you change `recovery_codes.length` or `recovery_codes.alphabet`,
+  `length × log2(alphabet size)` must still reach 64, as the configuration check enforces only 40 bits (13 decimal
+  digits pass it at about 43).
 - Issue the replacement. The package marks a used code used and issues none in its place. `Mfa::generateRecoveryCodes()`
   replaces the whole set, and only on a session fresh enough for it, so prompt for it from `RecoveryCodeUsed` and
   `RecoveryCodesLow`.
