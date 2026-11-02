@@ -5,6 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Contracts;
 
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
  * Factor driver contract.
@@ -12,9 +14,9 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
  * Each factor type is a driver behind this one contract, registered with the
  * manager under the type's name: it states the channel kind its factors travel
  * on and the `amr` values (RFC 8176) a proof by it adds, starts an enrolment,
- * confirms a pending factor, issues a challenge, and verifies a code. A type
- * whose codes are delivered to a destination implements `CodeDeliveryDriver` as
- * well: the package then sends and checks its codes itself, and the driver only
+ * confirms a pending factor, and verifies a code. A type whose codes are
+ * delivered to a destination implements `CodeDeliveryDriver` as well: the bound
+ * `ChallengeGateway` then sends and checks its codes, and the driver only
  * delivers them. An application adds a type, or replaces a shipped one, by
  * registering its own driver.
  *
@@ -69,21 +71,17 @@ interface FactorDriver
     public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool;
 
     /**
-     * Issue a challenge for the factor: nothing for a type whose codes are made
-     * where they are held (TOTP). A type whose codes are delivered has them
-     * sent through `CodeDeliveryDriver::deliver()` instead.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
-     */
-    public function issueChallenge(Factor $factor): void;
-
-    /**
-     * Verify the code against the factor, comparing in constant time.
+     * Verify the code against the factor as stored under the identity's factor
+     * state lock, comparing in constant time, for the binding the verification
+     * is made under: `ACCEPTED` for a code that proves the factor, `INVALID`
+     * for one that does not, and `REPLAYED` only for a code that matches but
+     * was already used. A write it makes stays in the transaction a later
+     * refusal rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @return bool
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      */
-    public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool;
+    public function verify(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck;
 }

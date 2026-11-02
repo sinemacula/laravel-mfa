@@ -2,14 +2,21 @@
 
 <div align="center">
 
-[![Latest Stable Version](https://img.shields.io/packagist/v/sinemacula/laravel-mfa.svg)](https://packagist.org/packages/sinemacula/laravel-mfa)
-[![PHP Version](https://img.shields.io/packagist/dependency-v/sinemacula/laravel-mfa/php.svg)](https://packagist.org/packages/sinemacula/laravel-mfa)
-[![Laravel Version](https://img.shields.io/packagist/dependency-v/sinemacula/laravel-mfa/laravel/framework.svg?label=laravel)](https://packagist.org/packages/sinemacula/laravel-mfa)
-[![Build Status](https://github.com/sinemacula/laravel-mfa/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/sinemacula/laravel-mfa/actions/workflows/tests.yml)
-[![Quality Gates](https://github.com/sinemacula/laravel-mfa/actions/workflows/quality-gates.yml/badge.svg?branch=master)](https://github.com/sinemacula/laravel-mfa/actions/workflows/quality-gates.yml)
+[![Latest Stable
+Version](https://img.shields.io/packagist/v/sinemacula/laravel-mfa.svg)](https://packagist.org/packages/sinemacula/laravel-mfa)
+[![PHP
+Version](https://img.shields.io/packagist/dependency-v/sinemacula/laravel-mfa/php.svg)](https://packagist.org/packages/sinemacula/laravel-mfa)
+[![Laravel
+Version](https://img.shields.io/packagist/dependency-v/sinemacula/laravel-mfa/laravel/framework.svg?label=laravel)](https://packagist.org/packages/sinemacula/laravel-mfa)
+[![Build
+Status](https://github.com/sinemacula/laravel-mfa/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/sinemacula/laravel-mfa/actions/workflows/tests.yml)
+[![Quality
+Gates](https://github.com/sinemacula/laravel-mfa/actions/workflows/quality-gates.yml/badge.svg?branch=master)](https://github.com/sinemacula/laravel-mfa/actions/workflows/quality-gates.yml)
 [![Maintainability](https://qlty.sh/gh/sinemacula/projects/laravel-mfa/maintainability.svg)](https://qlty.sh/gh/sinemacula/projects/laravel-mfa)
-[![Code Coverage](https://qlty.sh/gh/sinemacula/projects/laravel-mfa/coverage.svg)](https://qlty.sh/gh/sinemacula/projects/laravel-mfa)
-[![Total Downloads](https://img.shields.io/packagist/dt/sinemacula/laravel-mfa.svg)](https://packagist.org/packages/sinemacula/laravel-mfa)
+[![Code
+Coverage](https://qlty.sh/gh/sinemacula/projects/laravel-mfa/coverage.svg)](https://qlty.sh/gh/sinemacula/projects/laravel-mfa)
+[![Total
+Downloads](https://img.shields.io/packagist/dt/sinemacula/laravel-mfa.svg)](https://packagist.org/packages/sinemacula/laravel-mfa)
 [![License](https://img.shields.io/github/license/sinemacula/laravel-mfa.svg)](LICENSE)
 
 </div>
@@ -33,10 +40,12 @@ whatever UI you like.
   sensitive actions.
 - **Structured exceptions**: `MfaRequiredException` and `MfaExpiredException` carry a masked `FactorSummary`
   list suitable for rendering a factor-picker UI.
-- **Lifecycle events**: `MfaChallengeIssued`, `MfaVerified`, `MfaVerificationFailed`, `MfaFactorEnrolled`,
-  `MfaFactorDisabled` dispatched by the manager, not by consumer code, and a catalogue of events for the enrolment,
-  verification, recovery code and lifecycle flows, each carrying a scalar context and no secret, dispatched once its
-  change commits (see [Events](docs/guides/events.md)).
+- **One way to verify**: `Mfa::verify()` takes a factor's code, a challenge's code, a recovery code or a passkey's
+  assertion, bound once to the owner, application, sign-in and purpose, and answers with a structured result and a
+  machine-readable failure reason. See [Verification](docs/guides/verification.md).
+- **Events**: a catalogue of events for the verification, recovery code and lifecycle flows, each carrying a scalar
+  context and no secret, dispatched once its change commits (see [Events](docs/guides/events.md)), with
+  `MfaFactorEnrolled` and `MfaFactorDisabled` until the enrolment and lifecycle flows join it.
 - **Polymorphic identity support**: works with any Eloquent identity type (`User`, `Admin`, ...) via the
   shipped `authenticatable_type` / `authenticatable_id` morph.
 - **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; recovery codes are stored only as salted
@@ -137,8 +146,7 @@ store (`Mfa::proofs()`), so keep the two predicates orthogonal.
 
 ## Usage
 
-The `Mfa` facade is the primary surface. The manager orchestrates drivers, enforces factor ownership, handles
-lockouts and attempt counting, and dispatches lifecycle events:
+The `Mfa` facade is the primary surface. Each method hands its call to the service of its capability:
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -148,19 +156,26 @@ Mfa::isFresh('mfa.remove_factor');      // bool: fresh enough for the operation
 Mfa::isSetup();                         // bool
 Mfa::proofs();                          // list<Proof> of the current sign-in
 Mfa::getFactors();                      // Collection|null
+Mfa::offeredFactors();                  // list<FactorSummary>, the preferred first
 
-Mfa::challenge($driver, $factor);       // MfaChallengeIssued; a SendResult for email and SMS
-Mfa::verify($driver, $factor, $code);   // MfaVerified | MfaVerificationFailed
+Mfa::sendCode($factorId);               // SendResult: the challenge's id, or why none was sent
+Mfa::requestAssertion($factorId);       // the options of a passkey's assertion request
+
+Mfa::verify(Submission::factor($factorId, $code));                  // TOTP, or a driver of your own
+Mfa::verify(Submission::challenge($factorId, $challengeId, $code)); // an email or SMS code
+Mfa::verify(Submission::recoveryCode($code));                       // one attempt against the whole unused set
+Mfa::verify(Submission::assertion($factorId, $response));           // a passkey
+
 Mfa::enroll($factor);                   // MfaFactorEnrolled
 Mfa::disable($factor);                  // MfaFactorDisabled; the recovery codes go with the last factor
-Mfa::generateRecoveryCodes();           // list<RevealedSecret>, returned once
-Mfa::redeemRecoveryCode($code);         // bool; one attempt against the whole unused set
+Mfa::generateRecoveryCodes();           // list<RevealedSecret>, returned once, on a fresh session at the level
 Mfa::recoveryCodes();                   // RecoveryCodeStatus|null: remaining, generation, generatedAt
 ```
 
-Ownership is stamped by the package, never trusted from the caller — `verify()`, `challenge()`, and `disable()`
-throw `FactorOwnershipMismatchException` when handed a factor owned by a different identity, closing the
-"look up factor by ID from request input" cross-account-bypass shape.
+`Mfa::verify()` answers with a `VerificationResult`: the proof and the evaluation of the whole requirement with it, or a
+machine-readable failure reason. Factors are looked up by id within the identity the request serves, so an id that does
+not exist and one that belongs to someone else get the same answer, closing the "look up factor by ID from request
+input" cross-account-bypass shape. See [Verification](docs/guides/verification.md).
 
 ### Middleware enforcement
 
@@ -253,8 +268,9 @@ use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
 return SecretResponse::json(['recovery_codes' => Mfa::generateRecoveryCodes()]);
 ```
 
-`Mfa::redeemRecoveryCode($code)` ignores case, spaces and hyphens, checks the code against every unused code of the
-set as one attempt, uses it up and records a recovery code proof on the current sign-in. See
+Generating a set needs a session fresh enough for `mfa.generate_recovery_codes` that reaches the level the application
+sets for issuing them. `Mfa::verify(Submission::recoveryCode($code))` ignores case, spaces and hyphens, checks the code
+against every unused code of the set as one attempt, uses it up and makes a recovery code proof. See
 [Recovery codes](docs/guides/recovery-codes.md).
 
 ### SMS and email senders

@@ -21,11 +21,12 @@ against, and an attempt that names no factor of its own (a recovery code, or a f
 outright. Guesses spread across several factors and recovery codes are bounded by the ceiling just as guesses at one
 factor are.
 
-A locked attempt is refused without reaching the driver, and `Mfa::verify()` reports it as a failure with the `locked`
-reason. A factor that is no longer among the identity's own when the attempt is made (removed in the meantime) is
-reported as `not_found`, also without reaching the driver, and is counted nowhere. The IP address is the one the
-request resolves through your trusted proxies (`$request->ip()`), counted by the client it stands for: an IPv4 address
-as itself, an IPv6 address by its /64 network.
+A locked attempt is refused without reaching the driver, and `Mfa::verify()` answers it as a failure with the `locked`
+reason, carrying the time it lifts, or no time for a factor or an identity at the failure ceiling, which does not lift
+by itself. A factor that is no longer among the identity's own when the attempt is made (removed in the meantime) is
+reported as `not_found`, also without reaching the driver, and is counted nowhere. The IP address is the one the request
+resolves through your trusted proxies (`$request->ip()`), counted by the client it stands for: an IPv4 address as
+itself, an IPv6 address by its /64 network.
 
 ## The counters
 
@@ -58,8 +59,8 @@ Three things never reset a count or lift a lockout:
 ## Who is charged
 
 An attempt is charged to the identity whose own pending or active session made it, and only one of that identity's
-factors can be attempted: `Mfa::verify()` verifies the current identity's own factor and refuses another identity's
-before anything is counted, and a factor that is not among the identity's factors as stored is not found. Nobody can
+factors can be attempted: `Mfa::verify()` looks the factor up within the identity the request serves, so another
+identity's is not found, before anything is counted. Nobody can
 lock an identity out with requests of their own. The IP address is charged whoever is signed in.
 
 ## Parallel guesses
@@ -68,10 +69,10 @@ The identity's lockout and the factor's lockout are read, the driver is called a
 transaction holding the identity's factor state lock (see [Storage](configuration.md#storage)), so parallel guesses
 against one identity are made one after the other and cannot overrun a cap. The driver is handed the factor as stored
 under that lock, so it checks the secret stored now rather than what the request read earlier. A code sent by email or
-SMS is checked by the code service instead, against the code sent to the request's session, inside the same transaction,
-so its use commits with the count and two requests with the same code cannot both pass. The IP address's slot is taken
-before, in one statement, and given back unless the attempt fails, so parallel guesses from one address across many
-identities cannot overrun its cap either.
+SMS is checked by the bound challenge gateway instead, against the code sent for the request's sign-in, inside the same
+transaction, so its use commits with the count and two requests with the same code cannot both pass. The IP address's
+slot is taken before the lock, in one statement, and given back unless the attempt fails and is counted, so parallel
+guesses from one address across many identities cannot overrun its cap either.
 
 Call `Mfa::verify()` outside a transaction of your own on the storage connection. On MySQL, whose default isolation
 level is `REPEATABLE READ`, a transaction that has already read answers later plain reads from that first snapshot,

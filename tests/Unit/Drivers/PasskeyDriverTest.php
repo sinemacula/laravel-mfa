@@ -8,6 +8,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Drivers\PasskeyDriver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Factors\InMemoryFactor;
 
 /**
@@ -33,12 +36,10 @@ final class PasskeyDriverTest extends TestCase
         $driver = new PasskeyDriver;
         $factor = new InMemoryFactor(type: 'passkey');
 
-        $driver->issueChallenge($factor);
-
         self::assertSame(ChannelKind::PASSKEY, $driver->channelKind());
         self::assertSame([], $driver->amr());
         self::assertNull($driver->startEnrollment($factor));
         self::assertFalse($driver->confirm($factor, '123456'));
-        self::assertFalse($driver->verify($factor, '123456'));
+        self::assertSame(CodeCheck::INVALID, $driver->verify($factor, '123456', new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::STEP_UP)));
     }
 }

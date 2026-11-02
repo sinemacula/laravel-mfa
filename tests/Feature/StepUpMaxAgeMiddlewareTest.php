@@ -10,6 +10,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Exceptions\MfaExpiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Feature\Concerns\InteractsWithRequireMfaMiddleware;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -43,7 +44,7 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     {
         [, $factor, $code] = $this->enrollTotp();
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
 
         $this->travel(4)->minutes();
 
@@ -64,7 +65,7 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     {
         [, $factor, $code] = $this->enrollTotp();
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
 
         $this->travel(6)->minutes();
 
@@ -85,7 +86,7 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
     {
         [, $factor, $code] = $this->enrollTotp();
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
 
         $this->expectException(MfaExpiredException::class);
 
@@ -109,7 +110,7 @@ final class StepUpMaxAgeMiddlewareTest extends TestCase
 
         [, $factor, $code] = $this->enrollTotp();
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
 
         $this->travel(30)->minutes();
 

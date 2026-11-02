@@ -7,7 +7,10 @@ namespace Tests\Unit\Codes;
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
+use SineMacula\Laravel\Mfa\Attempts\Lockout;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
@@ -67,5 +70,33 @@ final class SendResultTest extends TestCase
         self::assertSame(1, SendResult::refused(FailureReason::SENDING_CAPPED, 0)->retryAfter);
         self::assertSame(1, SendResult::refused(FailureReason::SENDING_CAPPED, -3)->retryAfter);
         self::assertNull(SendResult::refused(FailureReason::NOT_FOUND)->retryAfter);
+    }
+
+    /**
+     * A refusal by a challenge's admission carries its reason, and how long a
+     * lockout has left when it ends at a set time.
+     *
+     * @return void
+     */
+    public function testARefusalByAnAdmission(): void
+    {
+        CarbonImmutable::setTestNow('2026-11-01 12:00:00');
+
+        $locked = SendResult::refusedBy(ChallengeAdmission::locked(Lockout::endingAt(AttemptScope::FACTOR, CarbonImmutable::now()->addSeconds(90))));
+
+        self::assertSame(FailureReason::LOCKED, $locked->reason);
+        self::assertSame(90, $locked->retryAfter);
+
+        $refused = SendResult::refusedBy(ChallengeAdmission::refuse(FailureReason::NOT_ACCEPTED, 'Not accepted.'));
+
+        self::assertSame(FailureReason::NOT_ACCEPTED, $refused->reason);
+        self::assertNull($refused->retryAfter);
+
+        $ceiling = SendResult::refusedBy(ChallengeAdmission::locked(Lockout::disabled()));
+
+        self::assertSame(FailureReason::LOCKED, $ceiling->reason);
+        self::assertNull($ceiling->retryAfter);
+
+        CarbonImmutable::setTestNow();
     }
 }

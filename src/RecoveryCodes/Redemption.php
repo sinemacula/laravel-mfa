@@ -6,12 +6,11 @@ namespace SineMacula\Laravel\Mfa\RecoveryCodes;
 
 use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
-use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * How a recovery code redemption ended: passed, with how many codes remain and
- * the proof it recorded; failed, counted against the identity and the address
- * as an attempt; or refused before any attempt was made, counted nowhere.
+ * How a recovery code redemption ended: passed, with how many codes remain;
+ * failed, counted against the identity as an attempt; or refused before any
+ * attempt was made, counted nowhere.
  *
  * A failure carries the reason a caller may be told and a detail for events and
  * logs only, never the submitted code. A lockout carries the time it lifts, or
@@ -36,7 +35,6 @@ final readonly class Redemption
      * @param  ?string  $detail
      * @param  ?\Carbon\CarbonImmutable  $lockedUntil
      * @param  ?int  $remaining
-     * @param  ?\SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      */
     private function __construct(
 
@@ -57,22 +55,17 @@ final readonly class Redemption
 
         /** How many codes were unused when the set was read, or null when it was not. */
         public ?int $remaining = null,
-
-        /** The proof the redemption recorded, when it passed. */
-        public ?Proof $proof = null,
     ) {}
 
     /**
-     * A redemption that used a code, leaving the given number unused, with the
-     * proof it recorded.
+     * A redemption that used a code, leaving the given number unused.
      *
      * @param  int  $remaining
-     * @param  ?\SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return self
      */
-    public static function passed(int $remaining, ?Proof $proof = null): self
+    public static function passed(int $remaining): self
     {
-        return new self(passed: true, counted: true, remaining: $remaining, proof: $proof);
+        return new self(passed: true, counted: true, remaining: $remaining);
     }
 
     /**

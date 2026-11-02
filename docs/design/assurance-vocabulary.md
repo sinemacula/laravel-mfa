@@ -54,8 +54,9 @@ referencing another's.
   several sources are composed with `Requirement::strictest()`.
 - An evaluation of a session's proofs says what the combination is and which parts of the requirement it meets, and a
   verification result carries the proof with its evaluation, or a `FailureReason` with its internal detail.
-- `Mfa::verify()` answers a boolean today; its failures are reported by `MfaVerificationFailed`, which carries the
-  `FailureReason` and the detail.
+- `Mfa::verify()` answers with that result. Its `amr` is the proof's own, leaving out `mfa`, which only the evaluation can
+  report, and it also holds the type proved and what the completion seam returned, opaque to this package. It keeps all of
+  that out of a dump and JSON, and refuses to be serialised.
 
 ## Failure / Edge Cases
 

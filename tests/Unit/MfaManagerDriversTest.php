@@ -8,11 +8,13 @@ use Illuminate\Config\Repository;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Codes\CustomMfaCodeMessage;
 use Tests\Fixtures\Identities\TestUser;
 
@@ -181,7 +183,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     public function testVerifyThrowsWhenExtendedDriverIsNotAFactorDriver(): void
     {
         // The base Manager's extend() accepts any callable returning mixed;
-        // resolveDriver guards the FactorDriver contract at the boundary so a
+        // the resolver guards the FactorDriver contract at the boundary so a
         // misconfigured extension surfaces a LogicException rather than a fatal
         // type error deep inside verify().
         $manager = $this->manager();
@@ -193,20 +195,21 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         ]);
         $this->actingAs($user);
 
-        // Stamp ownership AND driver onto the factor so the bad-driver guard
-        // fires ahead of the ownership / driver-mismatch guards — the test's
-        // subject is the LogicException raised when the extension factory
-        // returns something that is not a FactorDriver, not a cross-account
-        // rejection or a driver/factor identity mismatch.
-        $factor                       = new Factor;
-        $factor->type                 = 'not-a-driver';
-        $factor->authenticatable_type = $user::class;
-        $factor->authenticatable_id   = (string) $user->id;
+        config()->set('mfa.applications.web', ['types' => ['not-a-driver'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        $factor = Factor::query()->create([
+            'type'                 => 'not-a-driver',
+            'status'               => 'confirmed',
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+        ]);
+
+        $this->container()->make(ProofStore::class)->begin($user, 'web', 'sign-in-1');
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Driver [not-a-driver] must implement');
 
-        $manager->verify('not-a-driver', $factor, '000000');
+        $manager->verify(Submission::factor($factor->id, '000000'));
     }
 
     /**

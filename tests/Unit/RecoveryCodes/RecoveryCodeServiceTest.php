@@ -84,8 +84,8 @@ final class RecoveryCodeServiceTest extends TestCase
         self::assertSame('2026-11-01 08:00:00', $status->generatedAt?->format('Y-m-d H:i:s'));
         self::assertTrue($status->exists());
 
-        $this->recoveryCodes()->redeem($holder, $codes[0], Purpose::SIGN_IN);
-        $this->recoveryCodes()->redeem($holder, $codes[1], Purpose::SIGN_IN);
+        $this->recoveryCodes()->redeem($holder, $codes[0], self::redemptionBinding($holder, Purpose::SIGN_IN));
+        $this->recoveryCodes()->redeem($holder, $codes[1], self::redemptionBinding($holder, Purpose::SIGN_IN));
 
         self::assertSame(8, $this->recoveryCodes()->status($holder)->remaining);
 
@@ -140,7 +140,7 @@ final class RecoveryCodeServiceTest extends TestCase
         $holder = $this->signInHolder();
 
         foreach (self::plaintexts($this->recoveryCodes()->generate($holder)) as $code) {
-            $this->recoveryCodes()->redeem($holder, $code, Purpose::SIGN_IN);
+            $this->recoveryCodes()->redeem($holder, $code, self::redemptionBinding($holder, Purpose::SIGN_IN));
         }
 
         $status = $this->recoveryCodes()->status($holder);
@@ -306,7 +306,7 @@ final class RecoveryCodeServiceTest extends TestCase
         $holder = $this->signInHolder();
         $first  = self::plaintexts($this->recoveryCodes()->generate($holder));
 
-        $this->recoveryCodes()->redeem($holder, $first[0], Purpose::SIGN_IN);
+        $this->recoveryCodes()->redeem($holder, $first[0], self::redemptionBinding($holder, Purpose::SIGN_IN));
 
         $this->travelTo(CarbonImmutable::parse('2026-10-10 00:00:00'));
 
@@ -314,7 +314,7 @@ final class RecoveryCodeServiceTest extends TestCase
 
         $this->travelTo(CarbonImmutable::parse('2026-10-20 00:00:00'));
 
-        $this->recoveryCodes()->redeem($holder, $second[0], Purpose::SIGN_IN);
+        $this->recoveryCodes()->redeem($holder, $second[0], self::redemptionBinding($holder, Purpose::SIGN_IN));
 
         self::assertSame(3, $this->recoveryCodes()->prune(CarbonImmutable::parse('2026-10-15 00:00:00')));
 

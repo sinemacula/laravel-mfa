@@ -9,12 +9,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
-use SineMacula\Laravel\Mfa\Attempts\Attempt;
-use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
-use SineMacula\Laravel\Mfa\Attempts\RequestIp;
-use SineMacula\Laravel\Mfa\Context\Caller;
-use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
@@ -23,21 +18,16 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
-use SineMacula\Laravel\Mfa\Enums\PendingAction;
-use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
-use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * Requests and verifies passkey assertions for the caller's passkey factors,
- * through the bound `PasskeyGateway`, one factor and one credential per
- * ceremony.
+ * The ceremony checks of a passkey factor, through the bound `PasskeyGateway`,
+ * one factor and one credential per ceremony, for `Verification` to run.
  *
  * A ceremony is allowed exactly the credential associated with the factor, and
- * only when the factor is a confirmed passkey of the caller's, of a type the
+ * only when the factor is a confirmed passkey of the identity's, of a type the
  * application enables, its association names the same owner and credential, the
  * gateway still lists the credential among the identity's registered passkeys,
  * and the combination policy accepts it after the session's first factor, so
@@ -45,15 +35,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  * ever started with an empty or wider allowlist: a credential that fails any of
  * these is refused with an `OperationRefusedException`.
  *
- * Verifying is an attempt through `Attempts\AttemptService`: refused while a
- * lockout applies, re-checked under the identity's factor state lock, and
- * counted against the factor and the identity, so a failed assertion counts as
- * a wrong code would. An assertion the gateway verifies for another credential
- * than the one allowed fails. A verified assertion is returned with what it
- * observed, for the verification flow to record as a proof.
- *
- * Serving a pending session needs its `mfa.verify` action: without it, and
- * without a signed-in person, there is nothing to request or verify.
+ * An assertion the gateway verifies for another credential than the one allowed
+ * fails as an invalid code. Nothing here counts an attempt or records a proof:
+ * the verification flow does both, holding the identity's factor state lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -69,131 +53,85 @@ final readonly class PasskeyAssertions
      * Constructor.
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
-     * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      * @param  \SineMacula\Laravel\Mfa\Context\SessionFirstFactor  $firstFactors
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations  $associations
-     * @param  \SineMacula\Laravel\Mfa\Factors\OperationGuard  $guard
-     * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptService  $attempts
      */
     public function __construct(
 
         /** The container the gateway and the policy are resolved from. */
         private Container $container,
 
-        /** The resolver of who the request serves. */
-        private CallerContextResolver $callers,
-
         /** The reader of the session's first factor. */
         private SessionFirstFactor $firstFactors,
 
         /** The association records. */
         private PasskeyAssociations $associations,
-
-        /** The guard every operation on a factor starts with. */
-        private OperationGuard $guard,
-
-        /** The counts a verification is made through. */
-        private AttemptService $attempts,
     ) {}
 
     /**
-     * The options of an assertion request for the caller's passkey factor, for
-     * the purpose given; none when the request serves nobody for verifying.
+     * The options of an assertion request for the identity's passkey factor,
+     * bound as the binding says.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return array<string, mixed>
      *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     * @throws \Throwable
      */
-    public function requestAssertion(Factor $factor, Purpose $purpose): array
+    public function options(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): array
     {
-        $caller = $this->callers->resolve(PendingAction::VERIFY);
-
-        if ($caller === null) {
-            return [];
-        }
-
-        $binding    = $this->binding($caller, $purpose);
-        $stored     = $this->guard->factor($caller->identity, $factor->getFactorIdentifier(), $binding->application);
-        $credential = $this->credential($caller->identity, $stored, $binding);
-
-        return $this->gateway()->requestAssertion($caller->identity, $binding, [$credential]);
+        return $this->gateway()->requestAssertion($identity, $binding, [$this->credential($identity, $factor, $binding)]);
     }
 
     /**
-     * Verify the client's response for the caller's passkey factor, for the
-     * purpose given, and return what the assertion observed; `null` when it
-     * does not verify, or when the request serves nobody for verifying.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @param  array<string, mixed>  $response
-     * @return ?\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
-     * @throws \Throwable
-     */
-    public function verifyAssertion(Factor $factor, Purpose $purpose, array $response): ?PasskeyAssertion
-    {
-        $caller = $this->callers->resolve(PendingAction::VERIFY);
-
-        if ($caller === null) {
-            return null;
-        }
-
-        self::assertStored($factor);
-
-        $identity  = $caller->identity;
-        $binding   = $this->binding($caller, $purpose);
-        $assertion = null;
-
-        $outcome = $this->attempts->attempt(
-            new Attempt($identity, $factor, $purpose, RequestIp::resolve($this->container), $binding->application),
-            function (?Factor $stored) use ($identity, $binding, $response, &$assertion): bool {
-
-                if (!LockedFactors::keepsState($stored)) {
-                    return false;
-                }
-
-                $assertion = $this->verified($identity, $stored, $binding, $response);
-
-                if ($assertion === null) {
-                    return false;
-                }
-
-                $stored->recordVerification();
-                $stored->persist();
-
-                return true;
-            },
-        );
-
-        return $outcome->passed ? $assertion : null;
-    }
-
-    /**
-     * Under the lock: check the factor again, ask the gateway to verify the
-     * response against its one credential, and return what it observed when it
-     * verified that credential.
+     * Check the factor again as stored under the lock, ask the gateway to
+     * verify the response against its one credential, and return what it
+     * observed when it verified that credential, or why it did not.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  array<string, mixed>  $response
-     * @return ?\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
+     * @return \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    private function verified(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding, array $response): ?PasskeyAssertion
-    {
+    public function check(
+        MultiFactorAuthenticatable $identity,
+        EloquentFactor&Model $factor,
+        ProofBinding $binding,
+        #[\SensitiveParameter] array $response,
+    ): FailureReason|PasskeyAssertion {
         $credential = $this->credential($identity, $factor, $binding);
         $assertion  = $this->gateway()->verifyAssertion($identity, $binding, [$credential], $response);
 
-        return $assertion !== null && $assertion->credentialId === $credential ? $assertion : null;
+        if ($assertion instanceof FailureReason) {
+            return $assertion;
+        }
+
+        return $assertion->credentialId === $credential ? $assertion : FailureReason::INVALID_CODE;
+    }
+
+    /**
+     * Whether the factor could take part in a ceremony at all: passkeys are
+     * available, its association matches, and the gateway still lists its
+     * credential.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function canTakePart(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor): bool
+    {
+        return $this->gateway()->isAvailable()
+            && $this->isAssociated($identity, $factor)
+            && in_array($factor->getCredentialReference(), $this->registered($identity), true);
     }
 
     /**
@@ -212,14 +150,13 @@ final readonly class PasskeyAssertions
      */
     private function credential(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): string
     {
-        $id         = LockedFactors::idOf($factor);
         $credential = $factor->getCredentialReference();
-        $associated = $factor->getType() === self::TYPE
-            && $id         !== null
-            && $credential !== null
-            && PasskeyAssociations::matches($factor, ProofOwner::of($identity), $this->associations->forFactor($id));
 
-        OperationRefusedException::unless($associated, FailureReason::NOT_FOUND, 'The factor is not a passkey associated with the identity.');
+        OperationRefusedException::unless(
+            $credential !== null && $this->isAssociated($identity, $factor),
+            FailureReason::NOT_FOUND,
+            'The factor is not a passkey associated with the identity.',
+        );
 
         $this->refuseUnusable($factor, $binding);
 
@@ -235,6 +172,25 @@ final readonly class PasskeyAssertions
         OperationRefusedException::unless($accepted, FailureReason::NOT_ACCEPTED, 'The combination policy does not accept the passkey after the session\'s first factor.');
 
         return $credential;
+    }
+
+    /**
+     * Whether the factor is a passkey whose association names the identity and
+     * the factor's credential.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @return bool
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private function isAssociated(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor): bool
+    {
+        $id = LockedFactors::idOf($factor);
+
+        return $factor->getType() === self::TYPE
+            && $id !== null
+            && PasskeyAssociations::matches($factor, ProofOwner::of($identity), $this->associations->forFactor($id));
     }
 
     /**
@@ -273,26 +229,6 @@ final readonly class PasskeyAssertions
     }
 
     /**
-     * What the caller's ceremony is bound to, refusing a caller with no session
-     * a proof could be recorded on.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     */
-    private function binding(Caller $caller, Purpose $purpose): ProofBinding
-    {
-        $binding = $this->callers->binding($caller, $purpose);
-
-        OperationRefusedException::unless($binding !== null, FailureReason::NOT_FOUND, 'The identity has no sign-in to bind the ceremony to.');
-
-        return $binding;
-    }
-
-    /**
      * The bound passkey gateway.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway
@@ -302,21 +238,5 @@ final readonly class PasskeyAssertions
     private function gateway(): PasskeyGateway
     {
         return $this->container->make(PasskeyGateway::class);
-    }
-
-    /**
-     * Refuse a factor that keeps no state of its own: a passkey factor is
-     * stored.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
-     */
-    private static function assertStored(Factor $factor): void
-    {
-        if (!LockedFactors::keepsState($factor)) {
-            throw new UnsupportedFactorException('A passkey factor must be a stored EloquentFactor model.');
-        }
     }
 }

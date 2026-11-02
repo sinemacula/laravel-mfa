@@ -24,15 +24,19 @@ interface StepUp
     /**
      * Hand a successful verification to the active session it was made in.
      *
-     * Returning means the proof was accepted and recorded. A result whose
-     * binding does not validate, or a proof that cannot be recorded, is refused
-     * by throwing, never by returning, so the change the call is part of rolls
-     * back.
+     * It runs as the last write of the identity's factor state transaction, on
+     * the storage connection, after the code is spent and counted. Returning
+     * means the proof was accepted; what it returns is opaque to this package
+     * and reaches the caller as `VerificationResult::$completion`. A result
+     * whose binding does not validate, or a proof that cannot be recorded, is
+     * refused by throwing an `OperationRefusedException` carrying the reason,
+     * never by returning, so the code's use and the count roll back with it.
+     * Any other throwable propagates to the caller.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
-     * @return void
+     * @return ?object
      *
-     * @throws \RuntimeException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    public function stepUp(VerificationResult $result): void;
+    public function stepUp(VerificationResult $result): ?object;
 }

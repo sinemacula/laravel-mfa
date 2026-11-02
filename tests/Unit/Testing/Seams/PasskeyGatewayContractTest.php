@@ -9,7 +9,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
 use SineMacula\Laravel\Mfa\Passkeys\UnavailablePasskeyGateway;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -36,8 +38,8 @@ final class PasskeyGatewayContractTest extends TestCase
     use PasskeyGatewayTests;
 
     /**
-     * The default is unavailable, lists nothing, verifies nothing and refuses
-     * to start a ceremony.
+     * The default is unavailable, lists nothing, refuses to verify counting
+     * nothing, and refuses to start a ceremony.
      *
      * @return void
      */
@@ -47,7 +49,14 @@ final class PasskeyGatewayContractTest extends TestCase
 
         self::assertFalse($gateway->isAvailable());
         self::assertSame([], $gateway->credentialIds($this->passkeyIdentity()));
-        self::assertNull($gateway->verifyAssertion($this->passkeyIdentity(), $this->passkeyBinding(), ['Y3JlZGVudGlhbC1vbmU'], ['id' => 'x']));
+
+        try {
+            $gateway->verifyAssertion($this->passkeyIdentity(), $this->passkeyBinding(), ['Y3JlZGVudGlhbC1vbmU'], ['id' => 'x']);
+
+            self::fail('The default must refuse to verify.');
+        } catch (OperationRefusedException $exception) {
+            self::assertSame(FailureReason::TYPE_NOT_ENABLED, $exception->reason);
+        }
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Passkeys are unavailable: bind a passkey gateway to ' . PasskeyGateway::class . '.');
@@ -68,6 +77,20 @@ final class PasskeyGatewayContractTest extends TestCase
         PasskeyGatewayContract::assertAnUnavailableGatewayListsNothing($gateway, $this->passkeyIdentity());
         PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential($gateway, $this->passkeyIdentity(), $this->passkeyBinding(), ['id' => 'x']);
         PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies($gateway, $this->passkeyIdentity(), $this->passkeyBinding());
+    }
+
+    /**
+     * A gateway that refuses to verify at all passes the kit, as the default
+     * does, and so does one that says why it did not.
+     *
+     * @return void
+     */
+    public function testAcceptsAGatewayThatRefusesOrSaysWhy(): void
+    {
+        $gateway = new FakePasskeyGateway(['Y3JlZGVudGlhbC1vbmU'], refusal: new OperationRefusedException(FailureReason::TYPE_NOT_ENABLED, 'Unavailable.'));
+
+        PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential($gateway, $this->passkeyIdentity(), $this->passkeyBinding(), ['id' => 'x']);
+        PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies(new FakePasskeyGateway(['Y3JlZGVudGlhbC1vbmU']), $this->passkeyIdentity(), $this->passkeyBinding());
     }
 
     /**

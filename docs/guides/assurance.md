@@ -309,16 +309,12 @@ more than its own answers allow (see [Evaluations](#evaluations)). How the defau
 
 ## Verification results
 
-A verification result (`Verification\VerificationResult`) is either `verified($proof, $evaluation)` or
-`failed($reason, $detail)`, told apart by `isVerified()` and `isFailed()`. A failure carries a `FailureReason`, which
-is what a caller may be told, and a detail, which stays in events and logs. A `locked` failure also carries the time
-the lockout lifts (`lockedUntil`), and no other failure does.
-
-Today `Mfa::verify()` answers `true` or `false`, and a failure is reported by the `MfaVerificationFailed` event, which
-carries the same `FailureReason` as `$event->reason` and the detail as `$event->detail`. A locked factor fails as
-`locked`. A delivered code fails as what its check found: `invalid_code` for a wrong code, `replayed` for a used one,
-and `expired` for an expired code, a challenge out of attempts or no code at all, told apart by the detail. Any other
-factor fails as `not_confirmed` when it has no secret, and as `invalid_code` otherwise.
+A verification result (`Verification\VerificationResult`) is what `Mfa::verify()` answers: either verified, with the
+proof, its evaluation, the proof's own `amr` values, its type and what the completion seam returned, or failed, with a
+reason and a detail, told apart by `isVerified()` and `isFailed()`. A failure carries a `FailureReason`, which is what a
+caller may be told, and a detail, which stays in logs. A `locked` failure also carries the time the lockout lifts
+(`lockedUntil`), or none at the failure ceiling, which does not lift by itself; no other failure carries one. Every
+reason is listed in [Verification](verification.md#failure-reasons).
 
 ## Stable names
 

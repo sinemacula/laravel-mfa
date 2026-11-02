@@ -53,12 +53,14 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   association matches it, so an unusable passkey never lets the last usable factor go.
 - A change to what an associated credential proves (its id, key, owner or relying party) is refused outright: it is a
   removal and then a registration. Renaming it and its usage bookkeeping are not gated.
-- `Passkeys\PasskeyAssertions` requests and verifies an assertion for one factor at a time, allowing exactly its
-  associated credential, and only while the factor is a confirmed passkey of the caller's of an enabled type, not
-  disabled, its association matches, the gateway still lists the credential, and the combination policy accepts it after
-  the session's first factor. No ceremony starts with an empty or wider allowlist. Verifying is an attempt through
-  `Attempts\AttemptService`, so a failed assertion counts against the factor and the identity; an assertion verified for
-  another credential fails. A pending session needs `mfa.verify`.
+- `Passkeys\PasskeyAssertions` holds the ceremony's checks for one factor at a time, allowing exactly its associated
+  credential, and only while the factor is a confirmed passkey of the caller's of an enabled type, not disabled, its
+  association matches, the gateway still lists the credential, and the combination policy accepts it after the session's
+  first factor. No ceremony starts with an empty or wider allowlist. `Mfa::requestAssertion()` starts one; verifying is
+  `Mfa::verify(Submission::assertion(...))`, an attempt through `Attempts\AttemptService`, so a reason the gateway
+  returns counts against the factor and the identity, and an assertion verified for another credential fails as
+  `invalid_code`. A gateway that cannot verify at all refuses with an `OperationRefusedException`, which counts nothing.
+  A pending session needs `mfa.verify`.
 - The legacy direct enrolment refuses a passkey: only the gate associates one.
 
 ## Success Path
@@ -68,8 +70,9 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   the factor's summary with any recovery codes, which the caller reveals once it has committed. `PasskeyAssociated`,
   `FactorConfirmed` and, with codes, `RecoveryCodesGenerated` are dispatched on the commit.
 - To remove a passkey, it calls `removing()` in the transaction that deletes the credential; the factor goes with it.
-- To verify a passkey factor, the verification flow asks `PasskeyAssertions` for the options of a ceremony, hands the
-  client's response back, and records the returned assertion's observed properties as the proof.
+- To verify a passkey factor, `Mfa::requestAssertion()` asks `PasskeyAssertions` for the options of a ceremony, and
+  `Mfa::verify(Submission::assertion(...))` hands the client's response back under the identity's lock and makes a proof
+  of what the returned assertion observed, with the challenge it answered when the gateway reports one.
 
 ## Failure / Edge Cases
 
@@ -86,7 +89,6 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
 
 ## Seams Left
 
-- Verification does not yet turn a verified assertion into a recorded proof; the verification flow will.
 - The removal and recovery code flows of the package's own do not yet share `Lifecycle\FactorRemoval`; the lifecycle
   flow will.
 

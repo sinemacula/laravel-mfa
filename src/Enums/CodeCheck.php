@@ -29,24 +29,29 @@ enum CodeCheck: string
     // The code matched the challenge's last code, which was already used
     case REPLAYED = 'replayed';
 
+    // The challenge was already used, and the code is not the one that used it
+    case SPENT = 'spent';
+
     // No code was sent for the factor, session, application and purpose, or the
     // challenge named belongs to another
     case MISSING = 'missing';
 
     /**
      * Why a check that did not accept the code failed, as a failure reason, or
-     * `null` for one that did. A challenge with no live code to check against,
-     * whatever the cause, is `expired`.
+     * `null` for one that did. A known challenge with no live code to check
+     * against, whatever the cause, is `expired`; a challenge that is absent, or
+     * another's, is `not_found`.
      *
      * @return ?\SineMacula\Laravel\Mfa\Enums\FailureReason
      */
     public function failure(): ?FailureReason
     {
         return match ($this) {
-            self::ACCEPTED                                => null,
-            self::INVALID                                 => FailureReason::INVALID_CODE,
-            self::REPLAYED                                => FailureReason::REPLAYED,
-            self::EXPIRED, self::EXHAUSTED, self::MISSING => FailureReason::EXPIRED,
+            self::ACCEPTED                              => null,
+            self::INVALID                               => FailureReason::INVALID_CODE,
+            self::REPLAYED                              => FailureReason::REPLAYED,
+            self::EXPIRED, self::EXHAUSTED, self::SPENT => FailureReason::EXPIRED,
+            self::MISSING                               => FailureReason::NOT_FOUND,
         };
     }
 
@@ -64,6 +69,7 @@ enum CodeCheck: string
             self::EXPIRED   => 'The code has expired.',
             self::EXHAUSTED => 'The challenge has used up its attempts.',
             self::REPLAYED  => 'The code was already used.',
+            self::SPENT     => 'The challenge was already used.',
             self::MISSING   => 'No code was sent for this factor, session, application and purpose.',
         };
     }

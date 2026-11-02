@@ -6,6 +6,8 @@ namespace Tests\Fixtures\Drivers;
 
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 
 /**
@@ -22,28 +24,16 @@ final class NoopFactorDriver implements FactorDriver
     use DescribesNoChannel;
 
     /**
-     * No-op — fixture exists only to register a driver name.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
-     */
-    #[\Override]
-    public function issueChallenge(Factor $factor): void
-    {
-        // Intentional no-op — fixture exists only to register a driver name;
-        // runtime behaviour is irrelevant.
-    }
-
-    /**
      * Always report verification failure — the fixture does not verify.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @return bool
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      */
     #[\Override]
-    public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
+    public function verify(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck
     {
-        return false;
+        return CodeCheck::INVALID;
     }
 }

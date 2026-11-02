@@ -10,7 +10,8 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 
 /**
  * One attempt to prove a factor or a recovery code, and what it is counted
- * against: the factor, the identity and the IP address.
+ * against: the factor and the identity. The IP address is reserved around the
+ * whole verification (see `AttemptService::throttled()`).
  *
  * The identity is the one whose own pending or active session made the attempt,
  * as the caller validated it, and it is charged for the attempt: an attempt
@@ -28,7 +29,6 @@ final readonly class Attempt
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @param  ?string  $ip
      * @param  ?string  $application
      */
     public function __construct(
@@ -41,9 +41,6 @@ final readonly class Attempt
 
         /** What the attempt was for. */
         public Purpose $purpose,
-
-        /** The IP address the request came from, as resolved through the trusted proxies, or null outside a request. */
-        public ?string $ip = null,
 
         /** The application the attempt was made through, named in the events' context. */
         public ?string $application = null,

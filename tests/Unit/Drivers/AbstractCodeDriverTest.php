@@ -9,7 +9,10 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Drivers\AbstractCodeDriver;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Codes\RecordingCodeDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
 
@@ -50,15 +53,14 @@ final class AbstractCodeDriverTest extends TestCase
         $factor = new InMemoryFactor(type: 'email', destination: 'ada@example.test');
 
         yield 'confirm' => [static fn (RecordingCodeDriver $driver): bool => $driver->confirm($factor, '123456'), 'confirmed'];
-        yield 'issue a challenge' => [static function (RecordingCodeDriver $driver) use ($factor): void {
-            $driver->issueChallenge($factor);
-        }, 'sent'];
-        yield 'verify' => [static fn (RecordingCodeDriver $driver): bool => $driver->verify($factor, '123456'), 'checked'];
+        $binding = new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::STEP_UP);
+
+        yield 'verify' => [static fn (RecordingCodeDriver $driver): CodeCheck => $driver->verify($factor, '123456', $binding), 'checked'];
     }
 
     /**
-     * Sending, checking or confirming a code with the factor alone is refused,
-     * and delivers nothing: a code is bound to more than its factor.
+     * Checking or confirming a code with the factor alone is refused, and
+     * delivers nothing: a code is bound to more than its factor.
      *
      * @param  \Closure(\Tests\Fixtures\Codes\RecordingCodeDriver): mixed  $call
      * @param  string  $action

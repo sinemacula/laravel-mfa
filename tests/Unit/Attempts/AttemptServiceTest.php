@@ -193,7 +193,7 @@ final class AttemptServiceTest extends TestCase
         Carbon::setTestNow('2026-11-01 12:05:00');
 
         $outcome = $this->service()->attempt(
-            new Attempt($user, $factor, Purpose::SIGN_IN, self::IP),
+            new Attempt($user, $factor, Purpose::SIGN_IN),
             static function (): bool {
                 throw new MidRotationFailureException('The verification must not run.');
             },
@@ -612,9 +612,12 @@ final class AttemptServiceTest extends TestCase
         $this->attempt($user, $stateless, false);
         $this->attempt($user, null, false);
 
-        $refused = $this->service()->attempt(new Attempt($user, null, Purpose::SIGN_IN, self::IP), static function (): bool {
-            throw new MidRotationFailureException('The verification must not run.');
-        });
+        $refused = $this->service()->throttled(self::IP, fn (): AttemptOutcome => $this->service()->attempt(
+            new Attempt($user, null, Purpose::SIGN_IN),
+            static function (): bool {
+                throw new MidRotationFailureException('The verification must not run.');
+            },
+        ));
 
         self::assertTrue($refused->isRefused());
         self::assertSame(AttemptScope::IDENTITY, $refused->lockout?->scope);
@@ -710,9 +713,12 @@ final class AttemptServiceTest extends TestCase
 
         Factor::query()->whereKey($factor->id)->delete();
 
-        $outcome = $this->service()->attempt(new Attempt($user, $factor, Purpose::SIGN_IN, self::IP), static function (): bool {
-            throw new MidRotationFailureException('The verification must not run.');
-        });
+        $outcome = $this->service()->throttled(self::IP, fn (): AttemptOutcome => $this->service()->attempt(
+            new Attempt($user, $factor, Purpose::SIGN_IN),
+            static function (): bool {
+                throw new MidRotationFailureException('The verification must not run.');
+            },
+        ));
 
         self::assertTrue($outcome->isNotFound());
         self::assertFalse($outcome->passed);
@@ -734,7 +740,7 @@ final class AttemptServiceTest extends TestCase
         $user  = $this->user();
         $other = $this->factor($this->user('other@example.com'), failures: 1);
 
-        $outcome = $this->service()->attempt(new Attempt($user, $other, Purpose::SIGN_IN, self::IP), static function (): bool {
+        $outcome = $this->service()->attempt(new Attempt($user, $other, Purpose::SIGN_IN), static function (): bool {
             throw new MidRotationFailureException('The verification must not run.');
         });
 
@@ -778,7 +784,8 @@ final class AttemptServiceTest extends TestCase
 
     /**
      * A listener that throws once the attempt has committed leaves the failure
-     * counted, the address's charge included.
+     * counted against the factor and the identity. The address's slot is given
+     * back, since the exception reaches the throttle.
      *
      * @return void
      *
@@ -804,7 +811,7 @@ final class AttemptServiceTest extends TestCase
         }
 
         self::assertSame(1, $this->fresh($factor)->getConsecutiveFailures());
-        self::assertSame(1, $this->hits($this->keys()->ip(self::IP)));
+        self::assertSame(0, $this->hits($this->keys()->ip(self::IP)));
         self::assertSame(AttemptScope::FACTOR, $this->service()->lockout($user, $factor)?->scope);
     }
 
@@ -822,9 +829,12 @@ final class AttemptServiceTest extends TestCase
         $factor = $this->factor($user);
 
         try {
-            $this->service()->attempt(new Attempt($user, $factor, Purpose::SIGN_IN, self::IP), static function (): bool {
-                throw new MidRotationFailureException('verification failed');
-            });
+            $this->service()->throttled(self::IP, fn (): AttemptOutcome => $this->service()->attempt(
+                new Attempt($user, $factor, Purpose::SIGN_IN),
+                static function (): bool {
+                    throw new MidRotationFailureException('verification failed');
+                },
+            ));
 
             self::fail('The verification\'s exception must propagate.');
         } catch (MidRotationFailureException $exception) {
@@ -896,7 +906,7 @@ final class AttemptServiceTest extends TestCase
      */
     private function attempt(TestUser $user, ?FactorContract $factor, bool $passes, ?string $ip = self::IP): AttemptOutcome
     {
-        return $this->service()->attempt(new Attempt($user, $factor, Purpose::SIGN_IN, $ip), static fn (): bool => $passes);
+        return $this->service()->throttled($ip, fn (): AttemptOutcome => $this->service()->attempt(new Attempt($user, $factor, Purpose::SIGN_IN), static fn (): bool => $passes));
     }
 
     /**

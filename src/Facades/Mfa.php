@@ -26,12 +26,13 @@ use Illuminate\Support\Facades\Facade;
  * @method static bool isSetup()
  * @method static list<\SineMacula\Laravel\Mfa\Proofs\Proof> proofs()
  * @method static ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> getFactors()
- * @method static ?\SineMacula\Laravel\Mfa\Codes\SendResult challenge(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor, \SineMacula\Laravel\Mfa\Enums\Purpose $purpose = \SineMacula\Laravel\Mfa\Enums\Purpose::SIGN_IN)
- * @method static bool verify(string $driver, \SineMacula\Laravel\Mfa\Contracts\Factor $factor, string $code, \SineMacula\Laravel\Mfa\Enums\Purpose $purpose = \SineMacula\Laravel\Mfa\Enums\Purpose::SIGN_IN)
+ * @method static list<\SineMacula\Laravel\Mfa\Factors\FactorSummary> offeredFactors()
+ * @method static \SineMacula\Laravel\Mfa\Codes\SendResult sendCode(mixed $factorId, ?\SineMacula\Laravel\Mfa\Enums\Purpose $purpose = null)
+ * @method static array<string, mixed> requestAssertion(mixed $factorId, ?\SineMacula\Laravel\Mfa\Enums\Purpose $purpose = null)
+ * @method static \SineMacula\Laravel\Mfa\Verification\VerificationResult verify(\SineMacula\Laravel\Mfa\Verification\Submission $submission, ?\SineMacula\Laravel\Mfa\Enums\Purpose $purpose = null)
  * @method static void enroll(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
  * @method static void disable(\SineMacula\Laravel\Mfa\Contracts\Factor $factor)
  * @method static list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret> generateRecoveryCodes()
- * @method static bool redeemRecoveryCode(string $code, \SineMacula\Laravel\Mfa\Enums\Purpose $purpose = \SineMacula\Laravel\Mfa\Enums\Purpose::SIGN_IN)
  * @method static ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus recoveryCodes()
  *
  * @phpcs:enable Generic.Files.LineLength.TooLong

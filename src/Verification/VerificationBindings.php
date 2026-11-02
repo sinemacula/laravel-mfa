@@ -7,7 +7,8 @@ namespace SineMacula\Laravel\Mfa\Verification;
 use Illuminate\Contracts\Foundation\Application;
 
 /**
- * Registers the verification service.
+ * Registers the verification service. Its collaborators keep nothing between
+ * calls, so the container builds them as it needs them.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

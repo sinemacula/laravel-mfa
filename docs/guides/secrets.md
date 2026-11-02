@@ -105,7 +105,7 @@ codes and full destinations out of the application's logs and error reports:
     because a frame cannot say which of its arguments is a code;
   - every string those calls received, every value any call marks with `#[\SensitiveParameter]`, and every value
     under a key above is redacted wherever it reappears in another frame: the facade's own frame, which records
-    `Mfa::verify()` as `Facade::__callStatic('verify', [..., $code])`, and the frames of the hasher, encrypter or
+    `Mfa::verify()` as `Facade::__callStatic('verify', [...])`, and the frames of the hasher, encrypter or
     driver the package hands it to. A string equal to one becomes `[redacted]`, and so does a string containing one of
     six characters or more;
   - a code message, or a queued job sending one, becomes `[redacted]` in every frame, nested in an argument too, and

@@ -51,7 +51,7 @@ trait DescribesNoChannel
     }
 
     /**
-     * Confirmation checked as verification.
+     * No confirmation.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
@@ -61,15 +61,6 @@ trait DescribesNoChannel
      */
     public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool
     {
-        return $this->verify($factor, $code);
+        return false;
     }
-
-    /**
-     * Verify the code against the factor.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $code
-     * @return bool
-     */
-    abstract public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool;
 }

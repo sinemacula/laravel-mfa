@@ -8,15 +8,12 @@ use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
-use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\InMemoryFactor;
-use Tests\Fixtures\Identities\SecondaryUser;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
@@ -39,9 +36,6 @@ use Tests\Fixtures\Identities\TestUser;
 #[CoversClass(MfaManager::class)]
 final class MfaManagerOwnershipTest extends MfaManagerTestCase
 {
-    /** @var string Right-shape OTP value used to drive the rejected verify() paths. */
-    private const string WRONG_CODE = '000000';
-
     /**
      * Tear down Mockery expectations between test cases.
      *
@@ -55,67 +49,6 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
         }
 
         parent::tearDown();
-    }
-
-    /**
-     * `verify()` must throw when the supplied Eloquent factor's morph columns
-     * do not point at the currently authenticated identity.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testVerifyRejectsEloquentFactorOwnedByDifferentIdentity(): void
-    {
-        [$victim, $attacker, $victimsFactor] = $this->stageCrossAccount();
-
-        $this->actingAs($attacker);
-
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldNotReceive('verify');
-
-        $this->stubDriver('totp', $driver);
-
-        Event::fake();
-
-        $this->expectException(FactorOwnershipMismatchException::class);
-
-        try {
-            $this->manager()->verify('totp', $victimsFactor, self::WRONG_CODE);
-        } finally {
-            Event::assertNotDispatched(MfaVerified::class);
-            self::assertNotNull($victim);
-        }
-    }
-
-    /**
-     * `challenge()` must throw on the same cross-account shape, and never
-     * invoke the driver's `issueChallenge()`.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testChallengeRejectsEloquentFactorOwnedByDifferentIdentity(): void
-    {
-        [, $attacker, $victimsFactor] = $this->stageCrossAccount();
-
-        $this->actingAs($attacker);
-
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldNotReceive('issueChallenge');
-
-        $this->stubDriver('totp', $driver);
-
-        Event::fake();
-
-        $this->expectException(FactorOwnershipMismatchException::class);
-
-        try {
-            $this->manager()->challenge('totp', $victimsFactor);
-        } finally {
-            Event::assertNotDispatched(MfaChallengeIssued::class);
-        }
     }
 
     /**
@@ -198,60 +131,6 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
         $this->manager()->enroll($factor);
 
         Event::assertDispatched(MfaFactorEnrolled::class);
-    }
-
-    /**
-     * A non-Eloquent `Factor` whose `getAuthenticatable()` returns `null` must
-     * be rejected — without an owner reference there is no way to verify the
-     * factor was issued for the current identity.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testVerifyRejectsNonEloquentFactorWithUnknownOwner(): void
-    {
-        $user = TestUser::query()->create(['email' => 'no-owner@example.test']);
-
-        $this->actingAs($user);
-
-        $factor = new InMemoryFactor(type: 'totp');
-
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldNotReceive('verify');
-
-        $this->stubDriver('totp', $driver);
-
-        $this->expectException(FactorOwnershipMismatchException::class);
-
-        $this->manager()->verify('totp', $factor, self::WRONG_CODE);
-    }
-
-    /**
-     * A non-Eloquent `Factor` bound to a different identity must be rejected
-     * even when the FQCN matches but the identifier does not.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testVerifyRejectsNonEloquentFactorOwnedByDifferentIdentifier(): void
-    {
-        $user = TestUser::query()->create(['email' => 'right-class@example.test']);
-        $foe  = TestUser::query()->create(['email' => 'wrong-id@example.test']);
-
-        $this->actingAs($user);
-
-        $factor = new InMemoryFactor(type: 'totp', authenticatable: $foe);
-
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldNotReceive('verify');
-
-        $this->stubDriver('totp', $driver);
-
-        $this->expectException(FactorOwnershipMismatchException::class);
-
-        $this->manager()->verify('totp', $factor, self::WRONG_CODE);
     }
 
     /**
@@ -353,40 +232,6 @@ final class MfaManagerOwnershipTest extends MfaManagerTestCase
         $this->manager()->enroll($factor);
 
         Event::assertDispatched(MfaFactorEnrolled::class);
-    }
-
-    /**
-     * The non-Eloquent assertion branch must also reject a factor whose owner
-     * has the same identifier but a different class — `User #1` and `Admin #1`
-     * are distinct identities even when their primary keys collide.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testVerifyRejectsNonEloquentFactorOwnedByDifferentClassWithSameIdentifier(): void
-    {
-        $primary = TestUser::query()->create(['email' => 'primary@example.test']);
-
-        // Force the secondary identity onto the same primary-key value so the
-        // only difference is the FQCN — proving the manager distinguishes by
-        // class, not just ID.
-        $secondary = SecondaryUser::query()->create(['email' => 'secondary@example.test']);
-        $secondary->forceFill(['id' => $primary->getKey()])->saveQuietly();
-        $secondary->refresh();
-
-        $this->actingAs($primary);
-
-        $factor = new InMemoryFactor(type: 'totp', authenticatable: $secondary);
-
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldNotReceive('verify');
-
-        $this->stubDriver('totp', $driver);
-
-        $this->expectException(FactorOwnershipMismatchException::class);
-
-        $this->manager()->verify('totp', $factor, self::WRONG_CODE);
     }
 
     /**

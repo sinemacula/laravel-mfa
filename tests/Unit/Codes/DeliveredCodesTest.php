@@ -66,7 +66,7 @@ final class DeliveredCodesTest extends TestCase
         self::assertSame($now->addMinutes(10)->getTimestamp(), $issued->expiresAt->getTimestamp());
         self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
         self::assertSame(CodeCheck::REPLAYED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
-        self::assertSame(CodeCheck::MISSING, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now));
+        self::assertSame(CodeCheck::SPENT, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now));
         self::assertNotNull(self::row($issued)->consumed_at);
     }
 
@@ -548,7 +548,7 @@ final class DeliveredCodesTest extends TestCase
      *
      * @throws \Random\RandomException
      */
-    public function testACheckOvertakenByAUseIsMissing(): void
+    public function testACheckOvertakenByAUseIsSpent(): void
     {
         $codes  = $this->codes([], [self::CODE]);
         $now    = self::now();
@@ -556,7 +556,7 @@ final class DeliveredCodesTest extends TestCase
 
         $this->onFirstRead(static fn () => Code::query()->whereKey($issued->challengeId)->update(['consumed_at' => $now]));
 
-        self::assertSame(CodeCheck::MISSING, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
+        self::assertSame(CodeCheck::SPENT, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
         self::assertSame(0, self::row($issued)->attempts);
     }
 

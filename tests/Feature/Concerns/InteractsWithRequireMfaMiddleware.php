@@ -65,6 +65,9 @@ trait InteractsWithRequireMfaMiddleware
      */
     protected function enrollTotp(string $email = 'totp-mw@example.test'): array
     {
+        config()->set('mfa.applications.web.types', ['totp']);
+        config()->set('mfa.applications.web.first_factor', ['method' => 'password', 'channel' => 'password']);
+
         $user = TestUser::create([
             'email'       => $email,
             'mfa_enabled' => true,
@@ -77,6 +80,7 @@ trait InteractsWithRequireMfaMiddleware
             ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
+            'status'               => 'confirmed',
         ]);
 
         return [$user, $factor, AuthenticatorApp::code($factor)];

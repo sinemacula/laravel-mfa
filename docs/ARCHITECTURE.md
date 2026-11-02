@@ -56,13 +56,11 @@ Historical record of the architectural calls made during the 1.0 cycle.
   owned by `laravel-audit-log`. *Superseded:* failures are now counted durably on the factor and
   identity state rows, with temporary throttles in `mfa_attempts` (see
   [Attempts and Lockout](design/attempts-and-lockout.md)); audit still goes through events.
-- **D3 — Challenge split between manager and driver.** The verification service behind
-  `MfaManager::challenge()` orchestrates (events, rate-limiting hooks, logging).
-  `FactorDriver::issueChallenge(Factor): void` implements per-factor-type transport (no-op for TOTP,
-  mail dispatch for email, gateway dispatch for SMS). Since superseded for email and SMS: their
-  codes are bound to a session and purpose the factor alone does not carry, so the package sends
-  and checks them itself and the driver only delivers each one (see
-  [Delivered Codes](design/delivered-codes.md)).
+- **D3 — Challenge split between manager and driver.** *Superseded:* a delivered code is bound to a
+  sign-in and purpose the factor alone does not carry, so `Mfa::sendCode()` goes through the bound
+  `ChallengeGateway`, the driver only delivers each code, and a driver has no challenge to issue (see
+  [Delivered Codes](design/delivered-codes.md) and
+  [Verification Lifecycle and Events](design/verification-lifecycle-and-events.md)).
 - **D4 — Per-device verification is the default.** A session's proofs are its own. In paired
   mode they live in the authentication package's session record, through a rebound `ProofStore`;
   in standalone mode they live in the Laravel session, through `SessionProofStore` (which is
@@ -80,8 +78,8 @@ Historical record of the architectural calls made during the 1.0 cycle.
   consumer code.** Factor enrolment goes through `Mfa::enroll(Factor)`; factor removal goes through
   `Mfa::disable(Factor)`. Both finish their change and dispatch
   `MfaFactorEnrolled` / `MfaFactorDisabled` so audit subscribers do not have to rely on consumer
-  cooperation. Five lifecycle events in total: `MfaChallengeIssued`, `MfaVerified`,
-  `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`.
+  cooperation. Verification reports through the catalogue instead (see
+  [Event Catalogue](design/event-catalogue.md)).
 - **D7 — Both `Factor::$secret` and `Factor::$code` are encrypted at rest.** The `secret`
   column carries long-lived material (TOTP keys); the `code` column holds
   live OTPs during their expiry window. Encrypting both closes the read-only-DB-replay attack

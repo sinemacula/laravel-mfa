@@ -119,10 +119,10 @@ final class DeliveredCodeContentionTest extends TestCase
             $this->assertCompetingSendIsLockedOut();
         };
 
-        self::assertTrue($this->service()->send(self::identity(), self::factor(), self::binding('session-a'), $driver)->wasSent());
+        self::assertTrue($this->service()->send(self::factor(), self::binding('session-a'), $driver)->wasSent());
         self::assertCount(1, $driver->delivered);
 
-        $competing = $this->asObserver(fn () => $this->service()->send(self::identity(), self::factor(), self::binding('session-b'), new RecordingCodeDriver));
+        $competing = $this->asObserver(fn () => $this->service()->send(self::factor(), self::binding('session-b'), new RecordingCodeDriver));
 
         self::assertSame(FailureReason::SENDING_CAPPED, $competing->reason);
         self::assertSame(3600, $competing->retryAfter);
@@ -139,7 +139,7 @@ final class DeliveredCodeContentionTest extends TestCase
      */
     public function testOfTwoInterleavedChecksOnlyOneIsAccepted(): void
     {
-        $this->service()->send(self::identity(), self::factor(), self::binding('session-a'), new RecordingCodeDriver);
+        $this->service()->send(self::factor(), self::binding('session-a'), new RecordingCodeDriver);
 
         $competing = null;
         $done      = false;
@@ -157,7 +157,7 @@ final class DeliveredCodeContentionTest extends TestCase
         $first = $this->service()->check(self::factor(), self::binding('session-a'), self::CODE);
 
         self::assertSame(CodeCheck::ACCEPTED, $competing);
-        self::assertSame(CodeCheck::MISSING, $first);
+        self::assertSame(CodeCheck::SPENT, $first);
         self::assertSame(1, DB::connection('storage')->table('mfa_codes')->value('attempts'));
     }
 
@@ -225,7 +225,7 @@ final class DeliveredCodeContentionTest extends TestCase
     private function assertCompetingSendIsLockedOut(): void
     {
         try {
-            $this->asObserver(fn () => $this->service()->send(self::identity(), self::factor(), self::binding('session-b'), new RecordingCodeDriver));
+            $this->asObserver(fn () => $this->service()->send(self::factor(), self::binding('session-b'), new RecordingCodeDriver));
 
             self::fail('A competing send must not take the lock while another send holds it.');
         } catch (\Throwable $exception) {

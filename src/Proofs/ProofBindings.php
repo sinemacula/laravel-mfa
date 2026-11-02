@@ -10,15 +10,18 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Session\Session;
+use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
+use SineMacula\Laravel\Mfa\Contracts\StepUp;
 
 /**
  * Registers the proof service, the default `ProofStore`, which keeps each
  * sign-in's proofs in the Laravel session, the default `SessionRevoker`, which
- * advances the identity's verification generation, and the listeners that begin
- * a sign-in on Laravel's `Login` event and forget it on `Logout` and
- * `CurrentDeviceLogout`.
+ * advances the identity's verification generation, the default
+ * `PendingCompletion` and `StepUp`, which record a verified proof in the store
+ * (`ProofStoreCompletion`), and the listeners that begin a sign-in on Laravel's
+ * `Login` event and forget it on `Logout` and `CurrentDeviceLogout`.
  *
  * The store is built on every resolution, from the session of the request at
  * hand, so no singleton holds one request's session into the next. An
@@ -38,8 +41,8 @@ final class ProofBindings
     private function __construct() {}
 
     /**
-     * Register the proof service, the default proof store and session revoker,
-     * and the sign-in listeners.
+     * Register the proof service, the default proof store, session revoker,
+     * pending completion and step-up, and the sign-in listeners.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
@@ -55,6 +58,8 @@ final class ProofBindings
 
         $app->singleton(ProofService::class);
         $app->singleton(SessionRevoker::class, GenerationSessionRevoker::class);
+        $app->singleton(PendingCompletion::class, ProofStoreCompletion::class);
+        $app->singleton(StepUp::class, ProofStoreCompletion::class);
 
         $events = $app->make(Dispatcher::class);
 

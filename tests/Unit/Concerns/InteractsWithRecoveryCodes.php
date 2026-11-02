@@ -8,9 +8,11 @@ use Illuminate\Config\Repository;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use Tests\Fixtures\Identities\FactorHolder;
@@ -105,6 +107,18 @@ trait InteractsWithRecoveryCodes
     protected function recoveryCodes(): RecoveryCodeService
     {
         return $this->container()->make(RecoveryCodeService::class);
+    }
+
+    /**
+     * What a redemption by the identity is bound to.
+     *
+     * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
+     */
+    protected static function redemptionBinding(FactorHolder $holder, Purpose $purpose = Purpose::SIGN_IN): ProofBinding
+    {
+        return new ProofBinding($holder->getMorphClass(), (string) $holder->id, 'web', 'redemption-sign-in', $purpose);
     }
 
     /**

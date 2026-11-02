@@ -14,6 +14,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
@@ -25,6 +26,7 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
@@ -51,6 +53,19 @@ final class SignInProofsTest extends TestCase
     use RefreshDatabase;
 
     /**
+     * Enable TOTP on the default guard's application.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('mfa.applications.web', ['types' => ['totp'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+    }
+
+    /**
      * A TOTP verification on a signed-in session records an additional factor
      * proof of the factor on the default guard's application.
      *
@@ -64,7 +79,7 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
 
         $proofs = Mfa::proofs();
 
@@ -74,7 +89,7 @@ final class SignInProofsTest extends TestCase
         self::assertSame($factor->getKey(), $proofs[0]->reference);
         self::assertSame(['kind' => 'authenticator_app', 'reference' => $factor->getKey()], $proofs[0]->channel?->toArray());
         self::assertSame('web', $proofs[0]->binding->application);
-        self::assertSame(Purpose::SIGN_IN, $proofs[0]->binding->purpose);
+        self::assertSame(Purpose::STEP_UP, $proofs[0]->binding->purpose);
     }
 
     /**
@@ -90,12 +105,12 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code, Purpose::STEP_UP));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code), Purpose::SIGN_IN)->isVerified());
 
         $proofs = Mfa::proofs();
 
         self::assertCount(1, $proofs);
-        self::assertSame(Purpose::STEP_UP, $proofs[0]->binding->purpose);
+        self::assertSame(Purpose::SIGN_IN, $proofs[0]->binding->purpose);
     }
 
     /**
@@ -111,7 +126,7 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        Mfa::verify('totp', $factor, $code);
+        Mfa::verify(Submission::factor($factor->id, $code));
 
         Auth::logout();
         Auth::setUser($user);
@@ -133,7 +148,7 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        Mfa::verify('totp', $factor, $code);
+        Mfa::verify(Submission::factor($factor->id, $code));
 
         self::assertCount(1, Mfa::proofs());
 
@@ -160,7 +175,7 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        Mfa::verify('totp', $factor, $code);
+        Mfa::verify(Submission::factor($factor->id, $code));
 
         Auth::guard('admin')->login($user);
 
@@ -170,18 +185,16 @@ final class SignInProofsTest extends TestCase
 
         self::assertCount(1, Mfa::proofs());
 
-        $factor->refresh();
-
         // The step just accepted is never accepted again, so the next one is
         // proved.
-        self::assertTrue(Mfa::verify('totp', $factor, AuthenticatorApp::code($factor, 1)));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->isVerified());
         self::assertCount(2, Mfa::proofs());
     }
 
     /**
      * A guard that fires neither event nor calls the hooks gains nothing from
-     * the identity's sign-in through another guard: its verification records
-     * nothing, it has no proofs, and the other guard's are untouched.
+     * the identity's sign-in through another guard: its verification is
+     * refused, it has no proofs, and the other guard's are untouched.
      *
      * @return void
      *
@@ -197,14 +210,12 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        Mfa::verify('totp', $factor, $code);
+        Mfa::verify(Submission::factor($factor->id, $code));
 
         Auth::guard('admin')->setUser($user);
         Auth::shouldUse('admin');
 
-        $factor->refresh();
-
-        self::assertTrue(Mfa::verify('totp', $factor, AuthenticatorApp::code($factor, 1)));
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->reason);
 
         $admin = Mfa::proofs();
 
@@ -240,7 +251,7 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($alice);
 
-        Mfa::verify('totp', $factor, $code);
+        Mfa::verify(Submission::factor($factor->id, $code));
 
         self::assertCount(1, Mfa::proofs());
 
@@ -255,8 +266,8 @@ final class SignInProofsTest extends TestCase
 
     /**
      * A guard that fires neither of Laravel's events nor calls the hooks leaves
-     * no sign-in: a successful verification records nothing, and the middleware
-     * still requires one.
+     * no sign-in: a verification is refused and records nothing, and the
+     * middleware still requires one.
      *
      * @return void
      *
@@ -270,7 +281,7 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::factor($factor->id, $code))->reason);
         self::assertSame([], Mfa::proofs());
 
         $this->expectException(MfaRequiredException::class);
@@ -308,7 +319,7 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        Mfa::verify('totp', $factor, $code);
+        Mfa::verify(Submission::factor($factor->id, $code));
 
         $proofs = Mfa::proofs();
 
@@ -390,6 +401,7 @@ final class SignInProofsTest extends TestCase
             ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
+            'status'               => 'confirmed',
         ]);
 
         return [$factor, AuthenticatorApp::code($factor)];

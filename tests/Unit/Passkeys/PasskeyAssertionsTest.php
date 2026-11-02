@@ -17,7 +17,6 @@ use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
@@ -25,8 +24,8 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
-use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\Fixtures\Passkeys\FakePasskeyGateway;
@@ -46,6 +45,7 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(PasskeyAssertions::class)]
+#[CoversClass(ChallengeRequests::class)]
 #[CoversClass(PasskeyAssociations::class)]
 final class PasskeyAssertionsTest extends TestCase
 {
@@ -87,7 +87,7 @@ final class PasskeyAssertionsTest extends TestCase
      */
     public function testRequestsExactlyTheFactorsCredential(): void
     {
-        $options = $this->assertions()->requestAssertion($this->passkey, Purpose::STEP_UP);
+        $options = $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP);
 
         self::assertSame([[self::CREDENTIAL]], $this->gateway->requested);
         self::assertSame(self::SESSION, $options['session']);
@@ -106,17 +106,17 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $this->gateway->registered = [self::OTHER_CREDENTIAL];
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->assertions()->requestAssertion($this->passkey, Purpose::STEP_UP)));
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)));
 
         $this->gateway->registered = [self::CREDENTIAL];
 
         PasskeyAssociation::query()->update(['credential_id' => self::OTHER_CREDENTIAL]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->assertions()->requestAssertion($this->passkey, Purpose::STEP_UP)));
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)));
 
         PasskeyAssociation::query()->delete();
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->assertions()->requestAssertion($this->passkey, Purpose::STEP_UP)));
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)));
         self::assertSame([], $this->gateway->requested);
     }
 
@@ -132,11 +132,11 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $this->enablePasskeys(['first_factor' => ['method' => 'passkey', 'channel' => 'passkey']], [self::CREDENTIAL]);
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->refusal(fn () => $this->assertions()->requestAssertion($this->passkey, Purpose::STEP_UP)));
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->refusal(fn () => $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)));
 
         $this->signInWithPasskey(self::CREDENTIAL);
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->refusal(fn () => $this->assertions()->requestAssertion($this->passkey, Purpose::STEP_UP)));
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->refusal(fn () => $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)));
     }
 
     /**
@@ -151,22 +151,22 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $this->passkey->update(['disabled_at' => CarbonImmutable::now()]);
 
-        self::assertSame(FailureReason::LOCKED, $this->refusal(fn () => $this->assertions()->requestAssertion($this->passkey, Purpose::STEP_UP)));
+        self::assertSame(FailureReason::LOCKED, $this->refusal(fn () => $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)));
 
         $this->passkey->update(['disabled_at' => null, 'status' => 'pending']);
 
-        self::assertSame(FailureReason::NOT_CONFIRMED, $this->refusal(fn () => $this->assertions()->requestAssertion($this->passkey, Purpose::STEP_UP)));
+        self::assertSame(FailureReason::NOT_CONFIRMED, $this->refusal(fn () => $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)));
 
         $this->passkey->update(['status' => 'confirmed']);
 
         config()->set('mfa.applications.web.types', ['totp']);
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->refusal(fn () => $this->assertions()->requestAssertion($this->passkey, Purpose::STEP_UP)));
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->refusal(fn () => $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)));
     }
 
     /**
      * A verified assertion of the factor's credential is returned with what it
-     * observed, and stamps the factor's last use.
+     * observed.
      *
      * @return void
      *
@@ -175,44 +175,35 @@ final class PasskeyAssertionsTest extends TestCase
     public function testReturnsWhatAVerifiedAssertionObserved(): void
     {
         $properties               = new ObservedProperties(userPresence: true, userVerification: true);
-        $this->gateway->assertion = new PasskeyAssertion(self::CREDENTIAL, $properties);
+        $this->gateway->assertion = new PasskeyAssertion(self::CREDENTIAL, $properties, 'challenge-1');
 
-        $assertion = $this->assertions()->verifyAssertion($this->passkey, Purpose::STEP_UP, ['id' => self::CREDENTIAL]);
+        $assertion = $this->assertions()->check($this->user, $this->passkey, $this->bindingOf($this->user, Purpose::STEP_UP), ['id' => self::CREDENTIAL]);
 
-        self::assertSame($properties, $assertion?->properties);
+        self::assertInstanceOf(PasskeyAssertion::class, $assertion);
+        self::assertSame($properties, $assertion->properties);
+        self::assertSame('challenge-1', $assertion->challengeId);
         self::assertSame([[self::CREDENTIAL]], $this->gateway->verified);
-        self::assertNotNull(Factor::query()->findOrFail($this->passkey->id)->getLastUsedAt());
     }
 
     /**
-     * An assertion the gateway verifies for another credential fails, and is
-     * counted against the factor; so is one that does not verify.
+     * An assertion the gateway verifies for another credential fails as an
+     * invalid code, and why the gateway did not verify one is passed on.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testAnAssertionOfAnotherCredentialFailsAndIsCounted(): void
+    public function testAnAssertionOfAnotherCredentialFails(): void
     {
+        $binding = $this->bindingOf($this->user, Purpose::STEP_UP);
+
         $this->gateway->assertion = new PasskeyAssertion(self::OTHER_CREDENTIAL, new ObservedProperties(userPresence: true));
 
-        self::assertNull($this->assertions()->verifyAssertion($this->passkey, Purpose::STEP_UP, ['id' => self::OTHER_CREDENTIAL]));
-        self::assertNull($this->assertions()->verifyAssertion($this->passkey, Purpose::STEP_UP, []));
-        self::assertSame(2, Factor::query()->findOrFail($this->passkey->id)->getConsecutiveFailures());
-    }
+        self::assertSame(FailureReason::INVALID_CODE, $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::OTHER_CREDENTIAL]));
 
-    /**
-     * A factor that keeps no state of its own is refused.
-     *
-     * @return void
-     *
-     * @throws \Throwable
-     */
-    public function testRefusesAFactorThatKeepsNoState(): void
-    {
-        $this->expectException(UnsupportedFactorException::class);
+        $this->gateway->assertion = FailureReason::EXPIRED;
 
-        $this->assertions()->verifyAssertion(new InMemoryFactor(type: 'passkey'), Purpose::STEP_UP, ['id' => self::CREDENTIAL]);
+        self::assertSame(FailureReason::EXPIRED, $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::CREDENTIAL]));
     }
 
     /**
@@ -227,12 +218,24 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $this->pending([PendingAction::LIST_FACTORS]);
 
-        self::assertSame([], $this->assertions()->requestAssertion($this->passkey, Purpose::SIGN_IN));
-        self::assertNull($this->assertions()->verifyAssertion($this->passkey, Purpose::SIGN_IN, ['id' => self::CREDENTIAL]));
+        self::assertSame([], $this->requests()->requestAssertion($this->passkey->id, Purpose::SIGN_IN));
 
         $this->pending([PendingAction::VERIFY]);
 
-        self::assertSame('pending-1', $this->assertions()->requestAssertion($this->passkey, Purpose::SIGN_IN)['session']);
+        self::assertSame('pending-1', $this->requests()->requestAssertion($this->passkey->id, Purpose::SIGN_IN)['session']);
+    }
+
+    /**
+     * A purpose a ceremony is not made for is refused.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRefusesAPurposeNotOfACeremony(): void
+    {
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->refusal(fn () => $this->requests()->requestAssertion($this->passkey->id, Purpose::ENROLLMENT)));
+        self::assertSame([], $this->gateway->requested);
     }
 
     /**
@@ -246,7 +249,7 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $this->container()->make(ProofStore::class)->forget($this->user, self::APPLICATION);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->assertions()->requestAssertion($this->passkey, Purpose::STEP_UP)));
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)));
     }
 
     /**
@@ -304,6 +307,18 @@ final class PasskeyAssertionsTest extends TestCase
         }
 
         self::fail('The call was expected to be refused.');
+    }
+
+    /**
+     * The requests under test.
+     *
+     * @return \SineMacula\Laravel\Mfa\Verification\ChallengeRequests
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function requests(): ChallengeRequests
+    {
+        return $this->container()->make(ChallengeRequests::class);
     }
 
     /**

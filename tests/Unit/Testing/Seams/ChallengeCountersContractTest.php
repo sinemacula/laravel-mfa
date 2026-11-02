@@ -378,7 +378,7 @@ final class ChallengeCountersContractTest extends TestCase
         $gateway = $this->container()->make(ChallengeGateway::class);
         $binding = $this->emailBinding($this->user);
 
-        $this->challenge ??= $gateway->send($this->factor, $binding);
+        $this->challenge ??= (string) $gateway->send($this->factor, $binding)->challengeId;
 
         $code = self::lastEmailedCode($this->mailbox);
 
@@ -398,10 +398,10 @@ final class ChallengeCountersContractTest extends TestCase
     {
         $gateway   = $this->container()->make(ChallengeGateway::class);
         $binding   = $this->emailBinding($this->user);
-        $challenge = $gateway->send($this->factor, $binding);
+        $challenge = (string) $gateway->send($this->factor, $binding)->challengeId;
         $code      = self::lastEmailedCode($this->mailbox);
 
-        self::assertTrue($gateway->verify($this->factor, $binding, $challenge, $code));
+        self::assertTrue($gateway->verify($this->factor, $binding, $challenge, $code)->hasPassed());
 
         $factor = $this->factor;
 

@@ -7,6 +7,8 @@ namespace SineMacula\Laravel\Mfa\Testing\Seams;
 use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
@@ -53,7 +55,7 @@ final class PasskeyGatewayContract
         ProofBinding $binding,
         array $response,
     ): void {
-        Assert::assertNull($gateway->verifyAssertion($identity, $binding, [], $response), 'An assertion must never verify against an empty allowlist.');
+        self::assertDoesNotVerify(static fn () => $gateway->verifyAssertion($identity, $binding, [], $response), 'An assertion must never verify against an empty allowlist.');
     }
 
     /**
@@ -66,6 +68,23 @@ final class PasskeyGatewayContract
      */
     public static function assertAnEmptyResponseNeverVerifies(PasskeyGateway $gateway, MultiFactorAuthenticatable $identity, ProofBinding $binding): void
     {
-        Assert::assertNull($gateway->verifyAssertion($identity, $binding, $gateway->credentialIds($identity), []), 'An empty response must never verify.');
+        self::assertDoesNotVerify(static fn () => $gateway->verifyAssertion($identity, $binding, $gateway->credentialIds($identity), []), 'An empty response must never verify.');
+    }
+
+    /**
+     * The verification answers with why it did not verify, or refuses by
+     * throwing an `OperationRefusedException`, never with an assertion.
+     *
+     * @param  \Closure(): (\SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion)  $verification
+     * @param  string  $message
+     * @return void
+     */
+    private static function assertDoesNotVerify(\Closure $verification, string $message): void
+    {
+        try {
+            Assert::assertInstanceOf(FailureReason::class, $verification(), $message);
+        } catch (OperationRefusedException) {
+            return;
+        }
     }
 }

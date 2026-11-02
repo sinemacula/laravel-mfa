@@ -116,9 +116,7 @@ final readonly class SessionFirstFactor
             return $recorded;
         }
 
-        $resolved = $this->container->make(FirstFactorResolver::class)->resolve($identity, $application);
-
-        return $resolved !== null && self::isTrusted($resolved, $identity, $application, $session) ? $resolved : null;
+        return $this->resolved($identity, $application, $session);
     }
 
     /**
@@ -136,9 +134,10 @@ final readonly class SessionFirstFactor
      */
     public function proofs(MultiFactorAuthenticatable $identity, string $application): array
     {
-        $store = $this->container->make(ProofStore::class);
+        $store   = $this->container->make(ProofStore::class);
+        $session = $store->currentSession($identity, $application);
 
-        if ($store->currentSession($identity, $application) === null) {
+        if ($session === null) {
             return [];
         }
 
@@ -150,9 +149,28 @@ final readonly class SessionFirstFactor
             }
         }
 
-        $firstFactor = $this->current($identity, $application);
+        $firstFactor = $this->resolved($identity, $application, $session);
 
         return $firstFactor === null ? $proofs : [$firstFactor, ...$proofs];
+    }
+
+    /**
+     * The bound resolver's first factor of the identity's current sign-in, when
+     * it may count.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private function resolved(MultiFactorAuthenticatable $identity, string $application, string $session): ?Proof
+    {
+        $resolved = $this->container->make(FirstFactorResolver::class)->resolve($identity, $application);
+
+        return $resolved !== null && self::isTrusted($resolved, $identity, $application, $session) ? $resolved : null;
     }
 
     /**

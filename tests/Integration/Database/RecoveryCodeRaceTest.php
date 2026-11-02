@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus;
 use SineMacula\Laravel\Mfa\RecoveryCodes\Redemption;
@@ -91,7 +92,7 @@ final class RecoveryCodeRaceTest extends TestCase
             $this->redeemAsObserver($holder, $code);
         });
 
-        $first = $this->service()->redeem($holder, $code, Purpose::SIGN_IN);
+        $first = $this->service()->redeem($holder, $code, self::bound($holder));
 
         self::assertTrue($first->passed);
         self::assertNull($this->parallel);
@@ -197,10 +198,21 @@ final class RecoveryCodeRaceTest extends TestCase
     private function redeemAsObserver(FactorHolder $holder, string $code): void
     {
         try {
-            $this->parallel = $this->asObserver(fn (): Redemption => $this->service()->redeem($holder, $code, Purpose::SIGN_IN));
+            $this->parallel = $this->asObserver(fn (): Redemption => $this->service()->redeem($holder, $code, self::bound($holder)));
         } catch (QueryException $exception) {
             $this->stopped = $exception;
         }
+    }
+
+    /**
+     * What a redemption by the identity is bound to.
+     *
+     * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
+     * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
+     */
+    private static function bound(FactorHolder $holder): ProofBinding
+    {
+        return new ProofBinding($holder->getMorphClass(), (string) $holder->id, 'web', 'race-sign-in', Purpose::SIGN_IN);
     }
 
     /**

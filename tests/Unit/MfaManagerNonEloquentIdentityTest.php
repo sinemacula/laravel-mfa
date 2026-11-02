@@ -8,12 +8,12 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
+use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
-use Tests\Fixtures\Factors\InMemoryFactor;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 
 /**
@@ -70,32 +70,23 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * `FactorOwnership::assert()` must reject a non-Eloquent factor whose owner
-     * FQCN matches but whose identifier is non-scalar — exercising the
-     * `isSameIdentifier()` short-circuit on the non-string-non-int branch.
+     * An identity whose key cannot name a record is refused rather than
+     * collapsing distinct identities onto one record, before any driver runs.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testNonScalarIdentifierIsRejectedAsOwnershipMismatch(): void
+    public function testNonScalarIdentifierIsRefused(): void
     {
         $identity = new NonEloquentIdentity(['nested' => 'array'], mfaEnabled: false);
 
         Auth::shouldReceive('user')->andReturn($identity);
+        Auth::shouldReceive('getDefaultDriver')->andReturn('web');
 
-        $factor = new InMemoryFactor(type: 'totp', authenticatable: $identity);
+        $this->expectException(UnsupportedIdentifierException::class);
 
-        $driver = \Mockery::mock(FactorDriver::class);
-        $driver->shouldNotReceive('verify');
-
-        $this->stubDriver('totp', $driver);
-
-        // Both sides of the identifier comparison are non-scalar so
-        // `isSameIdentifier()` collapses to false and the manager throws.
-        $this->expectException(FactorOwnershipMismatchException::class);
-
-        $this->manager()->verify('totp', $factor, '000000');
+        $this->manager()->verify(Submission::factor('any', '000000'));
     }
 
     /**
@@ -127,7 +118,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 
         $this->actingAs($identity);
 
-        self::assertCount(2, $this->manager()->generateRecoveryCodes());
+        self::assertCount(2, $this->container()->make(RecoveryCodeService::class)->generate($identity));
 
         // Stored rows must carry the identity's FQCN as the owner type, proving
         // the `: $identity::class` fallback fired.
@@ -138,33 +129,6 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
                 ->where('authenticatable_id', 'plain-issue')
                 ->count(),
         );
-    }
-
-    /**
-     * Without an authenticated identity, `challenge()` short-circuits before
-     * any driver lookup — but with an identity present and an extension that
-     * fails the `FactorDriver` contract, the manager surfaces a clear
-     * `LogicException` rather than a fatal type error inside the dispatch path.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testChallengeThrowsLogicExceptionForNonFactorDriverExtension(): void
-    {
-        $identity = new NonEloquentIdentity('plain-id', mfaEnabled: false);
-
-        Auth::shouldReceive('user')->andReturn($identity);
-
-        $factor = new InMemoryFactor(type: 'broken', authenticatable: $identity);
-
-        $manager = $this->manager();
-        $manager->extend('broken', fn (): \stdClass => new \stdClass);
-
-        $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('Driver [broken] must implement');
-
-        $manager->challenge('broken', $factor);
     }
 
     /**
@@ -180,17 +144,5 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
         Assert::assertInstanceOf(MfaManager::class, $manager);
 
         return $manager;
-    }
-
-    /**
-     * Register a stub driver under the given name on the MFA manager.
-     *
-     * @param  string  $name
-     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
-     * @return void
-     */
-    private function stubDriver(string $name, FactorDriver $driver): void
-    {
-        $this->manager()->extend($name, fn (): FactorDriver => $driver);
     }
 }

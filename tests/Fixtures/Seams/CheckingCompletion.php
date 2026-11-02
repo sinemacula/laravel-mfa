@@ -7,6 +7,8 @@ namespace Tests\Fixtures\Seams;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
@@ -29,6 +31,7 @@ final class CheckingCompletion implements PendingCompletion, StepUp
      *
      * @param  string  $session
      * @param  bool  $checks
+     * @param  ?object  $completion
      */
     public function __construct(
 
@@ -37,6 +40,9 @@ final class CheckingCompletion implements PendingCompletion, StepUp
 
         /** Whether results are checked at all. */
         private readonly bool $checks = true,
+
+        /** What a result that is accepted returns. */
+        private readonly ?object $completion = null,
     ) {}
 
     /**
@@ -44,28 +50,28 @@ final class CheckingCompletion implements PendingCompletion, StepUp
      *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
-     * @return void
+     * @return ?object
      *
-     * @throws \RuntimeException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
     #[\Override]
-    public function complete(PendingContext $pending, VerificationResult $result): void
+    public function complete(PendingContext $pending, VerificationResult $result): ?object
     {
-        $this->accept($result, $pending->sessionId);
+        return $this->accept($result, $pending->sessionId);
     }
 
     /**
      * Accept a successful result bound to the active session.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
-     * @return void
+     * @return ?object
      *
-     * @throws \RuntimeException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
     #[\Override]
-    public function stepUp(VerificationResult $result): void
+    public function stepUp(VerificationResult $result): ?object
     {
-        $this->accept($result, $this->session);
+        return $this->accept($result, $this->session);
     }
 
     /**
@@ -74,16 +80,18 @@ final class CheckingCompletion implements PendingCompletion, StepUp
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @param  string  $session
-     * @return void
+     * @return ?object
      *
-     * @throws \RuntimeException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    private function accept(VerificationResult $result, string $session): void
+    private function accept(VerificationResult $result, string $session): ?object
     {
         if ($this->checks && $result->proof?->binding->sessionId !== $session) {
-            throw new \RuntimeException('The result is not bound to the session.');
+            throw new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'The result is not bound to the session.');
         }
 
         $this->accepted[] = $result;
+
+        return $this->completion;
     }
 }

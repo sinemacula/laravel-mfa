@@ -18,9 +18,11 @@ event carries is built, and why every event is dispatched only after the change 
 - An event carries a factor as a `Factors\FactorSummary` (id, type, label, masked destination, status, preferred, last
   use), never the model, a secret, a code, a provisioning URI, a credential reference or a full destination, so a queued
   listener can serialise it. Who took an action on someone else's factors is an `Events\Actor`, a type and an id.
-- Verification events carry the purpose and, when the attempt went through an authentication challenge, its id. A
-  failure carries the machine-readable `Enums\FailureReason`. There is one verification event per attempt, and a check
-  against the whole recovery code set is one attempt.
+- Verification events carry the purpose and, when the attempt went through a challenge or a passkey's gateway reported
+  one, its id, as `CodeSent` does for the challenge it sent. A failure carries the machine-readable `Enums\FailureReason`.
+  There is one verification event per attempt, and a check against the whole recovery code set is one attempt. A factor
+  missing, foreign or removed under the lock is reported with no factor and no type, so the two cannot be told apart. The
+  order against the commit is in [Verification Lifecycle and Events](verification-lifecycle-and-events.md).
 - The context is an allowlist of scalars (`Events\EventContext::KEYS`): identity type and id, principal type and id,
   tenant id, application, session id, IP address and user agent, `null` when not known. It is read through
   `Contracts\EventContextResolver` and cut down to those keys and to integers and strings by

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Codes;
 
 use Carbon\CarbonImmutable;
+use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
@@ -66,6 +67,20 @@ final readonly class SendResult
     public static function refused(FailureReason $reason, ?int $retryAfter = null): self
     {
         return new self(null, null, $reason, $retryAfter === null ? null : max(1, $retryAfter));
+    }
+
+    /**
+     * No code was sent because the challenge may not go ahead, for the reason
+     * it gives; when a lockout refuses it, another may be sent once that ends.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission  $admission
+     * @return self
+     */
+    public static function refusedBy(ChallengeAdmission $admission): self
+    {
+        $until = $admission->lockedUntil;
+
+        return self::refused($admission->reason ?? FailureReason::NOT_FOUND, $until === null ? null : $until->getTimestamp() - CarbonImmutable::now()->getTimestamp());
     }
 
     /**

@@ -85,15 +85,14 @@ name:
 ],
 ```
 
-Every key below is checked; `requirement`, `totp_window`, `recovery_codes.enabled`, `freshness` and `first_factor` are
-applied, and `limits`, `bootstrap` and `recovery_codes.level` so far only by the passkey change gate (see
-[Passkeys](extending.md#passkeys)).
+Every key below is checked; `types`, `requirement`, `totp_window`, `recovery_codes`, `freshness` and `first_factor` are
+applied, and `limits` and `bootstrap` so far only by the passkey change gate (see [Passkeys](extending.md#passkeys)).
 `requirement` is composed into `Mfa::requirement()`, which the `mfa` middleware asks before it enforces anything, and
-`freshness` is what `Mfa::isFresh()` judges a step-up against (see [Requirements and step-up](requirements.md)). The
-TOTP driver accepts the window of the application a bound `Contracts\ApplicationResolver` names for the request, and
-`totp.window` when none is bound, and recovery codes are generated and redeemed only where the application accepts them.
-Until the flows that read the other keys ship, the shipped drivers verify a factor of any type whichever application
-asks, and the limits are enforced only on passkeys.
+`freshness` is what `Mfa::isFresh()` judges a step-up against (see [Requirements and step-up](requirements.md)). A
+factor is sent a code and verified only where the application enables its type (see [Verification](verification.md)), a
+TOTP code is checked within the window of the application the verification is bound to, and recovery codes are generated
+and redeemed only where the application accepts them, a new set only at `recovery_codes.level`. The limits are enforced
+only on passkeys until the enrolment flow ships.
 
 | Key                         | Default                   | Meaning                                                                                                                                |
 |-----------------------------|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------|

@@ -4,6 +4,9 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Seams;
 
+use Carbon\CarbonImmutable;
+use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
+use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -23,39 +26,43 @@ final readonly class ScriptedChallengeGateway implements ChallengeGateway
     /**
      * Constructor.
      *
-     * @param  \Closure(string): bool  $accepts
+     * @param  \Closure(string, string): \SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome  $answers
+     * @param  ?\SineMacula\Laravel\Mfa\Codes\SendResult  $sent
      */
     public function __construct(
 
-        /** Whether a code is accepted. */
-        private \Closure $accepts,
+        /** How the code and the challenge named are answered. */
+        private \Closure $answers,
+
+        /** What a send answers, or a challenge sent. */
+        private ?SendResult $sent = null,
     ) {}
 
     /**
-     * A challenge id, with nothing sent.
+     * The answer scripted, or a challenge id with nothing sent.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @return string
+     * @return \SineMacula\Laravel\Mfa\Codes\SendResult
      */
     #[\Override]
-    public function send(Factor $factor, ProofBinding $binding): string
+    public function send(Factor $factor, ProofBinding $binding): SendResult
     {
-        return 'scripted-challenge';
+        return $this->sent ?? SendResult::sent('scripted-challenge', CarbonImmutable::now()->addMinutes(5));
     }
 
     /**
-     * Whether the script accepts the code.
+     * The outcome the script gives the code.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $challengeId
      * @param  string  $code
-     * @return bool
+     * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome
      */
     #[\Override]
-    public function verify(Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): bool
+    public function verify(Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): ChallengeOutcome
     {
-        return ($this->accepts)($code);
+        return ($this->answers)($code, $challengeId);
     }
 }

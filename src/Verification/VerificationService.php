@@ -4,58 +4,77 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Verification;
 
+use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
-use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Contracts\Session\Session;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Manager;
-use SineMacula\Laravel\Mfa\Attempts\Attempt;
+use SineMacula\Laravel\Mfa\Assurance\Authenticator;
+use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
+use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
+use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Attempts\RequestIp;
-use SineMacula\Laravel\Mfa\Codes\CodeService;
-use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
-use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
+use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
-use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
+use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
+use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
+use SineMacula\Laravel\Mfa\Contracts\StepUp;
+use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
-use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
-use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
-use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
-use SineMacula\Laravel\Mfa\Events\MfaVerified;
-use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
+use SineMacula\Laravel\Mfa\Enums\SubmissionKind;
+use SineMacula\Laravel\Mfa\Events\EventDispatcher;
+use SineMacula\Laravel\Mfa\Events\VerificationFailed;
+use SineMacula\Laravel\Mfa\Events\VerificationPassed;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Exceptions\SignInChangedException;
 use SineMacula\Laravel\Mfa\Factors\FactorChannel;
-use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
+use SineMacula\Laravel\Mfa\Factors\OperationGuard;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
-use SineMacula\Laravel\Mfa\Proofs\ProofService;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
+use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Issues challenges for the factors of the identity the request serves and
- * verifies the codes submitted against them: a pending session's identity when
- * its credential allows sending a code (`mfa.send_code`) or verifying
- * (`mfa.verify`), otherwise the signed-in person (see
- * `Context\CallerContextResolver`); with neither, nothing is sent or checked.
+ * The one way a person verifies: a code for one of their factors, a code
+ * answering a challenge, a recovery code or a passkey's assertion, with one
+ * result and one reason for every failure.
  *
- * A factor whose driver delivers codes (email, SMS) has its codes sent and
- * checked through `Codes\CodeService`, bound to the factor, the identity, the
- * application, the session and the purpose: on a pending session its own
- * application and public id; otherwise the application a bound
- * `ApplicationResolver` names for the request, or the default guard's name, and
- * the Laravel session the request runs in. Every other factor goes through its
- * driver. Every verification is an attempt made through
- * `Attempts\AttemptService`, so it is counted, and refused while a lockout
- * applies, whichever way its code is checked. A verification that passes
- * records its proof on the identity's current sign-in through
- * `Proofs\ProofService`.
+ * The caller and what it is bound to (the owner, the application, the sign-in
+ * and the purpose) are captured once and threaded through the check and the
+ * proof. An IP address slot is taken, then the identity's factor state lock.
+ * Under the lock the caller and the binding are resolved again and compared, so
+ * a sign-in that ended or changed in the meantime is refused, counting and
+ * reporting nothing; the submission is admitted, then checked and counted along
+ * its one route (see `SubmissionRoutes`). A failure ends there, so its count
+ * commits. A success makes the proof, stamped with the verification generation
+ * read under the lock, which must itself be accepted after the session's first
+ * factor; the whole requirement is evaluated again with it; the result goes to
+ * `PendingCompletion` or `StepUp` as the last write of the transaction, so
+ * their refusal rolls back the code's use and the count.
+ *
+ * A failure is a result, carrying a reason a caller may be told, with one
+ * `VerificationFailed` once the transaction has ended, except where the request
+ * serves nobody at all. A success dispatches `VerificationPassed`, and for a
+ * recovery code `RecoveryCodeUsed` and `RecoveryCodesLow`, once it commits,
+ * after the default seams' proof reaches the store. Any exception but a refusal
+ * propagates.
+ *
+ * Stateless: the seams are resolved on every call.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -68,376 +87,466 @@ final readonly class VerificationService
      * Constructor.
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
-     * @param  \SineMacula\Laravel\Mfa\Drivers\DriverResolver  $drivers
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
+     * @param  \SineMacula\Laravel\Mfa\Factors\OperationGuard  $guard
+     * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptService  $attempts
+     * @param  \SineMacula\Laravel\Mfa\Verification\SubmissionRoutes  $routes
+     * @param  \SineMacula\Laravel\Mfa\Events\EventDispatcher  $events
      */
     public function __construct(
 
-        /** The container the services, dispatcher and session are read from. */
+        /** The container the seams and the configuration are resolved from. */
         private Container $container,
 
-        /** The resolver of the factor drivers. */
-        private DriverResolver $drivers,
+        /** The resolver of who the request serves. */
+        private CallerContextResolver $callers,
 
-        /** The recorder of the proofs a verification makes. */
-        private ProofService $proofs,
+        /** The guard every operation on a factor starts with. */
+        private OperationGuard $guard,
+
+        /** The throttle on the request's IP address. */
+        private AttemptService $attempts,
+
+        /** The routes a submission is checked along. */
+        private SubmissionRoutes $routes,
+
+        /** The dispatcher of the verification events. */
+        private EventDispatcher $events,
     ) {}
 
     /**
-     * Issue a challenge for the given factor through the named driver, for the
-     * purpose given.
+     * Verify the submission for the purpose given: for a pending session,
+     * completing its sign-in; for an active one, stepping up unless `sign_in`
+     * is asked for. See `PurposeRule`.
      *
-     * For a driver that delivers codes, a code bound to this session and the
-     * purpose is sent through the code service, and the outcome returned: sent,
-     * or refused with its reason. For any other driver, its `issueChallenge()`
-     * runs and nothing is returned. `MfaChallengeIssued` is dispatched unless
-     * the send was refused.
+     * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
-     * Throws `FactorOwnershipMismatchException` when the supplied factor does
-     * not belong to the current identity, closing the cross-account
-     * factor-tampering primitive. Throws `FactorDriverMismatchException` when
-     * the requested driver name does not match the factor's own `getType()`:
-     * routing one driver's logic through a factor registered against another is
-     * always a caller bug.
-     *
-     * The driver is resolved from the given registry: the manager the challenge
-     * was issued through.
-     *
-     * @param  \Illuminate\Support\Manager  $registry
-     * @param  string  $driver
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @return ?\SineMacula\Laravel\Mfa\Codes\SendResult
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
      * @throws \Throwable
      */
-    public function challenge(Manager $registry, string $driver, Factor $factor, Purpose $purpose = Purpose::SIGN_IN): ?SendResult
+    public function verify(#[\SensitiveParameter] Submission $submission, ?Purpose $purpose = null): VerificationResult
     {
-        $caller = $this->callers()->resolve(PendingAction::SEND_CODE);
+        $caller = $this->callers->resolve(PendingAction::VERIFY);
 
         if ($caller === null) {
-            return null;
+            return VerificationResult::failed(FailureReason::NOT_FOUND, 'The request serves nobody for verifying.');
         }
 
-        $identity = $caller->identity;
+        $allowed = PurposeRule::resolve($caller, $purpose);
 
-        $this->drivers->assertMatchesFactor($driver, $factor);
-        FactorOwnership::assert($factor, $identity);
+        if ($allowed === null) {
+            $application = $this->callers->application($caller);
 
-        $resolved = $this->drivers->resolve($registry, $driver);
-        $result   = null;
-
-        // A delivered code is sent bound to this session and purpose. Sending a
-        // code resets no count and lifts no lockout: only a success of the
-        // factor resets its failures in a row, so a resend cannot be used to
-        // wipe a lockout. A TOTP factor has no per-challenge secret to mint, so
-        // its `issueChallenge()` is a no-op.
-        if ($resolved instanceof CodeDeliveryDriver) {
-            $result = $this->container->make(CodeService::class)->send($identity, $factor, $this->binding($caller, $purpose), $resolved);
-        } else {
-            $resolved->issueChallenge($factor);
+            return $this->refused($caller->identity, $application, $purpose ?? Purpose::SIGN_IN, FailureReason::NOT_ACCEPTED, 'A verification is not made for that purpose.');
         }
 
-        if ($result === null || $result->wasSent()) {
-            $events = $this->container->make(Dispatcher::class);
-            $events->dispatch(new MfaChallengeIssued($identity, $factor, $driver));
+        $binding = $this->callers->binding($caller, $allowed);
+
+        if ($binding === null) {
+            return VerificationResult::failed(FailureReason::NOT_FOUND, 'The identity has no sign-in to bind the verification to.');
         }
 
-        return $result;
+        return $submission->kind === SubmissionKind::RECOVERY_CODE
+            ? $this->attempt($submission, $caller, $binding, null, null)
+            : $this->attemptFactor($submission, $caller, $binding);
     }
 
     /**
-     * Verify a submitted code against the given factor through the named
-     * driver, for the purpose given.
+     * Find the submission's factor and its driver, refuse one that may not be
+     * used or that takes another kind of submission, and make the attempt.
      *
-     * - The attempt is made through the attempt service, charged to the current
-     *   identity, the factor and the request's IP address, for the purpose:
-     *   refused without checking the code while a lockout applies, otherwise
-     *   counted with its outcome under the identity's factor state lock.
-     * - The code is checked against the factor as stored under that lock, not
-     *   the instance passed in: through the code service, against the code
-     *   sent for this session and the purpose, for a driver that delivers
-     *   codes; through the driver's verification logic otherwise.
-     * - So a secret replaced in the meantime is the one checked, and a factor
-     *   removed in the meantime is reported as not found without checking
-     *   anything.
-     * - Just before the code is checked, under that lock, the identity's
-     *   verification generation is read, when it has a sign-in a proof can be
-     *   recorded on, so a generation advanced while the code is checked leaves
-     *   the proof behind.
-     * - On success, inside the same transaction: a delivered code is used up
-     *   and the factor's last use stamped, so they commit with the count and
-     *   two requests with the same code cannot both pass.
-     * - Once the code is checked, the instance passed in is brought up to date
-     *   with the stored factor. On success the proof is recorded on the
-     *   identity's current sign-in through the bound proof store, for the
-     *   purpose, and `MfaVerified` dispatched; on failure
-     *   `MfaVerificationFailed` is dispatched with a machine-readable reason,
-     *   `locked` for an attempt a lockout refused and `not_found` for a factor
-     *   removed in the meantime.
-     *
-     * Throws `FactorOwnershipMismatchException` when the supplied factor does
-     * not belong to the current identity, closing the cross-account MFA-bypass
-     * primitive, before anything is counted. Throws
-     * `FactorDriverMismatchException` when the requested driver name does not
-     * match the factor's own `getType()`.
-     *
-     * The driver is resolved from the given registry: the manager the
-     * verification was called on.
-     *
-     * @param  \Illuminate\Support\Manager  $registry
-     * @param  string  $driver
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $code
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @return bool
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
-     * @throws \Throwable
-     */
-    public function verify(Manager $registry, string $driver, Factor $factor, #[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
-    {
-        $caller = $this->callers()->resolve(PendingAction::VERIFY);
-
-        if ($caller === null) {
-            return false;
-        }
-
-        $identity = $caller->identity;
-
-        $this->drivers->assertMatchesFactor($driver, $factor);
-        FactorOwnership::assert($factor, $identity);
-
-        $events   = $this->container->make(Dispatcher::class);
-        $resolved = $this->drivers->resolve($registry, $driver);
-
-        return $this->makeAttempt($caller, $factor, $driver, $resolved, $code, $purpose, $events);
-    }
-
-    /**
-     * Make the attempt to verify the code against the factor through the
-     * resolved driver, for the purpose given, and apply what it found: bring
-     * the factor up to date, record the proof on success, and dispatch the
-     * outcome.
-     *
+     * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $driver
-     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $resolved
-     * @param  string  $code
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @param  \Illuminate\Contracts\Events\Dispatcher  $events
-     * @return bool
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    private function makeAttempt(
+    private function attemptFactor(#[\SensitiveParameter] Submission $submission, Caller $caller, ProofBinding $binding): VerificationResult
+    {
+        try {
+            $factor = $this->guard->factor($caller->identity, $submission->factorId, $binding->application);
+        } catch (OperationRefusedException $exception) {
+            return $this->refused($caller->identity, $binding->application, $binding->purpose, $exception->reason, $exception->getMessage());
+        }
+
+        $driver = $this->container->make(DriverResolver::class)->fromContainer($this->container, $factor->getType());
+
+        if (!SubmissionRoutes::fits($submission, $driver, $factor->getType())) {
+            $check = CheckOutcome::refused(FailureReason::NOT_FOUND, 'The factor does not take that kind of submission.');
+
+            return $this->report($caller->identity, $binding, FactorSummary::fromFactor($factor), $factor->getType(), $submission, $check);
+        }
+
+        return $this->attempt($submission, $caller, $binding, $factor, $driver);
+    }
+
+    /**
+     * Make the attempt holding a slot of the IP address's window and the
+     * identity's lock, and report how it failed if it did.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
+     * @param  ?\SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
+     * @throws \Throwable
+     */
+    private function attempt(
+        #[\SensitiveParameter] Submission $submission,
         Caller $caller,
-        Factor $factor,
-        string $driver,
-        FactorDriver $resolved,
-        #[\SensitiveParameter] string $code,
-        Purpose $purpose,
-        Dispatcher $events,
-    ): bool {
-        $identity   = $caller->identity;
-        $binding    = $resolved instanceof CodeDeliveryDriver ? $this->binding($caller, $purpose) : null;
-        $verified   = $factor;
-        $check      = null;
-        $generation = null;
+        ProofBinding $binding,
+        (EloquentFactor&Model)|null $factor,
+        ?FactorDriver $driver,
+    ): VerificationResult {
+        $settled = $this->settled($submission, $caller->identity, $binding, $factor, $driver);
 
-        // The current identity's own session makes the attempt, so the identity
-        // is charged for it.
-        $outcome = $this->container->make(AttemptService::class)->attempt(
-            new Attempt($identity, $factor, $purpose, RequestIp::resolve($this->container)),
-            function (?Factor $stored) use ($identity, $resolved, $binding, $code, &$verified, &$check, &$generation): bool {
-
-                $verified   = $stored ?? $verified;
-                $generation = $this->proofs->generationFor($identity);
-
-                return $this->isAccepted($resolved, $binding, $verified, $code, $check);
-            },
-        );
-
-        if ($outcome->lockout !== null || $outcome->isNotFound()) {
-
-            [$reason, $detail] = $outcome->lockout !== null
-                ? [FailureReason::LOCKED, $outcome->lockout->detail()]
-                : [FailureReason::NOT_FOUND, 'The factor is no longer among the identity\'s factors.'];
-
-            $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason, $detail));
-
-            return false;
+        if ($settled instanceof VerificationResult) {
+            return $settled;
         }
 
-        if ($factor instanceof Model && $verified instanceof Model && $verified !== $factor) {
-            $factor->setRawAttributes($verified->getAttributes(), true);
-        }
+        $vanished = $settled->reason     === FailureReason::NOT_FOUND && !$settled->counted;
+        $summary  = $vanished || $factor === null ? null : FactorSummary::fromFactor($factor);
+        $type     = $factor              === null ? RecoveryCodeService::TYPE : $factor->getType();
 
-        if ($outcome->passed && $generation !== null) {
-            $this->recordProof($identity, $generation, $factor, $driver, $resolved, $purpose);
-        }
-
-        $this->finalizeVerification($identity, $factor, $driver, $outcome->passed, $check, $events);
-
-        return $outcome->passed;
+        return $this->report($caller->identity, $binding, $summary, $vanished ? null : $type, $submission, $settled);
     }
 
     /**
-     * Check the code against the factor as stored, and record a success on it:
-     * through the code service, under the binding, for a driver that delivers
-     * codes, recording what the check found in `$check`; through the driver
-     * otherwise.
+     * How the attempt settled, holding a slot of the IP address's window and,
+     * once it has one, the identity's lock. A refusal thrown has rolled back
+     * what the attempt did; one the address's throttle made ran nothing.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
-     * @param  ?\SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $code
-     * @param  ?\SineMacula\Laravel\Mfa\Enums\CodeCheck  $check
-     * @return bool
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
-     */
-    private function isAccepted(FactorDriver $driver, ?ProofBinding $binding, Factor $factor, #[\SensitiveParameter] string $code, ?CodeCheck &$check): bool
-    {
-        if ($binding !== null) {
-            $check = $this->container->make(CodeService::class)->check($factor, $binding, $code);
-        }
-
-        $accepted = $check === null ? $driver->verify($factor, $code) : $check === CodeCheck::ACCEPTED;
-
-        if ($accepted && $factor instanceof EloquentFactor) {
-            $factor->recordVerification();
-            $factor->persist();
-        }
-
-        return $accepted;
-    }
-
-    /**
-     * Record the proof a successful verification made on the identity's current
-     * sign-in, for the purpose it was made for, stamped with the verification
-     * generation read before the code was checked: an additional factor proof
-     * on the factor's channel (see `Factors\FactorChannel`). A driver whose
-     * channel cannot carry a factor proves nothing, and neither does a factor
-     * whose identifier cannot name it.
-     *
+     * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  int  $generation
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $driver
-     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $resolved
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @return void
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
+     * @param  ?\SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
+     * @return \SineMacula\Laravel\Mfa\Verification\CheckOutcome|\SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
-    private function recordProof(MultiFactorAuthenticatable $identity, int $generation, Factor $factor, string $driver, FactorDriver $resolved, Purpose $purpose): void
-    {
-        $identifier = $factor->getFactorIdentifier();
-        $channel    = FactorChannel::of($factor, $resolved->channelKind());
+    private function settled(
+        #[\SensitiveParameter]
+        Submission $submission,
+        MultiFactorAuthenticatable $identity,
+        ProofBinding $binding,
+        (EloquentFactor&Model)|null $factor,
+        ?FactorDriver $driver,
+    ): CheckOutcome|VerificationResult {
+        $settled = CheckOutcome::refused(FailureReason::NOT_FOUND, 'The verification did not run.');
 
-        if ($channel === null || (!is_string($identifier) && !is_int($identifier))) {
-            return;
+        try {
+            $outcome = $this->attempts->throttled(
+                RequestIp::resolve($this->container),
+                function () use ($submission, $identity, $binding, $factor, $driver, &$settled): AttemptOutcome {
+
+                    $settled = $this->transaction($submission, $identity, $binding, $factor, $driver);
+
+                    return self::attemptOutcome($settled);
+                },
+            );
+        } catch (SignInChangedException) {
+            return VerificationResult::failed(FailureReason::NOT_FOUND, 'The sign-in the verification was made for is no longer the request\'s.');
+        } catch (OperationRefusedException $exception) {
+            return CheckOutcome::refused($exception->reason, $exception->getMessage());
         }
 
-        $this->proofs->record($identity, $generation, ProofKind::ADDITIONAL_FACTOR, $driver, $channel, (string) $identifier, $purpose);
+        return $outcome->lockout === null ? $settled : CheckOutcome::refused(FailureReason::LOCKED, $outcome->lockout->detail(), $outcome->lockout->until);
     }
 
     /**
-     * Apply the post-verify side effects: dispatch `MfaVerified` on success, or
-     * classify the failure and dispatch `MfaVerificationFailed` with a
-     * machine-readable reason on failure.
+     * Open the identity's factor state transaction and settle the attempt in
+     * it. What a success returns commits with it, and what a failure counted
+     * commits too, since it returns; a refusal thrown rolls everything back.
      *
+     * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $driver
-     * @param  bool  $valid
-     * @param  ?\SineMacula\Laravel\Mfa\Enums\CodeCheck  $check
-     * @param  \Illuminate\Contracts\Events\Dispatcher  $events
-     * @return void
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
+     * @param  ?\SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
+     * @return \SineMacula\Laravel\Mfa\Verification\CheckOutcome|\SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
+     * @throws \Throwable
      */
-    private function finalizeVerification(MultiFactorAuthenticatable $identity, Factor $factor, string $driver, bool $valid, ?CodeCheck $check, Dispatcher $events): void
-    {
-        if ($valid) {
-            AfterStorageCommit::run($this->container, static fn () => $events->dispatch(new MfaVerified($identity, $factor, $driver)));
+    private function transaction(
+        #[\SensitiveParameter] Submission $submission,
+        MultiFactorAuthenticatable $identity,
+        ProofBinding $binding,
+        (EloquentFactor&Model)|null $factor,
+        ?FactorDriver $driver,
+    ): CheckOutcome|VerificationResult {
+        $model = $factor ?? new (ConfiguredModels::factor($this->container->make(Repository::class)));
 
-            return;
-        }
+        $settle = function (Collection $factors) use ($submission, $binding, $factor, $driver): CheckOutcome|VerificationResult {
 
-        // Classify the failure: a delivered code by what its check found; any
-        // other factor as not confirmed when it holds no secret, so its
-        // enrolment never completed, and as an invalid code otherwise.
-        [$reason, $detail] = match (true) {
-            $check !== null               => [$check->failure() ?? FailureReason::INVALID_CODE, $check->detail()],
-            $factor->getSecret() === null => [FailureReason::NOT_CONFIRMED, 'The factor has no secret, so its enrolment never completed.'],
-            default                       => [FailureReason::INVALID_CODE, 'The code did not match.'],
+            $caller = $this->callers->still(PendingAction::VERIFY, $binding)
+                ?? throw new SignInChangedException('The sign-in changed before the identity\'s lock was held.');
+
+            if ($factor === null || $driver === null) {
+                return $this->settleRecoveryCode($submission, $caller, $binding);
+            }
+
+            $stored = LockedFactors::find($factor, $factors);
+
+            return $stored === null
+                ? CheckOutcome::refused(FailureReason::NOT_FOUND, 'The factor is no longer among the identity\'s factors.')
+                : $this->settleFactor($submission, $caller, $binding, $stored, $driver);
         };
 
-        $events->dispatch(new MfaVerificationFailed($identity, $factor, $driver, $reason, $detail));
+        return FactorStateTransaction::forIdentity($identity, $model, $settle);
     }
 
     /**
-     * What a delivered code for the caller is bound to in this request: the
-     * identity, the application, the session and the purpose. On a pending
-     * session they are the pending session's own application and public id;
-     * otherwise the current request's application and the Laravel session.
+     * Under the lock: admit the factor as stored, check and count the
+     * submission, and on a pass stamp the factor's last use and complete.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
+     * @return \SineMacula\Laravel\Mfa\Verification\CheckOutcome|\SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
+     * @throws \Throwable
+     */
+    private function settleFactor(
+        #[\SensitiveParameter] Submission $submission,
+        Caller $caller,
+        ProofBinding $binding,
+        EloquentFactor&Model $factor,
+        FactorDriver $driver,
+    ): CheckOutcome|VerificationResult {
+        $admission = $this->container->make(ChallengeCounters::class)->underLock($caller->identity, $factor, $binding);
+
+        if (!$admission->isAdmitted()) {
+            return CheckOutcome::refusedBy($admission);
+        }
+
+        $check = $this->routes->factor($caller->identity, $submission, $factor, $driver, $binding);
+
+        if (!$check->hasPassed()) {
+            return $check;
+        }
+
+        $factor->recordVerification();
+        $factor->persist();
+
+        $reference = (string) LockedFactors::idOf($factor);
+        $channel   = FactorChannel::of($factor, $driver->channelKind());
+
+        $generation = VerificationGeneration::current($caller->identity);
+        $properties = self::observed($check);
+        $now        = CarbonImmutable::now();
+        $proof      = new Proof(ProofKind::ADDITIONAL_FACTOR, $factor->getType(), $channel, $reference, $properties, $now, $binding, $generation, $check->challengeId);
+
+        return $this->complete($caller, $proof, $check, $driver->amr(), FactorSummary::fromFactor($factor), $factor->getType());
+    }
+
+    /**
+     * Under the lock: admit the recovery code, redeem it, and on a pass
+     * complete.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Verification\CheckOutcome|\SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
+     * @throws \Throwable
+     */
+    private function settleRecoveryCode(#[\SensitiveParameter] Submission $submission, Caller $caller, ProofBinding $binding): CheckOutcome|VerificationResult
+    {
+        $admission = $this->container->make(RecoveryCodeService::class)->admission($caller->identity, $binding);
+
+        if (!$admission->isAdmitted()) {
+            return CheckOutcome::refusedBy($admission);
+        }
+
+        $check = $this->routes->recoveryCode($caller->identity, $submission, $binding);
+
+        if (!$check->hasPassed()) {
+            return $check;
+        }
+
+        $generation = VerificationGeneration::current($caller->identity);
+        $proof      = new Proof(ProofKind::RECOVERY_CODE, RecoveryCodeService::TYPE, null, null, self::observed($check), CarbonImmutable::now(), $binding, $generation);
+
+        return $this->complete($caller, $proof, $check, [], null, RecoveryCodeService::TYPE);
+    }
+
+    /**
+     * Under the lock: refuse a proof that is not itself accepted after the
+     * session's first factor, whatever an older proof shows; evaluate the whole
+     * requirement again with it; hand the result to the seam; and queue the
+     * events, so a rollback discards them.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+     * @param  \SineMacula\Laravel\Mfa\Verification\CheckOutcome  $check
+     * @param  list<string>  $driverAmr
+     * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $summary
+     * @param  string  $type
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    private function binding(Caller $caller, Purpose $purpose): ProofBinding
+    private function complete(Caller $caller, Proof $proof, CheckOutcome $check, array $driverAmr, ?FactorSummary $summary, string $type): VerificationResult
     {
-        return new ProofBinding(
-            CurrentIdentity::typeOf($caller->identity),
-            self::identityKey($caller->identity),
-            $this->callers()->application($caller),
-            $caller->pending->sessionId ?? $this->container->make(Session::class)->getId(),
-            $purpose,
+        $requirements = $this->container->make(RequirementCheck::class);
+        $binding      = $proof->binding;
+        $pending      = $caller->pending;
+        $proofs       = $pending === null
+            ? $this->container->make(SessionFirstFactor::class)->proofs($caller->identity, $binding->application)
+            : [$pending->firstFactor, ...self::counting($pending, $proof->generation)];
+        $firstFactor = self::firstFactorOf($proofs);
+
+        OperationRefusedException::unless(
+            $firstFactor !== null && $requirements->check(Requirement::none(), $firstFactor, $proof)->accepted,
+            FailureReason::NOT_ACCEPTED,
+            'The proof is not accepted after the session\'s first factor.',
         );
-    }
 
-    /**
-     * The resolver of who the request serves.
-     *
-     * @return \SineMacula\Laravel\Mfa\Context\CallerContextResolver
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    private function callers(): CallerContextResolver
-    {
-        return $this->container->make(CallerContextResolver::class);
-    }
+        $requirement = $pending->requirement ?? $this->container->make(RequirementService::class)->requirementFor($caller->identity, $binding->application);
+        $evaluation  = $requirements->check($requirement, ...$proofs, ...[$proof]);
 
-    /**
-     * The identity's key as a string, which a delivered code is bound to.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @return string
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
-     */
-    private static function identityKey(MultiFactorAuthenticatable $identity): string
-    {
-        $key = $identity->getAuthIdentifier();
+        $amr    = array_values(array_unique(array_diff([...Authenticator::of($proof)->amr, ...$driverAmr], ['mfa'])));
+        $result = VerificationResult::verified($proof, $evaluation, $amr, $type);
 
-        if ((!is_string($key) && !is_int($key)) || $key === '') {
-            throw new UnsupportedIdentifierException(sprintf('A delivered code is bound to an identity with a string or integer key; got [%s].', get_debug_type($key)));
+        $completion = $pending === null
+            ? $this->container->make(StepUp::class)->stepUp($result)
+            : $this->container->make(PendingCompletion::class)->complete($pending, $result);
+
+        $context = $this->events->context($caller->identity, $binding->application);
+
+        $this->events->dispatch(new VerificationPassed($context, $summary, $type, $binding->purpose, $proof->challengeId));
+
+        if ($check->remaining !== null) {
+            $this->container->make(RecoveryCodeService::class)->reportRedeemed($caller->identity, $binding, $check->remaining);
         }
 
-        return (string) $key;
+        return $result->withCompletion($completion);
+    }
+
+    /**
+     * Report a refusal made before any factor or attempt.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
+     * @param  string  $detail
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    private function refused(MultiFactorAuthenticatable $identity, string $application, Purpose $purpose, FailureReason $reason, string $detail): VerificationResult
+    {
+        $this->events->dispatch(new VerificationFailed($this->events->context($identity, $application), null, null, $purpose, $reason));
+
+        return VerificationResult::failed($reason, $detail);
+    }
+
+    /**
+     * Report a failed attempt, once, and answer it. The challenge named is
+     * reported only with the factor it was named for.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $summary
+     * @param  ?string  $type
+     * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
+     * @param  \SineMacula\Laravel\Mfa\Verification\CheckOutcome  $check
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    private function report(
+        MultiFactorAuthenticatable $identity,
+        ProofBinding $binding,
+        ?FactorSummary $summary,
+        ?string $type,
+        #[\SensitiveParameter] Submission $submission,
+        CheckOutcome $check,
+    ): VerificationResult {
+        $reason = $check->reason ?? FailureReason::INVALID_CODE;
+
+        $this->events->dispatch(new VerificationFailed(
+            $this->events->context($identity, $binding->application),
+            $summary,
+            $type,
+            $binding->purpose,
+            $reason,
+            $summary === null ? null : $submission->challengeId,
+        ));
+
+        return VerificationResult::failed($reason, $check->detail, $check->lockedUntil);
+    }
+
+    /**
+     * What the address's throttle makes of how the attempt settled: only a
+     * failure that was counted keeps its slot.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Verification\CheckOutcome|\SineMacula\Laravel\Mfa\Verification\VerificationResult  $settled
+     * @return \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome
+     */
+    private static function attemptOutcome(CheckOutcome|VerificationResult $settled): AttemptOutcome
+    {
+        return match (true) {
+            $settled instanceof VerificationResult => AttemptOutcome::pass(),
+            $settled->counted                      => AttemptOutcome::fail(),
+            default                                => AttemptOutcome::uncounted(),
+        };
+    }
+
+    /**
+     * The pending session's further proofs that still count: those of the
+     * current verification generation, made by now.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @param  int  $generation
+     * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
+     */
+    private static function counting(PendingContext $pending, int $generation): array
+    {
+        $now = CarbonImmutable::now();
+
+        return array_values(array_filter($pending->proofs, static fn (Proof $proof): bool => $proof->generation === $generation && $proof->provedAt->lessThanOrEqualTo($now)));
+    }
+
+    /**
+     * The session's first factor among its proofs, if it has one.
+     *
+     * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
+     * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
+     */
+    private static function firstFactorOf(array $proofs): ?Proof
+    {
+        foreach ($proofs as $proof) {
+            if ($proof->kind === ProofKind::FIRST_FACTOR) {
+                return $proof;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * What a check that passed observed.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Verification\CheckOutcome  $check
+     * @return \SineMacula\Laravel\Mfa\Assurance\ObservedProperties
+     *
+     * @throws \LogicException
+     */
+    private static function observed(CheckOutcome $check): ObservedProperties
+    {
+        return $check->properties ?? throw new \LogicException('A check that passed says what it observed.');
     }
 }

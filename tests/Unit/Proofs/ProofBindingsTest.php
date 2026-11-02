@@ -9,11 +9,14 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Events\Dispatcher;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
+use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Proofs\GenerationSessionRevoker;
 use SineMacula\Laravel\Mfa\Proofs\ProofBindings;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\Proofs\ProofStoreCompletion;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -57,6 +60,19 @@ final class ProofBindingsTest extends TestCase
         self::assertInstanceOf(SessionProofStore::class, $this->container()->make(ProofStore::class));
         self::assertFalse($this->container()->isShared(ProofStore::class));
         self::assertNotSame($this->container()->make(ProofStore::class), $this->container()->make(ProofStore::class));
+    }
+
+    /**
+     * The default pending completion and step-up record in the proof store.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBindsTheDefaultCompletions(): void
+    {
+        self::assertInstanceOf(ProofStoreCompletion::class, $this->container()->make(PendingCompletion::class));
+        self::assertInstanceOf(ProofStoreCompletion::class, $this->container()->make(StepUp::class));
     }
 
     /**

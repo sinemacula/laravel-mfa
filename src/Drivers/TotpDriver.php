@@ -13,6 +13,8 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
  * TOTP factor driver: time-based one-time passwords (RFC 6238) from an
@@ -24,18 +26,20 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
  * which the factor keeps. A code is checked against every time step of the
  * window, each compared with `hash_equals()` and none skipped when an earlier
  * one matches, so the work does not depend on which step matches or whether one
- * does. The window is the `totp_window` of the application a bound
- * `ApplicationResolver` names for the current request, or `mfa.totp.window`
- * without one; it is read from the configuration on every call and never
- * widens.
+ * does. The window is the `totp_window` of the application the verification's
+ * binding names; a confirmation has no binding, so it uses the application a
+ * bound `ApplicationResolver` names for the current request, or
+ * `mfa.totp.window` without one. The window is read from the configuration on
+ * every call and never widens.
  *
  * A time step is single-use per factor (RFC 6238 §5.2): a code is accepted only
  * when its step is later than the factor's last accepted one, recorded in the
  * same compare-and-set (see `EloquentFactor::storeAcceptedStep()`), at
  * confirmation as at verification. Of two requests with the same code, only one
- * records the step, and a code for an earlier step is refused. A factor that
- * cannot record a step, one implementing only the `Factor` read surface, cannot
- * be held to single use, so it verifies nothing.
+ * records the step, and a code that matches a step already passed is reported
+ * as replayed, never as wrong. A factor that cannot record a step, one
+ * implementing only the `Factor` read surface, cannot be held to single use, so
+ * it verifies nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -58,37 +62,29 @@ final readonly class TotpDriver implements FactorDriver
     ) {}
 
     /**
-     * TOTP challenges are implicit: the authenticator app makes codes locally
-     * from the shared secret, so there is nothing to send.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
-     */
-    #[\Override]
-    public function issueChallenge(Factor $factor): void
-    {
-        // Nothing to send: the authenticator app makes the code.
-    }
-
-    /**
-     * Verify the code against the factor's secret and parameters, recording the
-     * matched time step so it is never accepted again.
+     * Verify the code against the factor's secret and parameters within the
+     * window of the binding's application, recording the matched time step so
+     * it is never accepted again: `ACCEPTED`, `INVALID` for a code that matches
+     * no step of the window, or `REPLAYED` for one that matches a step already
+     * passed.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @return bool
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
     #[\Override]
-    public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
+    public function verify(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck
     {
-        $step = $this->matchedStep($factor, $code);
+        $step = $this->matchedStep($factor, $code, $binding->application);
 
-        return $step !== null
-            && $factor instanceof EloquentFactor
-            && $factor->storeAcceptedStep($step);
+        if ($step === null || !$factor instanceof EloquentFactor) {
+            return CodeCheck::INVALID;
+        }
+
+        return $factor->storeAcceptedStep($step) ? CodeCheck::ACCEPTED : CodeCheck::REPLAYED;
     }
 
     /**
@@ -159,7 +155,11 @@ final readonly class TotpDriver implements FactorDriver
     #[\Override]
     public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool
     {
-        return $this->verify($factor, $code);
+        $step = $this->matchedStep($factor, $code, $this->application());
+
+        return $step !== null
+            && $factor instanceof EloquentFactor
+            && $factor->storeAcceptedStep($step);
     }
 
     /**
@@ -222,12 +222,12 @@ final readonly class TotpDriver implements FactorDriver
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
+     * @param  ?string  $application
      * @return ?int
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    private function matchedStep(Factor $factor, #[\SensitiveParameter] string $code): ?int
+    private function matchedStep(Factor $factor, #[\SensitiveParameter] string $code, ?string $application): ?int
     {
         $parameters = TotpParameters::fromFactor($factor);
         $key        = Base32::decode($factor->getSecret() ?? '');
@@ -236,7 +236,7 @@ final readonly class TotpDriver implements FactorDriver
             return null;
         }
 
-        $window  = $this->settings->windowFor($this->application());
+        $window  = $this->settings->windowFor($application);
         $current = $parameters->stepAt(CarbonImmutable::now()->getTimestamp());
         $matched = null;
 

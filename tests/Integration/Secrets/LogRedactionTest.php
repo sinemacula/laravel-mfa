@@ -16,14 +16,17 @@ use Monolog\Logger as Monolog;
 use Monolog\LogRecord;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Secrets\ExceptionScrubber;
 use SineMacula\Laravel\Mfa\Secrets\Redactor;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecrets;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecretsInLogs;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Secrets\SecretBindings;
-use Tests\Fixtures\Factors\InMemoryFactor;
+use SineMacula\Laravel\Mfa\Verification\Submission;
+use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Secrets\AddsCodeToExtra;
 use Tests\Fixtures\Secrets\CodeForwardingDriver;
@@ -312,15 +315,25 @@ final class LogRedactionTest extends TestCase
      */
     private function exceptionPassingTheCode(): \Throwable
     {
+        config()->set('mfa.applications.web', ['types' => ['forwarding'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
         $user = TestUser::query()->create(['email' => 'secrets@example.com']);
 
         $this->actingAs($user);
 
+        $this->container()->make(ProofStore::class)->begin($user, 'web', 'sign-in-1');
+
         Mfa::extend('forwarding', static fn (): FactorDriver => new CodeForwardingDriver);
 
-        $factor = new InMemoryFactor(type: 'forwarding', authenticatable: $user);
+        $factor = Factor::query()->create([
+            'authenticatable_type' => $user->getMorphClass(),
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'forwarding',
+            'status'               => 'confirmed',
+        ]);
 
-        return RecordedTrace::thrownBy(static fn (): bool => Mfa::verify('forwarding', $factor, self::CODE));
+        return RecordedTrace::thrownBy(static fn (): VerificationResult => Mfa::verify(Submission::factor($factor->getKey(), self::CODE)));
     }
 
     /**

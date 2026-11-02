@@ -22,12 +22,9 @@ the provider or another capability.
 - The services act for the current identity: `Support\CurrentIdentity::resolve()`, which is `Auth::user()` on the
   default guard when it implements `MultiFactorAuthenticatable`. Without one, every service answers as it always has: no
   setup, no factors, no proofs, and nothing written or dispatched.
-- The manager passes itself to the operations that run a factor through its driver (`challenge()`, `verify()`), and
-  `Drivers\DriverResolver` resolves the driver from that registry. Recovery codes are not a factor and have no driver:
-  the recovery code methods hand their service the current identity instead. The drivers registered
-  against the manager the call was made on are the ones a service runs, whether it is the `mfa` singleton or a manager
-  built separately. A factor is only run through the driver it was registered against (`assertMatchesFactor()`), and
-  only for its owner (`Factors\FactorOwnership`).
+- A factor runs through the driver of its type, resolved by `Drivers\DriverResolver` from the `mfa` manager the container
+  holds, whichever manager the call was made on. Recovery codes are not a factor and have no driver. A factor is only
+  looked up within the identity the request serves (`Factors\OperationGuard`).
 - No service keeps request state: the reads (`isSetup()`, `getFactors()`, `proofs()`) go to the identity, the
   database or the bound proof store on every call, so a singleton service never carries one request's identity or
   factors into the next.
@@ -52,10 +49,10 @@ the provider or another capability.
   drivers, each built from the settings of its capability's block (`mfa.totp`, `mfa.codes`), before the container
   applies any extender or resolving callback.
   The factory first checks the whole configuration (see the application configuration note).
-- A call such as `Mfa::verify('totp', $factor, $code)` reaches `MfaManager::verify()`, which hands it to
-  `Verification\VerificationService::verify()` with the manager as the driver registry. The service resolves the current
-  identity, checks the driver and the owner, runs the driver, records the outcome on the factor, records the proof on
-  the identity's sign-in through the bound proof store and dispatches the event.
+- A call such as `Mfa::verify(Submission::factor($id, $code))` reaches `MfaManager::verify()`, which hands it to
+  `Verification\VerificationService::verify()`. The service resolves who the request serves, guards the factor, checks and
+  counts the code under the identity's lock, hands the result to the completion seam and queues the events (see
+  [Verification Lifecycle and Events](verification-lifecycle-and-events.md)).
 
 ## Failure / Edge Cases
 

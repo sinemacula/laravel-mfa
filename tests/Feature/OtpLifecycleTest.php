@@ -4,11 +4,8 @@ declare(strict_types = 1);
 
 namespace Tests\Feature;
 
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Session\Session;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
@@ -17,28 +14,25 @@ use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
-use SineMacula\Laravel\Mfa\Events\CodeSent;
-use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
-use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
-use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
 use SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
-use Tests\Fixtures\Identities\TestUser;
+use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
  * End-to-end lifecycle of the delivered codes (email and SMS) through the
  * manager: a code is delivered through the bound sender and accepted once, for
- * its own session, purpose and factor only; a resend replaces it after the
+ * its own sign-in, purpose and factor only; a resend replaces it after the
  * cooldown, and resets no failure count or lockout; the sends are capped across
- * sessions; and nothing is sent without a sender bound.
+ * sign-ins; and nothing is sent without a sender bound.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -52,70 +46,80 @@ use Tests\TestCase;
 #[CoversClass(SmsDriver::class)]
 final class OtpLifecycleTest extends TestCase
 {
-    use RefreshDatabase;
-
-    /** @var string The address the email factor delivers to. */
-    private const string ADDRESS = 'email-mfa@example.test';
+    use ArrangesVerification;
 
     /** @var string The phone number the SMS factor delivers to. */
     private const string PHONE = '+447700900123';
 
     /**
+     * Arrange the application.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->arrangeVerification();
+    }
+
+    /**
+     * Release the frozen clock.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
+    /**
      * An email code is delivered to the factor's address in the code message,
-     * reported, and verified once.
+     * and verified once.
      *
      * @return void
      */
     public function testAnEmailCodeIsDeliveredAndVerifiedOnce(): void
     {
-        $sender = FakeEmailSender::fake($this->container());
-        $factor = $this->enroll('email', self::ADDRESS);
+        $factor = $this->emailFactor($this->signedInPerson());
 
-        Event::fake([MfaChallengeIssued::class, CodeSent::class, MfaVerified::class]);
+        $result = Mfa::sendCode($factor->id);
+        $code   = $this->mailbox->lastCodeTo(self::ADDRESS);
 
-        $result = Mfa::challenge('email', $factor);
-        $code   = $sender->lastCodeTo(self::ADDRESS);
-
-        self::assertNotNull($result);
         self::assertTrue($result->wasSent());
         self::assertNotNull($code);
-        self::assertInstanceOf(MfaCodeMessage::class, $sender->sentTo(self::ADDRESS)[0]['message']);
-        Event::assertDispatched(MfaChallengeIssued::class);
-        Event::assertDispatched(CodeSent::class, static fn (CodeSent $event): bool => $event->challengeId === $result->challengeId);
+        self::assertNotNull($result->challengeId);
+        self::assertInstanceOf(MfaCodeMessage::class, $this->mailbox->sentTo(self::ADDRESS)[0]['message']);
 
-        self::assertTrue(Mfa::verify('email', $factor, $code));
-        Event::assertDispatched(MfaVerified::class);
-
-        self::assertFalse(Mfa::verify('email', $factor, $code));
+        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $result->challengeId, $code))->isVerified());
+        self::assertSame(FailureReason::REPLAYED, Mfa::verify(Submission::challenge($factor->id, $result->challengeId, $code))->reason);
     }
 
     /**
-     * Verifying an email code on a signed-in session records a proof on the
-     * email channel, named by the factor's destination, for the purpose the
-     * code was sent and checked for.
+     * Verifying an email code records a proof on the email channel, named by
+     * the factor's destination, for the purpose the code was sent and checked
+     * for.
      *
      * @return void
      */
     public function testAVerifiedEmailCodeRecordsAProof(): void
     {
-        $sender = FakeEmailSender::fake($this->container());
-        $factor = $this->enroll('email', self::ADDRESS);
-        $user   = TestUser::query()->sole();
+        $factor = $this->emailFactor($this->signedInPerson());
 
-        // Signing in migrates the session, so the code is sent after it.
-        Auth::login($user);
+        [$challenge, $code] = $this->sentCode($factor);
 
-        Mfa::challenge('email', $factor, Purpose::STEP_UP);
-
-        $code = $sender->lastCodeTo(self::ADDRESS);
-
-        self::assertNotNull($code);
-        self::assertTrue(Mfa::verify('email', $factor, $code, Purpose::STEP_UP));
+        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
 
         $proofs = Mfa::proofs();
 
         self::assertCount(1, $proofs);
+        self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proofs[0]->kind);
         self::assertSame('email', $proofs[0]->method);
+        self::assertSame($challenge, $proofs[0]->challengeId);
         self::assertSame(Purpose::STEP_UP, $proofs[0]->binding->purpose);
         self::assertSame(['kind' => 'email', 'reference' => self::ADDRESS], $proofs[0]->channel?->toArray());
     }
@@ -128,16 +132,18 @@ final class OtpLifecycleTest extends TestCase
      */
     public function testAnSmsCodeIsDeliveredAndVerified(): void
     {
+        $this->enableApplication(['types' => ['sms']]);
+
         $sender = FakeSmsSender::fake($this->container());
-        $factor = $this->enroll('sms', self::PHONE);
+        $factor = $this->factorOf($this->signedInPerson(), ['type' => 'sms', 'destination' => self::PHONE]);
 
-        Mfa::challenge('sms', $factor);
+        $challenge = Mfa::sendCode($factor->id)->challengeId;
+        $message   = $sender->lastMessageTo(self::PHONE);
 
-        $message = $sender->lastMessageTo(self::PHONE);
-
+        self::assertNotNull($challenge);
         self::assertNotNull($message);
         self::assertSame(1, preg_match('/^Your verification code is: (\d{6})$/D', $message, $matches));
-        self::assertTrue(Mfa::verify('sms', $factor, $matches[1]));
+        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $challenge, $matches[1]))->isVerified());
     }
 
     /**
@@ -148,94 +154,36 @@ final class OtpLifecycleTest extends TestCase
      */
     public function testTheCodeIsNeverStoredInClear(): void
     {
-        $sender = FakeEmailSender::fake($this->container());
-        $factor = $this->enroll('email', self::ADDRESS);
+        $factor = $this->emailFactor($this->signedInPerson());
 
-        Mfa::challenge('email', $factor);
+        [, $code] = $this->sentCode($factor);
 
-        $code = $sender->lastCodeTo(self::ADDRESS);
-        $row  = Code::query()->sole();
+        $row = Code::query()->sole();
 
-        self::assertNotNull($code);
         self::assertStringNotContainsString($code, (string) json_encode($row->getAttributes()));
         self::assertStringNotContainsString($code, (string) json_encode(Factor::query()->sole()->getAttributes()));
     }
 
     /**
-     * A code matches only the session it was sent in: after the session
-     * changes, it is not found, and a code sent for the new session is.
+     * A code matches only the sign-in it was sent in: under another it is not
+     * found, and a code sent for the new one is.
      *
      * @return void
      */
-    public function testACodeMatchesOnlyItsOwnSession(): void
+    public function testACodeMatchesOnlyItsOwnSignIn(): void
     {
-        $sender = FakeEmailSender::fake($this->container());
-        $factor = $this->enroll('email', self::ADDRESS);
+        $user   = $this->signedInPerson();
+        $factor = $this->emailFactor($user);
 
-        Mfa::challenge('email', $factor);
+        [$challenge, $code] = $this->sentCode($factor);
 
-        $first = $sender->lastCodeTo(self::ADDRESS);
+        $this->beginSignIn($user, 'sign-in-b');
 
-        self::assertNotNull($first);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::challenge($factor->id, $challenge, $code))->reason);
 
-        $this->container()->make(Session::class)->setId(str_repeat('b', 40));
+        [$next, $nextCode] = $this->sentCode($factor);
 
-        Event::fake([MfaVerificationFailed::class]);
-
-        self::assertFalse(Mfa::verify('email', $factor, $first));
-        Event::assertDispatched(MfaVerificationFailed::class, static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::EXPIRED);
-
-        Mfa::challenge('email', $factor);
-
-        $second = $sender->lastCodeTo(self::ADDRESS);
-
-        self::assertNotNull($second);
-        self::assertTrue(Mfa::verify('email', $factor, $second));
-    }
-
-    /**
-     * A code sent before the session is regenerated, as a stateless request or
-     * a sign-in would, is never found after it.
-     *
-     * @return void
-     */
-    public function testACodeIsLeftBehindByARegeneratedSession(): void
-    {
-        $sender = FakeEmailSender::fake($this->container());
-        $factor = $this->enroll('email', self::ADDRESS);
-
-        Mfa::challenge('email', $factor);
-
-        $code = $sender->lastCodeTo(self::ADDRESS);
-
-        self::assertNotNull($code);
-
-        $this->container()->make(Session::class)->regenerate();
-
-        Event::fake([MfaVerificationFailed::class]);
-
-        self::assertFalse(Mfa::verify('email', $factor, $code));
-        Event::assertDispatched(MfaVerificationFailed::class, static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::EXPIRED);
-    }
-
-    /**
-     * A code matches only the purpose it was sent for.
-     *
-     * @return void
-     */
-    public function testACodeMatchesOnlyItsOwnPurpose(): void
-    {
-        $sender = FakeEmailSender::fake($this->container());
-        $factor = $this->enroll('email', self::ADDRESS);
-
-        Mfa::challenge('email', $factor, Purpose::STEP_UP);
-
-        $code = $sender->lastCodeTo(self::ADDRESS);
-
-        self::assertNotNull($code);
-        self::assertFalse(Mfa::verify('email', $factor, $code));
-        self::assertFalse(Mfa::verify('email', $factor, $code, Purpose::ENROLLMENT));
-        self::assertTrue(Mfa::verify('email', $factor, $code, Purpose::STEP_UP));
+        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $next, $nextCode))->isVerified());
     }
 
     /**
@@ -246,17 +194,14 @@ final class OtpLifecycleTest extends TestCase
      */
     public function testACodeMatchesOnlyItsOwnFactor(): void
     {
-        $sender = FakeEmailSender::fake($this->container());
-        $factor = $this->enroll('email', self::ADDRESS);
-        $other  = Factor::query()->create([...$this->ownerOf($factor), 'type' => 'email', 'destination' => self::ADDRESS]);
+        $user   = $this->signedInPerson();
+        $factor = $this->emailFactor($user);
+        $other  = $this->emailFactor($user);
 
-        Mfa::challenge('email', $factor);
+        [$challenge, $code] = $this->sentCode($factor);
 
-        $code = $sender->lastCodeTo(self::ADDRESS);
-
-        self::assertNotNull($code);
-        self::assertFalse(Mfa::verify('email', $other, $code));
-        self::assertTrue(Mfa::verify('email', $factor, $code));
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::challenge($other->id, $challenge, $code))->reason);
+        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
     }
 
     /**
@@ -267,107 +212,83 @@ final class OtpLifecycleTest extends TestCase
      */
     public function testAResendReplacesTheCodeAfterTheCooldown(): void
     {
-        $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00:00'));
+        $factor = $this->emailFactor($this->signedInPerson());
 
-        $sender = FakeEmailSender::fake($this->container());
-        $factor = $this->enroll('email', self::ADDRESS);
+        [$challenge, $first] = $this->sentCode($factor);
 
-        Mfa::challenge('email', $factor);
+        $refused = Mfa::sendCode($factor->id);
 
-        $first   = $sender->lastCodeTo(self::ADDRESS);
-        $refused = Mfa::challenge('email', $factor);
-
-        self::assertNotNull($refused);
         self::assertSame(FailureReason::SENDING_CAPPED, $refused->reason);
         self::assertSame(60, $refused->retryAfter);
-        self::assertCount(1, $sender->sent());
+        self::assertCount(1, $this->mailbox->sent());
 
-        $this->travel(60)->seconds();
+        Carbon::setTestNow(CarbonImmutable::now()->addSeconds(60));
 
-        $resent = Mfa::challenge('email', $factor);
-        $second = $sender->lastCodeTo(self::ADDRESS);
+        [$resent, $second] = $this->sentCode($factor);
 
-        self::assertNotNull($resent);
-        self::assertTrue($resent->wasSent());
-        self::assertNotNull($first);
-        self::assertNotNull($second);
-
-        if ($first !== $second) {
-            self::assertFalse(Mfa::verify('email', $factor, $first));
-        }
-
-        self::assertTrue(Mfa::verify('email', $factor, $second));
+        self::assertSame($challenge, $resent);
+        self::assertNotSame($first, $second);
+        self::assertSame(FailureReason::INVALID_CODE, Mfa::verify(Submission::challenge($factor->id, $resent, $first))->reason);
+        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $resent, $second))->isVerified());
     }
 
     /**
-     * Sending a fresh code resets nothing: the factor's failures in a row and
-     * its lockout survive the send, so a resend is never a free unlock, and the
-     * code it sends is refused until the lockout ends.
+     * Asking for a code resets nothing: the factor's failures in a row and its
+     * lockout survive the request, so a resend is never a free unlock, and no
+     * code is sent until the lockout ends.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \Throwable
      */
-    public function testEmailChallengeResetsNothing(): void
+    public function testAskingForACodeResetsNothing(): void
     {
         config()->set('mfa.attempts.factor_limit', 3);
 
-        $sender = FakeEmailSender::fake($this->container());
-        $factor = $this->enroll('email', self::ADDRESS);
-        $user   = TestUser::query()->sole();
+        $user   = $this->signedInPerson();
+        $factor = $this->emailFactor($user);
 
-        self::assertFalse(Mfa::verify('email', $factor, '000000'));
-        self::assertFalse(Mfa::verify('email', $factor, '000000'));
-        self::assertFalse(Mfa::verify('email', $factor, '000000'));
+        [$challenge] = $this->sentCode($factor);
+
+        foreach (range(1, 3) as $attempt) {
+            self::assertSame(FailureReason::INVALID_CODE, Mfa::verify(Submission::challenge($factor->id, $challenge, 'wrong' . $attempt))->reason);
+        }
 
         $attempts = $this->container()->make(AttemptService::class);
         $before   = $attempts->lockout($user, $factor);
 
         self::assertNotNull($before);
-        self::assertTrue(Mfa::challenge('email', $factor)?->wasSent());
-
-        $factor->refresh();
+        self::assertSame(FailureReason::LOCKED, Mfa::sendCode($factor->id)->reason);
 
         $after = $attempts->lockout($user, $factor);
-        $code  = $sender->lastCodeTo(self::ADDRESS);
 
-        self::assertSame(3, $factor->getConsecutiveFailures());
+        self::assertSame(3, $this->factorRun($factor));
         self::assertNotNull($after);
         self::assertEquals($before->until, $after->until);
-        self::assertNotNull($code);
-
-        Event::fake([MfaVerificationFailed::class]);
-
-        self::assertFalse(Mfa::verify('email', $factor, $code));
-
-        Event::assertDispatched(MfaVerificationFailed::class, static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::LOCKED);
+        self::assertCount(1, $this->mailbox->sent());
     }
 
     /**
-     * The sends of a factor are capped across sessions, so a new session does
+     * The sends of a factor are capped across sign-ins, so a new sign-in does
      * not bring new sends.
      *
      * @return void
      */
-    public function testSendsAreCappedAcrossSessions(): void
+    public function testSendsAreCappedAcrossSignIns(): void
     {
         config()->set('mfa.codes.factor_send_limit', 2);
 
-        $sender  = FakeEmailSender::fake($this->container());
-        $factor  = $this->enroll('email', self::ADDRESS);
-        $session = $this->container()->make(Session::class);
+        $user   = $this->signedInPerson();
+        $factor = $this->emailFactor($user);
 
         foreach (['a', 'b'] as $id) {
-            $session->setId(str_repeat($id, 40));
+            $this->beginSignIn($user, 'sign-in-' . $id);
 
-            self::assertTrue(Mfa::challenge('email', $factor)?->wasSent());
+            self::assertTrue(Mfa::sendCode($factor->id)->wasSent());
         }
 
-        $session->setId(str_repeat('c', 40));
+        $this->beginSignIn($user, 'sign-in-c');
 
-        self::assertSame(FailureReason::SENDING_CAPPED, Mfa::challenge('email', $factor)?->reason);
-        self::assertCount(2, $sender->sent());
+        self::assertSame(FailureReason::SENDING_CAPPED, Mfa::sendCode($factor->id)->reason);
+        self::assertCount(2, $this->mailbox->sent());
     }
 
     /**
@@ -378,50 +299,22 @@ final class OtpLifecycleTest extends TestCase
      */
     public function testNothingIsSentWithoutASender(): void
     {
-        $factor = $this->enroll('sms', self::PHONE);
+        $this->enableApplication(['types' => []]);
+
+        // The manager checks the configuration once, when it is first resolved.
+        $this->mfa();
+
+        $factor = $this->factorOf($this->signedInPerson(), ['type' => 'sms', 'destination' => self::PHONE]);
+
+        config()->set('mfa.applications.web.types', ['sms']);
 
         try {
-            Mfa::challenge('sms', $factor);
+            Mfa::sendCode($factor->id);
+
             self::fail('Expected the send to be refused.');
         } catch (CodeDeliveryFailedException $exception) {
             self::assertInstanceOf(SenderNotConfiguredException::class, $exception->getPrevious());
             self::assertSame(0, Code::query()->count());
         }
-    }
-
-    /**
-     * Sign in as a new user with a factor of the type, delivering to the
-     * destination.
-     *
-     * @param  string  $type
-     * @param  string  $destination
-     * @return \SineMacula\Laravel\Mfa\Models\Factor
-     */
-    private function enroll(string $type, string $destination): Factor
-    {
-        $user = TestUser::query()->create(['email' => self::ADDRESS, 'mfa_enabled' => true]);
-
-        $this->actingAs($user);
-
-        return Factor::query()->create([
-            'authenticatable_type' => $user->getMorphClass(),
-            'authenticatable_id'   => (string) $user->id,
-            'type'                 => $type,
-            'destination'          => $destination,
-        ]);
-    }
-
-    /**
-     * The owner columns of a factor, to create another for the same identity.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
-     * @return array{authenticatable_type: string, authenticatable_id: string}
-     */
-    private function ownerOf(Factor $factor): array
-    {
-        return [
-            'authenticatable_type' => $factor->authenticatable_type,
-            'authenticatable_id'   => $factor->authenticatable_id,
-        ];
     }
 }

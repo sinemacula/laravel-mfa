@@ -15,16 +15,25 @@ that call them, so the flows can be built against one fixed set.
 - An answer that cannot be given safely is the refusing one: `null` for an unknown first factor, no reauthentication or
   no pending session, `false` for a passkey gateway that is unavailable or a factor that may not be removed, and "not
   fresh" for an operation with no setting or a session with no record.
-- A call that changes state and answers nothing (`PendingCompletion`, `StepUp`, `SessionRevoker`, `SessionTransition`)
-  reports a refusal or a failure by throwing, never by returning: a binding that does not validate, a proof that cannot
-  be recorded, a session that cannot be ended or returned to pending. Returning means it was done, and a throw rolls
-  back the factor state change the call runs in.
+- A call that changes state (`SessionRevoker`, `SessionTransition`) reports a refusal or a failure by throwing, never by
+  returning: a session that cannot be ended or returned to pending. Returning means it was done, and a throw rolls back
+  the factor state change the call runs in.
+- `PendingCompletion` and `StepUp` are the last write of a verification's transaction, and refuse by throwing an
+  `OperationRefusedException` with a reason, which rolls the verification back and is answered as a failed result;
+  anything else they throw propagates. Returning means the proof was accepted, a session still pending included, and
+  what they return is opaque to this package and reaches the caller as `VerificationResult::$completion`, so an
+  authentication layer's tokens need no request state in a singleton and no reference to a sibling class. Turning that
+  layer's refused result into a throw is the adapter's job. The rollback holds only when the adapter's writes share the
+  storage connection.
 - Results cross the seams as structured values, never reduced to `amr`.
-- Every seam has a default that works without an authentication layer and fails closed, bound by the `*Bindings`
-  class of the capability whose state it reads (or `Seams\SeamBindings` for one that reads nothing of the package), so
-  a binding made after the package's provider replaces it. The exceptions are `PendingCompletion` and `StepUp`, whose
-  defaults come with verification, and `SelfServiceRecovery`, whose default comes with the lifecycle flows; nothing
-  resolves them yet. `ApplicationResolver` has no binding either: without one, the application is the guard's name.
+- Every seam has a default that works without an authentication layer and fails closed, bound by the `*Bindings` class
+  of the capability whose state it reads (or `Seams\SeamBindings` for one that reads nothing of the package), so a
+  binding made after the package's provider replaces it. The exception is `SelfServiceRecovery`, whose default comes
+  with the lifecycle flows; nothing resolves it yet. `ApplicationResolver` has no binding either: without one, the
+  application is the guard's name.
+- `PendingCompletion` and `StepUp` are both bound to `Proofs\ProofStoreCompletion`, which records the proof in the bound
+  proof store once the transaction commits, refusing a binding that is not the store's current sign-in, and for a
+  pending session the pending context's as well, as `not_accepted` (see [Proof Store](proof-store.md)).
 - `EventContextResolver` is bound to `Context\DefaultEventContextResolver`, which gives the identity, the application
   and the request (see [Event Catalogue](event-catalogue.md)).
 - `ProofStore` is bound to `Proofs\SessionProofStore`, which keeps each sign-in's proofs in the Laravel session (see
@@ -63,14 +72,21 @@ that call them, so the flows can be built against one fixed set.
   does.
 - `ChallengeGateway` is bound to `Codes\PackageChallengeGateway`, the package's own delivered codes, owned exactly as an
   authentication layer must own its challenges (see the reverse calls below). It serves only a binding that is exactly
-  the caller's own: its identity, its application and its session (the pending session's, or the current sign-in's).
-  A request carrying a pending session never reaches an active sign-in of the same identity elsewhere.
-- `PasskeyGateway` is bound to `Passkeys\UnavailablePasskeyGateway`: no passkey is registered, nothing verifies, and
-  starting a ceremony is a `LogicException`. The configuration check refuses an application that enables `passkey`
-  while it is bound (see [Passkeys](passkeys.md)).
+  the caller's own: its identity, its application and its session (the pending session's, or the current sign-in's). A
+  request carrying a pending session never reaches an active sign-in of the same identity elsewhere. `send()` answers a
+  `Codes\SendResult`, and `verify()` an `Attempts\ChallengeOutcome`: passed, failed and counted, or refused and counted
+  nowhere. `CodeSent` and the verification events are dispatched by the verification flow, whichever gateway is bound.
+- `PasskeyGateway` is bound to `Passkeys\UnavailablePasskeyGateway`: no passkey is registered, verifying is refused with
+  an `OperationRefusedException` that counts nothing, and starting a ceremony is a `LogicException`. The configuration
+  check refuses an application that enables `passkey` while it is bound (see [Passkeys](passkeys.md)).
 - `LastFactorPolicy` is bound to `Lifecycle\RequiredFactorPolicy`: while the identity's own contract, or any configured
   application set to `always`, requires a factor, the last factor some configured application accepts (confirmed, of a
   type an application enables) may not be removed.
+- Authentication's activation fires Laravel's `Login`, on which `Proofs\BeginSignInOnLogin` calls
+  `ProofStore::begin()`. An adapter over authoritative session rows makes `begin()` a no-op for them: activation
+  preserves that row's sign-in and proofs, and an actual new sign-in uses a new row. Its transaction order is the
+  identity, its factors, the challenge, then authentication's session row. A recovery code's proof has no channel, which
+  the adapter maps onto the channel authentication requires.
 - Authentication's proof kinds are this package's four plus `external_reauthentication`, which this package does not
   add. An adapter maps them one way, by value, onto `ProofKind`:
 
@@ -153,8 +169,8 @@ exception that rolls the caller's change back with it.
 
 ## Failure / Edge Cases
 
-- Resolving `PendingCompletion`, `StepUp`, `SelfServiceRecovery` or `ApplicationResolver` with nothing bound fails with
-  Laravel's binding error; no shipped flow does so.
+- Resolving `SelfServiceRecovery` or `ApplicationResolver` with nothing bound fails with Laravel's binding error; no
+  shipped flow does so.
 - A pending credential that does not validate makes the resolver throw, and every helper with it: it is never served as
   the guard's user.
 - Two revocations of the other sessions in one change leave the current session to verify again: the second finds
@@ -164,8 +180,6 @@ exception that rolls the caller's change back with it.
 
 ## Seams Left
 
-- `PendingCompletion` and `StepUp` defaults come with verification, which will hand a successful proof to them; until
-  then a verification on a pending session records no proof.
 - The `mfa` middleware judges the structured requirement only once the middleware is replaced; until then the
   `SessionTransition` default leaves it to the newest proof's age.
 

@@ -114,20 +114,30 @@ final readonly class ChallengeCounters
 
             $stored = LockedFactors::find($factor, $factors);
 
-            if ($stored === null) {
-                return ChallengeAdmission::refuse(FailureReason::NOT_FOUND, 'The factor is not among the identity\'s factors.');
-            }
-
-            $refusal = $this->factorRefusal($identity, $stored, $binding);
-
-            if ($refusal !== null) {
-                return $refusal;
-            }
-
-            $lockout = $this->attempts->lockedOut($identity, $stored);
-
-            return $lockout === null ? ChallengeAdmission::admit() : ChallengeAdmission::locked($lockout);
+            return $stored === null
+                ? ChallengeAdmission::refuse(FailureReason::NOT_FOUND, 'The factor is not among the identity\'s factors.')
+                : $this->factorAdmission($identity, $stored, $binding);
         });
+    }
+
+    /**
+     * Whether the factor as stored may be challenged now under the binding, for
+     * a caller already holding the identity's factor state lock.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     *
+     * @internal
+     */
+    public function underLock(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): ChallengeAdmission
+    {
+        return $this->identityRefusal($identity, $binding) ?? $this->factorAdmission($identity, $factor, $binding);
     }
 
     /**
@@ -155,7 +165,7 @@ final readonly class ChallengeCounters
         OperationRefusedException::unless(ProofOwner::of($identity)->owns($binding), FailureReason::NOT_FOUND, 'The challenge\'s binding names another identity.');
 
         return $this->attempts->attempt(
-            new Attempt($identity, $factor, $binding->purpose, null, $binding->application),
+            new Attempt($identity, $factor, $binding->purpose, $binding->application),
             static fn (): bool => $passed,
         );
     }
@@ -181,6 +191,32 @@ final readonly class ChallengeCounters
             !$identity->isMfaActive()                  => ChallengeAdmission::refuse(FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.'),
             default                                    => null,
         };
+    }
+
+    /**
+     * Refuse a stored factor as `factorRefusal()` does, or one a lockout or the
+     * failure ceiling holds.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private function factorAdmission(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): ChallengeAdmission
+    {
+        $refusal = $this->factorRefusal($identity, $factor, $binding);
+
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
+        $lockout = $this->attempts->lockedOut($identity, $factor);
+
+        return $lockout === null ? ChallengeAdmission::admit() : ChallengeAdmission::locked($lockout);
     }
 
     /**

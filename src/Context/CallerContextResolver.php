@@ -121,6 +121,27 @@ final readonly class CallerContextResolver
     }
 
     /**
+     * The caller as the request serves it now, when it is still the one the
+     * binding was captured for: resolved again, so a bound pending resolver
+     * revalidates the credential and an authoritative store shows the current
+     * sign-in, with the same binding. `null` when anything differs.
+     *
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\PendingAction  $action
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return ?\SineMacula\Laravel\Mfa\Context\Caller
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function still(?PendingAction $action, ProofBinding $binding): ?Caller
+    {
+        $caller = $this->resolve($action);
+
+        return $caller !== null && $this->binding($caller, $binding->purpose)?->toArray() === $binding->toArray() ? $caller : null;
+    }
+
+    /**
      * The request's pending session, as the bound resolver reads it, or `null`
      * without a request or a pending session.
      *

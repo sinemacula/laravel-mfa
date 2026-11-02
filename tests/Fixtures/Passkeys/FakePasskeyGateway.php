@@ -6,6 +6,8 @@ namespace Tests\Fixtures\Passkeys;
 
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
@@ -32,18 +34,19 @@ final class FakePasskeyGateway implements PasskeyGateway
      * Constructor.
      *
      * @param  list<string>  $registered
-     * @param  ?\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion  $assertion
+     * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion  $assertion
      * @param  bool  $available
      * @param  bool  $checksAllowlist
      * @param  bool  $checksResponse
+     * @param  ?\SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException  $refusal
      */
     public function __construct(
 
         /** The credential ids of the identity's registered passkeys. */
         public array $registered = [],
 
-        /** What every verified assertion observed, or `null` when none verifies. */
-        public ?PasskeyAssertion $assertion = null,
+        /** What every verified assertion observed, or why it did not verify. */
+        public FailureReason|PasskeyAssertion $assertion = FailureReason::INVALID_CODE,
 
         /** Whether passkeys can be used. */
         public bool $available = true,
@@ -53,6 +56,9 @@ final class FakePasskeyGateway implements PasskeyGateway
 
         /** Whether an empty response verifies nothing, as it must. */
         public bool $checksResponse = true,
+
+        /** What a verification is refused with, when it cannot verify at all. */
+        public ?OperationRefusedException $refusal = null,
     ) {}
 
     /**
@@ -96,19 +102,29 @@ final class FakePasskeyGateway implements PasskeyGateway
 
     /**
      * Keep the allowlist, and answer the fixed assertion for a non-empty
-     * allowlist and response.
+     * allowlist and response; otherwise an invalid code.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  list<string>  $credentialIds
      * @param  array<string, mixed>  $response
-     * @return ?\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
+     * @return \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
     #[\Override]
-    public function verifyAssertion(MultiFactorAuthenticatable $identity, ProofBinding $binding, #[\SensitiveParameter] array $credentialIds, array $response): ?PasskeyAssertion
-    {
+    public function verifyAssertion(
+        MultiFactorAuthenticatable $identity,
+        ProofBinding $binding,
+        #[\SensitiveParameter] array $credentialIds,
+        #[\SensitiveParameter] array $response,
+    ): FailureReason|PasskeyAssertion {
         $this->verified[] = $credentialIds;
 
-        return ($this->checksAllowlist && $credentialIds === []) || ($this->checksResponse && $response === []) ? null : $this->assertion;
+        if ($this->refusal !== null) {
+            throw $this->refusal;
+        }
+
+        return ($this->checksAllowlist && $credentialIds === []) || ($this->checksResponse && $response === []) ? FailureReason::INVALID_CODE : $this->assertion;
     }
 }

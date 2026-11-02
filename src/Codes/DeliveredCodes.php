@@ -118,7 +118,7 @@ final readonly class DeliveredCodes
      *
      * A binding with no challenge, or a challenge named that is not the
      * binding's, is `missing`; a used challenge is `replayed` for its last code
-     * and `missing` for any other; an expired code or a challenge that has used
+     * and `spent` for any other; an expired code or a challenge that has used
      * up its attempts says so, without counting. A check that can count an
      * attempt against the issue it read compares the code, and accepts it only
      * when it also uses that issue up; one that cannot (a concurrent resend,
@@ -146,7 +146,7 @@ final readonly class DeliveredCodes
         }
 
         if ($row->consumed_at !== null) {
-            return $this->matches($row, $factorId, $binding, $code) ? CodeCheck::REPLAYED : CodeCheck::MISSING;
+            return $this->matches($row, $factorId, $binding, $code) ? CodeCheck::REPLAYED : CodeCheck::SPENT;
         }
 
         return $this->attempt($row, $factorId, $binding, $code, $now);
@@ -515,7 +515,7 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Why the challenge refuses checks: used (`missing`), expired, or out of
+     * Why the challenge refuses checks: used (`spent`), expired, or out of
      * attempts; `null` when it takes one.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
@@ -526,7 +526,7 @@ final readonly class DeliveredCodes
     private static function refusal(Code $row, int $max, CarbonImmutable $now): ?CodeCheck
     {
         return match (true) {
-            $row->consumed_at !== null                               => CodeCheck::MISSING,
+            $row->consumed_at !== null                               => CodeCheck::SPENT,
             $row->expires_at->getTimestamp() <= $now->getTimestamp() => CodeCheck::EXPIRED,
             $row->attempts >= $max                                   => CodeCheck::EXHAUSTED,
             default                                                  => null,

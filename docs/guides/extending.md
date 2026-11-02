@@ -48,14 +48,13 @@ later says.
 
 A driver is one factor type behind `Contracts\FactorDriver`, registered under the type's name:
 
-| Method                            | Answers                                                                                        |
-|-----------------------------------|------------------------------------------------------------------------------------------------|
-| `channelKind()`                   | The `Enums\ChannelKind` the type's factors travel on, which the combination policy reads       |
-| `amr()`                           | The RFC 8176 `amr` values a proof by the type adds on its own, such as `otp` or `sms`          |
-| `startEnrollment(Factor $factor)` | The secret to store on the pending factor and show the person once, or `null` when it has none |
-| `confirm(Factor $factor, $code)`  | Whether the first code the person submits confirms the pending factor                          |
-| `issueChallenge(Factor $factor)`  | Issue a challenge: nothing for TOTP; delivered codes go through `deliver()` instead            |
-| `verify(Factor $factor, $code)`   | Whether the code proves the factor, compared in constant time                                  |
+| Method                                    | Answers                                                                                        |
+|-------------------------------------------|------------------------------------------------------------------------------------------------|
+| `channelKind()`                           | The `Enums\ChannelKind` the type's factors travel on, which the combination policy reads       |
+| `amr()`                                   | The RFC 8176 `amr` values a proof by the type adds on its own, such as `otp` or `sms`          |
+| `startEnrollment(Factor $factor)`         | The secret to store on the pending factor and show the person once, or `null` when it has none |
+| `confirm(Factor $factor, $code)`          | Whether the first code the person submits confirms the pending factor                          |
+| `verify(Factor $factor, $code, $binding)` | `CodeCheck::ACCEPTED`, `INVALID`, or `REPLAYED` for a code that matches but was already used   |
 
 The type fixes the channel kind, so the combination policy never infers a channel from a type's name. A driver claims
 only the `amr` values its method always adds: values that depend on what a proof observed, such as user presence, are
@@ -71,19 +70,20 @@ not the driver's to claim. The shipped drivers state:
 The `passkey` driver only states its channel: a passkey is never confirmed or proved by a code, and its `amr` values
 come from what each assertion observed (see [Passkeys](#passkeys)).
 
-A driver leaves attempt counters, lockouts, events and the verification record to the services around it, and may
-change only the single-use material its type keeps when it is spent.
+A driver leaves attempt counters, lockouts, events and the verification record to the services around it, and may change
+only the single-use material its type keeps when it is spent; that write stays in the transaction a later refusal rolls
+back. It compares in constant time, is handed the factor as stored under the identity's lock, and reads the binding for
+what depends on the application, as the TOTP window does.
 
 A type whose codes are delivered to a destination implements `Contracts\CodeDeliveryDriver` as well, usually by
-extending `Drivers\AbstractCodeDriver`, as the email and SMS drivers do. The package then draws, stores and checks its
-codes itself, bound to the factor, the session, the application and the purpose (see
+extending `Drivers\AbstractCodeDriver`, as the email and SMS drivers do. The bound `ChallengeGateway` then draws, stores
+and checks its codes, bound to the factor, the session, the application and the purpose (see
 [Delivered codes](configuration.md#delivered-codes)), and the driver only delivers each one with `deliver()`: it never
-sees or keeps a code otherwise, and its `issueChallenge()`, `verify()` and `confirm()` refuse to work on a factor
-alone.
+sees or keeps a code otherwise, and its `verify()` and `confirm()` refuse to work on a factor alone.
 
 Bind your implementations in a service provider's `register()` or `boot()`: the package checks its configuration once
-every provider has booted (see [Checking the configuration](configuration.md#checking-the-configuration)), and refuses an
-application that enables `sms` or `email` while the default `NullSmsSender` or `NullEmailSender` is still bound, or
+every provider has booted (see [Checking the configuration](configuration.md#checking-the-configuration)), and refuses
+an application that enables `sms` or `email` while the default `NullSmsSender` or `NullEmailSender` is still bound, or
 that neither declares its first factor nor has a `Contracts\FirstFactorResolver` bound. To send email codes through
 Laravel's mailer, bind the package's own sender:
 
@@ -114,15 +114,15 @@ registers it with the container, and the classes only it uses:
 | `Drivers`       | The TOTP, email, SMS and passkey drivers, the resolver the services run drivers through             |
 | `Codes`         | Delivered codes: `CodeService`, the senders' defaults, `PackageChallengeGateway`, `MfaCodeMessage`  |
 | `Requirements`  | `requirement()`, `isFresh()`, `Requirement` and the requirement seams' defaults                     |
-| `Proofs`        | The sign-in's proofs (`proofs()`), `SessionProofStore`, `GuardHooks`, `Proof`, `ProofSettings`      |
-| `Verification`  | `challenge()`, `verify()` and `VerificationResult`                                                  |
+| `Proofs`        | The sign-in's proofs, `SessionProofStore`, `ProofStoreCompletion`, `GuardHooks`, `Proof`            |
+| `Verification`  | `verify()`, `sendCode()`, `offeredFactors()`, `Submission` and `VerificationResult`                 |
 | `Assurance`     | `Channel`, `ObservedProperties`, `Evaluation` and the default `DefaultCombinationPolicy`            |
 | `Context`       | `PendingContext`, who a request serves, and the pending session and subject type defaults           |
 | `Passkeys`      | The change gate, `PasskeyRegistration`, `CredentialId`, assertions and the unavailable gateway      |
 | `Seams`         | Defaults that read nothing of the package: `RefusingReauthenticator`                                |
 | `Enrollment`    | `enroll()` and `EnrollmentSettings`                                                                 |
 | `Lifecycle`     | `disable()`, `ForgetIdentity` and `LifecycleSettings`                                               |
-| `RecoveryCodes` | `generateRecoveryCodes()`, `redeemRecoveryCode()`, `recoveryCodes()` and `RecoveryCodeSettings`     |
+| `RecoveryCodes` | `generateRecoveryCodes()`, `recoveryCodes()` and `RecoveryCodeSettings`                             |
 | `Attempts`      | `AttemptService`, and `ChallengeCounters`, the counts a challenge owner reports into                |
 | `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
 | `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction             |
@@ -139,8 +139,8 @@ and `Config`, `Database` and `Support` the internal helpers the capabilities sha
 capability reads its own block of `config/mfa.php` through its `*Settings` class, on every call.
 `Contracts` also declares the seams the requirement, verification, enrolment and lifecycle flows are built against,
 listed in [the seam contracts design note](../design/seam-contracts.md). Each has a default that works without an
-authentication layer and fails closed (see [Seam defaults](#seam-defaults)), but for `PendingCompletion` and `StepUp`,
-which come with verification, and `SelfServiceRecovery`, which comes with the lifecycle flows. The `Mfa` facade and
+authentication layer and fails closed (see [Seam defaults](#seam-defaults)), but for `SelfServiceRecovery`, which comes
+with the lifecycle flows. The `Mfa` facade and
 `MfaManager` stay the entry point: each manager method hands its call to the service of its capability, so nothing you
 call changes with the layout. The services and `*Bindings` classes are internal; extend the package through the points
 in the table above. How the layout works is described in
@@ -161,6 +161,8 @@ service provider:
 | `SessionRevoker`         | `Proofs\GenerationSessionRevoker`           | The verification generation advances; other sessions verify again       |
 | `SessionTransition`      | `Http\MiddlewareSessionTransition`          | Nothing to change: the `mfa` middleware gates the session               |
 | `ChallengeGateway`       | `Codes\PackageChallengeGateway`             | The package's own delivered codes                                       |
+| `PendingCompletion`      | `Proofs\ProofStoreCompletion`               | A pending session's proof goes in the proof store                       |
+| `StepUp`                 | `Proofs\ProofStoreCompletion`               | An active session's proof goes in the proof store                       |
 | `PasskeyGateway`         | `Passkeys\UnavailablePasskeyGateway`        | Passkeys are unavailable                                                |
 | `LastFactorPolicy`       | `Lifecycle\RequiredFactorPolicy`            | The last acceptable factor stays while one is required                  |
 
@@ -169,8 +171,8 @@ something proves its first factor again: bind a `Contracts\Reauthenticator` that
 example, and returns a `first_factor_reauthentication` proof bound to their current sign-in.
 
 Every helper that returns summaries, sends a code or reveals a secret asks the bound `PendingSessionResolver` first.
-On a pending session it serves only the action it needs (`mfa.list_factors` for `getFactors()` and `recoveryCodes()`,
-`mfa.send_code` for `challenge()`, `mfa.verify` for `verify()`, `redeemRecoveryCode()` and passkey assertions), as the
+On a pending session it serves only the action it needs (`mfa.list_factors` for `getFactors()`, `offeredFactors()` and
+`recoveryCodes()`, `mfa.send_code` for `sendCode()`, `mfa.verify` for `verify()` and `requestAssertion()`), as the
 pending session's own identity; anything else gets nothing, never the guard's user in its place. Generating recovery
 codes, enrolling a factor directly, `disable()`, `isSetup()` and `proofs()` serve active sessions only. A code is sent
 or checked only for a binding that is exactly the caller's own, on its application and its session. A resolver reports
@@ -180,17 +182,22 @@ a pending credential that does not validate by throwing.
 
 Whoever owns a delivered factor's challenges (the package's own `Codes\PackageChallengeGateway`, or an authentication
 layer's adapter behind `Contracts\ChallengeGateway`) reports to `Attempts\ChallengeCounters`, inside the transaction on
-the storage connection that consumes the challenge:
+the storage connection that consumes the challenge, and answers with an `Attempts\ChallengeOutcome`, so the reason
+reaches the caller:
 
 ```php
-DB::transaction(function () use ($counters, $identity, $factor, $binding, $code): bool {
-    if (!$counters->isUsable($identity, $factor, $binding)->isAdmitted()) {
-        return false;
+DB::transaction(function () use ($counters, $identity, $factor, $binding, $code): ChallengeOutcome {
+    $admission = $counters->isUsable($identity, $factor, $binding);
+
+    if (!$admission->isAdmitted()) {
+        return ChallengeOutcome::refused($admission->reason, $admission->detail, $admission->lockedUntil);
     }
 
     $passed = $this->consume($binding, $code); // the owner's own challenge, locked and consumed here
 
-    return $counters->report($identity, $factor, $binding, $passed)->passed;
+    return $counters->report($identity, $factor, $binding, $passed)->passed
+        ? ChallengeOutcome::passed()
+        : ChallengeOutcome::failed(FailureReason::INVALID_CODE, 'The code did not match.');
 });
 ```
 
