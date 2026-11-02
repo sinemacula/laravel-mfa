@@ -14,47 +14,54 @@
 
 </div>
 
-Driver-based multi-factor authentication for Laravel. Ships **TOTP**, **email codes** and **SMS codes** out of the box,
-with **recovery codes** as a fallback and a pluggable driver API for custom factor types.
+Driver-based multi-factor authentication for Laravel. Adds factors (**TOTP**, **email codes**, **SMS codes** and
+**passkeys**), **recovery codes**, step-up verification and a route gate to any guard, and says what a session's proofs
+add up to on the scale NIST SP 800-63B-4 defines.
 
-Composes with any authentication stack — SessionGuard, Sanctum, Passport, a custom guard, or
-`sinemacula/laravel-authentication`. No runtime coupling to the auth layer: depends only on Laravel's standard
-`Authenticatable` contract. Attach middleware to enforce MFA on any route; catch structured exceptions to render
-whatever UI you like.
+Works alone behind any Laravel guard and any `Authenticatable` model, or with `sinemacula/laravel-authentication`
+through adapters you or `sinemacula/laravel-iam` bind: this package references no class of another. Routes, controllers
+and user interfaces stay yours.
+
+## Core Concept
+
+| Concept             | What it is                                                                                                           |
+|---------------------|----------------------------------------------------------------------------------------------------------------------|
+| **Factor**          | One enrolled means of proving a further factor: an authenticator app, a phone, an email address or a passkey.        |
+| **Proof**           | One verified authentication event on a session, with its time, its binding and the properties actually observed.     |
+| **Requirement**     | What a session must prove: an additional verification, multifactor authentication, a level, phishing resistance.     |
+| **Application**     | The app being signed into, by default the guard's name. It chooses the types it accepts, its requirement and limits. |
+| **Recovery code**   | One code of a single-use set for a person who has lost their factors. A fallback, never a factor.                    |
+| **Assurance level** | What a combination of proofs supports: `aal1`, `aal2`, `aal3`, or `unclassified` when the evidence supports none.    |
+
+Factors belong to the identity and are the same in every application; proofs belong to one sign-in. Everything the
+package decides about a session is worked out from its proofs, never from a single "verified at" time.
 
 ## Features
 
-- **Three built-in factor drivers**: TOTP, email code, SMS code.
-- **Recovery codes**: a set of single-use codes shown once, stored as salted hashes, replaced atomically, and redeemed
-  as one attempt against the whole unused set. See [Recovery codes](docs/guides/recovery-codes.md).
-- **Pluggable driver API**: register custom factor drivers via the Laravel-style `Mfa::extend()` method.
-- **Route enforcement middleware**: `mfa` judges a route's whole requirement, `mfa:level=aal2` adds a level, and
-  `mfa.exempt` marks the routes that complete a verification. See [Route middleware](docs/guides/middleware.md).
-- **Step-up per operation**: `mfa:operation=name` asks for a named operation's freshness on a route.
-- **A structured refusal**: `InsufficientAuthenticationException` carries the requirement and masked factor summaries,
-  for an answer as RFC 9470 describes or a factor picker.
+- **Factor types**: TOTP (computed by the package, with each time step accepted once), email and SMS codes (stored only
+  as keyed hashes bound to one sign-in and purpose), passkeys through a gateway you bind, and your own drivers through
+  `Mfa::extend()`.
+- **Enrolment**: start, then confirm, within a grant no longer lived than the step-up that authorised it, with verified
+  destinations, per-application limits and a bootstrap path for a pending sign-in.
 - **One way to verify**: `Mfa::verify()` takes a factor's code, a challenge's code, a recovery code or a passkey's
-  assertion, bound once to the owner, application, sign-in and purpose, and answers with a structured result and a
-  machine-readable failure reason. See [Verification](docs/guides/verification.md).
-- **Factor lifecycle**: list and remove factors, reset someone who lost theirs with an actor and a reason, unlock, and
-  prune what is no longer of use, each change serialised on the identity. See
-  [Factor lifecycle](docs/guides/lifecycle.md).
-- **Events**: a catalogue of events for the verification, recovery code and lifecycle flows, each carrying a scalar
-  context and no secret, dispatched once its change commits (see [Events](docs/guides/events.md)).
-- **Polymorphic identity support**: works with any Eloquent identity type (`User`, `Admin`, ...) via the
-  shipped `authenticatable_type` / `authenticatable_id` morph.
-- **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; recovery codes are stored only as salted
-  hashes made with the application's hasher; email and SMS codes are stored only as keyed hashes bound to their factor,
-  session, application and purpose, and the package's email code message encrypts its payload whenever it is queued.
-- **Secrets shown once**: a value that refuses to be serialised, cast or dumped, which recovery codes and the
-  enrolment flow's TOTP secret, provisioning URI and grant are returned in, a response helper and an `mfa.no-store`
-  middleware that no cache keeps, and the
-  redaction of secrets, codes and full destinations from logs, exception messages and traces, delivery failures
-  included (see [Secrets](docs/guides/secrets.md)).
-- **Attempt caps and lockouts**: failures are counted per factor, per identity and per IP address in the database, with
-  no cache; too many lock the factor, the identity or the address out before the driver is called, and a factor that
-  reaches the failure ceiling is disabled. See [Attempts and lockouts](docs/guides/attempts.md).
-- **Zero ecosystem coupling**: depends only on Laravel and the standard `Authenticatable` contract.
+  assertion, and answers with a structured result or a machine-readable failure reason.
+- **Requirements and step-up**: composed from the application, the identity, a re-enrolment obligation and an active
+  tenant, with a requirement and a maximum age per named operation.
+- **A route gate**: `mfa` judges a route's whole requirement, `mfa:level=aal2` and `mfa:operation=name` add to it,
+  `mfa.exempt` marks the routes that complete a verification, and a refusal carries what RFC 9470 needs.
+- **Recovery codes**: a set shown once, stored as salted hashes, replaced atomically and redeemed as one attempt against
+  the whole unused set.
+- **Attempt caps and lockouts**: failures counted per factor, per identity and per IP address in the database, with a
+  failure ceiling that disables a factor.
+- **Factor lifecycle**: list, rename and remove factors, reset someone who lost theirs, unlock, forget a deleted
+  identity and prune, each change serialised on the identity.
+- **Secrets shown once**: a value that refuses to be serialised, cast or dumped, a response no cache keeps, and the
+  redaction of secrets, codes and full destinations from logs and traces.
+- **Events**: a catalogue with a scalar context and no secret, dispatched once the change commits.
+- **A seam for everything else**: every policy is a contract with a default that fails closed, a contract test kit for
+  your adapter, testing helpers for your application, and every message translated.
+- **Ready for production**: safe under Octane and in queue workers, with reads from the write connection, no dependency
+  on a cache, and a configuration check at boot and from `mfa:check`.
 
 ## Installation
 
@@ -62,7 +69,9 @@ whatever UI you like.
 composer require sinemacula/laravel-mfa
 ```
 
-Publish the config and migrations, then migrate:
+## Configuration
+
+Publish the config and the migrations, then migrate:
 
 ```bash
 php artisan vendor:publish --tag=mfa-config
@@ -70,50 +79,41 @@ php artisan vendor:publish --tag=mfa-migrations
 php artisan migrate
 ```
 
-## Configuration
-
-The published `mfa.php` config holds one block per application, for what it accepts and offers, and one block per
-capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `lifecycle`) for what is the same everywhere:
+An application enables nothing until it says so. Give each one a block in `config/mfa.php`, under the name of its guard,
+naming the factor types it accepts, when it requires a factor and the first factor its guard signs people in with:
 
 ```php
-return [
-    'applications' => [
-        'web' => [
-            'types'        => ['totp', 'email'],
-            'requirement'  => 'enrolled',
-            'first_factor' => ['method' => 'password', 'channel' => 'password'],
-        ],
+'applications' => [
+    'web' => [
+        'types'          => ['totp', 'email'],
+        'requirement'    => 'enrolled',
+        'recovery_codes' => ['enabled' => true],
+        'first_factor'   => ['method' => 'password', 'channel' => 'password'],
     ],
+],
+```
 
-    'codes' => [
-        'length'      => 6,  // digits, 6 to 10
-        'ttl_minutes' => 10, // 1 to 10
-    ],
+An application that enables `email` or `sms` binds a sender to deliver its codes:
 
-    'attempts' => [
-        'factor_limit'    => 5,
-        'lockout_seconds' => 900,
-    ],
-];
+```php
+use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
+use SineMacula\Laravel\Mfa\Contracts\EmailSender;
+
+$this->app->bind(EmailSender::class, MailEmailSender::class);
 ```
 
 Every setting has a production-safe default and enforced bounds. The package checks the whole configuration when it
-boots, and `php artisan mfa:check` reports every problem for a deploy pipeline. See
-[Configuration](docs/guides/configuration.md) for every key, its default and its bounds, and
-[Requirements and step-up](docs/guides/requirements.md) for what a sign-in and a sensitive operation must prove.
+boots, and `php artisan mfa:check` reports every problem for a deploy pipeline. TOTP secrets are encrypted with
+`APP_KEY`, so keep an old key in `APP_PREVIOUS_KEYS` when you rotate it (see
+[Rotating the application key](docs/guides/secrets.md#rotating-the-application-key)), and every package table lives on
+one connection, `storage.connection` (see [Storage](docs/guides/configuration.md#storage)).
 
-> **APP_KEY rotation.** Factor secrets are encrypted at rest via Laravel's `encrypted` cast, so when you rotate
-> `APP_KEY`, list the old key in `APP_PREVIOUS_KEYS` for as long as factors enrolled under it exist: a plain swap
-> leaves existing factor rows undecryptable. See
-> [Rotating the application key](docs/guides/secrets.md#rotating-the-application-key).
+See [Installation](docs/guides/installation.md) for senders and the ways of running, and
+[Configuration](docs/guides/configuration.md) for every option.
 
-Every package table lives on one database connection, `storage.connection` (`MFA_STORAGE_CONNECTION`, the default
-connection when `null`), which the shipped models and migrations both use; a factor model on another connection is
-refused when the package boots. See [Storage](docs/guides/configuration.md#storage).
+## Usage
 
-## Identity Model
-
-Implement `MultiFactorAuthenticatable` on the identity the authentication stack hands back, and use `HasFactors`:
+Give your identity model the contract and the trait:
 
 ```php
 use Illuminate\Foundation\Auth\User;
@@ -126,278 +126,75 @@ class AppUser extends User implements MultiFactorAuthenticatable
 }
 ```
 
-The trait gives the identity its factors (of the configured factor model), counts it as enabled once it has a
-confirmed factor, treats it as an active person who requires nothing of their own sign-ins until the model says
-otherwise, and deletes everything the package holds for it once the model is deleted (a soft delete keeps it). See
-[Identity models](docs/guides/identity-models.md). What the current sign-in has proved lives separately, in the proof
-store (`Mfa::proofs()`), so keep the two predicates orthogonal.
-
-## Usage
-
-The `Mfa` facade is the primary surface. Each method hands its call to the service of its capability:
+Verify on routes of your own, through the `Mfa` facade:
 
 ```php
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 
-Mfa::requirement();                     // Requirement the current sign-in must meet
-Mfa::isFresh('mfa.remove_factor');      // bool: fresh enough for the operation
-Mfa::proofs();                          // list<Proof> of the current sign-in
-Mfa::factors();                         // list<FactorSummary>, every factor, the preferred first
-Mfa::factor($factorId);                 // ?FactorSummary
-Mfa::offeredFactors();                  // list<FactorSummary>, the preferred first
+Route::middleware(['web', 'auth', 'mfa.exempt'])->post('/mfa/verify', function (Request $request) {
+    $result = Mfa::verify(Submission::factor(
+        $request->string('factor')->toString(),
+        $request->string('code')->toString(),
+    ), Purpose::SIGN_IN);
 
-Mfa::sendCode($factorId);               // SendResult: the challenge's id, or why none was sent
-Mfa::requestAssertion($factorId);       // AssertionRequest: a passkey's options, or why there are none
-
-Mfa::verify(Submission::factor($factorId, $code));                  // TOTP, or a driver of your own
-Mfa::verify(Submission::challenge($factorId, $challengeId, $code)); // an email or SMS code
-Mfa::verify(Submission::recoveryCode($code));                       // one attempt against the whole unused set
-Mfa::verify(Submission::assertion($factorId, $response));           // a passkey
-
-Mfa::startEnrollment($request);         // a pending factor, its grant and, by type, secrets or a first code
-Mfa::confirmEnrollment($grant, $code);  // the factor, and recovery codes with the first one
-Mfa::resendEnrollmentCode($grant);      // the code again, renewing nothing
-Mfa::cancelEnrollment($grant);          // the pending factor gone
-Mfa::renameFactor($factorId, $label);   // no step-up
-Mfa::setPreferredFactor($factorId);     // offered first; no step-up
-Mfa::removeFactor($factorId);           // FactorRemovalResult, on a fresh session; the last takes the recovery codes
-Mfa::resetIdentity($user, $actor, $reason); // everything gone, every session revoked, re-enrolment obliged
-Mfa::unlockFactor($user, $factorId, $actor); // bool: a live temporary lockout was lifted
-Mfa::unlockIdentity($user, $actor);     // bool: a live temporary lockout was lifted
-Mfa::forgetIdentity($user);             // everything held for a deleted identity; `HasFactors` does it for a model
-Mfa::prune();                           // PruneResult; `mfa:prune` is the same from the console
-Mfa::generateRecoveryCodes();           // RecoveryCodeGeneration: the codes, once, or why not
-Mfa::recoveryCodeStatus();              // RecoveryCodeStatus|null: remaining, generation, generatedAt
+    return $result->isFailed()
+        ? response()->json(['reason' => $result->reason->value], 422)
+        : response()->noContent();
+});
 ```
 
-Every flow is one call: [Helpers](docs/guides/helpers.md) lists what each returns, who it serves and which pending
-action it needs, and how a route binds a factor, which it finds only within the caller's identity.
+This form is for TOTP. Email and SMS factors use `Mfa::sendCode()` and then `Submission::challenge()`, and a step-up
+leaves the purpose out (see [Verification](docs/guides/verification.md#sending-a-code)).
 
-`Mfa::verify()` answers with a `VerificationResult`: the proof and the evaluation of the whole requirement with it, or a
-machine-readable failure reason. Factors are looked up by id within the identity the request serves, so an id that does
-not exist and one that belongs to someone else get the same answer, closing the "look up factor by ID from request
-input" cross-account-bypass shape. See [Verification](docs/guides/verification.md).
-
-### Middleware enforcement
-
-The `mfa` middleware lets a request on only when the session it serves meets its whole requirement, read from the proofs
-it holds. The alias is registered automatically; `mfa.exempt` marks the routes that complete a verification:
+Gate the rest with the middleware, asking for more where a route needs it:
 
 ```php
 Route::middleware('mfa')->group(function () {
     Route::get('/dashboard', DashboardController::class);
-});
 
-Route::middleware('mfa.exempt')->post('/mfa/verify', MfaVerifyController::class);
-```
-
-A route may ask for more, a level or a named operation's freshness:
-
-```php
-Route::middleware('mfa:level=aal2')->get('/billing', BillingController::class);
-Route::middleware('mfa:operation=account.delete')->delete('/account', AccountController::class);
-```
-
-Bare `mfa` enforces the composed requirement and adds nothing, so on `never`, or `enrolled` with no factor, it asks
-nothing further. It always refuses a guest, an identity that is not MFA-capable, a machine, an inactive identity and a
-pending session, so a route machines use does not carry it. A refusal is an `InsufficientAuthenticationException`, a 401
-carrying the requirement and masked factor summaries:
-
-```php
-use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
-
-$this->renderable(function (InsufficientAuthenticationException $e) {
-    return response()->json($e->toArray(), 401, ['WWW-Authenticate' => $e->wwwAuthenticate()]);
+    Route::middleware('mfa:level=aal2')->get('/billing', BillingController::class);
+    Route::middleware('mfa:operation=account.delete')->delete('/account', DeleteAccountController::class);
 });
 ```
 
-See [Route middleware](docs/guides/middleware.md).
+A request that falls short raises `InsufficientAuthenticationException`, a `401` carrying the requirement and the
+factors on offer as masked summaries (see [Route middleware](docs/guides/middleware.md#answering)).
 
-### TOTP enrolment
+Before you ship, read [CSRF protection](docs/guides/middleware.md#csrf-protection) for cookie-authenticated routes that
+change factors or recovery codes, [Identity models](docs/guides/identity-models.md) for machines and inactive
+identities, and [Secrets](docs/guides/secrets.md) for sending what is shown once. To claim an assurance level, follow
+the [NIST SP 800-63B-4 compliance profile](docs/guides/compliance.md).
 
-Start the enrolment, which makes a pending factor and returns its secret, provisioning URI and grant once, as
-`RevealedSecret` values for a response no cache keeps. Render the URI as a QR code, then confirm with the first code the
-person's authenticator app shows:
+### Guides
 
-```php
-use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
-use SineMacula\Laravel\Mfa\Facades\Mfa;
-use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
+| Guide                                                          | Covers                                                                                         |
+|----------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| [Installation](docs/guides/installation.md)                    | Publishing, the first application, senders, and running alone or with the suite                |
+| [Identity models](docs/guides/identity-models.md)              | The contract and trait, machines, inactive identities, deleting an identity                    |
+| [Configuration](docs/guides/configuration.md)                  | Every key, its default and its bounds, storage, and the configuration check                    |
+| [Helpers](docs/guides/helpers.md)                              | Every `Mfa::` helper, who it serves, how it refuses, and binding a factor to a route           |
+| [Enrolment](docs/guides/enrollment.md)                         | Starting and confirming a factor, the grant, replacing a factor, labels                        |
+| [Verification](docs/guides/verification.md)                    | `Mfa::verify()`, what a code is bound to, offers, results, failure reasons, completion         |
+| [Recovery codes](docs/guides/recovery-codes.md)                | Generating, redeeming and removing a set, and what it costs                                    |
+| [Attempts and lockouts](docs/guides/attempts.md)               | Every counter, what resets it, the failure ceiling and limiting the endpoint                   |
+| [Requirements and step-up](docs/guides/requirements.md)        | What a sign-in must prove, per-operation freshness, and the contracts behind them              |
+| [Route middleware](docs/guides/middleware.md)                  | `mfa` and `mfa.exempt`, who is refused, answering, CSRF protection, the authentication context |
+| [Recorded proofs](docs/guides/proofs.md)                       | Reading proofs, sign-ins, custom and stateless guards, invalidating proofs                     |
+| [Proofs, assurance and requirements](docs/guides/assurance.md) | The values, the combination policy, the default classification and the stable names            |
+| [Compliance](docs/guides/compliance.md)                        | What an application must also configure to claim a NIST SP 800-63B-4 level                     |
+| [Factor lifecycle](docs/guides/lifecycle.md)                   | Listing, removing, resetting, unlocking and pruning                                            |
+| [Secrets](docs/guides/secrets.md)                              | What is shown once, sending it, redaction, failed queries and key rotation                     |
+| [Events](docs/guides/events.md)                                | Every event, its payload and its context                                                       |
+| [Localisation](docs/guides/localization.md)                    | Every message, translating it, and what is not translated                                      |
+| [Operations](docs/guides/operations.md)                        | Octane, queue workers, read replicas, database failure and the cache                           |
+| [Testing](docs/guides/testing.md)                              | Fake senders, the current TOTP code, acting as a verified identity                             |
+| [Extending](docs/guides/extending.md)                          | Custom drivers and models, every seam and its default, the seams with an authentication layer  |
 
-$start = Mfa::startEnrollment(EnrollmentRequest::totp($user->email, label: 'Authenticator app'));
-
-if (! $start->hasStarted()) {
-    return response()->json(['reason' => $start->reason->value], 422);
-}
-
-return SecretResponse::json([
-    'grant'            => $start->grant,
-    'secret'           => $start->secret,
-    'provisioning_uri' => $start->provisioningUri,
-]);
-
-// Then, with what the person sends back. Its time step is recorded, so the same
-// code cannot be used again.
-$confirmation = Mfa::confirmEnrollment($request->string('grant'), $request->string('code'));
-
-return SecretResponse::json(['recovery_codes' => $confirmation->recoveryCodes]);
-```
-
-A start needs a fresh step-up, or for the first factor the first factor proved again, or the bootstrap path on a pending
-sign-in. The grant lives no longer than that authority. See [Enrolment](docs/guides/enrollment.md).
-
-The package computes TOTP codes itself (RFC 6238) and needs no other dependency. Each code is checked against the
-application's `totp_window` steps either side of now (`mfa.totp.window` when it sets none), and each time step is
-accepted once per factor, also when two requests race with the same code. See
-[Configuration](docs/guides/configuration.md#totp) and [the TOTP design note](docs/design/totp.md).
-
-### Recovery codes
-
-Recovery codes are a fallback for lost factors, not a factor. An application accepts them once its block enables them
-(`'recovery_codes' => ['enabled' => true]`), and only an identity with a confirmed factor can have a set.
-`Mfa::generateRecoveryCodes()` replaces any earlier set atomically, keeps only a salted hash of each code, and answers
-with the codes **exactly once**, as `RevealedSecret` values for a response no cache keeps, or with the reason it
-refused:
-
-```php
-use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
-
-$generation = Mfa::generateRecoveryCodes();
-
-return $generation->wasGenerated()
-    ? SecretResponse::json(['recovery_codes' => $generation->codes])
-    : response()->json(['reason' => $generation->reason->value], 403);
-```
-
-Generating a set needs a session fresh enough for `mfa.generate_recovery_codes` that reaches the level the application
-sets for issuing them. `Mfa::verify(Submission::recoveryCode($code))` ignores case, spaces and hyphens, checks the code
-against every unused code of the set as one attempt, uses it up and makes a recovery code proof. See
-[Recovery codes](docs/guides/recovery-codes.md).
-
-### SMS and email senders
-
-The email and SMS drivers deliver their codes through senders the application binds: `SmsSender` for SMS and
-`EmailSender` for email. The shipped defaults throw `SenderNotConfiguredException`, and the configuration check refuses
-an application that enables `sms` or `email` while its default is still bound, so a missing binding fails loudly before
-anyone is sent a code. A sender's failure surfaces as `CodeDeliveryFailedException`, scrubbed of the code and the full
-destination, with the sender's own exception as its previous one. Email can go through Laravel's mailer with the
-package's own sender:
-
-```php
-use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
-use SineMacula\Laravel\Mfa\Contracts\EmailSender;
-
-$this->app->bind(EmailSender::class, MailEmailSender::class);
-```
-
-An SMS sender wraps the application's provider:
-
-```php
-use SineMacula\Laravel\Mfa\Contracts\SmsSender;
-use Twilio\Rest\Client;
-
-final readonly class TwilioSmsSender implements SmsSender
-{
-    public function __construct(
-        private Client $twilio,
-        private string $fromNumber,
-    ) {}
-
-    public function send(string $phoneNumber, #[\SensitiveParameter] string $message): void
-    {
-        $this->twilio->messages->create($phoneNumber, [
-            'from' => $this->fromNumber,
-            'body' => $message,
-        ]);
-    }
-}
-```
-
-Bind it in a service provider:
-
-```php
-$this->app->bind(SmsSender::class, static fn ($app): TwilioSmsSender => new TwilioSmsSender(
-    twilio: new Client(config('services.twilio.sid'), config('services.twilio.token')),
-    fromNumber: config('services.twilio.from'),
-));
-```
-
-The contracts expose only the destination and the message: the package owns drawing, hashing, binding and checking the
-code, the resend cooldown, the delivery caps and lockouts, so the adapter stays thin. Sending for a factor answers a
-`Codes\SendResult`: sent, with the challenge's id and expiry, or refused with `sending_capped` and the seconds to wait.
-In tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` capture the messages instead.
-
-### Custom factor drivers
-
-```php
-Mfa::extend('webauthn', fn ($app) => new WebAuthnDriver(/* ... */));
-```
-
-Custom drivers must implement `SineMacula\Laravel\Mfa\Contracts\FactorDriver`, which also states the type's channel
-kind and `amr` values (see [Factor drivers](docs/guides/extending.md#factor-drivers)). The manager builds a driver on
-every call rather than caching it, so a driver keeps no state between calls, and the most recent registration is the one
-used. Register it in a service provider's `register()` or `boot()` rather than mid-request, as a closure registered from
-inside a request stays on the shared manager.
-
-## Security Model
-
-### Rate limiting
-
-The package counts failures per factor, per identity and per IP address and locks each out past its cap (see
-[Attempts and lockouts](docs/guides/attempts.md)). Those caps bound guessing at a factor; they do not bound load on the
-endpoint itself. Layer Laravel's built-in `RateLimiter` on the verify endpoint as well:
-
-```php
-use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
-
-RateLimiter::for('mfa-verify', static function (Request $request): array {
-    $identifier = optional($request->user())->getAuthIdentifier() ?? $request->ip();
-
-    return [
-        Limit::perMinute(10)->by($request->ip() ?? 'unknown'),
-        Limit::perMinute(5)->by((string) ($identifier ?: 'unknown')),
-    ];
-});
-
-Route::post('/mfa/verify', VerifyController::class)
-    ->middleware(['mfa.exempt', 'throttle:mfa-verify']);
-```
-
-Apply the throttle **only** to the verify endpoint — state-read routes (`Mfa::requirement()`, `Mfa::factors()`,
-etc.) are called on every request and would exhaust the bucket without representing an attack signal.
-
-### Proof store
-
-Each verification on a signed-in session records a proof, kept by the default `SessionProofStore` in the Laravel session
-for the identity's current sign-in on the application. Laravel's `Login` event begins a sign-in on the guard's
-application and `Logout` or `CurrentDeviceLogout` ends it, so a new identity on a reused session inherits nothing. A
-guard that fires neither event calls `Proofs\GuardHooks::signedIn()` and `signedOut()` instead; one that does neither
-leaves no proof to rely on. A stateless guard rebinds `Contracts\ProofStore`.
-See [Recorded proofs](docs/guides/proofs.md).
-
-## Extensibility
-
-All concrete classes in this package are `final` unless explicitly designed for extension. Extension is through
-**composition and DI**, not inheritance:
-
-| Extension point            | How                                                            |
-|----------------------------|----------------------------------------------------------------|
-| Custom factor driver       | Implement `FactorDriver`, register via `Mfa::extend()`         |
-| Custom identity model      | Implement `MultiFactorAuthenticatable` and use `HasFactors`    |
-| Requirements and freshness | Implement `RequirementPolicy` or `FreshnessGate` and bind it   |
-| Custom proof store         | Implement `ProofStore` and bind it via the container           |
-| Custom factor model        | Set `config('mfa.factor.model')` to your subclass              |
-| Custom recovery code model | Set `config('mfa.recovery_codes.model')` to your subclass      |
-| Event context              | Implement `EventContextResolver` and bind it via the container |
-| SMS delivery               | Implement `SmsSender` and bind it via the container            |
-| Email delivery             | Bind `MailEmailSender`, or your own `EmailSender`              |
-
-Running it under Octane or in a queue worker, with read replicas, and what a database failure does: see
-[Operations](docs/guides/operations.md).
-
-The security and lifecycle contracts behind the package, for maintainers and reviewers, are in
+The security and lifecycle contracts behind them, for maintainers and reviewers, are in
 [docs/design](docs/design/README.md).
 
 ## Requirements

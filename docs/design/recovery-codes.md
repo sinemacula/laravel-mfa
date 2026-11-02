@@ -98,16 +98,14 @@ moment when both work or neither exists, and what a redemption leaves behind.
 - A redemption is refused before any attempt, counted nowhere, with one `VerificationFailed` and nothing checked or
   spent: `machine_identity` or `identity_inactive`; `not_accepted` for an enrolment, which a recovery code cannot
   confirm; `type_not_enabled` when the application does not accept recovery codes; `no_factor` without a confirmed
-  factor; and `not_accepted` when the identity has no sign-in the proof store knows of, so a single-use code is never
-  spent for no proof (stricter than a factor's verification, which proves nothing then but still passes).
+  factor; and `not_accepted` when the session's first factor is not known. An identity with no sign-in the proof store
+  knows of has nothing to bind to, and is `not_found`, with no event, so a single-use code is never spent for no proof.
 - A lockout of the identity or the IP address refuses the attempt before anything is checked: `locked`, with the time
   it lifts, or none when the identity's run of failures has reached the failure ceiling, which only a success or a
   reset clears.
-- A sign-in that ended, or a last confirmed factor that went, while the redemption waited for the lock: one counted
-  failure (`not_accepted` or `no_factor`), nothing checked.
-- A sign-in that ended while the code was being checked leaves no sign-in to record the proof on: the redemption throws
-  `ProofRefusedException`, so the code's use rolls back, nothing is counted and nothing is reported. A redemption never
-  passes without its proof.
+- A sign-in that changed while the redemption waited for the lock is `not_found`, counted and reported nowhere. A last
+  confirmed factor that went meanwhile is `no_factor` from the admission under the lock: one `VerificationFailed`,
+  nothing counted and nothing checked.
 - A factor deletion a model event cancels throws `WriteCanceledException` and keeps the set.
 - No set, or every code used: one counted attempt, `invalid_code`, no hash checked.
 - Two redemptions of one code: the lock serialises them, and the second finds the code used; a redemption that read the
@@ -149,4 +147,4 @@ moment when both work or neither exists, and what a redemption leaves behind.
 - A change to how codes are drawn, normalised or hashed, or to the bounds of a malformed code.
 - A redemption that could stop before checking every unused code, or check anything outside the identity's lock.
 - A replacement that could leave a moment with both sets or neither, or a set removed outside the factor's removal.
-- The freshness and level gates being applied to generation, or redemption moving into the unified verification.
+- The freshness and level gates on generation, or redemption leaving the unified verification.

@@ -54,13 +54,13 @@ later says.
 
 A driver is one factor type behind `Contracts\FactorDriver`, registered under the type's name:
 
-| Method                                     | Answers                                                                                        |
-|--------------------------------------------|------------------------------------------------------------------------------------------------|
-| `channelKind()`                            | The `Enums\ChannelKind` the type's factors travel on, which the combination policy reads       |
-| `amr()`                                    | The RFC 8176 `amr` values a proof by the type adds on its own, such as `otp` or `sms`          |
-| `startEnrollment(Factor $factor)`          | The secret, as a `RevealedSecret`, to store on the pending factor and show once, or `null`     |
-| `confirm(Factor $factor, $code, $binding)` | The `CodeCheck` of the first code the person submits, as `verify()` answers                    |
-| `verify(Factor $factor, $code, $binding)`  | `CodeCheck::ACCEPTED`, `INVALID`, or `REPLAYED` for a code that matches but was already used   |
+| Method                                     | Answers                                                                                      |
+|--------------------------------------------|----------------------------------------------------------------------------------------------|
+| `channelKind()`                            | The `Enums\ChannelKind` the type's factors travel on, which the combination policy reads     |
+| `amr()`                                    | The RFC 8176 `amr` values a proof by the type adds on its own, such as `otp` or `sms`        |
+| `startEnrollment(Factor $factor)`          | The secret, as a `RevealedSecret`, to store on the pending factor and show once, or `null`   |
+| `confirm(Factor $factor, $code, $binding)` | The `CodeCheck` of the first code the person submits, as `verify()` answers                  |
+| `verify(Factor $factor, $code, $binding)`  | `CodeCheck::ACCEPTED`, `INVALID`, or `REPLAYED` for a code that matches but was already used |
 
 The type fixes the channel kind, so the combination policy never infers a channel from a type's name. A driver claims
 only the `amr` values its method always adds: values that depend on what a proof observed, such as user presence, are
@@ -133,27 +133,27 @@ them on what a restart keeps, such as the owner and the destination.
 The package is organised by capability. Each capability's namespace holds its service, the `*Bindings` class that
 registers it with the container, and the classes only it uses:
 
-| Namespace       | Holds                                                                                               |
-|-----------------|-----------------------------------------------------------------------------------------------------|
-| `Factors`       | Factor reads, `FactorSummary` and `OperationGuard`                                                  |
-| `Drivers`       | The TOTP, email, SMS and passkey drivers, the resolver the services run drivers through             |
-| `Codes`         | Delivered codes: `CodeService`, the senders' defaults, `PackageChallengeGateway`, `MfaCodeMessage`  |
-| `Requirements`  | `requirement()`, `isFresh()`, `Requirement` and the requirement seams' defaults                     |
-| `Proofs`        | The sign-in's proofs, `SessionProofStore`, `ProofStoreCompletion`, `GuardHooks`, `Proof`            |
-| `Verification`  | `verify()`, `sendCode()`, `offeredFactors()`, `Submission` and `VerificationResult`                 |
-| `Assurance`     | `Channel`, `ObservedProperties`, `Evaluation` and the default `DefaultCombinationPolicy`            |
-| `Context`       | `PendingContext`, who a request serves, the defaults, and `AuthenticationContextContributor`        |
-| `Passkeys`      | The change gate, `PasskeyRegistration`, `CredentialId`, assertions and the unavailable gateway      |
-| `Seams`         | Defaults that read nothing of the package: `RefusingReauthenticator`                                |
-| `Enrollment`    | `startEnrollment()`, `confirmEnrollment()`, what they answer and `EnrollmentSettings`               |
-| `Lifecycle`     | Removing, resetting, unlocking, forgetting and pruning, and `LifecycleSettings`                     |
-| `RecoveryCodes` | `generateRecoveryCodes()`, `recoveryCodeStatus()` and `RecoveryCodeSettings`                        |
-| `Attempts`      | `AttemptService`, and `ChallengeCounters`, the counts a challenge owner reports into                |
-| `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
-| `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction             |
-| `Http`          | The `mfa` and `mfa.exempt` middleware, `EnsureMfaRequirementIsMet` and `ExemptFromMfa`              |
-| `Testing`       | The fakes, `AuthenticatorApp`, `Concerns\InteractsWithMfa`, and the kit in `Testing\Seams`          |
-| `Console`       | The `mfa:check` and `mfa:prune` commands                                                            |
+| Namespace       | Holds                                                                                              |
+|-----------------|----------------------------------------------------------------------------------------------------|
+| `Factors`       | Factor reads, `FactorSummary` and `OperationGuard`                                                 |
+| `Drivers`       | The TOTP, email, SMS and passkey drivers, the resolver the services run drivers through            |
+| `Codes`         | Delivered codes: `CodeService`, the senders' defaults, `PackageChallengeGateway`, `MfaCodeMessage` |
+| `Requirements`  | `requirement()`, `isFresh()`, `Requirement` and the requirement seams' defaults                    |
+| `Proofs`        | The sign-in's proofs, `SessionProofStore`, `ProofStoreCompletion`, `GuardHooks`, `Proof`           |
+| `Verification`  | `verify()`, `sendCode()`, `offeredFactors()`, `Submission` and `VerificationResult`                |
+| `Assurance`     | `Channel`, `ObservedProperties`, `Evaluation` and the default `DefaultCombinationPolicy`           |
+| `Context`       | `PendingContext`, who a request serves, the defaults, and `AuthenticationContextContributor`       |
+| `Passkeys`      | The change gate, `PasskeyRegistration`, `CredentialId`, assertions and the unavailable gateway     |
+| `Seams`         | Defaults that read nothing of the package: `RefusingReauthenticator`                               |
+| `Enrollment`    | `startEnrollment()`, `confirmEnrollment()`, what they answer and `EnrollmentSettings`              |
+| `Lifecycle`     | Removing, resetting, unlocking, forgetting and pruning, and `LifecycleSettings`                    |
+| `RecoveryCodes` | `generateRecoveryCodes()`, `recoveryCodeStatus()` and `RecoveryCodeSettings`                       |
+| `Attempts`      | `AttemptService`, and `ChallengeCounters`, the counts a challenge owner reports into               |
+| `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`         |
+| `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction            |
+| `Http`          | The `mfa` and `mfa.exempt` middleware, `EnsureMfaRequirementIsMet` and `ExemptFromMfa`             |
+| `Testing`       | The fakes, `AuthenticatorApp`, `Concerns\InteractsWithMfa`, and the kit in `Testing\Seams`         |
+| `Console`       | The `mfa:check` and `mfa:prune` commands                                                           |
 
 `Contracts`, `Concerns`, `Models`, `Events`, `Exceptions`, `Enums` and `Facades` hold what their names say for every
 capability (the events and how they are dispatched are in [Events](events.md), and the values and enums assurance is
@@ -163,7 +163,8 @@ and `Config`, `Database` and `Support` the internal helpers the capabilities sha
 `Database\StorageConnection` and `Support\FactorStateTransaction` (see [Storage](configuration.md#storage)). Each
 capability reads its own block of `config/mfa.php` through its `*Settings` class, on every call.
 `Contracts` also declares the seams the requirement, verification, enrolment and lifecycle flows are built against,
-listed in [the seam contracts design note](../design/seam-contracts.md). Each has a default that works without an
+listed in [the seam contracts design note](../design/seam-contracts.md), and those an authentication layer meets in
+[Seams with an authentication layer](#seams-with-an-authentication-layer). Each has a default that works without an
 authentication layer and fails closed (see [Seam defaults](#seam-defaults)). The `Mfa` facade and
 `MfaManager` stay the entry point: each manager method hands its call to the service of its capability, so nothing you
 call changes with the layout. The services and `*Bindings` classes are internal; extend the package through the points
@@ -176,21 +177,36 @@ Every seam is bound to a default that works without an authentication layer and 
 cannot answer safely. An adapter over an authentication layer, or the application, rebinds any of them in its own
 service provider:
 
-| Contract                 | Default                                     | Without an authentication layer                                         |
-|--------------------------|---------------------------------------------|-------------------------------------------------------------------------|
-| `PendingSessionResolver` | `Context\NoPendingSessionResolver`          | No request carries a pending session                                    |
-| `SubjectTypeResolver`    | `Context\IdentityContractSubjectType`       | A person is an identity whose `canHoldFactors()` is true                |
-| `FirstFactorResolver`    | `Applications\DeclaredFirstFactorResolver`  | The application's `first_factor`, dated at the Unix epoch               |
-| `Reauthenticator`        | `Seams\RefusingReauthenticator`             | Nothing proves the first factor again                                   |
-| `SessionRevoker`         | `Proofs\GenerationSessionRevoker`           | The verification generation advances; other sessions verify again       |
-| `SessionTransition`      | `Http\MiddlewareSessionTransition`          | Nothing to change: the `mfa` middleware is the gate                     |
-| `ChallengeGateway`       | `Codes\PackageChallengeGateway`             | The package's own delivered codes                                       |
-| `PendingCompletion`      | `Proofs\ProofStoreCompletion`               | A pending session's proof goes in the proof store                       |
-| `StepUp`                 | `Proofs\ProofStoreCompletion`               | An active session's proof goes in the proof store                       |
-| `PasskeyGateway`         | `Passkeys\UnavailablePasskeyGateway`        | Passkeys are unavailable                                                |
-| `LastFactorPolicy`       | `Lifecycle\RequiredFactorPolicy`            | The last acceptable factor stays while one is required                  |
-| `SelfServiceRecovery`    | `Lifecycle\NoSelfServiceRecovery`           | None is offered; a person is reset by someone else                      |
-| `ActiveTenantResolver`   | `Requirements\NoActiveTenant`               | No session has an active tenant                                         |
+| Contract                 | Default                                    | Without an authentication layer                                             |
+|--------------------------|--------------------------------------------|-----------------------------------------------------------------------------|
+| `CombinationPolicy`      | `Assurance\DefaultCombinationPolicy`       | The classification of [Combination policy](assurance.md#combination-policy) |
+| `ProofStore`             | `Proofs\SessionProofStore`                 | Proofs live in the Laravel session                                          |
+| `RequirementPolicy`      | `Requirements\ConfiguredRequirementPolicy` | The composed requirement, or none when the first factor meets it all        |
+| `IdentityRequirement`    | `Requirements\IdentityContractRequirement` | What the identity's `requiresAdditionalFactor()` returns                    |
+| `TenantRequirement`      | `Requirements\NoTenantRequirement`         | A tenant asks for nothing                                                   |
+| `ActiveTenantResolver`   | `Requirements\NoActiveTenant`              | No session has an active tenant                                             |
+| `RequirementCheck`       | `Requirements\ProofRequirementCheck`       | One sign-in's proofs go to the combination policy                           |
+| `FreshnessGate`          | `Requirements\ConfiguredFreshnessGate`     | The application's `freshness`, judged on the recorded proofs                |
+| `PendingSessionResolver` | `Context\NoPendingSessionResolver`         | No request carries a pending session                                        |
+| `SubjectTypeResolver`    | `Context\IdentityContractSubjectType`      | A person is an identity whose `canHoldFactors()` is true                    |
+| `EventContextResolver`   | `Context\DefaultEventContextResolver`      | The identity, the application and the request                               |
+| `FirstFactorResolver`    | `Applications\DeclaredFirstFactorResolver` | The application's `first_factor`, dated at the Unix epoch                   |
+| `Reauthenticator`        | `Seams\RefusingReauthenticator`            | Nothing proves the first factor again                                       |
+| `SessionRevoker`         | `Proofs\GenerationSessionRevoker`          | The verification generation advances; other sessions verify again           |
+| `SessionTransition`      | `Http\MiddlewareSessionTransition`         | Nothing to change: the `mfa` middleware is the gate                         |
+| `ChallengeGateway`       | `Codes\PackageChallengeGateway`            | The package's own delivered codes                                           |
+| `PendingCompletion`      | `Proofs\ProofStoreCompletion`              | A pending session's proof goes in the proof store                           |
+| `StepUp`                 | `Proofs\ProofStoreCompletion`              | An active session's proof goes in the proof store                           |
+| `PasskeyGateway`         | `Passkeys\UnavailablePasskeyGateway`       | Passkeys are unavailable                                                    |
+| `LastFactorPolicy`       | `Lifecycle\RequiredFactorPolicy`           | The last acceptable factor stays while one is required                      |
+| `SelfServiceRecovery`    | `Lifecycle\NoSelfServiceRecovery`          | None is offered; a person is reset by someone else                          |
+| `SmsSender`              | `Codes\NullSmsSender`                      | Throws: the application binds one to enable `sms`                           |
+| `EmailSender`            | `Codes\NullEmailSender`                    | Throws: the application binds one to enable `email`                         |
+| `ApplicationResolver`    | None bound                                 | The application is the guard's name                                         |
+
+The rest of `Contracts` is what the flows take rather than seams with a default: `Factor` and `EloquentFactor`,
+`RecoveryCode` and `MultiFactorAuthenticatable` for your models, `FactorDriver`, `CodeDeliveryDriver` and
+`ProvisioningDriver` for your drivers, and `MfaEvent`, which every event implements.
 
 The refusing reauthenticator means an identity cannot add its first additional factor on an active session until
 something proves its first factor again: bind a `Contracts\Reauthenticator` that asks the person for their password, for
@@ -204,6 +220,54 @@ and cancelling an enrolment need `mfa.start_bootstrap_enrollment`, and confirmin
 `mfa.confirm_bootstrap_enrollment`. Generating recovery codes, renaming, preferring or removing a factor and `proofs()`
 serve active sessions only. A code is sent or checked only for a binding that is exactly the caller's own, on its
 application and its session. A resolver reports a pending credential that does not validate by throwing.
+
+## Seams with an authentication layer
+
+An adapter implements this package's seams with `laravel-authentication`, translating between the two packages' values:
+this package references no class of that one, and that package's names are relative to
+`SineMacula\Laravel\Authentication`. It lives in the application or in `laravel-iam`, never here. Results cross as
+structured values, never reduced to `amr`. What each seam meets:
+
+| This package                                                                          | `laravel-authentication`                                                                                                                                                                                                             |
+|---------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Contracts\RequirementPolicy`                                                         | `Contracts\AdditionalFactorPolicy::requiresAdditionalFactor()`, bound by the adapter                                                                                                                                                 |
+| `Contracts\TenantRequirement`                                                         | `Contracts\TenantAuthenticationPolicy::requirementFor()`; `Auth::sessions()->tenantPolicyChanged()` for a change outside a request                                                                                                   |
+| `Contracts\RequirementCheck`                                                          | `Contracts\RequirementCheck::evaluate()`, which the adapter answers with this check                                                                                                                                                  |
+| `Contracts\ActiveTenantResolver`                                                      | `Auth::tenant()`                                                                                                                                                                                                                     |
+| `Contracts\PendingSessionResolver`                                                    | `Auth::sessions()->pending()`, answering a `Sessions\PendingSession`                                                                                                                                                                 |
+| `Enums\PendingAction`                                                                 | `Sessions\Enums\PendingAction`, with the same values                                                                                                                                                                                 |
+| `Contracts\PendingCompletion`                                                         | `Auth::sessions()->satisfy()`                                                                                                                                                                                                        |
+| `Contracts\StepUp`                                                                    | `Auth::sessions()->stepUp()`                                                                                                                                                                                                         |
+| `Contracts\FreshnessGate`                                                             | `Contracts\FreshnessPolicy::requirement()` and `freshProof()`                                                                                                                                                                        |
+| `Contracts\Reauthenticator`                                                           | `Auth::sessions()->reauthenticate()`                                                                                                                                                                                                 |
+| `Contracts\SessionRevoker`                                                            | `Auth::sessions()->factorRemoved()` for the others, `revokeSessions()` for all of them                                                                                                                                               |
+| `Contracts\SubjectTypeResolver`                                                       | `Contracts\MachineIdentity`                                                                                                                                                                                                          |
+| `Contracts\ApplicationResolver`                                                       | The session's `getGuard()`, from `Auth::session()`                                                                                                                                                                                   |
+| `Contracts\EventContextResolver`                                                      | `Auth::identity()`, `Auth::principal()`, `Auth::tenant()` and `Auth::session()`                                                                                                                                                      |
+| `Contracts\PasskeyGateway`                                                            | `Auth::passkeys()->passkeys()`, `factorOptions()` and `verifyFactor()`                                                                                                                                                               |
+| `Contracts\SmsSender`, `Contracts\EmailSender`                                        | `Contracts\OneTimeCodeSender`, bound to the same gateway                                                                                                                                                                             |
+| `Secrets\RevealedSecret`, `Secrets\SecretResponse`                                    | Nothing to bind: a secret it reveals is its own, so check its documentation for how it sends one uncached                                                                                                                            |
+| `Contracts\ProofStore`, `Contracts\FirstFactorResolver`                               | `Requirements\RequirementSubject::proofs()` and `$firstFactor`, passed to `Contracts\RequirementCheck::evaluate()`, and `Contracts\FreshnessPolicy::freshProof()`. Needs a read of the session's proofs outside `evaluate()` as well |
+| `Contracts\ChallengeGateway`, `Attempts\ChallengeCounters`                            | Needs its own challenge bound to the factor and purpose, which asks `isUsable()` before locking or consuming it and calls `report()` once, from the transaction that consumes it                                                     |
+| `Contracts\SessionTransition`                                                         | Needs a way to return an active session to pending when a factor change leaves it short                                                                                                                                              |
+| `Passkeys\PasskeyChangeGate`                                                          | Needs its passkey register, remove and change paths to call the gate, inside their own transaction on the storage connection                                                                                                         |
+| `Context\AuthenticationContextContributor`                                            | Needs its authentication context to read these keys from `contribute()`                                                                                                                                                              |
+| `CombinationPolicy`, `IdentityRequirement`, `LastFactorPolicy`, `SelfServiceRecovery` | Nothing: these are this package's own                                                                                                                                                                                                |
+
+A row that says what a seam needs names no method, as there is no public name to give here: check that package's own
+documentation for it. Until the layer provides it, what an adapter does depends on the seam:
+
+- `Contracts\ChallengeGateway` and `Contracts\SessionTransition` keep their defaults, which are safe: the package's own
+  delivered codes, and the `mfa` middleware as the gate.
+- `Contracts\ProofStore` must be rebound. The default keeps proofs in the Laravel session, which a stateless layer does
+  not have, so there is no sign-in and every verification answers `not_found`.
+
+> **Do not enable `passkey` over a layer whose register, remove and change paths do not call
+> `Passkeys\PasskeyChangeGate`.** The gate has no default that can act for it, because the caller has to invoke it.
+> Binding `Contracts\PasskeyGateway` over such a layer lets a passkey be removed with no step-up, last factor check or
+> revocation, and an event after the fact cannot stand in for the gate.
+
+How each seam behaves is in [the seam contracts design note](../design/seam-contracts.md).
 
 ## Challenge counters
 

@@ -96,7 +96,8 @@ in [Factor lifecycle](../guides/lifecycle.md).
 
 ## Seams Left
 
-- The factor's temporary lockout stays in `mfa_attempts`. Moving it is a recorded hardening option, not part of this.
+- The factor's temporary lockout is in `mfa_attempts`, and a reset lifts it there. Moving it onto the factor's row is a
+  possible hardening that nothing depends on.
 
 ## Implementation Anchors
 

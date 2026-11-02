@@ -60,6 +60,10 @@ is built the way it is, and which test helpers deliberately stay private to the 
   cookie with its own `mfa.proofs`.
 - The application given chooses where proofs go, not what the next request resolves.
 
+The package's own tests extend `AbstractFactorStub` and `AbstractEloquentFactorStub`, in `tests/Fixtures/Factors/`,
+rather than the raw contracts: each gives every `Factor` or `EloquentFactor` method a safe default, so a fixture
+overrides only what it needs and stays well below the limit on methods per class.
+
 Only `AuthenticatorApp` is public. `SignInProofs` deliberately builds wrong evidence, and `ArrangesVerification` is tied
 to the package's own test identities and settings, so both stay fixtures.
 

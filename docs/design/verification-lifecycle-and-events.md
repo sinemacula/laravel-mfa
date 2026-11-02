@@ -36,8 +36,8 @@ leaves the package, and the order of the events listeners and audit sinks attach
   passkey.
 - Every event reporting a write goes through `Events\EventDispatcher`, once the change commits.
 - `VerificationResult` and `Submission` keep secrets out of every route. The code, the response and the completion are
-  each held as a `\SensitiveParameterValue` and read through an accessor, and `Assurance\Channel` holds its reference the
-  same way, so `print_r`, `var_dump`, `var_export`, array casts and Symfony's VarDumper show none of them.
+  each held as a `\SensitiveParameterValue` and read through an accessor, and `Assurance\Channel` holds its reference
+  the same way, so `print_r`, `var_dump`, `var_export`, array casts and Symfony's VarDumper show none of them.
   `jsonSerialize()` leaves them out and `__serialize()` throws.
 
 ## Success Path
@@ -88,8 +88,8 @@ On success, the listeners run once the transaction commits, in this order: the d
 - A pending session's further proofs are validated by `PendingContext` (bound to its identity, application and session,
   no first factor among them), and those of another generation, or dated in the future, are dropped before evaluating.
 - A pending session's first factor counts only when it is of the current generation and not dated in the future, by the
-  same rule as a resolved first factor (`Context\SessionFirstFactor`). One that does not is `not_accepted` on every route,
-  before anything is checked or spent, and such a session is offered nothing.
+  same rule as a resolved first factor (`Context\SessionFirstFactor`). One that does not is `not_accepted` on every
+  route, before anything is checked or spent, and such a session is offered nothing.
 - A recovery code with no known first factor is refused before any hash is checked.
 - A store that refuses the proof at the commit throws `ProofRefusedException` from `verify()`, with the code spent. A
   listener that throws keeps `Events\EventDispatcher`'s behaviour: its exception reaches the caller, and the change has

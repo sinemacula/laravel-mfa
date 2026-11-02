@@ -36,11 +36,11 @@ the attempt caps (see [Attempts and lockouts](attempts.md)), and the recovery co
 The enrolment flow dispatches its events in the order [Enrolment](enrollment.md#events) sets out, and the lifecycle flow
 in the order [Factor lifecycle](lifecycle.md#events) sets out.
 
-The names of the events and of their fields are stable. `factor` is a `Factors\FactorSummary` (id, type, label, masked
-destination, status, preferred, last use, disabled), `previous` another; `purpose` is an `Enums\Purpose` (`sign_in`,
-`step_up`, `enrollment` and `reauthenticate`); `reason` an `Enums\FailureReason`; `actor` an `Events\Actor` (type and
-id), set when someone other than the identity took the action; `challengeId` the challenge a code or an attempt went
-through, when it went through one; `type` the type proved or tried (`recovery_code` for a recovery code).
+The names of the events and of their fields are stable once released. `factor` is a `Factors\FactorSummary` (id, type,
+label, masked destination, status, preferred, last use, disabled), `previous` another; `purpose` is an `Enums\Purpose`
+(`sign_in`, `step_up`, `enrollment` and `reauthenticate`); `reason` an `Enums\FailureReason`; `actor` an `Events\Actor`
+(type and id), set when someone other than the identity took the action; `challengeId` the challenge a code or an
+attempt went through, when it went through one; `type` the type proved or tried (`recovery_code` for a recovery code).
 
 Every event also says what it was for through `$event->purpose()`: the purpose of the attempt, code or proof behind it
 for the events that carry a `purpose` field, `enrollment` for the enrolment events (from `EnrollmentStarted` to
@@ -50,7 +50,8 @@ a reset or a new recovery code set. A listener can tell a sign-in recovery from 
 ## Context
 
 Every event implements `Contracts\MfaEvent` and carries its context in `$event->context` (also `$event->context()`): who
-and what it is about, as scalar values under the same keys every time, `null` for one not known:
+and what it is about, as scalar values under the same keys every time, which are stable once released, `null` for one
+not known:
 
 | Key              | Holds                                                            |
 |------------------|------------------------------------------------------------------|
@@ -100,9 +101,8 @@ final class MfaAuditMapper implements EventMapper
 AuditLog::map(MfaEvent::class, MfaAuditMapper::class);
 ```
 
-`PendingRecord::event()` and its dotted codes are on audit-log's `master`; the `AuditLog::map()` seam and `EventMapper`
-are its agreed mapping API, pending availability in a release of that package, so check its own documentation for the
-final namespaces.
+This is the mapping that package has agreed, ahead of its first release, so check the namespaces against its own
+documentation once it is released.
 
 The context is read through `Contracts\EventContextResolver`. Alone, the package's default gives the identity, the
 application a bound `Contracts\ApplicationResolver` names, and the request's IP address and user agent; it never gives

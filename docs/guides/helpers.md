@@ -1,6 +1,7 @@
 # Helpers
 
-Every flow is one call on the `Mfa` facade, and routes and controllers stay yours. Every class name below is relative to
+Every flow is one call on the `Mfa` facade, and routes and controllers stay yours, which makes their CSRF protection
+yours too (see [CSRF protection](middleware.md#csrf-protection)). Every class name below is relative to
 `SineMacula\Laravel\Mfa`.
 
 ## Every helper
@@ -57,14 +58,14 @@ rule: there is no separate helper to redeem one.
 
 ### Lifecycle
 
-| Helper                                       | Returns               | Serves               |
-|----------------------------------------------|-----------------------|----------------------|
-| `removeFactor($factorId)`                    | `FactorRemovalResult` | The signed-in person |
-| `resetIdentity($identity, $actor, $reason)`  | `void`                | The identity given   |
-| `unlockFactor($identity, $factorId, $actor)` | `bool`                | The identity given   |
-| `unlockIdentity($identity, $actor)`          | `bool`                | The identity given   |
-| `forgetIdentity($identity)`                  | `void`                | The identity given   |
-| `prune()`                                    | `PruneResult`         | No identity          |
+| Helper                                                            | Returns               | Serves               |
+|-------------------------------------------------------------------|-----------------------|----------------------|
+| `removeFactor($factorId)`                                         | `FactorRemovalResult` | The signed-in person |
+| `resetIdentity($identity, $actor, $reason, $requireReenrollment)` | `void`                | The identity given   |
+| `unlockFactor($identity, $factorId, $actor)`                      | `bool`                | The identity given   |
+| `unlockIdentity($identity, $actor)`                               | `bool`                | The identity given   |
+| `forgetIdentity($identity)`                                       | `void`                | The identity given   |
+| `prune()`                                                         | `PruneResult`         | No identity          |
 
 `removeFactor()` serves active sessions only. The others are told the identity by their caller, so who may call them is
 your authorisation.

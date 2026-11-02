@@ -56,6 +56,34 @@ request carries can claim it. The marker takes no parameters.
 
 With no matched route nothing is exempt, so `mfa` is route middleware only. Do not put it in the global stack.
 
+## CSRF protection
+
+The package ships no routes and makes no CSRF check, so a route of yours that a browser's cookies authenticate is
+protected only by what you put on it. A forged cross-site request carries those cookies, and the helpers cannot tell it
+from the person.
+
+Put these routes in Laravel's `web` middleware group, or otherwise under its CSRF protection, whenever they are
+authenticated by a cookie (the session guard, or Sanctum's stateful requests):
+
+| The route calls                                                                                       | Because                                                         |
+|-------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|
+| `startEnrollment()`, `confirmEnrollment()`, `resendEnrollmentCode()`, `cancelEnrollment()`            | A forged request could bind a factor, or send or discard a code |
+| `renameFactor()`, `setPreferredFactor()`, `removeFactor()`                                            | It could change or take away a person's factors                 |
+| `generateRecoveryCodes()`                                                                             | It could replace a person's recovery codes                      |
+| `resetIdentity()`, `unlockFactor()`, `unlockIdentity()`, `forgetIdentity()`, where a route calls them | It could act with an administrator's cookies                    |
+| `verify()`, `sendCode()`, `requestAssertion()`                                                        | It could spend attempts, redeem a code or send a person codes   |
+
+`mfa.exempt` exempts a route from the gate and from nothing else: never add these routes to the CSRF exceptions because
+they are exempt. A step-up does not stand in for the check either, as a forged request made within a fresh session
+passes it.
+
+Only a route that accepts its credential exclusively through a header is unaffected, since a browser does not attach one
+by itself. A route that also accepts ambient cookie authentication is not, whichever credential a given request carries.
+
+`laravel-authentication`'s refresh cookie has CSRF checks of its own, for refreshing and for the routes that set it: see
+"Refresh token cookie" in its
+[refreshing guide](https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/refreshing.md).
+
 ## Who is refused
 
 There is one exception for every refusal. These hold under `never` too, since that setting controls the requirement and
@@ -87,9 +115,13 @@ answer in the exception handler:
 ```php
 use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
 
-$this->renderable(function (InsufficientAuthenticationException $e) {
-    return response()->json($e->toArray(), 401, ['WWW-Authenticate' => $e->wwwAuthenticate()]);
-});
+->withExceptions(function (Exceptions $exceptions) {
+    $exceptions->render(fn (InsufficientAuthenticationException $e) => response()->json(
+        $e->toArray(),
+        401,
+        ['WWW-Authenticate' => $e->wwwAuthenticate()],
+    ));
+})
 ```
 
 `wwwAuthenticate()` gives `Bearer error="insufficient_user_authentication", error_description="...", acr_values="aal2",

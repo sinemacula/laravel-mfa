@@ -2,7 +2,8 @@
 
 A factor is listed, removed, reset by someone else, or unlocked through the `Mfa` facade, and records that no longer
 serve any purpose are pruned. Every class name below is relative to `SineMacula\Laravel\Mfa`. Enrolling a factor,
-renaming it and choosing the preferred one are in [Enrolment](enrollment.md).
+renaming it and choosing the preferred one are in [Enrolment](enrollment.md). Cookie-authenticated routes that change
+factors need CSRF protection (see [CSRF protection](middleware.md#csrf-protection)).
 
 ## Listing and getting factors
 

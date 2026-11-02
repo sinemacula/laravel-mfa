@@ -10,6 +10,9 @@ nothing is stored in their place.
 
 ## Invariants
 
+- The requirement contracts are generic: the package composes what a sign-in must prove behind `RequirementPolicy`,
+  `IdentityRequirement` and `TenantRequirement`, and judges freshness behind `FreshnessGate`, and whatever sits above it
+  binds its own at its own layer. The package never learns what an organisation is, only an opaque tenant id.
 - A sign-in's requirement is `Requirement::strictest()` of its parts, so the same inputs give the same answer in any
   order (`Requirements\RequirementService::requirementFor()`):
   - the application's configured mode (`mfa.applications.{name}.requirement`): nothing for `never` and for an

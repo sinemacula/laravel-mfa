@@ -1,4 +1,4 @@
-# Identity Models
+# Identity models
 
 ## Adopting the package
 
@@ -27,7 +27,8 @@ The trait gives the model everything the contract asks:
 
 Factors belong to the identity, never to a principal or a tenant: one set per person, used in every application. The
 owner is polymorphic, by the model's morph class (so an application's morph map is honoured) and its key, which may be
-an integer, a UUID or a ULID.
+an integer, a UUID or a ULID. `isMfaEnabled()` says what the identity holds; what the current sign-in has proved lives
+separately, in the proof store (`Mfa::proofs()`), so keep the two apart.
 
 ## People and machines
 

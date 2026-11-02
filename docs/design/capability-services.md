@@ -51,7 +51,8 @@ the provider or another capability.
   also build them, and the provider's `mfa` factory registers them against the manager through the same `extend()` API a
   consumer uses, before it returns the manager. The shipped drivers therefore exist before the container runs any
   extender or resolving callback on `mfa`, so a consumer's registration of the same name replaces them however it is
-  made: `Mfa::extend()`, a container extender or a resolving callback.
+  made: `Mfa::extend()`, a container extender or a resolving callback. Shipped drivers are therefore indistinguishable
+  from an application's, which is what keeps every [operating mode](operating-modes.md) the same.
 - The public surface is unchanged by the layout: the manager's and the facade's method names, the configuration keys,
   the events and the middleware aliases are the same whichever service answers them.
 
