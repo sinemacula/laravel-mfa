@@ -54,9 +54,11 @@ referencing another's.
   several sources are composed with `Requirement::strictest()`.
 - An evaluation of a session's proofs says what the combination is and which parts of the requirement it meets, and a
   verification result carries the proof with its evaluation, or a `FailureReason` with its internal detail.
-- `Mfa::verify()` answers with that result. Its `amr` is the proof's own, leaving out `mfa`, which only the evaluation can
-  report, and it also holds the type proved and what the completion seam returned, opaque to this package. It keeps all of
-  that out of a dump and JSON, and refuses to be serialised.
+- `Mfa::verify()` answers with that result. Its `amr` is the proof's own, leaving out `mfa`, which only the evaluation
+  can report, and it also holds the type proved and what the completion seam returned, opaque to this package. It keeps
+  all of that out of every dump and JSON, and refuses to be serialised.
+- A channel holds its reference as a `\SensitiveParameterValue`, read through `reference()`, so no dump of a proof shows
+  a full destination; only the stored form, `toArray()`, gives it up.
 
 ## Failure / Edge Cases
 

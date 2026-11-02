@@ -105,12 +105,12 @@ final class ProofStoreCompletionTest extends TestCase
         $proof = $this->proof(Purpose::STEP_UP);
 
         self::assertNull($seam->stepUp($this->resultOf($proof)));
-        self::assertEquals([$proof], $this->store()->proofs($this->user, 'web'));
+        self::assertSame([$proof->toArray()], $this->storedArrays());
 
         $signIn = $this->proof(Purpose::SIGN_IN);
 
         self::assertNull($seam->stepUp($this->resultOf($signIn)));
-        self::assertEquals([$proof, $signIn], $this->store()->proofs($this->user, 'web'));
+        self::assertSame([$proof->toArray(), $signIn->toArray()], $this->storedArrays());
     }
 
     /**
@@ -126,7 +126,7 @@ final class ProofStoreCompletionTest extends TestCase
         $proof = $this->proof(Purpose::SIGN_IN, 'pending-1');
 
         self::assertNull($this->pendingCompletion()->complete($this->pendingContext(), $this->resultOf($proof)));
-        self::assertEquals([$proof], $this->store()->proofs($this->user, 'web'));
+        self::assertSame([$proof->toArray()], $this->storedArrays());
     }
 
     /**
@@ -318,6 +318,16 @@ final class ProofStoreCompletionTest extends TestCase
     private function resultOf(Proof $proof): VerificationResult
     {
         return VerificationResult::verified($proof, $this->container()->make(RequirementCheck::class)->check(Requirement::none(), $proof), ['otp'], 'totp');
+    }
+
+    /**
+     * The proofs the store holds for the person, in their stored form.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function storedArrays(): array
+    {
+        return array_map(static fn (Proof $proof): array => $proof->toArray(), $this->store()->proofs($this->user, 'web'));
     }
 
     /**

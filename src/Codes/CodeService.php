@@ -108,20 +108,20 @@ final readonly class CodeService
     }
 
     /**
-     * Check the code against the factor's challenge under the binding (the one
-     * named, or the latest), using it up when it matches.
+     * Check the code against the factor's challenge named under the binding,
+     * using it up when it matches.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $code
-     * @param  ?string  $challengeId
+     * @param  string  $challengeId
      * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
      */
-    public function check(Factor $factor, ProofBinding $binding, #[\SensitiveParameter] string $code, ?string $challengeId = null): CodeCheck
+    public function check(Factor $factor, ProofBinding $binding, #[\SensitiveParameter] string $code, string $challengeId): CodeCheck
     {
         $stored = self::stored($factor, $binding);
 

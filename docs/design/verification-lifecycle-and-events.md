@@ -35,8 +35,10 @@ leaves the package, and the order of the events listeners and audit sinks attach
 - Proofs are honest: `ObservedProperties::none()` for TOTP, SMS and email, and what its assertion observed for a
   passkey.
 - Every event reporting a write goes through `Events\EventDispatcher`, once the change commits.
-- `VerificationResult` and `Submission` keep secrets out of every route: `__debugInfo()` and `jsonSerialize()` leave out
-  the completion, the channel's destination, the code and the response, and `__serialize()` throws.
+- `VerificationResult` and `Submission` keep secrets out of every route. The code, the response and the completion are
+  each held as a `\SensitiveParameterValue` and read through an accessor, and `Assurance\Channel` holds its reference the
+  same way, so `print_r`, `var_dump`, `var_export`, array casts and Symfony's VarDumper show none of them.
+  `jsonSerialize()` leaves them out and `__serialize()` throws.
 
 ## Success Path
 
@@ -85,10 +87,18 @@ On success, the listeners run once the transaction commits, in this order: the d
   that never existed.
 - A pending session's further proofs are validated by `PendingContext` (bound to its identity, application and session,
   no first factor among them), and those of another generation, or dated in the future, are dropped before evaluating.
+- A pending session's first factor counts only when it is of the current generation and not dated in the future, by the
+  same rule as a resolved first factor (`Context\SessionFirstFactor`). One that does not is `not_accepted` on every route,
+  before anything is checked or spent, and such a session is offered nothing.
 - A recovery code with no known first factor is refused before any hash is checked.
 - A store that refuses the proof at the commit throws `ProofRefusedException` from `verify()`, with the code spent. A
   listener that throws keeps `Events\EventDispatcher`'s behaviour: its exception reaches the caller, and the change has
-  committed. The address's slot is then given back, since the exception reaches the throttle.
+  committed. That holds for a listener's `OperationRefusedException` too. Only a refusal made inside the transaction is
+  turned into a failed result, carried out of it by `Exceptions\RefusedUnderLockException`, so what committed is never
+  reported as failed. `Mfa::sendCode()` treats a refusal in the same way. The address's slot is then given back, since
+  the exception reaches the throttle.
+- A seam's refusal after a passkey verified reports the challenge the gateway named, on `VerificationFailed`. A failed
+  assertion is a bare `FailureReason`, so it reports none.
 - `SessionProofStore` reads a per-request snapshot, so the lock cannot show another request's writes, and no session
   locking is added. An application serialises overlapping requests on one Laravel session with `Route::block()`. What
   holds without it: A's code is refused in any request that read B, and a proof bound to A cannot be recorded on B.
@@ -104,7 +114,8 @@ On success, the listeners run once the transaction commits, in this order: the d
 - `src/Codes/PackageChallengeGateway.php`, `src/Passkeys/PasskeyAssertions.php`,
   `src/RecoveryCodes/RecoveryCodeService.php`: `admission()`, `redeem()`, `reportRedeemed()`.
 - `src/Proofs/ProofStoreCompletion.php`: the default `PendingCompletion` and `StepUp`.
-- `src/Exceptions/SignInChangedException.php`, `src/Exceptions/OperationRefusedException.php`.
+- `src/Exceptions/SignInChangedException.php`, `src/Exceptions/OperationRefusedException.php`,
+  `src/Exceptions/RefusedUnderLockException.php`.
 
 ## Authoritative Tests
 

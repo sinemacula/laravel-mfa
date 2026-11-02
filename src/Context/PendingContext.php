@@ -9,6 +9,7 @@ use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
@@ -142,11 +143,11 @@ final readonly class PendingContext
     {
         $key = $this->identity->getAuthIdentifier();
 
-        return $binding->identityType === CurrentIdentity::typeOf($this->identity)
-            && (is_string($key) || is_int($key))
-            && $binding->identityKey === (string) $key
-            && $binding->application === $this->application
-            && $binding->sessionId   === $this->sessionId;
+        if (!is_string($key) && !is_int($key)) {
+            return false;
+        }
+
+        return (new ProofOwner(CurrentIdentity::typeOf($this->identity), (string) $key))->ownsSignIn($binding, $this->application, $this->sessionId);
     }
 
     /**

@@ -6,6 +6,7 @@ namespace Tests\Feature\Verification;
 
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
@@ -14,6 +15,7 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
@@ -25,8 +27,11 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Enums\RequirementPart;
+use SineMacula\Laravel\Mfa\Events\VerificationFailed;
+use SineMacula\Laravel\Mfa\Events\VerificationPassed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException;
+use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -76,6 +81,8 @@ use Tests\TestCase;
 #[CoversClass(PackageChallengeGateway::class)]
 #[CoversClass(RecoveryCodeService::class)]
 #[CoversClass(SendResult::class)]
+#[CoversClass(RefusedUnderLockException::class)]
+#[CoversClass(SessionFirstFactor::class)]
 final class CompletionVerificationServiceTest extends TestCase
 {
     use ArrangesVerification;
@@ -124,8 +131,8 @@ final class CompletionVerificationServiceTest extends TestCase
         self::assertSame([], $before);
         self::assertTrue($result->isVerified());
         self::assertCount(1, $after);
-        self::assertEquals($result->proof, $after[0]);
-        self::assertNull($result->completion);
+        self::assertSame($result->proof?->toArray(), $after[0]->toArray());
+        self::assertNull($result->completion());
     }
 
     /**
@@ -273,7 +280,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
         self::assertTrue($result->isVerified());
-        self::assertSame($completion, $result->completion);
+        self::assertSame($completion, $result->completion());
         self::assertSame([RequirementPart::PHISHING_RESISTANCE], $result->evaluation?->unmet);
         self::assertCount(1, $seam->accepted);
     }
@@ -347,13 +354,146 @@ final class CompletionVerificationServiceTest extends TestCase
 
         $this->container()->instance(CombinationPolicy::class, $policy);
 
-        $this->pendingSession($user, Requirement::none(), proofs: [$old, $kept, $future]);
+        $this->pendingSession($user, Requirement::none(), proofs: [$old, $kept, $future], firstFactor: $proofs->password(60));
         $this->beginSignIn($user, self::PENDING);
 
         $result = $this->mfa()->verify(Submission::factor($totp->id, AuthenticatorApp::code($totp)));
 
         self::assertTrue($result->isVerified());
         self::assertSame([$kept, $result->proof], array_slice($policy->handed[1], 1));
+    }
+
+    /**
+     * A pending session's first factor made before the verification generation
+     * advanced proves nothing: every route refuses it before spending anything,
+     * whatever a resolver of the application's own still reports.
+     *
+     * @param  string  $route
+     * @return void
+     */
+    #[DataProvider('routes')]
+    public function testAPendingFirstFactorOfAnotherGenerationIsRefused(string $route): void
+    {
+        $this->enablePasskeys();
+
+        $user = $this->person();
+
+        $this->pendingSession($user);
+        $this->beginSignIn($user, self::PENDING);
+
+        $submission = $this->passingSubmission($user, $route);
+
+        $this->forgetReports();
+
+        Factor::query()->update(['consecutive_failures' => 2]);
+
+        VerificationGeneration::advance($user);
+
+        $result = $this->mfa()->verify($submission);
+
+        self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->failureReported()->reason);
+        self::assertSame(2, Factor::query()->firstOrFail()->getConsecutiveFailures());
+        self::assertSame(0, Code::query()->whereNotNull('consumed_at')->count());
+        self::assertSame(0, RecoveryCode::query()->whereNotNull('used_at')->count());
+        self::assertSame([], $this->furtherProofs($user));
+    }
+
+    /**
+     * A pending session's first factor dated in the future proves nothing.
+     *
+     * @return void
+     */
+    public function testAPendingFirstFactorDatedInTheFutureIsRefused(): void
+    {
+        $user   = $this->person();
+        $factor = $this->totpFactor($user);
+        $proofs = SignInProofs::of($user)->inSession(self::PENDING);
+
+        $this->pendingSession($user, firstFactor: $proofs->password(-300));
+        $this->beginSignIn($user, self::PENDING);
+
+        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+
+        self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
+        self::assertNull(Factor::query()->whereKey($factor->id)->sole()->getLastAcceptedStep());
+    }
+
+    /**
+     * A listener's refusal after the commit is not the verification's: it
+     * propagates, what committed stays, and no failure is reported for an
+     * attempt that succeeded.
+     *
+     * @param  string  $route
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('routes')]
+    public function testAListenersRefusalAfterTheCommitPropagates(string $route): void
+    {
+        $this->enablePasskeys();
+
+        $user       = $this->signedInPerson();
+        $submission = $this->passingSubmission($user, $route);
+
+        $this->forgetReports();
+
+        Event::listen(VerificationPassed::class, static function (): void {
+            throw new OperationRefusedException(FailureReason::NOT_FRESH, 'A listener refused.');
+        });
+
+        try {
+            $this->mfa()->verify($submission);
+
+            self::fail('The listener\'s refusal must propagate.');
+        } catch (OperationRefusedException $exception) {
+            self::assertSame('A listener refused.', $exception->getMessage());
+        }
+
+        self::assertCount(1, $this->furtherProofs($user));
+        self::assertSame([], array_filter($this->reported, static fn (object $event): bool => $event instanceof VerificationFailed));
+        self::assertSame($route === 'email' ? 1 : 0, Code::query()->whereNotNull('consumed_at')->count());
+        self::assertSame($route === 'recovery_code' ? 1 : 0, RecoveryCode::query()->whereNotNull('used_at')->count());
+    }
+
+    /**
+     * A refusal after a passkey verified keeps the challenge the gateway
+     * reported, for the failure's event, and still rolls back.
+     *
+     * @return void
+     */
+    public function testAPasskeysChallengeSurvivesASeamsRefusal(): void
+    {
+        $this->enablePasskeys();
+
+        $user = $this->signedInPerson();
+        $key  = $this->passkeyFactor($user);
+
+        $this->container()->instance(StepUp::class, new RefusingCompletion(new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'Refused.')));
+
+        $result = $this->mfa()->verify(Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
+
+        self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
+        self::assertSame('passkey-challenge', $this->failureReported()->challengeId);
+        self::assertNull(Factor::query()->whereKey($key->id)->sole()->getLastUsedAt());
+        self::assertSame([], $this->furtherProofs($user));
+    }
+
+    /**
+     * A failed assertion reports no challenge, as the gateway names none.
+     *
+     * @return void
+     */
+    public function testAFailedAssertionReportsNoChallenge(): void
+    {
+        $this->enablePasskeys(FailureReason::EXPIRED);
+
+        $user = $this->signedInPerson();
+        $key  = $this->passkeyFactor($user);
+
+        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Submission::assertion($key->id, ['id' => self::CREDENTIAL]))->reason);
+        self::assertNull($this->failureReported()->challengeId);
     }
 
     /**
@@ -439,7 +579,7 @@ final class CompletionVerificationServiceTest extends TestCase
         self::assertEquals(new ObservedProperties(userPresence: true, userVerification: true, phishingResistance: true), $proof->properties);
         self::assertSame(AssuranceLevel::AAL2, $passkey->evaluation?->level);
         self::assertSame('passkey-challenge', $proof->challengeId);
-        self::assertEquals(new Channel(ChannelKind::PASSKEY, self::CREDENTIAL), $proof->channel);
+        self::assertSame((new Channel(ChannelKind::PASSKEY, self::CREDENTIAL))->toArray(), $proof->channel?->toArray());
         self::assertContains('pop', $passkey->amr);
         self::assertContains('user', $passkey->amr);
 

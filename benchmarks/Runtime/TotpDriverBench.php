@@ -26,7 +26,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * visible. It computes and compares every time step of the window whether or
  * not one matches, so a matching and a mismatched code should cost the same;
  * the factor records no step, so the cost of the database's compare-and-set is
- * not included. `issueChallenge()` is a no-op for TOTP so it is not measured.
+ * not included.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

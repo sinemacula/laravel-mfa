@@ -166,6 +166,7 @@ trait ArrangesVerification
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @param  string  $session
+     * @param  ?\SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
      */
     protected function pendingSession(
@@ -174,9 +175,10 @@ trait ArrangesVerification
         array $actions = [PendingAction::LIST_FACTORS, PendingAction::SEND_CODE, PendingAction::VERIFY],
         array $proofs = [],
         string $session = self::PENDING,
+        ?Proof $firstFactor = null,
     ): PendingContext {
-        $firstFactor = SignInProofs::of($user)->inSession($session)->password(60);
-        $pending     = new PendingContext($user, self::APPLICATION, $session, $firstFactor, $requirement ?? Requirement::none(), $actions, $proofs);
+        $firstFactor ??= SignInProofs::of($user)->inSession($session)->password(60);
+        $pending = new PendingContext($user, self::APPLICATION, $session, $firstFactor, $requirement ?? Requirement::none(), $actions, $proofs);
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver($pending));
 

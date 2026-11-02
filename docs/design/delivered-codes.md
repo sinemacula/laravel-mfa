@@ -38,7 +38,7 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   the same transaction, so a delivery that throws keeps no code and spends no cooldown or cap. `CodeSent` is dispatched
   by `Verification\ChallengeRequests` once the transaction commits, whichever gateway sent the code, with the factor's
   summary (its masked destination), the purpose and the challenge's id.
-- A check reads the challenge on the write connection: the one named, or the binding's latest. No challenge is
+- A check reads the challenge it names on the write connection. One unknown, or not the binding's, is
   `missing`; a used one is `replayed` for its last code and `spent` for any other; an expired code (`expires_at <=
   now`) is `expired`; a challenge with `attempts >= max_attempts` is `exhausted`; none of these counts an attempt.
   Otherwise the attempt is counted before anything is compared, by `UPDATE ... SET attempts = attempts + 1 WHERE id AND

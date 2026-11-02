@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
+use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Identities\TestUser;
@@ -141,7 +142,9 @@ final class SessionFirstFactorTest extends TestCase
 
         $this->store()->record($first);
 
-        self::assertEquals($first, $this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP)));
+        $found = $this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP));
+
+        self::assertSame($first->toArray(), $found?->toArray());
         self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', 'elsewhere', Purpose::STEP_UP)));
         self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, 'someone-else', 'web', SignInProofs::SESSION, Purpose::STEP_UP)));
     }
@@ -167,6 +170,38 @@ final class SessionFirstFactorTest extends TestCase
 
         self::assertSame($first, $this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', 'pending-1', Purpose::SIGN_IN)));
         self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'admin', 'pending-1', Purpose::SIGN_IN)));
+    }
+
+    /**
+     * A pending session's first factor counts only under the identity's current
+     * verification generation and when not dated in the future.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAPendingFirstFactorMustStillCount(): void
+    {
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
+        $user   = TestUser::query()->create(['email' => 'stale@example.test']);
+        $proofs = SignInProofs::of($user)->inSession('pending-1');
+        $owner  = ProofOwner::of($user);
+
+        $pending = static fn (Proof $first): PendingContext => new PendingContext($user, 'web', 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY]);
+
+        $current = $pending($proofs->password());
+        $future  = $pending($proofs->password(-300));
+
+        self::assertSame($current->firstFactor, $this->firstFactors()->ofPending($user, $current));
+        self::assertNull($this->firstFactors()->ofPending($user, $future));
+
+        VerificationGeneration::advance($user);
+
+        self::assertNull($this->firstFactors()->ofPending($user, $current));
+
+        $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver($current));
+
+        self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', 'pending-1', Purpose::SIGN_IN)));
     }
 
     /**

@@ -150,11 +150,11 @@ final readonly class AttemptService
     /**
      * Run a verification holding a slot of the IP address's window: refused by
      * the address's throttle before it runs when the window is full, otherwise
-     * given back unless the verification failed and was counted, or threw. It
-     * is taken outside any transaction the package opens, so the slot survives
-     * a rollback of what the verification did, and nothing else counts the
-     * address. An attempt made outside a request has no address, and is not
-     * throttled.
+     * given back unless the verification failed and was counted; anything
+     * thrown gives it back too. It is taken outside any transaction the package
+     * opens, so the slot survives a rollback of what the verification did, and
+     * nothing else counts the address. An attempt made outside a request has no
+     * address, and is not throttled.
      *
      * @param  ?string  $ip
      * @param  \Closure(): \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome  $verification

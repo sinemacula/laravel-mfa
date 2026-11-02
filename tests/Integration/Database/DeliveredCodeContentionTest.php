@@ -139,22 +139,21 @@ final class DeliveredCodeContentionTest extends TestCase
      */
     public function testOfTwoInterleavedChecksOnlyOneIsAccepted(): void
     {
-        $this->service()->send(self::factor(), self::binding('session-a'), new RecordingCodeDriver);
-
+        $challenge = (string) $this->service()->send(self::factor(), self::binding('session-a'), new RecordingCodeDriver)->challengeId;
         $competing = null;
         $done      = false;
 
-        Code::retrieved(function () use (&$done, &$competing): void {
+        Code::retrieved(function () use (&$done, &$competing, $challenge): void {
 
             if ($done) {
                 return;
             }
 
             $done      = true;
-            $competing = $this->asObserver(fn (): CodeCheck => $this->service()->check(self::factor(), self::binding('session-a'), self::CODE));
+            $competing = $this->asObserver(fn (): CodeCheck => $this->service()->check(self::factor(), self::binding('session-a'), self::CODE, $challenge));
         });
 
-        $first = $this->service()->check(self::factor(), self::binding('session-a'), self::CODE);
+        $first = $this->service()->check(self::factor(), self::binding('session-a'), self::CODE, $challenge);
 
         self::assertSame(CodeCheck::ACCEPTED, $competing);
         self::assertSame(CodeCheck::SPENT, $first);

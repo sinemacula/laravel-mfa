@@ -26,8 +26,8 @@ use Tests\TestCase;
  * path.
  *
  * A custom driver registered via the Manager's `extend()` API must resolve to
- * the registered instance when requested by name, and its verify /
- * issueChallenge surface must be exercised identically to built-in drivers. A
+ * the registered instance when requested by name, and its `verify()` and
+ * `deliver()` surface must be exercised identically to built-in drivers. A
  * consumer's registration of a shipped driver's name wins however it is made:
  * through the facade, a container extender or a resolving callback on `mfa`.
  *

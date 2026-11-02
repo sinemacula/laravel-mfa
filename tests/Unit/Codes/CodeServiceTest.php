@@ -76,7 +76,7 @@ final class CodeServiceTest extends TestCase
         self::assertSame($result->expiresAt?->getTimestamp(), $driver->delivered[0]['expires_at']->getTimestamp());
 
         self::assertSame(CodeCheck::ACCEPTED, $this->service()->check($factor, self::binding($user), self::CODE, $result->challengeId));
-        self::assertSame(CodeCheck::REPLAYED, $this->service()->check($factor, self::binding($user), self::CODE));
+        self::assertSame(CodeCheck::REPLAYED, $this->service()->check($factor, self::binding($user), self::CODE, $result->challengeId));
     }
 
     /**
@@ -290,7 +290,7 @@ final class CodeServiceTest extends TestCase
         foreach ($factors as $factor) {
 
             try {
-                $this->service()->check($factor, self::binding($user), self::CODE);
+                $this->service()->check($factor, self::binding($user), self::CODE, 'a-challenge');
                 self::fail('Expected the factor to be refused.');
             } catch (UnsupportedFactorException $exception) {
                 self::assertSame('Delivered codes need a stored EloquentFactor model; got ' . $factor::class . '.', $exception->getMessage());
@@ -332,7 +332,7 @@ final class CodeServiceTest extends TestCase
         $factor->setAttribute('authenticatable_id', $key($user));
 
         try {
-            self::assertSame(CodeCheck::MISSING, $this->service()->check($factor, self::binding($user), self::CODE));
+            self::assertSame(CodeCheck::MISSING, $this->service()->check($factor, self::binding($user), self::CODE, 'a-challenge'));
             self::assertTrue($owned, 'Expected the owner key to be refused.');
         } catch (\InvalidArgumentException $exception) {
             self::assertFalse($owned, 'Expected the owner key to be accepted.');
@@ -371,7 +371,7 @@ final class CodeServiceTest extends TestCase
         $factor->setAttribute('id', $key);
 
         try {
-            self::assertSame(CodeCheck::MISSING, $this->service()->check($factor, self::binding($user), self::CODE));
+            self::assertSame(CodeCheck::MISSING, $this->service()->check($factor, self::binding($user), self::CODE, 'a-challenge'));
             self::assertTrue($bindable, 'Expected the factor key to be refused.');
         } catch (UnsupportedFactorException $exception) {
             self::assertFalse($bindable, 'Expected the factor key to be accepted.');

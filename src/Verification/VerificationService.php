@@ -37,6 +37,7 @@ use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\VerificationFailed;
 use SineMacula\Laravel\Mfa\Events\VerificationPassed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
 use SineMacula\Laravel\Mfa\Exceptions\SignInChangedException;
 use SineMacula\Laravel\Mfa\Factors\FactorChannel;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
@@ -72,7 +73,8 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * serves nobody at all. A success dispatches `VerificationPassed`, and for a
  * recovery code `RecoveryCodeUsed` and `RecoveryCodesLow`, once it commits,
  * after the default seams' proof reaches the store. Any exception but a refusal
- * propagates.
+ * made inside the transaction propagates, one a listener throws after the
+ * commit included: what committed is never reported as failed.
  *
  * Stateless: the seams are resolved on every call.
  *
@@ -217,8 +219,10 @@ final readonly class VerificationService
 
     /**
      * How the attempt settled, holding a slot of the IP address's window and,
-     * once it has one, the identity's lock. A refusal thrown has rolled back
-     * what the attempt did; one the address's throttle made ran nothing.
+     * once it has one, the identity's lock. A refusal carried out of the
+     * transaction has rolled back what the attempt did; one the address's
+     * throttle made ran nothing. Anything thrown once the transaction committed
+     * propagates.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -251,8 +255,8 @@ final readonly class VerificationService
             );
         } catch (SignInChangedException) {
             return VerificationResult::failed(FailureReason::NOT_FOUND, 'The sign-in the verification was made for is no longer the request\'s.');
-        } catch (OperationRefusedException $exception) {
-            return CheckOutcome::refused($exception->reason, $exception->getMessage());
+        } catch (RefusedUnderLockException $exception) {
+            return CheckOutcome::refused($exception->refusal->reason, $exception->refusal->getMessage(), challengeId: $exception->challengeId);
         }
 
         return $outcome->lockout === null ? $settled : CheckOutcome::refused(FailureReason::LOCKED, $outcome->lockout->detail(), $outcome->lockout->until);
@@ -261,7 +265,8 @@ final readonly class VerificationService
     /**
      * Open the identity's factor state transaction and settle the attempt in
      * it. What a success returns commits with it, and what a failure counted
-     * commits too, since it returns; a refusal thrown rolls everything back.
+     * commits too, since it returns; a refusal thrown inside it rolls
+     * everything back and is carried out, marked as made before the commit.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -286,15 +291,18 @@ final readonly class VerificationService
             $caller = $this->callers->still(PendingAction::VERIFY, $binding)
                 ?? throw new SignInChangedException('The sign-in changed before the identity\'s lock was held.');
 
-            if ($factor === null || $driver === null) {
-                return $this->settleRecoveryCode($submission, $caller, $binding);
-            }
+            return RefusedUnderLockException::carrying(function () use ($submission, $caller, $binding, $factor, $driver, $factors): CheckOutcome|VerificationResult {
 
-            $stored = LockedFactors::find($factor, $factors);
+                if ($factor === null || $driver === null) {
+                    return $this->settleRecoveryCode($submission, $caller, $binding);
+                }
 
-            return $stored === null
-                ? CheckOutcome::refused(FailureReason::NOT_FOUND, 'The factor is no longer among the identity\'s factors.')
-                : $this->settleFactor($submission, $caller, $binding, $stored, $driver);
+                $stored = LockedFactors::find($factor, $factors);
+
+                return $stored === null
+                    ? CheckOutcome::refused(FailureReason::NOT_FOUND, 'The factor is no longer among the identity\'s factors.')
+                    : $this->settleFactor($submission, $caller, $binding, $stored, $driver);
+            });
         };
 
         return FactorStateTransaction::forIdentity($identity, $model, $settle);
@@ -391,11 +399,33 @@ final readonly class VerificationService
      * @param  string  $type
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException
+     */
+    private function complete(Caller $caller, Proof $proof, CheckOutcome $check, array $driverAmr, ?FactorSummary $summary, string $type): VerificationResult
+    {
+        return RefusedUnderLockException::carrying(
+            fn (): VerificationResult => $this->accept($caller, $proof, $check, $driverAmr, $summary, $type),
+            $proof->challengeId,
+        );
+    }
+
+    /**
+     * Evaluate and hand over a proof the route made, refusing one the
+     * combination policy does not accept; see `complete()`.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+     * @param  \SineMacula\Laravel\Mfa\Verification\CheckOutcome  $check
+     * @param  list<string>  $driverAmr
+     * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $summary
+     * @param  string  $type
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    private function complete(Caller $caller, Proof $proof, CheckOutcome $check, array $driverAmr, ?FactorSummary $summary, string $type): VerificationResult
+    private function accept(Caller $caller, Proof $proof, CheckOutcome $check, array $driverAmr, ?FactorSummary $summary, string $type): VerificationResult
     {
         $requirements = $this->container->make(RequirementCheck::class);
         $binding      = $proof->binding;
@@ -453,8 +483,9 @@ final readonly class VerificationService
     }
 
     /**
-     * Report a failed attempt, once, and answer it. The challenge named is
-     * reported only with the factor it was named for.
+     * Report a failed attempt, once, and answer it: with the challenge a check
+     * reported before a seam refused, or the one the submission named, and only
+     * with the factor it was named for.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -483,7 +514,7 @@ final readonly class VerificationService
             $type,
             $binding->purpose,
             $reason,
-            $summary === null ? null : $submission->challengeId,
+            $summary === null ? null : ($check->challengeId ?? $submission->challengeId),
         ));
 
         return VerificationResult::failed($reason, $check->detail, $check->lockedUntil);

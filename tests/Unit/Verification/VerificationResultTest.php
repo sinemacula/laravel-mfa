@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
+use Tests\Fixtures\Verification\Dumps;
 use Tests\Unit\Concerns\BuildsProofs;
 
 /**
@@ -48,7 +49,7 @@ final class VerificationResultTest extends TestCase
         self::assertSame($evaluation, $result->evaluation);
         self::assertSame(['otp'], $result->amr);
         self::assertSame('totp', $result->type);
-        self::assertNull($result->completion);
+        self::assertNull($result->completion());
         self::assertNull($result->reason);
         self::assertNull($result->detail);
         self::assertNull($result->lockedUntil);
@@ -154,8 +155,8 @@ final class VerificationResultTest extends TestCase
         $completion = new \stdClass;
         $completed  = $result->withCompletion($completion);
 
-        self::assertNull($result->completion);
-        self::assertSame($completion, $completed->completion);
+        self::assertNull($result->completion());
+        self::assertSame($completion, $completed->completion());
         self::assertSame($proof, $completed->proof);
         self::assertSame($evaluation, $completed->evaluation);
         self::assertSame(['otp'], $completed->amr);
@@ -191,6 +192,20 @@ final class VerificationResultTest extends TestCase
 
         self::assertSame('The code did not match.', $debug['detail']);
         self::assertSame('invalid_code', $debug['reason']);
+    }
+
+    /**
+     * No way of dumping one shows the channel's destination or the completion,
+     * Laravel's dump helpers and an array cast included.
+     *
+     * @return void
+     */
+    public function testNoDumpShowsTheSecrets(): void
+    {
+        foreach (Dumps::of(self::verified()->withCompletion((object) ['token' => 'bearer-token'])) as $way => $shown) {
+            self::assertStringNotContainsString('person@example.test', $shown, $way);
+            self::assertStringNotContainsString('bearer-token', $shown, $way);
+        }
     }
 
     /**

@@ -49,7 +49,7 @@ final readonly class CheckOutcome
         /** What the check observed, when it passed. */
         public ?ObservedProperties $properties = null,
 
-        /** The challenge a passed check answered, when one was used. */
+        /** The challenge the check answered, when it passed or a seam then refused and one was reported. */
         public ?string $challengeId = null,
 
         /** How many recovery codes a passed redemption left unused. */
@@ -87,11 +87,12 @@ final readonly class CheckOutcome
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @param  ?\Carbon\CarbonImmutable  $lockedUntil
+     * @param  ?string  $challengeId
      * @return self
      */
-    public static function refused(FailureReason $reason, string $detail, ?CarbonImmutable $lockedUntil = null): self
+    public static function refused(FailureReason $reason, string $detail, ?CarbonImmutable $lockedUntil = null, ?string $challengeId = null): self
     {
-        return new self($reason, $detail, false, $lockedUntil);
+        return new self($reason, $detail, false, $lockedUntil, null, $challengeId);
     }
 
     /**

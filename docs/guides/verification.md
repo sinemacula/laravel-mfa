@@ -33,7 +33,9 @@ the factor's type.
 A request is served as its pending session's identity when the bound `Contracts\PendingSessionResolver` finds one and
 its credential allows the action (`mfa.list_factors`, `mfa.send_code`, `mfa.verify`); otherwise as the identity the
 guard signed in, when it is a person. A pending session that does not allow the action is served nothing, and the
-guard's user is never served in its place.
+guard's user is never served in its place. A pending session's first factor must be of the identity's current
+verification generation and not dated in the future: one that is not is refused as `not_accepted` before anything is
+checked or spent.
 
 ## What a code is bound to
 
@@ -88,7 +90,7 @@ Mfa::verify(Submission::challenge($factorId, $challengeId, $code), Purpose::SIGN
 `Mfa::offeredFactors()` returns the factors a session can try, as summaries that hold no secret, no code and no full
 destination: the identity's confirmed factors, of a type the application enables, that the combination policy accepts
 after the session's first factor, the preferred one first, then the oldest, then by id. None are offered while that
-first factor is not known.
+first factor is not known, or to an inactive identity, since sending and verifying refuse it as `identity_inactive`.
 
 A factor disabled at the failure ceiling is left out, and so is a passkey while the gateway is unavailable or its
 association or credential is missing, because none of those can succeed. A factor under a temporary lockout stays.
@@ -108,13 +110,13 @@ A factor that delivers no codes answers `not_found`. A delivered factor must nam
 
 `Verification\VerificationResult` is told apart by `isVerified()` and `isFailed()`.
 
-| On success   | Holds                                                                                                   |
-|--------------|---------------------------------------------------------------------------------------------------------|
-| `proof`      | The `Proofs\Proof` made: kind, method, channel, factor, what it observed, time, binding and generation  |
-| `evaluation` | The session's proofs with this one against the whole requirement: accepted, multifactor, level, met     |
-| `amr`        | The `amr` values of this proof alone, never `mfa`, which only the evaluation can report                 |
-| `type`       | The type proved: the factor's, or `recovery_code`                                                       |
-| `completion` | Whatever the completion seam returned, such as an authentication layer's tokens                         |
+| On success     | Holds                                                                                                  |
+|----------------|--------------------------------------------------------------------------------------------------------|
+| `proof`        | The `Proofs\Proof` made: kind, method, channel, factor, what it observed, time, binding and generation |
+| `evaluation`   | The session's proofs with this one against the whole requirement: accepted, multifactor, level, met    |
+| `amr`          | The `amr` values of this proof alone, never `mfa`, which only the evaluation can report                |
+| `type`         | The type proved: the factor's, or `recovery_code`                                                      |
+| `completion()` | Whatever the completion seam returned, such as an authentication layer's tokens                        |
 
 | On failure    | Holds                                                                                                  |
 |---------------|--------------------------------------------------------------------------------------------------------|
@@ -126,9 +128,10 @@ A successful verification whose `evaluation` does not yet meet the requirement i
 and the caller asks for the next factor. A requirement of an operation is not part of `verify()`: ask
 `Mfa::isFresh($operation)` afterwards (see [Requirements and step-up](requirements.md)).
 
-A result and a `Submission` never leave through a dump or JSON with anything secret in them: `var_dump()` and
-`print_r()` leave out the code, the assertion's response, the completion and the channel's destination, `json_encode()`
-gives what a caller may be told, and `serialize()` throws.
+A result and a `Submission` never leave through a dump or JSON with anything secret in them. The code, the assertion's
+response and the completion are read through `code()`, `response()` and `completion()`, and a channel's destination
+through `reference()`: `dump()`, `dd()`, `print_r()`, `var_dump()`, `var_export()` and an array cast show none of them,
+`json_encode()` gives what a caller may be told, and `serialize()` throws.
 
 ## Failure reasons
 
@@ -204,4 +207,9 @@ On success, once the transaction commits and in this order: the default seams' p
 `VerificationPassed`, then for a recovery code `RecoveryCodeUsed` and `RecoveryCodesLow`. A listener reading
 `Mfa::proofs()` sees the new proof, and a rollback dispatches none of them. A failure's `VerificationFailed` is
 dispatched once the transaction has ended. `CodeSent`, `VerificationPassed` and `VerificationFailed` carry the challenge
-id when one was used. See [Events](events.md).
+id when one was used. A passkey's challenge id is the one its gateway reports with a verified assertion, so it is on
+`VerificationPassed` and on the `VerificationFailed` of a seam's refusal after it, but not on that of a failed assertion,
+which names none.
+
+A listener that throws reaches the caller of `verify()` or `sendCode()`, whatever it throws, and the change has
+committed: it is not reported as a failure. See [Events](events.md).

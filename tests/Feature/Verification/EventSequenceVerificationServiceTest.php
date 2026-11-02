@@ -22,7 +22,9 @@ use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
 use SineMacula\Laravel\Mfa\Events\VerificationFailed;
 use SineMacula\Laravel\Mfa\Events\VerificationPassed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
@@ -58,6 +60,7 @@ use Tests\TestCase;
 #[CoversClass(PackageChallengeGateway::class)]
 #[CoversClass(RecoveryCodeService::class)]
 #[CoversClass(SendResult::class)]
+#[CoversClass(RefusedUnderLockException::class)]
 final class EventSequenceVerificationServiceTest extends TestCase
 {
     use ArrangesVerification;
@@ -249,6 +252,35 @@ final class EventSequenceVerificationServiceTest extends TestCase
         self::assertSame(self::APPLICATION, $event->context()['application']);
         self::assertSame(Purpose::STEP_UP, $event->purpose);
         self::assertContainsOnlyInstancesOf(MfaEvent::class, $this->reported);
+    }
+
+    /**
+     * A listener's refusal after the commit does not undo a code already
+     * delivered, nor is it answered as a refused send: it propagates.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAListenersRefusalOfASentCodePropagates(): void
+    {
+        $user   = $this->signedInPerson();
+        $factor = $this->emailFactor($user);
+
+        Event::listen(CodeSent::class, static function (): void {
+            throw new OperationRefusedException(FailureReason::NOT_FRESH, 'A listener refused.');
+        });
+
+        try {
+            $this->mfa()->sendCode($factor->id);
+
+            self::fail('The listener\'s refusal must propagate.');
+        } catch (OperationRefusedException $exception) {
+            self::assertSame('A listener refused.', $exception->getMessage());
+        }
+
+        self::assertSame(1, Code::query()->count());
+        self::assertNotNull($this->mailbox->lastCodeTo(self::ADDRESS));
     }
 
     /**

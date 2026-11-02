@@ -10,12 +10,15 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
+use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Verification\FactorOffers;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
@@ -194,6 +197,53 @@ final class FactorOffersTest extends TestCase
         $user = $this->signedInPerson();
 
         $this->totpFactor($user);
+
+        self::assertSame([], $this->mfa()->offeredFactors());
+    }
+
+    /**
+     * An inactive identity can send and verify nothing, so it is offered
+     * nothing.
+     *
+     * @return void
+     */
+    public function testAnInactiveIdentityIsOfferedNothing(): void
+    {
+        $this->totpFactor($this->person());
+
+        $store    = $this->container()->make(ProofStore::class);
+        $active   = new NonEloquentIdentity;
+        $inactive = new NonEloquentIdentity(active: false);
+
+        $this->actingAs($active);
+
+        $store->begin($active, self::APPLICATION, self::SESSION);
+
+        self::assertCount(1, $this->mfa()->offeredFactors());
+
+        $this->actingAs($inactive);
+
+        $store->begin($inactive, self::APPLICATION, self::SESSION);
+
+        self::assertSame([], $this->mfa()->offeredFactors());
+    }
+
+    /**
+     * A pending session whose first factor no longer counts is offered nothing,
+     * since sending and verifying would refuse it.
+     *
+     * @return void
+     */
+    public function testAPendingSessionsStaleFirstFactorIsOfferedNothing(): void
+    {
+        $user = $this->person();
+
+        $this->totpFactor($user);
+        $this->pendingSession($user);
+
+        self::assertCount(1, $this->mfa()->offeredFactors());
+
+        VerificationGeneration::advance($user);
 
         self::assertSame([], $this->mfa()->offeredFactors());
     }

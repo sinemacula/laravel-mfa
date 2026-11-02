@@ -33,8 +33,8 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  * Left out, because they cannot succeed: a factor disabled at the failure
  * ceiling, and a passkey when the gateway is unavailable or its association or
  * credential is missing. A factor under a temporary lockout stays. A pending
- * session must allow listing factors; a request that serves nobody is offered
- * nothing. Recovery codes are never offered.
+ * session must allow listing factors; a request that serves nobody, and an
+ * inactive identity, are offered nothing. Recovery codes are never offered.
  *
  * Offers are advisory: sending and verifying repeat every check.
  *
@@ -80,7 +80,7 @@ final readonly class FactorOffers
     {
         $caller = $this->callers->resolve(PendingAction::LIST_FACTORS);
 
-        if ($caller === null) {
+        if ($caller === null || !$caller->identity->isMfaActive()) {
             return [];
         }
 
@@ -119,7 +119,9 @@ final readonly class FactorOffers
      */
     private function firstFactor(Caller $caller, string $application): ?Proof
     {
-        return $caller->pending->firstFactor ?? $this->firstFactors->current($caller->identity, $application);
+        return $caller->pending === null
+            ? $this->firstFactors->current($caller->identity, $application)
+            : $this->firstFactors->ofPending($caller->identity, $caller->pending);
     }
 
     /**

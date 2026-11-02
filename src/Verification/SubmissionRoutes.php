@@ -100,7 +100,7 @@ final readonly class SubmissionRoutes
      */
     public function recoveryCode(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] Submission $submission, ProofBinding $binding): CheckOutcome
     {
-        $redemption = $this->recoveryCodes->redeem($identity, $submission->code ?? '', $binding);
+        $redemption = $this->recoveryCodes->redeem($identity, $submission->code() ?? '', $binding);
         $reason     = $redemption->reason;
 
         return match (true) {
@@ -162,7 +162,7 @@ final readonly class SubmissionRoutes
             new Attempt($identity, $factor, $binding->purpose, $binding->application),
             static function () use ($driver, $factor, $submission, $binding, &$check): bool {
 
-                $check = $driver->verify($factor, $submission->code ?? '', $binding);
+                $check = $driver->verify($factor, $submission->code() ?? '', $binding);
 
                 return $check === CodeCheck::ACCEPTED;
             },
@@ -195,7 +195,7 @@ final readonly class SubmissionRoutes
             new Attempt($identity, $factor, $binding->purpose, $binding->application),
             function () use ($identity, $factor, $binding, $submission, &$assertion): bool {
 
-                $assertion = $this->passkeys->check($identity, $factor, $binding, $submission->response);
+                $assertion = $this->passkeys->check($identity, $factor, $binding, $submission->response());
 
                 return $assertion instanceof PasskeyAssertion;
             },
@@ -221,7 +221,7 @@ final readonly class SubmissionRoutes
     private function challenge(#[\SensitiveParameter] Submission $submission, EloquentFactor&Model $factor, ProofBinding $binding): CheckOutcome
     {
         $challengeId = $submission->challengeId ?? '';
-        $outcome     = $this->container->make(ChallengeGateway::class)->verify($factor, $binding, $challengeId, $submission->code ?? '');
+        $outcome     = $this->container->make(ChallengeGateway::class)->verify($factor, $binding, $challengeId, $submission->code() ?? '');
         $reason      = $outcome->reason;
 
         return match (true) {

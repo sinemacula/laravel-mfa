@@ -26,6 +26,7 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
@@ -114,9 +115,15 @@ final readonly class ChallengeRequests
         }
 
         try {
-            return $this->send($caller, $binding, $this->guard->factor($caller->identity, $factorId, $binding->application));
+            $factor = $this->guard->factor($caller->identity, $factorId, $binding->application);
         } catch (OperationRefusedException $exception) {
             return SendResult::refused($exception->reason);
+        }
+
+        try {
+            return $this->send($caller, $binding, $factor);
+        } catch (RefusedUnderLockException $exception) {
+            return SendResult::refused($exception->refusal->reason);
         }
     }
 
@@ -181,7 +188,9 @@ final readonly class ChallengeRequests
                 $result = FactorStateTransaction::forIdentity(
                     $caller->identity,
                     $factor,
-                    fn (Collection $factors): SendResult => $this->sendUnderLock($binding, LockedFactors::find($factor, $factors)),
+                    fn (Collection $factors): SendResult => RefusedUnderLockException::carrying(
+                        fn (): SendResult => $this->sendUnderLock($binding, LockedFactors::find($factor, $factors)),
+                    ),
                 );
 
                 return AttemptOutcome::uncounted();

@@ -11,9 +11,11 @@ use SineMacula\Laravel\Mfa\Enums\SubmissionKind;
  * answering a challenge sent to a delivered factor, a recovery code, or a
  * passkey's response to an assertion request.
  *
- * It holds a secret, so nothing but its own properties ever shows it: dumping
- * it or encoding it as JSON leaves out the code and the response, and
- * serialising it is refused.
+ * It holds a secret, as a `\SensitiveParameterValue` read through `code()` and
+ * `response()`: no dump of it (`print_r`, `var_dump`, `var_export`, an array
+ * cast, or Symfony's VarDumper behind Laravel's dump helpers) shows the code or
+ * the response, encoding it as JSON leaves them out, and serialising it is
+ * refused.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,6 +24,12 @@ use SineMacula\Laravel\Mfa\Enums\SubmissionKind;
  */
 final readonly class Submission implements \JsonSerializable
 {
+    /** @var \SensitiveParameterValue The code, in clear, for anything but an assertion; hidden from dumps. */
+    private \SensitiveParameterValue $code;
+
+    /** @var \SensitiveParameterValue The client's response to an assertion request, hidden from dumps. */
+    private \SensitiveParameterValue $response;
+
     /**
      * Constructor.
      *
@@ -42,14 +50,17 @@ final readonly class Submission implements \JsonSerializable
         /** The challenge answered, for a delivered factor. */
         public ?string $challengeId = null,
 
-        /** The code, in clear, for anything but an assertion. */
+        // The code, in clear, for anything but an assertion.
         #[\SensitiveParameter]
-        public ?string $code = null,
+        ?string $code = null,
 
-        /** The client's response to an assertion request. */
+        // The client's response to an assertion request.
         #[\SensitiveParameter]
-        public array $response = [],
-    ) {}
+        array $response = [],
+    ) {
+        $this->code     = new \SensitiveParameterValue($code);
+        $this->response = new \SensitiveParameterValue($response);
+    }
 
     /**
      * What a dump shows: never the code or the response.
@@ -132,6 +143,28 @@ final readonly class Submission implements \JsonSerializable
     public static function assertion(mixed $factorId, #[\SensitiveParameter] array $response): self
     {
         return new self(SubmissionKind::ASSERTION, $factorId, response: $response);
+    }
+
+    /**
+     * The code, in clear, or `null` for an assertion.
+     *
+     * @return ?string
+     */
+    public function code(): ?string
+    {
+        /** @var ?string */
+        return $this->code->getValue();
+    }
+
+    /**
+     * The client's response to an assertion request; empty for anything else.
+     *
+     * @return array<string, mixed>
+     */
+    public function response(): array
+    {
+        /** @var array<string, mixed> */
+        return $this->response->getValue();
     }
 
     /**

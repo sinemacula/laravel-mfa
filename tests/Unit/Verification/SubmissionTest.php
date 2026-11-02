@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enums\SubmissionKind;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Verification\Dumps;
 
 /**
  * Unit tests for `Submission`: each named constructor holds what its route
@@ -36,29 +37,29 @@ final class SubmissionTest extends TestCase
 
         self::assertSame(SubmissionKind::FACTOR, $factor->kind);
         self::assertSame('factor-1', $factor->factorId);
-        self::assertSame(self::CODE, $factor->code);
+        self::assertSame(self::CODE, $factor->code());
         self::assertNull($factor->challengeId);
-        self::assertSame([], $factor->response);
+        self::assertSame([], $factor->response());
 
         $challenge = Submission::challenge('factor-1', 'challenge-1', self::CODE);
 
         self::assertSame(SubmissionKind::CHALLENGE, $challenge->kind);
         self::assertSame('factor-1', $challenge->factorId);
         self::assertSame('challenge-1', $challenge->challengeId);
-        self::assertSame(self::CODE, $challenge->code);
+        self::assertSame(self::CODE, $challenge->code());
 
         $recovery = Submission::recoveryCode(self::CODE);
 
         self::assertSame(SubmissionKind::RECOVERY_CODE, $recovery->kind);
         self::assertNull($recovery->factorId);
-        self::assertSame(self::CODE, $recovery->code);
+        self::assertSame(self::CODE, $recovery->code());
 
         $assertion = Submission::assertion('factor-1', ['id' => 'credential']);
 
         self::assertSame(SubmissionKind::ASSERTION, $assertion->kind);
         self::assertSame('factor-1', $assertion->factorId);
-        self::assertSame(['id' => 'credential'], $assertion->response);
-        self::assertNull($assertion->code);
+        self::assertSame(['id' => 'credential'], $assertion->response());
+        self::assertNull($assertion->code());
     }
 
     /**
@@ -80,6 +81,24 @@ final class SubmissionTest extends TestCase
         self::assertStringContainsString('challenge-1', $dumped);
         self::assertStringNotContainsString(self::CODE, print_r($code, true));
         self::assertSame(['kind' => 'challenge', 'factor_id' => 'factor-1', 'challenge_id' => 'challenge-1'], $code->__debugInfo());
+    }
+
+    /**
+     * No way of dumping one shows a code or a response, Laravel's dump helpers
+     * and an array cast included.
+     *
+     * @return void
+     */
+    public function testNoDumpShowsTheSecrets(): void
+    {
+        foreach (Dumps::of(Submission::challenge('factor-1', 'challenge-1', self::CODE)) as $way => $shown) {
+            self::assertStringNotContainsString(self::CODE, $shown, $way);
+            self::assertStringContainsString('challenge-1', $shown, $way);
+        }
+
+        foreach (Dumps::of(Submission::assertion('factor-1', ['signature' => 'signed-by-the-key'])) as $way => $shown) {
+            self::assertStringNotContainsString('signed-by-the-key', $shown, $way);
+        }
     }
 
     /**

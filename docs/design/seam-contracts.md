@@ -21,7 +21,7 @@ that call them, so the flows can be built against one fixed set.
 - `PendingCompletion` and `StepUp` are the last write of a verification's transaction, and refuse by throwing an
   `OperationRefusedException` with a reason, which rolls the verification back and is answered as a failed result;
   anything else they throw propagates. Returning means the proof was accepted, a session still pending included, and
-  what they return is opaque to this package and reaches the caller as `VerificationResult::$completion`, so an
+  what they return is opaque to this package and reaches the caller as `VerificationResult::completion()`, so an
   authentication layer's tokens need no request state in a singleton and no reference to a sibling class. Turning that
   layer's refused result into a throw is the adapter's job. The rollback holds only when the adapter's writes share the
   storage connection.

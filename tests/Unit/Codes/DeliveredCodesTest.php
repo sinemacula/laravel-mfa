@@ -64,9 +64,9 @@ final class DeliveredCodesTest extends TestCase
 
         self::assertSame(self::CODE, $issued->code);
         self::assertSame($now->addMinutes(10)->getTimestamp(), $issued->expiresAt->getTimestamp());
-        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
-        self::assertSame(CodeCheck::REPLAYED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
-        self::assertSame(CodeCheck::SPENT, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now));
+        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $issued->challengeId));
+        self::assertSame(CodeCheck::REPLAYED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $issued->challengeId));
+        self::assertSame(CodeCheck::SPENT, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now, $issued->challengeId));
         self::assertNotNull(self::row($issued)->consumed_at);
     }
 
@@ -102,7 +102,6 @@ final class DeliveredCodesTest extends TestCase
         $now    = self::now();
         $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
-        self::assertSame(CodeCheck::MISSING, $codes->check($factor, $binding, self::CODE, $now));
         self::assertSame(CodeCheck::MISSING, $codes->check($factor, $binding, self::CODE, $now, $issued->challengeId));
         self::assertSame(0, self::row($issued)->attempts);
         self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $issued->challengeId));
@@ -170,7 +169,7 @@ final class DeliveredCodesTest extends TestCase
         $now    = self::now();
         $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
-        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now));
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now, $issued->challengeId));
         self::assertSame(1, self::row($issued)->attempts);
         self::assertNull(self::row($issued)->consumed_at);
     }
@@ -189,9 +188,9 @@ final class DeliveredCodesTest extends TestCase
         $now    = self::now();
         $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
-        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now));
-        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now));
-        self::assertSame(CodeCheck::EXHAUSTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now, $issued->challengeId));
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now, $issued->challengeId));
+        self::assertSame(CodeCheck::EXHAUSTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $issued->challengeId));
         self::assertSame(2, self::row($issued)->attempts);
     }
 
@@ -209,9 +208,9 @@ final class DeliveredCodesTest extends TestCase
         $now    = self::now();
         $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
-        self::assertSame(CodeCheck::EXPIRED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now->addMinutes(5)));
+        self::assertSame(CodeCheck::EXPIRED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now->addMinutes(5), $issued->challengeId));
         self::assertSame(0, self::row($issued)->attempts);
-        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now->addMinutes(5)->subSecond()));
+        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now->addMinutes(5)->subSecond(), $issued->challengeId));
     }
 
     /**
@@ -251,11 +250,11 @@ final class DeliveredCodesTest extends TestCase
         $codes = $this->codes([], [self::CODE, self::NEXT_CODE]);
         $now   = self::now()->addSeconds(60);
 
-        $codes->issue(self::FACTOR, self::binding(), self::now());
+        $issued = self::issued($codes->issue(self::FACTOR, self::binding(), self::now()));
         $codes->issue(self::FACTOR, self::binding(), $now);
 
-        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
-        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now));
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $issued->challengeId));
+        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now, $issued->challengeId));
     }
 
     /**
@@ -277,8 +276,8 @@ final class DeliveredCodesTest extends TestCase
 
         self::assertSame(self::NEXT_CODE, $resent->code);
         self::assertSame([], $this->draws);
-        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
-        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now));
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $resent->challengeId));
+        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now, $resent->challengeId));
     }
 
     /**
@@ -294,16 +293,16 @@ final class DeliveredCodesTest extends TestCase
         $codes = $this->codes(['max_attempts' => 3], [self::CODE, self::NEXT_CODE]);
         $now   = self::now();
 
-        $codes->issue(self::FACTOR, self::binding(), $now);
+        $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
-        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now));
-        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now));
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now, $issued->challengeId));
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now, $issued->challengeId));
 
         $resent = self::issued($codes->issue(self::FACTOR, self::binding(), $now->addSeconds(60)));
 
         self::assertSame(2, self::row($resent)->attempts);
-        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now->addSeconds(60)));
-        self::assertSame(CodeCheck::EXHAUSTED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now->addSeconds(60)));
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now->addSeconds(60), $resent->challengeId));
+        self::assertSame(CodeCheck::EXHAUSTED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now->addSeconds(60), $resent->challengeId));
     }
 
     /**
@@ -324,13 +323,13 @@ final class DeliveredCodesTest extends TestCase
 
         self::assertSame($first->challengeId, $resent->challengeId);
         self::assertSame($now->addMinutes(12)->getTimestamp(), $resent->expiresAt->getTimestamp());
-        self::assertSame(CodeCheck::EXPIRED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now->addMinutes(12)));
+        self::assertSame(CodeCheck::EXPIRED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now->addMinutes(12), $resent->challengeId));
 
         $fresh = self::issued($codes->issue(self::FACTOR, self::binding(), $now->addMinutes(12)));
 
         self::assertNotSame($first->challengeId, $fresh->challengeId);
         self::assertSame($now->addMinutes(22)->getTimestamp(), $fresh->expiresAt->getTimestamp());
-        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), '111111', $now->addMinutes(12)));
+        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), '111111', $now->addMinutes(12), $fresh->challengeId));
     }
 
     /**
@@ -346,8 +345,8 @@ final class DeliveredCodesTest extends TestCase
         $codes = $this->codes(['max_attempts' => 1, 'challenge_ttl_minutes' => 30], [self::CODE, self::NEXT_CODE]);
         $now   = self::now();
 
-        $codes->issue(self::FACTOR, self::binding(), $now);
-        $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now);
+        $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+        $codes->check(self::FACTOR, self::binding(), self::WRONG_CODE, $now, $issued->challengeId);
 
         self::assertSame(1740, $codes->issue(self::FACTOR, self::binding(), $now->addSeconds(60)));
         self::assertInstanceOf(IssuedCode::class, $codes->issue(self::FACTOR, self::binding(), $now->addMinutes(30)));
@@ -367,12 +366,12 @@ final class DeliveredCodesTest extends TestCase
         $now   = self::now();
         $first = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
-        $codes->check(self::FACTOR, self::binding(), self::CODE, $now);
+        $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $first->challengeId);
 
         $second = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
         self::assertNotSame($first->challengeId, $second->challengeId);
-        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now));
+        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::NEXT_CODE, $now, $second->challengeId));
     }
 
     /**
@@ -480,7 +479,7 @@ final class DeliveredCodesTest extends TestCase
         $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
         self::assertMatchesRegularExpression('/^\d{8}$/D', $issued->code);
-        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), $issued->code, $now));
+        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), $issued->code, $now, $issued->challengeId));
 
         $digits = '';
 
@@ -516,7 +515,7 @@ final class DeliveredCodesTest extends TestCase
 
         $this->onFirstRead(static fn () => Code::query()->whereKey($issued->challengeId)->update(['attempts' => 1]));
 
-        self::assertSame(CodeCheck::EXHAUSTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
+        self::assertSame(CodeCheck::EXHAUSTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $issued->challengeId));
     }
 
     /**
@@ -535,7 +534,7 @@ final class DeliveredCodesTest extends TestCase
 
         $this->onFirstRead(static fn () => Code::query()->whereKey($issued->challengeId)->update(['sends' => 2]));
 
-        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $issued->challengeId));
         self::assertSame(0, self::row($issued)->attempts);
         self::assertNull(self::row($issued)->consumed_at);
     }
@@ -556,7 +555,7 @@ final class DeliveredCodesTest extends TestCase
 
         $this->onFirstRead(static fn () => Code::query()->whereKey($issued->challengeId)->update(['consumed_at' => $now]));
 
-        self::assertSame(CodeCheck::SPENT, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
+        self::assertSame(CodeCheck::SPENT, $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $issued->challengeId));
         self::assertSame(0, self::row($issued)->attempts);
     }
 
@@ -575,7 +574,7 @@ final class DeliveredCodesTest extends TestCase
 
         $this->onFirstRead(static fn () => Code::query()->whereKey($issued->challengeId)->delete());
 
-        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now));
+        self::assertSame(CodeCheck::INVALID, $codes->check(self::FACTOR, self::binding(), self::CODE, $now, $issued->challengeId));
         self::assertSame(0, Code::query()->count());
     }
 

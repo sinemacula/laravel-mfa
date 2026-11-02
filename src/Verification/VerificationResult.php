@@ -22,8 +22,11 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  * detail is for events and logs only: an answer to the person carries the
  * reason, within the disclosure boundary.
  *
- * The proof holds its channel's full destination, and the completion may hold
- * tokens, so neither leaves through a dump or JSON, which show a summary, and
+ * The completion may hold tokens, so it is held as a `\SensitiveParameterValue`
+ * and read through `completion()`, and the proof's channel hides its full
+ * destination in the same way (see `Assurance\Channel`), so neither leaves
+ * through any dump (`print_r`, `var_dump`, `var_export`, an array cast, or
+ * Symfony's VarDumper behind Laravel's dump helpers). JSON shows a summary, and
  * serialising a result is refused.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -31,6 +34,9 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  */
 final readonly class VerificationResult implements \JsonSerializable
 {
+    /** @var \SensitiveParameterValue What the completion seam returned, hidden from dumps. */
+    private \SensitiveParameterValue $completion;
+
     /**
      * Constructor.
      *
@@ -66,9 +72,12 @@ final readonly class VerificationResult implements \JsonSerializable
         /** The type proved, when it succeeded: the factor's, or `recovery_code`. */
         public ?string $type = null,
 
-        /** What the completion seam returned, opaque to this package. */
-        public ?object $completion = null,
-    ) {}
+        // What the completion seam returned, opaque to this package.
+        #[\SensitiveParameter]
+        ?object $completion = null,
+    ) {
+        $this->completion = new \SensitiveParameterValue($completion);
+    }
 
     /**
      * What a dump shows: the summary, and the internal detail of a failure;
@@ -150,9 +159,20 @@ final readonly class VerificationResult implements \JsonSerializable
      * @param  ?object  $completion
      * @return self
      */
-    public function withCompletion(?object $completion): self
+    public function withCompletion(#[\SensitiveParameter] ?object $completion): self
     {
         return new self($this->proof, $this->evaluation, $this->reason, $this->detail, $this->lockedUntil, $this->amr, $this->type, $completion);
+    }
+
+    /**
+     * What the completion seam returned, opaque to this package.
+     *
+     * @return ?object
+     */
+    public function completion(): ?object
+    {
+        /** @var ?object */
+        return $this->completion->getValue();
     }
 
     /**
