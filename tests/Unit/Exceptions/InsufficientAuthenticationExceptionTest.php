@@ -30,8 +30,9 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     private const string MESSAGE = 'Further authentication is required.';
 
     /**
-     * It is a 401 with a fixed message, and no challenge header of its own: the
-     * package also serves cookie guards, so the application chooses.
+     * It is a 401 with the shipped message in the default locale, and no
+     * challenge header of its own: the package also serves cookie guards, so
+     * the application chooses.
      *
      * @return void
      */

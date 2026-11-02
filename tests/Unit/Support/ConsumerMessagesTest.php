@@ -140,7 +140,7 @@ final class ConsumerMessagesTest extends TestCase
      *
      * @return void
      */
-    public function testATranslationInTheFallbackLocaleIsHonouredFirst(): void
+    public function testATranslationInTheFallbackLocaleIsHonoredFirst(): void
     {
         app()->setLocale('fr');
         app('translator')->setFallback('de');

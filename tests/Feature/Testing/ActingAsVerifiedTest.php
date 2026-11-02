@@ -12,6 +12,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
@@ -47,8 +48,8 @@ use Tests\TestCase;
  *
  * @internal
  */
-#[CoversClass(InteractsWithMfa::class)]
 #[CoversClass(VerifiedSignIn::class)]
+#[CoversTrait(InteractsWithMfa::class)]
 final class ActingAsVerifiedTest extends TestCase
 {
     use InteractsWithMfa;
@@ -734,7 +735,7 @@ final class ActingAsVerifiedTest extends TestCase
      *
      * @return void
      */
-    public function testItEnrolsNoFactor(): void
+    public function testItEnrollsNoFactor(): void
     {
         $user = $this->person();
 
@@ -841,7 +842,7 @@ final class ActingAsVerifiedTest extends TestCase
     }
 
     /**
-     * A first factor that already rates AAL3 under the leveled policy.
+     * A first factor that already rates AAL3 under the levelled policy.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof

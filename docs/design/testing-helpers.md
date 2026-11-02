@@ -8,7 +8,7 @@ is built the way it is, and which test helpers deliberately stay private to the 
 ## Invariants
 
 - The fakes keep what they are given. `FakeEmailSender::lastCodeTo()` reads the message's own field. `FakeSmsSender` has
-  no such method, because it has no authoritative code, only rendered text, and now that the wording is customisable a
+  no such method, because it has no authoritative code, only rendered text, and with wording a translation can change a
   digit heuristic could return a help line's phone number.
 - `AuthenticatorApp` reads `CarbonImmutable::now()`, the driver's clock, so `Carbon::setTestNow()` is the frozen time.
   There is no `$at` parameter and no refusal of an unfrozen clock.
@@ -60,8 +60,8 @@ is built the way it is, and which test helpers deliberately stay private to the 
   cookie with its own `mfa.proofs`.
 - The application given chooses where proofs go, not what the next request resolves.
 
-Only `AuthenticatorApp` moved out of the package's own fixtures. `SignInProofs` deliberately builds wrong evidence, and
-`ArrangesVerification` is tied to the package's own test identities and settings, so both stay there.
+Only `AuthenticatorApp` is public. `SignInProofs` deliberately builds wrong evidence, and `ArrangesVerification` is tied
+to the package's own test identities and settings, so both stay fixtures.
 
 ## Implementation Anchors
 

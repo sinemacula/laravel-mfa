@@ -9,16 +9,15 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
-use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 
 /**
- * Assertions against each driver's constructor default values.
+ * Assertions against the email driver's constructor default values.
  *
  * Pins the documented defaults so a silent change to any of them trips a
  * mutation-testing signal and a CI diff. The main driver tests exercise
- * behaviour with explicit values; this class locks down the values the drivers
- * pick when the consumer supplies none.
+ * behaviour with explicit values; this class locks down the values the driver
+ * picks when the consumer supplies none.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,7 +25,6 @@ use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
  * @internal
  */
 #[CoversClass(EmailDriver::class)]
-#[CoversClass(SmsDriver::class)]
 final class DefaultsTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
