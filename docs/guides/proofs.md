@@ -142,10 +142,8 @@ the forgotten proofs back on the current session. Serialise the route that remov
 
 ## The middleware
 
-The `mfa` middleware enforces nothing while the current sign-in's requirement (`Mfa::requirement()`, see
-[Requirements and step-up](requirements.md)) is empty. Otherwise it judges the newest additional factor or recovery
-code proof of the current sign-in: with none it throws `MfaRequiredException`, and with one older than the window (the
-route's `mfa:N` minutes, or `proofs.max_age_minutes`, see [Proofs](configuration.md#proofs)), or dated in the future,
-`MfaExpiredException`. A first factor alone is never a verification.
+The `mfa` middleware judges the current sign-in's whole requirement (see [Requirements and step-up](requirements.md)) on
+these proofs. A sign-in's proofs last as long as the sign-in, subject to invalidation: a time bound comes from a
+requirement's maximum age. See [Route middleware](middleware.md).
 
 How the store is built, and why each rule holds, is in [the proof store design note](../design/proof-store.md).

@@ -17,9 +17,9 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
-use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
+use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
-use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
+use SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\GuardHooks;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
@@ -228,9 +228,9 @@ final class SignInProofsTest extends TestCase
 
         Auth::shouldUse('admin');
 
-        $this->expectException(MfaRequiredException::class);
+        $this->expectException(InsufficientAuthenticationException::class);
 
-        $this->container()->make(RequireMfa::class)->handle(
+        $this->container()->make(EnsureMfaRequirementIsMet::class)->handle(
             $this->container()->make(Request::class),
             static fn (): Response => new Response('reached'),
         );
@@ -284,9 +284,9 @@ final class SignInProofsTest extends TestCase
         self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::factor($factor->id, $code))->reason);
         self::assertSame([], Mfa::proofs());
 
-        $this->expectException(MfaRequiredException::class);
+        $this->expectException(InsufficientAuthenticationException::class);
 
-        $this->container()->make(RequireMfa::class)->handle(
+        $this->container()->make(EnsureMfaRequirementIsMet::class)->handle(
             $this->container()->make(Request::class),
             static fn (): Response => new Response('reached'),
         );

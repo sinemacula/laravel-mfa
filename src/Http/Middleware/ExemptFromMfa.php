@@ -8,19 +8,22 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Skip MFA middleware.
+ * Marks a route as one `mfa` does not gate, such as the routes that complete a
+ * verification or a bootstrap enrolment, in every form `mfa` takes.
  *
- * Marks the current request to bypass MFA checks. This should be applied to
- * routes that handle the MFA verification flow itself, preventing circular
- * enforcement.
+ * It only passes the request on. `EnsureMfaRequirementIsMet` reads the mark
+ * from the route's resolved middleware rather than a request attribute, so the
+ * order the two run in does not matter, `withoutMiddleware()` is honoured and
+ * nothing a request carries can claim it. It grants nothing: whatever helper
+ * the route calls checks for itself.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
-final class SkipMfa
+final class ExemptFromMfa
 {
     /**
-     * Handle an incoming request.
+     * Pass the request on.
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Closure(\Illuminate\Http\Request): \Symfony\Component\HttpFoundation\Response  $next
@@ -28,8 +31,6 @@ final class SkipMfa
      */
     public function handle(Request $request, \Closure $next): Response
     {
-        $request->attributes->set('skip_mfa', true);
-
         return $next($request);
     }
 }

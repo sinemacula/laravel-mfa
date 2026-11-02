@@ -14,8 +14,8 @@ before anything relies on it.
   requires a factor, whether it accepts recovery codes and at what level it issues them, whether a pending session may
   enrol its first factor, its limits on enrolments made through it, its TOTP window, the requirement of each operation's
   step-up, and the first factor its guard uses. Those live in `mfa.applications.{name}`; everything else lives in a
-  block per capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `proofs`, `lifecycle`) beside
-  `storage`, `factor` and `identity_state`.
+  block per capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `lifecycle`) beside `storage`,
+  `factor` and `identity_state`.
 - Not every setting is applied yet. Of an application block, `totp_window` is read by the TOTP driver for the
   application a bound `ApplicationResolver` names, `recovery_codes.enabled` by the recovery code service, `requirement`
   by `Mfa::requirement()` and `freshness` by `Mfa::isFresh()` (see
@@ -25,8 +25,8 @@ before anything relies on it.
   setting as applied or not, and a flow that starts reading one updates it.
 - Every setting is read through one class that owns its block: `Applications\ApplicationSettings` (with
   `Applications\ApplicationBlock` reading the raw block), `Drivers\TotpSettings`, `Codes\CodeSettings`,
-  `RecoveryCodes\RecoveryCodeSettings`, `Attempts\AttemptSettings`, `Enrollment\EnrollmentSettings`,
-  `Proofs\ProofSettings` and `Lifecycle\LifecycleSettings`. Each reads the configuration on every call and holds nothing
+  `RecoveryCodes\RecoveryCodeSettings`, `Attempts\AttemptSettings`, `Enrollment\EnrollmentSettings` and
+  `Lifecycle\LifecycleSettings`. Each reads the configuration on every call and holds nothing
   between calls, so no request's settings outlive it in a long-running process, and a change applies at once.
 - A setting is checked as it is read. A number is an integer, or the digit string `env()` returns for one, within its
   bounds (`Config\IntegerSetting`); anything else, and anything out of bounds, fails closed with an
@@ -101,14 +101,13 @@ before anything relies on it.
 - `src/Applications/ApplicationSettings.php`, `src/Applications/ApplicationBlock.php`,
   `src/Applications/DeclaredFirstFactor.php`, `src/Enums/RequirementMode.php`.
 - `src/Drivers/TotpSettings.php`, `src/Codes/CodeSettings.php`, `src/RecoveryCodes/RecoveryCodeSettings.php`,
-  `src/Attempts/AttemptSettings.php`, `src/Enrollment/EnrollmentSettings.php`, `src/Proofs/ProofSettings.php`,
+  `src/Attempts/AttemptSettings.php`, `src/Enrollment/EnrollmentSettings.php`,
   `src/Lifecycle/LifecycleSettings.php`, `src/Config/IntegerSetting.php`.
 - `src/Config/ConfigurationValidator.php`: `report()`, `validate()`; `src/Config/ConfigurationBindings.php`: `boot()`,
   `validate()`; `src/MfaServiceProvider.php`: `boot()`, `registerManager()`.
 - `src/Console/CheckConfigurationCommand.php`; `src/Exceptions/InvalidConfigurationException.php`.
 - The readers: `src/Drivers/DriverBindings.php`, `src/RecoveryCodes/RecoveryCodeService.php`,
-  `src/Attempts/AttemptService.php` (`attempt()`, `lockout()`), `src/Http/Middleware/RequireMfa.php`
-  (`configuredMaxAgeMinutes()`).
+  `src/Attempts/AttemptService.php` (`attempt()`, `lockout()`).
 
 ## Authoritative Tests
 
@@ -116,8 +115,7 @@ before anything relies on it.
 - `tests/Unit/Applications/DeclaredFirstFactorTest.php`
 - `tests/Unit/Drivers/TotpSettingsTest.php`, `tests/Unit/Codes/CodeSettingsTest.php`,
   `tests/Unit/RecoveryCodes/RecoveryCodeSettingsTest.php`, `tests/Unit/Attempts/AttemptSettingsTest.php`,
-  `tests/Unit/Enrollment/EnrollmentSettingsTest.php`, `tests/Unit/Proofs/ProofSettingsTest.php`,
-  `tests/Unit/Lifecycle/LifecycleSettingsTest.php`
+  `tests/Unit/Enrollment/EnrollmentSettingsTest.php`, `tests/Unit/Lifecycle/LifecycleSettingsTest.php`
 - `tests/Unit/Config/IntegerSettingTest.php`
 - `tests/Unit/Config/ConfigurationValidatorTest.php`
 - `tests/Unit/Config/ConfigurationBindingsTest.php`

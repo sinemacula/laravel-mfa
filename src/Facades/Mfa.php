@@ -43,6 +43,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static \SineMacula\Laravel\Mfa\Lifecycle\PruneResult prune()
  * @method static list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret> generateRecoveryCodes()
  * @method static ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus recoveryCodes()
+ * @method static array{accepted: bool, multifactor: bool, factor_types: list<string>, level: string, phishing_resistant: bool, user_verification: bool, last_verification_age_seconds: ?int, has_confirmed_factor: bool} authenticationContext()
  *
  * @phpcs:enable Generic.Files.LineLength.TooLong
  *

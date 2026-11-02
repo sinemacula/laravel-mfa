@@ -13,8 +13,8 @@ use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
-use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
-use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
+use SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet;
+use SineMacula\Laravel\Mfa\Http\Middleware\ExemptFromMfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
@@ -114,7 +114,7 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * The provider must register the `'mfa'` and `'mfa.skip'` middleware
+     * The provider must register the `'mfa'` and `'mfa.exempt'` middleware
      * aliases against the router.
      *
      * @return void
@@ -127,9 +127,9 @@ final class ServiceProviderBindingsTest extends TestCase
         $aliases = $router->getMiddleware();
 
         self::assertArrayHasKey('mfa', $aliases);
-        self::assertArrayHasKey('mfa.skip', $aliases);
+        self::assertArrayHasKey('mfa.exempt', $aliases);
 
-        self::assertSame(RequireMfa::class, $aliases['mfa']);
-        self::assertSame(SkipMfa::class, $aliases['mfa.skip']);
+        self::assertSame(EnsureMfaRequirementIsMet::class, $aliases['mfa']);
+        self::assertSame(ExemptFromMfa::class, $aliases['mfa.exempt']);
     }
 }

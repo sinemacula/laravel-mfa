@@ -7,8 +7,8 @@ What a sign-in must prove, and how fresh a session must be before a sensitive op
 ## What a sign-in must prove
 
 `Mfa::requirement()` returns the requirement the current identity's sign-in on the current application must meet. It
-is empty when nothing further is needed, and without an MFA-capable identity. The `mfa` middleware enforces nothing
-while it is empty.
+is empty when nothing further is needed, and without an MFA-capable identity. The `mfa` middleware enforces it on the
+routes that carry it (see [Route middleware](middleware.md)).
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;

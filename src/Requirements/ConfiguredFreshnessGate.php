@@ -8,11 +8,11 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Assurance\Evaluation;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
  * The default `FreshnessGate`, which works from the proof store alone: the
@@ -21,15 +21,16 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  * the operation's requirement (see `OperationRequirements::effective()`), the
  * stricter of the application's configured one and the caller's.
  *
- * It is not fresh without an identity, without a requirement, without a sign-in
- * the store knows of, or without a first factor on it: proofs are judged only
- * after the sign-in's first factor. The first factor is the one the store
- * recorded; only when it holds none is the bound `FirstFactorResolver` asked,
- * and its answer counts only when it is a first factor of the identity on the
- * application, bound to the current sign-in, made under the identity's current
- * verification generation and not after now (see `Context\SessionFirstFactor`).
- * Only a proof's own time counts, so refreshing or regenerating the session
- * never renews freshness.
+ * It is not fresh without a requirement, without a person it serves (a pending
+ * session, a guest, a machine and an inactive identity are not fresh for any
+ * operation), without a sign-in the store knows of, or without a first factor
+ * on it: proofs are judged only after the sign-in's first factor. The first
+ * factor is the one the store recorded; only when it holds none is the bound
+ * `FirstFactorResolver` asked, and its answer counts only when it is a first
+ * factor of the identity on the application, bound to the current sign-in, made
+ * under the identity's current verification generation and not after now (see
+ * `Context\SessionFirstFactor`). Only a proof's own time counts, so refreshing
+ * or regenerating the session never renews freshness.
  *
  * Stateless: the configuration, the store and every collaborator are resolved
  * on every call.
@@ -107,7 +108,8 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
 
     /**
      * What the session's recorded proofs add up to against the operation's
-     * requirement, or `null` without an identity or a requirement.
+     * requirement, or `null` without a requirement or an active person it
+     * serves.
      *
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -121,9 +123,9 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
     {
         $application = $this->container->make(ProofService::class)->application();
         $requirement = $this->requirement($operation, $callerRequirement);
-        $identity    = CurrentIdentity::resolve();
+        $identity    = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
 
-        if ($requirement === null || $identity === null) {
+        if ($requirement === null || $identity === null || !$identity->isMfaActive()) {
             return null;
         }
 

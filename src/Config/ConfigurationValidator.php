@@ -27,7 +27,6 @@ use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleSettings;
 use SineMacula\Laravel\Mfa\Passkeys\UnavailablePasskeyGateway;
-use SineMacula\Laravel\Mfa\Proofs\ProofSettings;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeSettings;
 
 /**
@@ -40,12 +39,12 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeSettings;
  * Every check runs, so one run finds every problem. They are grouped by
  * subject: `storage` (the connection, and a name of its own for every table),
  * `factor`, `identity_state`, one per capability block (`totp`, `codes`,
- * `recovery_codes`, `attempts`, `enrollment`, `passkeys`, `proofs`,
- * `lifecycle`), `applications`, and `applications.{name}` for each configured
- * application. A block that names a table or a model has them checked with it:
- * a table name must be a non-blank string, and a model must be one, on the
- * storage connection. The package runs it once the application has booted and
- * again when the `mfa` manager is resolved, throwing an
+ * `recovery_codes`, `attempts`, `enrollment`, `passkeys`, `lifecycle`),
+ * `applications`, and `applications.{name}` for each configured application. A
+ * block that names a table or a model has them checked with it: a table name
+ * must be a non-blank string, and a model must be one, on the storage
+ * connection. The package runs it once the application has booted and again
+ * when the `mfa` manager is resolved, throwing an
  * `InvalidConfigurationException` that lists every problem; `mfa:check` prints
  * them instead. It reads configuration and the container only, and opens no
  * database connection.
@@ -136,7 +135,6 @@ final readonly class ConfigurationValidator
             'attempts'     => [static fn () => (new AttemptSettings($config))->validate(), fn () => $this->checkTable(TableNames::ATTEMPTS)],
             'enrollment'   => [static fn () => (new EnrollmentSettings($config))->validate(), fn () => $this->checkTable(TableNames::ENROLLMENTS)],
             'passkeys'     => [fn () => $this->checkTable(TableNames::PASSKEY_ASSOCIATIONS)],
-            'proofs'       => [static fn () => (new ProofSettings($config))->validate()],
             'lifecycle'    => [static fn () => (new LifecycleSettings($config))->validate()],
             'applications' => [static fn () => ApplicationSettings::names($config)],
         ];

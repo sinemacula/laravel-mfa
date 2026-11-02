@@ -5,8 +5,6 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Codes;
 
 use Illuminate\Contracts\Container\Container;
-use Illuminate\Database\ConnectionInterface;
-use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
@@ -15,7 +13,7 @@ use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
@@ -99,7 +97,7 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
 
         $driver = $this->driver($factor);
 
-        return $this->connection()->transaction(function () use ($identity, $factor, $binding, $driver): SendResult {
+        return StorageTransaction::run(function () use ($identity, $factor, $binding, $driver): SendResult {
 
             $admission = $this->counters->isUsable($identity, $factor, $binding);
 
@@ -129,7 +127,7 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
             return ChallengeOutcome::refused(FailureReason::NOT_FOUND, 'The binding does not name the identity the request serves.');
         }
 
-        return $this->connection()->transaction(function () use ($identity, $factor, $binding, $challengeId, $code): ChallengeOutcome {
+        return StorageTransaction::run(function () use ($identity, $factor, $binding, $challengeId, $code): ChallengeOutcome {
 
             $admission = $this->counters->isUsable($identity, $factor, $binding);
 
@@ -214,17 +212,5 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
         }
 
         return $driver;
-    }
-
-    /**
-     * The storage connection, where the counts and the codes live.
-     *
-     * @return \Illuminate\Database\ConnectionInterface
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function connection(): ConnectionInterface
-    {
-        return DB::connection(StorageConnection::name());
     }
 }

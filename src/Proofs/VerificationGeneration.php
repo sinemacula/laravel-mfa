@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 
@@ -75,7 +76,7 @@ final class VerificationGeneration
         $owner      = ProofOwner::of($identity);
         $connection = self::connection();
 
-        return $connection->transaction(static function () use ($connection, $owner): int {
+        return StorageTransaction::run(static function () use ($connection, $owner): int {
 
             $now = CarbonImmutable::now();
 

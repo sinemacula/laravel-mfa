@@ -9,15 +9,20 @@ use Illuminate\Contracts\Session\Session;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
+use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
+use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\OperationRequirements;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use Tests\Fixtures\Context\FixedPendingSessionResolver;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
 use Tests\Fixtures\Requirements\RecordingCombinationPolicy;
@@ -91,6 +96,74 @@ final class ConfiguredFreshnessGateTest extends TestCase
         self::assertTrue($this->gate()->isFresh('mfa.add_factor'));
         self::assertFalse($this->gate()->isFresh('billing.change_plan'));
         self::assertFalse($this->gate()->isFresh('billing.change_plan', Requirement::none()));
+    }
+
+    /**
+     * A pending session is fresh for no operation, and the guard's user is not
+     * asked about in its place.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAPendingSessionIsNeverFresh(): void
+    {
+        $user = $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password(), $signIn->totp()]);
+
+        self::assertTrue($this->gate()->isFresh('mfa.add_factor'));
+
+        $proofs = SignInProofs::of($user)->inSession('pending-1');
+
+        $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(new PendingContext(
+            $user,
+            SignInProofs::APPLICATION,
+            'pending-1',
+            $proofs->password(),
+            Requirement::none()->withAdditionalVerification(),
+            [PendingAction::VERIFY],
+            CarbonImmutable::now()->addMinutes(10),
+        )));
+
+        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
+        self::assertNull($this->gate()->freshUntil('mfa.add_factor'));
+    }
+
+    /**
+     * The identities the package does not serve.
+     *
+     * @return iterable<string, array{0: bool, 1: bool}>
+     */
+    public static function identitiesNotServed(): iterable
+    {
+        yield 'a machine' => [false, true];
+        yield 'an inactive identity' => [true, false];
+    }
+
+    /**
+     * Neither a machine nor an inactive identity is fresh for any operation,
+     * whatever proofs the store holds.
+     *
+     * @param  bool  $person
+     * @param  bool  $active
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[DataProvider('identitiesNotServed')]
+    public function testAnIdentityNotServedIsNeverFresh(bool $person, bool $active): void
+    {
+        $identity = new NonEloquentIdentity('someone-1', person: $person, active: $active);
+        $signIn   = SignInProofs::of($identity);
+        $store    = $this->container()->make(ProofStore::class);
+
+        $this->actingAs($identity);
+
+        $store->begin($identity, SignInProofs::APPLICATION, SignInProofs::SESSION);
+        $store->record($signIn->password());
+        $store->record($signIn->totp());
+
+        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
+        self::assertNull($this->gate()->freshUntil('mfa.add_factor'));
     }
 
     /**

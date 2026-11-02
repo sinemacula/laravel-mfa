@@ -3,8 +3,8 @@
 ## Purpose
 
 This note records where a session's proofs are kept, how a sign-in begins and ends, what makes a recorded proof stop
-counting, and how the `mfa` middleware reads the proofs to decide whether a request needs a fresh verification. The
-proofs are the evidence every later answer (freshness, levels, requirements) is worked out from; nothing stores a single
+counting, and that the `mfa` middleware judges a request on those proofs (see [Route Gate](route-gate.md)). The proofs
+are the evidence every later answer (freshness, levels, requirements) is worked out from; nothing stores a single
 "verified at" time in their place.
 
 ## Invariants
@@ -62,10 +62,8 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
   factor's proofs until the removal flow revokes them through the session revocation seam.
 - `Mfa::proofs()` is the public read: the proofs of the current identity's sign-in on the current application that
   still count, or none without an MFA-capable identity or a sign-in.
-- The `RequireMfa` middleware judges the newest additional factor or recovery code proof among them. None means
-  `MfaRequiredException`; one older than the window, a window of zero or less, or one dated in the future means
-  `MfaExpiredException`. The window is the route's `mfa:N` parameter, or `mfa.proofs.max_age_minutes`. A first factor
-  alone is never a verification.
+- A sign-in's proofs last as long as the sign-in, subject to invalidation and the verification generation. A time bound
+  comes from a requirement's maximum age, set by an identity, a tenant or a named operation, never from a global window.
 
 ## Success Path
 
@@ -73,8 +71,8 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 2. They verify a factor. `VerificationService::verify()` checks the code and counts the outcome under the identity's
    lock, makes the proof with the captured binding and the generation read there, and hands the result to `StepUp`; the
    store keeps the proof as the transaction commits, before `VerificationPassed` is dispatched.
-3. A later request passes through `mfa` (or `mfa:5` for a step-up route). The middleware reads `Mfa::proofs()`, takes
-   the newest verification and compares its age with the window.
+3. A later request passes through `mfa`, which reads the sign-in's proofs and judges the whole requirement on them (see
+   [Route Gate](route-gate.md)).
 4. They sign out. `Logout` (or `CurrentDeviceLogout`) fires and `ForgetSignInOnLogout` forgets the sign-in and its
    proofs on that guard's application.
 5. When the identity's other sessions must verify again, the caller advances the verification generation with
@@ -96,8 +94,6 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 - A `Login` or `Logout` event for an identity that cannot hold factors, or whose key cannot name a record, changes
   nothing and never fails the sign-in or sign-out.
 - A session holding something other than records under `mfa.proofs` reads as no sign-in.
-- A non-numeric, negative or fractional `mfa:N` parameter raises `InvalidArgumentException` the first time the route
-  handles a request.
 - The session store reaches only its own session: `forgetFactor()` cannot reach the identity's other sessions, which
   stop counting a removed factor's proofs when the generation is advanced. A stateless guard rebinds `ProofStore`,
   keyed by an id that names one sign-in, not merely a device.
@@ -118,8 +114,6 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 - `src/Proofs/ProofService.php` (`proofs()`, `beginSignIn()`, `endSignIn()`, `forgetFactor()`, `application()`,
   `applicationFor()`), `src/Proofs/ProofStoreCompletion.php`, `src/Proofs/ProofBindings.php`.
 - `src/Verification/VerificationService.php` (`verify()`); `src/Lifecycle/FactorRemoval.php` (`erase()`).
-- `src/Http/Middleware/RequireMfa.php` (`lastVerifiedAt()`, `hasExpired()`, `parseMaxAgeMinutes()`),
-  `src/Http/Middleware/SkipMfa.php`; `config/mfa.php` (`proofs.max_age_minutes`), `src/Proofs/ProofSettings.php`.
 
 ## Authoritative Tests
 
@@ -133,8 +127,6 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
   `tests/Feature/Lifecycle/RemovingFactorTest.php` (a removed factor's proofs).
 - `tests/Feature/Proofs/SignInProofsTest.php`: a reused session, sign-out and current-device sign-out, two guards on
   one session, a guard calling neither hook, a custom guard's hooks, a generation bump across sessions.
-- `tests/Unit/Http/Middleware/RequireMfaTest.php`, `tests/Feature/RequireMfaMiddlewareTest.php`,
-  `tests/Feature/StepUpMaxAgeMiddlewareTest.php`: the window, the newest verification, the parameter.
 
 ## Change Triggers
 
@@ -143,4 +135,4 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 - Advancing the verification generation from a shipped flow, such as factor removal.
 - Letting a guard that fires no event and calls no hook record a proof.
 - Recording a proof outside a verification, or a proof whose channel cannot carry a factor.
-- Judging the middleware on anything but the newest additional factor or recovery code proof.
+- Letting a proof lapse by anything but a requirement's maximum age, its invalidation or the end of its sign-in.
