@@ -183,12 +183,17 @@ final readonly class EnrollmentAuthority
      */
     private static function isFreshReauthentication(Proof $proof, MultiFactorAuthenticatable $identity, string $application, string $session): bool
     {
+        if ($proof->kind !== ProofKind::FIRST_FACTOR_REAUTHENTICATION || !ProofOwner::of($identity)->ownsSignIn($proof->binding, $application, $session)) {
+            return false;
+        }
+
+        if ($proof->generation !== VerificationGeneration::current($identity)) {
+            return false;
+        }
+
         $now = CarbonImmutable::now();
 
-        return $proof->kind === ProofKind::FIRST_FACTOR_REAUTHENTICATION
-            && ProofOwner::of($identity)->ownsSignIn($proof->binding, $application, $session)
-            && $proof->generation === VerificationGeneration::current($identity)
-            && $proof->provedAt->lessThanOrEqualTo($now)
+        return $proof->provedAt->lessThanOrEqualTo($now)
             && $proof->provedAt->greaterThanOrEqualTo($now->subSeconds(self::REAUTHENTICATION_MAX_AGE));
     }
 

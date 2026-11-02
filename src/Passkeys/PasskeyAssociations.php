@@ -149,10 +149,11 @@ final readonly class PasskeyAssociations
     {
         $id = $factor->getFactorIdentifier();
 
-        return $association !== null
-            && (is_string($id) || is_int($id))
-            && $association->factor_id            === (string) $id
-            && $association->authenticatable_type === $owner->type
+        if ($association === null || !(is_string($id) || is_int($id)) || $association->factor_id !== (string) $id) {
+            return false;
+        }
+
+        return $association->authenticatable_type === $owner->type
             && $association->authenticatable_id   === $owner->key
             && $association->credential_id        === $factor->getCredentialReference();
     }
