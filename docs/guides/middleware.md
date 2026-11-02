@@ -149,14 +149,21 @@ information comes through the pending flow.
 The package places `mfa` straight after authentication in the middleware priority, so `['mfa', 'auth:api']`
 authenticates first and judges the identity `auth:api` selects.
 
-If your application replaces the priority list with `withMiddleware()`, keep that order: authentication and whatever
-selects the application or the active tenant must run before `mfa`. Replacing it does not simply fail closed. When the
-default guard already holds a strongly authenticated identity, `mfa` passes for it, and `auth:api` then selects another.
+Whatever `ActiveTenantResolver` or the application selection reads must be set before `mfa` runs, whether or not you
+replace the priority list. A tenant of `null` adds no tenant part, so with a tenant not yet selected at the gate that
+tenant's requirement is not asked for and the request can pass. An `mfa` from an outer group runs before a tenant
+middleware on the route, so select the tenant ahead of it. `mfa` also runs before `SubstituteBindings`, even when a
+route lists the bindings first, so a resolver must not rely on bound route models.
+
+If your application replaces the priority list with `withMiddleware()`, keep authentication ahead of `mfa`. Replacing it
+does not simply fail closed: when the default guard already holds a strongly authenticated identity, `mfa` passes for
+it, and `auth:api` then selects another.
 
 ## Without an authentication layer
 
 A guard's identity alone supplies no trusted first factor. Without the sign-in hooks or a `FirstFactorResolver`, or an
-application declaring its `first_factor`, the gate refuses and the offers may be empty. See [Recorded proofs](proofs.md)
+application declaring its `first_factor`, the gate refuses any route whose requirement asks for something, and the
+offers may be empty. Bare `mfa` still passes where the composed requirement is empty. See [Recorded proofs](proofs.md)
 and [Applications](configuration.md#applications).
 
 How it holds together is in [the route gate design note](../design/route-gate.md).

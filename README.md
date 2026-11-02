@@ -73,8 +73,7 @@ php artisan migrate
 ## Configuration
 
 The published `mfa.php` config holds one block per application, for what it accepts and offers, and one block per
-capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `proofs`, `lifecycle`) for what is the same
-everywhere:
+capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `lifecycle`) for what is the same everywhere:
 
 ```php
 return [

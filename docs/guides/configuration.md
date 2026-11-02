@@ -407,9 +407,9 @@ The package checks its whole configuration, with the bindings it needs, once the
 service provider, so a binding made in a provider's `boot()` counts) and again when the `mfa` manager is resolved. Any
 problem fails with an `Exceptions\InvalidConfigurationException` whose message, and whose `problems`, list every problem
 found, each as `[<subject>] <message>`. The subjects are `storage`, `factor`, `identity_state`, each capability block
-(`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `proofs`, `lifecycle`), `applications`, and
-`applications.<name>` for each configured application, whose problems include a code type with no delivery binding and
-a first factor neither declared nor resolved.
+(`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `lifecycle`), `applications`, and `applications.<name>`
+for each configured application, whose problems include a code type with no delivery binding and a first factor neither
+declared nor resolved.
 
 Run the same check from a deploy pipeline or a readiness probe:
 

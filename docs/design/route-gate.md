@@ -81,9 +81,13 @@ response if the commit fails.
   every factor disabled, so `hasConfirmedFactor` is no authority to bootstrap.
 - `last_verification_age_seconds` is not operation freshness, and a multi-factor first factor can read `accepted` with
   the age `null`.
+- Whatever `ActiveTenantResolver` or the application selection reads must be set before the gate, under the default
+  priority too. A tenant of `null` adds no tenant part, so a tenant not yet selected means its requirement is not asked
+  for and the request can pass. An `mfa` from an outer group runs before a tenant middleware on the route, and the
+  priority places `mfa` before `SubstituteBindings` even when a route lists the bindings first, so a resolver must not
+  rely on bound route models.
 - An application replacing the priority list does not simply fail closed: if the default guard already holds a strongly
-  authenticated identity, `mfa` passes for it and `auth:api` then selects another. Tenant or application selection must
-  precede the gate too.
+  authenticated identity, `mfa` passes for it and `auth:api` then selects another.
 - The guarantee is the outermost commit's. An application that wraps `Mfa::verify()` in its own transaction on the
   storage connection makes our commit a savepoint, so the result reaches its closure first. Nested transactions stay
   supported. Returning a response from such a closure is safe, as `transaction()` must finish before it escapes;
@@ -109,6 +113,8 @@ response if the commit fails.
   refusals, parsing, exemption in both orders, two populated guards, read-only and stateless.
 - `tests/Feature/Http/RemovedFactorGateTest.php`: a recent weaker proof does not pass once the stronger factor is
   removed.
+- `tests/Feature/Http/EnrolledFactorGateTest.php`: on an `enrolled` application, a first factor confirmed through a real
+  enrolment gates the next request under the default transition, until the person verifies with it.
 - `tests/Unit/Exceptions/InsufficientAuthenticationExceptionTest.php`: status, no header, exact header strings,
   `toArray()`.
 - `tests/Feature/Context/AuthenticationContextContributorTest.php`: each kind of session pinned exactly.

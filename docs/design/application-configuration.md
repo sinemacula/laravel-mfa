@@ -14,8 +14,8 @@ before anything relies on it.
   requires a factor, whether it accepts recovery codes and at what level it issues them, whether a pending session may
   enrol its first factor, its limits on enrolments made through it, its TOTP window, the requirement of each operation's
   step-up, and the first factor its guard uses. Those live in `mfa.applications.{name}`; everything else lives in a
-  block per capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `proofs`, `lifecycle`) beside
-  `storage`, `factor` and `identity_state`.
+  block per capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `lifecycle`) beside `storage`,
+  `factor` and `identity_state`.
 - Not every setting is applied yet. Of an application block, `totp_window` is read by the TOTP driver for the
   application a bound `ApplicationResolver` names, `recovery_codes.enabled` by the recovery code service, `requirement`
   by `Mfa::requirement()` and `freshness` by `Mfa::isFresh()` (see

@@ -52,7 +52,10 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * It belongs on routes and needs its authentication first, which the package's
  * middleware priority sees to; with no matched route nothing is exempt, so it
- * does not belong in the global stack.
+ * does not belong in the global stack. Whatever selects the application or the
+ * active tenant must run before it too, as a tenant of `null` adds no part, and
+ * since it runs before route bindings are substituted, a resolver must not rely
+ * on bound route models.
  *
  * Stateless: the seams are resolved on every call.
  *
