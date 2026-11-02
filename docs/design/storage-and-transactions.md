@@ -34,6 +34,10 @@ cannot interleave.
   handed over. Every change takes the locks in that order, so two changes for one identity never wait on each other in
   opposite orders: the second waits for the first to commit, then sees what it left, and checks its preconditions again
   on it.
+- `Database\StorageTransaction` is every transaction the package opens on the storage connection, that one included.
+  When its commit fails, the work waiting for that commit (`Database\AfterStorageCommit`: a proof, an event, a queued
+  cookie) ends with it. Laravel 13 discards that work itself; Laravel 12 keeps it and runs it on the connection's next
+  commit, which would record the proof of a verification that never committed.
 - The identity's row is one per owner (a unique index on `authenticatable_type` and `authenticatable_id`), created by
   the first change that needs it. The lock is an insert that updates the existing row's `updated_at` on a conflict,
   which takes the row's exclusive lock in one statement on MySQL and PostgreSQL, also when two first changes race to

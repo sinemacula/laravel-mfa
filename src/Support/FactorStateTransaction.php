@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
@@ -198,7 +199,7 @@ final class FactorStateTransaction
 
         $connection = DB::connection(StorageConnection::name());
 
-        return $connection->transaction(static function () use ($connection, $type, $key, $factorModel, $callback): mixed {
+        return StorageTransaction::run(static function () use ($connection, $type, $key, $factorModel, $callback): mixed {
 
             self::lockIdentityState($connection, $type, $key);
 

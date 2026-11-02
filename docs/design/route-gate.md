@@ -92,6 +92,10 @@ response if the commit fails.
   storage connection makes our commit a savepoint, so the result reaches its closure first. Nested transactions stay
   supported. Returning a response from such a closure is safe, as `transaction()` must finish before it escapes;
   emitting it or publishing the completion inside the closure is not.
+- A failed commit of our own takes the work waiting for it along (`Database\StorageTransaction`), on every supported
+  Laravel version. The commit of an application's own outer transaction is Laravel's: Laravel 12 keeps the work waiting
+  for it and runs it on the connection's next commit. An application that catches that failure and carries on in the
+  same process must discard it with `app('db.transactions')->rollback($connection, 0)`.
 - A listener throwing after a real commit is a separate case: the session did activate and the result is lost. That is
   an honest server error, not a commit failure.
 
@@ -105,7 +109,7 @@ response if the commit fails.
 - `src/Requirements/ConfiguredFreshnessGate.php`: `evaluation()`, which answers not fresh for anyone the package does
   not serve; `src/Requirements/RequirementService.php`: `requirementFor()`, `isFresh()`, `freshnessRequirement()`.
 - `src/Verification/VerificationService.php`: `settled()`, `accept()`; `src/Enrollment/EnrollmentConfirmer.php`:
-  `attempt()`; `src/Database/AfterStorageCommit.php`.
+  `attempt()`; `src/Database/AfterStorageCommit.php`; `src/Database/StorageTransaction.php`.
 
 ## Authoritative Tests
 
@@ -119,8 +123,10 @@ response if the commit fails.
   `toArray()`.
 - `tests/Feature/Context/AuthenticationContextContributorTest.php`: each kind of session pinned exactly.
 - `tests/Feature/Verification/CommitFailureTest.php`: a failed commit on a pending verification, a step-up and a pending
-  enrolment confirmation reaches the caller with neither token nor cookie, with a control that shows both, an outer
-  rollback and an outer commit.
+  enrolment confirmation reaches the caller with neither token nor cookie, and leaves nothing to run alongside a retry,
+  with a control that shows both, an outer rollback and an outer commit.
+- `tests/Unit/Database/StorageTransactionTest.php`: the work of a failed commit never runs later, under a manager that
+  behaves as Laravel 12's on every version; an open outer transaction keeps its own.
 - `tests/Unit/Http/HttpBindingsTest.php`: the aliases and the priority, a kernel resolved before and after booting.
 - `tests/Unit/Http/Middleware/ExemptFromMfaTest.php`, `tests/Unit/Requirements/ConfiguredFreshnessGateTest.php`.
 

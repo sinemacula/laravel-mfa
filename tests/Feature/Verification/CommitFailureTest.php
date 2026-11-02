@@ -14,6 +14,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmer;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
@@ -46,7 +47,8 @@ use Tests\TestCase;
  * `transaction()` commits on the PDO directly. It leaves the PDO's transaction
  * open, as a commit the database refused might, so each test rolls that back
  * before it reads durable state, and pending writes are not taken for a
- * rollback.
+ * rollback. Each then retries, and what the failed commit left waiting must not
+ * run alongside the retry.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -55,6 +57,7 @@ use Tests\TestCase;
  */
 #[CoversClass(VerificationService::class)]
 #[CoversClass(EnrollmentConfirmer::class)]
+#[CoversClass(StorageTransaction::class)]
 final class CommitFailureTest extends TestCase
 {
     use ArrangesEnrollment;
@@ -142,6 +145,8 @@ final class CommitFailureTest extends TestCase
 
         self::assertTrue($retried->isVerified(), 'The code must still be unspent.');
         self::assertInstanceOf(IssuedTokens::class, $retried->completion());
+        self::assertCount(1, $this->furtherProofs($user), 'The failed commit\'s proof must not follow the retry\'s.');
+        self::assertCount(1, $this->passedReports(), 'The failed commit\'s report must not follow the retry\'s.');
     }
 
     /**
@@ -167,7 +172,8 @@ final class CommitFailureTest extends TestCase
         $retried = Mfa::verify($submission);
 
         self::assertTrue($retried->isVerified(), 'The code must still be unspent.');
-        self::assertCount(1, $this->furtherProofs($user));
+        self::assertCount(1, $this->furtherProofs($user), 'The failed commit\'s proof must not follow the retry\'s.');
+        self::assertCount(1, $this->passedReports(), 'The failed commit\'s report must not follow the retry\'s.');
     }
 
     /**
@@ -197,6 +203,8 @@ final class CommitFailureTest extends TestCase
 
         self::assertTrue($retried->isConfirmed(), 'The grant and the code must still work.');
         self::assertInstanceOf(IssuedTokens::class, $retried->verification?->completion());
+        self::assertCount(1, $this->furtherProofs($user), 'The failed commit\'s proof must not follow the retry\'s.');
+        self::assertCount(1, $this->passedReports(), 'The failed commit\'s report must not follow the retry\'s.');
     }
 
     /**
