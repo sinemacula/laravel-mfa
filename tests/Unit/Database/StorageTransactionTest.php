@@ -198,11 +198,81 @@ final class StorageTransactionTest extends TestCase
             });
         } catch (CommitFailedException) {
             self::assertSame(1, $connection->transactionLevel());
+            self::assertTrue($connection->getPdo()->inTransaction());
         }
 
         $connection->commit();
 
         self::assertSame(1, $this->runs);
+    }
+
+    /**
+     * The connection serves a next transaction after a failed commit, without
+     * anything rolling back what that commit left, and what it had pending is
+     * gone.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailedCommitLeavesTheConnectionUsable(): void
+    {
+        $connection = $this->connection();
+
+        $connection->statement('create table storage_transaction_rows (id integer)');
+
+        $this->failTheNextCommit();
+
+        try {
+            StorageTransaction::run(static function () use ($connection): void {
+                $connection->table('storage_transaction_rows')->insert(['id' => 1]);
+            });
+        } catch (CommitFailedException) {
+            self::assertSame(0, $connection->table('storage_transaction_rows')->count());
+        }
+
+        StorageTransaction::run(static function () use ($connection): void {
+            $connection->table('storage_transaction_rows')->insert(['id' => 2]);
+        });
+
+        self::assertSame(2, $connection->table('storage_transaction_rows')->value('id'));
+        self::assertFalse($connection->getPdo()->inTransaction());
+
+        $connection->statement('drop table storage_transaction_rows');
+    }
+
+    /**
+     * A connection that cannot be rolled back after a failed commit is dropped,
+     * to be opened afresh, and the caller still receives the commit's failure.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailedRollBackDropsTheConnectionAndKeepsTheFailure(): void
+    {
+        $connection = $this->connection();
+        $original   = $connection->getPdo();
+        $pdo        = \Mockery::mock(\PDO::class);
+
+        $pdo->shouldReceive('beginTransaction')->andReturnTrue();
+        $pdo->shouldReceive('exec')->andReturn(0);
+        $pdo->shouldReceive('inTransaction')->andReturnTrue();
+        $pdo->shouldReceive('rollBack')->once()->andThrow(new \PDOException('The connection has gone.'));
+
+        $connection->setPdo($pdo);
+
+        $this->failTheNextCommit();
+
+        try {
+            StorageTransaction::run(static fn (): null => null);
+
+            self::fail('The commit failure must reach the caller.');
+        } catch (CommitFailedException) {
+            self::assertNull($connection->getRawPdo());
+        } finally {
+            $connection->setPdo($original);
+        }
     }
 
     /**
@@ -232,8 +302,8 @@ final class StorageTransactionTest extends TestCase
 
     /**
      * Assert the failure of a commit on the storage connection with work
-     * waiting for it reaches the caller, and roll back the transaction it left
-     * open on the PDO.
+     * waiting for it reaches the caller, and leaves no transaction open on the
+     * PDO.
      *
      * @return void
      *
@@ -246,7 +316,7 @@ final class StorageTransactionTest extends TestCase
                 AfterStorageCommit::run($this->container(), $this->work(...));
             });
         } catch (CommitFailedException) {
-            DB::connection(StorageConnection::name())->getPdo()->rollBack();
+            self::assertFalse(DB::connection(StorageConnection::name())->getPdo()->inTransaction());
 
             return;
         }

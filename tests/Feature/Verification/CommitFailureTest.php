@@ -345,7 +345,9 @@ final class CommitFailureTest extends TestCase
 
             self::fail('The commit failure must reach the caller.');
         } catch (CommitFailedException) {
-            $this->rollBackTheFailedCommit();
+            // The transaction that failed is this test's own, so what it left
+            // on the PDO is for the test to end, not the package.
+            DB::connection(StorageConnection::name())->getPdo()->rollBack();
         }
 
         self::assertSame(0, Factor::query()->count());
@@ -506,7 +508,7 @@ final class CommitFailureTest extends TestCase
             $call();
         } catch (CommitFailedException $failure) {
             $this->assertItCarriesNoResult($failure);
-            $this->rollBackTheFailedCommit();
+            $this->assertTheFailedCommitLeftNoTransaction();
 
             return;
         }
@@ -531,7 +533,7 @@ final class CommitFailureTest extends TestCase
 
         $response = $this->postJson($route, $input);
 
-        $this->rollBackTheFailedCommit();
+        $this->assertTheFailedCommitLeftNoTransaction();
 
         $response->assertStatus(500);
         $response->assertCookieMissing(TokenIssuingCompletion::COOKIE);
@@ -569,18 +571,14 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * The failure left the PDO's transaction open: roll it back, so durable
-     * state can be read and not what the failed commit had pending.
+     * The failure left no transaction open on the PDO, so what is read next is
+     * durable state and not what the failed commit had pending.
      *
      * @return void
      */
-    private function rollBackTheFailedCommit(): void
+    private function assertTheFailedCommitLeftNoTransaction(): void
     {
-        $pdo = DB::connection(StorageConnection::name())->getPdo();
-
-        self::assertTrue($pdo->inTransaction());
-
-        $pdo->rollBack();
+        self::assertFalse(DB::connection(StorageConnection::name())->getPdo()->inTransaction());
     }
 
     /**

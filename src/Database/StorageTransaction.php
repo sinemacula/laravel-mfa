@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Database;
 
 use Illuminate\Container\Container;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 
@@ -41,14 +42,46 @@ final class StorageTransaction
      */
     public static function run(\Closure $callback): mixed
     {
+        $connection = DB::connection(StorageConnection::name());
+        $outermost  = $connection->transactionLevel() === 0;
+
         try {
-            return DB::connection(StorageConnection::name())->transaction($callback);
+            return $connection->transaction($callback);
         } catch (\Throwable $failure) {
             AfterStorageCommit::forgetFailedCommit(Container::getInstance());
+
+            if ($outermost) {
+                self::endOrphanedTransaction($connection);
+            }
 
             QueryExceptionMask::maskChain($failure);
 
             throw $failure;
+        }
+    }
+
+    /**
+     * End the transaction a failed commit left open on the PDO. Laravel has
+     * already counted it as closed, so on a connection a long-running process
+     * reuses, the next request would otherwise read what never committed and
+     * fail to begin a transaction of its own. Only the transaction this class
+     * opened is ever ended, never one the application holds, and whatever goes
+     * wrong here gives way to the failure the caller is about to receive: a
+     * connection that cannot be rolled back is dropped, to be opened afresh.
+     *
+     * @param  \Illuminate\Database\Connection  $connection
+     * @return void
+     */
+    private static function endOrphanedTransaction(Connection $connection): void
+    {
+        try {
+            $pdo = $connection->getPdo();
+
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+        } catch (\Throwable) {
+            $connection->disconnect();
         }
     }
 }

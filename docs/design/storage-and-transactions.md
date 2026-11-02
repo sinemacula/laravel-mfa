@@ -37,7 +37,10 @@ cannot interleave.
 - `Database\StorageTransaction` is every transaction the package opens on the storage connection, that one included.
   When its commit fails, the work waiting for that commit (`Database\AfterStorageCommit`: a proof, an event, a queued
   cookie) ends with it. Laravel 13 discards that work itself; Laravel 12 keeps it and runs it on the connection's next
-  commit, which would record the proof of a verification that never committed. It runs once: a deadlock is a server
+  commit, which would record the proof of a verification that never committed. A failed commit also leaves the PDO in
+  the transaction Laravel has already counted as closed, so the outermost one is rolled back there, or the connection
+  dropped if that fails too: a long-running process reuses the connection, and its next request would otherwise read
+  what never committed. A transaction the application holds is never touched. It runs once: a deadlock is a server
   error for the caller to retry, as running it again would run a driver again and could deliver a second code. A failed
   query leaves it masked, and a concurrency failure in a nested transaction leaves it as Laravel's `DeadlockException`,
   masked too (see [Secrets in responses and logs](secrets-in-responses-and-logs.md)).

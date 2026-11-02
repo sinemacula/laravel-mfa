@@ -336,11 +336,7 @@ final class ConsecutiveRequestsTest extends TestCase
 
         $this->serve($this->verification($alice, $totp))->assertStatus(500);
 
-        $pdo = DB::connection(StorageConnection::name())->getPdo();
-
-        self::assertTrue($pdo->inTransaction());
-
-        $pdo->rollBack();
+        self::assertFalse(DB::connection(StorageConnection::name())->getPdo()->inTransaction());
 
         $this->assertPassedReports(0);
 
