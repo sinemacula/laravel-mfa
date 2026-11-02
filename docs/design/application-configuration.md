@@ -17,11 +17,11 @@ before anything relies on it.
   block per capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `lifecycle`) beside `storage`,
   `factor` and `identity_state`.
 - Every setting is applied. Of an application block, `types` decides what a factor may be sent, verified and enrolled
-  for, `totp_window` is read by the TOTP driver for the application a bound `ApplicationResolver` names,
-  `recovery_codes` by the recovery code service, `requirement` by `Mfa::requirement()`, `freshness` by `Mfa::isFresh()`
-  (see [Requirements and Freshness](requirements-and-freshness.md)), `limits` and `bootstrap` by every enrolment, a
-  passkey's registration included (see [Enrolment](enrollment.md) and [Passkeys](passkeys.md)), and `first_factor` by
-  the shipped first factor resolver.
+  for, `totp_window` is read by the TOTP driver for the application a verification is bound to, `recovery_codes` by the
+  recovery code service, `requirement` by `Mfa::requirement()`, `freshness` by `Mfa::isFresh()` (see
+  [Requirements and Freshness](requirements-and-freshness.md)), `limits` and `bootstrap` by every enrolment, a passkey's
+  registration included (see [Enrolment](enrollment.md) and [Passkeys](passkeys.md)), and `first_factor` by the shipped
+  first factor resolver.
 - Every setting is read through one class that owns its block: `Applications\ApplicationSettings` (with
   `Applications\ApplicationBlock` reading the raw block), `Drivers\TotpSettings`, `Codes\CodeSettings`,
   `RecoveryCodes\RecoveryCodeSettings`, `Attempts\AttemptSettings`, `Enrollment\EnrollmentSettings` and

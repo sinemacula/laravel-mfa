@@ -57,9 +57,10 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
   own. An application binding its own `PendingSessionResolver` alone begins the store's sign-in under the pending id
   through `GuardHooks::signedIn()`. Beginning a sign-in grants nothing by itself: the middleware or the pending context
   still decides. A guard that fires no event, calls no hook and stays in an existing sign-in stays in that sign-in.
-- Removing a factor forgets every proof made with it on the current session, on every application, and advances the
-  verification generation through the session revocation seam, so the identity's other sessions stop counting its
-  proofs (see [Factor Lifecycle](factor-lifecycle.md)).
+- Removing a factor forgets every proof made with it on the current session, on every application, and revokes the
+  identity's other sessions through the session revocation seam. The shipped `Proofs\GenerationSessionRevoker` does
+  that by advancing the verification generation, so those sessions stop counting its proofs; a revoker bound in its
+  place ends them its own way (see [Factor Lifecycle](factor-lifecycle.md)).
 - `Mfa::proofs()` is the public read: the proofs of the current identity's sign-in on the current application that
   still count, or none without an MFA-capable identity or a sign-in.
 - A sign-in's proofs last as long as the sign-in, subject to invalidation and the verification generation. A time bound
@@ -76,8 +77,9 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
 4. They sign out. `Logout` (or `CurrentDeviceLogout`) fires and `ForgetSignInOnLogout` forgets the sign-in and its
    proofs on that guard's application.
 5. When the identity's other sessions must verify again, the caller advances the verification generation with
-   `VerificationGeneration::advance()`, and every session's proofs stop counting at their next read. Removing and
-   resetting factors advance it, through the session revocation seam.
+   `VerificationGeneration::advance()`, and every session's proofs stop counting at their next read. Resetting an
+   identity advances it itself and then revokes through the session revocation seam; removing a factor only revokes
+   through the seam, whose shipped default advances it.
 
 ## Failure / Edge Cases
 

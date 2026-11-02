@@ -21,12 +21,11 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - A code is the HOTP value (RFC 4226 §5.3) of the time step, `floor(unix time / period)`: the HMAC of the step as an
   8-byte big-endian counter, dynamically truncated to 31 bits, reduced to the factor's digits and zero-padded.
 - A submitted code is compared with the code of every step of the window, each with `hash_equals()`. The window is the
-  `totp_window` of the application a bound `Contracts\ApplicationResolver` names for the current request, or
-  `mfa.totp.window` when the application sets none, no resolver is bound or there is no request (default 1, at most 3).
-  No comparison is skipped when an earlier one matches, and a malformed code is compared like any other, so the work
-  does not depend on which step matches or whether one does. The latest matching step is the one accepted. The window
-  is read from the configuration and the request on every call, so a driver built once serves each application with
-  its own, and nothing widens it, failures included; the package does not resynchronise (RFC 6238 §6).
+  `totp_window` of the application the verification is bound to, or `mfa.totp.window` when that application sets none
+  or has no block (default 1, at most 3). No comparison is skipped when an earlier one matches, and a malformed code is
+  compared like any other, so the work does not depend on which step matches or whether one does. The latest matching
+  step is the one accepted. The window is read from the configuration on every call, so a driver built once serves each
+  application with its own, and nothing widens it, failures included; the package does not resynchronise (RFC 6238 §6).
 - A time step is single-use per factor (RFC 6238 §5.2). A matching code is accepted only when
   `EloquentFactor::storeAcceptedStep()` records its step, and it records it only when it is later than
   `last_accepted_step`: one compare-and-set, `UPDATE ... SET last_accepted_step = :step WHERE id = :id AND
@@ -70,8 +69,7 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
   `UPDATE` reads the row as committed.
 - A factor not yet stored has no row another request can see, so it compares with its own attribute, and the recorded
   step is stored with it.
-- An application that sets no `totp_window`, or one nobody configured, gets `mfa.totp.window`; so does a request when
-  no `ApplicationResolver` is bound, which is the case until an authentication layer or the application binds one.
+- An application that sets no `totp_window`, or one nobody configured, gets `mfa.totp.window`.
 - The driver opens no transaction of its own. The compare-and-set needs none to be atomic, and the transaction that
   also holds the identity's lock and records the outcome belongs to the verification flow: the attempt service calls
   the driver inside its `FactorStateTransaction`, on the factor as stored under the lock, so the recorded step commits
@@ -97,9 +95,7 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - `tests/Unit/Drivers/TotpDriverTest.php`
   `testTheDefaultWindowAcceptsOneStepEitherSideOnly`
 - `tests/Unit/Drivers/TotpDriverTest.php`
-  `testTheWindowIsTheRequestedApplicationsOwn`
-- `tests/Unit/Drivers/TotpDriverTest.php`
-  `testWithoutARequestThePackageWideWindowApplies`
+  `testAVerificationsWindowIsItsBindingsApplications`
 - `tests/Unit/Drivers/TotpDriverTest.php`
   `testTheWindowNeverWidensAfterFailures`
 - `tests/Unit/Drivers/TotpDriverTest.php`
@@ -120,7 +116,7 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - `tests/Unit/Concerns/ActsAsFactorStoreAcceptedStepTest.php`
   `testAStaleCopyCannotRecordAStepAnotherCopyRecorded`
 - `tests/Unit/Concerns/ActsAsFactorStoreAcceptedStepTest.php`
-  `testPersistingAfterwardsKeepsALaterStepAnotherCopyRecorded`
+  `testPersistingAfterwardKeepsALaterStepAnotherCopyRecorded`
 - `tests/Unit/Concerns/ActsAsFactorStoreAcceptedStepTest.php`
   `testAStepRecordedInsideATransactionRollsBackWithIt`
 - `tests/Integration/Database/TotpReplayRaceTest.php`

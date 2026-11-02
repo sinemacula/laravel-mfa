@@ -109,7 +109,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A canceled save of the confirmed factor confirms nothing: the grant, the
+     * A cancelled save of the confirmed factor confirms nothing: the grant, the
      * obligation and the TOTP step are as they were, no recovery codes are
      * issued, and nothing is reported.
      *
@@ -129,7 +129,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A canceled deletion of the row would leave a used grant usable, so it
+     * A cancelled deletion of the row would leave a used grant usable, so it
      * confirms nothing either.
      *
      * @return void
@@ -148,7 +148,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A canceled count of a wrong code is not taken for a counted failure.
+     * A cancelled count of a wrong code is not taken for a counted failure.
      *
      * @return void
      *
@@ -166,7 +166,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
         try {
             $this->mfa()->confirmEnrollment($this->grantOf($start), $wrong);
 
-            self::fail('A canceled count was expected to propagate.');
+            self::fail('A cancelled count was expected to propagate.');
         } catch (WriteCanceledException) {
             self::assertSame(0, Enrollment::query()->sole()->attempts);
             self::assertSame(0, $this->addressHits('127.0.0.1'));
@@ -174,7 +174,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A canceled save of the row starts nothing.
+     * A cancelled save of the row starts nothing.
      *
      * @return void
      *
@@ -189,7 +189,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
         try {
             $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
 
-            self::fail('A canceled save was expected to propagate.');
+            self::fail('A cancelled save was expected to propagate.');
         } catch (WriteCanceledException) {
             self::assertSame(0, Factor::query()->count());
             self::assertSame(0, Enrollment::query()->count());
@@ -197,8 +197,8 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A canceled record of the first code's challenge rolls the start back: the
-     * code could never be confirmed.
+     * A cancelled record of the first code's challenge rolls the start back:
+     * the code could never be confirmed.
      *
      * @return void
      *
@@ -213,7 +213,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
         try {
             $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS));
 
-            self::fail('A canceled record was expected to propagate.');
+            self::fail('A cancelled record was expected to propagate.');
         } catch (WriteCanceledException) {
             self::assertSame(0, Factor::query()->count());
             self::assertSame(0, Enrollment::query()->count());
@@ -222,7 +222,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A canceled record of the new challenge a resend had to start rolls the
+     * A cancelled record of the new challenge a resend had to start rolls the
      * resend back, once the first has ended.
      *
      * @return void
@@ -245,14 +245,14 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
         try {
             $this->mfa()->resendEnrollmentCode($grant);
 
-            self::fail('A canceled record was expected to propagate.');
+            self::fail('A cancelled record was expected to propagate.');
         } catch (WriteCanceledException) {
             self::assertSame(1, Code::query()->sole()->sends);
         }
     }
 
     /**
-     * A canceled deletion of a row with no factor left stops the restart.
+     * A cancelled deletion of a row with no factor left stops the restart.
      *
      * @return void
      *
@@ -270,7 +270,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
         try {
             $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
 
-            self::fail('A canceled deletion was expected to propagate.');
+            self::fail('A cancelled deletion was expected to propagate.');
         } catch (WriteCanceledException) {
             self::assertSame(1, Enrollment::query()->count());
             self::assertSame(0, Factor::query()->count());
@@ -278,7 +278,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A canceled save stops a rename, which is never reported as made.
+     * A cancelled save stops a rename, which is never reported as made.
      *
      * @return void
      *
@@ -296,7 +296,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
         try {
             $this->mfa()->renameFactor($factor->id, 'New');
 
-            self::fail('A canceled save was expected to propagate.');
+            self::fail('A cancelled save was expected to propagate.');
         } catch (WriteCanceledException) {
             self::assertSame('Old', Factor::query()->sole()->getLabel());
             self::assertSame([], $this->reported);
@@ -338,7 +338,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
         try {
             $this->mfa()->confirmEnrollment($grant, $code);
 
-            self::fail('A canceled write was expected to propagate.');
+            self::fail('A cancelled write was expected to propagate.');
         } catch (WriteCanceledException) {
             $factor = $this->pendingFactorOf($start);
 

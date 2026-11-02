@@ -104,7 +104,7 @@ referencing another's.
 - `tests/Unit/Support/SerializedFieldsTest.php`
   `testAnUnknownFieldIsRefused`
 - `tests/Unit/Verification/VerificationResultTest.php`
-  `testALockoutWithoutItsTimeIsRefused`
+  `testALockoutMayLackItsTime`
 - `tests/Unit/Enums/FailureReasonTest.php`
   `testFailureReasonsAreTheReportedValues`
 - `tests/Unit/Enums/AssuranceLevelTest.php`

@@ -102,19 +102,16 @@ final readonly class TotpSettings
 
     /**
      * How many time steps either side of the current one the named application
-     * accepts: its own `totp_window`, or `window()` when it sets none or no
-     * application is named.
+     * accepts: its own `totp_window`, or `window()` when it sets none.
      *
-     * @param  ?string  $application
+     * @param  string  $application
      * @return int
      *
      * @throws \InvalidArgumentException
      */
-    public function windowFor(?string $application): int
+    public function windowFor(string $application): int
     {
-        return $application === null
-            ? $this->window()
-            : (new ApplicationSettings($this->config, $application))->totpWindow();
+        return (new ApplicationSettings($this->config, $application))->totpWindow();
     }
 
     /**

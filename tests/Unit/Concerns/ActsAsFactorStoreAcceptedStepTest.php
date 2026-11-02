@@ -94,7 +94,7 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
      *
      * @return void
      */
-    public function testPersistingAfterwardsKeepsALaterStepAnotherCopyRecorded(): void
+    public function testPersistingAfterwardKeepsALaterStepAnotherCopyRecorded(): void
     {
         $first  = $this->storedFactor();
         $second = Factor::query()->findOrFail($first->id);

@@ -262,12 +262,11 @@ SHA-512. `issuer` is what an authenticator app shows for a new factor when the e
 application's name without one; it may not hold a colon.
 
 `window` is the number of time steps either side of the current one a code is accepted for, absorbing clock skew and
-entry delay, for an application that sets no `totp_window` of its own, and for every request when no
-`Contracts\ApplicationResolver` is bound. It is at most 3; the default of 1 follows RFC 6238, which recommends allowing
-at most one step for transmission delay. The window never widens after failures, and the package does not resynchronise
-a drifting clock. Each time step is accepted once per factor: a code for the step last accepted, or an earlier one, is
-refused even inside the window, so the code that confirmed a factor cannot be used again (see
-[the TOTP design note](../design/totp.md)).
+entry delay, for an application that sets no `totp_window` of its own or has no block. It is at most 3; the default of 1
+follows RFC 6238, which recommends allowing at most one step for transmission delay. The window never widens after
+failures, and the package does not resynchronise a drifting clock. Each time step is accepted once per factor: a code
+for the step last accepted, or an earlier one, is refused even inside the window, so the code that confirmed a factor
+cannot be used again (see [the TOTP design note](../design/totp.md)).
 
 ## Delivered codes
 
