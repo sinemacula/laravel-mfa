@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\CustomFactor;
@@ -96,6 +97,41 @@ final class HasFactorsTest extends TestCase
         self::assertFalse($identity->isMfaEnabled());
 
         $this->createFactor($identity, 'confirmed');
+
+        self::assertTrue($identity->isMfaEnabled());
+    }
+
+    /**
+     * Stored statuses that are none the package knows, which only a reset
+     * clears.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function unknownStatuses(): iterable
+    {
+        yield 'another case of confirmed' => ['CONFIRMED'];
+        yield 'another case of pending' => ['PENDING'];
+        yield 'pending, padded' => ['pending '];
+        yield 'another word' => ['retired'];
+        yield 'empty' => [''];
+    }
+
+    /**
+     * A factor whose stored status is none the package knows holds the identity
+     * to MFA as a confirmed one does: only exactly `pending` does not, so a
+     * corrupt status is never read as having no factor, on a database whose
+     * collation ignores case and padding as on any other.
+     *
+     * @param  string  $status
+     * @return void
+     */
+    #[DataProvider('unknownStatuses')]
+    public function testAFactorOfAnUnknownStatusEnablesMfa(string $status): void
+    {
+        $identity = $this->createHolder('one@example.test');
+
+        $this->createFactor($identity, 'pending');
+        $this->createFactor($identity, $status);
 
         self::assertTrue($identity->isMfaEnabled());
     }

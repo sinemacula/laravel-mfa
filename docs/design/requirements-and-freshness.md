@@ -17,7 +17,9 @@ nothing is stored in their place.
   order (`Requirements\RequirementService::requirementFor()`):
   - the application's configured mode (`mfa.applications.{name}.requirement`): nothing for `never` and for an
     application nobody configured; an additional verification of any age for `always`; and for `enrolled` an
-    additional verification once the identity has a confirmed factor (`isMfaEnabled()`), nothing before;
+    additional verification once the identity has a factor that is not pending (`isMfaEnabled()`), nothing before. A
+    factor whose stored status is none the package knows counts, so a corrupt status never lets the identity on as
+    having no factor, and that factor throws when it is read;
   - the identity's own requirement, from the bound `Contracts\IdentityRequirement`, whose default
     (`Requirements\IdentityContractRequirement`) is the model's `requiresAdditionalFactor()`, nothing for `null`;
   - an additional verification while the identity's re-enrolment obligation (`reenrollment_required` on its row in the

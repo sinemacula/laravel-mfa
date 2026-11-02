@@ -7,14 +7,20 @@ namespace Tests\Feature\Http;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmer;
 use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet;
 use SineMacula\Laravel\Mfa\Http\MiddlewareSessionTransition;
+use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
+use Tests\Fixtures\Identities\FactorHolder;
 use Tests\TestCase;
 
 /**
@@ -89,6 +95,40 @@ final class EnrolledFactorGateTest extends TestCase
         self::assertTrue(Mfa::verify(Submission::factor($factor->id, $this->appCode($start)))->isVerified());
 
         $this->get(self::GATED)->assertOk();
+    }
+
+    /**
+     * A person whose only factor's stored status is none the package knows is
+     * still held to MFA, by the trait's own rule, not read as having no factor
+     * and let on: the gate refuses the request, and the route is never reached.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnUnknownStatusOnTheOnlyFactorStillGatesThePerson(): void
+    {
+        $holder = FactorHolder::query()->create(['email' => 'holder@example.test']);
+
+        $this->actingAs($holder);
+        $this->container()->make(ProofStore::class)->begin($holder, self::APPLICATION, self::SESSION);
+
+        Factor::query()->create([
+            ...AuthenticatorApp::FACTOR,
+            'authenticatable_type' => $holder->getMorphClass(),
+            'authenticatable_id'   => (string) $holder->id,
+            'status'               => 'CONFIRMED',
+            'application'          => self::APPLICATION,
+        ]);
+
+        self::assertTrue($holder->isMfaEnabled());
+        self::assertSame(self::VERIFIED, $this->container()->make(RequirementService::class)->requirementFor($holder, self::APPLICATION)->toArray());
+
+        $response = $this->get(self::GATED);
+
+        $response->assertServerError();
+        self::assertInstanceOf(InvalidModelException::class, $response->exception);
+        self::assertStringContainsString('[status]', $response->exception->getMessage());
     }
 
     /**

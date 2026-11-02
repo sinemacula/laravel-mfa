@@ -132,7 +132,7 @@ max_age="300"`, omitting what is absent. An adapter mapping levels to `acr` name
 | `$requirement`        | The whole effective requirement, not what is left of it. The authority                          |
 | `$offered`            | The factors the session could use next, as masked `FactorSummary` values                        |
 | `$operation`          | The operation the route names, or `null`. Only its name for a caller the package does not serve |
-| `$hasConfirmedFactor` | Whether the identity has a confirmed factor                                                     |
+| `$hasConfirmedFactor` | Whether the identity has a factor that is not pending (`isMfaEnabled()`)                        |
 | `maxAge()`            | The shortest maximum age of any part, or `null`                                                 |
 | `acrValues()`         | The minimum level's value, or none                                                              |
 | `toArray()`           | `error`, `max_age`, `acr_values`, `requirement`, `operation`, `has_confirmed_factor`, `factors` |
@@ -168,7 +168,11 @@ description in `wwwAuthenticate()` is always the shipped English, since RFC 6750
 | `phishing_resistant`            | `bool`         | Whether they are phishing-resistant                                          |
 | `user_verification`             | `bool`         | Evidence, or a first factor supporting a level, observed the person verified |
 | `last_verification_age_seconds` | `?int`         | Whole seconds since the newest evidence, `null` without any                  |
-| `has_confirmed_factor`          | `bool`         | Whether the identity has a confirmed factor                                  |
+| `has_confirmed_factor`          | `bool`         | Whether the identity has a factor that is not pending (`isMfaEnabled()`)     |
+
+`has_confirmed_factor` is the identity's `isMfaEnabled()`, so it is `true` for a factor whose stored status is none the
+package knows as well as for a confirmed one: such a factor cannot be used, and the identity needs a reset, but it is
+never reported as having no factor. The refusal's `has_confirmed_factor` reads the same.
 
 Evidence is each additional factor and recovery code the bound check accepts after the session's one first factor. A
 recovery code is named `recovery_code` and sets the age, as it meets an additional verification. These fields say what

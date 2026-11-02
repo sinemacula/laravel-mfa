@@ -63,6 +63,10 @@ final readonly class AuthenticationContextContributor
 
     /**
      * The keys of the `mfa` namespace for the session the request serves.
+     * `has_confirmed_factor` is the identity's `isMfaEnabled()`: whether it has
+     * a factor that is not pending, one whose stored status is none the package
+     * knows included, so a corrupt status is never reported as having no
+     * factor.
      *
      * @formatter:off
      *

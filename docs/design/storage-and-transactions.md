@@ -54,7 +54,7 @@ cannot interleave.
 - Reads that decide a verification, a lockout or who owns a factor go to the storage connection's write host
   (`Database\WriteConnection::query()`), so a replica that lags behind a lockout, a used code or a removed factor
   cannot answer them: the identity's factors as `FactorService::factors()` reads them, whether the identity has a
-  confirmed factor as `HasFactors::isMfaEnabled()` reads it, and every read inside
+  factor that is not pending as `HasFactors::isMfaEnabled()` reads it, and every read inside
   `FactorStateTransaction`, which locks its rows and so reads from the writer anyway. A factor the application loads
   itself and hands in is read wherever the application read it.
 - Every index a shipped migration names (`Database\IndexName`) is the table's name and a suffix, such as

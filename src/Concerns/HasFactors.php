@@ -94,8 +94,13 @@ trait HasFactors
     }
 
     /**
-     * Determine whether the identity has a confirmed factor: a pending one does
-     * not count. The factors are read from the write connection (see
+     * Determine whether the identity has a factor that is not pending: a
+     * confirmed one, or one whose stored status is none the package knows. Only
+     * a status of exactly `pending` does not count, compared here rather than
+     * in SQL, where a collation may ignore case or padding. A corrupt status so
+     * holds the identity to MFA, and its factor throws when it is read, so the
+     * person cannot pass until a reset rather than being let on as having no
+     * factor. The factors are read from the write connection (see
      * `Database\WriteConnection`), so a factor just confirmed or removed is
      * seen before a replica catches up.
      *
@@ -104,9 +109,12 @@ trait HasFactors
     public function isMfaEnabled(): bool
     {
         $factors = $this->authFactors();
+        $column  = $factors->getModel()->getStatusName();
 
-        // @phpstan-ignore method.notFound
-        return WriteConnection::query($factors->where($factors->getModel()->getStatusName(), FactorStatus::CONFIRMED->value))->exists();
+        return WriteConnection::query($factors)
+            ->toBase()
+            ->pluck($column)
+            ->contains(static fn (mixed $status): bool => $status !== FactorStatus::PENDING->value);
     }
 
     /**
