@@ -7,10 +7,8 @@ namespace Tests\Unit\Drivers;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
-use SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
-use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 
 /**
@@ -84,35 +82,6 @@ final class DriverResolverTest extends TestCase
         $this->expectExceptionMessage('Driver [other] must implement SineMacula\Laravel\Mfa\Contracts\FactorDriver.');
 
         $this->resolver()->resolve($this->manager(), 'other');
-    }
-
-    /**
-     * A factor matches the driver it was registered against.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testAcceptsTheFactorsOwnDriver(): void
-    {
-        $this->resolver()->assertMatchesFactor('email', new InMemoryFactor(type: 'email'));
-
-        // Reaching this line without a mismatch exception is the assertion.
-        $this->addToAssertionCount(1);
-    }
-
-    /**
-     * A factor is refused for any other driver.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testRefusesAnotherDriver(): void
-    {
-        $this->expectException(FactorDriverMismatchException::class);
-
-        $this->resolver()->assertMatchesFactor('totp', new InMemoryFactor(type: 'email'));
     }
 
     /**

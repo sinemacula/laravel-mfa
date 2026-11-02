@@ -15,10 +15,15 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
+use SineMacula\Laravel\Mfa\Verification\FactorOffers;
+use SineMacula\Laravel\Mfa\Verification\Submission;
+use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 
 /**
@@ -35,16 +40,16 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  * - `Factors\FactorService`: the identity's factors and the factor model.
  * - `Proofs\ProofService`: the proofs the current sign-in has recorded
  *   (`proofs()`).
- * - `Verification\VerificationService`: `challenge()` and `verify()`.
+ * - `Verification\VerificationService`: `verify()`.
+ * - `Verification\ChallengeRequests`: `sendCode()` and `requestAssertion()`.
+ * - `Verification\FactorOffers`: `offeredFactors()`.
  * - `Enrollment\EnrollmentService`: `enroll()`.
  * - `Lifecycle\LifecycleService`: `disable()`.
- * - `RecoveryCodes\RecoveryCodeService`: `generateRecoveryCodes()`,
- *   `redeemRecoveryCode()` and `recoveryCodes()`.
+ * - `RecoveryCodes\RecoveryCodeIssuance`: `generateRecoveryCodes()`.
+ * - `RecoveryCodes\RecoveryCodeService`: `recoveryCodes()`.
  *
- * The operations that run a factor through its driver pass the manager itself
- * to their service, so they use this manager's driver registry. The built-in
- * drivers are registered by `Drivers\DriverBindings` through the same
- * `extend()` API a consumer uses.
+ * The built-in drivers are registered by `Drivers\DriverBindings` through the
+ * same `extend()` API a consumer uses.
  *
  * Exceeds the project's max-methods-per-class threshold by design: it is the
  * one surface the facade exposes, and each method only delegates.
@@ -150,42 +155,69 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Issue a challenge for the given factor through the named driver, for the
-     * purpose given: for a type that delivers codes, the outcome of sending one
-     * bound to this session and the purpose; otherwise `null`.
+     * The factors offered to the session the request serves, as summaries:
+     * confirmed, of an enabled type and accepted after its first factor, the
+     * preferred one first; none when it serves nobody.
      *
-     * @param  string  $driver
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @return ?\SineMacula\Laravel\Mfa\Codes\SendResult
+     * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
-     * @throws \Throwable
+     * @throws \InvalidArgumentException
      */
-    public function challenge(string $driver, Factor $factor, Purpose $purpose = Purpose::SIGN_IN): ?SendResult
+    public function offeredFactors(): array
     {
-        return $this->container->make(VerificationService::class)->challenge($this, $driver, $factor, $purpose);
+        return $this->container->make(FactorOffers::class)->offered();
     }
 
     /**
-     * Verify a submitted code against the given factor through the named
-     * driver, for the purpose given.
+     * Send a code for the identity's delivered factor, bound to its sign-in and
+     * the purpose: for a pending session, its sign-in; for an active one, a
+     * step-up unless `sign_in` is asked for. Verify under the same purpose.
      *
-     * @param  string  $driver
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $code
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @return bool
+     * @param  mixed  $factorId
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return \SineMacula\Laravel\Mfa\Codes\SendResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorDriverMismatchException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
+     * @throws \Throwable
      */
-    public function verify(string $driver, Factor $factor, #[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
+    public function sendCode(mixed $factorId, ?Purpose $purpose = null): SendResult
     {
-        return $this->container->make(VerificationService::class)->verify($this, $driver, $factor, $code, $purpose);
+        return $this->container->make(ChallengeRequests::class)->sendCode($factorId, $purpose);
+    }
+
+    /**
+     * The options of an assertion request for the identity's passkey factor;
+     * none when the request serves nobody for verifying.
+     *
+     * @param  mixed  $factorId
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return array<string, mixed>
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     * @throws \Throwable
+     */
+    public function requestAssertion(mixed $factorId, ?Purpose $purpose = null): array
+    {
+        return $this->container->make(ChallengeRequests::class)->requestAssertion($factorId, $purpose);
+    }
+
+    /**
+     * Verify a code for a factor, a code answering a challenge, a recovery code
+     * or a passkey's assertion, for the purpose given: for a pending session,
+     * its sign-in; for an active one, a step-up unless `sign_in` is asked for.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function verify(#[\SensitiveParameter] Submission $submission, ?Purpose $purpose = null): VerificationResult
+    {
+        return $this->container->make(VerificationService::class)->verify($submission, $purpose);
     }
 
     /**
@@ -218,9 +250,12 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Generate a new recovery code set for the current identity, replacing any
-     * earlier one, and return its codes, once, as secrets for the response;
-     * none without an MFA-capable person signed in, or on a pending session.
+     * Generate a new recovery code set for the signed-in person, replacing any
+     * earlier one, and return its codes, once, as secrets for the response:
+     * refused as `not_fresh` unless the session is fresh enough for
+     * `mfa.generate_recovery_codes` and reaches the level the application sets
+     * for issuing them; none without an MFA-capable person signed in, or on a
+     * pending session.
      *
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
@@ -230,31 +265,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function generateRecoveryCodes(): array
     {
-        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
-
-        return $identity === null ? [] : $this->container->make(RecoveryCodeService::class)->generate($identity);
-    }
-
-    /**
-     * Redeem a recovery code for the identity the request serves for
-     * verifying, for the purpose given: whether a code was used and its proof
-     * recorded; `false` on a pending session that does not allow verifying,
-     * and without an MFA-capable person.
-     *
-     * @param  string  $code
-     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @return bool
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \Throwable
-     *
-     * @imperative
-     */
-    public function redeemRecoveryCode(#[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
-    {
-        $identity = $this->container->make(CallerContextResolver::class)->resolve(PendingAction::VERIFY)?->identity;
-
-        return $identity !== null && $this->container->make(RecoveryCodeService::class)->redeem($identity, $code, $purpose)->passed;
+        return $this->container->make(RecoveryCodeIssuance::class)->generate();
     }
 
     /**

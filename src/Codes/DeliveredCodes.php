@@ -113,12 +113,11 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Check the code against the factor's challenge under the binding (the one
-     * named, or the latest), and use it up when it matches.
+     * Check the code against the factor's challenge named under the binding,
+     * and use it up when it matches.
      *
-     * A binding with no challenge, or a challenge named that is not the
-     * binding's, is `missing`; a used challenge is `replayed` for its last code
-     * and `missing` for any other; an expired code or a challenge that has used
+     * A challenge that is unknown, or is not the binding's, is `missing`; a used challenge is `replayed` for its last code
+     * and `spent` for any other; an expired code or a challenge that has used
      * up its attempts says so, without counting. A check that can count an
      * attempt against the issue it read compares the code, and accepts it only
      * when it also uses that issue up; one that cannot (a concurrent resend,
@@ -129,24 +128,23 @@ final readonly class DeliveredCodes
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $code
      * @param  \Carbon\CarbonImmutable  $now
-     * @param  ?string  $challengeId
+     * @param  string  $challengeId
      * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      *
      * @throws \InvalidArgumentException
      *
      * @phpstan-impure
      */
-    public function check(string $factorId, ProofBinding $binding, #[\SensitiveParameter] string $code, CarbonImmutable $now, ?string $challengeId = null): CodeCheck
+    public function check(string $factorId, ProofBinding $binding, #[\SensitiveParameter] string $code, CarbonImmutable $now, string $challengeId): CodeCheck
     {
-        $query = $this->bound($factorId, $binding, $this->keys->session($binding->sessionId));
-        $row   = self::firstOf($challengeId === null ? $query : $query->where('id', $challengeId));
+        $row = self::firstOf($this->bound($factorId, $binding, $this->keys->session($binding->sessionId))->where('id', $challengeId));
 
         if ($row === null) {
             return CodeCheck::MISSING;
         }
 
         if ($row->consumed_at !== null) {
-            return $this->matches($row, $factorId, $binding, $code) ? CodeCheck::REPLAYED : CodeCheck::MISSING;
+            return $this->matches($row, $factorId, $binding, $code) ? CodeCheck::REPLAYED : CodeCheck::SPENT;
         }
 
         return $this->attempt($row, $factorId, $binding, $code, $now);
@@ -515,7 +513,7 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Why the challenge refuses checks: used (`missing`), expired, or out of
+     * Why the challenge refuses checks: used (`spent`), expired, or out of
      * attempts; `null` when it takes one.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
@@ -526,7 +524,7 @@ final readonly class DeliveredCodes
     private static function refusal(Code $row, int $max, CarbonImmutable $now): ?CodeCheck
     {
         return match (true) {
-            $row->consumed_at !== null                               => CodeCheck::MISSING,
+            $row->consumed_at !== null                               => CodeCheck::SPENT,
             $row->expires_at->getTimestamp() <= $now->getTimestamp() => CodeCheck::EXPIRED,
             $row->attempts >= $max                                   => CodeCheck::EXHAUSTED,
             default                                                  => null,

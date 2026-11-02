@@ -23,11 +23,10 @@ return [
     | configured application declares the first factor its guard signs people
     | in with, unless a first factor resolver of its own is bound; one that
     | enables `passkey` needs a passkey gateway bound. Every key is checked
-    | when the package boots; `requirement`, `totp_window`,
-    | `recovery_codes.enabled`, `freshness` and `first_factor` are applied,
-    | and `limits`, `bootstrap` and `recovery_codes.level` so far by the
-    | passkey change gate only. `freshness`
-    | maps each operation's name to the seconds within which an additional
+    | when the package boots; `types`, `requirement`, `totp_window`,
+    | `recovery_codes`, `freshness` and `first_factor` are applied, and `limits`
+    | and `bootstrap` so far by the passkey change gate only. `freshness` maps
+    | each operation's name to the seconds within which an additional
     | verification must have been made, or to a requirement whose every part has
     | a `max_age`. See the configuration guide for every key, its default, its
     | bounds and whether it is applied yet:

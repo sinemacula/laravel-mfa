@@ -183,7 +183,7 @@ final class SeamsWithoutStateContractTest extends TestCase
 
         (new MiddlewareSessionTransition)->returnToPending($user, 'web', Requirement::none()->withAdditionalVerification());
 
-        self::assertEquals($before, $store->proofs($user, 'web'));
+        self::assertSame($before[0]->toArray(), $store->proofs($user, 'web')[0]->toArray());
     }
 
     /**

@@ -8,8 +8,11 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -55,7 +58,10 @@ final class KeyRotationTest extends TestCase
         $reloaded = Factor::query()->findOrFail($factor->id);
 
         self::assertSame(self::SECRET, $reloaded->secret);
-        self::assertTrue(Mfa::driver('totp')->verify($reloaded, self::totp(self::SECRET, time())));
+
+        $binding = new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::STEP_UP);
+
+        self::assertSame(CodeCheck::ACCEPTED, Mfa::driver('totp')->verify($reloaded, self::totp(self::SECRET, time()), $binding));
     }
 
     /**

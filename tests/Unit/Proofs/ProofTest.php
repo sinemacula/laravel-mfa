@@ -267,9 +267,9 @@ final class ProofTest extends TestCase
         /** @var array<string, mixed> $decoded */
         $decoded = json_decode((string) json_encode($proof), true);
 
-        self::assertEquals($proof, Proof::fromArray($proof->toArray()));
-        self::assertEquals($proof, Proof::fromArray($decoded));
-        self::assertEquals($recovery, Proof::fromArray($recovery->toArray()));
+        self::assertSame($proof->toArray(), Proof::fromArray($proof->toArray())->toArray());
+        self::assertSame($proof->toArray(), Proof::fromArray($decoded)->toArray());
+        self::assertSame($recovery->toArray(), Proof::fromArray($recovery->toArray())->toArray());
         self::assertSame('+01:00', Proof::fromArray($decoded)->provedAt->format('P'));
     }
 

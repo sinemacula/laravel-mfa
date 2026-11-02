@@ -27,15 +27,15 @@ Every event the package dispatches is a class in `SineMacula\Laravel\Mfa\Events`
 | `RecoveryCodesLow`             | A redemption leaves the set at or below its low count                       | `remaining`, `purpose`                                     |
 | `RecoveryCodesRemoved`         | The identity's recovery code set is removed                                 | `actor`                                                    |
 
-The flows that dispatch them are built over the package's enrolment, verification, recovery code and lifecycle
-capabilities; until each flow ships, its events are declared but not yet dispatched, and the earlier
-`MfaChallengeIssued`, `MfaVerified`, `MfaVerificationFailed`, `MfaFactorEnrolled` and `MfaFactorDisabled` events,
-described in [the lifecycle events design note](../design/verification-lifecycle-and-events.md), are dispatched instead.
-`CodeSent` is dispatched already, once for every code the package sends, resends included, with the id of the code's
-challenge (see [Delivered Codes](../design/delivered-codes.md)). `LockoutApplied`, `LockoutLifted` and
-`FactorDisabled` are dispatched already, by the attempt caps (see [Attempts and lockouts](attempts.md)). The recovery
-code events are dispatched already too, and so are `VerificationPassed` and `VerificationFailed` for a recovery code,
-once per redemption: a check against the whole set is one attempt (see [Recovery codes](recovery-codes.md)).
+Verification dispatches `CodeSent`, once for every code sent, resends included and whichever gateway sent it, and
+`VerificationPassed` and `VerificationFailed`, once per attempt: a check against the whole recovery code set is one
+attempt (see [Verification](verification.md)). `LockoutApplied`, `LockoutLifted` and `FactorDisabled` are dispatched by
+the attempt caps (see [Attempts and lockouts](attempts.md)), and the recovery code events by the set's own flows (see
+[Recovery codes](recovery-codes.md)).
+
+The enrolment and lifecycle flows build on the same catalogue. Until each of them ships, its catalogue events are
+declared but not yet dispatched, and `MfaFactorEnrolled` and `MfaFactorDisabled` are dispatched in their place; those
+two carry the factor model and are not `MfaEvent`s.
 
 The names of the events and of their fields are stable. `factor` is a `Factors\FactorSummary` (id, type, label, masked
 destination, status, preferred, last use), `previous` another; `purpose` is an `Enums\Purpose` (`sign_in`, `step_up`,
@@ -65,16 +65,45 @@ and what it is about, as scalar values under the same keys every time, `null` fo
 | `ip`             | The request's IP address                                         |
 | `user_agent`     | The request's user agent                                         |
 
-One listener takes every event and attributes each the same way:
+One listener can take every event, since each implements the one contract:
 
 ```php
 use Illuminate\Support\Facades\Event;
 use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 
 Event::listen(MfaEvent::class, function (MfaEvent $event): void {
-    AuditLog::record(event: $event::class, context: $event->context());
+    // $event->context(), $event->purpose()
 });
 ```
+
+To audit them with `sinemacula/laravel-audit-log`, map the contract rather than listening. `laravel-iam` does this
+itself. Without it, register an `EventMapper` that sets an explicit code on the record, because an audit code is never
+derived from a class name:
+
+```php
+use SineMacula\Laravel\AuditLog\Contracts\EventMapper;
+use SineMacula\Laravel\AuditLog\Facades\AuditLog;
+use SineMacula\Laravel\AuditLog\Records\PendingRecord;
+use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
+use SineMacula\Laravel\Mfa\Events\VerificationPassed;
+
+final class MfaAuditMapper implements EventMapper
+{
+    public function map(object $event, PendingRecord $record): ?PendingRecord
+    {
+        return match (true) {
+            $event instanceof VerificationPassed => $record->event('mfa.verification_passed'),
+            default                              => null,
+        };
+    }
+}
+
+AuditLog::map(MfaEvent::class, MfaAuditMapper::class);
+```
+
+`PendingRecord::event()` and its dotted codes are on audit-log's `master`; the `AuditLog::map()` seam and `EventMapper`
+are its agreed mapping API, pending availability in a release of that package, so check its own documentation for the
+final namespaces.
 
 The context is read through `Contracts\EventContextResolver`. Alone, the package's default gives the identity, the
 application a bound `Contracts\ApplicationResolver` names, and the request's IP address and user agent; it never gives

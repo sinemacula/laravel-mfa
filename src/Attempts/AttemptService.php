@@ -52,11 +52,12 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * one after the other and cannot overrun a cap. The verification is handed the
  * factor as stored under that lock, and an attempt on a factor that is not
  * among the identity's stored factors is answered as not found without calling
- * it. The IP address's slot is taken before, in one statement, and given back
- * unless the attempt fails, so parallel guesses from one address cannot
- * overrun its cap either. A refused attempt is counted nowhere and so extends
- * nothing; a success lifts no lockout and resets no other factor's count, and
- * sending a code resets nothing.
+ * it. The IP address's slot is taken around the whole verification, by
+ * `throttled()`, in one statement and outside any transaction the package
+ * opens, and given back unless the attempt fails, so parallel guesses from one
+ * address cannot overrun its cap either. A refused attempt is counted nowhere
+ * and so extends nothing; a success lifts no lockout and resets no other
+ * factor's count, and sending a code resets nothing.
  *
  * Events are dispatched once the transaction has committed, so a listener that
  * throws cannot undo what was counted.
@@ -124,26 +125,57 @@ final readonly class AttemptService
     public function attempt(Attempt $attempt, \Closure $verify): AttemptOutcome
     {
         $settings = new AttemptSettings($this->config);
-        $slot     = $this->ipThrottle->take($attempt->ip, $settings);
+
+        /** @var list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent> $events */
+        $events = [];
+
+        $outcome = FactorStateTransaction::forIdentity(
+            $attempt->identity,
+            $this->factorModel($attempt->factor),
+            function (Collection $factors) use ($attempt, $verify, $settings, &$events): AttemptOutcome {
+
+                $events = [];
+
+                return $this->decide($attempt, $factors, $verify, $settings, $events);
+            },
+        );
+
+        foreach ($events as $event) {
+            $this->events->dispatch($event);
+        }
+
+        return $outcome;
+    }
+
+    /**
+     * Run a verification holding a slot of the IP address's window: refused by
+     * the address's throttle before it runs when the window is full, otherwise
+     * given back unless the verification failed and was counted; anything
+     * thrown gives it back too. It is taken outside any transaction the package
+     * opens, so the slot survives a rollback of what the verification did, and
+     * nothing else counts the address. An attempt made outside a request has no
+     * address, and is not throttled.
+     *
+     * @param  ?string  $ip
+     * @param  \Closure(): \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome  $verification
+     * @return \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome
+     *
+     * @throws \Throwable
+     *
+     * @param-immediately-invoked-callable $verification
+     *
+     * @internal
+     */
+    public function throttled(?string $ip, \Closure $verification): AttemptOutcome
+    {
+        $slot = $this->ipThrottle->take($ip, new AttemptSettings($this->config));
 
         if ($slot instanceof Lockout) {
             return AttemptOutcome::refuse($slot);
         }
 
-        /** @var list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent> $events */
-        $events = [];
-
         try {
-            $outcome = FactorStateTransaction::forIdentity(
-                $attempt->identity,
-                $this->factorModel($attempt->factor),
-                function (Collection $factors) use ($attempt, $verify, $settings, &$events): AttemptOutcome {
-
-                    $events = [];
-
-                    return $this->decide($attempt, $factors, $verify, $settings, $events);
-                },
-            );
+            $outcome = $verification();
         } catch (\Throwable $exception) {
 
             $this->ipThrottle->giveBack($slot);
@@ -153,10 +185,6 @@ final readonly class AttemptService
 
         if (!$outcome->isFailed()) {
             $this->ipThrottle->giveBack($slot);
-        }
-
-        foreach ($events as $event) {
-            $this->events->dispatch($event);
         }
 
         return $outcome;

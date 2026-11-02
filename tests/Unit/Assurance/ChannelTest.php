@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use Tests\Fixtures\Verification\Dumps;
 
 /**
  * Unit tests for the `Channel` value: construction, validation and
@@ -32,7 +33,28 @@ final class ChannelTest extends TestCase
         $channel = new Channel(ChannelKind::SMS, '+447700900123');
 
         self::assertSame(ChannelKind::SMS, $channel->kind);
-        self::assertSame('+447700900123', $channel->reference);
+        self::assertSame('+447700900123', $channel->reference());
+    }
+
+    /**
+     * No way of dumping a channel shows its destination, and PHP refuses to
+     * serialise one: only `toArray()` gives it up, for storing a proof.
+     *
+     * @return void
+     */
+    public function testNoDumpShowsTheReference(): void
+    {
+        $channel = new Channel(ChannelKind::SMS, '+447700900123');
+
+        foreach (Dumps::of($channel) as $way => $shown) {
+            self::assertStringNotContainsString('+447700900123', $shown, $way);
+            self::assertStringContainsStringIgnoringCase('sms', $shown, $way);
+        }
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Serialization of \'SensitiveParameterValue\' is not allowed');
+
+        serialize($channel);
     }
 
     /**
@@ -42,8 +64,8 @@ final class ChannelTest extends TestCase
      */
     public function testAReferenceIsOptional(): void
     {
-        self::assertNull((new Channel(ChannelKind::PASSWORD))->reference);
-        self::assertNull((new Channel(ChannelKind::PASSKEY))->reference);
+        self::assertNull((new Channel(ChannelKind::PASSWORD))->reference());
+        self::assertNull((new Channel(ChannelKind::PASSKEY))->reference());
     }
 
     /**
@@ -56,7 +78,7 @@ final class ChannelTest extends TestCase
         $channel = Channel::unknown();
 
         self::assertSame(ChannelKind::UNKNOWN, $channel->kind);
-        self::assertNull($channel->reference);
+        self::assertNull($channel->reference());
     }
 
     /**
@@ -137,7 +159,7 @@ final class ChannelTest extends TestCase
     {
         $channel = new Channel(ChannelKind::EXTERNAL_PROVIDER, 'okta');
 
-        self::assertEquals($channel, Channel::fromArray($channel->toArray()));
+        self::assertSame($channel->toArray(), Channel::fromArray($channel->toArray())->toArray());
         self::assertEquals(Channel::unknown(), Channel::fromArray(['kind' => 'unknown']));
     }
 

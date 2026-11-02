@@ -12,7 +12,7 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 /**
  * What every `PendingCompletion` must guarantee, as assertions: a result whose
  * binding does not validate against the pending session, and a failed result,
- * are refused by throwing, never by returning.
+ * are refused by throwing an `OperationRefusedException`, never by returning.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,7 +37,7 @@ final class PendingCompletionContract
      */
     public static function assertRefusesAResultOfAnotherBinding(PendingCompletion $completion, PendingContext $pending, VerificationResult $mismatched): void
     {
-        SeamAssert::refusesByThrowing(static fn () => $completion->complete($pending, $mismatched), 'A result bound elsewhere must be refused by throwing.');
+        SeamAssert::refusesWithAReason(static fn () => $completion->complete($pending, $mismatched), 'A result bound elsewhere must be refused with a reason.');
     }
 
     /**
@@ -51,6 +51,6 @@ final class PendingCompletionContract
     {
         $failed = VerificationResult::failed(FailureReason::INVALID_CODE, 'The code did not match.');
 
-        SeamAssert::refusesByThrowing(static fn () => $completion->complete($pending, $failed), 'A failed result must be refused by throwing.');
+        SeamAssert::refusesWithAReason(static fn () => $completion->complete($pending, $failed), 'A failed result must be refused with a reason.');
     }
 }

@@ -9,12 +9,14 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Drivers\RecordingFactorDriver;
-use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\MyDriverFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -24,12 +26,10 @@ use Tests\TestCase;
  * path.
  *
  * A custom driver registered via the Manager's `extend()` API must resolve to
- * the registered instance when requested by name, and its verify /
- * issueChallenge surface must be exercised identically to built-in drivers. A
+ * the registered instance when requested by name, and its `verify()` and
+ * `deliver()` surface must be exercised identically to built-in drivers. A
  * consumer's registration of a shipped driver's name wins however it is made:
- * through the facade, a container extender or a resolving callback on `mfa`. A
- * manager built apart from the `mfa` singleton runs factors through its own
- * drivers.
+ * through the facade, a container extender or a resolving callback on `mfa`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -65,7 +65,7 @@ final class CustomDriverExtensionTest extends TestCase
 
         Mfa::extend('my_driver', static fn () => $driver);
 
-        Mfa::driver('my_driver')->verify(new MyDriverFactor, 'correct');
+        Mfa::driver('my_driver')->verify(new MyDriverFactor, 'correct', new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::SIGN_IN));
 
         self::assertSame(1, $driver->verifyCalls);
     }
@@ -88,30 +88,19 @@ final class CustomDriverExtensionTest extends TestCase
             use DescribesNoChannel;
 
             /**
-             * No-op — the override is never asked to issue a challenge.
-             *
-             * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-             * @return void
-             */
-            #[\Override]
-            public function issueChallenge(Factor $factor): void
-            {
-                // No-op — never called in this test.
-            }
-
-            /**
              * Always succeed so the caller can observe that the override fired.
              *
              * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
              * @param  string  $code
-             * @return bool
+             * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+             * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
              */
             #[\Override]
-            public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
+            public function verify(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck
             {
-                // Marker driver — return true so the caller can observe that
-                // the override fired without setting up a factor.
-                return true;
+                // Marker driver — accept so the caller can observe that the
+                // override fired without setting up a factor.
+                return CodeCheck::ACCEPTED;
             }
         };
 
@@ -195,49 +184,6 @@ final class CustomDriverExtensionTest extends TestCase
         $this->manager();
 
         self::assertInstanceOf(TotpDriver::class, $seen);
-    }
-
-    /**
-     * A manager built apart from the `mfa` singleton verifies through its own
-     * driver, and the singleton through its own.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testASeparateManagerVerifiesThroughItsOwnDriver(): void
-    {
-        $factor   = new InMemoryFactor(authenticatable: $this->signIn());
-        $own      = new RecordingFactorDriver;
-        $separate = new MfaManager($this->container());
-
-        $separate->extend('totp', fn (): FactorDriver => $own);
-
-        self::assertTrue($separate->verify('totp', $factor, 'correct'));
-        self::assertFalse($this->manager()->verify('totp', $factor, 'correct'));
-        self::assertSame(1, $own->verifyCalls);
-    }
-
-    /**
-     * A manager built apart from the `mfa` singleton issues challenges through
-     * its own driver.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testASeparateManagerChallengesThroughItsOwnDriver(): void
-    {
-        $factor   = new InMemoryFactor(authenticatable: $this->signIn());
-        $own      = new RecordingFactorDriver;
-        $separate = new MfaManager($this->container());
-
-        $separate->extend('totp', fn (): FactorDriver => $own);
-
-        $separate->challenge('totp', $factor);
-        $this->manager()->challenge('totp', $factor);
-
-        self::assertSame(1, $own->issueCalls);
     }
 
     /**

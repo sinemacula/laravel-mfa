@@ -21,6 +21,9 @@ it.
   `__unserialize()` throw `Exceptions\SecretNotRevealedException`, a `LogicException`; `__debugInfo()` gives a
   `[redacted]` marker, and the `\SensitiveParameterValue` gives `print_r`, `var_dump`, `var_export`, array casts and
   Symfony's VarDumper nothing. The class is final and readonly.
+- A value that holds a secret but is not returned to show it keeps to the same standard: `Verification\Submission`'s code
+  and response, `Verification\VerificationResult`'s completion and `Assurance\Channel`'s reference are each held as a
+  `\SensitiveParameterValue` behind an accessor, so no dump shows them.
 - `Secrets\SecretResponse::json()` is the one helper that reveals: it replaces every `RevealedSecret` in the data, at
   any depth of nested arrays, by its plaintext, and sends the response with `Cache-Control: no-store` and
   `Pragma: no-cache`. A `RevealedSecret` inside another object is not revealed, so encoding it throws.
@@ -110,10 +113,10 @@ it.
 - A log call anywhere in the application writes `['code' => $code]`, or Laravel's shared context holds a code, or a
   channel's own processor adds one; the channel's `RedactSecrets` processor runs after every other processor of the
   logger and before any handler, and the record written holds `[redacted]`.
-- An exception thrown below a call such as `Mfa::verify($driver, $factor, $code)` is reported. The package's `report`
-  callback scrubs it before the handler logs it: the frames inside the package lose every argument, and the facade's
-  frame and every frame below the package lose the code, so the trace's string form shows `'[redacted]'` where it
-  would show the start of the code. The context the exception's `context()` gives is redacted by the processor.
+- An exception thrown below a call such as `Mfa::verify(Submission::factor($id, $code))` is reported. The package's
+  `report` callback scrubs it before the handler logs it: the frames inside the package lose every argument, and the
+  facade's frame and every frame below the package lose the code, so the trace's string form shows `'[redacted]'` where
+  it would show the start of the code. The context the exception's `context()` gives is redacted by the processor.
 - A bound SMS sender throws, quoting the phone number and the message. `CodeService` scrubs the code and the number
   from the sender's exception and every previous one, and throws `CodeDeliveryFailedException` naming the factor at
   its masked number; the transaction rolls back and no code is kept.

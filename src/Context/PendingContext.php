@@ -8,6 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
@@ -15,12 +17,14 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  * A pending session, a sign-in still owing a requirement, as resolved from a
  * pending credential the authentication layer has validated: the identity, the
  * application, the session's public id, the first factor's proof, the
- * outstanding requirement, and the actions the credential allows.
+ * outstanding requirement, the actions the credential allows, and the further
+ * proofs the session already holds.
  *
  * The rules between the parts are checked on construction: the first factor's
  * proof is a first factor made at sign-in, bound to this identity, application
- * and session, and the actions are pending actions, each named once. A helper
- * serves a pending session only an action it `allows()`.
+ * and session, each further proof is bound to them too and is no first factor,
+ * and the actions are pending actions, each named once. A helper serves a
+ * pending session only an action it `allows()`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,6 +40,7 @@ final readonly class PendingContext
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
+     * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      *
      * @throws \InvalidArgumentException
      */
@@ -58,6 +63,9 @@ final readonly class PendingContext
 
         /** The actions the pending credential allows. */
         public array $actions,
+
+        /** The further proofs the session already holds, oldest first. */
+        public array $proofs = [],
     ) {
         if (trim($application) === '') {
             throw new \InvalidArgumentException('The application of a pending session must not be blank.');
@@ -68,6 +76,7 @@ final readonly class PendingContext
         }
 
         $this->assertFirstFactor();
+        $this->assertProofs();
         self::assertActions($actions);
     }
 
@@ -96,16 +105,49 @@ final readonly class PendingContext
             throw new \InvalidArgumentException(sprintf('The first factor of a pending session must be a proof of kind [%s].', ProofKind::FIRST_FACTOR->value));
         }
 
-        $binding = $this->firstFactor->binding;
-        $key     = $this->identity->getAuthIdentifier();
-
-        $sameIdentity = $binding->identityType === CurrentIdentity::typeOf($this->identity)
-            && (is_string($key) || is_int($key))
-            && $binding->identityKey === (string) $key;
-
-        if (!$sameIdentity || $binding->application !== $this->application || $binding->sessionId !== $this->sessionId) {
+        if (!$this->isBoundHere($this->firstFactor->binding)) {
             throw new \InvalidArgumentException('The first factor of a pending session must be bound to its identity, application and session.');
         }
+    }
+
+    /**
+     * Refuse a further proof that is not a proof, is a first factor, or is
+     * bound to another identity, application or session.
+     *
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function assertProofs(): void
+    {
+        foreach ($this->proofs as $proof) {
+
+            if ($proof->kind === ProofKind::FIRST_FACTOR) {
+                throw new \InvalidArgumentException('The further proofs of a pending session must not hold a first factor.');
+            }
+
+            if (!$this->isBoundHere($proof->binding)) {
+                throw new \InvalidArgumentException('The further proofs of a pending session must be bound to its identity, application and session.');
+            }
+        }
+    }
+
+    /**
+     * Whether the binding names this session's identity, application and
+     * session.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return bool
+     */
+    private function isBoundHere(ProofBinding $binding): bool
+    {
+        $key = $this->identity->getAuthIdentifier();
+
+        if (!is_string($key) && !is_int($key)) {
+            return false;
+        }
+
+        return (new ProofOwner(CurrentIdentity::typeOf($this->identity), (string) $key))->ownsSignIn($binding, $this->application, $this->sessionId);
     }
 
     /**

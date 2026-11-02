@@ -8,6 +8,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
+use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
@@ -16,10 +17,8 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
-use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
-use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
@@ -77,71 +76,71 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     ) {}
 
     /**
-     * Send a code for the factor, bound as the binding says, and return the
-     * challenge's id. A challenge that may not go ahead, or a code that is not
-     * sent, is refused with an `OperationRefusedException` carrying why.
+     * Send a code for the factor, bound as the binding says: the challenge's id
+     * and when the code stops working, or why none was sent.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @return string
+     * @return \SineMacula\Laravel\Mfa\Codes\SendResult
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
     #[\Override]
-    public function send(Factor $factor, ProofBinding $binding): string
+    public function send(Factor $factor, ProofBinding $binding): SendResult
     {
         $identity = $this->identity(PendingAction::SEND_CODE, $binding);
 
-        OperationRefusedException::unless($identity !== null, FailureReason::NOT_FOUND, 'The binding does not name the identity the request serves.');
+        if ($identity === null) {
+            return SendResult::refused(FailureReason::NOT_FOUND);
+        }
 
         $driver = $this->driver($factor);
 
-        return $this->connection()->transaction(function () use ($identity, $factor, $binding, $driver): string {
+        return $this->connection()->transaction(function () use ($identity, $factor, $binding, $driver): SendResult {
 
             $admission = $this->counters->isUsable($identity, $factor, $binding);
 
-            if (!$admission->isAdmitted()) {
-                throw new OperationRefusedException($admission->reason ?? FailureReason::LOCKED, $admission->detail);
-            }
-
-            $result = $this->codes->send($identity, $factor, $binding, $driver);
-
-            return $result->challengeId ?? throw new OperationRefusedException($result->reason ?? FailureReason::SENDING_CAPPED, 'No code was sent.');
+            return $admission->isAdmitted() ? $this->codes->send($factor, $binding, $driver) : SendResult::refusedBy($admission);
         });
     }
 
     /**
      * Whether the code answers the challenge, consuming it when it does, with
      * the outcome counted against the factor and the identity. A challenge that
-     * may not go ahead is answered `false` without checking the code.
+     * may not go ahead is refused without checking the code, counting nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $challengeId
      * @param  string  $code
-     * @return bool
+     * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome
      *
      * @throws \Throwable
      */
     #[\Override]
-    public function verify(Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): bool
+    public function verify(Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): ChallengeOutcome
     {
         $identity = $this->identity(PendingAction::VERIFY, $binding);
 
         if ($identity === null) {
-            return false;
+            return ChallengeOutcome::refused(FailureReason::NOT_FOUND, 'The binding does not name the identity the request serves.');
         }
 
-        return $this->connection()->transaction(function () use ($identity, $factor, $binding, $challengeId, $code): bool {
+        return $this->connection()->transaction(function () use ($identity, $factor, $binding, $challengeId, $code): ChallengeOutcome {
 
-            if (!$this->counters->isUsable($identity, $factor, $binding)->isAdmitted()) {
-                return false;
+            $admission = $this->counters->isUsable($identity, $factor, $binding);
+
+            if (!$admission->isAdmitted()) {
+                return ChallengeOutcome::refused($admission->reason ?? FailureReason::LOCKED, $admission->detail, $admission->lockedUntil);
             }
 
-            $passed = $this->codes->check($factor, $binding, $code, $challengeId) === CodeCheck::ACCEPTED;
+            $check   = $this->codes->check($factor, $binding, $code, $challengeId);
+            $failure = $check->failure();
+            $outcome = $this->counters->report($identity, $factor, $binding, $failure === null);
 
-            return $this->counters->report($identity, $factor, $binding, $passed)->passed;
+            return $failure === null && $outcome->passed
+                ? ChallengeOutcome::passed()
+                : ChallengeOutcome::failed($failure ?? FailureReason::INVALID_CODE, $check->detail());
         });
     }
 

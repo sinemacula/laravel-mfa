@@ -41,23 +41,29 @@ moment when both work or neither exists, and what a redemption leaves behind.
 
 ## Success Path
 
-- Generation (`RecoveryCodeService::generate()`, `Mfa::generateRecoveryCodes()`): the identity is checked (a person,
-  active), the application must accept recovery codes and the identity must have a confirmed factor. The codes are
-  drawn and hashed before the lock is taken. Under the lock the checks are made again, the confirmed factor among the
-  factors as stored; every code of the identity not yet replaced, used ones included, is marked replaced; the new codes
-  are stored under the next generation; the generation and its time are recorded on the state row, every save required
-  to be made; and `RecoveryCodesGenerated` (size, generation, actor) is queued for the commit. The codes are returned
-  once the transaction has committed.
-- Redemption (`RecoveryCodeService::redeem()`, `Mfa::redeemRecoveryCode()`): refusals first (below), then the attempt
-  through `Attempts\AttemptService`, charged to the identity and to the request's IP address as resolved through the
-  trusted proxies. Under the lock: the sign-in and a confirmed factor are checked again; the verification generation
-  is read; the usable codes of the current generation are read with a locking read and all checked; a match is marked
-  used by `UPDATE ... SET used_at WHERE id AND used_at IS NULL AND replaced_at IS NULL`, which must change one row, and
-  its `recovery_code` proof (method `recovery_code`, no channel, no reference, the purpose given, the verification
-  generation read under the lock) is recorded on the current sign-in, for the store to keep once the transaction
-  commits. The attempt service counts the outcome in the same transaction. Once it has committed, a success dispatches
-  `VerificationPassed`, `RecoveryCodeUsed` with the remaining count and, when `low_count` is above 0 and the remaining
-  count is at or below it, `RecoveryCodesLow`, in that order. A success always carries its proof.
+- Generation (`RecoveryCodeService::generate()`): the identity is checked (a person, active), the application must
+  accept recovery codes and the identity must have a confirmed factor. The codes are drawn and hashed before the lock is
+  taken. Under the lock the checks are made again, the confirmed factor among the factors as stored; every code of the
+  identity not yet replaced, used ones included, is marked replaced; the new codes are stored under the next generation;
+  the generation and its time are recorded on the state row, every save required to be made; and
+  `RecoveryCodesGenerated` (size, generation, actor) is queued for the commit. The codes are returned once the
+  transaction has committed.
+- The public path, `Mfa::generateRecoveryCodes()` (`RecoveryCodes\RecoveryCodeIssuance`), serves the signed-in person
+  only, never a pending session. It captures the binding, and refuses as `not_fresh`, before the draw and again first
+  under the lock, a sign-in that changed, a session not fresh for `mfa.generate_recovery_codes` and one below
+  `ApplicationSettings::recoveryCodeLevel()`, since the remedy is the same stronger step-up; a refusal leaves the old
+  set intact.
+- Redemption (`Mfa::verify(Submission::recoveryCode(...))`, then `RecoveryCodeService::admission()` and `redeem()`,
+  under the identity's lock the verification holds): an inactive identity, an application that does not accept recovery
+  codes, no confirmed factor as stored and an unknown first factor are refused before any hash is checked. The attempt
+  then goes through `Attempts\AttemptService`, charged to the identity: the usable codes of the current generation are
+  read with a locking read and all checked, and a match is marked used by `UPDATE ... SET used_at WHERE id AND used_at
+  IS NULL AND replaced_at IS NULL`, which must change one row. `redeem()` records no proof and reports nothing, so the
+  verification can roll the code's use back. It makes the `recovery_code` proof (method `recovery_code`, no channel, no
+  reference, the purpose given, the verification generation read under the lock) and hands it to the completion seam,
+  then queues `VerificationPassed`, and `RecoveryCodeService::reportRedeemed()` queues `RecoveryCodeUsed` with the
+  remaining count and, when `low_count` is above 0 and the remaining count is at or below it, `RecoveryCodesLow`, in
+  that order.
 - Status (`RecoveryCodeService::status()`, `Mfa::recoveryCodes()`): one statement on the write connection, the state
   row left-joined to the usable codes of its current generation, gives the remaining count, the generation and the
   time, so the count and the generation are always of the same set. No lock is taken.
@@ -97,14 +103,15 @@ moment when both work or neither exists, and what a redemption leaves behind.
   both and never neither, and a code of an earlier generation never redeems.
 - An application that switches its hashing driver with `hashing.*.verify` on (Laravel's default) makes every existing
   set fail with the hasher's `RuntimeException` until a new set is generated, as it does for passwords.
-- The proof is handed to the store once the code's use commits: the two are not one atomic step, and a store that
-  refuses the proof throws `ProofRefusedException` with the code already used. Inside a surrounding transaction on the
-  storage connection that rolls back, the code stays unused and nothing is recorded or reported.
-- The freshness and assurance-level gates on generation, and the unified verification result, are not applied yet.
+- The default seams hand the proof to the store once the code's use commits: the two are not one atomic step, and a
+  store that refuses the proof throws `ProofRefusedException` with the code already used. A seam's refusal, and a
+  surrounding transaction on the storage connection that rolls back, leave the code unused with nothing recorded or
+  reported.
 
 ## Implementation Anchors
 
-- `src/RecoveryCodes/RecoveryCodeService.php`: `generate()`, `redeem()`, `status()`, `removeSet()`, `prune()`.
+- `src/RecoveryCodes/RecoveryCodeService.php`: `generate()`, `admission()`, `redeem()`, `reportRedeemed()`, `status()`,
+  `removeSet()`, `prune()`. `src/RecoveryCodes/RecoveryCodeIssuance.php`: the public path's gate.
 - `src/RecoveryCodes/RecoveryCodeGenerator.php`, `src/RecoveryCodes/RecoveryCodeNormalizer.php`,
   `src/RecoveryCodes/RecoveryCodeMatcher.php`, `src/RecoveryCodes/RecoveryCodeSettings.php`.
 - `src/RecoveryCodes/Redemption.php`, `src/RecoveryCodes/RecoveryCodeStatus.php`.

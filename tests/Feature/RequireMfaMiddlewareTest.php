@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\Feature\Concerns\InteractsWithRequireMfaMiddleware;
 use Tests\Fixtures\Identities\TestUser;
@@ -138,7 +139,7 @@ final class RequireMfaMiddlewareTest extends TestCase
         [$user, $factor, $code] = $this->enrollTotp();
 
         // Complete a verification first.
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
 
         // Rewind the session timestamp past the expiry.
         $this->travel(15 * 24 * 60 + 1)->minutes();

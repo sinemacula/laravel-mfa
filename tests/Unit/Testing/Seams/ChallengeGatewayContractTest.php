@@ -7,9 +7,12 @@ namespace Tests\Unit\Testing\Seams;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
+use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
@@ -96,7 +99,7 @@ final class ChallengeGatewayContractTest extends TestCase
      */
     public function testRejectsAGatewayThatRefusesEveryCode(): void
     {
-        $gateway = new ScriptedChallengeGateway(static fn (string $code): bool => false);
+        $gateway = new ScriptedChallengeGateway(static fn (): ChallengeOutcome => self::answer(false));
 
         $this->expectException(AssertionFailedError::class);
 
@@ -136,7 +139,7 @@ final class ChallengeGatewayContractTest extends TestCase
     #[DataProvider('sentCodes')]
     public function testRejectsAGatewayThatChecksOnlyTheFormat(string $sent): void
     {
-        $gateway = new ScriptedChallengeGateway(static fn (string $code): bool => preg_match('/^\d{6}$/D', $code) === 1);
+        $gateway = new ScriptedChallengeGateway(static fn (string $code): ChallengeOutcome => self::answer(preg_match('/^\d{6}$/D', $code) === 1));
 
         $this->expectException(AssertionFailedError::class);
 
@@ -151,9 +154,50 @@ final class ChallengeGatewayContractTest extends TestCase
      */
     public function testAcceptsAGatewayWhoseCodeIsAllZeros(): void
     {
-        $gateway = new ScriptedChallengeGateway(static fn (string $code): bool => $code === '000000');
+        $gateway = new ScriptedChallengeGateway(static fn (string $code): ChallengeOutcome => self::answer($code === '000000'));
 
         ChallengeGatewayContract::assertAWrongCodeIsRefused($gateway, $this->factor, $this->emailBinding($this->user), static fn (string $challenge): string => '000000');
+    }
+
+    /**
+     * The kit rejects a gateway that does not count a wrong code.
+     *
+     * @return void
+     */
+    public function testRejectsAGatewayThatCountsNothing(): void
+    {
+        $gateway = new ScriptedChallengeGateway(static fn (): ChallengeOutcome => ChallengeOutcome::refused(FailureReason::INVALID_CODE, 'No.'));
+
+        $this->expectException(AssertionFailedError::class);
+
+        ChallengeGatewayContract::assertAWrongCodeIsRefused($gateway, $this->factor, $this->emailBinding($this->user), self::sent(...));
+    }
+
+    /**
+     * The kit rejects a gateway that answers for a challenge it does not know.
+     *
+     * @return void
+     */
+    public function testRejectsAGatewayThatAnswersAnUnknownChallenge(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        ChallengeGatewayContract::assertAnUnknownChallengeIsNotFound(new AcceptingChallengeGateway, $this->factor, $this->emailBinding($this->user));
+    }
+
+    /**
+     * The kit rejects a gateway that sends nothing for a factor that may be
+     * challenged.
+     *
+     * @return void
+     */
+    public function testRejectsAGatewayThatSendsNothing(): void
+    {
+        $gateway = new ScriptedChallengeGateway(static fn (): ChallengeOutcome => self::answer(false), SendResult::refused(FailureReason::SENDING_CAPPED));
+
+        $this->expectException(AssertionFailedError::class);
+
+        ChallengeGatewayContract::assertACodeIsConsumedOnce($gateway, $this->factor, $this->emailBinding($this->user), self::sent(...));
     }
 
     /**
@@ -201,6 +245,17 @@ final class ChallengeGatewayContractTest extends TestCase
     protected function deliveredCode(string $challengeId): string
     {
         return self::lastEmailedCode($this->mailbox);
+    }
+
+    /**
+     * What a scripted gateway answers.
+     *
+     * @param  bool  $passes
+     * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome
+     */
+    private static function answer(bool $passes): ChallengeOutcome
+    {
+        return $passes ? ChallengeOutcome::passed() : ChallengeOutcome::failed(FailureReason::INVALID_CODE, 'No.');
     }
 
     /**

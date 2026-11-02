@@ -7,21 +7,22 @@ namespace SineMacula\Laravel\Mfa\Drivers;
 use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
  * Base class for the drivers whose codes are delivered to a destination (email,
  * SMS).
  *
- * The package draws, stores and checks their codes itself, bound to the factor,
- * the identity, the application, the session and the purpose (see
+ * The bound `ChallengeGateway` draws, stores and checks their codes, bound to
+ * the factor, the identity, the application, the session and the purpose (see
  * `Codes\CodeService`), so a concrete driver only describes its channel and its
  * transport: how a code reaches the factor's destination. A factor with no
  * destination is refused before anything is sent.
  *
- * The `FactorDriver` methods that take a factor alone cannot know a code's
- * binding, so `issueChallenge()`, `verify()` and `confirm()` refuse with a
- * `LogicException` rather than send or accept a code bound to nothing. Such a
+ * The driver holds no code to compare, so `verify()` and `confirm()` refuse
+ * with a `LogicException` rather than accept a code checked by nothing. Such a
  * type keeps no secret, so starting an enrolment returns none.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -72,30 +73,18 @@ abstract class AbstractCodeDriver implements CodeDeliveryDriver
     }
 
     /**
-     * Refuse: a code is sent under its binding, through the code service.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
-     *
-     * @throws \LogicException
-     */
-    #[\Override]
-    public function issueChallenge(Factor $factor): void
-    {
-        throw self::unbound('sent');
-    }
-
-    /**
-     * Refuse: a code is checked under its binding, through the code service.
+     * Refuse: a code is checked under its binding, through the challenge
+     * gateway.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @return bool
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      *
      * @throws \LogicException
      */
     #[\Override]
-    public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
+    public function verify(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck
     {
         throw self::unbound('checked');
     }

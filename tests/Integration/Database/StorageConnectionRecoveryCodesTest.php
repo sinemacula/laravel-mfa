@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
@@ -64,7 +65,7 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     {
         $user = $this->loginUser();
 
-        $codes = Mfa::generateRecoveryCodes();
+        $codes = $this->codes()->generate($user);
 
         self::assertCount(10, $codes);
         self::assertSame('secondary', (new RecoveryCode)->getConnectionName());
@@ -85,12 +86,10 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
      */
     public function testRedemptionRunsOnTheStorageConnection(): void
     {
-        $this->loginUser();
+        $code = $this->codes()->generate($this->loginUser())[0]->reveal();
 
-        $code = Mfa::generateRecoveryCodes()[0]->reveal();
-
-        self::assertTrue(Mfa::redeemRecoveryCode($code));
-        self::assertFalse(Mfa::redeemRecoveryCode($code));
+        self::assertTrue(Mfa::verify(Submission::recoveryCode($code))->isVerified());
+        self::assertTrue(Mfa::verify(Submission::recoveryCode($code))->isFailed());
         self::assertSame(1, DB::connection('secondary')->table('mfa_recovery_codes')->whereNotNull('used_at')->count());
         self::assertSame(0, DB::connection('secondary')->transactionLevel());
         self::assertSame(9, Mfa::recoveryCodes()?->remaining);
@@ -108,7 +107,7 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     public function testAFailedReplacementRollsBackOnTheStorageConnection(): void
     {
         $user  = $this->loginUser();
-        $prior = Mfa::generateRecoveryCodes();
+        $prior = $this->codes()->generate($user);
         $seen  = 0;
 
         RecoveryCode::creating(static function () use (&$seen): void {
@@ -118,7 +117,7 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
         });
 
         try {
-            Mfa::generateRecoveryCodes();
+            $this->codes()->generate($user);
             self::fail('Expected the replacement to fail partway through.');
         } catch (MidRotationFailureException $exception) {
             self::assertSame('mid-replacement failure', $exception->getMessage());
@@ -127,7 +126,7 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
         self::assertSame(0, DB::connection('secondary')->transactionLevel());
         self::assertSame(10, RecoveryCode::query()->where('authenticatable_id', (string) $user->id)->whereNull('replaced_at')->count());
         self::assertSame(1, Mfa::recoveryCodes()?->generation);
-        self::assertTrue(Mfa::redeemRecoveryCode($prior[9]->reveal()));
+        self::assertTrue(Mfa::verify(Submission::recoveryCode($prior[9]->reveal()))->isVerified());
     }
 
     /**
@@ -161,6 +160,18 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
             'recovery_codes' => ['enabled' => true],
             'first_factor'   => ['method' => 'password', 'channel' => 'password'],
         ]);
+    }
+
+    /**
+     * The recovery code service.
+     *
+     * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function codes(): RecoveryCodeService
+    {
+        return $this->container()->make(RecoveryCodeService::class);
     }
 
     /**

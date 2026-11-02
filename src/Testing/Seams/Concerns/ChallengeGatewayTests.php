@@ -10,8 +10,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeGatewayContract;
 
 /**
- * The `ChallengeGateway` contract kit: a wrong code is refused, a code answers
- * only its own binding, and a code is consumed once.
+ * The `ChallengeGateway` contract kit: a wrong code fails and is counted, a
+ * code answers only its own binding, a code is consumed once, and an unknown
+ * challenge is not found.
  *
  * A test case proves its implementation by using this trait and implementing
  * the hooks; each check delegates to `ChallengeGatewayContract`.
@@ -53,6 +54,16 @@ trait ChallengeGatewayTests
     public function testChallengeGatewayConsumesACodeOnce(): void
     {
         ChallengeGatewayContract::assertACodeIsConsumedOnce($this->challengeGateway(), $this->challengedFactor(), $this->challengeBinding(), $this->deliveredCode(...));
+    }
+
+    /**
+     * A challenge that is not the binding's is not found.
+     *
+     * @return void
+     */
+    public function testChallengeGatewayDoesNotFindAnUnknownChallenge(): void
+    {
+        ChallengeGatewayContract::assertAnUnknownChallengeIsNotFound($this->challengeGateway(), $this->challengedFactor(), $this->challengeBinding());
     }
 
     /**

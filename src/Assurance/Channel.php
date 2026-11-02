@@ -16,9 +16,13 @@ use SineMacula\Laravel\Mfa\Support\SerializedFields;
  * Two proofs on the same channel are not independent. A first factor whose
  * channel is unknown establishes no independence and no level.
  *
- * The reference may be a full destination, so the serialised form is for
- * storing a proof, never for an event, a log or a response: those carry a
- * factor's masked summary.
+ * The reference may be a full destination, so it is held as a
+ * `\SensitiveParameterValue` and read through `reference()`: no dump of a
+ * channel (`print_r`, `var_dump`, `var_export`, an array cast, or Symfony's
+ * VarDumper behind Laravel's dump helpers) shows it, and PHP refuses to
+ * serialise one. The serialised form, `toArray()`, is for storing a proof,
+ * never for an event, a log or a response: those carry a factor's masked
+ * summary.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, ?string>
  *
@@ -27,6 +31,9 @@ use SineMacula\Laravel\Mfa\Support\SerializedFields;
  */
 final readonly class Channel implements \JsonSerializable, Arrayable
 {
+    /** @var \SensitiveParameterValue The destination or credential the channel names, hidden from dumps. */
+    private \SensitiveParameterValue $reference;
+
     /**
      * Constructor.
      *
@@ -40,10 +47,12 @@ final readonly class Channel implements \JsonSerializable, Arrayable
         /** The kind of channel. */
         public ChannelKind $kind,
 
-        /** The destination or credential the channel names, or `null` when it names none. */
+        // The destination or credential the channel names, if any.
         #[\SensitiveParameter]
-        public ?string $reference = null,
+        ?string $reference = null,
     ) {
+        $this->reference = new \SensitiveParameterValue($reference);
+
         if ($reference === null) {
             return;
         }
@@ -86,6 +95,18 @@ final readonly class Channel implements \JsonSerializable, Arrayable
     }
 
     /**
+     * The destination or credential the channel names, or `null` when it names
+     * none.
+     *
+     * @return ?string
+     */
+    public function reference(): ?string
+    {
+        /** @var ?string */
+        return $this->reference->getValue();
+    }
+
+    /**
      * The channel with snake_case keys.
      *
      * @return array{kind: string, reference: ?string}
@@ -95,7 +116,7 @@ final readonly class Channel implements \JsonSerializable, Arrayable
     {
         return [
             'kind'      => $this->kind->value,
-            'reference' => $this->reference,
+            'reference' => $this->reference(),
         ];
     }
 

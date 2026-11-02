@@ -15,12 +15,12 @@ use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
-use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
-use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
-use SineMacula\Laravel\Mfa\Events\MfaVerified;
+use SineMacula\Laravel\Mfa\Events\VerificationFailed;
+use SineMacula\Laravel\Mfa\Events\VerificationPassed;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -28,8 +28,8 @@ use Tests\TestCase;
 /**
  * End-to-end TOTP lifecycle feature tests.
  *
- * Exercises the full enrolment → challenge → verify flow against a real Factor
- * row, the shipped TOTP driver, and the default session-backed proof store.
+ * Exercises the full enrolment and verification flow against a real Factor row,
+ * the shipped TOTP driver, and the default session-backed proof store.
  * Assertions cover the events fired, the factor state transitions, the proofs
  * recorded, and the single use of each time step. Time is frozen in the middle
  * of a step, so no assertion straddles a step boundary.
@@ -62,6 +62,8 @@ final class TotpLifecycleTest extends TestCase
         parent::setUp();
 
         $this->travelTo(CarbonImmutable::createFromTimestamp(self::NOW));
+
+        config()->set('mfa.applications.web', ['types' => ['totp'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
     }
 
     /**
@@ -74,14 +76,14 @@ final class TotpLifecycleTest extends TestCase
     {
         [, $factor, $code] = $this->enrollTotp();
 
-        Mfa::verify('totp', $factor, $code);
+        Mfa::verify(Submission::factor($factor->id, $code));
 
         self::assertSame(60000000, $factor->refresh()->getLastAcceptedStep());
     }
 
     /**
-     * The same code is refused at a second verification, as an invalid code,
-     * and counted as a failed attempt.
+     * The same code is refused at a second verification, as a replay, and
+     * counted as a failed attempt.
      *
      * @return void
      */
@@ -89,16 +91,16 @@ final class TotpLifecycleTest extends TestCase
     {
         [, $factor, $code] = $this->enrollTotp();
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
 
-        Event::fake([MfaVerificationFailed::class]);
+        Event::fake([VerificationFailed::class]);
 
-        self::assertFalse(Mfa::verify('totp', $factor->refresh(), $code));
+        self::assertSame(FailureReason::REPLAYED, Mfa::verify(Submission::factor($factor->id, $code))->reason);
         self::assertSame(1, $factor->refresh()->getConsecutiveFailures());
 
         Event::assertDispatched(
-            MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::INVALID_CODE,
+            VerificationFailed::class,
+            static fn (VerificationFailed $event): bool => $event->reason === FailureReason::REPLAYED,
         );
     }
 
@@ -112,25 +114,9 @@ final class TotpLifecycleTest extends TestCase
     {
         [, $factor] = $this->enrollTotp();
 
-        self::assertTrue(Mfa::verify('totp', $factor, AuthenticatorApp::code($factor)));
-        self::assertFalse(Mfa::verify('totp', $factor->refresh(), AuthenticatorApp::code($factor, -1)));
-        self::assertTrue(Mfa::verify('totp', $factor->refresh(), AuthenticatorApp::code($factor, 1)));
-    }
-
-    /**
-     * Two copies of the factor, read before either verifies, cannot both pass
-     * with one code.
-     *
-     * @return void
-     */
-    public function testTwoCopiesOfTheFactorCannotBothPassWithOneCode(): void
-    {
-        [, $factor, $code] = $this->enrollTotp();
-
-        $copy = Factor::query()->findOrFail($factor->id);
-
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
-        self::assertFalse(Mfa::verify('totp', $copy, $code));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, -1)))->isFailed());
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->isVerified());
     }
 
     /**
@@ -148,20 +134,20 @@ final class TotpLifecycleTest extends TestCase
         self::assertInstanceOf(TotpDriver::class, $driver);
         self::assertTrue($driver->confirm($factor, $code));
         self::assertSame(60000000, $factor->refresh()->getLastAcceptedStep());
-        self::assertFalse(Mfa::verify('totp', $factor, $code));
-        self::assertTrue(Mfa::verify('totp', $factor->refresh(), AuthenticatorApp::code($factor, 1)));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isFailed());
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->isVerified());
     }
 
     /**
-     * Test successful TOTP verification returns true.
+     * Test successful TOTP verification reports it.
      *
      * @return void
      */
-    public function testSuccessfulVerificationReturnsTrue(): void
+    public function testSuccessfulVerificationIsVerified(): void
     {
         [, $factor, $code] = $this->enrollTotp();
 
-        self::assertTrue(Mfa::verify('totp', $factor, $code));
+        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
     }
 
     /**
@@ -172,11 +158,9 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testSuccessfulVerificationRecordsAProof(): void
     {
-        [$user, $factor, $code] = $this->enrollTotp();
+        [, $factor, $code] = $this->enrollTotp();
 
-        Auth::login($user);
-
-        Mfa::verify('totp', $factor, $code);
+        Mfa::verify(Submission::factor($factor->id, $code));
 
         $proofs = Mfa::proofs();
 
@@ -194,7 +178,7 @@ final class TotpLifecycleTest extends TestCase
     {
         [, $factor, $code] = $this->enrollTotp();
 
-        Mfa::verify('totp', $factor, $code);
+        Mfa::verify(Submission::factor($factor->id, $code));
 
         $factor->refresh();
 
@@ -203,25 +187,26 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test successful TOTP verification dispatches MfaVerified event.
+     * Test successful TOTP verification dispatches `VerificationPassed`.
      *
      * @return void
      */
     public function testSuccessfulVerificationDispatchesVerifiedEvent(): void
     {
-        Event::fake([MfaVerified::class]);
+        Event::fake([VerificationPassed::class]);
 
         [$user, $factor, $code] = $this->enrollTotp();
 
-        Mfa::verify('totp', $factor, $code);
+        Mfa::verify(Submission::factor($factor->id, $code));
 
-        Event::assertDispatched(MfaVerified::class, static function (MfaVerified $event) use ($user, $factor): bool {
-            $identity = $event->identity;
+        $key = $user->getKey();
 
-            return $identity instanceof TestUser
-                && $identity->getKey()                   === $user->getKey()
-                && $event->factor->getFactorIdentifier() === $factor->getFactorIdentifier()
-                && $event->driver                        === 'totp';
+        Event::assertDispatched(VerificationPassed::class, static function (VerificationPassed $event) use ($key, $factor): bool {
+            self::assertSame($factor->id, $event->factor?->id);
+            self::assertSame('totp', $event->type);
+            self::assertEquals($key, $event->context['identity_id']);
+
+            return true;
         });
     }
 
@@ -233,21 +218,21 @@ final class TotpLifecycleTest extends TestCase
      */
     public function testFailedVerificationIncrementsAttemptsAndFiresFailureEvent(): void
     {
-        Event::fake([MfaVerificationFailed::class]);
+        Event::fake([VerificationFailed::class]);
 
         [, $factor] = $this->enrollTotp();
 
-        $verified = Mfa::verify('totp', $factor, self::WRONG_CODE);
+        $result = Mfa::verify(Submission::factor($factor->id, self::WRONG_CODE));
 
-        self::assertFalse($verified);
+        self::assertSame(FailureReason::INVALID_CODE, $result->reason);
 
         $factor->refresh();
         self::assertSame(1, $factor->getConsecutiveFailures());
         self::assertNull($factor->getLastUsedAt());
 
         Event::assertDispatched(
-            MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::INVALID_CODE,
+            VerificationFailed::class,
+            static fn (VerificationFailed $event): bool => $event->reason === FailureReason::INVALID_CODE,
         );
     }
 
@@ -282,15 +267,15 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test verifying after lockout returns false.
+     * Test verifying after lockout fails.
      *
      * @return void
      */
-    public function testVerifyingAfterLockoutReturnsFalse(): void
+    public function testVerifyingAfterLockoutFails(): void
     {
         $factor = $this->enrollAndBurnAttempts();
 
-        self::assertFalse(Mfa::verify('totp', $factor, self::WRONG_CODE));
+        self::assertSame(FailureReason::LOCKED, Mfa::verify(Submission::factor($factor->id, self::WRONG_CODE))->reason);
     }
 
     /**
@@ -302,30 +287,30 @@ final class TotpLifecycleTest extends TestCase
     {
         $factor = $this->enrollAndBurnAttempts();
 
-        Event::fake([MfaVerificationFailed::class]);
+        Event::fake([VerificationFailed::class]);
 
-        Mfa::verify('totp', $factor, self::WRONG_CODE);
+        Mfa::verify(Submission::factor($factor->id, self::WRONG_CODE));
 
         Event::assertDispatched(
-            MfaVerificationFailed::class,
-            static fn (MfaVerificationFailed $event): bool => $event->reason === FailureReason::LOCKED,
+            VerificationFailed::class,
+            static fn (VerificationFailed $event): bool => $event->reason === FailureReason::LOCKED,
         );
     }
 
     /**
-     * Test challenge preserves the failures in a row after lockout.
+     * Test asking for a code preserves the failures in a row after lockout.
      *
-     * `challenge()` must NOT clear an active lockout: wiping the count on every
+     * `sendCode()` must NOT clear an active lockout: wiping the count on every
      * "start MFA" call would let any consumer-side resend endpoint act as a
      * free unlock against the configured `mfa.attempts.factor_limit` defence.
      *
      * @return void
      */
-    public function testChallengePreservesAttemptsAfterLockout(): void
+    public function testAskingForACodePreservesAttemptsAfterLockout(): void
     {
         $factor = $this->enrollAndBurnAttempts();
 
-        Mfa::challenge('totp', $factor);
+        Mfa::sendCode($factor->id);
 
         $factor->refresh();
 
@@ -333,18 +318,18 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test challenge preserves the time the lockout ends.
+     * Test asking for a code preserves the time the lockout ends.
      *
      * @return void
      */
-    public function testChallengePreservesTheLockoutEndAfterLockout(): void
+    public function testAskingForACodePreservesTheLockoutEndAfterLockout(): void
     {
         $factor = $this->enrollAndBurnAttempts();
 
         $lockedUntilBefore = $this->lockoutOf($factor)?->until;
         self::assertNotNull($lockedUntilBefore);
 
-        Mfa::challenge('totp', $factor);
+        Mfa::sendCode($factor->id);
 
         $lockedUntilAfter = $this->lockoutOf($factor)?->until;
         self::assertNotNull($lockedUntilAfter);
@@ -355,33 +340,17 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test challenge keeps the factor locked after lockout.
+     * Test asking for a code keeps the factor locked after lockout.
      *
      * @return void
      */
-    public function testChallengeKeepsFactorLockedAfterLockout(): void
+    public function testAskingForACodeKeepsFactorLockedAfterLockout(): void
     {
         $factor = $this->enrollAndBurnAttempts();
 
-        Mfa::challenge('totp', $factor);
+        Mfa::sendCode($factor->id);
 
         self::assertNotNull($this->lockoutOf($factor));
-    }
-
-    /**
-     * Test challenge dispatches MfaChallengeIssued even when locked.
-     *
-     * @return void
-     */
-    public function testChallengeDispatchesEventEvenWhenLocked(): void
-    {
-        $factor = $this->enrollAndBurnAttempts();
-
-        Event::fake([MfaChallengeIssued::class]);
-
-        Mfa::challenge('totp', $factor);
-
-        Event::assertDispatched(MfaChallengeIssued::class);
     }
 
     /**
@@ -397,13 +366,14 @@ final class TotpLifecycleTest extends TestCase
             'mfa_enabled' => true,
         ]);
 
-        $this->actingAs($user);
+        Auth::login($user);
 
         /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::create([
             ...AuthenticatorApp::FACTOR,
             'authenticatable_type' => $user::class,
             'authenticatable_id'   => (string) $user->id,
+            'status'               => 'confirmed',
         ]);
 
         return [$user, $factor, AuthenticatorApp::code($factor)];
@@ -436,9 +406,9 @@ final class TotpLifecycleTest extends TestCase
 
         config()->set('mfa.attempts.factor_limit', 3);
 
-        Mfa::verify('totp', $factor, self::WRONG_CODE);
-        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
-        Mfa::verify('totp', $factor->refresh(), self::WRONG_CODE);
+        Mfa::verify(Submission::factor($factor->id, self::WRONG_CODE));
+        Mfa::verify(Submission::factor($factor->id, self::WRONG_CODE));
+        Mfa::verify(Submission::factor($factor->id, self::WRONG_CODE));
 
         $factor->refresh();
 

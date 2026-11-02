@@ -62,6 +62,20 @@ final class PendingContextTest extends TestCase
     }
 
     /**
+     * A session's further proofs are held as they came, and it holds none
+     * unless given.
+     *
+     * @return void
+     */
+    public function testHoldsItsFurtherProofs(): void
+    {
+        $further = self::proof(['binding' => self::binding(Purpose::SIGN_IN)]);
+
+        self::assertSame([$further], self::context(['proofs' => [$further]])->proofs);
+        self::assertSame([], self::context()->proofs);
+    }
+
+    /**
      * A context that allows nothing is valid, and allows nothing.
      *
      * @return void
@@ -107,6 +121,13 @@ final class PendingContextTest extends TestCase
         yield 'another application' => [['firstFactor' => self::firstFactor(['application' => 'mobile'])], $bound];
         yield 'another session' => [['firstFactor' => self::firstFactor(['sessionId' => 'session-2'])], $bound];
         yield 'an unsupported key' => [['identity' => new NonEloquentIdentity((object) ['id' => 42])], $bound];
+        $further = 'The further proofs of a pending session must be bound to its identity, application and session.';
+
+        yield 'a further first factor' => [['proofs' => [self::firstFactor()]], 'The further proofs of a pending session must not hold a first factor.'];
+        yield 'a further proof of another identity type' => [['proofs' => [self::proof(['binding' => self::binding(Purpose::STEP_UP, ['identityType' => 'user'])])]], $further];
+        yield 'a further proof of another identity key' => [['proofs' => [self::proof(['binding' => self::binding(Purpose::STEP_UP, ['identityKey' => '43'])])]], $further];
+        yield 'a further proof of another application' => [['proofs' => [self::proof(['binding' => self::binding(Purpose::STEP_UP, ['application' => 'mobile'])])]], $further];
+        yield 'a further proof of another session' => [['proofs' => [self::proof(['binding' => self::binding(Purpose::STEP_UP, ['sessionId' => 'session-2'])])]], $further];
         yield 'actions not a list' => [['actions' => [1 => PendingAction::VERIFY]], 'The actions of a pending session must be a list.'];
         yield 'not a pending action' => [['actions' => ['mfa.verify']], 'The actions of a pending session must be ' . PendingAction::class . ' cases; got [string].'];
         yield 'an action named twice' => [

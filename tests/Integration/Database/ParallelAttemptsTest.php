@@ -128,12 +128,17 @@ final class ParallelAttemptsTest extends TestCase
         $other       = $this->user('other@example.com');
         $otherFactor = $this->factor($other);
 
-        $outcome = $this->service()->attempt(new Attempt($first, $this->factor($first), Purpose::SIGN_IN, self::IP), function () use ($other, $otherFactor): bool {
+        $factor = $this->factor($first);
 
-            $this->parallel = $this->asObserver($other, $otherFactor->id, self::IP);
+        $outcome = $this->service()->throttled(self::IP, fn (): AttemptOutcome => $this->service()->attempt(
+            new Attempt($first, $factor, Purpose::SIGN_IN),
+            function () use ($other, $otherFactor): bool {
 
-            return false;
-        });
+                $this->parallel = $this->asObserver($other, $otherFactor->id, self::IP);
+
+                return false;
+            },
+        ));
 
         self::assertTrue($outcome->isFailed());
         self::assertInstanceOf(AttemptOutcome::class, $this->parallel);
@@ -223,12 +228,12 @@ final class ParallelAttemptsTest extends TestCase
         config()->set('mfa.storage.connection', 'observer');
 
         try {
-            return $this->service()->attempt(
-                new Attempt($user, Factor::query()->findOrFail($factorId), Purpose::SIGN_IN, $ip),
+            return $this->service()->throttled($ip, fn (): AttemptOutcome => $this->service()->attempt(
+                new Attempt($user, Factor::query()->findOrFail($factorId), Purpose::SIGN_IN),
                 static function (): bool {
                     throw new MidRotationFailureException('A parallel guess must not reach its driver.');
                 },
-            );
+            ));
         } finally {
             config()->set('mfa.storage.connection', null);
         }

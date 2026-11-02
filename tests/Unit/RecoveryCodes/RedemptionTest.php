@@ -7,12 +7,7 @@ namespace Tests\Unit\RecoveryCodes;
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
-use SineMacula\Laravel\Mfa\Enums\ProofKind;
-use SineMacula\Laravel\Mfa\Enums\Purpose;
-use SineMacula\Laravel\Mfa\Proofs\Proof;
-use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\RecoveryCodes\Redemption;
 
 /**
@@ -28,29 +23,26 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\Redemption;
 final class RedemptionTest extends TestCase
 {
     /**
-     * A passed redemption is counted and carries the remaining count and its
-     * proof; nothing about a failure.
+     * A passed redemption is counted and carries the remaining count; nothing
+     * about a failure.
      *
      * @return void
      */
     public function testAPassedRedemption(): void
     {
-        $proof      = self::proof();
-        $redemption = Redemption::passed(7, $proof);
+        $redemption = Redemption::passed(7);
 
         self::assertTrue($redemption->passed);
         self::assertTrue($redemption->counted);
         self::assertSame(7, $redemption->remaining);
-        self::assertSame($proof, $redemption->proof);
         self::assertNull($redemption->reason);
         self::assertNull($redemption->detail);
         self::assertNull($redemption->lockedUntil);
-        self::assertNull(Redemption::passed(3)->proof);
     }
 
     /**
      * A failed redemption is counted, carries its reason, detail and the
-     * remaining count when the set was read, and no proof or time.
+     * remaining count when the set was read, and no time.
      *
      * @return void
      */
@@ -64,7 +56,6 @@ final class RedemptionTest extends TestCase
         self::assertSame('No code matched.', $redemption->detail);
         self::assertSame(4, $redemption->remaining);
         self::assertNull($redemption->lockedUntil);
-        self::assertNull($redemption->proof);
         self::assertNull(Redemption::failed(FailureReason::NO_FACTOR, 'Gone.')->remaining);
     }
 
@@ -125,24 +116,5 @@ final class RedemptionTest extends TestCase
         $this->expectExceptionMessage('A lockout refuses a redemption before it is counted.');
 
         Redemption::failed(FailureReason::LOCKED, 'Locked.');
-    }
-
-    /**
-     * A recovery code proof.
-     *
-     * @return \SineMacula\Laravel\Mfa\Proofs\Proof
-     */
-    private static function proof(): Proof
-    {
-        return new Proof(
-            ProofKind::RECOVERY_CODE,
-            'recovery_code',
-            null,
-            null,
-            ObservedProperties::none(),
-            CarbonImmutable::parse('2026-11-01 12:00:00'),
-            new ProofBinding('user', '1', 'web', 'session', Purpose::SIGN_IN),
-            0,
-        );
     }
 }

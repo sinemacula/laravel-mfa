@@ -65,8 +65,10 @@ are described here.
 - `enableFactor($factor)` clears `disabled_at` and the factor's failures in a row under the lock, and leaves any lockout
   to end on its own. It reports nothing: rebinding and resetting, which call it, report themselves.
 - `resetIdentityFailures($identity)` clears the identity's run under the lock, and nothing else.
-- `lockout()`, `liftLockout()`, `enableFactor()` and `resetIdentityFailures()` are the public operations; `attempt()` is
-  internal to the verification paths.
+- `lockout()`, `liftLockout()`, `enableFactor()` and `resetIdentityFailures()` are the public operations; `throttled()`
+  and `attempt()` are internal to the verification paths.
+- A verification's `attempt()` is made inside the verification's own factor state transaction, whose admission has
+  already asked `ChallengeCounters::underLock()`, and reads the lock again; `attempt()` no longer touches the address.
 - A challenge another owner sends and consumes (an authentication layer's `mfa` challenge, or the package's own
   `Codes\PackageChallengeGateway`) is counted through `Attempts\ChallengeCounters`, inside the owner's transaction on
   the storage connection: `isUsable()` reads the lockouts under the identity's lock (`lockedOut()`, without an address)
@@ -80,7 +82,8 @@ are described here.
 
 ## Success Path
 
-- The address's slot is taken first, by `Attempts\IpThrottle::take()`, in single statements of
+- The address's slot is taken first, by `AttemptService::throttled()` around the whole verification, outside any
+  transaction the package opens, through `Attempts\IpThrottle::take()`, in single statements of
   `Attempts\AttemptStore::take()`: one `UPDATE` adds the attempt to a live window with room or restarts an ended one, an
   `insertOrIgnore` creates a missing row, and a live window ending elsewhere (after a change of `window_seconds`) is
   counted in as stored. A full window answers its end, and the attempt is refused without opening a transaction.
@@ -88,16 +91,17 @@ are described here.
   state row and its factors in that order (see [Storage and Transactions](storage-and-transactions.md)), and hands over
   the factors as stored under the lock. The service reads the identity's state, finds the attempted factor among the
   locked ones, reads the factor's lockout row, and refuses the attempt while a lockout applies.
-- Otherwise it runs the verification inside the transaction, so a driver's own change (a TOTP step) and the verification
-  service's record of a success (the delivered code used up, `last_used_at`) commit with the count, and counts the
+- Otherwise it runs the verification inside the transaction, so a driver's own change (a TOTP step) commits with the
+  count, and counts the
   outcome on the locked rows: a success resets as above; a failure records the identity's window, in one
   upsert, and its run, then the factor's failures in a row, its lockout or its disablement.
 - The identity's state row is read `FOR UPDATE`, a lock the transaction already holds, so a lockout committed while the
   attempt waited is never answered from an older snapshot. The throttle rows are read with plain reads: a locking read
   of a missing key would take a gap lock on MySQL and let two identities' first failures deadlock.
-- After the commit, the address's slot is given back unless the attempt failed: a success or a refusal is not a failure
-  of the address. The events the attempt raised are then dispatched (see [Event Catalogue](event-catalogue.md)); a
-  listener that throws leaves the count, and the address's charge, standing.
+- After the commit, the address's slot is given back unless the attempt failed and was counted: a success or a refusal
+  is not a failure of the address. The events the attempt raised run with the commit (see [Event
+  Catalogue](event-catalogue.md)); a listener that throws leaves the count standing, and gives the address's slot back,
+  since the exception reaches the throttle.
 
 ## Failure / Edge Cases
 
@@ -119,9 +123,10 @@ are described here.
 - The failure ceiling takes precedence over the factor limit: a failure that reaches both disables the factor and
   applies no lockout. A disabled factor is refused as disabled whatever its lockout.
 - Lifting a lockout that already ended, or was never applied, lifts nothing, reports nothing and answers `false`.
-- `Mfa::verify()` reports a refused attempt as `MfaVerificationFailed` with the `locked` reason and the lockout's detail
-  (the factor, the identity, the address, a factor disabled at the ceiling or an identity at it), a factor not found as
-  `not_found`, and `false`.
+- `Mfa::verify()` answers a refused attempt as a failed result, reporting one `VerificationFailed`, with the `locked`
+  reason and the lockout's detail (the factor, the identity, the address, a factor disabled at the ceiling or an
+  identity at it), and its time, or none at the ceiling, which does not lift by itself; a factor not found as
+  `not_found`.
 - A setting out of its bounds fails closed with an `InvalidArgumentException` naming the key when it is read, inside the
   transaction, which rolls back; the package checks every setting at boot, so this is a misconfiguration that never
   reaches a person's verification.
@@ -129,7 +134,7 @@ are described here.
 
 ## Implementation Anchors
 
-- `src/Attempts/AttemptService.php`: `attempt()`, `lockout()`, `liftLockout()`, `enableFactor()`,
+- `src/Attempts/AttemptService.php`: `throttled()`, `attempt()`, `lockout()`, `liftLockout()`, `enableFactor()`,
   `resetIdentityFailures()`.
 - `src/Attempts/LockedFactors.php`: the attempted factor found among the locked ones.
 - `src/Attempts/AttemptStore.php`: the single-statement window counts (`take()`, `record()` as an upsert, `giveBack()`)
@@ -153,12 +158,10 @@ are described here.
 - `tests/Unit/Attempts/LockedFactorsTest.php`
 - `tests/Unit/Attempts/AttemptSettingsTest.php`
 - `tests/Integration/Database/ParallelAttemptsTest.php` (MySQL and PostgreSQL)
-- `tests/Unit/Verification/VerificationServiceTest.php` `testAnAttemptOnAnotherIdentitysFactorChargesNobody`,
-  `testAFailureIsCountedAgainstTheRequestsAddress`, `testTheAttemptReachingTheLimitLocksTheFactor`,
-  `testARemovedFactorIsNotFoundWithoutReachingTheDriver`, `testTheDriverVerifiesTheFactorAsStored`,
-  `testASuccessIsRecordedWithItsCount`, `testSendingACodeResetsNothing`
-- `tests/Feature/OtpLifecycleTest.php` `testEmailChallengeResetsNothing`
-- `tests/Feature/TotpLifecycleTest.php` `testChallengePreservesTheLockoutEndAfterLockout`
+- `tests/Feature/Verification/CountingVerificationServiceTest.php`,
+  `tests/Feature/Verification/FailureReasonsVerificationServiceTest.php`
+- `tests/Feature/OtpLifecycleTest.php` `testAskingForACodeResetsNothing`
+- `tests/Feature/TotpLifecycleTest.php` `testAskingForACodePreservesTheLockoutEndAfterLockout`
 
 ## Change Triggers
 

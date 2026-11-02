@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Testing\Seams;
 
 use PHPUnit\Framework\Assert;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 
 /**
  * Assertions the seam contracts share.
@@ -35,6 +36,28 @@ final class SeamAssert
             $call();
         } catch (\Throwable $exception) {
             Assert::assertInstanceOf(\RuntimeException::class, $exception, $message);
+
+            return;
+        }
+
+        Assert::fail($message);
+    }
+
+    /**
+     * The call refuses by throwing an `OperationRefusedException`, the one
+     * refusal the verification flow rolls back and answers as a failure, never
+     * by returning or by throwing anything else.
+     *
+     * @param  \Closure(): mixed  $call
+     * @param  string  $message
+     * @return void
+     */
+    public static function refusesWithAReason(\Closure $call, string $message): void
+    {
+        try {
+            $call();
+        } catch (\Throwable $exception) {
+            Assert::assertInstanceOf(OperationRefusedException::class, $exception, $message);
 
             return;
         }

@@ -38,14 +38,14 @@ final class FactorChannelTest extends TestCase
 
         $channel = FactorChannel::of($passkey, ChannelKind::PASSKEY);
 
-        self::assertSame('person@example.test', FactorChannel::of(new InMemoryFactor(type: 'email', destination: 'person@example.test'), ChannelKind::EMAIL)?->reference);
+        self::assertSame('person@example.test', FactorChannel::of(new InMemoryFactor(type: 'email', destination: 'person@example.test'), ChannelKind::EMAIL)?->reference());
 
         self::assertNotNull($channel);
-        self::assertSame('Y3JlZGVudGlhbC1vbmU', $channel->reference);
+        self::assertSame('Y3JlZGVudGlhbC1vbmU', $channel->reference());
         self::assertSame(ChannelKind::PASSKEY, $channel->kind);
 
-        self::assertSame('factor-id', FactorChannel::of(new InMemoryFactor, ChannelKind::AUTHENTICATOR_APP)?->reference);
-        self::assertSame('7', FactorChannel::of(new InMemoryFactor(identifier: 7), ChannelKind::AUTHENTICATOR_APP)?->reference);
+        self::assertSame('factor-id', FactorChannel::of(new InMemoryFactor, ChannelKind::AUTHENTICATOR_APP)?->reference());
+        self::assertSame('7', FactorChannel::of(new InMemoryFactor(identifier: 7), ChannelKind::AUTHENTICATOR_APP)?->reference());
     }
 
     /**

@@ -125,12 +125,15 @@ final class DefaultCombinationPolicy implements CombinationPolicy
             return false;
         }
 
-        if ($first->reference === null || $factor->reference === null) {
+        $firstReference  = $first->reference();
+        $factorReference = $factor->reference();
+
+        if ($firstReference === null || $factorReference === null) {
             return true;
         }
 
-        return self::normalizeReference($first->kind, $first->reference)
-            === self::normalizeReference($factor->kind, $factor->reference);
+        return self::normalizeReference($first->kind, $firstReference)
+            === self::normalizeReference($factor->kind, $factorReference);
     }
 
     /**

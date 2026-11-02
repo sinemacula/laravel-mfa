@@ -36,18 +36,19 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   made, not from when it began waiting.
 - The code is stored first, then delivered by the factor's driver (`Contracts\CodeDeliveryDriver::deliver()`) inside
   the same transaction, so a delivery that throws keeps no code and spends no cooldown or cap. `CodeSent` is dispatched
-  once the transaction commits, with the factor's summary (its masked destination), the purpose and the challenge's id.
-- A check reads the challenge on the write connection: the one named, or the binding's latest. No challenge is
-  `missing`; a used one is `replayed` for its last code and `missing` for any other; an expired code (`expires_at <=
+  by `Verification\ChallengeRequests` once the transaction commits, whichever gateway sent the code, with the factor's
+  summary (its masked destination), the purpose and the challenge's id.
+- A check reads the challenge it names on the write connection. One unknown, or not the binding's, is
+  `missing`; a used one is `replayed` for its last code and `spent` for any other; an expired code (`expires_at <=
   now`) is `expired`; a challenge with `attempts >= max_attempts` is `exhausted`; none of these counts an attempt.
   Otherwise the attempt is counted before anything is compared, by `UPDATE ... SET attempts = attempts + 1 WHERE id AND
   sends AND consumed_at IS NULL AND expires_at > now AND attempts < max`. A check whose increment matched no row never
-  compares: it answers from a fresh read (`missing` when another check used that issue, `exhausted` or `expired` when it
+  compares: it answers from a fresh read (`spent` when another check used that issue, `exhausted` or `expired` when it
   now is, otherwise `invalid`). A matching code is accepted only when `UPDATE ... SET consumed_at = now WHERE id AND
   sends AND consumed_at IS NULL` changed the row, so of two correct submissions exactly one is accepted.
-- `invalid` answers the failure reason `invalid_code`, `replayed` answers `replayed`, and `missing`, `expired` and
-  `exhausted` answer `expired`: there is no live code to check against. The detail that tells them apart stays in the
-  failure event.
+- `invalid` answers the failure reason `invalid_code`, `replayed` answers `replayed`, `spent`, `expired` and `exhausted`
+  answer `expired`, since a known challenge has no live code to check against, and `missing` answers `not_found`. The
+  detail that tells them apart stays internal. Every one of them is counted against the factor and the identity.
 - Neither a send nor a check resets a factor's failure count or lifts its lockout.
 - Every time is a whole second, and one `now` is used per operation.
 - A code is bound to the request's Laravel session id. Sending and checking must run in the same started session: a
@@ -62,27 +63,27 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 - `MfaCodeMessage`, and every subclass of it, implements `ShouldBeEncrypted`, so whenever it is queued, by a sender that
   queues it or because the class is queueable, the queue stores its payload encrypted with the application key, never
   the code in clear.
-- A driver that delivers codes is not asked to send or check them with the factor alone: its `issueChallenge()`,
-  `verify()` and `confirm()` throw a `LogicException`, since a code bound to nothing could be accepted anywhere.
+- A driver that delivers codes is not asked to check them with the factor alone: its `verify()` and `confirm()` throw a
+  `LogicException`, since a code bound to nothing could be accepted anywhere.
 
 ## Success Path
 
-- `Mfa::challenge('email', $factor)` (or with `Purpose::STEP_UP`): identity and ownership checks; the binding of this
-  request (the identity, the application a bound `ApplicationResolver` names or the default guard's name, the Laravel
-  session's id, the purpose); `CodeService::send()`: the factor state transaction, the identity's and the factor's
-  sends counted, a challenge started or resent, the code delivered through the bound `EmailSender`, `CodeSent` queued
-  for the commit; `MfaChallengeIssued`; a `Codes\SendResult` with the challenge's id and expiry.
-- `Mfa::verify('email', $factor, $code)` with the same purpose, in the same session: `CodeService::check()`: the
-  read, the counting `UPDATE`, the comparison and the using `UPDATE`; then the factor's verification is recorded as
-  for any type. The check runs inside the attempt the attempt service makes (see
-  [Attempts and Lockout](attempts-and-lockout.md)), so a lockout refuses it before the challenge is read, spending none
-  of its attempts, and its outcome is counted against the factor, the identity and the address in the same transaction
-  as the code's own attempt and use.
+- `Mfa::sendCode($factorId)`: the caller and its binding are captured (the identity, the application, the sign-in, the
+  purpose), the factor state transaction opens and they are checked again, the factor is admitted, and the bound
+  `ChallengeGateway` sends: by default `Codes\PackageChallengeGateway`, through `CodeService::send()`: the identity's
+  and the factor's sends counted, a challenge started or resent, the code delivered through the bound `EmailSender`.
+  `CodeSent` is queued for the commit, and the answer is a `Codes\SendResult` with the challenge's id and expiry.
+- `Mfa::verify(Submission::challenge($factorId, $challengeId, $code))` under the same purpose, in the same sign-in: the
+  gateway asks `ChallengeCounters::isUsable()`, `CodeService::check()` makes the read, the counting `UPDATE`, the
+  comparison and the using `UPDATE`, and `ChallengeCounters::report()` counts the outcome against the factor and the
+  identity in the same transaction, so a lockout refuses it before the challenge is read, spending none of its attempts,
+  and the code's use and the count commit as one. A refusal by the completion seam rolls both back (see [Verification
+  Lifecycle and Events](verification-lifecycle-and-events.md)).
 
 ## Failure / Edge Cases
 
 - A resend within the cooldown, a send for an exhausted challenge, or one past a cap: `SendResult::refused()` with
-  `sending_capped` and the wait; nothing is delivered and `MfaChallengeIssued` is not dispatched.
+  `sending_capped` and the wait; nothing is delivered and `CodeSent` is not dispatched.
 - A factor with no destination: `MissingDestinationException`, before the transport; the code is not kept.
 - No sender bound: `SenderNotConfiguredException` from the default sender; the code is not kept. The configuration check
   normally refuses this before any send.

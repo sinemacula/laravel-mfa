@@ -46,25 +46,29 @@ racing the replacement sees one set or the other, never both and never neither. 
 | `identity_inactive` | The identity is inactive                                            |
 | `type_not_enabled`  | The application does not accept recovery codes                      |
 | `no_factor`         | The identity has no confirmed factor (a pending one does not count) |
+| `not_fresh`         | The session is not fresh enough, or below the level                 |
 
 `RecoveryCodesGenerated` is dispatched once the new set is stored, with its size and generation, never a code. Without
-a signed-in identity that can hold factors, `generateRecoveryCodes()` returns an empty list.
+a signed-in identity that can hold factors, and on a pending session, `generateRecoveryCodes()` returns an empty list.
 
-Generating a set will need a fresh step-up and a session at the assurance level the application sets for it
-(`recovery_codes.level`); neither is applied yet, so put your own step-up in front of the route until it is.
+Generating a set needs a session fresh enough for `mfa.generate_recovery_codes` that also reaches the assurance level
+the application sets for it (`recovery_codes.level`, `aal2` by default). Both are checked before the codes are drawn and
+again under the identity's lock, and a shortfall in either is refused as `not_fresh`, since the remedy is the same
+stronger step-up. A refusal leaves the old set intact.
 
 ## Redeeming a code
 
-`Mfa::redeemRecoveryCode($code, $purpose)` redeems a code for the signed-in identity, for a sign-in (the default), a
-step-up or a reauthentication, and returns whether it passed. A code that passes is used up, and its proof is recorded
-on the identity's current sign-in like a factor's (see [Proofs](proofs.md)): kind `recovery_code`, method
-`recovery_code`, no channel.
+`Mfa::verify(Submission::recoveryCode($code), $purpose)` redeems a code wherever a factor's code is taken: to complete a
+pending sign-in or to step up (see [Verification](verification.md)). A code that passes is used up, and its proof is
+handed over like a factor's (see [Proofs](proofs.md)): kind `recovery_code`, method `recovery_code`, no channel.
 
 ```php
-use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 
-if (!Mfa::redeemRecoveryCode((string) $request->input('code'), Purpose::STEP_UP)) {
+$result = Mfa::verify(Submission::recoveryCode((string) $request->input('code')));
+
+if ($result->isFailed()) {
     return back()->withErrors(['code' => 'That code did not work.']);
 }
 ```
@@ -83,25 +87,21 @@ These are refused before any attempt is made, so nothing is counted and no code 
 
 | Reason              | When                                                              |
 |---------------------|-------------------------------------------------------------------|
-| `machine_identity`  | The identity is not a person                                      |
 | `identity_inactive` | The identity is inactive                                          |
 | `not_accepted`      | The purpose is an enrolment, which a recovery code cannot confirm |
 | `type_not_enabled`  | The application does not accept recovery codes                    |
 | `no_factor`         | The identity has no confirmed factor                              |
-| `not_accepted`      | The identity has no sign-in to record the proof on                |
+| `not_accepted`      | The session's first factor is not known                           |
+| `not_found`         | The request serves nobody, or the identity has no sign-in         |
 
-A code that matches nothing fails with `invalid_code`, and an attempt a lockout refuses with `locked`. Every failure
-dispatches one `VerificationFailed` with its reason and the type `recovery_code`; a success dispatches
-`VerificationPassed`, then `RecoveryCodeUsed` with how many codes remain unused, then, when that is at or below
-`recovery_codes.low_count`, `RecoveryCodesLow`, so the application can prompt for a new set. Each is dispatched once
-the change has committed (see [Events](events.md)). The code is used up and the proof handed to the proof store once
-the change commits; a store that refuses the proof throws `ProofRefusedException`, with the code already used. A
-sign-in that ends while the code is being checked also throws `ProofRefusedException`, but then the code is left unused
-and nothing is counted: a redemption never passes without its proof.
-
-The unified verification, which will take a recovery code wherever it takes a factor's code and answer with a
-structured result, is not shipped yet; until it is, call `redeemRecoveryCode()` from your own route where you would
-verify a factor.
+A code that matches nothing fails with `invalid_code`, and an attempt a lockout refuses with `locked`. An identity at
+the failure ceiling is `locked` with no time, while a usable factor can still recover it. Every failure but the last row
+above dispatches one `VerificationFailed` with its reason; a success dispatches `VerificationPassed`, then
+`RecoveryCodeUsed` with how many codes remain unused, then, when that is at or below `recovery_codes.low_count`,
+`RecoveryCodesLow`, so the application can prompt for a new set. Each is dispatched once the change has committed (see
+[Events](events.md)). A refusal by the completion seam rolls the code's use back; with the default seams, the proof is
+handed to the proof store once the change commits, and a store that refuses it then throws `ProofRefusedException`, with
+the code already used.
 
 ## Remaining codes
 

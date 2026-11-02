@@ -7,6 +7,8 @@ namespace SineMacula\Laravel\Mfa\Drivers;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
  * Passkey factor driver.
@@ -74,27 +76,16 @@ final class PasskeyDriver implements FactorDriver
     }
 
     /**
-     * Nothing to issue: an assertion is requested through the gateway.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
-     */
-    #[\Override]
-    public function issueChallenge(Factor $factor): void
-    {
-        // An assertion request goes through the passkey gateway.
-    }
-
-    /**
      * Never: a code does not prove a passkey; an assertion does.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @return bool
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      */
     #[\Override]
-    public function verify(Factor $factor, #[\SensitiveParameter] string $code): bool
+    public function verify(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck
     {
-        return false;
+        return CodeCheck::INVALID;
     }
 }

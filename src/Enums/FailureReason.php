@@ -31,7 +31,8 @@ enum FailureReason: string
     // The code was for a TOTP time step already accepted, or was already used
     case REPLAYED = 'replayed';
 
-    // The factor or the identity is locked out until a set time
+    // The factor, the identity or the IP address is locked out: until a set
+    // time, or with none when a factor or an identity is at the failure ceiling
     case LOCKED = 'locked';
 
     // The factor's enrolment was never confirmed, so it cannot be used

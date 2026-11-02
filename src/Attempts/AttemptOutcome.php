@@ -6,9 +6,9 @@ namespace SineMacula\Laravel\Mfa\Attempts;
 
 /**
  * How an attempt ended: passed, failed (and counted), refused before it reached
- * the driver by the lockout it names (and counted nowhere), or not found, when
- * the factor it names is not among the identity's factors as stored (and
- * counted nowhere either).
+ * the driver by the lockout it names (and counted nowhere), not found, when the
+ * factor it names is not among the identity's factors as stored (and counted
+ * nowhere either), or refused for any other reason, counted nowhere.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,6 +21,7 @@ final readonly class AttemptOutcome
      * @param  bool  $passed
      * @param  ?\SineMacula\Laravel\Mfa\Attempts\Lockout  $lockout
      * @param  bool  $found
+     * @param  bool  $counted
      */
     private function __construct(
 
@@ -32,6 +33,9 @@ final readonly class AttemptOutcome
 
         /** Whether the factor the attempt names was found among the identity's stored factors. */
         public bool $found = true,
+
+        /** Whether an attempt that did not pass was counted as a failure. */
+        public bool $counted = true,
     ) {}
 
     /**
@@ -78,13 +82,24 @@ final readonly class AttemptOutcome
     }
 
     /**
+     * An attempt refused for a reason other than a lockout or a missing factor,
+     * counted nowhere.
+     *
+     * @return self
+     */
+    public static function uncounted(): self
+    {
+        return new self(false, null, true, false);
+    }
+
+    /**
      * Determine whether the driver refused the attempt, which was counted.
      *
      * @return bool
      */
     public function isFailed(): bool
     {
-        return !$this->passed && $this->lockout === null && $this->found;
+        return !$this->passed && $this->lockout === null && $this->found && $this->counted;
     }
 
     /**

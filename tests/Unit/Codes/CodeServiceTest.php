@@ -7,7 +7,6 @@ namespace Tests\Unit\Codes;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
@@ -16,7 +15,6 @@ use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
-use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Models\Code;
@@ -66,12 +64,10 @@ final class CodeServiceTest extends TestCase
      */
     public function testACodeIsDeliveredReportedAndAcceptedOnce(): void
     {
-        Event::fake([CodeSent::class]);
-
         [$user, $factor] = $this->factor();
 
         $driver = new RecordingCodeDriver;
-        $result = $this->service()->send($user, $factor, self::binding($user), $driver);
+        $result = $this->service()->send($factor, self::binding($user), $driver);
 
         self::assertTrue($result->wasSent());
         self::assertNotNull($result->challengeId);
@@ -79,64 +75,52 @@ final class CodeServiceTest extends TestCase
         self::assertSame(self::CODE, $driver->lastCode());
         self::assertSame($result->expiresAt?->getTimestamp(), $driver->delivered[0]['expires_at']->getTimestamp());
 
-        Event::assertDispatched(CodeSent::class, static fn (CodeSent $event): bool => $event->challengeId === $result->challengeId
-            && $event->purpose                                                                            === Purpose::SIGN_IN
-            && $event->factor->type                                                                       === 'email'
-            && $event->factor->maskedDestination !== self::ADDRESS
-            && $event->context['application'] === 'web');
-
         self::assertSame(CodeCheck::ACCEPTED, $this->service()->check($factor, self::binding($user), self::CODE, $result->challengeId));
-        self::assertSame(CodeCheck::REPLAYED, $this->service()->check($factor, self::binding($user), self::CODE));
+        self::assertSame(CodeCheck::REPLAYED, $this->service()->check($factor, self::binding($user), self::CODE, $result->challengeId));
     }
 
     /**
-     * A code sent inside a transaction that rolls back is reported to no one.
+     * A code sent inside a transaction that rolls back is not kept.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testACodeRolledBackIsNeverReported(): void
+    public function testACodeRolledBackIsNotKept(): void
     {
-        Event::fake([CodeSent::class]);
-
         [$user, $factor] = $this->factor();
 
         DB::beginTransaction();
 
-        $this->service()->send($user, $factor, self::binding($user), new RecordingCodeDriver);
+        $this->service()->send($factor, self::binding($user), new RecordingCodeDriver);
 
         DB::rollBack();
 
-        Event::assertNotDispatched(CodeSent::class);
         self::assertSame(0, Code::query()->count());
     }
 
     /**
-     * A send refused for its cooldown delivers and reports nothing, and says
-     * how long to wait.
+     * A send refused for its cooldown delivers nothing, and says how long to
+     * wait.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testARefusedSendDeliversAndReportsNothing(): void
+    public function testARefusedSendDeliversNothing(): void
     {
         [$user, $factor] = $this->factor();
 
         $driver = new RecordingCodeDriver;
 
-        $this->service()->send($user, $factor, self::binding($user), $driver);
+        $this->service()->send($factor, self::binding($user), $driver);
 
-        Event::fake([CodeSent::class]);
-
-        $result = $this->service()->send($user, $factor, self::binding($user), $driver);
+        $result = $this->service()->send($factor, self::binding($user), $driver);
 
         self::assertFalse($result->wasSent());
         self::assertSame(FailureReason::SENDING_CAPPED, $result->reason);
         self::assertSame(60, $result->retryAfter);
         self::assertCount(1, $driver->delivered);
-        Event::assertNotDispatched(CodeSent::class);
     }
 
     /**
@@ -151,15 +135,13 @@ final class CodeServiceTest extends TestCase
      */
     public function testAFailedDeliveryKeepsNothing(): void
     {
-        Event::fake([CodeSent::class]);
-
         [$user, $factor] = $this->factor();
 
         $driver       = new RecordingCodeDriver;
         $driver->fail = true;
 
         try {
-            $this->service()->send($user, $factor, self::binding($user), $driver);
+            $this->service()->send($factor, self::binding($user), $driver);
             self::fail('Expected the delivery to fail.');
         } catch (CodeDeliveryFailedException $exception) {
             self::assertSame('The code could not be delivered to the email factor at a**@example.test.', $exception->getMessage());
@@ -168,11 +150,10 @@ final class CodeServiceTest extends TestCase
         }
 
         self::assertSame(0, Code::query()->count());
-        Event::assertNotDispatched(CodeSent::class);
 
         $driver->fail = false;
 
-        self::assertTrue($this->service()->send($user, $factor, self::binding($user), $driver)->wasSent());
+        self::assertTrue($this->service()->send($factor, self::binding($user), $driver)->wasSent());
     }
 
     /**
@@ -205,7 +186,7 @@ final class CodeServiceTest extends TestCase
         [$user, $factor] = $this->factor('sms', self::PHONE);
 
         $driver    = new SmsDriver(new LeakingSmsSender);
-        $exception = RecordedTrace::thrownBy(fn () => $this->service()->send($user, $factor, self::binding($user), $driver), $arguments);
+        $exception = RecordedTrace::thrownBy(fn () => $this->service()->send($factor, self::binding($user), $driver), $arguments);
 
         self::assertInstanceOf(CodeDeliveryFailedException::class, $exception);
         self::assertSame('The code could not be delivered to the sms factor at *********0123.', $exception->getMessage());
@@ -257,13 +238,13 @@ final class CodeServiceTest extends TestCase
             $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00:50'));
         });
 
-        $result = $this->service()->send($user, $factor, self::binding($user), new RecordingCodeDriver);
+        $result = $this->service()->send($factor, self::binding($user), new RecordingCodeDriver);
 
         self::assertSame(CarbonImmutable::parse('2026-11-01 12:10:50')->getTimestamp(), $result->expiresAt?->getTimestamp());
 
         $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00:59'));
 
-        self::assertSame(51, $this->service()->send($user, $factor, self::binding($user), new RecordingCodeDriver)->retryAfter);
+        self::assertSame(51, $this->service()->send($factor, self::binding($user), new RecordingCodeDriver)->retryAfter);
     }
 
     /**
@@ -281,7 +262,7 @@ final class CodeServiceTest extends TestCase
         Factor::query()->whereKey($factor->getKey())->delete();
 
         $driver = new RecordingCodeDriver;
-        $result = $this->service()->send($user, $factor, self::binding($user), $driver);
+        $result = $this->service()->send($factor, self::binding($user), $driver);
 
         self::assertSame(FailureReason::NOT_FOUND, $result->reason);
         self::assertNull($result->retryAfter);
@@ -309,7 +290,7 @@ final class CodeServiceTest extends TestCase
         foreach ($factors as $factor) {
 
             try {
-                $this->service()->check($factor, self::binding($user), self::CODE);
+                $this->service()->check($factor, self::binding($user), self::CODE, 'a-challenge');
                 self::fail('Expected the factor to be refused.');
             } catch (UnsupportedFactorException $exception) {
                 self::assertSame('Delivered codes need a stored EloquentFactor model; got ' . $factor::class . '.', $exception->getMessage());
@@ -351,7 +332,7 @@ final class CodeServiceTest extends TestCase
         $factor->setAttribute('authenticatable_id', $key($user));
 
         try {
-            self::assertSame(CodeCheck::MISSING, $this->service()->check($factor, self::binding($user), self::CODE));
+            self::assertSame(CodeCheck::MISSING, $this->service()->check($factor, self::binding($user), self::CODE, 'a-challenge'));
             self::assertTrue($owned, 'Expected the owner key to be refused.');
         } catch (\InvalidArgumentException $exception) {
             self::assertFalse($owned, 'Expected the owner key to be accepted.');
@@ -390,7 +371,7 @@ final class CodeServiceTest extends TestCase
         $factor->setAttribute('id', $key);
 
         try {
-            self::assertSame(CodeCheck::MISSING, $this->service()->check($factor, self::binding($user), self::CODE));
+            self::assertSame(CodeCheck::MISSING, $this->service()->check($factor, self::binding($user), self::CODE, 'a-challenge'));
             self::assertTrue($bindable, 'Expected the factor key to be refused.');
         } catch (UnsupportedFactorException $exception) {
             self::assertFalse($bindable, 'Expected the factor key to be accepted.');
@@ -421,7 +402,7 @@ final class CodeServiceTest extends TestCase
         foreach ($bindings as $binding) {
 
             try {
-                $this->service()->send($user, $factor, $binding, $driver);
+                $this->service()->send($factor, $binding, $driver);
                 self::fail('Expected the binding to be refused.');
             } catch (\InvalidArgumentException $exception) {
                 self::assertSame('A delivered code\'s binding must name the identity that owns the factor.', $exception->getMessage());

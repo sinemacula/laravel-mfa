@@ -25,9 +25,9 @@ The current note set is:
 - `combination-policy.md`: how the default combination policy decides which factors may follow a first factor, how it
   classifies a session's proofs (accepted, multifactor, level, phishing resistance, restriction, `amr`), and how it
   judges each requirement part and its maximum age.
-- `verification-lifecycle-and-events.md`: the five lifecycle events (`MfaChallengeIssued`, `MfaVerified`,
-  `MfaVerificationFailed`, `MfaFactorEnrolled`, `MfaFactorDisabled`), who dispatches them, and the exact ordering
-  against driver calls and proof writes.
+- `verification-lifecycle-and-events.md`: how a verification runs: the one binding captured and checked again under the
+  lock, the routes and their counts, the seam as the last write, re-evaluating the requirement, and the order of the
+  events against the commit.
 - `application-configuration.md`: the shape of the configuration (one block per application, one per capability),
   the settings classes that read and check each block on every call, the bounds they enforce, and the check of the
   whole configuration and the bindings it needs at boot, at manager resolution and from `mfa:check`.

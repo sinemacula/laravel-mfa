@@ -38,21 +38,23 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
   `Proofs\GuardHooks::signedIn()` with the proof of the first factor it signed the identity in with, whose binding names
   the application, and `GuardHooks::signedOut()` with the application. A guard that does neither leaves no sign-in,
   so nothing is recorded for it and nothing counts, whatever sign-in the identity holds on another application.
-- A successful verification on a signed-in session records its proof through `Proofs\ProofService::record()`: an
-  additional factor proof on the driver's channel, named by the factor's destination or the factor itself, bound to
-  the application of the request (a bound `ApplicationResolver`'s answer, or the default guard's name), the current
-  sign-in there and the purpose the verification was made for. A driver whose channel cannot carry a factor proves
-  nothing. A redeemed recovery code records a recovery code proof the same way, on no channel; a redemption for an
-  enrolment, or with no sign-in to record the proof on, is refused before the attempt, so the code is not used up and
-  nothing is counted (see [Recovery Codes](recovery-codes.md)).
-- The proof is stamped with the verification generation read, under the attempt's lock, just before the code is
-  checked (`ProofService::generationFor()`), so a generation advanced while the code is checked leaves the proof
-  behind. A factor's proof is recorded once the attempt has committed, and a recovery code's under the lock, so a
-  lockout refusing the attempt records nothing.
-  Bound as it was when the code was checked, it is kept only once the storage connection's open transaction, if any,
-  commits (`Database\AfterStorageCommit`, the rule events follow too): a verification made inside a transaction the
-  application rolls back leaves no proof behind, with its code and count undone. Its success event waits with it and
-  is dispatched only after the proof has been kept.
+- A successful verification's proof reaches the store through the seams its result is handed to: by default
+  `Proofs\ProofStoreCompletion`, the `PendingCompletion` and `StepUp` of a package with no authentication layer. It
+  refuses a failed result, and a binding whose owner, application or session is not the store's current sign-in, and for
+  a pending session the pending context's as well, as `not_accepted`, so everything the verification did rolls back. It
+  never begins a sign-in.
+- The proof is an additional factor proof on the driver's channel, named by the factor's destination, credential or the
+  factor itself, or a recovery code proof on no channel, bound to the one captured binding (see [Verification Lifecycle
+  and Events](verification-lifecycle-and-events.md)), and stamped with the verification generation read under the
+  identity's lock, after the code is checked.
+- It is kept only once the storage connection's open transaction commits (`Database\AfterStorageCommit`, the rule events
+  follow too), because a write to the Laravel session cannot roll back. A store that refuses it then throws
+  `ProofRefusedException` from `verify()`, with the code spent. The success event waits with it and is dispatched after
+  the proof has been kept.
+- A sign-in id is fresh and never reused: the `Login` listener's is a ULID, and a caller of `GuardHooks` must see to its
+  own. An application binding its own `PendingSessionResolver` alone begins the store's sign-in under the pending id
+  through `GuardHooks::signedIn()`. Beginning a sign-in grants nothing by itself: the middleware or the pending context
+  still decides. A guard that fires no event, calls no hook and stays in an existing sign-in stays in that sign-in.
 - Disabling a factor forgets every proof made with it on the current session, on every application. It does not yet
   advance the verification generation: no shipped flow does, so the identity's other sessions keep counting a removed
   factor's proofs until the removal flow revokes them through the session revocation seam.
@@ -66,9 +68,9 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 ## Success Path
 
 1. A person signs in through a session guard. `Login` fires and `BeginSignInOnLogin` begins a sign-in for them.
-2. They verify a factor. `VerificationService::verify()` makes the attempt, which reads the identity's generation,
-   checks the code and counts the outcome, then `ProofService::record()` binds the proof to the current sign-in and the
-   purpose, stamps it with that generation and the store keeps it, before `MfaVerified` is dispatched.
+2. They verify a factor. `VerificationService::verify()` checks the code and counts the outcome under the identity's
+   lock, makes the proof with the captured binding and the generation read there, and hands the result to `StepUp`; the
+   store keeps the proof as the transaction commits, before `VerificationPassed` is dispatched.
 3. A later request passes through `mfa` (or `mfa:5` for a step-up route). The middleware reads `Mfa::proofs()`, takes
    the newest verification and compares its age with the window.
 4. They sign out. `Logout` (or `CurrentDeviceLogout`) fires and `ForgetSignInOnLogout` forgets the sign-in and its
@@ -111,10 +113,9 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 - `src/Contracts/ProofStore.php`; `src/Exceptions/ProofRefusedException.php`.
 - `src/Proofs/SessionProofStore.php`, `src/Proofs/ProofOwner.php`, `src/Proofs/VerificationGeneration.php`.
 - `src/Proofs/GuardHooks.php`, `src/Proofs/BeginSignInOnLogin.php`, `src/Proofs/ForgetSignInOnLogout.php`.
-- `src/Proofs/ProofService.php` (`proofs()`, `beginSignIn()`, `endSignIn()`, `generationFor()`, `record()`,
-  `forgetFactor()`, `application()`, `applicationFor()`), `src/Proofs/ProofBindings.php`.
-- `src/Verification/VerificationService.php` (`verify()`, `recordProof()`); `src/Lifecycle/LifecycleService.php`
-  (`disable()`).
+- `src/Proofs/ProofService.php` (`proofs()`, `beginSignIn()`, `endSignIn()`, `forgetFactor()`, `application()`,
+  `applicationFor()`), `src/Proofs/ProofStoreCompletion.php`, `src/Proofs/ProofBindings.php`.
+- `src/Verification/VerificationService.php` (`verify()`); `src/Lifecycle/LifecycleService.php` (`disable()`).
 - `src/Http/Middleware/RequireMfa.php` (`lastVerifiedAt()`, `hasExpired()`, `parseMaxAgeMinutes()`),
   `src/Http/Middleware/SkipMfa.php`; `config/mfa.php` (`proofs.max_age_minutes`), `src/Proofs/ProofSettings.php`.
 
@@ -125,9 +126,9 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
 - `tests/Unit/Proofs/VerificationGenerationTest.php`, `tests/Unit/Proofs/ProofOwnerTest.php`.
 - `tests/Unit/Proofs/GuardHooksTest.php`, `tests/Unit/Proofs/BeginSignInOnLoginTest.php`,
   `tests/Unit/Proofs/ForgetSignInOnLogoutTest.php`, `tests/Unit/Proofs/ProofBindingsTest.php`.
-- `tests/Unit/Proofs/ProofServiceTest.php`; `tests/Unit/Verification/VerificationServiceTest.php` (the proof each
-  verification records, and the generation read before the driver); `tests/Unit/Lifecycle/LifecycleServiceTest.php`
-  (a disabled factor's proofs).
+- `tests/Unit/Proofs/ProofServiceTest.php`; `tests/Unit/Proofs/ProofStoreCompletionTest.php` and
+  `tests/Feature/Verification/CompletionVerificationServiceTest.php` (the proof each verification hands over);
+  `tests/Unit/Lifecycle/LifecycleServiceTest.php` (a disabled factor's proofs).
 - `tests/Feature/Proofs/SignInProofsTest.php`: a reused session, sign-out and current-device sign-out, two guards on
   one session, a guard calling neither hook, a custom guard's hooks, a generation bump across sessions.
 - `tests/Unit/Http/Middleware/RequireMfaTest.php`, `tests/Feature/RequireMfaMiddlewareTest.php`,

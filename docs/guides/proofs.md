@@ -34,11 +34,12 @@ A recorded proof stops counting, and is left out, when:
 - the factor it was made with has been disabled on this session;
 - it cannot be read back.
 
-A successful `Mfa::verify()` records an additional factor proof of the factor on the driver's channel, bound to the
-purpose the verification was made for (`sign_in` unless you pass another). A driver whose channel cannot carry a factor
-(`ChannelKind::carriesFactor()`) proves nothing. A successful `Mfa::redeemRecoveryCode()` records a recovery code proof,
-method `recovery_code`, on no channel; a recovery code cannot confirm an enrolment, so one redeemed for it is refused
-with `not_accepted` before anything is checked (see [Recovery codes](recovery-codes.md)).
+A successful `Mfa::verify()` makes an additional factor proof of the factor on the driver's channel, bound to the
+purpose the verification was made for (`step_up` on an active session unless you ask for `sign_in`, and always `sign_in`
+on a pending one). A factor whose driver's channel cannot carry one (`ChannelKind::carriesFactor()`) is refused as
+`not_accepted` before its code is checked. A recovery code makes a recovery code proof, method `recovery_code`, on no
+channel. The proof reaches the store through the seam the result is handed to: by default `Proofs\ProofStoreCompletion`,
+once the verification commits (see [Verification](verification.md#completion)).
 
 ## Sign-ins
 
@@ -52,9 +53,9 @@ Each application keeps its own sign-in. With two session guards over the same us
 signing in to or out of one leaves the other's sign-in and proofs alone. A guard's application is the one a bound
 `Contracts\ApplicationResolver` names for the request, or the guard's name.
 
-A guard that sets the user without firing `Login` leaves no sign-in, so a verification still succeeds but records
-nothing, and the `mfa` middleware keeps requiring one. That includes Laravel's `actingAs()` in tests: sign the user in
-with `Auth::login()` when a test needs proofs recorded.
+A guard that sets the user without firing `Login` leaves no sign-in, so a verification is refused as `not_found` and
+nothing is sent or recorded, and the `mfa` middleware keeps requiring one. That includes Laravel's `actingAs()` in
+tests: sign the user in with `Auth::login()` when a test needs proofs recorded.
 
 ## Custom guards
 

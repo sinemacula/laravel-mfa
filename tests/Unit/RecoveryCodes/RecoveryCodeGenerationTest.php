@@ -175,7 +175,7 @@ final class RecoveryCodeGenerationTest extends TestCase
         $holder   = $this->signInHolder();
         $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
 
-        self::assertTrue($this->recoveryCodes()->redeem($holder, $previous[0], Purpose::STEP_UP)->passed);
+        self::assertTrue($this->recoveryCodes()->redeem($holder, $previous[0], self::redemptionBinding($holder, Purpose::STEP_UP))->passed);
 
         $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00:00'));
 
@@ -190,8 +190,8 @@ final class RecoveryCodeGenerationTest extends TestCase
         self::assertCount(10, $stored->filter(static fn (RecoveryCode $row): bool => $row->getGeneration() === 2 && $row->isUsable()));
         self::assertSame(2, $this->stateOf($holder)->recovery_codes_generation);
 
-        self::assertFalse($this->recoveryCodes()->redeem($holder, $previous[1], Purpose::STEP_UP)->passed);
-        self::assertTrue($this->recoveryCodes()->redeem($holder, $current[1], Purpose::STEP_UP)->passed);
+        self::assertFalse($this->recoveryCodes()->redeem($holder, $previous[1], self::redemptionBinding($holder, Purpose::STEP_UP))->passed);
+        self::assertTrue($this->recoveryCodes()->redeem($holder, $current[1], self::redemptionBinding($holder, Purpose::STEP_UP))->passed);
     }
 
     /**
@@ -279,7 +279,7 @@ final class RecoveryCodeGenerationTest extends TestCase
 
         self::assertCount(10, $this->storedCodes($holder));
         self::assertSame(1, $this->stateOf($holder)->recovery_codes_generation);
-        self::assertTrue($this->recoveryCodes()->redeem($holder, $previous[3], Purpose::SIGN_IN)->passed);
+        self::assertTrue($this->recoveryCodes()->redeem($holder, $previous[3], self::redemptionBinding($holder, Purpose::SIGN_IN))->passed);
     }
 
     /**
@@ -482,7 +482,7 @@ final class RecoveryCodeGenerationTest extends TestCase
         IdentityState::flushEventListeners();
         RecoveryCode::flushEventListeners();
 
-        self::assertTrue($this->recoveryCodes()->redeem($holder, $previous[3], Purpose::SIGN_IN)->passed);
+        self::assertTrue($this->recoveryCodes()->redeem($holder, $previous[3], self::redemptionBinding($holder, Purpose::SIGN_IN))->passed);
     }
 
     /**

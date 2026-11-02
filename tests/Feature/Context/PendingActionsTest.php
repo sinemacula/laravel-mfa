@@ -11,6 +11,7 @@ use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
@@ -20,6 +21,7 @@ use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
@@ -109,9 +111,9 @@ final class PendingActionsTest extends TestCase
         $this->pendingSession([PendingAction::START_BOOTSTRAP_ENROLLMENT]);
 
         self::assertNull($this->manager()->getFactors());
-        self::assertNull($this->manager()->challenge('email', $this->factor));
-        self::assertFalse($this->manager()->verify('email', $this->factor, '123456'));
-        self::assertFalse($this->manager()->redeemRecoveryCode('ABCDEFGHJKLM'));
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->sendCode($this->factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Submission::challenge($this->factor->id, 'any', '123456'))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
         self::assertSame([], $this->manager()->generateRecoveryCodes());
         self::assertNull($this->manager()->recoveryCodes());
         self::assertSame([], $this->manager()->proofs());
@@ -167,13 +169,16 @@ final class PendingActionsTest extends TestCase
     {
         $this->pendingSession([PendingAction::SEND_CODE, PendingAction::VERIFY]);
 
-        self::assertTrue($this->manager()->challenge('email', $this->factor)?->wasSent());
+        $this->container()->make(ProofStore::class)->begin($this->pending, 'web', 'pending-1');
 
+        $sent = $this->manager()->sendCode($this->factor->id);
         $code = $this->mailbox->lastCodeTo('pending@example.test');
 
+        self::assertTrue($sent->wasSent());
+        self::assertNotNull($sent->challengeId);
         self::assertNotNull($code);
         self::assertNull($this->mailbox->lastCodeTo('guarded@example.test'));
-        self::assertTrue($this->manager()->verify('email', $this->factor, $code));
+        self::assertTrue($this->manager()->verify(Submission::challenge($this->factor->id, $sent->challengeId, $code))->isVerified());
     }
 
     /**
@@ -188,9 +193,12 @@ final class PendingActionsTest extends TestCase
     {
         $this->pendingSession([PendingAction::SEND_CODE]);
 
-        $this->manager()->challenge('email', $this->factor);
+        $sent = $this->manager()->sendCode($this->factor->id);
 
-        self::assertFalse($this->manager()->verify('email', $this->factor, (string) $this->mailbox->lastCodeTo('pending@example.test')));
+        self::assertTrue($sent->wasSent());
+        $code = (string) $this->mailbox->lastCodeTo('pending@example.test');
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Submission::challenge($this->factor->id, (string) $sent->challengeId, $code))->reason);
     }
 
     /**

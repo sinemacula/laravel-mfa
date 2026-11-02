@@ -10,11 +10,11 @@ use Carbon\CarbonImmutable;
  * Code delivery driver contract.
  *
  * A factor driver whose type proves possession of a destination by a code sent
- * to it (SMS, email). The package draws, stores and checks the code itself, as
- * a challenge bound to the factor, the identity, the application, the session
- * and the purpose, none of which the factor alone carries; the driver only
- * delivers each code to the factor's destination. Its codes are therefore never
- * sent or checked through `issueChallenge()`, `verify()` or `confirm()`.
+ * to it (SMS, email). The bound `ChallengeGateway` draws, stores and checks the
+ * code, as a challenge bound to the factor, the identity, the application, the
+ * session and the purpose, none of which the factor alone carries; the driver
+ * only delivers each code to the factor's destination. Its codes are therefore
+ * never checked through `verify()` or `confirm()`.
  *
  * @api
  *

@@ -15,6 +15,8 @@ use SineMacula\Laravel\Mfa\Drivers\Base32;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpParameters;
 use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
  * Hot-path benchmarks for the TOTP driver.
@@ -24,7 +26,7 @@ use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
  * visible. It computes and compares every time step of the window whether or
  * not one matches, so a matching and a mismatched code should cost the same;
  * the factor records no step, so the cost of the database's compare-and-set is
- * not included. `issueChallenge()` is a no-op for TOTP so it is not measured.
+ * not included.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,6 +39,9 @@ final class TotpDriverBench
 
     /** @var \Benchmarks\Support\TotpFactor */
     private TotpFactor $factor;
+
+    /** @var \SineMacula\Laravel\Mfa\Proofs\ProofBinding */
+    private ProofBinding $binding;
 
     /** @var string */
     private string $code = '';
@@ -53,6 +58,8 @@ final class TotpDriverBench
     {
         $this->driver = new TotpDriver(new TotpSettings(new Repository), new Container);
         $this->factor = new TotpFactor(Base32::encode(random_bytes(20)));
+
+        $this->binding = new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::STEP_UP);
     }
 
     /**
@@ -80,7 +87,7 @@ final class TotpDriverBench
     #[Revs(1000)]
     public function benchVerifyHit(): void
     {
-        $this->driver->verify($this->factor, $this->code);
+        $this->driver->verify($this->factor, $this->code, $this->binding);
     }
 
     /**
@@ -92,6 +99,6 @@ final class TotpDriverBench
     #[Revs(1000)]
     public function benchVerifyMiss(): void
     {
-        $this->driver->verify($this->factor, '000000');
+        $this->driver->verify($this->factor, '000000', $this->binding);
     }
 }

@@ -6,6 +6,9 @@ namespace Tests\Fixtures\Secrets;
 
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 
 /**
@@ -25,15 +28,14 @@ final class CodeForwardingDriver implements FactorDriver
     use DescribesNoChannel;
 
     /**
-     * Send nothing.
+     * An authenticator app's channel, so the code reaches the driver.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return void
+     * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
      */
     #[\Override]
-    public function issueChallenge(Factor $factor): void
+    public function channelKind(): ChannelKind
     {
-        // Nothing is sent; the fixture only verifies.
+        return ChannelKind::AUTHENTICATOR_APP;
     }
 
     /**
@@ -41,12 +43,13 @@ final class CodeForwardingDriver implements FactorDriver
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @return bool
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      */
     #[\Override]
-    public function verify(Factor $factor, string $code): bool
+    public function verify(Factor $factor, string $code, ProofBinding $binding): CodeCheck
     {
-        return $this->isAccepted($code);
+        return $this->isAccepted($code) ? CodeCheck::ACCEPTED : CodeCheck::INVALID;
     }
 
     /**

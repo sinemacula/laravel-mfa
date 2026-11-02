@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Contracts;
 
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
@@ -55,14 +56,24 @@ interface PasskeyGateway
 
     /**
      * Verify the client's response to an assertion request, limited to the
-     * given credentials, and return what it observed, or `null` when it does
-     * not verify.
+     * given credentials, and return what it observed, or why it does not
+     * verify, which is counted as a failed attempt: `invalid_code` for an
+     * assertion that does not hold, `expired` for a ceremony that has ended and
+     * `replayed` for one already answered. A gateway that cannot verify at all
+     * refuses by throwing an `OperationRefusedException`, which counts nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  list<string>  $credentialIds
      * @param  array<string, mixed>  $response
-     * @return ?\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
+     * @return \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    public function verifyAssertion(MultiFactorAuthenticatable $identity, ProofBinding $binding, #[\SensitiveParameter] array $credentialIds, array $response): ?PasskeyAssertion;
+    public function verifyAssertion(
+        MultiFactorAuthenticatable $identity,
+        ProofBinding $binding,
+        #[\SensitiveParameter] array $credentialIds,
+        #[\SensitiveParameter] array $response,
+    ): FailureReason|PasskeyAssertion;
 }

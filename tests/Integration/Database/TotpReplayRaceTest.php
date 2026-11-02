@@ -13,7 +13,10 @@ use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\TestCase;
 
@@ -62,7 +65,7 @@ final class TotpReplayRaceTest extends TestCase
     private const int POLL_INTERVAL = 25000;
 
     /** @var int How many times to look for the worker waiting on the row. */
-    private const int POLLS = 400;
+    private const int POLLS = 2400;
 
     /** @var string The connection the second request runs on. */
     private string $racer = 'testing';
@@ -163,7 +166,7 @@ final class TotpReplayRaceTest extends TestCase
 
         $connection->beginTransaction();
 
-        self::assertTrue($driver->verify(Factor::query()->findOrFail($factor->id), $code));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify(Factor::query()->findOrFail($factor->id), $code, self::binding()));
 
         $pid = pcntl_fork();
 
@@ -229,6 +232,16 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
+     * What a verification in the race is bound to.
+     *
+     * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
+     */
+    private static function binding(): ProofBinding
+    {
+        return new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::SIGN_IN);
+    }
+
+    /**
      * Run the race: the second request opens its transaction and reads the
      * factor, the first verifies its code and commits, then the second verifies
      * its own and commits. Returns whether each passed.
@@ -254,8 +267,8 @@ final class TotpReplayRaceTest extends TestCase
 
             $first = Factor::query()->findOrFail($factor->id);
 
-            $firstPassed  = $driver->verify($first, $firstCode($first));
-            $secondPassed = $driver->verify($second, ($secondCode ?? $firstCode)($second));
+            $firstPassed  = $driver->verify($first, $firstCode($first), self::binding())                    === CodeCheck::ACCEPTED;
+            $secondPassed = $driver->verify($second, ($secondCode ?? $firstCode)($second), self::binding()) === CodeCheck::ACCEPTED;
 
             $racer->commit();
         } catch (\Throwable $exception) {
@@ -289,7 +302,7 @@ final class TotpReplayRaceTest extends TestCase
             $backend = $connection->scalar($connection->getDriverName() === 'pgsql' ? 'select pg_backend_pid()' : 'select connection_id()');
 
             $send(is_scalar($backend) ? (string) $backend : '');
-            $send($driver->verify($copy, $code) ? 'passed' : 'refused');
+            $send($driver->verify($copy, $code, self::binding()) === CodeCheck::ACCEPTED ? 'passed' : 'refused');
         } catch (\Throwable $exception) {
             $send(sprintf('%s: %s', $exception::class, str_replace("\n", ' ', $exception->getMessage())));
         }

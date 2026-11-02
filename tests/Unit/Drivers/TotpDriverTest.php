@@ -15,7 +15,10 @@ use SineMacula\Laravel\Mfa\Drivers\Base32;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpParameters;
 use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Factors\TotpStubFactor;
@@ -66,22 +69,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Issuing a challenge sends nothing and changes nothing: the app makes the
-     * code.
-     *
-     * @return void
-     */
-    public function testIssueChallengeSendsNothing(): void
-    {
-        $factor = $this->factor();
-
-        $this->driver()->issueChallenge($factor);
-
-        self::assertSame(AuthenticatorApp::SECRET, $factor->getSecret());
-        self::assertNull($factor->getLastAcceptedStep());
-    }
-
-    /**
      * The code the app shows now verifies, and its step is recorded.
      *
      * @return void
@@ -90,7 +77,7 @@ final class TotpDriverTest extends TestCase
     {
         $factor = $this->factor();
 
-        self::assertTrue($this->driver()->verify($factor, self::CODE));
+        self::assertSame(CodeCheck::ACCEPTED, $this->driver()->verify($factor, self::CODE, self::binding()));
         self::assertSame(self::STEP, $factor->getLastAcceptedStep());
     }
 
@@ -140,11 +127,11 @@ final class TotpDriverTest extends TestCase
 
         $this->travelTo(CarbonImmutable::createFromTimestamp($time));
 
-        self::assertTrue($this->driver()->verify(new TotpStubFactor($key, $algorithm, 8), $code));
+        self::assertSame(CodeCheck::ACCEPTED, $this->driver()->verify(new TotpStubFactor($key, $algorithm, 8), $code, self::binding()));
 
         $this->travelTo(CarbonImmutable::createFromTimestamp($time + 30));
 
-        self::assertFalse($this->driver()->verify(new TotpStubFactor($key, $algorithm, 8), $code));
+        self::assertNotSame(CodeCheck::ACCEPTED, $this->driver()->verify(new TotpStubFactor($key, $algorithm, 8), $code, self::binding()));
     }
 
     /**
@@ -155,10 +142,10 @@ final class TotpDriverTest extends TestCase
      */
     public function testTheDefaultWindowAcceptsOneStepEitherSideOnly(): void
     {
-        self::assertTrue($this->driver()->verify($this->factor(), '385088'));
-        self::assertTrue($this->driver()->verify($this->factor(), '050219'));
-        self::assertFalse($this->driver()->verify($this->factor(), '168521'));
-        self::assertFalse($this->driver()->verify($this->factor(), '687638'));
+        self::assertSame(CodeCheck::ACCEPTED, $this->driver()->verify($this->factor(), '385088', self::binding()));
+        self::assertSame(CodeCheck::ACCEPTED, $this->driver()->verify($this->factor(), '050219', self::binding()));
+        self::assertNotSame(CodeCheck::ACCEPTED, $this->driver()->verify($this->factor(), '168521', self::binding()));
+        self::assertNotSame(CodeCheck::ACCEPTED, $this->driver()->verify($this->factor(), '687638', self::binding()));
     }
 
     /**
@@ -173,27 +160,52 @@ final class TotpDriverTest extends TestCase
 
         $this->configuration()->set('mfa.totp.window', 0);
 
-        self::assertFalse($driver->verify($this->factor(), '385088'));
-        self::assertTrue($driver->verify($this->factor(), self::CODE));
+        self::assertNotSame(CodeCheck::ACCEPTED, $driver->verify($this->factor(), '385088', self::binding()));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($this->factor(), self::CODE, self::binding()));
 
         $this->configuration()->set('mfa.totp.window', 3);
 
         $factor = $this->factor();
 
-        self::assertTrue($driver->verify($factor, AuthenticatorApp::code($factor, -3)));
-        self::assertTrue($driver->verify($factor, AuthenticatorApp::code($factor, 3)));
-        self::assertFalse($driver->verify($this->factor(), AuthenticatorApp::code($factor, 4)));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($factor, AuthenticatorApp::code($factor, -3), self::binding()));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($factor, AuthenticatorApp::code($factor, 3), self::binding()));
+        self::assertNotSame(CodeCheck::ACCEPTED, $driver->verify($this->factor(), AuthenticatorApp::code($factor, 4), self::binding()));
     }
 
     /**
-     * The window is the `totp_window` of the application a bound resolver names
-     * for the current request, read for each request through a driver built
-     * once; an application that sets none, or is not configured, takes the
-     * package-wide window. Confirmation applies the same window.
+     * A verification's window is the `totp_window` of the application its
+     * binding names, through a driver built once; an application that sets
+     * none, or is not configured, takes the package-wide window.
      *
      * @return void
      */
-    public function testTheWindowIsTheRequestedApplicationsOwn(): void
+    public function testAVerificationsWindowIsItsBindingsApplications(): void
+    {
+        $this->configuration()->set('mfa.applications', [
+            'strict'  => ['totp_window' => 0],
+            'lenient' => ['totp_window' => 2],
+        ]);
+
+        $driver = $this->driver();
+        $factor = $this->factor();
+
+        self::assertSame(CodeCheck::INVALID, $driver->verify($this->factor(), '385088', self::binding('strict')));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($this->factor(), self::CODE, self::binding('strict')));
+
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($this->factor(), AuthenticatorApp::code($factor, -2), self::binding('lenient')));
+        self::assertSame(CodeCheck::INVALID, $driver->verify($this->factor(), AuthenticatorApp::code($factor, -3), self::binding('lenient')));
+
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($this->factor(), '385088', self::binding('unconfigured')));
+        self::assertSame(CodeCheck::INVALID, $driver->verify($this->factor(), AuthenticatorApp::code($factor, -2), self::binding('unconfigured')));
+    }
+
+    /**
+     * A confirmation has no binding, so its window is that of the application a
+     * bound resolver names for the current request, read for each request.
+     *
+     * @return void
+     */
+    public function testAConfirmationsWindowIsTheRequestedApplicationsOwn(): void
     {
         $this->configuration()->set('mfa.applications', [
             'strict'  => ['totp_window' => 0],
@@ -207,29 +219,21 @@ final class TotpDriverTest extends TestCase
 
         $this->requestFor('strict');
 
-        self::assertFalse($driver->verify($this->factor(), '385088'));
         self::assertFalse($driver->confirm($this->factor(), '050219'));
-        self::assertTrue($driver->verify($this->factor(), self::CODE));
 
         $this->requestFor('lenient');
 
-        self::assertTrue($driver->verify($this->factor(), AuthenticatorApp::code($factor, -2)));
         self::assertTrue($driver->confirm($this->factor(), AuthenticatorApp::code($factor, 2)));
-        self::assertFalse($driver->verify($this->factor(), AuthenticatorApp::code($factor, -3)));
-
-        $this->requestFor('unconfigured');
-
-        self::assertTrue($driver->verify($this->factor(), '385088'));
-        self::assertFalse($driver->verify($this->factor(), AuthenticatorApp::code($factor, -2)));
     }
 
     /**
      * Without a request, or with something other than an HTTP request bound as
-     * one, no application is named and the package-wide window applies.
+     * one, a confirmation names no application and the package-wide window
+     * applies.
      *
      * @return void
      */
-    public function testWithoutARequestThePackageWideWindowApplies(): void
+    public function testWithoutARequestAConfirmationTakesThePackageWideWindow(): void
     {
         $config = new Repository(['mfa' => ['applications' => ['strict' => ['totp_window' => 0]]]]);
 
@@ -238,15 +242,15 @@ final class TotpDriverTest extends TestCase
 
         $driver = new TotpDriver(new TotpSettings($config), $container);
 
-        self::assertTrue($driver->verify($this->factor(), '385088'));
+        self::assertTrue($driver->confirm($this->factor(), '385088'));
 
         $container->instance('request', new \stdClass);
 
-        self::assertTrue($driver->verify($this->factor(), '385088'));
+        self::assertTrue($driver->confirm($this->factor(), '385088'));
 
         $container->instance('request', Request::create('/'));
 
-        self::assertFalse($driver->verify($this->factor(), '385088'));
+        self::assertFalse($driver->confirm($this->factor(), '385088'));
     }
 
     /**
@@ -260,11 +264,11 @@ final class TotpDriverTest extends TestCase
         $factor = $this->factor();
 
         for ($attempt = 0; $attempt < 10; $attempt++) {
-            self::assertFalse($driver->verify($factor, '000000'));
+            self::assertNotSame(CodeCheck::ACCEPTED, $driver->verify($factor, '000000', self::binding()));
         }
 
-        self::assertFalse($driver->verify($factor, '687638'));
-        self::assertTrue($driver->verify($factor, self::CODE));
+        self::assertNotSame(CodeCheck::ACCEPTED, $driver->verify($factor, '687638', self::binding()));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($factor, self::CODE, self::binding()));
     }
 
     /**
@@ -277,8 +281,8 @@ final class TotpDriverTest extends TestCase
         $driver = $this->driver();
         $factor = $this->factor();
 
-        self::assertTrue($driver->verify($factor, self::CODE));
-        self::assertFalse($driver->verify($factor, self::CODE));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($factor, self::CODE, self::binding()));
+        self::assertSame(CodeCheck::REPLAYED, $driver->verify($factor, self::CODE, self::binding()));
         self::assertSame(self::STEP, $factor->getLastAcceptedStep());
     }
 
@@ -293,9 +297,9 @@ final class TotpDriverTest extends TestCase
         $driver = $this->driver();
         $factor = $this->factor();
 
-        self::assertTrue($driver->verify($factor, '050219'));
-        self::assertFalse($driver->verify($factor, self::CODE));
-        self::assertFalse($driver->verify($factor, '385088'));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($factor, '050219', self::binding()));
+        self::assertSame(CodeCheck::REPLAYED, $driver->verify($factor, self::CODE, self::binding()));
+        self::assertSame(CodeCheck::REPLAYED, $driver->verify($factor, '385088', self::binding()));
         self::assertSame(self::STEP + 1, $factor->getLastAcceptedStep());
     }
 
@@ -310,13 +314,13 @@ final class TotpDriverTest extends TestCase
         $driver = $this->driver();
         $factor = $this->factor();
 
-        self::assertTrue($driver->verify($factor, '385088'));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($factor, '385088', self::binding()));
         self::assertSame(self::STEP - 1, $factor->getLastAcceptedStep());
 
-        self::assertTrue($driver->verify($factor, self::CODE));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($factor, self::CODE, self::binding()));
         self::assertSame(self::STEP, $factor->getLastAcceptedStep());
 
-        self::assertTrue($driver->verify($factor, '050219'));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->verify($factor, '050219', self::binding()));
         self::assertSame(self::STEP + 1, $factor->getLastAcceptedStep());
     }
 
@@ -333,7 +337,7 @@ final class TotpDriverTest extends TestCase
 
         self::assertTrue($driver->confirm($factor, self::CODE));
         self::assertSame(self::STEP, $factor->getLastAcceptedStep());
-        self::assertFalse($driver->verify($factor, self::CODE));
+        self::assertNotSame(CodeCheck::ACCEPTED, $driver->verify($factor, self::CODE, self::binding()));
         self::assertFalse($driver->confirm($factor, self::CODE));
     }
 
@@ -349,7 +353,7 @@ final class TotpDriverTest extends TestCase
         $factor = $this->factor();
 
         foreach (['000000', '76814', '7681470', ' 768147', ''] as $code) {
-            self::assertFalse($driver->verify($factor, $code), $code);
+            self::assertNotSame(CodeCheck::ACCEPTED, $driver->verify($factor, $code, self::binding()), $code);
         }
 
         self::assertNull($factor->getLastAcceptedStep());
@@ -377,7 +381,7 @@ final class TotpDriverTest extends TestCase
     #[DataProvider('unusableSecrets')]
     public function testRefusesAFactorWithoutAUsableSecret(?string $secret): void
     {
-        self::assertFalse($this->driver()->verify(new TotpStubFactor($secret), self::CODE));
+        self::assertNotSame(CodeCheck::ACCEPTED, $this->driver()->verify(new TotpStubFactor($secret), self::CODE, self::binding()));
     }
 
     /**
@@ -390,8 +394,8 @@ final class TotpDriverTest extends TestCase
     {
         $parameters = new TotpParameters('sha1', 6, 30);
 
-        self::assertFalse($this->driver()->verify(new TotpStubFactor(''), $parameters->code('', self::STEP)));
-        self::assertFalse($this->driver()->verify(new TotpStubFactor('===='), $parameters->code('', self::STEP)));
+        self::assertNotSame(CodeCheck::ACCEPTED, $this->driver()->verify(new TotpStubFactor(''), $parameters->code('', self::STEP), self::binding()));
+        self::assertNotSame(CodeCheck::ACCEPTED, $this->driver()->verify(new TotpStubFactor('===='), $parameters->code('', self::STEP), self::binding()));
     }
 
     /**
@@ -420,7 +424,7 @@ final class TotpDriverTest extends TestCase
     #[DataProvider('unusableParameters')]
     public function testRefusesAFactorWithoutUsableParameters(?string $algorithm, ?int $digits, ?int $period): void
     {
-        self::assertFalse($this->driver()->verify(new TotpStubFactor(AuthenticatorApp::SECRET, $algorithm, $digits, $period), self::CODE));
+        self::assertNotSame(CodeCheck::ACCEPTED, $this->driver()->verify(new TotpStubFactor(AuthenticatorApp::SECRET, $algorithm, $digits, $period), self::CODE, self::binding()));
     }
 
     /**
@@ -431,7 +435,7 @@ final class TotpDriverTest extends TestCase
      */
     public function testRefusesAFactorThatCannotRecordAStep(): void
     {
-        self::assertFalse($this->driver()->verify(new UnrecordableTotpFactor, self::CODE));
+        self::assertNotSame(CodeCheck::ACCEPTED, $this->driver()->verify(new UnrecordableTotpFactor, self::CODE, self::binding()));
         self::assertFalse($this->driver()->confirm(new UnrecordableTotpFactor, self::CODE));
     }
 
@@ -636,6 +640,17 @@ final class TotpDriverTest extends TestCase
             self::assertNotNull($parameter);
             self::assertNotEmpty($parameter->getAttributes(\SensitiveParameter::class), $method);
         }
+    }
+
+    /**
+     * What a verification through the driver is bound to.
+     *
+     * @param  string  $application
+     * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
+     */
+    private static function binding(string $application = 'web'): ProofBinding
+    {
+        return new ProofBinding('user', '1', $application, 'sign-in-1', Purpose::STEP_UP);
     }
 
     /**

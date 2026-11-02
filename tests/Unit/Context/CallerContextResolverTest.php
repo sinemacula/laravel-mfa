@@ -214,6 +214,39 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
+     * The caller is still the one a binding was captured for only while nothing
+     * has changed: the action, the sign-in and the purpose are all part of it.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testStillAnswersOnlyForTheCapturedBinding(): void
+    {
+        $user    = $this->signIn();
+        $binding = $this->resolver()->binding(new Caller($user), Purpose::STEP_UP);
+
+        self::assertNotNull($binding);
+        self::assertSame($user, $this->resolver()->still(PendingAction::VERIFY, $binding)?->identity);
+
+        $this->container()->make(ProofStore::class)->begin($user, 'web', 'sign-in-b');
+
+        self::assertNull($this->resolver()->still(PendingAction::VERIFY, $binding));
+
+        $this->container()->make(ProofStore::class)->begin($user, 'web', $binding->sessionId);
+
+        self::assertNotNull($this->resolver()->still(PendingAction::VERIFY, $binding));
+
+        $this->container()->make(ProofStore::class)->forget($user, 'web');
+
+        self::assertNull($this->resolver()->still(PendingAction::VERIFY, $binding));
+
+        $this->pending([PendingAction::LIST_FACTORS]);
+
+        self::assertNull($this->resolver()->still(PendingAction::VERIFY, $binding));
+    }
+
+    /**
      * Sign a person in through the guard, with a sign-in the proof store knows.
      *
      * @return \Tests\Fixtures\Identities\TestUser

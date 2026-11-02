@@ -19,8 +19,9 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
  * The first factor a session started with, read only from a trusted source, so
  * the combination policy can decide which factor may follow it.
  *
- * For a pending session it is the pending context's own first factor. For an
- * active one it is the latest first factor the proof store holds for the
+ * For a pending session it is the pending context's own first factor, when it
+ * is of the identity's current verification generation and not dated after now.
+ * For an active one it is the latest first factor the proof store holds for the
  * identity's current sign-in, or, when it holds none, the bound
  * `FirstFactorResolver`'s answer, which counts only when it is a first factor
  * of the identity on the application, bound to the current sign-in, made under
@@ -76,14 +77,30 @@ final readonly class SessionFirstFactor
         }
 
         if ($pending !== null) {
-            return $pending->sessionId === $binding->sessionId && $pending->application === $binding->application && $owner->owns($pending->firstFactor->binding)
-                ? $pending->firstFactor
+            return $pending->sessionId === $binding->sessionId && $pending->application === $binding->application
+                ? $this->ofPending($identity, $pending)
                 : null;
         }
 
         $session = $this->container->make(ProofStore::class)->currentSession($identity, $binding->application);
 
         return $session !== null && $session === $binding->sessionId ? $this->current($identity, $binding->application) : null;
+    }
+
+    /**
+     * The pending session's first factor, when it may still count: a first
+     * factor of the identity on the pending session, made under the identity's
+     * current verification generation and not after now.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function ofPending(MultiFactorAuthenticatable $identity, PendingContext $pending): ?Proof
+    {
+        return self::isTrusted($pending->firstFactor, $identity, $pending->application, $pending->sessionId) ? $pending->firstFactor : null;
     }
 
     /**
@@ -116,9 +133,7 @@ final readonly class SessionFirstFactor
             return $recorded;
         }
 
-        $resolved = $this->container->make(FirstFactorResolver::class)->resolve($identity, $application);
-
-        return $resolved !== null && self::isTrusted($resolved, $identity, $application, $session) ? $resolved : null;
+        return $this->resolved($identity, $application, $session);
     }
 
     /**
@@ -136,9 +151,10 @@ final readonly class SessionFirstFactor
      */
     public function proofs(MultiFactorAuthenticatable $identity, string $application): array
     {
-        $store = $this->container->make(ProofStore::class);
+        $store   = $this->container->make(ProofStore::class);
+        $session = $store->currentSession($identity, $application);
 
-        if ($store->currentSession($identity, $application) === null) {
+        if ($session === null) {
             return [];
         }
 
@@ -150,14 +166,33 @@ final readonly class SessionFirstFactor
             }
         }
 
-        $firstFactor = $this->current($identity, $application);
+        $firstFactor = $this->resolved($identity, $application, $session);
 
         return $firstFactor === null ? $proofs : [$firstFactor, ...$proofs];
     }
 
     /**
-     * Whether a resolved first factor may count for the sign-in: a first factor
-     * of the identity on the application, bound to the sign-in, made under the
+     * The bound resolver's first factor of the identity's current sign-in, when
+     * it may count.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private function resolved(MultiFactorAuthenticatable $identity, string $application, string $session): ?Proof
+    {
+        $resolved = $this->container->make(FirstFactorResolver::class)->resolve($identity, $application);
+
+        return $resolved !== null && self::isTrusted($resolved, $identity, $application, $session) ? $resolved : null;
+    }
+
+    /**
+     * Whether a first factor may count for the session: a first factor of the
+     * identity on the application, bound to the sign-in, made under the
      * identity's current verification generation and not after now.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor

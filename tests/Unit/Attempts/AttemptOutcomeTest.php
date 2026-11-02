@@ -88,4 +88,22 @@ final class AttemptOutcomeTest extends TestCase
         self::assertFalse($outcome->isRefused());
         self::assertTrue($outcome->isNotFound());
     }
+
+    /**
+     * An attempt refused for any other reason neither passed nor counted, and
+     * is neither a lockout nor a factor not found.
+     *
+     * @return void
+     */
+    public function testAnUncountedAttempt(): void
+    {
+        $outcome = AttemptOutcome::uncounted();
+
+        self::assertFalse($outcome->passed);
+        self::assertFalse($outcome->counted);
+        self::assertFalse($outcome->isFailed());
+        self::assertFalse($outcome->isRefused());
+        self::assertFalse($outcome->isNotFound());
+        self::assertTrue(AttemptOutcome::fail()->counted);
+    }
 }

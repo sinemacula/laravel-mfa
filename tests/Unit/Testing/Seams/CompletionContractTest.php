@@ -20,12 +20,14 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\CheckingCompletion;
+use Tests\Fixtures\Seams\RefusingCompletion;
 use Tests\TestCase;
 
 /**
  * The `PendingCompletion` and `StepUp` contract kits prove a completion that
- * checks each result's binding, and reject one that accepts every result. The
- * package binds neither by default: their defaults come with verification.
+ * checks each result's binding, and reject one that accepts every result, or
+ * refuses with anything but an `OperationRefusedException`. The package's own
+ * default, which records in the proof store, passes both.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -66,6 +68,20 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
+     * The kit rejects a seam that refuses with anything but a reason.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRejectsASeamThatThrowsAnythingElse(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        StepUpContract::assertRefusesAResultOfAnotherBinding(new RefusingCompletion(new \RuntimeException('Not a reason.')), $this->resultOfAnotherBinding());
+    }
+
+    /**
      * A completion that checks each result.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\PendingCompletion
@@ -101,7 +117,7 @@ final class CompletionContractTest extends TestCase
     {
         $proof = SignInProofs::of(new NonEloquentIdentity)->inSession('another-session')->totp();
 
-        return VerificationResult::verified($proof, $this->container()->make(RequirementCheck::class)->check(Requirement::none(), $proof));
+        return VerificationResult::verified($proof, $this->container()->make(RequirementCheck::class)->check(Requirement::none(), $proof), ['otp'], 'totp');
     }
 
     /**

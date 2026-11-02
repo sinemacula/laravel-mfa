@@ -29,14 +29,15 @@ final class CodeCheckTest extends TestCase
     public function testTheOutcomesArePinned(): void
     {
         self::assertSame(
-            ['accepted', 'invalid', 'expired', 'exhausted', 'replayed', 'missing'],
+            ['accepted', 'invalid', 'expired', 'exhausted', 'replayed', 'spent', 'missing'],
             array_map(static fn (CodeCheck $check): string => $check->value, CodeCheck::cases()),
         );
     }
 
     /**
      * An accepted code is no failure; a wrong one is an invalid code, a used
-     * one replayed, and a check with no live code to compare is expired.
+     * one replayed, a known challenge with no live code to compare is expired,
+     * and a challenge that is absent or another's is not found.
      *
      * @return void
      */
@@ -47,7 +48,8 @@ final class CodeCheckTest extends TestCase
         self::assertSame(FailureReason::REPLAYED, CodeCheck::REPLAYED->failure());
         self::assertSame(FailureReason::EXPIRED, CodeCheck::EXPIRED->failure());
         self::assertSame(FailureReason::EXPIRED, CodeCheck::EXHAUSTED->failure());
-        self::assertSame(FailureReason::EXPIRED, CodeCheck::MISSING->failure());
+        self::assertSame(FailureReason::EXPIRED, CodeCheck::SPENT->failure());
+        self::assertSame(FailureReason::NOT_FOUND, CodeCheck::MISSING->failure());
     }
 
     /**
@@ -63,6 +65,7 @@ final class CodeCheckTest extends TestCase
             'expired'   => 'The code has expired.',
             'exhausted' => 'The challenge has used up its attempts.',
             'replayed'  => 'The code was already used.',
+            'spent'     => 'The challenge was already used.',
             'missing'   => 'No code was sent for this factor, session, application and purpose.',
         ], array_combine(
             array_map(static fn (CodeCheck $check): string => $check->value, CodeCheck::cases()),

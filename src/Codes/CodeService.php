@@ -11,11 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
-use SineMacula\Laravel\Mfa\Events\CodeSent;
-use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
@@ -35,9 +32,10 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * again under the lock, and one a concurrent change removed is `not_found`. The
  * time of a send is read once the locks are held, never before. The code is
  * stored, then delivered by the factor's driver inside the same transaction, so
- * a delivery that throws keeps no code and spends no cooldown or cap;
- * `CodeSent` is dispatched once the transaction commits. Neither sending nor
- * checking resets a failure count or lifts a lockout.
+ * a delivery that throws keeps no code and spends no cooldown or cap. Neither
+ * sending nor checking resets a failure count or lifts a lockout, and neither
+ * reports anything: `CodeSent` and the verification events are dispatched by
+ * `Verification\VerificationService`, whichever gateway the code went through.
  *
  * A delivery that throws is scrubbed of the code and the factor's destination,
  * which the service knows, in the message and the trace of every exception in
@@ -62,7 +60,7 @@ final readonly class CodeService
      */
     public function __construct(
 
-        /** The container the engine and the event dispatcher are resolved from. */
+        /** The container the engine is resolved from. */
         private Container $container,
     ) {}
 
@@ -70,7 +68,6 @@ final readonly class CodeService
      * Send a code for the factor under the binding through its driver: a new
      * challenge, or a resend of the binding's open one.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver  $driver
@@ -82,13 +79,12 @@ final readonly class CodeService
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
      * @throws \Throwable
      */
-    public function send(MultiFactorAuthenticatable $identity, Factor $factor, ProofBinding $binding, CodeDeliveryDriver $driver): SendResult
+    public function send(Factor $factor, ProofBinding $binding, CodeDeliveryDriver $driver): SendResult
     {
         $stored = self::stored($factor, $binding);
         $codes  = $this->container->make(DeliveredCodes::class);
-        $events = $this->container->make(EventDispatcher::class);
 
-        return FactorStateTransaction::forFactor($stored, static function (Collection $factors) use ($stored, $identity, $binding, $driver, $codes, $events): SendResult {
+        return FactorStateTransaction::forFactor($stored, static function (Collection $factors) use ($stored, $binding, $driver, $codes): SendResult {
 
             // Read once the locks are held, so a send that waited for them is
             // timed, and its cooldown and expiry run, from when it was made
@@ -107,27 +103,25 @@ final readonly class CodeService
 
             self::deliver($driver, $locked, $issued);
 
-            $events->dispatch(new CodeSent($events->context($identity, $binding->application), FactorSummary::fromFactor($locked), $binding->purpose, $issued->challengeId));
-
             return SendResult::sent($issued->challengeId, $issued->expiresAt);
         });
     }
 
     /**
-     * Check the code against the factor's challenge under the binding (the one
-     * named, or the latest), using it up when it matches.
+     * Check the code against the factor's challenge named under the binding,
+     * using it up when it matches.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $code
-     * @param  ?string  $challengeId
+     * @param  string  $challengeId
      * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
      */
-    public function check(Factor $factor, ProofBinding $binding, #[\SensitiveParameter] string $code, ?string $challengeId = null): CodeCheck
+    public function check(Factor $factor, ProofBinding $binding, #[\SensitiveParameter] string $code, string $challengeId): CodeCheck
     {
         $stored = self::stored($factor, $binding);
 
