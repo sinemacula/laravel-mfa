@@ -48,6 +48,10 @@ in [Factor lifecycle](../guides/lifecycle.md).
 - A reset's order is the lock order: lockouts and counts, every factor and enrolment, the recovery set, the obligation,
   the generation, then `SessionRevoker::revokeAll()`. Every lockout lifts before any factor goes, so every
   `LockoutLifted` precedes every removal event, and the factors are taken in id order so the events are deterministic.
+- A reset removes every factor of the identity, whatever its stored state, as it is the remedy for one that cannot be
+  read. A factor whose summary, status or deadline throws is not read for a lift, so its deadline goes with its row; it
+  gets no `FactorRemoved` or `EnrollmentAbandoned`, since its summary cannot be built honestly, and
+  `FactorsReset::$unreadableFactors` counts it.
   The event context is captured before the revocation, which could clear the authentication context it reads.
 - A reset advances the generation itself, as a rebound revoker may not. With the default revoker it therefore moves
   twice; what is specified is that it only ever goes up, so nothing depends on the increment.

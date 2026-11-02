@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Factors\EnumStatusFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -259,6 +260,25 @@ final class ActsAsFactorStateTest extends TestCase
 
         $this->expectException(InvalidModelException::class);
         $this->expectExceptionMessage('The factor\'s column [status] holds no status the package knows, so whether it is confirmed cannot be told.');
+
+        $factor->getStatus();
+    }
+
+    /**
+     * On a model that casts the status to the enum, a stored value the enum
+     * does not know throws Laravel's `ValueError` from the cast, before the
+     * trait sees it: it fails closed, though not as `InvalidModelException`.
+     *
+     * @return void
+     */
+    public function testAnEnumCastStatusTheEnumDoesNotKnowThrowsAValueError(): void
+    {
+        $factor = new EnumStatusFactor;
+
+        $factor->setRawAttributes(['status' => 'CONFIRMED']);
+        $factor->exists = true;
+
+        $this->expectException(\ValueError::class);
 
         $factor->getStatus();
     }

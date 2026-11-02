@@ -4,28 +4,28 @@
 
 Every event the package dispatches is a class in `SineMacula\Laravel\Mfa\Events`:
 
-| Event                          | Fired when                                                                  | Payload                                                    |
-|--------------------------------|-----------------------------------------------------------------------------|------------------------------------------------------------|
-| `EnrollmentStarted`            | An enrolment starts: a pending factor awaits confirmation                   | `factor`                                                   |
-| `FactorConfirmed`              | A pending factor is confirmed, and so becomes usable                        | `factor`                                                   |
-| `EnrollmentAbandoned`          | An enrolment is restarted, cancelled or out of confirmation attempts        | `factor`                                                   |
-| `EnrollmentExpired`            | An enrolment's grant expires before it was confirmed                        | `factor`                                                   |
-| `BootstrapEnrollmentCompleted` | A factor is confirmed during a pending sign-in by an identity that had none | `factor`                                                   |
-| `PasskeyAssociated`            | A passkey is associated with the identity as a factor                       | `factor`                                                   |
-| `FactorRenamed`                | A factor is given a new label                                               | `factor`, `previousLabel`                                  |
-| `PreferredFactorChanged`       | The identity chooses another preferred factor                               | `factor`, `previous`                                       |
-| `FactorRemoved`                | A factor is removed, by the identity or by someone else                     | `factor`, `actor`                                          |
-| `FactorDisabled`               | A factor, or the identity's run, reaches the failure ceiling                | `factor`, `purpose`                                        |
-| `FactorsReset`                 | Someone resets the identity's factors                                       | `actor`, `reason`, `reenrollmentRequired`                  |
-| `LockoutApplied`               | Failed attempts lock a factor, or the identity across its factors           | `factor` (null for the identity), `lockedUntil`, `purpose` |
-| `LockoutLifted`                | A lockout is lifted before it ends                                          | `factor` (null for the identity), `actor`                  |
-| `CodeSent`                     | A code is sent by SMS or email                                              | `factor`, `purpose`, `challengeId`                         |
-| `VerificationPassed`           | An attempt passes, once per attempt                                         | `factor`, `type`, `purpose`, `challengeId`                 |
-| `VerificationFailed`           | An attempt fails, once per attempt                                          | `factor`, `type`, `purpose`, `reason`, `challengeId`       |
-| `RecoveryCodesGenerated`       | A new recovery code set replaces any earlier one                            | `count`, `generation`, `actor`                             |
-| `RecoveryCodeUsed`             | A recovery code is redeemed                                                 | `remaining`, `purpose`                                     |
-| `RecoveryCodesLow`             | A redemption leaves the set at or below its low count                       | `remaining`, `purpose`                                     |
-| `RecoveryCodesRemoved`         | The identity's recovery code set is removed                                 | `actor`                                                    |
+| Event                          | Fired when                                                                  | Payload                                                        |
+|--------------------------------|-----------------------------------------------------------------------------|----------------------------------------------------------------|
+| `EnrollmentStarted`            | An enrolment starts: a pending factor awaits confirmation                   | `factor`                                                       |
+| `FactorConfirmed`              | A pending factor is confirmed, and so becomes usable                        | `factor`                                                       |
+| `EnrollmentAbandoned`          | An enrolment is restarted, cancelled or out of confirmation attempts        | `factor`                                                       |
+| `EnrollmentExpired`            | An enrolment's grant expires before it was confirmed                        | `factor`                                                       |
+| `BootstrapEnrollmentCompleted` | A factor is confirmed during a pending sign-in by an identity that had none | `factor`                                                       |
+| `PasskeyAssociated`            | A passkey is associated with the identity as a factor                       | `factor`                                                       |
+| `FactorRenamed`                | A factor is given a new label                                               | `factor`, `previousLabel`                                      |
+| `PreferredFactorChanged`       | The identity chooses another preferred factor                               | `factor`, `previous`                                           |
+| `FactorRemoved`                | A factor is removed, by the identity or by someone else                     | `factor`, `actor`                                              |
+| `FactorDisabled`               | A factor, or the identity's run, reaches the failure ceiling                | `factor`, `purpose`                                            |
+| `FactorsReset`                 | Someone resets the identity's factors                                       | `actor`, `reason`, `reenrollmentRequired`, `unreadableFactors` |
+| `LockoutApplied`               | Failed attempts lock a factor, or the identity across its factors           | `factor` (null for the identity), `lockedUntil`, `purpose`     |
+| `LockoutLifted`                | A lockout is lifted before it ends                                          | `factor` (null for the identity), `actor`                      |
+| `CodeSent`                     | A code is sent by SMS or email                                              | `factor`, `purpose`, `challengeId`                             |
+| `VerificationPassed`           | An attempt passes, once per attempt                                         | `factor`, `type`, `purpose`, `challengeId`                     |
+| `VerificationFailed`           | An attempt fails, once per attempt                                          | `factor`, `type`, `purpose`, `reason`, `challengeId`           |
+| `RecoveryCodesGenerated`       | A new recovery code set replaces any earlier one                            | `count`, `generation`, `actor`                                 |
+| `RecoveryCodeUsed`             | A recovery code is redeemed                                                 | `remaining`, `purpose`                                         |
+| `RecoveryCodesLow`             | A redemption leaves the set at or below its low count                       | `remaining`, `purpose`                                         |
+| `RecoveryCodesRemoved`         | The identity's recovery code set is removed                                 | `actor`                                                        |
 
 Verification dispatches `CodeSent`, once for every code sent, resends included and whichever gateway sent it, and
 `VerificationPassed` and `VerificationFailed`, once per attempt: a check against the whole recovery code set is one

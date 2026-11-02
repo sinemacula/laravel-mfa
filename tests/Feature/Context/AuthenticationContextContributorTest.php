@@ -15,11 +15,15 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
+use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\PlainUser;
 use Tests\Fixtures\Identities\TestUser;
@@ -100,6 +104,39 @@ final class AuthenticationContextContributorTest extends TestCase
             'last_verification_age_seconds' => 90,
             'has_confirmed_factor'          => true,
         ], $this->context());
+    }
+
+    /**
+     * `has_confirmed_factor` is a fact: an identity whose only factor's stored
+     * status is none the package knows reports no confirmed factor, while the
+     * requirement, which is conservative, still holds it to MFA.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACorruptStatusIsNoConfirmedFactorYetStillHeldToMfa(): void
+    {
+        $this->enableApplication(['requirement' => 'enrolled', 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        $holder = FactorHolder::query()->create(['email' => 'holder@example.test']);
+
+        $this->actingAs($holder);
+        $this->container()->make(ProofStore::class)->begin($holder, self::APPLICATION, self::SESSION);
+
+        Factor::query()->create([
+            ...AuthenticatorApp::FACTOR,
+            'authenticatable_type' => $holder->getMorphClass(),
+            'authenticatable_id'   => (string) $holder->id,
+            'status'               => 'CONFIRMED',
+        ]);
+
+        self::assertFalse($this->context()['has_confirmed_factor']);
+        self::assertTrue($holder->isMfaEnabled());
+        self::assertSame(
+            ['additional_verification' => ['max_age' => null]],
+            $this->container()->make(RequirementService::class)->requirementFor($holder, self::APPLICATION)->toArray(),
+        );
     }
 
     /**

@@ -151,6 +151,8 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
      * would unlock the factor.
      *
      * @return ?\Carbon\CarbonInterface
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function getLockedUntil(): ?CarbonInterface;
 

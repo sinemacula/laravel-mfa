@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Http\Middleware;
 
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
@@ -11,10 +12,12 @@ use Illuminate\Routing\Router;
 use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
+use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
+use SineMacula\Laravel\Mfa\Factors\ConfirmedFactors;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Verification\FactorOffers;
@@ -106,7 +109,7 @@ final readonly class EnsureMfaRequirementIsMet
         $pending = $callers->pending();
 
         if ($pending !== null) {
-            throw $this->refusal(Requirement::strictest($pending->requirement, $level), $operation, $pending->identity->isMfaEnabled());
+            throw $this->refusal(Requirement::strictest($pending->requirement, $level), $operation, $this->hasConfirmedFactor($pending->identity));
         }
 
         $caller = $callers->resolve(null) ?? throw $this->refusal($level, $operation, false);
@@ -141,7 +144,7 @@ final readonly class EnsureMfaRequirementIsMet
 
         $freshness = $operation === null ? null : $requirements->freshnessRequirement($operation);
 
-        throw $this->refusal(Requirement::strictest($requirement, $freshness ?? Requirement::none()), $operation, $caller->identity->isMfaEnabled());
+        throw $this->refusal(Requirement::strictest($requirement, $freshness ?? Requirement::none()), $operation, $this->hasConfirmedFactor($caller->identity));
     }
 
     /**
@@ -204,6 +207,22 @@ final readonly class EnsureMfaRequirementIsMet
     private function refusal(Requirement $requirement, ?string $operation, bool $hasConfirmedFactor): InsufficientAuthenticationException
     {
         return new InsufficientAuthenticationException($requirement, $this->container->make(FactorOffers::class)->offered(), $operation, $hasConfirmedFactor);
+    }
+
+    /**
+     * Determine whether the identity has a factor whose stored status is
+     * exactly `confirmed`, for the refusal to report as a fact (see
+     * `Factors\ConfirmedFactors`).
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     */
+    private function hasConfirmedFactor(MultiFactorAuthenticatable $identity): bool
+    {
+        return ConfirmedFactors::isHeldBy($identity, $this->container->make(Repository::class));
     }
 
     /**

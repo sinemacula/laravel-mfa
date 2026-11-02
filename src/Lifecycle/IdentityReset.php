@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Lifecycle;
 
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
@@ -22,6 +23,7 @@ use SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
 use SineMacula\Laravel\Mfa\Events\FactorsReset;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
@@ -47,12 +49,20 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * next protected request finds no proof. Delivered code rows stay, since the
  * send caps read them; with the factor gone they verify nothing.
  *
+ * A reset is the remedy for a factor whose stored state cannot be read: a
+ * status the package does not know, or a deadline or disabled time that is not
+ * a time. Every factor of the identity is removed under the lock, whatever its
+ * state. Such a factor is never read for a lift, so its deadline goes with its
+ * row, and no status or confirmation is invented for it: it is reported by no
+ * event of its own, and `FactorsReset` counts it.
+ *
  * A verification holding the lock first commits, and its proof is then
  * invalidated here; one that waits for the lock finds its factor gone. The
  * events come once the change commits: `LockoutLifted` for each live lockout,
  * then, in id order, `FactorRemoved` for a confirmed factor and
  * `EnrollmentAbandoned` for a pending one, `RecoveryCodesRemoved` when there
- * was a set, and `FactorsReset` last.
+ * was a set, and `FactorsReset` last, with the count of factors removed whose
+ * state could not be read.
  *
  * Stateless: the seams are resolved on every call.
  *
@@ -125,11 +135,13 @@ final readonly class IdentityReset
 
         FactorStateTransaction::forIdentity($identity, new $model, function (Collection $stored) use ($identity, $actor, $reason, $requireReenrollment): void {
 
-            $factors = $stored->sortBy(static fn (EloquentFactor&Model $factor): ?string => LockedFactors::idOf($factor))->values();
-            $context = $this->events->context($identity);
+            $factors    = $stored->sortBy(static fn (EloquentFactor&Model $factor): ?string => LockedFactors::idOf($factor))->values();
+            $readable   = $factors->filter(static fn (EloquentFactor&Model $factor): bool => self::isReadable($factor))->values();
+            $unreadable = $factors->count() - $readable->count();
+            $context    = $this->events->context($identity);
 
-            $this->liftLockouts($identity, $factors, $actor);
-            $this->removeFactors($identity, $factors, $actor, $context);
+            $this->liftLockouts($identity, $readable, $actor);
+            $this->removeFactors($identity, $factors, $readable, $actor, $context);
 
             $this->recoveryCodes->removeSet($identity, $actor);
 
@@ -138,13 +150,42 @@ final readonly class IdentityReset
 
             $this->container->make(SessionRevoker::class)->revokeAll($identity);
 
-            $this->events->dispatch(new FactorsReset($context, $actor, $reason, $requireReenrollment));
+            $this->events->dispatch(new FactorsReset($context, $actor, $reason, $requireReenrollment, $unreadable));
         });
     }
 
     /**
-     * Lift every lockout: each factor's, then the identity's, and clear its run
-     * of failures.
+     * Determine whether the factor's stored state can be read: the summary its
+     * events carry, its status and its deadline. A factor that cannot is still
+     * removed, but never read again.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @return bool
+     */
+    private static function isReadable(EloquentFactor&Model $factor): bool
+    {
+        // A value that cannot be read throws the trait's InvalidModelException,
+        // a datetime cast's InvalidFormatException or an enum cast's
+        // ValueError; static analysis traces neither of the last two through
+        // the model, nor the first through the summary, so the catches are
+        // marked.
+        try {
+            FactorSummary::fromFactor($factor);
+            $factor->getLockedUntil();
+            // @phpstan-ignore catch.neverThrown
+        } catch (InvalidFormatException|InvalidModelException) {
+            return false;
+        } catch (\ValueError) { // @phpstan-ignore catch.neverThrown
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Lift every lockout of the factors whose state can be read, then the
+     * identity's, and clear its run of failures. A factor whose state cannot be
+     * read is not read for a lift: its deadline goes with its row.
      *
      * @formatter:off
      *
@@ -169,12 +210,14 @@ final readonly class IdentityReset
 
     /**
      * Remove every factor and enrolment of the identity's, reporting each
-     * factor by how far it got.
+     * factor whose state can be read by how far it got, and nothing for the
+     * others.
      *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
+     * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $readable
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  array<string, int|string|null>  $context
      * @return void
@@ -184,13 +227,20 @@ final readonly class IdentityReset
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
-    private function removeFactors(MultiFactorAuthenticatable $identity, Collection $factors, Actor $actor, array $context): void
+    private function removeFactors(MultiFactorAuthenticatable $identity, Collection $factors, Collection $readable, Actor $actor, array $context): void
     {
         foreach ($this->enrollments->ofOwner(ProofOwner::of($identity)) as $enrollment) {
             $this->enrollments->forget($enrollment);
         }
 
         foreach ($factors as $factor) {
+
+            if (!$readable->contains($factor)) {
+
+                $this->removal->erase($identity, $factor);
+
+                continue;
+            }
 
             $summary   = FactorSummary::fromFactor($factor);
             $confirmed = $factor->isConfirmed();

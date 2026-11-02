@@ -130,8 +130,15 @@ authentication layer the Laravel login itself goes on, and its next protected re
 
 Once it commits the events follow, in this order: `LockoutLifted` for each live lockout, naming the actor; in id order,
 `FactorRemoved` naming the actor for a confirmed factor and `EnrollmentAbandoned` for a pending one;
-`RecoveryCodesRemoved` when there was a set; and `FactorsReset`, with the actor, the reason and whether re-enrolment is
-required.
+`RecoveryCodesRemoved` when there was a set; and `FactorsReset`, with the actor, the reason, whether re-enrolment is
+required and `unreadableFactors`.
+
+A reset is the remedy for a factor whose stored state cannot be read: a status the package does not know, or a deadline
+or disabled time that is not a time. Such a factor makes verifying, listing and removing it throw, so the person cannot
+pass, but a reset removes every factor of the identity whatever its state. One whose state cannot be read is never read
+for a lift, so its deadline goes with its row, and no status or confirmation is invented for it: it has no
+`FactorRemoved` or `EnrollmentAbandoned` of its own, and `FactorsReset::$unreadableFactors` counts it, so the audit trail
+still records it.
 
 ### Racing a verification
 

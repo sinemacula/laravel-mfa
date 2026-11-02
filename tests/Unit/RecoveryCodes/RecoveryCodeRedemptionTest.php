@@ -7,10 +7,12 @@ namespace Tests\Unit\RecoveryCodes;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -386,6 +388,47 @@ final class RecoveryCodeRedemptionTest extends TestCase
         $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
 
         Factor::query()->update(['status' => 'pending']);
+
+        $this->assertRefusedRedemption($code, FailureReason::NO_FACTOR);
+    }
+
+    /**
+     * Stored statuses that are not exactly `confirmed`, each beside the
+     * collation that would match it to `confirmed`.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function nearlyConfirmed(): iterable
+    {
+        yield 'another case' => ['CONFIRMED', 'NOCASE'];
+        yield 'padded' => ['confirmed ', 'RTRIM'];
+    }
+
+    /**
+     * A valid code is refused when the only factor's stored status is not
+     * exactly `confirmed`, even where the column's collation matches it to
+     * `confirmed`: a case and padding insensitive one is MySQL's default, and
+     * SQLite is given the same here, so the check is shown to be made in PHP.
+     *
+     * @param  string  $status
+     * @param  string  $collation
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('nearlyConfirmed')]
+    public function testAStatusThatIsNotExactlyConfirmedIsNoConfirmedFactor(string $status, string $collation): void
+    {
+        $holder = $this->signInHolder();
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Schema::table('mfa_factors', static function (Blueprint $table) use ($collation): void {
+                $table->string('status', 16)->default('pending')->collation($collation)->change();
+            });
+        }
+
+        Factor::query()->toBase()->update(['status' => $status]);
 
         $this->assertRefusedRedemption($code, FailureReason::NO_FACTOR);
     }

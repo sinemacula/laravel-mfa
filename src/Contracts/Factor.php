@@ -123,6 +123,8 @@ interface Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethod
      * not confirmed can let a weaker path through.
      *
      * @return \SineMacula\Laravel\Mfa\Enums\FactorStatus
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function getStatus(): FactorStatus;
 
@@ -155,6 +157,8 @@ interface Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethod
      * throw, never read as `null`, since that would enable the factor.
      *
      * @return ?\Carbon\CarbonInterface
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function getDisabledAt(): ?CarbonInterface;
 

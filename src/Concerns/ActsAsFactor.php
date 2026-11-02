@@ -294,7 +294,9 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
      * factor not yet given one. Anything else throws rather than reads as
      * pending, a stored factor with no status included: a factor read as not
      * confirmed can let through a path that a confirmed one would hold to a
-     * stronger proof.
+     * stronger proof. On a model that casts the column to the enum, a value the
+     * enum does not know throws Laravel's `ValueError` from the cast before it
+     * gets here: that fails closed too, though not as `InvalidModelException`.
      *
      * @return \SineMacula\Laravel\Mfa\Enums\FactorStatus
      *

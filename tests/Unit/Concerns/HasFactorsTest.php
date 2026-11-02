@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\CustomFactor;
+use Tests\Fixtures\Factors\EnumStatusFactor;
 use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\SoftDeletingFactorHolder;
@@ -132,6 +133,64 @@ final class HasFactorsTest extends TestCase
 
         $this->createFactor($identity, 'pending');
         $this->createFactor($identity, $status);
+
+        self::assertTrue($identity->isMfaEnabled());
+    }
+
+    /**
+     * A stored factor with no status at all, where a column allows that, holds
+     * the identity to MFA too.
+     *
+     * @return void
+     */
+    public function testAFactorWithNoStatusEnablesMfa(): void
+    {
+        Schema::table('mfa_factors', static function (Blueprint $table): void {
+            $table->string('status', 16)->nullable()->default(null)->change();
+        });
+
+        $identity = $this->createHolder('one@example.test');
+
+        Factor::query()->create([
+            'authenticatable_type' => $identity->getMorphClass(),
+            'authenticatable_id'   => (string) $identity->id,
+            'type'                 => 'totp',
+            'status'               => null,
+        ]);
+
+        self::assertNull(Factor::query()->value('status'));
+        self::assertTrue($identity->isMfaEnabled());
+    }
+
+    /**
+     * On a model that casts its status to the enum, the stored values are read
+     * as stored: a pending one does not count, a confirmed one does, and so
+     * does one the enum does not know, which the model itself cannot read.
+     *
+     * @return void
+     */
+    public function testAnEnumCastStatusIsReadAsStored(): void
+    {
+        $this->container()->make(Repository::class)->set('mfa.factor.model', EnumStatusFactor::class);
+
+        $identity = $this->createHolder('one@example.test');
+        $factor   = fn (string $status): EnumStatusFactor => EnumStatusFactor::query()->create([
+            'authenticatable_type' => $identity->getMorphClass(),
+            'authenticatable_id'   => (string) $identity->id,
+            'type'                 => 'totp',
+            'status'               => $status,
+        ]);
+
+        $pending = $factor('pending');
+
+        self::assertFalse($identity->isMfaEnabled());
+
+        EnumStatusFactor::query()->whereKey($pending->getKey())->toBase()->update(['status' => 'CONFIRMED']);
+
+        self::assertTrue($identity->isMfaEnabled());
+
+        EnumStatusFactor::query()->whereKey($pending->getKey())->toBase()->update(['status' => 'pending']);
+        $factor('confirmed');
 
         self::assertTrue($identity->isMfaEnabled());
     }

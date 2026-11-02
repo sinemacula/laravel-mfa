@@ -27,7 +27,6 @@ use SineMacula\Laravel\Mfa\Database\BoundedDelete;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\OpenTransaction;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
-use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Events\Actor;
@@ -38,6 +37,7 @@ use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
+use SineMacula\Laravel\Mfa\Factors\ConfirmedFactors;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -722,7 +722,10 @@ final readonly class RecoveryCodeService
 
     /**
      * Determine whether the identity still has a confirmed factor, read with a
-     * locking read under the identity's lock.
+     * locking read under the identity's lock. The factors are matched to the
+     * owner exactly and their status compared in PHP (see
+     * `Factors\ConfirmedFactors`), as a collation that ignores case or padding
+     * would let a status such as `CONFIRMED` admit a code in SQL.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @return bool
@@ -736,12 +739,14 @@ final readonly class RecoveryCodeService
 
         [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factor);
 
-        return $factor->newQuery()
+        /** @var \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $factors */
+        $factors = $factor->newQuery()
             ->where($typeColumn, $owner->type)
             ->where($keyColumn, $owner->key)
-            ->where($factor->getStatusName(), FactorStatus::CONFIRMED->value)
             ->lockForUpdate()
-            ->value($factor->getKeyName()) !== null;
+            ->get();
+
+        return ConfirmedFactors::isAmong($factors->filter(static fn (EloquentFactor&Model $stored): bool => FactorOwnerColumns::owns($stored, $owner->type, $owner->key)));
     }
 
     /**

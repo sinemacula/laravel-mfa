@@ -36,12 +36,11 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * masked, and Laravel does not report an HTTP exception, so nothing secret
  * reaches a log.
  *
- * `hasConfirmedFactor` is the identity's `isMfaEnabled()`: whether it has a
- * factor that is not pending, one whose stored status is none the package knows
- * included, so a corrupt status is never reported as having no factor. It is no
- * authority to bootstrap. Having none does not mean enrolment is needed, as a
- * multi-factor first factor can meet a requirement, and it is no grant:
- * enrolment has its own checks.
+ * `hasConfirmedFactor` is a fact: whether the identity has a factor whose
+ * stored status is exactly `confirmed`, a status the package does not know
+ * counting as none. It is no authority to bootstrap. Having none does not mean
+ * enrolment is needed, as a multi-factor first factor can meet a requirement,
+ * and it is no grant: enrolment has its own checks.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -70,7 +69,7 @@ final class InsufficientAuthenticationException extends HttpException
         /** The operation the route names, when it names one. */
         public readonly ?string $operation = null,
 
-        /** Whether the identity has a factor that is not pending. */
+        /** Whether the identity has a factor whose stored status is exactly `confirmed`. */
         public readonly bool $hasConfirmedFactor = false,
     ) {
         parent::__construct(401, ConsumerMessages::line(ConsumerMessages::FURTHER_AUTHENTICATION_REQUIRED));

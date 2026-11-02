@@ -5,8 +5,10 @@ declare(strict_types = 1);
 namespace Tests\Feature\Lifecycle;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
@@ -36,6 +38,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Factors\RemappedLockoutFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
@@ -293,6 +296,79 @@ final class ResettingIdentityTest extends TestCase
         Mfa::resetIdentity($user, self::actor(), self::REASON);
 
         self::assertSame(['FactorsReset'], $this->reportedNames());
+
+        $reset = $this->reported[0];
+
+        self::assertInstanceOf(FactorsReset::class, $reset);
+        self::assertSame(0, $reset->unreadableFactors);
+    }
+
+    /**
+     * A reset removes a factor whose status cannot be read, beside one that
+     * can, reporting no removal for it, since its summary cannot be built
+     * honestly, and counting it on `FactorsReset` instead.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAResetRemovesAFactorWhoseStatusCannotBeRead(): void
+    {
+        $user    = $this->signedInPerson();
+        $corrupt = $this->confirmedFactor($user);
+        $sound   = $this->confirmedFactor($user);
+
+        Factor::query()->whereKey($corrupt->id)->toBase()->update(['status' => 'CONFIRMED', 'locked_until' => CarbonImmutable::now()->addHour()]);
+
+        Mfa::resetIdentity($user, self::actor(), self::REASON);
+
+        self::assertSame(0, Factor::query()->count());
+        self::assertSame(['FactorRemoved', 'FactorsReset'], $this->reportedNames());
+
+        [$removed, $reset] = $this->reported;
+
+        self::assertInstanceOf(FactorRemoved::class, $removed);
+        self::assertSame($sound->id, $removed->factor->id);
+        self::assertInstanceOf(FactorsReset::class, $reset);
+        self::assertSame(1, $reset->unreadableFactors);
+    }
+
+    /**
+     * A reset removes a factor whose deadline cannot be read, clearing it with
+     * the row rather than reading it, and lifts nothing for it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAResetRemovesAFactorWhoseDeadlineCannotBeRead(): void
+    {
+        config()->set('mfa.factor.model', RemappedLockoutFactor::class);
+
+        Schema::table('mfa_factors', static function (Blueprint $table): void {
+            $table->string('held_until')->nullable();
+        });
+
+        $user = $this->signedInPerson();
+
+        $factor = RemappedLockoutFactor::query()->create([
+            'authenticatable_type' => $user->getMorphClass(),
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'totp',
+            'status'               => 'confirmed',
+        ]);
+
+        DB::table('mfa_factors')->where('id', $factor->getKey())->update(['held_until' => 'not a time']);
+
+        Mfa::resetIdentity($user, self::actor(), self::REASON);
+
+        self::assertSame(0, DB::table('mfa_factors')->count());
+        self::assertSame(['FactorsReset'], $this->reportedNames());
+
+        $reset = $this->reported[0];
+
+        self::assertInstanceOf(FactorsReset::class, $reset);
+        self::assertSame(1, $reset->unreadableFactors);
     }
 
     /**
