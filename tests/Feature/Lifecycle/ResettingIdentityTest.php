@@ -5,11 +5,13 @@ declare(strict_types = 1);
 namespace Tests\Feature\Lifecycle;
 
 use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
@@ -25,6 +27,7 @@ use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Lifecycle\IdentityReset;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -38,6 +41,8 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Factors\EnumStatusFactor;
+use Tests\Fixtures\Factors\FailingReadFactor;
 use Tests\Fixtures\Factors\RemappedLockoutFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -369,6 +374,102 @@ final class ResettingIdentityTest extends TestCase
 
         self::assertInstanceOf(FactorsReset::class, $reset);
         self::assertSame(1, $reset->unreadableFactors);
+    }
+
+    /**
+     * Rows of `[column, stored value, exception]`: a value an application's own
+     * model, casting the status to the enum, cannot read, and what reading it
+     * throws.
+     *
+     * @return iterable<string, array{0: string, 1: string, 2: class-string<\Throwable>}>
+     */
+    public static function unreadableFactors(): iterable
+    {
+        yield 'a status the enum does not know' => ['status', 'CONFIRMED', \ValueError::class];
+        yield 'a disabled time that is not a time' => ['disabled_at', 'not a time', InvalidFormatException::class];
+    }
+
+    /**
+     * A reset removes a factor an application's own model cannot read, its cast
+     * throwing rather than the package's own refusal, beside one it can,
+     * reporting no removal for it and counting it on `FactorsReset` instead.
+     *
+     * @param  string  $column
+     * @param  string  $value
+     * @param  class-string<\Throwable>  $exception
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('unreadableFactors')]
+    public function testAResetRemovesAFactorItCannotRead(string $column, string $value, string $exception): void
+    {
+        config()->set('mfa.factor.model', EnumStatusFactor::class);
+
+        if ($column === 'disabled_at') {
+            Schema::table('mfa_factors', static function (Blueprint $table): void {
+                $table->string('disabled_at')->nullable()->change();
+            });
+        }
+
+        $user    = $this->signedInPerson();
+        $corrupt = $this->confirmedFactor($user);
+        $sound   = $this->confirmedFactor($user);
+
+        DB::table('mfa_factors')->where('id', $corrupt->id)->update([$column => $value]);
+
+        try {
+            FactorSummary::fromFactor(EnumStatusFactor::query()->findOrFail($corrupt->id));
+            self::fail('The corrupted factor was expected not to be readable.');
+        } catch (\Throwable $thrown) {
+            self::assertInstanceOf($exception, $thrown);
+        }
+
+        Mfa::resetIdentity($user, self::actor(), self::REASON);
+
+        self::assertSame(0, DB::table('mfa_factors')->count());
+        self::assertSame(['FactorRemoved', 'FactorsReset'], $this->reportedNames());
+
+        [$removed, $reset] = $this->reported;
+
+        self::assertInstanceOf(FactorRemoved::class, $removed);
+        self::assertSame($sound->id, $removed->factor->id);
+        self::assertInstanceOf(FactorsReset::class, $reset);
+        self::assertSame(1, $reset->unreadableFactors);
+    }
+
+    /**
+     * A factor whose read fails for any other reason is not taken for one that
+     * cannot be read: the failure propagates from the first read, before the
+     * reset writes anything, so nothing changes and nothing is reported.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnUnrelatedReadFailureIsNotTakenForAnUnreadableFactor(): void
+    {
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+
+        $this->recoveryCodesOf($user);
+
+        $generation = VerificationGeneration::current($user);
+
+        config()->set('mfa.factor.model', FailingReadFactor::class);
+
+        try {
+            Mfa::resetIdentity($user, self::actor(), self::REASON);
+            self::fail('A read that failed was expected to propagate.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame(FailingReadFactor::MESSAGE, $exception->getMessage());
+        }
+
+        self::assertTrue($this->isStored($factor));
+        self::assertSame(10, RecoveryCode::query()->count());
+        self::assertFalse(ReenrollmentObligation::isRequired($user));
+        self::assertSame($generation, VerificationGeneration::current($user));
+        self::assertSame([], $this->reportedNames());
     }
 
     /**

@@ -53,6 +53,21 @@ the provider or another capability.
   extender or resolving callback on `mfa`, so a consumer's registration of the same name replaces them however it is
   made: `Mfa::extend()`, a container extender or a resolving callback. Shipped drivers are therefore indistinguishable
   from an application's, which is what keeps every [operating mode](operating-modes.md) the same.
+- The dependency rules between namespaces are data in `NamespaceDependenciesTest`, so a change that moves a class or
+  narrows a dependency adds or tightens a rule there. Enums name nothing else of the package; models name only its
+  concerns, contracts, storage and enums; the seam defaults only its contracts and enums. Exceptions and events carry
+  summaries, never models: exceptions name only enums, the support helpers, `Factors\FactorSummary`, `Codes\SendResult`
+  and `Requirements\Requirement`, and events only the context, contracts, storage, enums, support helpers and
+  `Factors\FactorSummary`. The assurance vocabulary names none of the capabilities that use it, and storage, the
+  support helpers and secrets name no capability but `Proofs\ProofOwner` and `Codes\MfaCodeMessage`. Contracts name no
+  model, capability service, seam default or composition root. Only the manager names a flow service (enrolment,
+  factors, lifecycle, verification); only the provider names the HTTP layer, a `*Bindings` class, or, with the
+  configuration bindings, the console; only the provider, the facade and the driver bindings name the manager; nothing
+  names the provider or the facade; and only the testing helpers name the testing helpers. Only
+  `Events\EventDispatcher` reaches Laravel's event dispatcher (its contract, its class, its facade, its container key,
+  the `Dispatchable` trait or the `event()` helper), apart from `Proofs\ProofBindings`, which only registers the sign-in
+  listeners on it. The test reads tokens, not a parse, so a class named in a string, or unqualified within its own
+  namespace, is not seen: it is a backstop for the rules, not a proof of them.
 - The public surface is unchanged by the layout: the manager's and the facade's method names, the configuration keys,
   the events and the middleware aliases are the same whichever service answers them.
 
@@ -125,6 +140,12 @@ the provider or another capability.
   `testContainerExtenderOverrideOfTotpWins`
 - `tests/Integration/CustomDriverExtensionTest.php`
   `testResolvingCallbackOverrideOfTotpWins`
+- `tests/Unit/Architecture/NamespaceDependenciesTest.php`
+  `testNoClassNamesWhatItsRuleForbids`
+- `tests/Unit/Architecture/NamespaceDependenciesTest.php`
+  `testOnlyTheProviderNamesABindingsClass`
+- `tests/Unit/Architecture/NamespaceDependenciesTest.php`
+  `testOnlyTheEventDispatcherReachesLaravelsDispatcher`
 
 ## Change Triggers
 
@@ -137,3 +158,5 @@ Update this note when any of the following change:
 - how or when the shipped drivers are registered against the manager, whether a driver is cached, or which manager a
   service runs drivers from
 - a service starts keeping request state between calls
+- a class moves, or a dependency between namespaces is added or narrowed (and its rule in `NamespaceDependenciesTest`
+  with it)

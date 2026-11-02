@@ -39,7 +39,9 @@ event carries is built, and why every event is dispatched only after the change 
 - `Events\EventDispatcher::dispatch()` is the one way the package dispatches an event: at once when the storage
   connection has no open transaction, when that transaction commits otherwise, and never when it rolls back. A
   transaction on another connection neither delays nor drops it. The transactions manager is read when the event is
-  dispatched, so the testing traits' manager, which ignores their wrapping transaction, is honoured.
+  dispatched, so the testing traits' manager, which ignores their wrapping transaction, is honoured. No other class
+  reaches Laravel's dispatcher, by its contract, its class, its facade, its container key, the `Dispatchable` trait or
+  the `event()` helper, but `Proofs\ProofBindings`, which only registers the sign-in listeners on it.
 - An event dispatched inside a nested transaction runs ahead of those its outer transaction dispatched, however early,
   as the nested one commits first. A flow that nests a transaction inside its own, as `RecoveryCodeService::generate()`
   does, therefore dispatches from outside it, so the events of an enrolment keep the order
@@ -73,12 +75,15 @@ event carries is built, and why every event is dispatched only after the change 
 - `tests/Unit/Events/EventCatalogTest.php` `testNoEventCarriesASecretACodeAUriOrAFullDestination`,
   `testEveryEventSaysWhatItWasFor`
 - `tests/Unit/Events/EventDispatcherTest.php` `testARollbackDispatchesNothing`
+- `tests/Unit/Architecture/NamespaceDependenciesTest.php` `testOnlyTheEventDispatcherReachesLaravelsDispatcher`
+- `tests/Unit/Documentation/DocumentationTest.php` `testEveryEventIsInTheEventsTable`,
+  `testEveryEventContextKeyIsDocumented`
 - `tests/Unit/Events/EventContextTest.php`
 - `tests/Unit/Context/DefaultEventContextResolverTest.php`
 
 ## Change Triggers
 
-- A new event: a class in `Events` extending `ContextEvent`, its purpose, a row in the events guide, and a row in the
-  catalogue test.
-- A new context key: `EventContext::KEYS`, the guide and the resolvers.
+- A new event: a class in `Events` extending `ContextEvent`, its purpose, a row in the events guide (which
+  `DocumentationTest` requires), and a row in the catalogue test.
+- A new context key: `EventContext::KEYS`, the guide (which `DocumentationTest` requires) and the resolvers.
 - Any change to when events are dispatched relative to the transaction.

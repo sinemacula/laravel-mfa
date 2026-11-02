@@ -103,7 +103,8 @@ registration included (see [Enrolment](enrollment.md)).
 | `limits.pending`            | `2`                       | Enrolments an identity may have pending through the application at once, 1 to 10                                                       |
 | `totp_window`               | `totp.window`             | TOTP time steps accepted either side of the current one, 0 to 3                                                                        |
 | `freshness`                 | 900 seconds per operation | The requirement each named operation's step-up must meet: seconds, 1 to 86400, or a requirement (below)                                |
-| `first_factor`              | `null`                    | The first factor the application's guard signs people in with: a `method` and the `channel` kind it proves                             |
+| `first_factor.method`       | `null`                    | The method the application's guard signs people in with, by any name, such as `password`                                               |
+| `first_factor.channel`      | `null`                    | The channel kind that method proves, any but `unknown`; `first_factor` is `null` or sets both keys                                     |
 
 An application with no block, and one whose block leaves a key out or sets it to `null`, takes the defaults: no type, no
 requirement, no recovery codes and no bootstrap, so a name nobody configured enables nothing. Left unset,
