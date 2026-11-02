@@ -148,6 +148,7 @@ passwords, because codes of 65 bits need a salted, slow hash to resist an offlin
 redemption costs one hash check per unused code, so at bcrypt's default cost a full set of 10 takes about as long as
 ten password checks; lower `recovery_codes.count`, or the hashing cost, if that is too slow for you. Generating a set
 hashes each code once, before the identity's lock is taken.
+[Budgets and benchmarks](../design/budgets-and-benchmarks.md) says how this is measured.
 
 Switching hashing driver (from bcrypt to Argon2id, say) with `hashing.*.verify` on, Laravel's default, makes existing
 sets fail with the hasher's `RuntimeException` until each identity generates a new one, as it does for passwords.
