@@ -87,13 +87,16 @@ final class FactorServiceTest extends TestCase
     {
         $user = $this->signIn();
 
-        foreach (['01c', '01a', '01b'] as $id) {
+        // Full length, as the column is fixed width and PostgreSQL pads it.
+        [$a, $b, $c] = array_map(static fn (string $letter): string => str_repeat($letter, 26), ['a', 'b', 'c']);
+
+        foreach ([$c, $a, $b] as $id) {
             $factor = $this->addFactor($user, ['status' => 'confirmed']);
 
-            DB::table('mfa_factors')->where('id', $factor->id)->update(['id' => $id, 'preferred' => $id === '01b']);
+            DB::table('mfa_factors')->where('id', $factor->id)->update(['id' => $id, 'preferred' => $id === $b]);
         }
 
-        self::assertSame(['01b', '01a', '01c'], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->service()->factors()));
+        self::assertSame([$b, $a, $c], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->service()->factors()));
     }
 
     /**

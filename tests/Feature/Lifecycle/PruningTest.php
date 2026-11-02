@@ -285,13 +285,16 @@ final class PruningTest extends TestCase
         $store = $this->container()->make(AttemptStore::class);
         $now   = CarbonImmutable::now()->getTimestamp();
 
-        $store->hold('ended', AttemptScope::IP, 3, $now - 1);
-        $store->hold('edge', AttemptScope::IP, 3, $now);
-        $store->hold('counting', AttemptScope::IP, 3, $now + 1);
+        // Full length, as the column is fixed width and PostgreSQL pads it.
+        [$ended, $edge, $counting] = array_map(static fn (string $letter): string => str_repeat($letter, 64), ['a', 'b', 'c']);
+
+        $store->hold($ended, AttemptScope::IP, 3, $now - 1);
+        $store->hold($edge, AttemptScope::IP, 3, $now);
+        $store->hold($counting, AttemptScope::IP, 3, $now + 1);
 
         self::assertSame(2, Mfa::prune()->attempts);
-        self::assertSame([], $store->read(['ended', 'edge']));
-        self::assertArrayHasKey('counting', $store->read(['counting']));
+        self::assertSame([], $store->read([$ended, $edge]));
+        self::assertArrayHasKey($counting, $store->read([$counting]));
     }
 
     /**
