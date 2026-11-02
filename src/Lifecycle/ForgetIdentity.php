@@ -24,18 +24,18 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * and factor state.
  *
  * The `HasFactors` trait calls it once an Eloquent identity's row is deleted;
- * an application whose identities are not Eloquent models calls it itself,
- * after deleting the identity. It runs in the identity's factor state
- * transaction (see `Support\FactorStateTransaction`), so nothing is left half
- * deleted and a change already holding the identity's lock commits first and is
- * deleted with the rest; called inside a transaction on the storage connection,
- * it joins it. The temporary throttles are left to expire: they are keyed by a
- * hash and hold nothing that names the identity.
- *
- * @api
+ * an application whose identities are not Eloquent models calls
+ * `Mfa::forgetIdentity()`, after deleting the identity. It runs in the
+ * identity's factor state transaction (see `Support\FactorStateTransaction`),
+ * so nothing is left half deleted and a change already holding the identity's
+ * lock commits first and is deleted with the rest; called inside a transaction
+ * on the storage connection, it joins it. The temporary throttles are left to
+ * expire: they are keyed by a hash and hold nothing that names the identity.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
+ *
+ * @internal
  */
 final readonly class ForgetIdentity
 {

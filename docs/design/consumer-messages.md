@@ -13,8 +13,8 @@ translation cannot be used, and what is deliberately left out.
 - The keys are American identifiers and stable names; the wording is British. `ConsumerMessages` has one constant per
   shipped key, and a test holds the two lists equal.
 - The translator is resolved through `Container::getInstance()` on every call, so under Octane it is the sandbox's. No
-  singleton holds a translator, a locale or a template: the driver holds no SMS wording, because a driver cached on the
-  manager could not follow the request's locale.
+  singleton holds a translator, a locale or a template: the driver holds no SMS wording, as the words belong to the
+  locale the message is sent in.
 - There is no configured SMS wording. A config string silently defeats every locale, so the only way to change the text
   is a translation.
 - A code stays out of the translator's arguments, replacement arrays and missing-key callbacks: `codeLine()` returns a

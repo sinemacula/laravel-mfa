@@ -118,7 +118,7 @@ final class MfaServiceProvider extends ServiceProvider
 
             $manager = new MfaManager($app);
 
-            DriverBindings::extend($manager, $app);
+            DriverBindings::extend($manager);
 
             return $manager;
         });

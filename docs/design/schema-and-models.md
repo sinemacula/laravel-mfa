@@ -59,7 +59,10 @@ factors starts with.
   model's `deleted` event, once its row is gone, unless the delete was soft.
 - `Lifecycle\ForgetIdentity` deletes the identity's codes, enrolments, passkey associations, recovery codes, factors and
   state row in its factor state transaction, by the owner columns of each model (a replaced factor or recovery code
-  model's own relation columns). The attempt throttles are left to expire.
+  model's own relation columns). The attempt throttles are left to expire. `Mfa::forgetIdentity()` is its one-call
+  entry point.
+- `Models\Factor` binds to a route only within the caller's identity (see
+  [Factor Route Binding](factor-route-binding.md)).
 - `Factors\OperationGuard` is the first step of every operation on an identity's factors, refusing in this order: a
   machine (`machine_identity`), an inactive identity (`identity_inactive`), a factor not found within the identity
   (`not_found`, for another identity's id exactly as for one that does not exist), a pending factor where the
@@ -80,7 +83,7 @@ factors starts with.
 - A factor id that is neither a string nor an integer, or an identity whose key is neither, finds nothing.
 - An inactive machine is refused as a machine: the reasons are checked in a fixed order.
 - A model deleted without its events (a query builder `delete()`) is not forgotten by the trait; the application calls
-  `ForgetIdentity` itself, as it does for an identity that is not an Eloquent model.
+  `Mfa::forgetIdentity()` itself, as it does for an identity that is not an Eloquent model.
 - A delete that a `deleting` listener cancels, or that fails, forgets nothing: the trait listens for `deleted`, so an
   identity is never left live without its factors. A soft delete forgets nothing; a force delete forgets the identity.
 - The forgetting commits on its own after the delete, unless the delete runs in a transaction on the storage

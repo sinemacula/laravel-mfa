@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
+use SineMacula\Laravel\Mfa\Concerns\ResolvesFactorRouteBinding;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
@@ -19,7 +20,8 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * connection with the package's other tables. Swappable via
  * `config('mfa.factor.model')` / `mfa.factor.table` as the package's default
  * Eloquent adapter. Subclasses MUST continue satisfying the `Factor`
- * persistence boundary.
+ * persistence boundary. An implicit route binding of it finds only the caller's
+ * own factors (see `Concerns\ResolvesFactorRouteBinding`).
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -48,7 +50,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  */
 class Factor extends Model implements EloquentFactor
 {
-    use ActsAsFactor, HasUlids;
+    use ActsAsFactor, HasUlids, ResolvesFactorRouteBinding;
 
     /** @var list<string> The attributes that are mass assignable. */
     protected $fillable = [

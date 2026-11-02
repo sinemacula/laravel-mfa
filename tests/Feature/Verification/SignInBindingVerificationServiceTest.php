@@ -326,7 +326,7 @@ final class SignInBindingVerificationServiceTest extends TestCase
         self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
         self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->sendCode($email->id)->reason);
         self::assertSame([], $this->reported);
-        self::assertSame([], $this->mfa()->requestAssertion($factor->id));
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->requestAssertion($factor->id)->reason);
     }
 
     /**

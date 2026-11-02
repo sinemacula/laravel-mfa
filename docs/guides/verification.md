@@ -17,7 +17,8 @@ $result = Mfa::verify(Submission::challenge($factorId, $sent->challengeId, $code
 
 $result = Mfa::verify(Submission::factor($factorId, $code));        // TOTP, or a driver of your own
 $result = Mfa::verify(Submission::recoveryCode($code));             // a recovery code
-$result = Mfa::verify(Submission::assertion($factorId, $response)); // a passkey's response to Mfa::requestAssertion()
+$request = Mfa::requestAssertion($factorId);       // an AssertionRequest: the options, or the reason
+$result  = Mfa::verify(Submission::assertion($factorId, $response)); // a passkey's response to those options
 
 if ($result->isFailed()) {
     return response()->json(['reason' => $result->reason->value], 422);

@@ -49,10 +49,16 @@ moment when both work or neither exists, and what a redemption leaves behind.
   `RecoveryCodesGenerated` (size, generation, actor) is queued for the commit. The codes are returned once the
   transaction has committed.
 - The public path, `Mfa::generateRecoveryCodes()` (`RecoveryCodes\RecoveryCodeIssuance`), serves the signed-in person
-  only, never a pending session. It captures the binding, and refuses as `not_fresh`, before the draw and again first
+  only, never a pending session, and answers with a `RecoveryCodes\RecoveryCodeGeneration`: the codes, or a reason.
+  Nobody served is `not_found`. It captures the binding, and refuses as `not_fresh`, before the draw and again first
   under the lock, a sign-in that changed, a session not fresh for `mfa.generate_recovery_codes` and one below
   `ApplicationSettings::recoveryCodeLevel()`, since the remedy is the same stronger step-up; a refusal leaves the old
   set intact.
+- Only the package's own refusals become a reason. `RecoveryCodeService::generate()` keeps its throwing contract for
+  its internal callers, and is `replaceSet()`, everything up to the commit, then `reportGenerated()`. The issuance wraps
+  only `replaceSet()`, where a refusal `OperationRefusedException::byPackage()` marked becomes the answer and any other
+  is thrown on, rolling back, and reports outside the wrapping: a listener's exception, marked or not, is never read as
+  a refusal of a set that committed, and an application's outer transaction still defers the event to its own commit.
 - Redemption (`Mfa::verify(Submission::recoveryCode(...))`, then `RecoveryCodeService::admission()` and `redeem()`,
   under the identity's lock the verification holds): an inactive identity, an application that does not accept recovery
   codes, no confirmed factor as stored and an unknown first factor are refused before any hash is checked. The attempt
@@ -64,9 +70,10 @@ moment when both work or neither exists, and what a redemption leaves behind.
   then queues `VerificationPassed`, and `RecoveryCodeService::reportRedeemed()` queues `RecoveryCodeUsed` with the
   remaining count and, when `low_count` is above 0 and the remaining count is at or below it, `RecoveryCodesLow`, in
   that order.
-- Status (`RecoveryCodeService::status()`, `Mfa::recoveryCodes()`): one statement on the write connection, the state
-  row left-joined to the usable codes of its current generation, gives the remaining count, the generation and the
-  time, so the count and the generation are always of the same set. No lock is taken.
+- Status (`RecoveryCodeService::status()`, `Mfa::recoveryCodeStatus()`, which reads the caller through
+  `statusOfCaller()`): one statement on the write connection, the state row left-joined to the usable codes of its
+  current generation, gives the remaining count, the generation and the time, so the count and the generation are always
+  of the same set. No lock is taken.
 - Removal (`RecoveryCodeService::removeSet()`): inside the transaction that removes the identity's last confirmed
   factor, every code row is deleted and the set's time cleared; the generation is kept. `RecoveryCodesRemoved` is
   queued when there was a set, used up or not, or any code row. `Lifecycle\FactorRemoval::remove()` deletes the

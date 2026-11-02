@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
+use SineMacula\Laravel\Mfa\Concerns\ResolvesFactorRouteBinding;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
@@ -40,6 +41,7 @@ use Tests\TestCase;
 #[CoversClass(FactorService::class)]
 #[CoversClass(ReenrollmentObligation::class)]
 #[CoversTrait(HasFactors::class)]
+#[CoversTrait(ResolvesFactorRouteBinding::class)]
 final class WriteConnectionReadTest extends TestCase
 {
     use MigratesTheStorageConnection;
@@ -106,6 +108,28 @@ final class WriteConnectionReadTest extends TestCase
         self::assertSame(0, $user->authFactors()->count());
 
         self::assertSame([$factor->getKey()], array_map(static fn (FactorSummary $read): string => $read->id, Mfa::factors()));
+    }
+
+    /**
+     * A factor on the writer and not yet on the reader binds to a route.
+     *
+     * @return void
+     */
+    public function testAFactorNotYetOnTheReaderStillBinds(): void
+    {
+        $user = TestUser::query()->create(['email' => 'bound@example.test', 'mfa_enabled' => true]);
+
+        $this->actingAs($user);
+
+        $factor = Factor::query()->create([
+            'authenticatable_type' => $user->getMorphClass(),
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'totp',
+        ]);
+
+        self::assertSame(0, Factor::query()->whereKey($factor->getKey())->count());
+        self::assertSame($factor->getKey(), (new Factor)->resolveRouteBinding($factor->getKey())?->getKey());
+        self::assertSame(0, Factor::query()->whereKey($factor->getKey())->count(), 'The connection must read the replica again afterwards.');
     }
 
     /**

@@ -12,9 +12,9 @@ use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\TestCase;
 
 /**
- * Tests for `DriverResolver`: drivers come from the registry passed in, a
- * driver that is not a `FactorDriver` is refused, and a factor is only run
- * through its own driver.
+ * Tests for `DriverResolver`: drivers come from the manager passed in, a driver
+ * that is not a `FactorDriver` is refused, and a factor is only run through its
+ * own driver.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,7 +38,7 @@ final class DriverResolverTest extends TestCase
 
         $this->manager()->extend('custom', fn (): NoopFactorDriver => $custom);
 
-        self::assertSame($this->manager()->driver('totp'), $this->resolver()->driver($this->manager(), 'totp'));
+        self::assertInstanceOf(TotpDriver::class, $this->resolver()->driver($this->manager(), 'totp'));
         self::assertInstanceOf(TotpDriver::class, $this->resolver()->resolve($this->manager(), 'totp'));
         self::assertSame($custom, $this->resolver()->resolve($this->manager(), 'custom'));
     }

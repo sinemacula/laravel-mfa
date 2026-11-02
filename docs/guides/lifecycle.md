@@ -175,12 +175,10 @@ identity is reset. The lower-level helpers are in [Attempts and lockouts](attemp
 ## Pruning
 
 ```php
-use SineMacula\Laravel\Mfa\Lifecycle\RecordPruner;
-
 Mfa::prune();                                           // PruneResult: enrollments, codes, recoveryCodes, attempts
 
 $schedule->command('mfa:prune')->daily();               // prints how many of each kind went
-$schedule->call(RecordPruner::class)->daily();          // or the helper itself
+$schedule->call(fn () => Mfa::prune())->daily();        // or the helper itself
 ```
 
 The package schedules nothing itself. `lifecycle.prune_after_days` (1 to 3650, default 30) is how long a record is kept

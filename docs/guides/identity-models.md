@@ -79,7 +79,7 @@ public function requiresAdditionalFactor(): ?Requirement
 
 Deleting the model deletes everything the package holds for it: its factors, its enrolments in progress, its delivered
 codes, its recovery codes, its passkey associations and its factor state. The trait does it on the model's `deleted`
-event, once the identity's row is gone, through `Lifecycle\ForgetIdentity`, in the identity's factor state transaction:
+event, once the identity's row is gone, in the identity's factor state transaction:
 
 - A delete that another `deleting` listener cancels, or that fails, forgets nothing, so the identity never outlives its
   factors.
@@ -93,9 +93,9 @@ An identity that is not an Eloquent model, or a model deleted without its events
 forgotten by calling the helper:
 
 ```php
-use SineMacula\Laravel\Mfa\Lifecycle\ForgetIdentity;
+use SineMacula\Laravel\Mfa\Facades\Mfa;
 
-app(ForgetIdentity::class)->forget($identity);
+Mfa::forgetIdentity($identity);
 ```
 
 The temporary attempt throttles are left to expire: they are keyed by a hash and hold nothing that names the identity.

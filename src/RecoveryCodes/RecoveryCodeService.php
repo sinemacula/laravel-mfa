@@ -18,6 +18,7 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -28,6 +29,7 @@ use SineMacula\Laravel\Mfa\Database\OpenTransaction;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
@@ -88,6 +90,7 @@ final readonly class RecoveryCodeService
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
      * @param  \SineMacula\Laravel\Mfa\Events\EventDispatcher  $events
      * @param  \SineMacula\Laravel\Mfa\Context\SessionFirstFactor  $firstFactors
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      */
     public function __construct(
 
@@ -114,6 +117,9 @@ final readonly class RecoveryCodeService
 
         /** The reader of the session's first factor. */
         private SessionFirstFactor $firstFactors,
+
+        /** The resolver of who the request serves. */
+        private CallerContextResolver $callers,
     ) {}
 
     /**
@@ -151,6 +157,33 @@ final readonly class RecoveryCodeService
     {
         $application ??= $this->proofs->application();
 
+        ['codes' => $codes, 'generation' => $generation] = $this->replaceSet($identity, $application, $gate);
+
+        // Dispatched from out here, so inside a caller's transaction it keeps
+        // its place among the caller's events rather than running ahead of them
+        // with this nested transaction's.
+        $this->reportGenerated($identity, $application, count($codes), $generation, $actor);
+
+        return $codes;
+    }
+
+    /**
+     * Everything `generate()` does up to the commit, reporting nothing: for a
+     * caller that must tell a refusal from a listener's failure once the change
+     * has committed, and reports with `reportGenerated()` itself. Returns the
+     * codes, once, as secrets for the response, and the set's generation.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  (\Closure(): void)|null  $gate
+     * @return array{codes: list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>, generation: int}
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \Throwable
+     */
+    public function replaceSet(MultiFactorAuthenticatable $identity, string $application, ?\Closure $gate = null): array
+    {
         $this->guardGeneration($identity, $application);
 
         self::requireConfirmedFactor($identity->isMfaEnabled(), 'Recovery codes are issued only to an identity with a confirmed factor.');
@@ -181,12 +214,29 @@ final readonly class RecoveryCodeService
             return $this->replace(ProofOwner::of($identity), $hashes);
         });
 
-        // Dispatched from out here, so inside a caller's transaction it keeps
-        // its place among the caller's events rather than running ahead of them
-        // with this nested transaction's.
-        $this->events->dispatch(new RecoveryCodesGenerated($this->events->context($identity, $application), count($hashes), $generation, $actor));
+        return [
+            'codes'      => array_map(static fn (string $code): RevealedSecret => new RevealedSecret($code), $codes),
+            'generation' => $generation,
+        ];
+    }
 
-        return array_map(static fn (string $code): RevealedSecret => new RevealedSecret($code), $codes);
+    /**
+     * Report a set of the given size and generation as generated, once the
+     * change it belongs to has committed.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  int  $count
+     * @param  int  $generation
+     * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    public function reportGenerated(MultiFactorAuthenticatable $identity, string $application, int $count, int $generation, ?Actor $actor = null): void
+    {
+        $this->events->dispatch(new RecoveryCodesGenerated($this->events->context($identity, $application), $count, $generation, $actor));
     }
 
     /**
@@ -339,6 +389,24 @@ final readonly class RecoveryCodeService
     }
 
     /**
+     * Where the set of the identity the request serves for listing factors
+     * stands: a pending session's when its credential allows listing them,
+     * otherwise the signed-in person's; `null` when it serves nobody.
+     *
+     * @return ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     */
+    public function statusOfCaller(): ?RecoveryCodeStatus
+    {
+        $caller = $this->callers->resolve(PendingAction::LIST_FACTORS);
+
+        return $caller === null ? null : $this->status($caller->identity);
+    }
+
+    /**
      * Remove the identity's set, as with its last confirmed factor: every code
      * row is deleted and the set's time cleared; the generation is kept, so it
      * only ever rises. `RecoveryCodesRemoved` is dispatched once the removal
@@ -422,7 +490,7 @@ final readonly class RecoveryCodeService
         $this->guard->identity($identity);
 
         if (!(new ApplicationSettings($this->config, $application))->acceptsRecoveryCodes()) {
-            throw new OperationRefusedException(FailureReason::TYPE_NOT_ENABLED, 'The application does not accept recovery codes.');
+            throw OperationRefusedException::byPackage(FailureReason::TYPE_NOT_ENABLED, 'The application does not accept recovery codes.');
         }
     }
 
@@ -438,7 +506,7 @@ final readonly class RecoveryCodeService
     private static function requireConfirmedFactor(bool $confirmed, string $detail): void
     {
         if (!$confirmed) {
-            throw new OperationRefusedException(FailureReason::NO_FACTOR, $detail);
+            throw OperationRefusedException::byPackage(FailureReason::NO_FACTOR, $detail);
         }
     }
 

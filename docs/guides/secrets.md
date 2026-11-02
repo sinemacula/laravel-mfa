@@ -10,7 +10,7 @@ traces, and the rotation of the key TOTP secrets are encrypted with.
 ## Secrets shown once
 
 `Secrets\RevealedSecret` is the type secrets are returned in, revealed explicitly, and only for the response to the
-client and for storing the factor. `Mfa::generateRecoveryCodes()` returns each recovery code as one (see
+client and for storing the factor. `Mfa::generateRecoveryCodes()` answers with each recovery code as one (see
 [Recovery codes](recovery-codes.md)), and `Mfa::startEnrollment()` returns the TOTP secret, the provisioning URI and
 the enrolment grant as them (see [Enrolment](enrollment.md)), as the TOTP driver's `startEnrollment()` and
 `provisioningUri()` do. Wrapping a secret of your own, `new RevealedSecret($secret)`, gives it the protection below.

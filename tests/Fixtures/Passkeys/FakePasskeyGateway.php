@@ -39,6 +39,7 @@ final class FakePasskeyGateway implements PasskeyGateway
      * @param  bool  $checksAllowlist
      * @param  bool  $checksResponse
      * @param  ?\SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException  $refusal
+     * @param  ?\Throwable  $requestRefusal
      */
     public function __construct(
 
@@ -59,6 +60,9 @@ final class FakePasskeyGateway implements PasskeyGateway
 
         /** What a verification is refused with, when it cannot verify at all. */
         public ?OperationRefusedException $refusal = null,
+
+        /** What a request for an assertion fails with, when it cannot start one. */
+        public ?\Throwable $requestRefusal = null,
     ) {}
 
     /**
@@ -91,10 +95,16 @@ final class FakePasskeyGateway implements PasskeyGateway
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  list<string>  $credentialIds
      * @return array<string, mixed>
+     *
+     * @throws \Throwable
      */
     #[\Override]
     public function requestAssertion(MultiFactorAuthenticatable $identity, ProofBinding $binding, #[\SensitiveParameter] array $credentialIds): array
     {
+        if ($this->requestRefusal !== null) {
+            throw $this->requestRefusal;
+        }
+
         $this->requested[] = $credentialIds;
 
         return ['challenge' => 'fake-challenge', 'session' => $binding->sessionId, 'allowCredentials' => $credentialIds];

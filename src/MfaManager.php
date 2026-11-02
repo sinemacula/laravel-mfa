@@ -4,27 +4,31 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa;
 
+use Illuminate\Container\Container;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Container\Container as ContainerContract;
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
-use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
-use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Factors\FactorChange;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult;
+use SineMacula\Laravel\Mfa\Lifecycle\ForgetIdentity;
 use SineMacula\Laravel\Mfa\Lifecycle\IdentityReset;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\Lifecycle\PruneResult;
 use SineMacula\Laravel\Mfa\Lifecycle\RecordPruner;
+use SineMacula\Laravel\Mfa\Passkeys\AssertionRequest;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus;
@@ -35,6 +39,7 @@ use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
 use SineMacula\Laravel\Mfa\Verification\FactorOffers;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
+
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 
 /**
@@ -43,7 +48,7 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  * The factor driver registry (Laravel's `Manager`, so `Mfa::extend()` works as
  * for any manager) and the package's single entry point. Every other method is
  * a one-line delegation to the service of the capability it belongs to,
- * resolved from the container on each call:
+ * resolved from the application current at the time on each call:
  *
  * - `Requirements\RequirementService`: what the current sign-in must prove
  *   (`requirement()`) and whether it is fresh enough for an operation
@@ -60,13 +65,22 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  * - `Lifecycle\LifecycleService`: `removeFactor()`, `unlockFactor()` and
  *   `unlockIdentity()`.
  * - `Lifecycle\IdentityReset`: `resetIdentity()`.
+ * - `Lifecycle\ForgetIdentity`: `forgetIdentity()`.
  * - `Lifecycle\RecordPruner`: `prune()`.
  * - `RecoveryCodes\RecoveryCodeIssuance`: `generateRecoveryCodes()`.
- * - `RecoveryCodes\RecoveryCodeService`: `recoveryCodes()`.
+ * - `RecoveryCodes\RecoveryCodeService`: `recoveryCodeStatus()`.
  * - `Context\AuthenticationContextContributor`: `authenticationContext()`.
  *
  * The built-in drivers are registered by `Drivers\DriverBindings` through the
  * same `extend()` API a consumer uses.
+ *
+ * It keeps nothing a request gave it, as one instance may outlive many requests
+ * on a long-running server: it declares no property, resolves from
+ * `Container::getInstance()` rather than the container it was built with,
+ * builds a driver on every call rather than caching it, and refuses a new
+ * container. Calling a method it does not declare is refused too, as Laravel's
+ * manager would forward it to the default driver, outside attempts, proofs and
+ * events.
  *
  * Exceeds the project's max-methods-per-class threshold by design: it is the
  * one surface the facade exposes, and each method only delegates.
@@ -80,6 +94,27 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  */
 class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
+    // phpcs:disable Squiz.Commenting.FunctionComment.ScalarTypeHintMissing
+
+    /**
+     * Refuse a method the manager does not declare: Laravel's manager would
+     * forward it to the default driver, outside attempts, proofs and events.
+     * The arguments may hold a secret, so they are not named.
+     *
+     * @param  string  $method
+     * @param  array<int|string, mixed>  $parameters
+     * @return never
+     *
+     * @throws \BadMethodCallException
+     */
+    #[\Override]
+    public function __call($method, $parameters): never
+    {
+        throw new \BadMethodCallException(sprintf('Method %s::%s() does not exist.', static::class, $method));
+    }
+
+    // phpcs:enable Squiz.Commenting.FunctionComment.ScalarTypeHintMissing
+
     /**
      * Get the default driver name.
      *
@@ -89,6 +124,41 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     public function getDefaultDriver(): string
     {
         return 'totp';
+    }
+
+    /**
+     * Build the named driver, the default one when none is named: on every
+     * call, as a driver built here would otherwise keep the configuration and
+     * sender of the request that first asked for it.
+     *
+     * @param  string|\UnitEnum|null  $driver
+     * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
+     *
+     * @throws \InvalidArgumentException
+     */
+    #[\Override]
+    public function driver($driver = null): mixed
+    {
+        // phpcs:ignore SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly.ReferenceViaFullyQualifiedName
+        $name = \Illuminate\Support\enum_value($driver) ?: $this->getDefaultDriver();
+
+        /** @var \SineMacula\Laravel\Mfa\Contracts\FactorDriver */
+        return $this->createDriver($name);
+    }
+
+    /**
+     * Refuse a container: the inherited setter would keep a request's
+     * application.
+     *
+     * @param  \Illuminate\Contracts\Container\Container  $container
+     * @return never
+     *
+     * @throws \LogicException
+     */
+    #[\Override]
+    public function setContainer(ContainerContract $container): never
+    {
+        throw new \LogicException('The MFA manager resolves from the current application, and holds no container of a request\'s.');
     }
 
     /**
@@ -105,7 +175,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function requirement(): Requirement
     {
-        return $this->container->make(RequirementService::class)->requirement();
+        return $this->service(RequirementService::class)->requirement();
     }
 
     /**
@@ -123,7 +193,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function isFresh(string $operation, ?Requirement $requirement = null): bool
     {
-        return $this->container->make(RequirementService::class)->isFresh($operation, $requirement);
+        return $this->service(RequirementService::class)->isFresh($operation, $requirement);
     }
 
     /**
@@ -137,7 +207,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function proofs(): array
     {
-        return $this->container->make(ProofService::class)->proofs();
+        return $this->service(ProofService::class)->proofs();
     }
 
     /**
@@ -153,7 +223,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function factors(): array
     {
-        return $this->container->make(FactorService::class)->factors();
+        return $this->service(FactorService::class)->factors();
     }
 
     /**
@@ -168,7 +238,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function factor(mixed $factorId): ?FactorSummary
     {
-        return $this->container->make(FactorService::class)->factor($factorId);
+        return $this->service(FactorService::class)->factor($factorId);
     }
 
     /**
@@ -183,7 +253,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function offeredFactors(): array
     {
-        return $this->container->make(FactorOffers::class)->offered();
+        return $this->service(FactorOffers::class)->offered();
     }
 
     /**
@@ -200,24 +270,24 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function sendCode(mixed $factorId, ?Purpose $purpose = null): SendResult
     {
-        return $this->container->make(ChallengeRequests::class)->sendCode($factorId, $purpose);
+        return $this->service(ChallengeRequests::class)->sendCode($factorId, $purpose);
     }
 
     /**
-     * The options of an assertion request for the identity's passkey factor;
-     * none when the request serves nobody for verifying.
+     * Start an assertion request for the identity's passkey factor: its options
+     * for the client, or the reason there are none, `not_found` when the
+     * request serves nobody for verifying.
      *
      * @param  mixed  $factorId
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
-     * @return array<string, mixed>
+     * @return \SineMacula\Laravel\Mfa\Passkeys\AssertionRequest
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    public function requestAssertion(mixed $factorId, ?Purpose $purpose = null): array
+    public function requestAssertion(mixed $factorId, ?Purpose $purpose = null): AssertionRequest
     {
-        return $this->container->make(ChallengeRequests::class)->requestAssertion($factorId, $purpose);
+        return $this->service(ChallengeRequests::class)->requestAssertion($factorId, $purpose);
     }
 
     /**
@@ -234,7 +304,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function verify(#[\SensitiveParameter] Submission $submission, ?Purpose $purpose = null): VerificationResult
     {
-        return $this->container->make(VerificationService::class)->verify($submission, $purpose);
+        return $this->service(VerificationService::class)->verify($submission, $purpose);
     }
 
     /**
@@ -250,7 +320,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function startEnrollment(#[\SensitiveParameter] EnrollmentRequest $request): EnrollmentStart
     {
-        return $this->container->make(EnrollmentService::class)->start($request);
+        return $this->service(EnrollmentService::class)->start($request);
     }
 
     /**
@@ -267,7 +337,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function confirmEnrollment(#[\SensitiveParameter] RevealedSecret|string $grant, #[\SensitiveParameter] string $code): EnrollmentConfirmation
     {
-        return $this->container->make(EnrollmentService::class)->confirm($grant, $code);
+        return $this->service(EnrollmentService::class)->confirm($grant, $code);
     }
 
     /**
@@ -281,7 +351,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function resendEnrollmentCode(#[\SensitiveParameter] RevealedSecret|string $grant): SendResult
     {
-        return $this->container->make(EnrollmentService::class)->resend($grant);
+        return $this->service(EnrollmentService::class)->resend($grant);
     }
 
     /**
@@ -298,7 +368,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function cancelEnrollment(#[\SensitiveParameter] RevealedSecret|string $grant): bool
     {
-        return $this->container->make(EnrollmentService::class)->cancel($grant);
+        return $this->service(EnrollmentService::class)->cancel($grant);
     }
 
     /**
@@ -315,7 +385,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function renameFactor(mixed $factorId, ?string $label): FactorChange
     {
-        return $this->container->make(FactorService::class)->rename($factorId, $label);
+        return $this->service(FactorService::class)->rename($factorId, $label);
     }
 
     /**
@@ -330,7 +400,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function setPreferredFactor(mixed $factorId): FactorChange
     {
-        return $this->container->make(FactorService::class)->setPreferred($factorId);
+        return $this->service(FactorService::class)->setPreferred($factorId);
     }
 
     /**
@@ -345,7 +415,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function removeFactor(mixed $factorId): FactorRemovalResult
     {
-        return $this->container->make(LifecycleService::class)->removeFactor($factorId);
+        return $this->service(LifecycleService::class)->removeFactor($factorId);
     }
 
     /**
@@ -365,7 +435,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function resetIdentity(MultiFactorAuthenticatable $identity, Actor $actor, string $reason, bool $requireReenrollment = true): void
     {
-        $this->container->make(IdentityReset::class)->reset($identity, $actor, $reason, $requireReenrollment);
+        $this->service(IdentityReset::class)->reset($identity, $actor, $reason, $requireReenrollment);
     }
 
     /**
@@ -385,7 +455,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function unlockFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor): bool
     {
-        return $this->container->make(LifecycleService::class)->unlockFactor($identity, $factorId, $actor);
+        return $this->service(LifecycleService::class)->unlockFactor($identity, $factorId, $actor);
     }
 
     /**
@@ -403,7 +473,24 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function unlockIdentity(MultiFactorAuthenticatable $identity, Actor $actor): bool
     {
-        return $this->container->make(LifecycleService::class)->unlockIdentity($identity, $actor);
+        return $this->service(LifecycleService::class)->unlockIdentity($identity, $actor);
+    }
+
+    /**
+     * Delete everything the package holds for an identity that has been
+     * deleted: its factors, enrolments, delivered codes, recovery codes,
+     * passkey associations and factor state. The `HasFactors` trait does this
+     * for an Eloquent identity; call it after deleting any other.
+     *
+     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function forgetIdentity(Authenticatable $identity): void
+    {
+        $this->service(ForgetIdentity::class)->forget($identity);
     }
 
     /**
@@ -420,26 +507,26 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function prune(): PruneResult
     {
-        return ($this->container->make(RecordPruner::class))();
+        return ($this->service(RecordPruner::class))();
     }
 
     /**
      * Generate a new recovery code set for the signed-in person, replacing any
-     * earlier one, and return its codes, once, as secrets for the response:
-     * refused as `not_fresh` unless the session is fresh enough for
+     * earlier one, and answer with its codes, once, as secrets for the
+     * response; or the reason it was refused, leaving the earlier set:
+     * `not_fresh` unless the session is fresh enough for
      * `mfa.generate_recovery_codes` and reaches the level the application sets
-     * for issuing them; none without an MFA-capable person signed in, or on a
-     * pending session.
+     * for issuing them, and `not_found` without an MFA-capable person signed
+     * in, or on a pending session.
      *
-     * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
+     * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    public function generateRecoveryCodes(): array
+    public function generateRecoveryCodes(): RecoveryCodeGeneration
     {
-        return $this->container->make(RecoveryCodeIssuance::class)->generate();
+        return $this->service(RecoveryCodeIssuance::class)->generate();
     }
 
     /**
@@ -451,12 +538,12 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @return ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function recoveryCodes(): ?RecoveryCodeStatus
+    public function recoveryCodeStatus(): ?RecoveryCodeStatus
     {
-        $identity = $this->container->make(CallerContextResolver::class)->resolve(PendingAction::LIST_FACTORS)?->identity;
-
-        return $identity === null ? null : $this->container->make(RecoveryCodeService::class)->status($identity);
+        return $this->service(RecoveryCodeService::class)->statusOfCaller();
     }
 
     /**
@@ -484,7 +571,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function authenticationContext(): array
     {
-        return $this->container->make(AuthenticationContextContributor::class)->contribute();
+        return $this->service(AuthenticationContextContributor::class)->contribute();
     }
 
     /**
@@ -500,6 +587,40 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function factorModel(): string
     {
-        return $this->container->make(FactorService::class)->factorModel();
+        return $this->service(FactorService::class)->factorModel();
+    }
+
+    // phpcs:disable Squiz.Commenting.FunctionComment.ScalarTypeHintMissing
+
+    /**
+     * Call a custom driver creator with the application current at the time,
+     * not the one the manager was built with.
+     *
+     * @param  string  $driver
+     * @return mixed
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[\Override]
+    protected function callCustomCreator($driver): mixed
+    {
+        return $this->customCreators[$driver](Container::getInstance());
+    }
+
+    // phpcs:enable Squiz.Commenting.FunctionComment.ScalarTypeHintMissing
+
+    /**
+     * Resolve a service from the application current at the time.
+     *
+     * @template TService of object
+     *
+     * @param  class-string<TService>  $service
+     * @return TService
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function service(string $service): object
+    {
+        return Container::getInstance()->make($service);
     }
 }

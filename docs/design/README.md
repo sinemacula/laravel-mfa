@@ -66,6 +66,8 @@ The current note set is:
   queued message.
 - `consumer-messages.md`: the words that can reach a consumer, how each is translated and in which locale, the shipped
   English when a translation cannot be used, a line that loses its code, and what is deliberately not translated.
+- `factor-route-binding.md`: how a route parameter of the factor model binds only within the caller's identity, from
+  whichever credential the route uses, through the model's own lookup, and what the binding does not reach.
 - `testing-helpers.md`: the public helpers for an application's tests, what acting as a verified identity arranges and
   checks, and which test helpers stay private to the package.
 - `proof-store.md`: the `ProofStore` seam and its session-backed default, how a sign-in begins and ends (Laravel's

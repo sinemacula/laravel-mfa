@@ -6,8 +6,7 @@ Helpers for testing an application that uses the package. Every class name below
 ## Fake delivery
 
 `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` bind a sender that keeps each message instead of
-delivering it, and return it. The manager builds its drivers again, so a driver resolved before sends through the fake
-too.
+delivering it, and return it. The manager builds a driver on every call, so the next one sends through the fake.
 
 ```php
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;

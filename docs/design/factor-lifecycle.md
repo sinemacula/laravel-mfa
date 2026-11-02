@@ -74,8 +74,8 @@ in [Factor lifecycle](../guides/lifecycle.md).
 1. `Mfa::removeFactor()`: resolve the caller, capture its binding, run the guard on a snapshot; open the transaction;
    compare the caller; run the guard on the locked factors; `FactorRemoval::remove()`; commit; report.
 2. `Mfa::resetIdentity()`: refuse a blank reason or a machine; open the transaction; do the work above; commit; report.
-3. `RecordPruner`: for each enrolment past the retention, lock its owner (`FactorStateTransaction::forOwner()`), read it
-   again, discard or forget it; then the limited deletes.
+3. `Mfa::prune()` (`RecordPruner`): for each enrolment past the retention, lock its owner
+   (`FactorStateTransaction::forOwner()`), read it again, discard or forget it; then the limited deletes.
 
 ## Failure / Edge Cases
 

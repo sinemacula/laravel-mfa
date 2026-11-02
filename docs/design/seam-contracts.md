@@ -163,7 +163,12 @@ exception that rolls the caller's change back with it.
   guard's signed-in person; only a person either way. Starting, resending and cancelling an enrolment need
   `mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`. A helper that names no action
   (generating recovery codes, renaming, preferring or removing a factor and `proofs()`) serves active sessions only;
-  `recoveryCodes()` needs `mfa.list_factors`, as `factors()` and `factor()` do.
+  `recoveryCodeStatus()` needs `mfa.list_factors`, as `factors()` and `factor()` do. A bound factor route parameter
+  serves a pending session allowing any action that names an existing factor (see
+  [Factor Route Binding](factor-route-binding.md)).
+- A seam may throw an `OperationRefusedException`. It stays an exception on the two helpers that answer refusals as
+  values, `generateRecoveryCodes()` and `requestAssertion()`: only a refusal the package marks becomes the reason, so a
+  seam's is never read as the package deciding.
 - `FreshnessGate::requirement()` answers what the gate holds a session to, so a removal can judge it on the proofs made
   without the factor; `null` refuses that removal while another factor remains. `FreshnessGate::freshUntil()` answers
   how long `isFresh()`'s answer lasts, or `null`, which refuses what depends on it. `PendingContext::$expiresAt` is the

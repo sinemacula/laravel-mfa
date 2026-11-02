@@ -29,6 +29,7 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
+use SineMacula\Laravel\Mfa\Passkeys\AssertionRequest;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
@@ -128,10 +129,39 @@ final readonly class ChallengeRequests
     }
 
     /**
-     * The options of an assertion request for the caller's passkey factor; none
-     * when the request serves nobody for verifying. Anything else that may not
-     * go ahead is refused with an `OperationRefusedException`.
+     * The options of an assertion request for the caller's passkey factor, or
+     * the reason there are none: `not_found` when the request serves nobody for
+     * verifying. Only the package's own refusals are answered as a reason: a
+     * seam's exception propagates.
      *
+     * @param  mixed  $factorId
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @return \SineMacula\Laravel\Mfa\Passkeys\AssertionRequest
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     * @throws \Throwable
+     */
+    public function requestAssertion(mixed $factorId, ?Purpose $purpose = null): AssertionRequest
+    {
+        $caller = $this->callers->resolve(PendingAction::VERIFY);
+
+        if ($caller === null) {
+            return AssertionRequest::refused(FailureReason::NOT_FOUND);
+        }
+
+        try {
+            return AssertionRequest::started($this->assertionOptions($caller, $factorId, $purpose));
+        } catch (OperationRefusedException $exception) {
+            return $exception->byPackage ? AssertionRequest::refused($exception->reason) : throw $exception;
+        }
+    }
+
+    /**
+     * The options of the assertion request, refusing a purpose a ceremony is
+     * not made for, a caller with no sign-in to bind it to and a factor the
+     * caller may not use.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  mixed  $factorId
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return array<string, mixed>
@@ -139,21 +169,15 @@ final readonly class ChallengeRequests
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    public function requestAssertion(mixed $factorId, ?Purpose $purpose = null): array
+    private function assertionOptions(Caller $caller, mixed $factorId, ?Purpose $purpose): array
     {
-        $caller = $this->callers->resolve(PendingAction::VERIFY);
-
-        if ($caller === null) {
-            return [];
-        }
-
         $allowed = PurposeRule::resolve($caller, $purpose);
 
-        OperationRefusedException::unless($allowed !== null, FailureReason::NOT_ACCEPTED, 'An assertion is not requested for that purpose.');
+        OperationRefusedException::byPackageUnless($allowed !== null, FailureReason::NOT_ACCEPTED, 'An assertion is not requested for that purpose.');
 
         $binding = $this->callers->binding($caller, $allowed);
 
-        OperationRefusedException::unless($binding !== null, FailureReason::NOT_FOUND, 'The identity has no sign-in to bind the ceremony to.');
+        OperationRefusedException::byPackageUnless($binding !== null, FailureReason::NOT_FOUND, 'The identity has no sign-in to bind the ceremony to.');
 
         $factor = $this->guard->factor($caller->identity, $factorId, $binding->application);
 
