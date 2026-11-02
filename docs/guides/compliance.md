@@ -28,8 +28,10 @@ by itself. It is guidance for your own assessment, which remains yours.
 When the proofs cannot support a level, the level is `unclassified`, and `unclassified` meets no level requirement. That
 is the answer for an email code alone, as an email code is not an out-of-band authenticator (3.1.3.1) and establishes no
 level of its own, and for a first factor that is unknown or untrusted: no combination is accepted after one, so the
-session cannot satisfy any requirement until its first factor is known (see [Failing
-closed](assurance.md#failing-closed)).
+session cannot satisfy any non-empty requirement until its first factor is known (see [Failing
+closed](assurance.md#failing-closed)). An empty requirement asks for nothing and is met without evidence, so bare `mfa`
+admits an otherwise eligible caller under `never`, or under `enrolled` with no confirmed factor; hold a route to a level
+with `mfa:level=aal2`.
 
 Alone, an application declares `first_factor`, or binds a `Contracts\FirstFactorResolver`, and the configuration check
 refuses one with neither. A declaration describes what the guard does, and nothing checks it against what the guard
@@ -76,8 +78,10 @@ comes through a bound `Contracts\PasskeyGateway` and `passkey` in the applicatio
 passkeys unavailable, and the configuration check refuses an application that enables the type while it is bound (see
 [Passkeys](extending.md#passkeys)).
 
-Offering the option does not require anyone to use it. Where you do require it, ask for the part:
-`Requirement::none()->withPhishingResistance()`, from an identity, a tenant or an operation. A combination is
+Offering the option does not in general require anyone to use it. The exception is federal: agencies must require
+phishing-resistant authentication of staff, contractors and partners accessing federal information systems (2.2.2).
+Where you do require it, ask for the part: `Requirement::none()->withPhishingResistance()`, from an identity, a tenant
+or an operation. A combination is
 phishing-resistant only when a proof observed it, as `ObservedProperties::$phishingResistance` records, never because of
 its type.
 
@@ -198,8 +202,9 @@ Used for account recovery, a saved recovery code has at least 64 bits, is hashed
 one issued, and recovery notifies the person (4.2). The default code of 12 characters from an alphabet of 32 is 60 bits,
 so for this:
 
-- Set `recovery_codes.length` to 13 or more, which gives 65 bits within the bounds. That is necessary but not
-  sufficient.
+- Hold the code to 64 bits: `recovery_codes.length` of 13 or more with the default alphabet of 32 gives 65 bits. With a
+  custom alphabet, `length × log2(alphabet size)` must reach 64, as the configuration check enforces only 40 bits (13
+  decimal digits pass it at about 43). That is necessary but not sufficient.
 - Issue the replacement. The package marks a used code used and issues none in its place. `Mfa::generateRecoveryCodes()`
   replaces the whole set, and only on a session fresh enough for it, so prompt for it from `RecoveryCodeUsed` and
   `RecoveryCodesLow`.
