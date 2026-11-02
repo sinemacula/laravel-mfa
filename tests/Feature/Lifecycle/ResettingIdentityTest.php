@@ -440,14 +440,14 @@ final class ResettingIdentityTest extends TestCase
 
     /**
      * A factor whose read fails for any other reason is not taken for one that
-     * cannot be read: the failure propagates and the whole reset rolls back,
-     * reporting nothing.
+     * cannot be read: the failure propagates from the first read, before the
+     * reset writes anything, so nothing changes and nothing is reported.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testAnUnrelatedReadFailureRollsTheResetBack(): void
+    public function testAnUnrelatedReadFailureIsNotTakenForAnUnreadableFactor(): void
     {
         $user   = $this->signedInPerson();
         $factor = $this->confirmedFactor($user);

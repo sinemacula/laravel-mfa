@@ -49,7 +49,11 @@ final class NamespaceDependenciesTest extends TestCase
         'Illuminate\Contracts\Events\Dispatcher',
         'Illuminate\Events\Dispatcher',
         'Illuminate\Support\Facades\Event',
+        'Illuminate\Foundation\Events\Dispatchable',
     ];
+
+    /** @var string The key Laravel's container binds its event dispatcher to. */
+    private const string DISPATCHER_KEY = 'events';
 
     /** @var array<string, string> The classes that may reach Laravel's dispatcher, each with its reason. */
     private const array DISPATCHER_EXEMPTIONS = [
@@ -245,9 +249,10 @@ final class NamespaceDependenciesTest extends TestCase
 
     /**
      * Only the event dispatcher reaches Laravel's: outside the exempted
-     * classes, none names Laravel's dispatcher, by its contract, its class or
-     * its facade, or calls the `event()` helper, so every event the package
-     * dispatches goes through `Events\EventDispatcher`.
+     * classes, none names Laravel's dispatcher, by its contract, its class, its
+     * facade or the `Dispatchable` trait, resolves it by its container key, or
+     * calls the `event()` helper, so every event the package dispatches goes
+     * through `Events\EventDispatcher`.
      *
      * @return void
      */
@@ -297,6 +302,13 @@ final class NamespaceDependenciesTest extends TestCase
         yield 'the class fully qualified in code' => ['$events = new \Illuminate\Events\Dispatcher;', ['Illuminate\Events\Dispatcher']];
         yield 'the contract fully qualified in a docblock' => ['/** @var \Illuminate\Contracts\Events\Dispatcher $events */', ['Illuminate\Contracts\Events\Dispatcher']];
         yield 'the class named in another case' => ['$events = new \illuminate\events\DISPATCHER;', ['Illuminate\Events\Dispatcher']];
+        yield 'the trait imported and used' => [
+            "use Illuminate\\Foundation\\Events\\Dispatchable;\n\nfinal class Example\n{\n    use Dispatchable;\n}",
+            ['Illuminate\Foundation\Events\Dispatchable'],
+        ];
+        yield 'the container key resolved' => ['$events = $this->container->make(\'events\');', ['\'events\'']];
+        yield 'the container key resolved through the helper' => ['$events = app("events");', ['\'events\'']];
+        yield 'another string' => ['$key = \'event\';', []];
         yield 'the helper called' => ['event(new Example);', ['event()']];
         yield 'the helper called fully qualified' => ['\event(new Example);', ['event()']];
         yield 'the helper called in another case' => ['Event(new Example);', ['event()']];
@@ -309,10 +321,11 @@ final class NamespaceDependenciesTest extends TestCase
 
     /**
      * The scanner finds Laravel's dispatcher however a class reaches it:
-     * imported alone, aliased or grouped, through its facade, fully qualified
-     * in code or in a docblock, or by a call of the `event()` helper,
+     * imported alone, aliased or grouped, through its facade or the
+     * `Dispatchable` trait, fully qualified in code or in a docblock, by its
+     * container key in either quotes, or by a call of the `event()` helper,
      * unqualified or fully qualified; and nothing for a method named `event`,
-     * called or declared, or another name of Laravel's events.
+     * called or declared, another string, or another name of Laravel's events.
      *
      * @param  string  $code
      * @param  list<string>  $reaches
@@ -617,8 +630,9 @@ final class NamespaceDependenciesTest extends TestCase
 
     /**
      * How the source reaches Laravel's dispatcher: each of its names it names,
-     * in the order of `DISPATCHERS`, then `event()` for each call of the
-     * helper.
+     * in the order of `DISPATCHERS`, then, in the order they appear, `event()`
+     * for each call of the helper and `'events'` for each use of its container
+     * key.
      *
      * @param  string  $source
      * @return list<string>
@@ -631,14 +645,51 @@ final class NamespaceDependenciesTest extends TestCase
 
         foreach (array_keys($tokens) as $index) {
 
-            if (!self::isEventCall($tokens, $index)) {
+            $reach = self::reachAt($tokens, $index);
+
+            if ($reach === null) {
                 continue;
             }
 
-            $reaches[] = 'event()';
+            $reaches[] = $reach;
         }
 
         return $reaches;
+    }
+
+    /**
+     * How the token at the index reaches Laravel's dispatcher, if it does:
+     * `event()` for a call of the helper, or the quoted container key.
+     *
+     * @param  list<array{0: int, 1: string, 2: int}|string>  $tokens
+     * @param  int  $index
+     * @return ?string
+     */
+    private static function reachAt(array $tokens, int $index): ?string
+    {
+        if (self::isEventCall($tokens, $index)) {
+            return 'event()';
+        }
+
+        if (self::isDispatcherKey($tokens[$index])) {
+            return '\'' . self::DISPATCHER_KEY . '\'';
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether the token is the dispatcher's container key as a string literal,
+     * in single or double quotes.
+     *
+     * @param  array{0: int, 1: string, 2: int}|string  $token
+     * @return bool
+     */
+    private static function isDispatcherKey(array|string $token): bool
+    {
+        return is_array($token)
+            && $token[0]                === T_CONSTANT_ENCAPSED_STRING
+            && substr($token[1], 1, -1) === self::DISPATCHER_KEY;
     }
 
     /**

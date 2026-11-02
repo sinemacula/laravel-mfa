@@ -64,10 +64,10 @@ the provider or another capability.
   factors, lifecycle, verification); only the provider names the HTTP layer, a `*Bindings` class, or, with the
   configuration bindings, the console; only the provider, the facade and the driver bindings name the manager; nothing
   names the provider or the facade; and only the testing helpers name the testing helpers. Only
-  `Events\EventDispatcher` reaches Laravel's event dispatcher (its contract, its class, its facade or the `event()`
-  helper), apart from `Proofs\ProofBindings`, which only registers the sign-in listeners on it. The test reads tokens,
-  not a parse, so a class named in a string, or unqualified within its own namespace, is not seen: it is a backstop for
-  the rules, not a proof of them.
+  `Events\EventDispatcher` reaches Laravel's event dispatcher (its contract, its class, its facade, its container key,
+  the `Dispatchable` trait or the `event()` helper), apart from `Proofs\ProofBindings`, which only registers the sign-in
+  listeners on it. The test reads tokens, not a parse, so a class named in a string, or unqualified within its own
+  namespace, is not seen: it is a backstop for the rules, not a proof of them.
 - The public surface is unchanged by the layout: the manager's and the facade's method names, the configuration keys,
   the events and the middleware aliases are the same whichever service answers them.
 

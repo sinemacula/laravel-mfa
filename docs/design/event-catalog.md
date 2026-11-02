@@ -40,8 +40,8 @@ event carries is built, and why every event is dispatched only after the change 
   connection has no open transaction, when that transaction commits otherwise, and never when it rolls back. A
   transaction on another connection neither delays nor drops it. The transactions manager is read when the event is
   dispatched, so the testing traits' manager, which ignores their wrapping transaction, is honoured. No other class
-  reaches Laravel's dispatcher, by its contract, class or facade or the `event()` helper, but `Proofs\ProofBindings`,
-  which only registers the sign-in listeners on it.
+  reaches Laravel's dispatcher, by its contract, its class, its facade, its container key, the `Dispatchable` trait or
+  the `event()` helper, but `Proofs\ProofBindings`, which only registers the sign-in listeners on it.
 - An event dispatched inside a nested transaction runs ahead of those its outer transaction dispatched, however early,
   as the nested one commits first. A flow that nests a transaction inside its own, as `RecoveryCodeService::generate()`
   does, therefore dispatches from outside it, so the events of an enrolment keep the order
