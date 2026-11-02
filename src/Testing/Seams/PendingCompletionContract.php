@@ -27,8 +27,8 @@ final class PendingCompletionContract
     private function __construct() {}
 
     /**
-     * A result bound to another session, identity, application or purpose
-     * than the pending session's is refused by throwing.
+     * A result bound to another session, identity, application or purpose than
+     * the pending session's is refused by throwing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\PendingCompletion  $completion
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending

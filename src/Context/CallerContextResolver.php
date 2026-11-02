@@ -52,10 +52,10 @@ final readonly class CallerContextResolver
     ) {}
 
     /**
-     * The caller a helper that needs the given pending action serves, or
-     * `null` when it serves nobody: a pending session that does not allow the
-     * action (or any pending session, when no action is named), no signed-in
-     * identity, or one that is not a person.
+     * The caller a helper that needs the given pending action serves, or `null`
+     * when it serves nobody: a pending session that does not allow the action
+     * (or any pending session, when no action is named), no signed-in identity,
+     * or one that is not a person.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\PendingAction  $action
      * @return ?\SineMacula\Laravel\Mfa\Context\Caller
@@ -88,15 +88,15 @@ final readonly class CallerContextResolver
      */
     public function application(Caller $caller): string
     {
-        return $caller->pending?->application ?? $this->container->make(ProofService::class)->application();
+        return $caller->pending->application ?? $this->container->make(ProofService::class)->application();
     }
 
     /**
      * What a challenge or ceremony the caller takes part in is bound to: the
-     * caller, its application, its session and the purpose. The session is
-     * the pending session's, or the identity's current sign-in on the
-     * application the proof store knows of; `null` without one, so nothing is
-     * bound to a session no proof could be recorded on.
+     * caller, its application, its session and the purpose. The session is the
+     * pending session's, or the identity's current sign-in on the application
+     * the proof store knows of; `null` without one, so nothing is bound to a
+     * session no proof could be recorded on.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -109,7 +109,7 @@ final readonly class CallerContextResolver
     public function binding(Caller $caller, Purpose $purpose): ?ProofBinding
     {
         $application = $this->application($caller);
-        $session     = $caller->pending?->sessionId ?? $this->container->make(ProofStore::class)->currentSession($caller->identity, $application);
+        $session     = $caller->pending->sessionId ?? $this->container->make(ProofStore::class)->currentSession($caller->identity, $application);
 
         if ($session === null) {
             return null;

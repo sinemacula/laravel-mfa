@@ -2,9 +2,10 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Testing\Seams\PasskeyChangeGateContract;
 
 /**
  * The passkey change gate wiring kit: a registration path calls the gate inside
@@ -31,7 +32,7 @@ trait PasskeyChangeGateTests
      */
     public function testPasskeyChangeGateRollsBackARefusedRegistration(): void
     {
-        PasskeyChangeGateContract::assertARefusedGateRollsBackTheRegistration($this->gatedIdentity(), $this->registerPasskey(...), $this->passkeyIsStored(...));
+        PasskeyChangeGateContract::assertARefusedGateRollsBackTheRegistration($this->gatedIdentity(), $this->registerPasskey(...), $this->isPasskeyStored(...));
     }
 
     /**
@@ -67,7 +68,7 @@ trait PasskeyChangeGateTests
      * @param  string  $credentialId
      * @return mixed
      */
-    abstract protected function registerPasskey(MultiFactorAuthenticatable $identity, string $credentialId): mixed;
+    abstract protected function registerPasskey(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] string $credentialId): mixed;
 
     /**
      * Whether the path kept the credential.
@@ -76,5 +77,5 @@ trait PasskeyChangeGateTests
      * @param  string  $credentialId
      * @return bool
      */
-    abstract protected function passkeyIsStored(MultiFactorAuthenticatable $identity, string $credentialId): bool;
+    abstract protected function isPasskeyStored(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] string $credentialId): bool;
 }

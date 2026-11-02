@@ -6,12 +6,14 @@ namespace Tests\Unit\Testing\Seams;
 
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\FirstFactorResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\FirstFactorResolverContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\FirstFactorResolverTests;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -19,8 +21,8 @@ use Tests\TestCase;
 
 /**
  * The `FirstFactorResolver` contract kit proves the declared first factor, and
- * rejects a resolver that answers another identity's first factor or one for
- * an identity with no sign-in.
+ * rejects a resolver that answers another identity's first factor or one for an
+ * identity with no sign-in.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -77,12 +79,46 @@ final class FirstFactorResolverContractTest extends TestCase
     }
 
     /**
+     * Rows of a first factor the kit must reject: of another kind, on another
+     * application, and dated in the future.
+     *
+     * @return iterable<string, array{\Closure(\Tests\Fixtures\Requirements\SignInProofs): \SineMacula\Laravel\Mfa\Proofs\Proof}>
+     */
+    public static function wrongFirstFactors(): iterable
+    {
+        yield 'an additional factor' => [static fn (SignInProofs $proofs): Proof => $proofs->totp()];
+        yield 'another application' => [static fn (SignInProofs $proofs): Proof => $proofs->onApplication('api')->password()];
+        yield 'the future' => [static fn (SignInProofs $proofs): Proof => $proofs->password(-60)];
+    }
+
+    /**
+     * The kit rejects a resolver that answers anything but the identity's own
+     * first factor on the application, made by now.
+     *
+     * @param  \Closure(\Tests\Fixtures\Requirements\SignInProofs): \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[DataProvider('wrongFirstFactors')]
+    public function testRejectsAWrongFirstFactor(\Closure $proof): void
+    {
+        $identity = $this->signedInIdentity();
+        $resolver = new FixedFirstFactorResolver($proof(SignInProofs::of($identity)));
+
+        $this->expectException(AssertionFailedError::class);
+
+        FirstFactorResolverContract::assertAnswersOnlyTheIdentitysFirstFactor($resolver, $identity, 'web');
+    }
+
+    /**
      * The bound default.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
+    #[\Override]
     protected function firstFactorResolver(): FirstFactorResolver
     {
         return $this->container()->make(FirstFactorResolver::class);
@@ -95,6 +131,7 @@ final class FirstFactorResolverContractTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
+    #[\Override]
     protected function signedInIdentity(): MultiFactorAuthenticatable
     {
         /** @var \Tests\Fixtures\Identities\TestUser $user */
@@ -110,6 +147,7 @@ final class FirstFactorResolverContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
+    #[\Override]
     protected function identityWithoutSignIn(): MultiFactorAuthenticatable
     {
         /** @var \Tests\Fixtures\Identities\TestUser */
@@ -121,6 +159,7 @@ final class FirstFactorResolverContractTest extends TestCase
      *
      * @return string
      */
+    #[\Override]
     protected function firstFactorApplication(): string
     {
         return 'web';

@@ -19,13 +19,13 @@ use SineMacula\Laravel\Mfa\Enums\RequirementMode;
  * person it applies to.
  *
  * While the identity's own contract requires an additional factor, or any
- * configured application always requires one, a factor may be removed only
- * when another remains that some configured application accepts: confirmed,
- * and of a type an application enables. "Last" means the last acceptable one,
- * not the last row, so a pending factor, or one of a type no application
- * enables, does not keep the identity covered. Without such a requirement any
- * factor may be removed. It knows nothing of tenants; an adapter rebinds it to
- * consult a tenant's policy as well.
+ * configured application always requires one, a factor may be removed only when
+ * another remains that some configured application accepts: confirmed, and of a
+ * type an application enables. "Last" means the last acceptable one, not the
+ * last row, so a pending factor, or one of a type no application enables, does
+ * not keep the identity covered. Without such a requirement any factor may be
+ * removed. It knows nothing of tenants; an adapter rebinds it to consult a
+ * tenant's policy as well.
  *
  * The identity's factors are read from the write connection with a locking
  * read, so asked again inside the removal's factor state transaction it sees

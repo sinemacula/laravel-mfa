@@ -75,8 +75,8 @@ trait ArrangesPasskeys
     }
 
     /**
-     * A person, signed in through the guard, with a sign-in on the
-     * application the proof store knows.
+     * A person, signed in through the guard, with a sign-in on the application
+     * the proof store knows.
      *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
@@ -104,7 +104,7 @@ trait ArrangesPasskeys
      * @param  ?string  $credential
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
-    protected function confirmedFactor(TestUser $user, string $type = 'totp', ?string $credential = null): Factor
+    protected function confirmedFactor(TestUser $user, string $type = 'totp', #[\SensitiveParameter] ?string $credential = null): Factor
     {
         /** @var \SineMacula\Laravel\Mfa\Models\Factor $factor */
         $factor = Factor::query()->create([
@@ -169,8 +169,12 @@ trait ArrangesPasskeys
      * @param  string  $session
      * @return \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration
      */
-    protected function registration(TestUser $user, string $credential = self::CREDENTIAL, ?ObservedProperties $properties = null, string $session = self::SESSION): PasskeyRegistration
-    {
+    protected function registration(
+        TestUser $user,
+        #[\SensitiveParameter] string $credential = self::CREDENTIAL,
+        ?ObservedProperties $properties = null,
+        string $session = self::SESSION,
+    ): PasskeyRegistration {
         return new PasskeyRegistration($credential, $properties ?? new ObservedProperties(userPresence: true), $this->bindingOf($user, Purpose::ENROLLMENT, $session));
     }
 

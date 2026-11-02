@@ -13,8 +13,8 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
 use SineMacula\Laravel\Mfa\Passkeys\UnavailablePasskeyGateway;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\PasskeyGatewayTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\PasskeyGatewayContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\PasskeyGatewayTests;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Passkeys\FakePasskeyGateway;
 use Tests\TestCase;
@@ -97,10 +97,25 @@ final class PasskeyGatewayContractTest extends TestCase
     }
 
     /**
+     * The kit rejects a gateway that verifies an empty response.
+     *
+     * @return void
+     */
+    public function testRejectsAGatewayThatVerifiesAnEmptyResponse(): void
+    {
+        $gateway = new FakePasskeyGateway(['Y3JlZGVudGlhbC1vbmU'], new PasskeyAssertion('Y3JlZGVudGlhbC1vbmU', new ObservedProperties(userPresence: true)), checksResponse: false);
+
+        $this->expectException(AssertionFailedError::class);
+
+        PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies($gateway, $this->passkeyIdentity(), $this->passkeyBinding());
+    }
+
+    /**
      * The bound default.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway
      */
+    #[\Override]
     protected function passkeyGateway(): PasskeyGateway
     {
         return $this->container()->make(PasskeyGateway::class);
@@ -111,6 +126,7 @@ final class PasskeyGatewayContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
+    #[\Override]
     protected function passkeyIdentity(): MultiFactorAuthenticatable
     {
         return new NonEloquentIdentity;
@@ -121,6 +137,7 @@ final class PasskeyGatewayContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
+    #[\Override]
     protected function passkeyBinding(): ProofBinding
     {
         return new ProofBinding(NonEloquentIdentity::class, 'plain-1', 'web', 'sign-in-1', Purpose::STEP_UP);

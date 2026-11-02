@@ -23,8 +23,8 @@ use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
 /**
- * Tests for `EnrollmentAuthority`: when a caller may add a factor of a type,
- * on an active session and on a pending one, and the application's limits.
+ * Tests for `EnrollmentAuthority`: when a caller may add a factor of a type, on
+ * an active session and on a pending one, and the application's limits.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -93,8 +93,8 @@ final class EnrollmentAuthorityTest extends TestCase
 
     /**
      * A pending session may add a factor only on the bootstrap path: its
-     * credential allows it, the application allows bootstrap for the type,
-     * and the identity has no confirmed factor.
+     * credential allows it, the application allows bootstrap for the type, and
+     * the identity has no confirmed factor.
      *
      * @return void
      *
@@ -120,8 +120,8 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * The limits on confirmed factors enrolled through the application, of
-     * the type and in all, apply; factors enrolled elsewhere do not count.
+     * The limits on confirmed factors enrolled through the application, of the
+     * type and in all, apply; factors enrolled elsewhere do not count.
      *
      * @return void
      *
@@ -164,8 +164,8 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * The reason the caller is refused a factor of the type, or `null` when
-     * it is not.
+     * The reason the caller is refused a factor of the type, or `null` when it
+     * is not.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $type

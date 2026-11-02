@@ -29,8 +29,8 @@ final class PasskeyBindings
     private function __construct() {}
 
     /**
-     * Register the default passkey gateway, the change gate, the assertions
-     * and the association records.
+     * Register the default passkey gateway, the change gate, the assertions and
+     * the association records.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void

@@ -30,7 +30,6 @@ final class OpenTransaction
      * @param  string  $message
      * @return void
      *
-     * @throws \InvalidArgumentException
      * @throws \LogicException
      */
     public static function assertOpen(string $message): void

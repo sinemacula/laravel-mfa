@@ -18,8 +18,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  *
  * The gateway asks `Attempts\ChallengeCounters::isUsable()` before it sends or
  * checks a code, and reports every outcome through `report()` in the same
- * transaction that consumes the challenge, never later: a deferred report
- * would let parallel guesses overrun the per-identity cap. A delivery is never
+ * transaction that consumes the challenge, never later: a deferred report would
+ * let parallel guesses overrun the per-identity cap. A delivery is never
  * reported. Without an authentication layer, the package's own codes
  * (`Codes\PackageChallengeGateway`) are bound.
  *

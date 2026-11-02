@@ -11,14 +11,14 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 
 /**
- * What every `SessionRevoker` must guarantee, as assertions: revoking the
- * other sessions, or all of them, stops another session counting, and a
- * revocation inside a change that rolls back leaves it counting.
+ * What every `SessionRevoker` must guarantee, as assertions: revoking the other
+ * sessions, or all of them, stops another session counting, and a revocation
+ * inside a change that rolls back leaves it counting.
  *
  * What "counting" means is the implementation's: the closures given verify
  * another session of the identity and say whether it still counts. A revoker
- * that ends sessions passes; so does one that only stops their proofs
- * counting, as the package's default does.
+ * that ends sessions passes; so does one that only stops their proofs counting,
+ * as the package's default does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -41,8 +41,12 @@ final class SessionRevokerContract
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): bool  $otherCounts
      * @return void
      */
-    public static function assertRevokingOthersStopsAnotherSessionCounting(SessionRevoker $revoker, MultiFactorAuthenticatable $identity, \Closure $verifyOther, \Closure $otherCounts): void
-    {
+    public static function assertRevokingOthersStopsAnotherSessionCounting(
+        SessionRevoker $revoker,
+        MultiFactorAuthenticatable $identity,
+        \Closure $verifyOther,
+        \Closure $otherCounts,
+    ): void {
         self::verify($identity, $verifyOther, $otherCounts);
 
         $revoker->revokeOthers($identity);
@@ -59,8 +63,12 @@ final class SessionRevokerContract
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): bool  $otherCounts
      * @return void
      */
-    public static function assertRevokingAllStopsAnotherSessionCounting(SessionRevoker $revoker, MultiFactorAuthenticatable $identity, \Closure $verifyOther, \Closure $otherCounts): void
-    {
+    public static function assertRevokingAllStopsAnotherSessionCounting(
+        SessionRevoker $revoker,
+        MultiFactorAuthenticatable $identity,
+        \Closure $verifyOther,
+        \Closure $otherCounts,
+    ): void {
         self::verify($identity, $verifyOther, $otherCounts);
 
         $revoker->revokeAll($identity);
@@ -80,8 +88,12 @@ final class SessionRevokerContract
      *
      * @throws \Throwable
      */
-    public static function assertARolledBackRevocationLeavesSessionsCounting(SessionRevoker $revoker, MultiFactorAuthenticatable $identity, \Closure $verifyOther, \Closure $otherCounts): void
-    {
+    public static function assertARolledBackRevocationLeavesSessionsCounting(
+        SessionRevoker $revoker,
+        MultiFactorAuthenticatable $identity,
+        \Closure $verifyOther,
+        \Closure $otherCounts,
+    ): void {
         self::verify($identity, $verifyOther, $otherCounts);
 
         $connection = DB::connection(StorageConnection::name());

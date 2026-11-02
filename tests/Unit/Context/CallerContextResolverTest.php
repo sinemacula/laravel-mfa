@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
@@ -22,10 +23,10 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `CallerContextResolver`: a pending session is served only an
- * action its credential allows, and never in the guard's user's place; without
- * one the guard's user is served; only a person is served; and what the
- * caller's challenges are bound to.
+ * Tests for `CallerContextResolver`: a pending session is served only an action
+ * its credential allows, and never in the guard's user's place; without one the
+ * guard's user is served; only a person is served; and what the caller's
+ * challenges are bound to.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -52,7 +53,7 @@ final class CallerContextResolverTest extends TestCase
             $caller = $this->resolver()->resolve($action);
 
             self::assertSame($user, $caller?->identity);
-            self::assertNull($caller?->pending);
+            self::assertNull($caller->pending);
         }
 
         self::assertSame('web', $this->resolver()->application(new Caller($user)));
@@ -110,14 +111,14 @@ final class CallerContextResolverTest extends TestCase
         $caller  = $this->resolver()->resolve(PendingAction::LIST_FACTORS);
 
         self::assertSame($pending->identity, $caller?->identity);
-        self::assertSame($pending, $caller?->pending);
-        self::assertSame('admin', $caller === null ? null : $this->resolver()->application($caller));
+        self::assertSame($pending, $caller->pending);
+        self::assertSame('admin', $this->resolver()->application($caller));
     }
 
     /**
-     * A pending session is served nothing for an action its credential does
-     * not allow, nor for a helper that serves active sessions only; the
-     * guard's user is never served in its place.
+     * A pending session is served nothing for an action its credential does not
+     * allow, nor for a helper that serves active sessions only; the guard's
+     * user is never served in its place.
      *
      * @return void
      *
@@ -133,8 +134,7 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A pending session of an identity that is not a person is served
-     * nothing.
+     * A pending session of an identity that is not a person is served nothing.
      *
      * @return void
      *
@@ -148,8 +148,8 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A pending credential that does not validate is refused, not served as
-     * the guard's user.
+     * A pending credential that does not validate is refused, not served as the
+     * guard's user.
      *
      * @return void
      *
@@ -183,8 +183,8 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A caller's binding names it, its application and its session: the
-     * pending session's, or the current sign-in's, and none without one.
+     * A caller's binding names it, its application and its session: the pending
+     * session's, or the current sign-in's, and none without one.
      *
      * @return void
      *
@@ -198,7 +198,7 @@ final class CallerContextResolverTest extends TestCase
 
         self::assertSame([
             'identity_type' => TestUser::class,
-            'identity_key'  => (string) $user->getKey(),
+            'identity_key'  => ProofOwner::of($user)->key,
             'application'   => 'web',
             'session_id'    => SignInProofs::SESSION,
             'purpose'       => 'step_up',
@@ -214,8 +214,7 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * Sign a person in through the guard, with a sign-in the proof store
-     * knows.
+     * Sign a person in through the guard, with a sign-in the proof store knows.
      *
      * @return \Tests\Fixtures\Identities\TestUser
      *
@@ -234,8 +233,8 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * Make every request carry a pending session on the `admin` application,
-     * of another person unless given, allowing the actions.
+     * Make every request carry a pending session on the `admin` application, of
+     * another person unless given, allowing the actions.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
      * @param  ?\Tests\Fixtures\Identities\NonEloquentIdentity  $identity

@@ -2,12 +2,13 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
 
 /**
  * The challenge counters wiring kit: a challenge owner's path counts a failed

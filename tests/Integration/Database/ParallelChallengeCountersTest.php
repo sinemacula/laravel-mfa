@@ -125,8 +125,8 @@ final class ParallelChallengeCountersTest extends TestCase
     }
 
     /**
-     * Ask about the factor on the observer, inside a transaction of its own,
-     * as a concurrent owner would.
+     * Ask about the factor on the observer, inside a transaction of its own, as
+     * a concurrent owner would.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor

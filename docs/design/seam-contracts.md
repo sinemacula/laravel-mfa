@@ -107,7 +107,7 @@ that call them, so the flows can be built against one fixed set.
 | `LastFactorPolicy`       | Whether the identity's last factor may be removed                           | Nothing, or a tenant-aware policy of the iam layer |
 | `SelfServiceRecovery`    | Whether an application offers its own recovery, and starting it             | Nothing: the application's own                     |
 | `SubjectTypeResolver`    | Whether an identity is a person                                             | Its subject type                                   |
-| `ApplicationResolver`    | The application a request is for                                           | The session's application                          |
+| `ApplicationResolver`    | The application a request is for                                            | The session's application                          |
 | `EventContextResolver`   | The scalar context every event carries                                      | Its event context                                  |
 | `SmsSender`              | Delivers an SMS message carrying a code                                     | The gateway its own codes are sent through         |
 | `EmailSender`            | Delivers an email message carrying a code                                   | The gateway its own codes are sent through         |
@@ -117,7 +117,7 @@ own transaction on the storage connection:
 
 | Call                                                  | Made                                                                                  |
 |-------------------------------------------------------|---------------------------------------------------------------------------------------|
-| `Attempts\ChallengeCounters::isUsable()`              | Before sending or checking an `mfa` challenge: is the factor usable, is it locked      |
+| `Attempts\ChallengeCounters::isUsable()`              | Before sending or checking an `mfa` challenge: is the factor usable, is it locked     |
 | `Attempts\ChallengeCounters::report()`                | With every outcome, in the transaction that consumes the challenge, never later       |
 | `Passkeys\PasskeyChangeGate::registering()`           | Before storing a registered passkey: associates it as a factor where enabled          |
 | `Passkeys\PasskeyChangeGate::removing()`              | Before deleting a passkey: removes its factor under the removal rules                 |
@@ -141,11 +141,12 @@ exception that rolls the caller's change back with it.
   serves: a pending session only for the `PendingAction` the helper needs, as its own identity, and otherwise the
   guard's signed-in person; only a person either way. A helper that names no action (generating recovery codes, the
   direct enrolment) serves active sessions only.
-- `Testing\Seams` holds a contract kit per seam: a trait of tests with abstract hooks, delegating each check to a
-  `*Contract` class of static assertions. This package's tests use the traits to prove its defaults and call the
-  assertions on deliberately faulty implementations to prove the kit rejects them; an adapter's test case uses the same
-  traits. The kits live in `src/` because a dependent package does not load another's development autoloading; they
-  need PHPUnit, as Laravel's own testing helpers do. They check safety guarantees, not capabilities a default lacks.
+- `Testing\Seams` holds a contract kit per seam: a trait of tests with abstract hooks, in `Testing\Seams\Concerns`,
+  delegating each check to a `*Contract` class of static assertions. This package's tests use the traits to prove its
+  defaults and call the assertions on deliberately faulty implementations to prove the kit rejects them; an adapter's
+  test case uses the same traits. The kits live in `src/` because a dependent package does not load another's
+  development autoloading; they need PHPUnit, as Laravel's own testing helpers do. They check safety guarantees, not
+  capabilities a default lacks.
 
 ## Failure / Edge Cases
 
@@ -173,7 +174,7 @@ exception that rolls the caller's change back with it.
   `*Bindings` class of each capability: the defaults.
 - `src/Context/CallerContextResolver.php`, `src/Context/SessionFirstFactor.php`.
 - `src/Attempts/ChallengeCounters.php`, `src/Passkeys/PasskeyChangeGate.php`: the reverse calls.
-- `src/Testing/Seams/`: the contract kits.
+- `src/Testing/Seams/`: the contract kits, with their traits in `Concerns/`.
 
 ## Authoritative Tests
 

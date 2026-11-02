@@ -2,10 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Testing\Seams\EventContextResolverContract;
 
 /**
  * The `EventContextResolver` contract kit: the context is scalar values only.

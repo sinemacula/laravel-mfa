@@ -39,9 +39,9 @@ final class PendingSessionResolverContract
     }
 
     /**
-     * A request with a pending credential that does not validate is refused
-     * by throwing a `RuntimeException`. A resolver with no pending credentials
-     * at all is given no such request, and answers none for any.
+     * A request with a pending credential that does not validate is refused by
+     * throwing a `RuntimeException`. A resolver with no pending credentials at
+     * all is given no such request, and answers none for any.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver  $resolver
      * @param  ?\Illuminate\Http\Request  $request

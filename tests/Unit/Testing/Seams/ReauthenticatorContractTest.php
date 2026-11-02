@@ -6,13 +6,17 @@ namespace Tests\Unit\Testing\Seams;
 
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Seams\RefusingReauthenticator;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ReauthenticatorTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\ReauthenticatorContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\ReauthenticatorTests;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\FixedReauthenticator;
 use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
@@ -75,12 +79,46 @@ final class ReauthenticatorContractTest extends TestCase
     }
 
     /**
+     * Rows of a reauthentication the kit must reject: of another kind, of
+     * another identity, on another application, and dated in the future.
+     *
+     * @return iterable<string, array{\Closure(\Tests\Fixtures\Requirements\SignInProofs): \SineMacula\Laravel\Mfa\Proofs\Proof}>
+     */
+    public static function wrongReauthentications(): iterable
+    {
+        yield 'a first factor' => [static fn (SignInProofs $proofs): Proof => $proofs->password()];
+        yield 'another identity' => [static fn (SignInProofs $proofs): Proof => $proofs->ofIdentity('someone-else')->reauthentication()];
+        yield 'another application' => [static fn (SignInProofs $proofs): Proof => $proofs->onApplication('api')->reauthentication()];
+        yield 'the future' => [static fn (SignInProofs $proofs): Proof => $proofs->reauthentication(-60)];
+    }
+
+    /**
+     * The kit rejects a reauthenticator that answers anything but the
+     * identity's own reauthentication on the application, made by now.
+     *
+     * @param  \Closure(\Tests\Fixtures\Requirements\SignInProofs): \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[DataProvider('wrongReauthentications')]
+    public function testRejectsAWrongReauthentication(\Closure $proof): void
+    {
+        $identity = $this->reauthenticatingIdentity();
+
+        $this->expectException(AssertionFailedError::class);
+
+        ReauthenticatorContract::assertNeverAnswersAProofItDidNotJustMake(new FixedReauthenticator($proof(SignInProofs::of($identity))), $identity, 'web');
+    }
+
+    /**
      * The bound default.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\Reauthenticator
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
+    #[\Override]
     protected function reauthenticator(): Reauthenticator
     {
         return $this->container()->make(Reauthenticator::class);
@@ -93,6 +131,7 @@ final class ReauthenticatorContractTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
+    #[\Override]
     protected function reauthenticatingIdentity(): MultiFactorAuthenticatable
     {
         /** @var \Tests\Fixtures\Identities\TestUser $user */
@@ -108,6 +147,7 @@ final class ReauthenticatorContractTest extends TestCase
      *
      * @return string
      */
+    #[\Override]
     protected function reauthenticationApplication(): string
     {
         return 'web';

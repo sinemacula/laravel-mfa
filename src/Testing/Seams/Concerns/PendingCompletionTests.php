@@ -2,10 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
+use SineMacula\Laravel\Mfa\Testing\Seams\PendingCompletionContract;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**

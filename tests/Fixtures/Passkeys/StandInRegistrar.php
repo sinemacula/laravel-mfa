@@ -16,8 +16,8 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration;
  * writes or deletes its own credential row in `test_credentials` and calls the
  * change gate, both inside one transaction on the storage connection, as the
  * gate requires. A callback given runs after the gate, inside the same
- * transaction, so a test can make the caller fail once the gate has allowed
- * the change.
+ * transaction, so a test can make the caller fail once the gate has allowed the
+ * change.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -91,9 +91,11 @@ final readonly class StandInRegistrar
 
             $this->gate->removing($identity, $application, $credentialId);
 
-            if ($after !== null) {
-                $after();
+            if ($after === null) {
+                return;
             }
+
+            $after();
         });
     }
 

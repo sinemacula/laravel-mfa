@@ -2,10 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use Illuminate\Http\Request;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
+use SineMacula\Laravel\Mfa\Testing\Seams\PendingSessionResolverContract;
 
 /**
  * The `PendingSessionResolver` contract kit: a request with no pending

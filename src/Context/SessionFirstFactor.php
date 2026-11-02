@@ -53,10 +53,9 @@ final readonly class SessionFirstFactor
     ) {}
 
     /**
-     * The first factor of the session the binding names: the pending
-     * session's when the request carries that one, otherwise the identity's
-     * current sign-in's when the binding names it; `null` for any other
-     * session.
+     * The first factor of the session the binding names: the pending session's
+     * when the request carries that one, otherwise the identity's current
+     * sign-in's when the binding names it; `null` for any other session.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -84,8 +83,8 @@ final readonly class SessionFirstFactor
     }
 
     /**
-     * The first factor of the identity's current sign-in on the application,
-     * or `null` when it has no sign-in or its first factor is not known.
+     * The first factor of the identity's current sign-in on the application, or
+     * `null` when it has no sign-in or its first factor is not known.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

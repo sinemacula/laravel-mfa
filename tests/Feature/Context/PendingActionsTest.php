@@ -40,9 +40,6 @@ use Tests\TestCase;
 #[CoversClass(MfaManager::class)]
 final class PendingActionsTest extends TestCase
 {
-    /** @var \Tests\Fixtures\Identities\TestUser The person the guard signed in. */
-    private TestUser $guarded;
-
     /** @var \Tests\Fixtures\Identities\TestUser The person signing in on the pending session. */
     private TestUser $pending;
 
@@ -81,7 +78,6 @@ final class PendingActionsTest extends TestCase
         /** @var \Tests\Fixtures\Identities\TestUser $pending */
         $pending = TestUser::query()->create(['email' => 'pending@example.test']);
 
-        $this->guarded = $guarded;
         $this->pending = $pending;
         $this->factor  = $this->emailFactor($pending, 'pending@example.test');
 
@@ -90,8 +86,8 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * A pending session that allows none of what the helpers need gets
-     * nothing from any of them, and the guard's user is not served instead.
+     * A pending session that allows none of what the helpers need gets nothing
+     * from any of them, and the guard's user is not served instead.
      *
      * @return void
      *
@@ -126,8 +122,8 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * A code is sent to the pending person's factor and verified on the
-     * pending session that allows both.
+     * A code is sent to the pending person's factor and verified on the pending
+     * session that allows both.
      *
      * @return void
      *

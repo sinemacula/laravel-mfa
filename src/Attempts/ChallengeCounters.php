@@ -36,11 +36,11 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * Both calls run inside the owner's own transaction on the storage connection,
  * and refuse with a `LogicException` without one: the identity's factor state
  * lock they take (see `Support\FactorStateTransaction`) is then held until the
- * owner commits, so parallel guesses for one identity are counted one after
- * the other and cannot overrun a cap, and an owner that rolls back counts
- * nothing. The lock order is the identity's state, then its factors, then the
- * owner's challenge: the owner opens its transaction, asks `isUsable()`, then
- * locks and consumes its challenge, then calls `report()`.
+ * owner commits, so parallel guesses for one identity are counted one after the
+ * other and cannot overrun a cap, and an owner that rolls back counts nothing.
+ * The lock order is the identity's state, then its factors, then the owner's
+ * challenge: the owner opens its transaction, asks `isUsable()`, then locks and
+ * consumes its challenge, then calls `report()`.
  *
  * `isUsable()` answers under the lock: the binding must name the identity,
  * which must be an active person, and the factor must be one of its stored
@@ -152,9 +152,7 @@ final readonly class ChallengeCounters
     {
         OpenTransaction::assertOpen(self::NO_TRANSACTION);
 
-        if (!ProofOwner::of($identity)->owns($binding)) {
-            throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The challenge\'s binding names another identity.');
-        }
+        OperationRefusedException::unless(ProofOwner::of($identity)->owns($binding), FailureReason::NOT_FOUND, 'The challenge\'s binding names another identity.');
 
         return $this->attempts->attempt(
             new Attempt($identity, $factor, $binding->purpose, null, $binding->application),
@@ -175,11 +173,13 @@ final readonly class ChallengeCounters
      */
     private function identityRefusal(MultiFactorAuthenticatable $identity, ProofBinding $binding): ?ChallengeAdmission
     {
+        $people = $this->container->make(SubjectTypeResolver::class);
+
         return match (true) {
-            !ProofOwner::of($identity)->owns($binding)                               => ChallengeAdmission::refuse(FailureReason::NOT_FOUND, 'The challenge\'s binding names another identity.'),
-            !$this->container->make(SubjectTypeResolver::class)->isPerson($identity) => ChallengeAdmission::refuse(FailureReason::MACHINE_IDENTITY, 'The identity is not a person.'),
-            !$identity->isMfaActive()                                                => ChallengeAdmission::refuse(FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.'),
-            default                                                                  => null,
+            !ProofOwner::of($identity)->owns($binding) => ChallengeAdmission::refuse(FailureReason::NOT_FOUND, 'The challenge\'s binding names another identity.'),
+            !$people->isPerson($identity)              => ChallengeAdmission::refuse(FailureReason::MACHINE_IDENTITY, 'The identity is not a person.'),
+            !$identity->isMfaActive()                  => ChallengeAdmission::refuse(FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.'),
+            default                                    => null,
         };
     }
 

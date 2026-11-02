@@ -49,9 +49,9 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  * checked through `Codes\CodeService`, bound to the factor, the identity, the
  * application, the session and the purpose: on a pending session its own
  * application and public id; otherwise the application a bound
- * `ApplicationResolver` names for the request, or the default guard's name,
- * and the Laravel session the request runs in. Every other factor goes
- * through its driver. Every verification is an attempt made through
+ * `ApplicationResolver` names for the request, or the default guard's name, and
+ * the Laravel session the request runs in. Every other factor goes through its
+ * driver. Every verification is an attempt made through
  * `Attempts\AttemptService`, so it is counted, and refused while a lockout
  * applies, whichever way its code is checked. A verification that passes
  * records its proof on the identity's current sign-in through
@@ -405,7 +405,7 @@ final readonly class VerificationService
             CurrentIdentity::typeOf($caller->identity),
             self::identityKey($caller->identity),
             $this->callers()->application($caller),
-            $caller->pending?->sessionId ?? $this->container->make(Session::class)->getId(),
+            $caller->pending->sessionId ?? $this->container->make(Session::class)->getId(),
             $purpose,
         );
     }

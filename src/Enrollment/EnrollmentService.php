@@ -53,8 +53,8 @@ final readonly class EnrollmentService
      *
      * No-op when the request serves nobody for it, so consumers can call this
      * unconditionally: without an MFA-capable person signed in, and on a
-     * pending session, which this direct enrolment would confirm without a
-     * code (see `Context\CallerContextResolver`).
+     * pending session, which this direct enrolment would confirm without a code
+     * (see `Context\CallerContextResolver`).
      *
      * A passkey is refused with an `UnsupportedFactorException`: it becomes a
      * factor only through its association, which the passkey change gate makes

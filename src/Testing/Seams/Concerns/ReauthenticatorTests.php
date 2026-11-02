@@ -2,10 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
+use SineMacula\Laravel\Mfa\Testing\Seams\ReauthenticatorContract;
 
 /**
  * The `Reauthenticator` contract kit: it answers nothing, or a reauthentication

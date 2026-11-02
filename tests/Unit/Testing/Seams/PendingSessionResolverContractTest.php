@@ -12,8 +12,8 @@ use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\PendingSessionResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\PendingSessionResolverContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\PendingSessionResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\SeamAssert;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -49,15 +49,22 @@ final class PendingSessionResolverContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that finds a pending session in a request
-     * that carries no credential.
+     * The kit rejects a resolver that finds a pending session in a request that
+     * carries no credential.
      *
      * @return void
      */
     public function testRejectsAPendingSessionWithoutACredential(): void
     {
         $identity = new NonEloquentIdentity;
-        $pending  = new PendingContext($identity, 'web', 'pending-1', SignInProofs::of($identity)->inSession('pending-1')->password(), Requirement::none(), [PendingAction::VERIFY]);
+        $pending  = new PendingContext(
+            $identity,
+            'web',
+            'pending-1',
+            SignInProofs::of($identity)->inSession('pending-1')->password(),
+            Requirement::none(),
+            [PendingAction::VERIFY],
+        );
 
         $this->expectException(AssertionFailedError::class);
 
@@ -78,12 +85,36 @@ final class PendingSessionResolverContractTest extends TestCase
     }
 
     /**
+     * The kit rejects a resolver with no pending credentials that answers a
+     * pending session all the same.
+     *
+     * @return void
+     */
+    public function testRejectsAResolverWithoutCredentialsThatAnswersOne(): void
+    {
+        $identity = new NonEloquentIdentity;
+        $pending  = new PendingContext(
+            $identity,
+            'web',
+            'pending-1',
+            SignInProofs::of($identity)->inSession('pending-1')->password(),
+            Requirement::none(),
+            [PendingAction::VERIFY],
+        );
+
+        $this->expectException(AssertionFailedError::class);
+
+        PendingSessionResolverContract::assertAnInvalidCredentialIsRefused(new FixedPendingSessionResolver($pending), null);
+    }
+
+    /**
      * The bound default.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
+    #[\Override]
     protected function pendingSessionResolver(): PendingSessionResolver
     {
         return $this->container()->make(PendingSessionResolver::class);
@@ -94,6 +125,7 @@ final class PendingSessionResolverContractTest extends TestCase
      *
      * @return \Illuminate\Http\Request
      */
+    #[\Override]
     protected function requestWithoutPendingCredential(): Request
     {
         return Request::create('/');
@@ -102,9 +134,10 @@ final class PendingSessionResolverContractTest extends TestCase
     /**
      * None: the default knows no pending credentials.
      *
-     * @return ?\Illuminate\Http\Request
+     * @return null
      */
-    protected function requestWithInvalidPendingCredential(): ?Request
+    #[\Override]
+    protected function requestWithInvalidPendingCredential(): null
     {
         return null;
     }

@@ -226,12 +226,13 @@ roll back your own change, since catching it and committing breaks the gate.
 
 ## Proving an adapter
 
-`Testing\Seams` holds a contract kit for each seam: a trait of tests with abstract hooks, which an adapter's test case
-uses to prove its implementation meets what every implementation must guarantee. The kits for the challenge counters
-and the change gate prove the wiring of the calls an authentication layer makes into this package:
+`Testing\Seams` holds a contract kit for each seam: a trait of tests with abstract hooks, in `Testing\Seams\Concerns`,
+which an adapter's test case uses to prove its implementation meets what every implementation must guarantee. The kits
+for the challenge counters and the change gate prove the wiring of the calls an authentication layer makes into this
+package:
 
 ```php
-use SineMacula\Laravel\Mfa\Testing\Seams\ProofStoreTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ProofStoreTests;
 
 final class SessionProofStoreAdapterTest extends TestCase
 {

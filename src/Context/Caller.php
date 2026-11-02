@@ -8,8 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
 /**
  * Who a helper is serving on this request: a person, either the identity of a
- * pending session whose credential allows what the helper does, or the
- * identity the guard signed in on an active session.
+ * pending session whose credential allows what the helper does, or the identity
+ * the guard signed in on an active session.
  *
  * It is resolved once per call (see `CallerContextResolver`) and holds nothing
  * beyond the request it was resolved for.

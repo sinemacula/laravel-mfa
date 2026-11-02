@@ -277,8 +277,8 @@ final readonly class ConfigurationValidator
      * Refuse an application that enables `passkey` while the package's
      * `UnavailablePasskeyGateway` is still bound as the `PasskeyGateway`: this
      * package runs no ceremonies of its own. A gateway of the application's
-     * that reports itself unavailable at run time is not refused here; the
-     * type is then never offered.
+     * that reports itself unavailable at run time is not refused here; the type
+     * is then never offered.
      *
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $application
      * @return void
@@ -288,7 +288,24 @@ final readonly class ConfigurationValidator
      */
     private function checkPasskeys(ApplicationSettings $application): void
     {
-        if ($application->enables('passkey') && $this->container->make(PasskeyGateway::class) instanceof UnavailablePasskeyGateway) {
+        if (!$application->enables('passkey')) {
+            return;
+        }
+
+        self::checkPasskeyGateway($this->container->make(PasskeyGateway::class));
+    }
+
+    /**
+     * Refuse the package's `UnavailablePasskeyGateway`.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway  $gateway
+     * @return void
+     *
+     * @throws \LogicException
+     */
+    private static function checkPasskeyGateway(PasskeyGateway $gateway): void
+    {
+        if ($gateway instanceof UnavailablePasskeyGateway) {
             throw new \LogicException(sprintf('The application enables passkey, but no passkey gateway is bound: bind yours to %s.', PasskeyGateway::class));
         }
     }

@@ -33,8 +33,6 @@ final readonly class PasskeyAssociations
      *
      * @param  string  $credentialId
      * @return ?\SineMacula\Laravel\Mfa\Models\PasskeyAssociation
-     *
-     * @throws \InvalidArgumentException
      */
     public function forCredential(#[\SensitiveParameter] string $credentialId): ?PasskeyAssociation
     {
@@ -53,8 +51,6 @@ final readonly class PasskeyAssociations
      *
      * @param  string  $factorId
      * @return ?\SineMacula\Laravel\Mfa\Models\PasskeyAssociation
-     *
-     * @throws \InvalidArgumentException
      */
     public function forFactor(string $factorId): ?PasskeyAssociation
     {
@@ -98,8 +94,6 @@ final readonly class PasskeyAssociations
      *
      * @param  string  $factorId
      * @return void
-     *
-     * @throws \InvalidArgumentException
      */
     public function forget(string $factorId): void
     {

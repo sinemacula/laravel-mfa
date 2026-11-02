@@ -39,8 +39,8 @@ final class ChallengeAdmissionTest extends TestCase
     }
 
     /**
-     * A locked challenge carries when its lockout ends, and none at the
-     * failure ceiling.
+     * A locked challenge carries when its lockout ends, and none at the failure
+     * ceiling.
      *
      * @return void
      */

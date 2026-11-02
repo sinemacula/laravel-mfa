@@ -2,10 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Testing\Seams\RequirementSeamContract;
 
 /**
  * The `IdentityRequirement` contract kit: it keeps no state between calls.
@@ -35,7 +36,10 @@ trait IdentityRequirementTests
         $other       = $this->otherRequiringIdentity();
         $application = $this->requirementApplication();
 
-        RequirementSeamContract::assertKeepsNoStateBetweenCalls(static fn () => $requirement->requirementFor($identity, $application), static fn () => $requirement->requirementFor($other, $application));
+        RequirementSeamContract::assertKeepsNoStateBetweenCalls(
+            static fn () => $requirement->requirementFor($identity, $application),
+            static fn () => $requirement->requirementFor($other, $application),
+        );
     }
 
     /**

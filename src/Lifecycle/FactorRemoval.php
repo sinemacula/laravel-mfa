@@ -38,12 +38,12 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
  * factor and its passkey association are deleted, and with the last confirmed
  * factor the recovery code set; every proof made with the factor stops
  * counting, the current session's at once; the identity's other sessions are
- * revoked through the bound `SessionRevoker`; the current session's
- * requirement is evaluated again on the proofs it still holds, and a shortfall
- * is handed to the bound `SessionTransition`; `FactorRemoved` is dispatched
- * once the change commits. A refusal throws, so the caller's whole change rolls
- * back; the proofs already forgotten on the current session stay forgotten,
- * which leaves it to verify again.
+ * revoked through the bound `SessionRevoker`; the current session's requirement
+ * is evaluated again on the proofs it still holds, and a shortfall is handed to
+ * the bound `SessionTransition`; `FactorRemoved` is dispatched once the change
+ * commits. A refusal throws, so the caller's whole change rolls back; the
+ * proofs already forgotten on the current session stay forgotten, which leaves
+ * it to verify again.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -96,6 +96,7 @@ final readonly class FactorRemoval
      *
      * @throws \LogicException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      * @throws \Throwable
      */
@@ -103,18 +104,16 @@ final readonly class FactorRemoval
     {
         OpenTransaction::assertOpen('A factor is removed only inside the identity\'s factor state transaction.');
 
-        if (!$this->container->make(LastFactorPolicy::class)->allowsRemoval($identity, $application, $factor)) {
-            throw new OperationRefusedException(FailureReason::LAST_FACTOR, 'The factor is the last one keeping a required factor covered.');
-        }
+        $allowed = $this->container->make(LastFactorPolicy::class)->allowsRemoval($identity, $application, $factor);
 
-        $id      = LockedFactors::idOf($factor) ?? throw new UnsupportedFactorException('A factor is removed by its id.');
+        OperationRefusedException::unless($allowed, FailureReason::LAST_FACTOR, 'The factor is the last one keeping a required factor covered.');
+
+        $id      = self::idOf($factor);
         $summary = FactorSummary::fromFactor($factor);
 
         $this->associations->forget($id);
 
-        if ($factor->delete() === false) {
-            throw new WriteCancelledException('A model event cancelled the factor\'s deletion, so it was not removed.');
-        }
+        self::delete($factor);
 
         if (!$factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $id && $other->isConfirmed())) {
             $this->recoveryCodes->removeSet($identity, $actor);
@@ -155,5 +154,34 @@ final readonly class FactorRemoval
         }
 
         $this->container->make(SessionTransition::class)->returnToPending($identity, $application, $requirement);
+    }
+
+    /**
+     * The factor's id, which a factor is removed by.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @return string
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
+     */
+    private static function idOf(EloquentFactor&Model $factor): string
+    {
+        return LockedFactors::idOf($factor) ?? throw new UnsupportedFactorException('A factor is removed by its id.');
+    }
+
+    /**
+     * Delete the factor, and throw when a model event cancels the deletion, so
+     * the removal it is part of rolls back.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     */
+    private static function delete(EloquentFactor&Model $factor): void
+    {
+        if ($factor->delete() === false) {
+            throw new WriteCancelledException('A model event cancelled the factor\'s deletion, so it was not removed.');
+        }
     }
 }

@@ -19,8 +19,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 /**
  * What a registration path's wiring to `Passkeys\PasskeyChangeGate` must
  * guarantee, as assertions: the gate is called inside the registration's own
- * change, so a registration the gate refuses keeps nothing; and the gate
- * itself refuses a call made outside a transaction.
+ * change, so a registration the gate refuses keeps nothing; and the gate itself
+ * refuses a call made outside a transaction.
  *
  * The closures given register a passkey through the path under test, and say
  * whether its credential was kept. The gate is made to refuse by associating
@@ -43,8 +43,8 @@ final class PasskeyChangeGateContract
     private function __construct() {}
 
     /**
-     * A registration the gate refuses fails, keeps no credential and
-     * associates nothing with the identity.
+     * A registration the gate refuses fails, keeps no credential and associates
+     * nothing with the identity.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable, string): mixed  $register

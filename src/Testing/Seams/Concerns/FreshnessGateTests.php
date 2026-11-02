@@ -2,9 +2,10 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
+use SineMacula\Laravel\Mfa\Testing\Seams\FreshnessGateContract;
 
 /**
  * The `FreshnessGate` contract kit: a name that is not an operation's, and an

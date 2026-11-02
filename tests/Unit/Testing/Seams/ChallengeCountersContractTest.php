@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Testing\Seams;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
@@ -12,19 +13,21 @@ use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ChallengeCountersTests;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * The challenge counters wiring kit proves the package's own challenge
- * gateway, which counts every outcome inside its transaction, and rejects a
- * challenge path that counts nothing.
+ * The challenge counters wiring kit proves the package's own challenge gateway,
+ * which counts every outcome inside its transaction, and rejects a challenge
+ * path that counts nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -77,10 +80,90 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
+     * The kit rejects a challenge path that counts in a transaction of its own,
+     * committed whatever becomes of the change the challenge is part of.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRejectsAPathThatCommitsItsCountEarly(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        ChallengeCountersContract::assertARolledBackChallengeCountsNothing($this->factor, function (): void {
+            $this->countAFailure();
+            DB::connection(StorageConnection::name())->commit();
+        });
+    }
+
+    /**
+     * A challenge path that fails leaves the kit's change rolled back, and its
+     * failure propagates.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailingPathIsRolledBack(): void
+    {
+        $connection = DB::connection(StorageConnection::name());
+        $level      = $connection->transactionLevel();
+        $failure    = new \LogicException('The challenge path failed.');
+
+        try {
+            ChallengeCountersContract::assertARolledBackChallengeCountsNothing($this->factor, static function () use ($failure): void {
+                throw $failure;
+            });
+            self::fail('The path\'s failure was expected to propagate.');
+        } catch (\LogicException $exception) {
+            self::assertSame($failure, $exception);
+        }
+
+        self::assertSame($level, $connection->transactionLevel());
+    }
+
+    /**
+     * The kit rejects a challenge path that challenges a disabled factor.
+     *
+     * @return void
+     */
+    public function testRejectsAPathThatChallengesADisabledFactor(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        ChallengeCountersContract::assertADisabledFactorIsNotChallenged($this->factor, $this->countAFailure(...));
+    }
+
+    /**
+     * The kit rejects counters that admit and report with no transaction of the
+     * caller's to join, shown by calling them inside one.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRejectsCountersThatNeedNoTransaction(): void
+    {
+        $connection = DB::connection(StorageConnection::name());
+
+        $connection->beginTransaction();
+
+        $this->expectException(AssertionFailedError::class);
+
+        try {
+            ChallengeCountersContract::assertTheCountersNeedTheCallersTransaction($this->user, $this->factor, $this->emailBinding($this->user));
+        } finally {
+            $connection->rollBack();
+        }
+    }
+
+    /**
      * The person.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
+    #[\Override]
     protected function countedIdentity(): MultiFactorAuthenticatable
     {
         return $this->user;
@@ -91,6 +174,7 @@ final class ChallengeCountersContractTest extends TestCase
      *
      * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
      */
+    #[\Override]
     protected function countedFactor(): EloquentFactor&Model
     {
         return $this->factor;
@@ -101,6 +185,7 @@ final class ChallengeCountersContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
+    #[\Override]
     protected function countedBinding(): ProofBinding
     {
         return $this->emailBinding($this->user);
@@ -113,6 +198,7 @@ final class ChallengeCountersContractTest extends TestCase
      *
      * @throws \Throwable
      */
+    #[\Override]
     protected function failChallenge(): void
     {
         $gateway   = $this->container()->make(ChallengeGateway::class);
@@ -121,5 +207,16 @@ final class ChallengeCountersContractTest extends TestCase
         $code      = self::lastEmailedCode($this->mailbox);
 
         $gateway->verify($this->factor, $binding, $challenge, $code === '000000' ? '111111' : '000000');
+    }
+
+    /**
+     * Count a failure against the factor directly, as a path that checks no
+     * admission would.
+     *
+     * @return void
+     */
+    private function countAFailure(): void
+    {
+        WriteConnection::query($this->factor->newQuery())->whereKey($this->factor->getKey())->increment($this->factor->getConsecutiveFailuresName());
     }
 }

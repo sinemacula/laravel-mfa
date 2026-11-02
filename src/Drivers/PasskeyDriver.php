@@ -64,6 +64,8 @@ final class PasskeyDriver implements FactorDriver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @return bool
+     *
+     * @imperative
      */
     #[\Override]
     public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool

@@ -26,8 +26,8 @@ final class StepUpContract
     private function __construct() {}
 
     /**
-     * A result bound to another session, identity, application or purpose
-     * than the active session's is refused by throwing.
+     * A result bound to another session, identity, application or purpose than
+     * the active session's is refused by throwing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\StepUp  $stepUp
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $mismatched

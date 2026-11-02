@@ -2,10 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
+use SineMacula\Laravel\Mfa\Testing\Seams\SubjectTypeResolverContract;
 
 /**
  * The `SubjectTypeResolver` contract kit: a person is a person, and a machine

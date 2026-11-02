@@ -10,9 +10,9 @@ use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
- * A pending completion and step-up that accept a successful result bound to
- * the session they expect, and refuse anything else by throwing; or, when it
- * does not check, a faulty one that accepts every result.
+ * A pending completion and step-up that accept a successful result bound to the
+ * session they expect, and refuse anything else by throwing; or, when it does
+ * not check, a faulty one that accepts every result.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

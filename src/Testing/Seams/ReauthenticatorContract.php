@@ -15,8 +15,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 /**
  * What every `Reauthenticator` must guarantee, as an assertion: it answers
  * nothing, or a reauthentication with the first factor that it has just made,
- * bound to the identity and the application. A refusing default meets it; it
- * is not required to make a proof.
+ * bound to the identity and the application. A refusing default meets it; it is
+ * not required to make a proof.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -31,9 +31,8 @@ final class ReauthenticatorContract
     private function __construct() {}
 
     /**
-     * The answer is `null`, or a first factor reauthentication of the
-     * identity on the application, made within the last five minutes and not
-     * after now.
+     * The answer is `null`, or a first factor reauthentication of the identity
+     * on the application, made within the last five minutes and not after now.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Reauthenticator  $reauthenticator
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -44,7 +43,10 @@ final class ReauthenticatorContract
     {
         $proof = $reauthenticator->reauthenticate($identity, $application);
 
-        Assert::assertTrue($proof === null || $proof->kind === ProofKind::FIRST_FACTOR_REAUTHENTICATION, 'A reauthenticator must answer nothing or a first factor reauthentication.');
+        Assert::assertTrue(
+            $proof === null || $proof->kind === ProofKind::FIRST_FACTOR_REAUTHENTICATION,
+            'A reauthenticator must answer nothing or a first factor reauthentication.',
+        );
 
         if ($proof === null) {
             return;
@@ -55,6 +57,9 @@ final class ReauthenticatorContract
         Assert::assertTrue(ProofOwner::of($identity)->owns($proof->binding), 'The reauthentication must be bound to the identity asked about.');
         Assert::assertSame($application, $proof->binding->application, 'The reauthentication must be bound to the application asked about.');
         Assert::assertTrue($proof->provedAt->lessThanOrEqualTo($now), 'The reauthentication must not be dated in the future.');
-        Assert::assertTrue($proof->provedAt->greaterThanOrEqualTo($now->subSeconds(EnrollmentAuthority::REAUTHENTICATION_MAX_AGE)), 'The reauthentication must have just been made.');
+        Assert::assertTrue(
+            $proof->provedAt->greaterThanOrEqualTo($now->subSeconds(EnrollmentAuthority::REAUTHENTICATION_MAX_AGE)),
+            'The reauthentication must have just been made.',
+        );
     }
 }

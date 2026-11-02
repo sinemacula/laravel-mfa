@@ -22,8 +22,8 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 /**
  * What every `ProofStore` must guarantee, as assertions: a proof of another
  * sign-in is refused, a sign-in's proofs go with it, a proof made under an
- * earlier verification generation stops counting, and forgetting a factor
- * stops its proofs counting.
+ * earlier verification generation stops counting, and forgetting a factor stops
+ * its proofs counting.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -172,8 +172,15 @@ final class ProofStoreContract
      * @param  string  $session
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
-    private static function proof(MultiFactorAuthenticatable $identity, ProofKind $kind, string $method, Channel $channel, ?string $reference, string $application, string $session): Proof
-    {
+    private static function proof(
+        MultiFactorAuthenticatable $identity,
+        ProofKind $kind,
+        string $method,
+        Channel $channel,
+        ?string $reference,
+        string $application,
+        string $session,
+    ): Proof {
         $owner = ProofOwner::of($identity);
 
         return new Proof(

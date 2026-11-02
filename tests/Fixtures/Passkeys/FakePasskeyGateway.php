@@ -12,8 +12,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 /**
  * A passkey gateway for tests: lists the credential ids it is given, answers
  * every assertion with the one it is given (against a non-empty allowlist and
- * response only, unless told to ignore the allowlist, as a faulty gateway
- * would), and keeps what it was asked.
+ * response only, unless told to ignore either, as a faulty gateway would), and
+ * keeps what it was asked.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,6 +35,7 @@ final class FakePasskeyGateway implements PasskeyGateway
      * @param  ?\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion  $assertion
      * @param  bool  $available
      * @param  bool  $checksAllowlist
+     * @param  bool  $checksResponse
      */
     public function __construct(
 
@@ -49,6 +50,9 @@ final class FakePasskeyGateway implements PasskeyGateway
 
         /** Whether an empty allowlist verifies nothing, as it must. */
         public bool $checksAllowlist = true,
+
+        /** Whether an empty response verifies nothing, as it must. */
+        public bool $checksResponse = true,
     ) {}
 
     /**
@@ -105,6 +109,6 @@ final class FakePasskeyGateway implements PasskeyGateway
     {
         $this->verified[] = $credentialIds;
 
-        return ($this->checksAllowlist && $credentialIds === []) || $response === [] ? null : $this->assertion;
+        return ($this->checksAllowlist && $credentialIds === []) || ($this->checksResponse && $response === []) ? null : $this->assertion;
     }
 }

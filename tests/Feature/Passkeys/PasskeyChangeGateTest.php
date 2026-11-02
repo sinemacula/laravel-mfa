@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
+use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentAuthority;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
@@ -30,6 +31,7 @@ use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociationResult;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
@@ -41,6 +43,7 @@ use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\Fixtures\Passkeys\StandInRegistrar;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\FreshReauthenticator;
+use Tests\Fixtures\Seams\RecordingSessionTransition;
 use Tests\TestCase;
 
 /**
@@ -84,6 +87,7 @@ final class PasskeyChangeGateTest extends TestCase
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     public function testEveryCallIsRefusedOutsideATransaction(): void
     {
@@ -92,15 +96,17 @@ final class PasskeyChangeGateTest extends TestCase
         $user = $this->signedInPerson();
         $gate = $this->gate();
 
-        foreach ([
-            fn () => $gate->registering($user, self::APPLICATION, $this->registration($user)),
-            static function () use ($gate, $user): void {
-                $gate->removing($user, self::APPLICATION, self::CREDENTIAL);
-            },
-            static function () use ($gate, $user): void {
-                $gate->changing($user, self::APPLICATION, self::CREDENTIAL);
-            },
-        ] as $call) {
+        foreach (
+            [
+                fn () => $gate->registering($user, self::APPLICATION, $this->registration($user)),
+                static function () use ($gate, $user): void {
+                    $gate->removing($user, self::APPLICATION, self::CREDENTIAL);
+                },
+                static function () use ($gate, $user): void {
+                    $gate->changing($user, self::APPLICATION, self::CREDENTIAL);
+                },
+            ] as $call
+        ) {
             try {
                 $call();
                 self::fail('A call outside a transaction was expected to be refused.');
@@ -111,9 +117,9 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * On an application that does not enable passkeys, and for an identity
-     * that is not a person, the registration goes on as a sign-in passkey
-     * only: nothing is associated.
+     * On an application that does not enable passkeys, and for an identity that
+     * is not a person, the registration goes on as a sign-in passkey only:
+     * nothing is associated.
      *
      * @return void
      *
@@ -142,9 +148,9 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A first passkey on an active session needs the first factor proved
-     * again: the default reauthenticator refuses, and the refusal rolls back
-     * the caller's own credential with everything else.
+     * A first passkey on an active session needs the first factor proved again:
+     * the default reauthenticator refuses, and the refusal rolls back the
+     * caller's own credential with everything else.
      *
      * @return void
      *
@@ -286,13 +292,19 @@ final class PasskeyChangeGateTest extends TestCase
 
         $this->pending($user, [PendingAction::LIST_FACTORS]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user, session: 'pending-1'))));
+        self::assertSame(
+            FailureReason::NOT_FOUND,
+            $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user, session: 'pending-1'))),
+        );
 
         $this->pending($user, [PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT]);
 
         self::assertNotNull($this->registrar()->register($user, self::APPLICATION, $this->registration($user, session: 'pending-1')));
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user, self::OTHER_CREDENTIAL, session: 'pending-1'))));
+        self::assertSame(
+            FailureReason::NOT_FRESH,
+            $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user, self::OTHER_CREDENTIAL, session: 'pending-1'))),
+        );
     }
 
     /**
@@ -356,8 +368,14 @@ final class PasskeyChangeGateTest extends TestCase
         $user  = $this->signedInPerson();
         $other = TestUser::query()->create(['email' => 'other@example.test']);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user, session: 'another-sign-in'))));
-        self::assertSame(FailureReason::INVALID_CODE, $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user, properties: ObservedProperties::none()))));
+        self::assertSame(
+            FailureReason::NOT_FOUND,
+            $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user, session: 'another-sign-in'))),
+        );
+        self::assertSame(
+            FailureReason::INVALID_CODE,
+            $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user, properties: ObservedProperties::none()))),
+        );
         self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->registrar()->register($other, self::APPLICATION, $this->registration($other))));
         self::assertSame(0, PasskeyAssociation::query()->count());
     }
@@ -435,9 +453,10 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * While another factor remains, a step-up made only with the passkey
-     * being removed does not authorise its removal; one made with the other
-     * factor does.
+     * While another factor remains, a step-up made only with the passkey being
+     * removed does not authorise its removal; one made with the other factor
+     * does, and the recovery codes and the session, still meeting its
+     * requirement, stay as they are.
      *
      * @return void
      *
@@ -445,11 +464,17 @@ final class PasskeyChangeGateTest extends TestCase
      */
     public function testRemovingNeedsAStepUpMadeWithAnotherFactor(): void
     {
-        $this->enablePasskeys();
+        $this->enablePasskeys(['recovery_codes' => ['enabled' => true]]);
+
+        $transition = new RecordingSessionTransition;
+
+        $this->container()->instance(SessionTransition::class, $transition);
 
         $user    = $this->signedInPerson();
         $totp    = $this->confirmedFactor($user);
         $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        $this->container()->make(RecoveryCodeService::class)->generate($user);
 
         $this->stepUpWith($user, $passkey);
 
@@ -464,6 +489,8 @@ final class PasskeyChangeGateTest extends TestCase
         self::assertFalse(Factor::query()->whereKey($passkey->id)->exists());
         self::assertSame(0, PasskeyAssociation::query()->count());
         self::assertTrue(Factor::query()->whereKey($totp->id)->exists());
+        self::assertSame(10, RecoveryCode::query()->count());
+        self::assertSame([], $transition->returned);
         Event::assertDispatched(FactorRemoved::class, static fn (FactorRemoved $event): bool => $event->factor->id === $passkey->id);
     }
 
@@ -506,7 +533,7 @@ final class PasskeyChangeGateTest extends TestCase
         $user    = $this->signedInPerson();
         $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
 
-        DB::table(StandInRegistrar::TABLE)->insert(['owner' => (string) $user->getKey(), 'credential_id' => self::CREDENTIAL]);
+        DB::table(StandInRegistrar::TABLE)->insert(['owner' => ProofOwner::of($user)->key, 'credential_id' => self::CREDENTIAL]);
 
         $this->stepUpWith($user, $passkey);
 
@@ -564,7 +591,7 @@ final class PasskeyChangeGateTest extends TestCase
 
         $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
 
-        DB::table(StandInRegistrar::TABLE)->insert(['owner' => (string) $user->getKey(), 'credential_id' => self::CREDENTIAL]);
+        DB::table(StandInRegistrar::TABLE)->insert(['owner' => ProofOwner::of($user)->key, 'credential_id' => self::CREDENTIAL]);
 
         $refusal = $this->refusal(fn () => DB::transaction(function () use ($user): bool {
             DB::table(StandInRegistrar::TABLE)->update(['credential_id' => self::OTHER_CREDENTIAL]);
@@ -584,8 +611,115 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Registering, changing and removing in one outer transaction commit as
-     * one change; a refusal anywhere in it rolls all of it back.
+     * A change or a removal of an associated credential named for another
+     * identity or application than the request's caller is refused as not
+     * found; one of a credential associated with nobody is a no-op whoever it
+     * is named for.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAChangeOrRemovalForAnotherThanTheCallerIsRefused(): void
+    {
+        $this->enablePasskeys();
+
+        $user  = $this->signedInPerson();
+        $other = TestUser::query()->create(['email' => 'other@example.test']);
+
+        $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        $calls = [
+            fn () => $this->gate()->changing($other, self::APPLICATION, self::CREDENTIAL),
+            fn () => $this->gate()->changing($user, 'another-application', self::CREDENTIAL),
+            fn () => $this->gate()->removing($other, self::APPLICATION, self::CREDENTIAL),
+            fn () => $this->gate()->removing($user, 'another-application', self::CREDENTIAL),
+        ];
+
+        foreach ($calls as $call) {
+            self::assertSame(FailureReason::NOT_FOUND, $this->refusal(static fn () => DB::transaction($call)));
+        }
+
+        DB::transaction(function () use ($other): void {
+            $this->gate()->changing($other, self::APPLICATION, self::OTHER_CREDENTIAL);
+            $this->gate()->removing($other, self::APPLICATION, self::OTHER_CREDENTIAL);
+        });
+
+        self::assertSame(1, PasskeyAssociation::query()->count());
+    }
+
+    /**
+     * The caller removing a credential associated with another identity is
+     * refused as not found, and the other identity's factor and association
+     * stay.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRemovingAnotherIdentitysCredentialIsRefused(): void
+    {
+        $this->enablePasskeys();
+
+        $user = $this->signedInPerson();
+
+        /** @var \Tests\Fixtures\Identities\TestUser $other */
+        $other   = TestUser::query()->create(['email' => 'other@example.test']);
+        $passkey = $this->confirmedFactor($other, 'passkey', self::CREDENTIAL);
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => DB::transaction(function () use ($user): void {
+            $this->gate()->removing($user, self::APPLICATION, self::CREDENTIAL);
+        })));
+        self::assertTrue(Factor::query()->whereKey($passkey->id)->exists());
+        self::assertSame($passkey->id, PasskeyAssociation::query()->sole()->factor_id);
+    }
+
+    /**
+     * The passkey factor carries the label it was registered with.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testThePasskeyFactorCarriesItsLabel(): void
+    {
+        $this->enablePasskeys();
+        $this->reauthenticate();
+
+        $user = $this->signedInPerson();
+
+        DB::transaction(function () use ($user): void {
+            $this->gate()->registering($user, self::APPLICATION, $this->registration($user), 'Work laptop');
+        });
+
+        self::assertSame('Work laptop', Factor::query()->sole()->label);
+    }
+
+    /**
+     * A caller with no sign-in on the application has nothing to bind a
+     * registration to, so it is refused as not found.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testARegistrationWithoutASignInIsRefused(): void
+    {
+        $this->enablePasskeys();
+        $this->reauthenticate();
+
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
+        $user = TestUser::query()->create(['email' => 'person@example.test']);
+
+        $this->actingAs($user);
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user))));
+        self::assertSame(0, PasskeyAssociation::query()->count());
+    }
+
+    /**
+     * Registering, changing and removing in one outer transaction commit as one
+     * change; a refusal anywhere in it rolls all of it back.
      *
      * @return void
      *

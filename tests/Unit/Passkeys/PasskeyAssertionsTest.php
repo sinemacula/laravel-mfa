@@ -78,8 +78,8 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * An assertion is requested with exactly the factor's credential, bound
-     * to the person's sign-in.
+     * An assertion is requested with exactly the factor's credential, bound to
+     * the person's sign-in.
      *
      * @return void
      *

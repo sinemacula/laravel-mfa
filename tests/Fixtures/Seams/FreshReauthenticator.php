@@ -19,9 +19,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 
 /**
- * A reauthenticator that proves the password again, the given number of
- * seconds ago, on the identity's current sign-in, and counts how often it is
- * asked.
+ * A reauthenticator that proves the password again, the given number of seconds
+ * ago, on the identity's current sign-in, and counts how often it is asked.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

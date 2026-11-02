@@ -17,8 +17,8 @@ use Tests\TestCase;
 
 /**
  * Tests for `PasskeyBindings`: passkeys are unavailable by default, an
- * application may bind its own gateway, and the change gate, the assertions
- * and the association records are shared.
+ * application may bind its own gateway, and the change gate, the assertions and
+ * the association records are shared.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +29,8 @@ use Tests\TestCase;
 final class PasskeyBindingsTest extends TestCase
 {
     /**
-     * The gateway defaults to the unavailable one, shared, and a binding of
-     * the application's own replaces it.
+     * The gateway defaults to the unavailable one, shared, and a binding of the
+     * application's own replaces it.
      *
      * @return void
      *

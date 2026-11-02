@@ -11,8 +11,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
  * What every `PasskeyGateway` must guarantee, as assertions: an unavailable
- * gateway lists no passkeys, no assertion verifies against an empty
- * allowlist, and an empty response never verifies.
+ * gateway lists no passkeys, no assertion verifies against an empty allowlist,
+ * and an empty response never verifies.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -47,8 +47,12 @@ final class PasskeyGatewayContract
      * @param  array<string, mixed>  $response
      * @return void
      */
-    public static function assertNothingVerifiesWithoutAnAllowedCredential(PasskeyGateway $gateway, MultiFactorAuthenticatable $identity, ProofBinding $binding, array $response): void
-    {
+    public static function assertNothingVerifiesWithoutAnAllowedCredential(
+        PasskeyGateway $gateway,
+        MultiFactorAuthenticatable $identity,
+        ProofBinding $binding,
+        array $response,
+    ): void {
         Assert::assertNull($gateway->verifyAssertion($identity, $binding, [], $response), 'An assertion must never verify against an empty allowlist.');
     }
 

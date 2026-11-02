@@ -25,19 +25,19 @@ use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
 use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\Seams\ApplicationResolverContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\ApplicationResolverTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ApplicationResolverTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\EventContextResolverTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\FreshnessGateTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\IdentityRequirementTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\SessionTransitionTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\SubjectTypeResolverTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\TenantRequirementTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\EventContextResolverContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\EventContextResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\FreshnessGateContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\FreshnessGateTests;
-use SineMacula\Laravel\Mfa\Testing\Seams\IdentityRequirementTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\RequirementSeamContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\SeamAssert;
 use SineMacula\Laravel\Mfa\Testing\Seams\SessionTransitionContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\SessionTransitionTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\SubjectTypeResolverContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\SubjectTypeResolverTests;
-use SineMacula\Laravel\Mfa\Testing\Seams\TenantRequirementTests;
 use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -110,7 +110,10 @@ final class SeamsWithoutStateContractTest extends TestCase
 
         $this->expectException(AssertionFailedError::class);
 
-        RequirementSeamContract::assertKeepsNoStateBetweenCalls(static fn () => $faulty->requirementFor($identity, 'web'), static fn () => $faulty->requirementFor($identity, 'api'));
+        RequirementSeamContract::assertKeepsNoStateBetweenCalls(
+            static fn () => $faulty->requirementFor($identity, 'web'),
+            static fn () => $faulty->requirementFor($identity, 'api'),
+        );
     }
 
     /**
@@ -188,6 +191,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\ApplicationResolver
      */
+    #[\Override]
     protected function applicationResolver(): ApplicationResolver
     {
         return new HeaderApplicationResolver;
@@ -198,6 +202,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \Illuminate\Http\Request
      */
+    #[\Override]
     protected function applicationRequest(): Request
     {
         return HeaderApplicationResolver::requestFor('api');
@@ -208,6 +213,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\EventContextResolver
      */
+    #[\Override]
     protected function eventContextResolver(): EventContextResolver
     {
         return $this->container()->make(EventContextResolver::class);
@@ -218,6 +224,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
+    #[\Override]
     protected function eventIdentity(): MultiFactorAuthenticatable
     {
         return new NonEloquentIdentity;
@@ -228,6 +235,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
      */
+    #[\Override]
     protected function freshnessGate(): FreshnessGate
     {
         $this->actingAs($this->transitionIdentity());
@@ -240,6 +248,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\IdentityRequirement
      */
+    #[\Override]
     protected function identityRequirement(): IdentityRequirement
     {
         return $this->container()->make(IdentityRequirement::class);
@@ -250,6 +259,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
+    #[\Override]
     protected function requiringIdentity(): MultiFactorAuthenticatable
     {
         return new NonEloquentIdentity(requirement: Requirement::none()->withMultifactor());
@@ -260,6 +270,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
+    #[\Override]
     protected function otherRequiringIdentity(): MultiFactorAuthenticatable
     {
         return new NonEloquentIdentity('plain-2');
@@ -270,6 +281,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return string
      */
+    #[\Override]
     protected function requirementApplication(): string
     {
         return 'web';
@@ -280,6 +292,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\SessionTransition
      */
+    #[\Override]
     protected function sessionTransition(): SessionTransition
     {
         return $this->container()->make(SessionTransition::class);
@@ -290,6 +303,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
+    #[\Override]
     protected function transitionIdentity(): MultiFactorAuthenticatable
     {
         /** @var \Tests\Fixtures\Identities\TestUser */
@@ -301,6 +315,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return string
      */
+    #[\Override]
     protected function transitionApplication(): string
     {
         return 'web';
@@ -311,6 +326,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver
      */
+    #[\Override]
     protected function subjectTypeResolver(): SubjectTypeResolver
     {
         return $this->container()->make(SubjectTypeResolver::class);
@@ -321,6 +337,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \Illuminate\Contracts\Auth\Authenticatable
      */
+    #[\Override]
     protected function personIdentity(): Authenticatable
     {
         return new NonEloquentIdentity;
@@ -331,6 +348,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \Illuminate\Contracts\Auth\Authenticatable
      */
+    #[\Override]
     protected function machineIdentity(): Authenticatable
     {
         return new NonEloquentIdentity('machine-1', person: false);
@@ -341,6 +359,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\TenantRequirement
      */
+    #[\Override]
     protected function tenantRequirement(): TenantRequirement
     {
         return $this->container()->make(TenantRequirement::class);
@@ -351,6 +370,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
+    #[\Override]
     protected function tenantIdentity(): MultiFactorAuthenticatable
     {
         return new NonEloquentIdentity;
@@ -361,6 +381,7 @@ final class SeamsWithoutStateContractTest extends TestCase
      *
      * @return string
      */
+    #[\Override]
     protected function tenantApplication(): string
     {
         return 'web';

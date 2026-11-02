@@ -35,8 +35,8 @@ final class CredentialIdTest extends TestCase
     }
 
     /**
-     * The encoding is unpadded base64url, and the digest is the SHA-256 hex
-     * of the canonical string.
+     * The encoding is unpadded base64url, and the digest is the SHA-256 hex of
+     * the canonical string.
      *
      * @return void
      */

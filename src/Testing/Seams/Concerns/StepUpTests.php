@@ -2,9 +2,10 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
+use SineMacula\Laravel\Mfa\Testing\Seams\StepUpContract;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**

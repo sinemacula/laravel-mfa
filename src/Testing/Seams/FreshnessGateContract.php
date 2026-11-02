@@ -52,8 +52,8 @@ final class FreshnessGateContract
     }
 
     /**
-     * A caller's requirement with a part that carries no maximum age is
-     * refused with an `InvalidArgumentException`.
+     * A caller's requirement with a part that carries no maximum age is refused
+     * with an `InvalidArgumentException`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
      * @return void

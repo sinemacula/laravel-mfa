@@ -129,8 +129,8 @@ final class DeclaredFirstFactorResolverTest extends TestCase
 
     /**
      * A declared passkey first factor names no credential, so the combination
-     * policy accepts no passkey after it: the credential that signed the
-     * person in cannot be shown to differ.
+     * policy accepts no passkey after it: the credential that signed the person
+     * in cannot be shown to differ.
      *
      * @return void
      *

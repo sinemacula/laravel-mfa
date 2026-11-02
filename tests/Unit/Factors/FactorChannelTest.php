@@ -12,8 +12,8 @@ use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 
 /**
- * Unit tests for `FactorChannel`: a factor's channel names its destination,
- * its passkey credential, or the factor itself, and a kind that cannot carry a
+ * Unit tests for `FactorChannel`: a factor's channel names its destination, its
+ * passkey credential, or the factor itself, and a kind that cannot carry a
  * factor, or an identifier that cannot name one, has none.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -36,16 +36,21 @@ final class FactorChannelTest extends TestCase
 
         $passkey->setAttribute('id', 'factor-passkey');
 
+        $channel = FactorChannel::of($passkey, ChannelKind::PASSKEY);
+
         self::assertSame('person@example.test', FactorChannel::of(new InMemoryFactor(type: 'email', destination: 'person@example.test'), ChannelKind::EMAIL)?->reference);
-        self::assertSame('Y3JlZGVudGlhbC1vbmU', FactorChannel::of($passkey, ChannelKind::PASSKEY)?->reference);
+
+        self::assertNotNull($channel);
+        self::assertSame('Y3JlZGVudGlhbC1vbmU', $channel->reference);
+        self::assertSame(ChannelKind::PASSKEY, $channel->kind);
+
         self::assertSame('factor-id', FactorChannel::of(new InMemoryFactor, ChannelKind::AUTHENTICATOR_APP)?->reference);
         self::assertSame('7', FactorChannel::of(new InMemoryFactor(identifier: 7), ChannelKind::AUTHENTICATOR_APP)?->reference);
-        self::assertSame(ChannelKind::PASSKEY, FactorChannel::of($passkey, ChannelKind::PASSKEY)?->kind);
     }
 
     /**
-     * A kind that cannot carry a factor, or a factor that cannot be named,
-     * has no channel.
+     * A kind that cannot carry a factor, or a factor that cannot be named, has
+     * no channel.
      *
      * @return void
      */

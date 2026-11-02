@@ -20,6 +20,7 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -77,10 +78,12 @@ final class ChallengeCountersTest extends TestCase
     {
         $binding = $this->emailBinding($this->user);
 
-        foreach ([
-            fn () => $this->counters()->isUsable($this->user, $this->factor, $binding),
-            fn () => $this->counters()->report($this->user, $this->factor, $binding, false),
-        ] as $call) {
+        foreach (
+            [
+                fn () => $this->counters()->isUsable($this->user, $this->factor, $binding),
+                fn () => $this->counters()->report($this->user, $this->factor, $binding, false),
+            ] as $call
+        ) {
             try {
                 $call();
                 self::fail('A call outside a transaction was expected to be refused.');
@@ -91,8 +94,8 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * A confirmed factor of an enabled type, accepted after the session's
-     * first factor and not locked, is admitted.
+     * A confirmed factor of an enabled type, accepted after the session's first
+     * factor and not locked, is admitted.
      *
      * @return void
      *
@@ -121,7 +124,7 @@ final class ChallengeCountersTest extends TestCase
         $stranger = TestUser::query()->create(['email' => 'stranger@example.test']);
         $theirs   = $this->factor->replicate();
 
-        $theirs->setAttribute('authenticatable_id', (string) $stranger->getKey());
+        $theirs->setAttribute('authenticatable_id', ProofOwner::of($stranger)->key);
         $theirs->save();
 
         self::assertSame(FailureReason::NOT_FOUND, $this->admission(factor: $theirs)->reason);
@@ -187,7 +190,7 @@ final class ChallengeCountersTest extends TestCase
         $until = CarbonImmutable::now()->addMinutes(10)->startOfSecond();
 
         IdentityState::query()->updateOrCreate(
-            ['authenticatable_type' => TestUser::class, 'authenticatable_id' => (string) $this->user->getKey()],
+            ['authenticatable_type' => TestUser::class, 'authenticatable_id' => ProofOwner::of($this->user)->key],
             ['locked_until' => $until],
         );
 
@@ -198,8 +201,8 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * A failure is counted against the factor and the identity, and a
-     * success resets the factor's failures in a row.
+     * A failure is counted against the factor and the identity, and a success
+     * resets the factor's failures in a row.
      *
      * @return void
      *
@@ -240,8 +243,8 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * Competing failures cannot overrun the identity's cap: once it locks,
-     * a further outcome is refused and counted nowhere, and the lockout is
+     * Competing failures cannot overrun the identity's cap: once it locks, a
+     * further outcome is refused and counted nowhere, and the lockout is
      * reported once the change commits.
      *
      * @return void

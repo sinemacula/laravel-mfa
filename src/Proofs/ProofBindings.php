@@ -16,8 +16,8 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 /**
  * Registers the proof service, the default `ProofStore`, which keeps each
  * sign-in's proofs in the Laravel session, the default `SessionRevoker`, which
- * advances the identity's verification generation, and the listeners that
- * begin a sign-in on Laravel's `Login` event and forget it on `Logout` and
+ * advances the identity's verification generation, and the listeners that begin
+ * a sign-in on Laravel's `Login` event and forget it on `Logout` and
  * `CurrentDeviceLogout`.
  *
  * The store is built on every resolution, from the session of the request at

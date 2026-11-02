@@ -47,33 +47,33 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * The gate every entry point that registers, removes or changes a passkey
- * calls before it does, the authentication layer's included, in the same
- * change: an event reporting the change afterwards cannot stand in for it.
+ * The gate every entry point that registers, removes or changes a passkey calls
+ * before it does, the authentication layer's included, in the same change: an
+ * event reporting the change afterwards cannot stand in for it.
  *
  * Each call runs inside the caller's own transaction on the storage connection
  * and refuses with a `LogicException` without one. It acts only for the
- * request's validated caller, the identity and application it names, under
- * the identity's factor state lock, which joins the caller's transaction and
- * is held until it commits. A refusal is an `OperationRefusedException`
- * carrying the reason, so the caller's registration or change rolls back with
- * it; a caller that catches the refusal and commits anyway breaks the
- * contract. Every event waits for the caller's commit, so a caller that rolls
- * back after an allowed call leaves no factor, association or event behind.
+ * request's validated caller, the identity and application it names, under the
+ * identity's factor state lock, which joins the caller's transaction and is
+ * held until it commits. A refusal is an `OperationRefusedException` carrying
+ * the reason, so the caller's registration or change rolls back with it; a
+ * caller that catches the refusal and commits anyway breaks the contract. Every
+ * event waits for the caller's commit, so a caller that rolls back after an
+ * allowed call leaves no factor, association or event behind.
  *
- * - `registering()` associates a passkey with the identity as a factor when
- *   the application enables the type, confirmed by the registration ceremony's
- *   own evidence, with the fresh step-up, reauthentication or bootstrap
- *   exemption and the limits an enrolment needs, and recovery codes with the
- *   first additional factor. A credential associated already, with this
- *   identity or another, is refused.
- * - `removing()` removes the factor an associated credential is, with the
- *   fresh step-up a removal needs (proved without that factor while another
- *   remains), the last factor policy, and the revocation of the identity's
- *   other sessions.
- * - `changing()` refuses any change to an associated credential: one to what
- *   it proves is a removal and then a registration. A label, its counter and
- *   its last use are not gated.
+ * - `registering()` associates a passkey with the identity as a factor when the
+ *   application enables the type, confirmed by the registration ceremony's own
+ *   evidence, with the fresh step-up, reauthentication or bootstrap exemption
+ *   and the limits an enrolment needs, and recovery codes with the first
+ *   additional factor. A credential associated already, with this identity or
+ *   another, is refused.
+ * - `removing()` removes the factor an associated credential is, with the fresh
+ *   step-up a removal needs (proved without that factor while another remains),
+ *   the last factor policy, and the revocation of the identity's other
+ *   sessions.
+ * - `changing()` refuses any change to an associated credential: one to what it
+ *   proves is a removal and then a registration. A label, its counter and its
+ *   last use are not gated.
  *
  * Stateless: the request, the configuration and the seams are read on every
  * call.
@@ -191,17 +191,23 @@ final readonly class PasskeyChangeGate
      * @param  string  $credentialId
      * @return void
      *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \LogicException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     public function changing(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId): void
     {
         OpenTransaction::assertOpen(self::NO_TRANSACTION);
 
-        if ($this->associations->forCredential(CredentialId::canonical($credentialId)) !== null) {
-            throw new OperationRefusedException(FailureReason::CREDENTIAL_ASSOCIATED, 'An associated credential is not changed in place: remove it, then register the new one.');
+        if ($this->associations->forCredential(CredentialId::canonical($credentialId)) === null) {
+            return;
         }
+
+        $this->caller($identity, $application, null);
+
+        self::refuseChange();
     }
 
     /**
@@ -222,6 +228,7 @@ final readonly class PasskeyChangeGate
      * @formatter:on
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      * @throws \Throwable
      */
     private function associate(Caller $caller, string $application, PasskeyRegistration $registration, ?string $label, Collection $factors): PasskeyAssociationResult
@@ -230,15 +237,17 @@ final readonly class PasskeyChangeGate
 
         $this->container->make(OperationGuard::class)->identity($identity);
 
-        if ($this->associations->forCredential($registration->credentialId) !== null) {
-            throw new OperationRefusedException(FailureReason::CREDENTIAL_ASSOCIATED, 'The credential is associated as a factor already.');
-        }
+        OperationRefusedException::unless(
+            $this->associations->forCredential($registration->credentialId) === null,
+            FailureReason::CREDENTIAL_ASSOCIATED,
+            'The credential is associated as a factor already.',
+        );
 
         $this->container->make(EnrollmentAuthority::class)->authorize($caller, $application, PasskeyAssertions::TYPE, $factors);
 
         $first   = !$factors->contains(static fn (EloquentFactor&Model $factor): bool => $factor->isConfirmed());
         $factor  = $this->store($identity, $application, $registration->credentialId, $label);
-        $id      = LockedFactors::idOf($factor) ?? throw new WriteCancelledException('The passkey factor was stored without an id.');
+        $id      = self::storedId($factor);
         $summary = FactorSummary::fromFactor($factor);
         $context = $this->events->context($identity, $application);
 
@@ -255,9 +264,9 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * Under the lock: remove the identity's factor the credential is
-     * associated as, once the session is fresh enough to; an association no
-     * factor of the identity's remains for is deleted on its own.
+     * Under the lock: remove the identity's factor the credential is associated
+     * as, once the session is fresh enough to; an association no factor of the
+     * identity's remains for is deleted on its own.
      *
      * @formatter:off
      *
@@ -272,7 +281,7 @@ final readonly class PasskeyChangeGate
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    private function remove(MultiFactorAuthenticatable $identity, string $application, string $credentialId, Collection $factors): void
+    private function remove(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId, Collection $factors): void
     {
         $association = $this->associations->forCredential($credentialId);
 
@@ -282,9 +291,11 @@ final readonly class PasskeyChangeGate
 
         $owner = ProofOwner::of($identity);
 
-        if ($association->authenticatable_type !== $owner->type || $association->authenticatable_id !== $owner->key) {
-            throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The credential is associated with another identity.');
-        }
+        OperationRefusedException::unless(
+            $association->authenticatable_type === $owner->type && $association->authenticatable_id === $owner->key,
+            FailureReason::NOT_FOUND,
+            'The credential is associated with another identity.',
+        );
 
         $factor = $factors->first(static fn (EloquentFactor&Model $candidate): bool => LockedFactors::idOf($candidate) === $association->factor_id);
 
@@ -322,24 +333,27 @@ final readonly class PasskeyChangeGate
     {
         $operation = Operation::REMOVE_FACTOR->value;
 
-        if (!$this->container->make(RequirementService::class)->isFresh($operation)) {
-            throw new OperationRefusedException(FailureReason::NOT_FRESH, 'Removing a factor needs a fresh step-up.');
-        }
+        OperationRefusedException::unless(
+            $this->container->make(RequirementService::class)->isFresh($operation),
+            FailureReason::NOT_FRESH,
+            'Removing a factor needs a fresh step-up.',
+        );
 
         if (!$factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $factorId && $other->isConfirmed())) {
             return;
         }
 
-        $requirement = (new OperationRequirements($this->config))->effective($application, $operation)
-            ?? throw new OperationRefusedException(FailureReason::NOT_FRESH, 'Removing a factor has no freshness configured to judge it by.');
+        $requirement = (new OperationRequirements($this->config))->effective($application, $operation);
+
+        OperationRefusedException::unless($requirement !== null, FailureReason::NOT_FRESH, 'Removing a factor has no freshness configured to judge it by.');
+
         $proofs = array_values(array_filter(
             $this->container->make(SessionFirstFactor::class)->proofs($identity, $application),
             static fn (Proof $proof): bool => $proof->reference !== $factorId,
         ));
+        $fresh = $this->container->make(RequirementCheck::class)->check($requirement, ...$proofs)->meetsRequirement();
 
-        if (!$this->container->make(RequirementCheck::class)->check($requirement, ...$proofs)->meetsRequirement()) {
-            throw new OperationRefusedException(FailureReason::NOT_FRESH, 'Removing a factor needs a fresh step-up made with another factor.');
-        }
+        OperationRefusedException::unless($fresh, FailureReason::NOT_FRESH, 'Removing a factor needs a fresh step-up made with another factor.');
     }
 
     /**
@@ -394,7 +408,6 @@ final readonly class PasskeyChangeGate
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      */
     private function store(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId, ?string $label): EloquentFactor&Model
     {
@@ -410,16 +423,12 @@ final readonly class PasskeyChangeGate
         $factor->confirm();
         $factor->persist();
 
-        if (!$factor->exists) {
-            throw new WriteCancelledException('A model event cancelled the passkey factor\'s save, so the passkey was not associated.');
-        }
-
         return $factor;
     }
 
     /**
-     * Refuse a registration bound to anything but the caller's own enrolment
-     * on its session, or one that observed no user presence.
+     * Refuse a registration bound to anything but the caller's own enrolment on
+     * its session, or one that observed no user presence.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration  $registration
@@ -433,18 +442,18 @@ final readonly class PasskeyChangeGate
     {
         $binding = $this->callers->binding($caller, Purpose::ENROLLMENT);
 
-        if ($binding === null || $binding->toArray() !== $registration->binding->toArray()) {
-            throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The registration is bound to another identity, application or session.');
-        }
+        OperationRefusedException::unless(
+            $binding?->toArray() === $registration->binding->toArray(),
+            FailureReason::NOT_FOUND,
+            'The registration is bound to another identity, application or session.',
+        );
 
-        if ($registration->properties->userPresence !== true) {
-            throw new OperationRefusedException(FailureReason::INVALID_CODE, 'The registration observed no user presence.');
-        }
+        OperationRefusedException::unless($registration->properties->userPresence === true, FailureReason::INVALID_CODE, 'The registration observed no user presence.');
     }
 
     /**
-     * The request's validated caller, refused unless it is the identity and
-     * the application given.
+     * The request's validated caller, refused unless it is the identity and the
+     * application given.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -457,11 +466,10 @@ final readonly class PasskeyChangeGate
      */
     private function caller(MultiFactorAuthenticatable $identity, string $application, ?PendingAction $action): Caller
     {
-        $caller = $this->callers->resolve($action);
+        $caller   = $this->callers->resolve($action);
+        $isCaller = $caller !== null && ProofOwner::of($caller->identity)->slot() === ProofOwner::of($identity)->slot() && $this->callers->application($caller) === $application;
 
-        if ($caller === null || ProofOwner::of($caller->identity)->slot() !== ProofOwner::of($identity)->slot() || $this->callers->application($caller) !== $application) {
-            throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The identity and application are not the request\'s validated caller.');
-        }
+        OperationRefusedException::unless($isCaller, FailureReason::NOT_FOUND, 'The identity and application are not the request\'s validated caller.');
 
         return $caller;
     }
@@ -489,5 +497,34 @@ final readonly class PasskeyChangeGate
         $model = ConfiguredModels::factor($this->config);
 
         return new $model;
+    }
+
+    /**
+     * Refuse a change to an associated credential: a change to what it proves
+     * is a removal and then a registration.
+     *
+     * @return never
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     */
+    private static function refuseChange(): never
+    {
+        throw new OperationRefusedException(FailureReason::CREDENTIAL_ASSOCIATED, 'An associated credential is not changed in place: remove it, then register the new one.');
+    }
+
+    /**
+     * The stored factor's id, throwing when a model event cancelled its save,
+     * so the passkey is not associated.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @return string
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     */
+    private static function storedId(EloquentFactor&Model $factor): string
+    {
+        $id = $factor->exists ? LockedFactors::idOf($factor) : null;
+
+        return $id ?? throw new WriteCancelledException('A model event cancelled the passkey factor\'s save, so the passkey was not associated.');
     }
 }

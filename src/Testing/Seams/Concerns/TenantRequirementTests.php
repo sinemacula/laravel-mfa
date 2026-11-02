@@ -2,10 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
+use SineMacula\Laravel\Mfa\Testing\Seams\RequirementSeamContract;
 
 /**
  * The `TenantRequirement` contract kit: it keeps no state between calls.
@@ -34,7 +35,10 @@ trait TenantRequirementTests
         $identity    = $this->tenantIdentity();
         $application = $this->tenantApplication();
 
-        RequirementSeamContract::assertKeepsNoStateBetweenCalls(static fn () => $requirement->requirementFor($identity, $application, 'contract-tenant'), static fn () => $requirement->requirementFor($identity, $application, 'contract-other-tenant'));
+        RequirementSeamContract::assertKeepsNoStateBetweenCalls(
+            static fn () => $requirement->requirementFor($identity, $application, 'contract-tenant'),
+            static fn () => $requirement->requirementFor($identity, $application, 'contract-other-tenant'),
+        );
     }
 
     /**

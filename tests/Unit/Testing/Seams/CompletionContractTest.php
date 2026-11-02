@@ -12,10 +12,10 @@ use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\PendingCompletionTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\StepUpTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\PendingCompletionContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\PendingCompletionTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\StepUpContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\StepUpTests;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -70,6 +70,7 @@ final class CompletionContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\PendingCompletion
      */
+    #[\Override]
     protected function pendingCompletion(): PendingCompletion
     {
         return new CheckingCompletion('sign-in-1');
@@ -80,6 +81,7 @@ final class CompletionContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
      */
+    #[\Override]
     protected function pendingContext(): PendingContext
     {
         $identity = new NonEloquentIdentity;
@@ -94,6 +96,7 @@ final class CompletionContractTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
+    #[\Override]
     protected function resultOfAnotherBinding(): VerificationResult
     {
         $proof = SignInProofs::of(new NonEloquentIdentity)->inSession('another-session')->totp();
@@ -106,6 +109,7 @@ final class CompletionContractTest extends TestCase
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\StepUp
      */
+    #[\Override]
     protected function stepUp(): StepUp
     {
         return new CheckingCompletion('sign-in-1');
@@ -118,6 +122,7 @@ final class CompletionContractTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
+    #[\Override]
     protected function stepUpResultOfAnotherBinding(): VerificationResult
     {
         return $this->resultOfAnotherBinding();

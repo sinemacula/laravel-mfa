@@ -10,8 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 
 /**
  * The default `SubjectTypeResolver`, which reads the identity contract: an
- * identity is a person only when it implements `MultiFactorAuthenticatable`
- * and says it can hold factors. Anything else, an identity of another kind
+ * identity is a person only when it implements `MultiFactorAuthenticatable` and
+ * says it can hold factors. Anything else, an identity of another kind
  * included, is treated as a machine, which every operation refuses.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>

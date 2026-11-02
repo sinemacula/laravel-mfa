@@ -19,10 +19,10 @@ use Tests\TestCase;
 
 /**
  * Tests for `GenerationSessionRevoker`, which revokes by advancing the
- * identity's verification generation: the other sessions' proofs stop
- * counting, the current sign-in's are recorded again under exactly the
- * generation advanced to once the change commits, and a change that rolls back
- * revokes nothing.
+ * identity's verification generation: the other sessions' proofs stop counting,
+ * the current sign-in's are recorded again under exactly the generation
+ * advanced to once the change commits, and a change that rolls back revokes
+ * nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

@@ -59,10 +59,9 @@ final readonly class FactorService
      *
      * Returns null when the request serves nobody for listing factors: a
      * pending session that does not allow it, no MFA-capable identity, or one
-     * that is not a person. The factors are read from the write connection
-     * (see `Database\WriteConnection`), as they decide verification and
-     * lockout, and on every call, so nothing is kept from one request to the
-     * next.
+     * that is not a person. The factors are read from the write connection (see
+     * `Database\WriteConnection`), as they decide verification and lockout, and
+     * on every call, so nothing is kept from one request to the next.
      *
      * @formatter:off
      *

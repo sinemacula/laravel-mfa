@@ -75,8 +75,8 @@ final readonly class EnrollmentAuthority
     ) {}
 
     /**
-     * Refuse unless the caller may add a factor of the type on the
-     * application now.
+     * Refuse unless the caller may add a factor of the type on the application
+     * now.
      *
      * @formatter:off
      *
@@ -101,16 +101,19 @@ final readonly class EnrollmentAuthority
             self::authorizeBootstrap($caller->pending, $settings, $type, $confirmed->isEmpty());
         } elseif ($confirmed->isEmpty()) {
             $this->authorizeReauthentication($caller, $application);
-        } elseif (!$this->container->make(RequirementService::class)->isFresh(Operation::ADD_FACTOR->value)) {
-            throw new OperationRefusedException(FailureReason::NOT_FRESH, 'Adding a factor needs a fresh step-up.');
+        } else {
+            OperationRefusedException::unless(
+                $this->container->make(RequirementService::class)->isFresh(Operation::ADD_FACTOR->value),
+                FailureReason::NOT_FRESH,
+                'Adding a factor needs a fresh step-up.',
+            );
         }
 
         self::assertLimits($settings, $application, $type, $confirmed);
     }
 
     /**
-     * Refuse a pending session unless it is on the bootstrap path for the
-     * type.
+     * Refuse a pending session unless it is on the bootstrap path for the type.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $settings
@@ -123,22 +126,30 @@ final readonly class EnrollmentAuthority
      */
     private static function authorizeBootstrap(PendingContext $pending, ApplicationSettings $settings, string $type, bool $none): void
     {
-        [$reason, $detail] = match (true) {
-            !$pending->allows(PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT) => [FailureReason::NOT_FRESH, 'The pending session may not confirm a bootstrap enrolment.'],
-            !$settings->allowsBootstrap()                                  => [FailureReason::MFA_ENROLLMENT_REQUIRED, 'The application does not allow a pending session to enrol its first factor.'],
-            !in_array($type, $settings->bootstrapTypes(), true)            => [FailureReason::TYPE_NOT_ENABLED, sprintf('The application does not allow bootstrap enrolment of [%s].', $type)],
-            !$none                                                         => [FailureReason::NOT_FRESH, 'The identity has a confirmed factor, so the pending session must verify it.'],
-            default                                                        => [null, ''],
-        };
+        OperationRefusedException::unless(
+            $pending->allows(PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT),
+            FailureReason::NOT_FRESH,
+            'The pending session may not confirm a bootstrap enrolment.',
+        );
 
-        if ($reason !== null) {
-            throw new OperationRefusedException($reason, $detail);
-        }
+        OperationRefusedException::unless(
+            $settings->allowsBootstrap(),
+            FailureReason::MFA_ENROLLMENT_REQUIRED,
+            'The application does not allow a pending session to enrol its first factor.',
+        );
+
+        OperationRefusedException::unless(
+            in_array($type, $settings->bootstrapTypes(), true),
+            FailureReason::TYPE_NOT_ENABLED,
+            sprintf('The application does not allow bootstrap enrolment of [%s].', $type),
+        );
+
+        OperationRefusedException::unless($none, FailureReason::NOT_FRESH, 'The identity has a confirmed factor, so the pending session must verify it.');
     }
 
     /**
-     * Refuse an active session enrolling its first additional factor unless
-     * the bound reauthenticator proves its first factor again, now.
+     * Refuse an active session enrolling its first additional factor unless the
+     * bound reauthenticator proves its first factor again, now.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $application
@@ -152,10 +163,9 @@ final readonly class EnrollmentAuthority
     {
         $session = $this->callers->binding($caller, Purpose::REAUTHENTICATE)?->sessionId;
         $proof   = $session === null ? null : $this->container->make(Reauthenticator::class)->reauthenticate($caller->identity, $application);
+        $fresh   = $session !== null && $proof !== null && self::isFreshReauthentication($proof, $caller->identity, $application, $session);
 
-        if ($proof === null || $session === null || !self::isFreshReauthentication($proof, $caller->identity, $application, $session)) {
-            throw new OperationRefusedException(FailureReason::NOT_FRESH, 'Adding a first additional factor needs the first factor proved again.');
-        }
+        OperationRefusedException::unless($fresh, FailureReason::NOT_FRESH, 'Adding a first additional factor needs the first factor proved again.');
     }
 
     /**
@@ -203,9 +213,12 @@ final readonly class EnrollmentAuthority
     {
         $enrolled = $confirmed->filter(static fn (EloquentFactor&Model $factor): bool => $factor->getApplication() === $application);
         $ofType   = $enrolled->filter(static fn (EloquentFactor&Model $factor): bool => $factor->getType() === $type);
+        $detail   = sprintf('The identity has as many factors enrolled through the application as it allows, of type [%s] or in all.', $type);
 
-        if ($enrolled->count() >= $settings->confirmedLimit() || $ofType->count() >= $settings->confirmedPerTypeLimit()) {
-            throw new OperationRefusedException(FailureReason::LIMIT_REACHED, sprintf('The identity has as many factors enrolled through the application as it allows, of type [%s] or in all.', $type));
-        }
+        OperationRefusedException::unless(
+            $enrolled->count() < $settings->confirmedLimit() && $ofType->count() < $settings->confirmedPerTypeLimit(),
+            FailureReason::LIMIT_REACHED,
+            $detail,
+        );
     }
 }

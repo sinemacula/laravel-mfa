@@ -80,7 +80,10 @@ final class SessionFirstFactorTest extends TestCase
         $this->store()->record($proofs->totp());
 
         self::assertEquals($first, $this->firstFactors()->current($user, 'web'));
-        self::assertSame([ProofKind::FIRST_FACTOR, ProofKind::ADDITIONAL_FACTOR], array_map(static fn (Proof $proof): ProofKind => $proof->kind, $this->firstFactors()->proofs($user, 'web')));
+        self::assertSame(
+            [ProofKind::FIRST_FACTOR, ProofKind::ADDITIONAL_FACTOR],
+            array_map(static fn (Proof $proof): ProofKind => $proof->kind, $this->firstFactors()->proofs($user, 'web')),
+        );
     }
 
     /**

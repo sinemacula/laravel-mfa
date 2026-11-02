@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
@@ -86,8 +87,9 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     #[\Override]
     public function send(Factor $factor, ProofBinding $binding): string
     {
-        $identity = $this->identity(PendingAction::SEND_CODE, $binding)
-            ?? throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The binding does not name the identity the request serves.');
+        $identity = $this->identity(PendingAction::SEND_CODE, $binding);
+
+        OperationRefusedException::unless($identity !== null, FailureReason::NOT_FOUND, 'The binding does not name the identity the request serves.');
 
         $driver = $this->driver($factor);
 
@@ -107,8 +109,8 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
 
     /**
      * Whether the code answers the challenge, consuming it when it does, with
-     * the outcome counted against the factor and the identity. A challenge
-     * that may not go ahead is answered `false` without checking the code.
+     * the outcome counted against the factor and the identity. A challenge that
+     * may not go ahead is answered `false` without checking the code.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -168,10 +170,22 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
      */
     private function driver(Factor $factor): CodeDeliveryDriver
     {
-        $driver = $this->container->make(DriverResolver::class)->fromContainer($this->container, $factor->getType());
+        return self::deliveringCodes($this->container->make(DriverResolver::class)->fromContainer($this->container, $factor->getType()), $factor->getType());
+    }
 
+    /**
+     * The driver, which must deliver codes.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
+     * @param  string  $type
+     * @return \SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
+     */
+    private static function deliveringCodes(FactorDriver $driver, string $type): CodeDeliveryDriver
+    {
         if (!$driver instanceof CodeDeliveryDriver) {
-            throw new UnsupportedFactorException(sprintf('The factor\'s type [%s] does not deliver codes.', $factor->getType()));
+            throw new UnsupportedFactorException(sprintf('The factor\'s type [%s] does not deliver codes.', $type));
         }
 
         return $driver;

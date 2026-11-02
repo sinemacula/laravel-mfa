@@ -111,8 +111,8 @@ final readonly class LifecycleService
      * Delete the factor as stored under the identity's lock, in its factor
      * state transaction, with its passkey association, and the identity's
      * recovery codes with it when none of the factors left under the lock is
-     * confirmed. A factor already gone is
-     * not deleted again; the caller's instance is marked as no longer stored.
+     * confirmed. A factor already gone is not deleted again; the caller's
+     * instance is marked as no longer stored.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor

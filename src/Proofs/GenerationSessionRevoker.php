@@ -20,13 +20,13 @@ use SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException;
  *
  * Revoking every session advances the generation, and nothing else. Revoking
  * the others reads the current sign-in and its counting proofs first, advances
- * the generation, and once the change commits records those proofs again on
- * the same sign-in, stamped with exactly the generation this call advanced to,
- * so a later revocation in the same change still wins. They are recorded again
- * only while the store still names that sign-in; a refusal is dropped, which
- * leaves the current session to verify again. Advancing joins the open factor
- * state transaction, so a change that rolls back advances nothing and records
- * nothing again.
+ * the generation, and once the change commits records those proofs again on the
+ * same sign-in, stamped with exactly the generation this call advanced to, so a
+ * later revocation in the same change still wins. They are recorded again only
+ * while the store still names that sign-in; a refusal is dropped, which leaves
+ * the current session to verify again. Advancing joins the open factor state
+ * transaction, so a change that rolls back advances nothing and records nothing
+ * again.
  *
  * Stateless: the store and the application are resolved on every call, and the
  * work left for the commit holds only what this call read.
@@ -48,8 +48,7 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
     ) {}
 
     /**
-     * Stop every proof of the identity counting, but the current sign-in's
-     * own.
+     * Stop every proof of the identity counting, but the current sign-in's own.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void

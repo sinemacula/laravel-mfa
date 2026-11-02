@@ -2,10 +2,11 @@
 
 declare(strict_types = 1);
 
-namespace SineMacula\Laravel\Mfa\Testing\Seams;
+namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
+use SineMacula\Laravel\Mfa\Testing\Seams\SessionRevokerContract;
 
 /**
  * The `SessionRevoker` contract kit: revoking the other sessions, or all of
@@ -31,7 +32,12 @@ trait SessionRevokerTests
      */
     public function testSessionRevokerStopsAnotherSessionCountingWhenRevokingOthers(): void
     {
-        SessionRevokerContract::assertRevokingOthersStopsAnotherSessionCounting($this->sessionRevoker(), $this->revokedIdentity(), $this->verifyAnotherSession(...), $this->anotherSessionCounts(...));
+        SessionRevokerContract::assertRevokingOthersStopsAnotherSessionCounting(
+            $this->sessionRevoker(),
+            $this->revokedIdentity(),
+            $this->verifyAnotherSession(...),
+            $this->doesAnotherSessionCount(...),
+        );
     }
 
     /**
@@ -41,7 +47,12 @@ trait SessionRevokerTests
      */
     public function testSessionRevokerStopsAnotherSessionCountingWhenRevokingAll(): void
     {
-        SessionRevokerContract::assertRevokingAllStopsAnotherSessionCounting($this->sessionRevoker(), $this->revokedIdentity(), $this->verifyAnotherSession(...), $this->anotherSessionCounts(...));
+        SessionRevokerContract::assertRevokingAllStopsAnotherSessionCounting(
+            $this->sessionRevoker(),
+            $this->revokedIdentity(),
+            $this->verifyAnotherSession(...),
+            $this->doesAnotherSessionCount(...),
+        );
     }
 
     /**
@@ -53,7 +64,12 @@ trait SessionRevokerTests
      */
     public function testSessionRevokerLeavesSessionsCountingWhenRolledBack(): void
     {
-        SessionRevokerContract::assertARolledBackRevocationLeavesSessionsCounting($this->sessionRevoker(), $this->revokedIdentity(), $this->verifyAnotherSession(...), $this->anotherSessionCounts(...));
+        SessionRevokerContract::assertARolledBackRevocationLeavesSessionsCounting(
+            $this->sessionRevoker(),
+            $this->revokedIdentity(),
+            $this->verifyAnotherSession(...),
+            $this->doesAnotherSessionCount(...),
+        );
     }
 
     /**
@@ -84,5 +100,5 @@ trait SessionRevokerTests
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
      */
-    abstract protected function anotherSessionCounts(MultiFactorAuthenticatable $identity): bool;
+    abstract protected function doesAnotherSessionCount(MultiFactorAuthenticatable $identity): bool;
 }
