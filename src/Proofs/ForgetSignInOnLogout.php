@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Proofs;
 
 use Illuminate\Auth\Events\CurrentDeviceLogout;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Container\Container;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 
@@ -19,24 +20,17 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
  * An identity whose key cannot name a record holds no proofs, so it is left
  * alone rather than failing the sign-out.
  *
+ * The event dispatcher builds a class listener on the application it was booted
+ * with and keeps no copy of a request's, so the proof service is resolved from
+ * the application serving when the event fires, and acts on its session.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
-final readonly class ForgetSignInOnLogout
+final class ForgetSignInOnLogout
 {
-    /**
-     * Constructor.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
-     */
-    public function __construct(
-
-        /** The proof service the sign-in is ended through. */
-        private ProofService $proofs,
-    ) {}
-
     /**
      * Handle the `Logout` or `CurrentDeviceLogout` event.
      *
@@ -52,7 +46,7 @@ final readonly class ForgetSignInOnLogout
         }
 
         try {
-            $this->proofs->endSignIn($event->user, $event->guard);
+            Container::getInstance()->make(ProofService::class)->endSignIn($event->user, $event->guard);
         } catch (UnsupportedIdentifierException) {
             return;
         }

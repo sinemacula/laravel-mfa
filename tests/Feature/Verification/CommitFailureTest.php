@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
@@ -19,11 +20,18 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmer;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\VerificationPassed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
@@ -33,6 +41,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Exceptions\CommitFailedException;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Seams\RefusingCompletion;
 use Tests\Fixtures\Verification\IssuedTokens;
 use Tests\Fixtures\Verification\TokenIssuingCompletion;
@@ -58,12 +67,20 @@ use Tests\TestCase;
 #[CoversClass(VerificationService::class)]
 #[CoversClass(EnrollmentConfirmer::class)]
 #[CoversClass(StorageTransaction::class)]
+#[CoversClass(FactorRemoval::class)]
+#[CoversClass(PasskeyChangeGate::class)]
 final class CommitFailureTest extends TestCase
 {
     use ArrangesEnrollment;
 
     /** @var string The route a person verifies on. */
     private const string ROUTE = 'sign-in/verify';
+
+    /** @var string The route a person confirms an enrolment on. */
+    private const string CONFIRM_ROUTE = 'sign-in/confirm';
+
+    /** @var string The route a person removes a factor on. */
+    private const string REMOVE_ROUTE = 'sign-in/remove';
 
     /** @var bool Whether the next commit on the storage connection fails. */
     private bool $failNextCommit = false;
@@ -250,6 +267,93 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
+     * The same for confirming an enrolment through the kernel.
+     *
+     * @return void
+     */
+    public function testAFailedCommitOnAConfirmationAnswersWithNeither(): void
+    {
+        $this->bootstrapPerson(Requirement::none()->withAdditionalVerification());
+
+        $start = $this->startedTotp();
+
+        $this->forgetReports();
+
+        $this->assertTheAnswerCarriesNeither(['grant' => $this->grantOf($start), 'code' => $this->appCode($start)], self::CONFIRM_ROUTE);
+
+        $user = TestUser::query()->sole();
+
+        self::assertSame(FactorStatus::PENDING, $this->pendingFactorOf($start)->getStatus());
+        self::assertSame([], $this->furtherProofs($user));
+        self::assertSame([], $this->reported);
+    }
+
+    /**
+     * A removal whose commit fails is a server error: the factor stays, nothing
+     * is reported, and nothing the failed commit left waiting runs alongside
+     * the retry. The proofs it forgot on the session stay forgotten, which
+     * leaves the person to verify again.
+     *
+     * @return void
+     */
+    public function testAFailedCommitOnARemovalIsAServerError(): void
+    {
+        $user  = $this->steppedUpPerson();
+        $totp  = Factor::query()->where('type', 'totp')->sole();
+        $email = $this->emailFactor($user, attributes: ['application' => self::APPLICATION]);
+
+        $this->forgetReports();
+
+        $this->assertTheAnswerCarriesNeither(['factor' => $email->id], self::REMOVE_ROUTE);
+
+        self::assertTrue(Factor::query()->whereKey($email->id)->exists());
+        self::assertSame([], $this->reported);
+
+        $this->recordStepUp($user, $totp);
+
+        self::assertTrue(Mfa::removeFactor($email->id)->wasMade());
+        self::assertSame(['FactorRemoved'], $this->reportedNames());
+    }
+
+    /**
+     * A passkey's association in a change whose own commit fails leaves no
+     * factor, no association and no report: the caller's commit is what they
+     * wait for.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailedOuterCommitOnAPasskeyAssociationLeavesNothing(): void
+    {
+        $user = $this->reauthenticatedPerson();
+
+        $this->enablePasskeys();
+        $this->forgetReports();
+
+        $owner        = ProofOwner::of($user);
+        $binding      = new ProofBinding($owner->type, $owner->key, self::APPLICATION, self::SESSION, Purpose::ENROLLMENT);
+        $registration = new PasskeyRegistration(self::CREDENTIAL, new ObservedProperties(userPresence: true), $binding);
+        $gate         = $this->container()->make(PasskeyChangeGate::class);
+
+        $this->failNextCommit = true;
+
+        try {
+            DB::connection(StorageConnection::name())->transaction(static function () use ($gate, $user, $registration): void {
+                self::assertNotNull($gate->registering($user, self::APPLICATION, $registration));
+            });
+
+            self::fail('The commit failure must reach the caller.');
+        } catch (CommitFailedException) {
+            $this->rollBackTheFailedCommit();
+        }
+
+        self::assertSame(0, Factor::query()->count());
+        self::assertSame(0, PasskeyAssociation::query()->count());
+        self::assertSame([], $this->reported);
+    }
+
+    /**
      * A seam refusing after it began handing over returns a failed result, with
      * nothing a caller could send.
      *
@@ -340,6 +444,20 @@ final class CommitFailureTest extends TestCase
 
             return new Response($tokens instanceof IssuedTokens ? $tokens->accessToken : 'no token');
         })->middleware(AddQueuedCookiesToResponse::class);
+
+        $router->post(self::CONFIRM_ROUTE, static function (Request $request): Response {
+
+            $tokens = Mfa::confirmEnrollment($request->string('grant')->toString(), $request->string('code')->toString())->verification?->completion();
+
+            return new Response($tokens instanceof IssuedTokens ? $tokens->accessToken : 'no token');
+        })->middleware(AddQueuedCookiesToResponse::class);
+
+        $router->post(self::REMOVE_ROUTE, static function (Request $request): Response {
+
+            $made = Mfa::removeFactor($request->string('factor')->toString())->wasMade();
+
+            return new Response($made ? 'removed' : 'refused');
+        })->middleware(AddQueuedCookiesToResponse::class);
     }
 
     /**
@@ -400,17 +518,18 @@ final class CommitFailureTest extends TestCase
      * Fail the next commit of a request through the kernel, and assert the
      * answer is a server error with neither the token nor the cookie.
      *
-     * @param  array{factor: string, code: string}  $input
+     * @param  array<string, string>  $input
+     * @param  string  $route
      * @return void
      */
-    private function assertTheAnswerCarriesNeither(array $input): void
+    private function assertTheAnswerCarriesNeither(array $input, string $route = self::ROUTE): void
     {
         config()->set('app.debug', true);
         config()->set('logging.default', 'null');
 
         $this->failNextCommit = true;
 
-        $response = $this->postJson(self::ROUTE, $input);
+        $response = $this->postJson($route, $input);
 
         $this->rollBackTheFailedCommit();
 

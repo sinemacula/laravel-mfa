@@ -18,7 +18,7 @@ use Tests\TestCase;
 /**
  * Tests for `PasskeyBindings`: passkeys are unavailable by default, an
  * application may bind its own gateway, and the change gate, the assertions and
- * the association records are shared.
+ * the association records are built afresh.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +29,8 @@ use Tests\TestCase;
 final class PasskeyBindingsTest extends TestCase
 {
     /**
-     * The gateway defaults to the unavailable one, shared, and a binding of the
-     * application's own replaces it.
+     * The gateway defaults to the unavailable one, built afresh, and a binding
+     * of the application's own replaces it.
      *
      * @return void
      *
@@ -39,7 +39,7 @@ final class PasskeyBindingsTest extends TestCase
     public function testBindsTheUnavailableGatewayByDefault(): void
     {
         self::assertInstanceOf(UnavailablePasskeyGateway::class, $this->container()->make(PasskeyGateway::class));
-        self::assertTrue($this->container()->isShared(PasskeyGateway::class));
+        self::assertFalse($this->container()->isShared(PasskeyGateway::class));
 
         $own = new FakePasskeyGateway;
 
@@ -49,7 +49,7 @@ final class PasskeyBindingsTest extends TestCase
     }
 
     /**
-     * Rows of a service the bindings share.
+     * Rows of a service the bindings build afresh.
      *
      * @return iterable<string, array{class-string}>
      */
@@ -61,7 +61,7 @@ final class PasskeyBindingsTest extends TestCase
     }
 
     /**
-     * Each service is shared.
+     * Each service is built afresh.
      *
      * @param  class-string  $service
      * @return void
@@ -69,9 +69,10 @@ final class PasskeyBindingsTest extends TestCase
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     #[DataProvider('services')]
-    public function testSharesTheService(string $service): void
+    public function testBuildsTheServiceOnEveryResolution(string $service): void
     {
-        self::assertTrue($this->container()->isShared($service));
-        self::assertSame($this->container()->make($service), $this->container()->make($service));
+        self::assertFalse($this->container()->isShared($service));
+        self::assertTrue($this->container()->bound($service));
+        self::assertNotSame($this->container()->make($service), $this->container()->make($service));
     }
 }

@@ -23,10 +23,10 @@ use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 
 /**
- * Tests for `DriverBindings`: the driver resolver is shared, the TOTP, email
- * and SMS drivers are registered against the manager, and each factory reads
- * its slice of config with the documented defaults and delivers through the
- * bound sender.
+ * Tests for `DriverBindings`: the driver resolver is built afresh, the TOTP,
+ * email and SMS drivers are registered against the manager, and each factory
+ * reads its slice of config with the documented defaults and delivers through
+ * the bound sender.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,16 +37,17 @@ use Tests\TestCase;
 final class DriverBindingsTest extends TestCase
 {
     /**
-     * The driver resolver is a singleton.
+     * The driver resolver is built on every resolution.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testRegistersTheDriverResolverAsASingleton(): void
+    public function testBuildsTheDriverResolverOnEveryResolution(): void
     {
-        self::assertTrue($this->container()->isShared(DriverResolver::class));
-        self::assertSame($this->container()->make(DriverResolver::class), $this->container()->make(DriverResolver::class));
+        self::assertFalse($this->container()->isShared(DriverResolver::class));
+        self::assertTrue($this->container()->bound(DriverResolver::class));
+        self::assertNotSame($this->container()->make(DriverResolver::class), $this->container()->make(DriverResolver::class));
     }
 
     /**

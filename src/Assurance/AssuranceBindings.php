@@ -33,6 +33,6 @@ final class AssuranceBindings
      */
     public static function register(Application $app): void
     {
-        $app->singleton(CombinationPolicy::class, DefaultCombinationPolicy::class);
+        $app->bind(CombinationPolicy::class, DefaultCombinationPolicy::class);
     }
 }

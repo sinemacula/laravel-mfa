@@ -37,12 +37,16 @@ cannot interleave.
 - `Database\StorageTransaction` is every transaction the package opens on the storage connection, that one included.
   When its commit fails, the work waiting for that commit (`Database\AfterStorageCommit`: a proof, an event, a queued
   cookie) ends with it. Laravel 13 discards that work itself; Laravel 12 keeps it and runs it on the connection's next
-  commit, which would record the proof of a verification that never committed.
+  commit, which would record the proof of a verification that never committed. It runs once: a deadlock is a server
+  error for the caller to retry, as running it again would run a driver again and could deliver a second code. A failed
+  query leaves it masked (see [Secrets in responses and logs](secrets-in-responses-and-logs.md)).
 - The identity's row is one per owner (a unique index on `authenticatable_type` and `authenticatable_id`), created by
   the first change that needs it. The lock is an insert that updates the existing row's `updated_at` on a conflict,
   which takes the row's exclusive lock in one statement on MySQL and PostgreSQL, also when two first changes race to
   create it. A separate insert and `SELECT ... FOR UPDATE` would let two transactions share a lock on MySQL and then
-  deadlock upgrading it. SQLite serialises its writers, so the insert takes the database's write lock there.
+  deadlock upgrading it. SQLite serialises its writers, so the insert takes the database's write lock there. Every lock
+  of the row is `Database\IdentityStateRow::lock()`, advancing the verification generation's included, so there is one
+  way. An advance that then changes no row is refused with a `LogicException`, not answered with generation 0.
 - Reads that decide a verification, a lockout or who owns a factor go to the storage connection's write host
   (`Database\WriteConnection::query()`), so a replica that lags behind a lockout, a used code or a removed factor
   cannot answer them: the identity's factors as `FactorService::factors()` reads them, whether the identity has a
@@ -62,6 +66,50 @@ cannot interleave.
 - Calls to another package that must be atomic with the change (revoking sessions, reporting a challenge's outcome, a
   passkey change gate) run inside the callback. An adapter whose own storage is on another connection cannot be atomic
   with it and must say so.
+- Locking lookups are scoped to their owner: a grant by its hash and a credential by its hash, each with the owner's
+  columns in the same query. A credential someone else holds is found by the unlocked `exists()` and answered
+  `not_found`.
+- Package rows change before a session seam runs (`SessionRevoker`, `SessionTransition`, `PendingCompletion`, `StepUp`),
+  so a package row is never locked after a session row.
+
+## Lock Order
+
+Each mutating flow locks the identity's row first and one owner's row only. Unlocked reads may come before it, and a
+transaction that only refuses may lock nothing. The challenge gateway is at challenge rank, and not a session seam.
+
+| Flow                                | In order, inside the transaction                                         | Last, the seam                  |
+|-------------------------------------|--------------------------------------------------------------------------|---------------------------------|
+| Verifying, every route              | Identity, factors, the proof's writes, the counts                        | `PendingCompletion` or `StepUp` |
+| Sending a code                      | Identity, factors, the code                                              | None                            |
+| Starting or cancelling an enrolment | Identity, factors, the enrolment, the pending factor                     | None                            |
+| Confirming an enrolment             | Identity, factors, the enrolment, the factor, any recovery codes         | `PendingCompletion`, `StepUp`   |
+| Removing a factor                   | Identity, factors, the association, the factor, any recovery set         | `revokeOthers`, transition      |
+| Registering a passkey               | Identity, factors, the factor, the association, any recovery codes       | `PendingCompletion`, transition |
+| Removing a passkey                  | As removing a factor, the owner's association only                       | `revokeOthers`, transition      |
+| Resetting an identity               | Identity, factors, counts, factors, enrolments, recovery set, generation | `revokeAll`                     |
+| Renaming, preferring, unlocking     | Identity, factors, the row changed                                       | None                            |
+| Generating recovery codes           | Identity, factors, the codes, the state row                              | None                            |
+
+The default `Proofs\GenerationSessionRevoker` advances the owner's own generation as part of its call; nothing
+orchestrating it writes after it.
+
+Three things hold no second lock or are outside the order, and are kept as they are:
+
+- A factor's temporary lockout is a plain read of its `mfa_attempts` row, from the writer, for the reason given in
+  [Attempts and Lockout](attempts-and-lockout.md). It is a recorded trade-off, not an oversight.
+- An address's slot in `Attempts\IpThrottle` is taken outside the transaction, in one statement, and given back after
+  it.
+- The pruners delete in bounded, unlocked statements, touching only rows no flow reads as live; a deadlock victim is a
+  failed prune that can be retried.
+
+The authentication layer must call the passkey gate before it takes its session rows. This repository cannot test that
+package's order, so it is stated in the [seam contracts](seam-contracts.md) and in
+`Testing\Seams\PasskeyChangeGateContract`.
+
+What proves this is the order of the statements (`tests/Integration/Database/LockOrderTest.php`), not their contention,
+which stays with the tests CI runs on MySQL and PostgreSQL (`tests/Integration/Database/*Race*`,
+`ParallelAttemptsTest`). SQLite cannot show the absence of a gap or next-key deadlock.
+
 - Recovery codes run on it: a new set replaces the old one inside the transaction, a redemption uses its code inside
   the attempt's transaction, and the set is removed inside the transaction that removes the last confirmed factor (see
   [Recovery Codes](recovery-codes.md)).
@@ -85,7 +133,7 @@ cannot interleave.
   refuses it again before opening a transaction, so a configuration changed after boot (in a test) cannot split a
   change across two connections either. A configured factor model that is not a factor model at all fails at boot too.
 - A callback that throws rolls the whole change back, releases both locks and leaves nothing it wrote, the identity's
-  first state row included. The exception reaches the caller unchanged.
+  first state row included. The exception reaches the caller as it was thrown, a failed query's masked in place.
 - A change nested inside another transaction on the storage connection becomes a savepoint of it: the locks are held
   until the outer transaction ends.
 - Changing the setting moves no table, and a rollback runs against the setting at the time it runs: moving the tables
@@ -97,6 +145,7 @@ cannot interleave.
 - `src/Config/ConfigurationValidator.php`: `checkModel()`, `checkStorageConnection()`, `checkDistinctTables()`.
 - `src/Database/TableNames.php`, `src/Database/IndexName.php`.
 - `src/Database/WriteConnection.php`: `query()`; `src/Factors/FactorService.php`: `factors()`, `factor()`.
+- `src/Database/IdentityStateRow.php`: `lock()`; `src/Database/StorageTransaction.php`.
 - `src/Support/FactorStateTransaction.php`: `forIdentity()`, `forFactor()`, `forOwner()`, `snapshot()`, the lock order
   in `run()`; `src/Support/FactorOwnerColumns.php`: `of()`, `owns()`.
 - The constructor of every model under `src/Models/`; `getConnection()` in every migration under `database/migrations/`.
@@ -108,6 +157,9 @@ cannot interleave.
 - `tests/Integration/Database/StorageConnectionRecoveryCodesTest.php`
 - `tests/Integration/Database/IdentityOffStorageConnectionTest.php`
 - `tests/Integration/Database/WriteConnectionReadTest.php`
+- `tests/Integration/Database/PoisonedReaderTest.php`
+- `tests/Integration/Database/QueryFailureSweepTest.php`
+- `tests/Integration/Database/LockOrderTest.php`
 - `tests/Unit/Database/WriteConnectionTest.php`
 - `tests/Unit/Support/FactorOwnerColumnsTest.php`
 - `tests/Unit/Support/FactorStateTransactionTest.php`

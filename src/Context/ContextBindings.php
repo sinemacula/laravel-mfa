@@ -14,7 +14,8 @@ use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
  * contract (`IdentityContractSubjectType`). An adapter over an authentication
  * layer rebinds either in its own service provider.
  *
- * Neither default keeps state between calls, so each is shared.
+ * Neither default keeps state between calls, and each is built when it is asked
+ * for, on the application serving at the time.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,7 +37,7 @@ final class ContextBindings
      */
     public static function register(Application $app): void
     {
-        $app->singleton(PendingSessionResolver::class, NoPendingSessionResolver::class);
-        $app->singleton(SubjectTypeResolver::class, IdentityContractSubjectType::class);
+        $app->bind(PendingSessionResolver::class, NoPendingSessionResolver::class);
+        $app->bind(SubjectTypeResolver::class, IdentityContractSubjectType::class);
     }
 }

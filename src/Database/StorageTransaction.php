@@ -5,13 +5,18 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Database;
 
 use Illuminate\Container\Container;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 
 /**
  * Every transaction the package opens on the storage connection, so that work
  * waiting for its commit (`AfterStorageCommit`) ends with it when the commit
  * fails, on every Laravel version the package supports, rather than running on
- * the connection's next commit.
+ * the connection's next commit, and so that a failed query leaves it with
+ * nothing it was given (see `Secrets\QueryExceptionMask`). A transaction runs
+ * once: a deadlock is a server error for the caller to retry, since running it
+ * again here would run a driver again and could deliver a second code.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -41,6 +46,10 @@ final class StorageTransaction
             return DB::connection(StorageConnection::name())->transaction($callback);
         } catch (\Throwable $failure) {
             AfterStorageCommit::forgetFailedCommit(Container::getInstance());
+
+            if ($failure instanceof QueryException) {
+                QueryExceptionMask::mask($failure);
+            }
 
             throw $failure;
         }

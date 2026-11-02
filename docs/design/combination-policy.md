@@ -51,7 +51,7 @@ values they report, and which parts of a requirement they meet within each part'
 ## Success Path
 
 - The provider registers `Assurance\AssuranceBindings`, which binds `Contracts\CombinationPolicy` to
-  `Assurance\DefaultCombinationPolicy` as a singleton. The policy holds no state.
+  `Assurance\DefaultCombinationPolicy`. The policy holds no state.
 - Before offering or verifying a factor on a session, a flow asks `accepts()` with the session's first-factor proof and
   the factor's channel; a refused factor is neither offered nor verified.
 - After a proof, a flow asks `evaluate()` with the outstanding requirement and the session's proofs, and acts on the
@@ -118,7 +118,7 @@ values they report, and which parts of a requirement they meet within each part'
 - `tests/Unit/Assurance/CombinationTest.php`
   `testAnAnswerIsAsFreshAsItsEvidence`
 - `tests/Unit/Assurance/AssuranceBindingsTest.php`
-  `testBindsTheDefaultPolicyAsASingleton`
+  `testBindsTheDefaultPolicyAfreshOnEveryResolution`
 
 ## Change Triggers
 

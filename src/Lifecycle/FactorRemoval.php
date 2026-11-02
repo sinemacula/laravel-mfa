@@ -31,13 +31,15 @@ use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
  * and a passkey's gate behave alike.
  *
  * In order: the factor and its passkey association are deleted; every proof
- * made with it stops counting, the current session's at once; the identity's
- * other sessions are revoked through the bound `SessionRevoker`; the current
- * session's requirement is evaluated again on the proofs it still holds, and a
- * shortfall goes to the bound `SessionTransition`; with that security work done
- * `FactorRemoved` is queued, then with the last confirmed factor the recovery
- * code set goes, reporting its own removal after it. So the default revoker's
- * kept proofs are recorded again before any listener runs.
+ * made with it stops counting, the current session's at once; with the last
+ * confirmed factor the recovery code set goes; the identity's other sessions
+ * are revoked through the bound `SessionRevoker`; the current session's
+ * requirement is evaluated again on the proofs it still holds, and a shortfall
+ * goes to the bound `SessionTransition`; with that security work done
+ * `FactorRemoved` is queued, then the recovery code set's removal is reported
+ * after it. So every package row has changed before a session seam runs, in the
+ * lock order every change shares, and the default revoker's kept proofs are
+ * recorded again before any listener runs.
  *
  * A failure rolls the caller's whole change back. The proofs already forgotten
  * on the current session stay forgotten, which leaves it to verify again; they
@@ -110,6 +112,9 @@ final readonly class FactorRemoval
 
         $this->erase($identity, $factor);
 
+        $setRemoved = !$factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $id && $other->isConfirmed())
+            && $this->recoveryCodes->deleteSet($identity);
+
         // What the current session still holds is read before the revocation,
         // which hides every proof it does not record again once committed.
         $kept = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
@@ -120,8 +125,8 @@ final readonly class FactorRemoval
 
         $this->events->dispatch(new FactorRemoved($context, $summary));
 
-        if (!$factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $id && $other->isConfirmed())) {
-            $this->recoveryCodes->removeSet($identity);
+        if ($setRemoved) {
+            $this->recoveryCodes->reportSetRemoved($identity);
         }
 
         return $outstanding;

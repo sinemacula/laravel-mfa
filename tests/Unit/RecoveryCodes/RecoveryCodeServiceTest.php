@@ -151,6 +151,38 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
+     * Deleting the set reports nothing and says it existed; reporting it is its
+     * own call, once the set's removal is ready to be told.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testDeletingTheSetReportsNothingUntilItIsAsked(): void
+    {
+        $holder = $this->signInHolder();
+
+        $this->recoveryCodes()->generate($holder);
+
+        Event::fake([RecoveryCodesRemoved::class]);
+
+        self::assertTrue(FactorStateTransaction::forIdentity($holder, new Factor, fn (): bool => $this->recoveryCodes()->deleteSet($holder)));
+        self::assertCount(0, $this->storedCodes($holder));
+        self::assertNull($this->stateOf($holder)->recovery_codes_generated_at);
+
+        Event::assertNotDispatched(RecoveryCodesRemoved::class);
+
+        self::assertFalse(FactorStateTransaction::forIdentity($holder, new Factor, fn (): bool => $this->recoveryCodes()->deleteSet($holder)));
+
+        $actor = new Actor('admin', '9');
+
+        $this->recoveryCodes()->reportSetRemoved($holder, $actor);
+
+        Event::assertDispatchedTimes(RecoveryCodesRemoved::class, 1);
+        Event::assertDispatched(RecoveryCodesRemoved::class, static fn (RecoveryCodesRemoved $event): bool => $event->actor === $actor);
+    }
+
+    /**
      * Removing the set deletes every code row, clears the set's time, keeps its
      * generation, and reports the removal with the actor once it commits.
      *

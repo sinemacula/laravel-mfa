@@ -8,8 +8,10 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\QueryException;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 
 /**
  * Default implementation of the `Factor` contract for Eloquent models.
@@ -470,15 +472,26 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     /**
      * Persist pending mutations to the underlying storage, throwing when a
      * model event cancels the save, so the change it is part of never reports a
-     * state that was not stored.
+     * state that was not stored. A failed query leaves with nothing it was
+     * given, since a factor binds a destination and a credential reference as
+     * they are (see `Secrets\QueryExceptionMask`).
      *
      * @return void
      *
+     * @throws \Illuminate\Database\QueryException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      */
     public function persist(): void
     {
-        if (!$this->save()) {
+        try {
+            $saved = $this->save();
+        } catch (QueryException $failure) { // @phpstan-ignore catch.neverThrown
+            QueryExceptionMask::mask($failure);
+
+            throw $failure;
+        }
+
+        if (!$saved) {
             throw new WriteCancelledException('A model event cancelled the factor\'s save, so the change it is part of was not made.');
         }
     }

@@ -104,6 +104,21 @@ it.
   encrypted under a key listed in `app.previous_keys` (`APP_PREVIOUS_KEYS`) decrypts and verifies after the key is
   rotated. Nothing re-encrypts it under the new key.
 
+## Failed Queries
+
+- `Secrets\QueryExceptionMask::mask()` rewrites a `QueryException` and its chain in place, keeping the class and the
+  code: the message becomes the SQLSTATE, the driver error number, the connection's name and the SQL with placeholders,
+  each previous message the SQLSTATE and number alone, the bindings are emptied and `errorInfo`'s driver text cleared.
+  No substring is redacted, so an escaped or truncated value, or a stored value in a driver's diagnostics, goes too.
+- It runs unconditionally at `Database\StorageTransaction::run()`, `Concerns\ActsAsFactor::persist()` and
+  `Database\WriteConnection::during()`, and in `ExceptionScrubber` on the report path for a chain whose SQL names a
+  package table, while redaction is on. A passkey's unique violation is handled inside the transaction, before the mask,
+  and its re-read uses the credential, not the exception.
+- A literal an application writes into its own raw SQL stays in `getSql()`; the promise covers the queries the package
+  builds, which bind every value (the attempts `Expression` quotes only timestamps). The audited plain reads bind only
+  hashes and owner keys: an exemption based on the inventory, not a general guarantee, which the sweep's plaintext
+  assertion keeps true.
+
 ## Success Path
 
 - The enrolment flow returns the TOTP secret and provisioning URI as `RevealedSecret` values; the application's
@@ -179,6 +194,9 @@ it.
 - `src/Models/Factor.php`: the `encrypted` cast on `secret`.
 
 ## Authoritative Tests
+
+- `tests/Unit/Secrets/QueryExceptionMaskTest.php`
+- `tests/Integration/Database/QueryFailureSweepTest.php`
 
 - `tests/Unit/Secrets/RevealedSecretTest.php`
   every refusal, and every dump showing no plaintext

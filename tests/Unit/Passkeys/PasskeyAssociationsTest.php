@@ -4,11 +4,19 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Passkeys;
 
+use Illuminate\Database\Connection;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
+use SineMacula\Laravel\Mfa\Passkeys\CredentialId;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
+use Tests\Fixtures\Hardening\LockMarkingSqliteGrammar;
 use Tests\TestCase;
 
 /**
@@ -78,6 +86,156 @@ final class PasskeyAssociationsTest extends TestCase
         self::assertFalse(PasskeyAssociations::matches($this->factor('factor-1'), new ProofOwner(self::TYPE, '8'), $this->association('factor-1')));
         self::assertFalse(PasskeyAssociations::matches($this->factor('factor-1'), new ProofOwner('App\Models\Admin', self::KEY), $this->association('factor-1')));
         self::assertFalse(PasskeyAssociations::matches($this->factor('factor-1', 'b3RoZXI'), $this->owner(), $this->association('factor-1')));
+    }
+
+    /**
+     * The owner's association of the credential is found; nobody's, or another
+     * owner's, is not, and a row whose digest matches but whose id differs is
+     * not either.
+     *
+     * @return void
+     */
+    public function testAnOwnedCredentialIsOnlyTheOwnersOwn(): void
+    {
+        $this->association('factor-1')->save();
+
+        $associations = new PasskeyAssociations;
+
+        self::assertSame('factor-1', $associations->ownedCredential(self::CREDENTIAL, $this->owner())?->factor_id);
+        self::assertNull($associations->ownedCredential('Y3JlZGVudGlhbC0y', $this->owner()));
+        self::assertNull($associations->ownedCredential(self::CREDENTIAL, new ProofOwner(self::TYPE, '8')));
+        self::assertNull($associations->ownedCredential(self::CREDENTIAL, new ProofOwner('App\Models\Admin', self::KEY)));
+
+        PasskeyAssociation::query()->where('factor_id', 'factor-1')->toBase()->update(['credential_id_hash' => CredentialId::hash('Y3JlZGVudGlhbC0y')]);
+
+        self::assertNull($associations->ownedCredential('Y3JlZGVudGlhbC0y', $this->owner()));
+    }
+
+    /**
+     * Two owners who differ only in case stay apart on a database whose
+     * collation compares them as equal.
+     *
+     * @return void
+     */
+    public function testAnOwnedCredentialIsComparedExactly(): void
+    {
+        $connection = DB::connection();
+
+        if ($connection->getDriverName() !== 'sqlite') {
+            self::markTestSkipped('The collation is changed through SQLite\'s own schema.');
+        }
+
+        $statement = $connection->scalar('select sql from sqlite_master where type = ? and name = ?', ['table', 'mfa_passkey_associations']);
+
+        self::assertIsString($statement);
+
+        $connection->statement('drop table "mfa_passkey_associations"');
+        $connection->statement(preg_replace('/"(authenticatable_type|authenticatable_id)" varchar not null/', '$0 collate nocase', $statement) ?? $statement);
+
+        $association = $this->association('factor-1');
+
+        $association->authenticatable_id = 'owner-a';
+        $association->save();
+
+        $associations = new PasskeyAssociations;
+
+        self::assertNull($associations->ownedCredential(self::CREDENTIAL, new ProofOwner(self::TYPE, 'OWNER-A')));
+        self::assertNull($associations->ownedCredential(self::CREDENTIAL, new ProofOwner(strtoupper(self::TYPE), 'owner-a')));
+        self::assertNotNull($associations->ownedCredential(self::CREDENTIAL, new ProofOwner(self::TYPE, 'owner-a')));
+    }
+
+    /**
+     * A unique index refusing an association of a credential someone holds is
+     * the conflict it looks like, and leaves the transaction it ran in usable.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACredentialAlreadyAssociatedIsRefusedInsideItsOwnSavepoint(): void
+    {
+        $this->association('factor-1')->save();
+
+        $associations = new PasskeyAssociations;
+
+        DB::transaction(function () use ($associations): void {
+
+            try {
+                $associations->associate($this->owner(), 'factor-2', self::CREDENTIAL);
+
+                self::fail('The credential is associated already.');
+            } catch (OperationRefusedException $refusal) {
+                self::assertSame(FailureReason::CREDENTIAL_ASSOCIATED, $refusal->reason);
+            }
+
+            $associations->associate($this->owner(), 'factor-2', 'Y3JlZGVudGlhbC0y');
+        });
+
+        self::assertSame(2, PasskeyAssociation::query()->count());
+    }
+
+    /**
+     * The credential is looked up again with a locking read, as a plain read in
+     * a MySQL transaction reads its snapshot, which can miss the row that was
+     * committed after it.
+     *
+     * @return void
+     */
+    public function testAConflictIsLookedUpAgainWithALockingRead(): void
+    {
+        $this->association('factor-1')->save();
+
+        $connection = DB::connection();
+
+        self::assertInstanceOf(Connection::class, $connection);
+
+        if ($connection->getDriverName() === 'sqlite') {
+            $connection->setQueryGrammar(new LockMarkingSqliteGrammar($connection));
+        }
+
+        $statements = [];
+
+        $connection->beforeExecuting(static function (string $query) use (&$statements): void {
+            $statements[] = $query;
+        });
+
+        try {
+            (new PasskeyAssociations)->associate($this->owner(), 'factor-2', self::CREDENTIAL);
+
+            self::fail('The credential is associated already.');
+        } catch (OperationRefusedException) {
+            self::assertStringContainsStringIgnoringCase('for update', (string) end($statements));
+        }
+    }
+
+    /**
+     * Any other unique violation is a database error, not a domain conflict:
+     * the factor is associated already, with another credential, so the
+     * credential itself is found nowhere.
+     *
+     * @return void
+     */
+    public function testAnUnrelatedUniqueViolationIsThrown(): void
+    {
+        $this->association('factor-1')->save();
+
+        $this->expectException(UniqueConstraintViolationException::class);
+
+        (new PasskeyAssociations)->associate($this->owner(), 'factor-1', 'Y3JlZGVudGlhbC0y');
+    }
+
+    /**
+     * A model event cancelling the save is told apart from a conflict.
+     *
+     * @return void
+     */
+    public function testACanceledSaveIsThrown(): void
+    {
+        PasskeyAssociation::saving(static fn (): false => false);
+
+        $this->expectException(WriteCancelledException::class);
+
+        (new PasskeyAssociations)->associate($this->owner(), 'factor-1', self::CREDENTIAL);
     }
 
     /**

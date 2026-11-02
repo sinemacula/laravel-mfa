@@ -32,6 +32,6 @@ final class SeamBindings
      */
     public static function register(Application $app): void
     {
-        $app->singleton(Reauthenticator::class, RefusingReauthenticator::class);
+        $app->bind(Reauthenticator::class, RefusingReauthenticator::class);
     }
 }

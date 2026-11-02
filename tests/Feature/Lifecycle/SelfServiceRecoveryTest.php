@@ -46,7 +46,7 @@ final class SelfServiceRecoveryTest extends TestCase
         $seam   = $this->container()->make(SelfServiceRecovery::class);
 
         self::assertInstanceOf(NoSelfServiceRecovery::class, $seam);
-        self::assertTrue($this->container()->isShared(SelfServiceRecovery::class));
+        self::assertFalse($this->container()->isShared(SelfServiceRecovery::class));
         self::assertFalse($seam->isOffered($user, self::APPLICATION));
 
         try {

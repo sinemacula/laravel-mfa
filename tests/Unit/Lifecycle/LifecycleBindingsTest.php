@@ -14,9 +14,9 @@ use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
 use Tests\TestCase;
 
 /**
- * Tests for `LifecycleBindings`: the lifecycle service is shared, and the last
- * factor policy defaults to `RequiredFactorPolicy`, which an application may
- * rebind.
+ * Tests for `LifecycleBindings`: the lifecycle service is built afresh, and the
+ * last factor policy defaults to `RequiredFactorPolicy`, which an application
+ * may rebind.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,21 +27,22 @@ use Tests\TestCase;
 final class LifecycleBindingsTest extends TestCase
 {
     /**
-     * The lifecycle service is a singleton.
+     * The lifecycle service is built on every resolution.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testRegistersTheServiceAsASingleton(): void
+    public function testBuildsTheServiceOnEveryResolution(): void
     {
-        self::assertTrue($this->container()->isShared(LifecycleService::class));
-        self::assertSame($this->container()->make(LifecycleService::class), $this->container()->make(LifecycleService::class));
+        self::assertFalse($this->container()->isShared(LifecycleService::class));
+        self::assertTrue($this->container()->bound(LifecycleService::class));
+        self::assertNotSame($this->container()->make(LifecycleService::class), $this->container()->make(LifecycleService::class));
     }
 
     /**
-     * The last factor policy defaults to the required factor policy, shared,
-     * and a binding of the application's own replaces it.
+     * The last factor policy defaults to the required factor policy, built
+     * afresh, and a binding of the application's own replaces it.
      *
      * @return void
      *
@@ -50,7 +51,7 @@ final class LifecycleBindingsTest extends TestCase
     public function testBindsTheRequiredFactorPolicyByDefault(): void
     {
         self::assertInstanceOf(RequiredFactorPolicy::class, $this->container()->make(LastFactorPolicy::class));
-        self::assertTrue($this->container()->isShared(LastFactorPolicy::class));
+        self::assertFalse($this->container()->isShared(LastFactorPolicy::class));
 
         $own = \Mockery::mock(LastFactorPolicy::class);
 
@@ -60,7 +61,7 @@ final class LifecycleBindingsTest extends TestCase
     }
 
     /**
-     * Self-service recovery defaults to none, shared.
+     * Self-service recovery defaults to none, built afresh.
      *
      * @return void
      *
@@ -69,6 +70,6 @@ final class LifecycleBindingsTest extends TestCase
     public function testBindsNoSelfServiceRecoveryByDefault(): void
     {
         self::assertInstanceOf(NoSelfServiceRecovery::class, $this->container()->make(SelfServiceRecovery::class));
-        self::assertTrue($this->container()->isShared(SelfServiceRecovery::class));
+        self::assertFalse($this->container()->isShared(SelfServiceRecovery::class));
     }
 }

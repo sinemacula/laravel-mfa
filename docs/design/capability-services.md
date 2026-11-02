@@ -44,11 +44,11 @@ the provider or another capability.
   container holds. Recovery codes are not a factor and have no driver. A factor
   is only looked up within the identity the request serves (`Factors\OperationGuard`).
 - No service keeps request state: the reads (`factors()`, `factor()`, `proofs()`) go to the identity, the
-  database or the bound proof store on every call, so a singleton service never carries one request's identity or
-  factors into the next.
+  database or the bound proof store on every call, and no service is kept between resolutions, so none carries one
+  request's identity or factors into the next (see [Long-Running Processes](long-running-processes.md)).
 - Each capability registers its container wiring in its own `*Bindings` class, which the provider calls: the
-  capability's service as a singleton and the defaults for the seams it owns. The capabilities that ship drivers also
-  build them, and the provider's `mfa` factory registers them against the manager through the same `extend()` API a
+  capability's service and the defaults for the seams it owns, each with `bind()`. The capabilities that ship drivers
+  also build them, and the provider's `mfa` factory registers them against the manager through the same `extend()` API a
   consumer uses, before it returns the manager. The shipped drivers therefore exist before the container runs any
   extender or resolving callback on `mfa`, so a consumer's registration of the same name replaces them however it is
   made: `Mfa::extend()`, a container extender or a resolving callback.

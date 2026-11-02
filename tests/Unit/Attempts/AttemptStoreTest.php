@@ -7,6 +7,7 @@ namespace Tests\Unit\Attempts;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use Tests\TestCase;
@@ -43,6 +44,28 @@ final class AttemptStoreTest extends TestCase
         self::assertSame($this->formatted(self::NOW + 60), $window);
         self::assertSame([self::KEY => ['hits' => 1, 'ends' => self::NOW + 60]], $this->store()->read([self::KEY]));
         self::assertSame('ip', DB::table('mfa_attempts')->where('key', self::KEY)->value('scope'));
+    }
+
+    /**
+     * A new row's window never ends later than the longest window the settings
+     * allow from now, so an insert that ignores its conflict has no value a
+     * database could coerce into another row's: the key is a fixed-width hash,
+     * and the scope an enum.
+     *
+     * @return void
+     */
+    public function testANewRowsWindowIsBoundedByTheSettings(): void
+    {
+        config()->set('mfa.attempts.window_seconds', 86400);
+
+        $settings = $this->container()->make(AttemptSettings::class);
+        $end      = self::NOW + $settings->windowSeconds();
+
+        self::assertSame(self::NOW + 86400, $end);
+
+        $this->store()->take(self::KEY, AttemptScope::IP, 2, self::NOW, $end);
+
+        self::assertSame($end, $this->store()->read([self::KEY])[self::KEY]['ends']);
     }
 
     /**

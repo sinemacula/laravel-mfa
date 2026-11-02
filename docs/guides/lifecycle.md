@@ -85,10 +85,10 @@ tenant's policy too.
 ### What a removal does
 
 In one transaction under the identity's lock: the factor and its passkey association go; every proof made with it stops
-counting on this session; the identity's other sessions are revoked through the bound `SessionRevoker`; this session's
-requirement is evaluated again on the proofs it kept, the active tenant's included, and a shortfall goes to the bound
-`SessionTransition`; `FactorRemoved` is queued; and with the last confirmed factor the recovery code set goes, reporting
-`RecoveryCodesRemoved` when there was one. A pending factor left behind does not keep the set; a confirmed one the
+counting on this session; with the last confirmed factor the recovery code set goes; the identity's other sessions are
+revoked through the bound `SessionRevoker`; this session's requirement is evaluated again on the proofs it kept, the
+active tenant's included, and a shortfall goes to the bound `SessionTransition`; `FactorRemoved` is queued, then
+`RecoveryCodesRemoved` when there was a set. A pending factor left behind does not keep the set; a confirmed one the
 ceiling disabled does.
 
 `$result->outstanding` is the whole requirement the session no longer meets, not what is left of it. Nothing is promoted
