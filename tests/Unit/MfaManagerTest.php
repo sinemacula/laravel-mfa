@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
@@ -96,6 +97,7 @@ final class MfaManagerTest extends TestCase
         yield 'requirement empty' => ['requirement', RequirementService::class, 'requirement', [], Requirement::none()];
         yield 'isFresh true' => ['isFresh', RequirementService::class, 'isFresh', ['mfa.add_factor', $requirement], true];
         yield 'isFresh false' => ['isFresh', RequirementService::class, 'isFresh', ['billing.change_plan', null], false];
+        yield 'authentication context' => ['authenticationContext', AuthenticationContextContributor::class, 'contribute', [], ['accepted' => false]];
         yield 'factors' => ['factors', FactorService::class, 'factors', [], [$summary]];
         yield 'factor' => ['factor', FactorService::class, 'factor', ['factor-1'], $summary];
         yield 'factor missing' => ['factor', FactorService::class, 'factor', ['factor-1'], null];

@@ -97,10 +97,9 @@ when the preferred factor goes: removing it leaves none preferred, and offers fa
 Forgetting the proofs happens at once and is not undone if the change rolls back, which leaves the session to verify
 again. Restoring them could undo a later invalidation.
 
-> [!IMPORTANT]
-> Until the middleware judges the whole structured requirement, `RequireMfa` accepts any recent additional proof, so the
-> gate a removal promises holds only as far as that goes. `$result->outstanding` and the bound `SessionTransition`
-> already report the true shortfall.
+A session left short is held to the whole requirement on its next request through the `mfa` middleware, which judges
+the structured requirement against the proofs that remain: a recent weaker proof does not pass once the stronger factor
+it stood beside is gone. See [Route middleware](middleware.md).
 
 ## Resetting an identity
 

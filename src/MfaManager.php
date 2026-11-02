@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa;
 
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
@@ -62,6 +63,7 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
  * - `Lifecycle\RecordPruner`: `prune()`.
  * - `RecoveryCodes\RecoveryCodeIssuance`: `generateRecoveryCodes()`.
  * - `RecoveryCodes\RecoveryCodeService`: `recoveryCodes()`.
+ * - `Context\AuthenticationContextContributor`: `authenticationContext()`.
  *
  * The built-in drivers are registered by `Drivers\DriverBindings` through the
  * same `extend()` API a consumer uses.
@@ -455,6 +457,34 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
         $identity = $this->container->make(CallerContextResolver::class)->resolve(PendingAction::LIST_FACTORS)?->identity;
 
         return $identity === null ? null : $this->container->make(RecoveryCodeService::class)->status($identity);
+    }
+
+    /**
+     * The keys of the authentication context's `mfa` namespace for the session
+     * the request serves.
+     *
+     * @formatter:off
+     *
+     * @return array{
+     *     accepted: bool,
+     *     multifactor: bool,
+     *     factor_types: list<string>,
+     *     level: string,
+     *     phishing_resistant: bool,
+     *     user_verification: bool,
+     *     last_verification_age_seconds: ?int,
+     *     has_confirmed_factor: bool,
+     * }
+     *
+     * @formatter:on
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function authenticationContext(): array
+    {
+        return $this->container->make(AuthenticationContextContributor::class)->contribute();
     }
 
     /**

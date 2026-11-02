@@ -64,6 +64,10 @@ in [Factor lifecycle](../guides/lifecycle.md).
   long lock: limited statements for mass deletes, one owner's lock at a time for an enrolment.
 - Context of an expiry is built from the row (`EventDispatcher::ownerContext()`), since a scheduled run's session or
   tenant has nothing to do with the owner.
+- A session left short by a removal is held to the whole requirement on its next request. `mfa` judges the structured
+  requirement against the proofs that remain, so a recent proof that does not meet it does not pass, and with the
+  default `SessionTransition`, which changes nothing, that gate is what keeps the promise (see
+  [Route Gate](route-gate.md)).
 
 ## Success Path
 
@@ -89,9 +93,6 @@ in [Factor lifecycle](../guides/lifecycle.md).
 
 ## Seams Left
 
-- `Http\Middleware\RequireMfa` derives set-up from the list but still accepts any recent additional proof without
-  judging the structured requirement, so the gate a removal or an enrolment promises does not yet hold through it. The
-  middleware that replaces it evaluates the whole requirement; this is a blocking dependency of that work.
 - The factor's temporary lockout stays in `mfa_attempts`. Moving it is a recorded hardening option, not part of this.
 
 ## Implementation Anchors
@@ -101,6 +102,7 @@ in [Factor lifecycle](../guides/lifecycle.md).
 - `src/Factors/FactorService.php`: `factors()`, `factor()`; `src/Attempts/LockedFactors.php`: `withId()`.
 - `src/Support/FactorStateTransaction.php`: `forOwner()`, `snapshot()`; `src/Support/FactorOwnerColumns.php`: `owns()`.
 - `src/Passkeys/PasskeyChangeGate.php`: `remove()`; `src/Passkeys/PasskeyAssociations.php`: `associates()`.
+- `src/Http/Middleware/EnsureMfaRequirementIsMet.php`: the gate a session left short is held to.
 - `src/Contracts/LastFactorPolicy.php`, `SelfServiceRecovery.php`, `ActiveTenantResolver.php`, `FreshnessGate.php`.
 - `src/Requirements/RequirementService.php`: `requirementFor()`, `freshnessRequirement()`;
   `src/Requirements/SessionReevaluation.php`; `src/Requirements/ReenrollmentObligation.php`: `record()`.
@@ -118,11 +120,12 @@ in [Factor lifecycle](../guides/lifecycle.md).
 - `tests/Feature/Lifecycle/UnlockingTest.php`, `tests/Feature/Lifecycle/PruningTest.php`,
   `tests/Feature/Lifecycle/SelfServiceRecoveryTest.php`.
 - `tests/Integration/Database/LifecycleRaceTest.php`: overlapping removals and resets on MySQL and PostgreSQL.
+- `tests/Feature/Http/RemovedFactorGateTest.php`: a recent weaker proof does not pass the gate once the stronger factor
+  is removed.
 - `tests/Unit/Lifecycle/RequiredFactorPolicyTest.php`, `tests/Unit/Factors/FactorServiceTest.php`,
   `tests/Feature/Passkeys/PasskeyChangeGateTest.php`.
 
 ## Change Triggers
 
 Revisit this note when the lock order changes, when a new entry point removes factors, when a new record needs pruning,
-when the middleware that judges the whole requirement lands, or when where a factor's temporary lockout lives is
-decided.
+or when where a factor's temporary lockout lives is decided.

@@ -241,22 +241,6 @@ return [
 
     /*
     |---------------------------------------------------------------------------
-    | Proofs
-    |---------------------------------------------------------------------------
-    |
-    | How long a recorded verification counts before the person must verify
-    | again (0 to 525600 minutes). With 0 none counts, so the `mfa` middleware
-    | refuses every request: use its step-up parameter to require a fresh
-    | verification for one route group instead.
-    |
-    */
-
-    'proofs' => [
-        'max_age_minutes' => env('MFA_PROOFS_MAX_AGE_MINUTES', 20160),
-    ],
-
-    /*
-    |---------------------------------------------------------------------------
     | Lifecycle
     |---------------------------------------------------------------------------
     |

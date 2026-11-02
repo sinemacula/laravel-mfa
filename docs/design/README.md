@@ -45,6 +45,9 @@ The current note set is:
 - `requirements-and-freshness.md`: how a sign-in's requirement is composed from the application's mode, the identity,
   a re-enrolment obligation and an active tenant, how a session's proofs are checked against a requirement, and how a
   named operation's freshness is judged, the stricter of the package's and the caller's setting applying.
+- `route-gate.md`: the `mfa` middleware that judges a route's whole requirement, who it refuses, the exempt marker, the
+  exception it raises, the authentication context, and why what a completion returns can never reach a response if the
+  commit fails.
 - `factor-lifecycle.md`: what happens to a factor after it is enrolled: how it is listed, what a removal checks before
   and under the lock, what a reset does and in which order, what unlocking leaves alone, and what pruning may delete.
 - `enrollment.md`: how a factor is enrolled: what authorises a start, why a grant's expiry is taken once from what
@@ -63,7 +66,7 @@ The current note set is:
   queued message.
 - `proof-store.md`: the `ProofStore` seam and its session-backed default, how a sign-in begins and ends (Laravel's
   events or the guard hooks), what makes a recorded proof stop counting, the verification generation, and how the
-  `mfa` middleware and its `mfa:N` step-up window read the proofs.
+  `mfa` middleware judges a request on the proofs.
 - `factor-payload-hygiene.md`: encryption at rest for `secret`, the `FactorSummary` projection used on
   exception payloads, and the destination-masking rules.
 - `secrets-in-responses-and-logs.md`: the value secrets are meant to be returned in and what it refuses, the response

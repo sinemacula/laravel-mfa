@@ -12,9 +12,9 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 /**
  * Benchmarks for `FactorSummary::fromFactor()` and its JSON serialisation.
  *
- * Exercised on every `MfaRequiredException` / `MfaExpiredException` emission,
- * which runs once per gated request against each of the user's registered
- * factors — so this is a soft hot path.
+ * Exercised on every `InsufficientAuthenticationException`, which runs once per
+ * refused request against each of the factors the session is offered — so this
+ * is a soft hot path.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

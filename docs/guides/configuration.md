@@ -53,7 +53,6 @@ between requests.
 | `attempts.failure_ceiling`      | `100`                              | 1 to 100                               | `MFA_ATTEMPTS_FAILURE_CEILING`      | yes     |
 | `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        | yes     |
 | `enrollment.max_attempts`       | `5`                                | 1 to 10                                | `MFA_ENROLLMENT_MAX_ATTEMPTS`       | yes     |
-| `proofs.max_age_minutes`        | `20160`                            | 0 to 525600 minutes                    | `MFA_PROOFS_MAX_AGE_MINUTES`        | yes     |
 | `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    | yes     |
 | `secrets.redact`                | `true`                             | off only for a false value             | `MFA_SECRETS_REDACT`                | yes     |
 
@@ -376,19 +375,6 @@ and when it expires is set out in [Attempts and lockouts](attempts.md).
 A pending factor can be confirmed for `ttl_minutes` after its enrolment starts, at most 60, or until what authorised it
 stops being fresh, whichever is sooner. `max_attempts` wrong or replayed codes, at most 10, abandon it. See
 [Enrolment](enrollment.md).
-
-## Proofs
-
-```php
-'proofs' => [
-    'max_age_minutes' => env('MFA_PROOFS_MAX_AGE_MINUTES', 20160),
-],
-```
-
-`max_age_minutes` is how long a recorded verification counts before the person must verify again, 14 days by default
-and at most a year: the `mfa` middleware's window when the route gives none, judged on the newest factor or recovery
-code proof of the current sign-in (see [Recorded proofs](proofs.md)). With `0` none counts, so the `mfa` middleware
-refuses every request; use its step-up parameter to require a fresh verification for one route group instead.
 
 ## Lifecycle
 

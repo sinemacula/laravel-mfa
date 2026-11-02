@@ -10,11 +10,13 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
  * The default `SessionTransition`: without an authentication layer there is no
- * session state to change. The requirement is worked out again on every request
- * from the configuration, the identity contract and the identity's state row,
- * so a session left short is gated by the `mfa` middleware until it meets it
- * again, and nothing handed to this call needs keeping. The session keeps its
- * proofs, as a pending session does, and is asked for what it lacks.
+ * session state to change, because the `mfa` middleware
+ * (`Middleware\EnsureMfaRequirementIsMet`) is the gate. It works the whole
+ * requirement out again on every request and judges the session's proofs
+ * against it, so a session left short is refused on every route that carries
+ * `mfa` until it meets it again, and nothing handed to this call needs keeping.
+ * The session keeps its proofs, as a pending session does, and is asked for
+ * what it lacks.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

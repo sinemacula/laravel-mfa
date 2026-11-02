@@ -114,12 +114,14 @@ nothing is stored in their place.
   from it lives no longer than the proof that authorised it (see [Enrolment](enrollment.md)). `Evaluation::$metUntil` is
   how the default gate reads it: for each part with a maximum age, the latest evidence time among the combinations
   providing it plus that age, and the earliest across the parts.
+- The default gate answers for the person the request serves and nobody else: a pending session, a guest, a machine and
+  an inactive identity are not fresh for any operation, and no helper's `isFresh()` or `freshUntil()` reads the guard's
+  user in their place.
+- The `mfa` middleware judges this requirement, with any level or operation its route asks (see
+  [Route Gate](route-gate.md)).
 
 ## Seams Left
 
-- The `mfa` middleware still judges the newest additional factor or recovery code against `proofs.max_age_minutes`
-  once the requirement is not empty; it does not yet check the structured requirement, so it can refuse a passkey that
-  verified the person and accept evidence below a requested level.
 - A reset sets the re-enrolment obligation as it states (`ReenrollmentObligation::record()`, see
   [Factor Lifecycle](factor-lifecycle.md)); confirming a factor ends it (`ReenrollmentObligation::end()`, see
   [Enrolment](enrollment.md)).
@@ -140,7 +142,7 @@ nothing is stored in their place.
   `Proofs\VerificationGeneration`.
 - `src/Applications/ApplicationSettings.php` (`requirement()`, `freshness()`, `freshnessFor()`),
   `src/Enums/Operation.php` (`isName()`).
-- `src/MfaManager.php` (`requirement()`, `isFresh()`), `src/Http/Middleware/RequireMfa.php`.
+- `src/MfaManager.php` (`requirement()`, `isFresh()`), `src/Http/Middleware/EnsureMfaRequirementIsMet.php`.
 
 ## Authoritative Tests
 

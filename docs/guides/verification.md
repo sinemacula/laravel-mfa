@@ -195,6 +195,18 @@ final readonly class AuthenticationStepUp implements StepUp
 An adapter over authoritative session rows makes `ProofStore::begin()` a no-op for them: activation preserves that row's
 sign-in and proofs, and an actual new sign-in uses a new row.
 
+### If the commit fails
+
+A verification's result only exists once the transaction has committed, so what a completion returned, with any tokens
+and cookie in it, never reaches a response if the commit fails: the failure reaches the caller of `Mfa::verify()` in its
+place, the code is unspent, and no proof or event is left. Confirming an enrolment works the same way.
+
+Two boundaries are worth knowing. If you wrap `Mfa::verify()` in your own transaction on the storage connection, our
+commit is a savepoint and the result reaches your closure first. Returning a response from that closure is safe, as
+`transaction()` must finish before it escapes, but do not emit the response or publish the completion inside it. And a
+listener that throws after a real commit is a different case: the session did change and the result is lost, which is an
+honest server error. See [the route gate design note](../design/route-gate.md).
+
 ## Counting
 
 Every route counts exactly once, and reports one `VerificationFailed` per attempt: `Attempts\AttemptService` for a code

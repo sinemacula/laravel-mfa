@@ -31,7 +31,7 @@ use Tests\TestCase;
 final class CheckConfigurationCommandTest extends TestCase
 {
     /** @var list<string> The package-wide subjects, in the order they are reported. */
-    private const array SUBJECTS = ['storage', 'factor', 'identity_state', 'totp', 'codes', 'recovery_codes', 'attempts', 'enrollment', 'proofs', 'lifecycle', 'applications'];
+    private const array SUBJECTS = ['storage', 'factor', 'identity_state', 'totp', 'codes', 'recovery_codes', 'attempts', 'enrollment', 'lifecycle', 'applications'];
 
     /** @var array<array-key, mixed> The console arguments before the test. */
     private array $argv = [];

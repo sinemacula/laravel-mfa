@@ -52,7 +52,6 @@ final class ConfigurationValidatorTest extends TestCase
         'attempts'       => [],
         'enrollment'     => [],
         'passkeys'       => [],
-        'proofs'         => [],
         'lifecycle'      => [],
         'applications'   => [],
     ];
@@ -150,7 +149,6 @@ final class ConfigurationValidatorTest extends TestCase
         ];
         yield 'an attempt setting' => ['mfa.attempts.failure_ceiling', 101, 'attempts', 'mfa.attempts.failure_ceiling must be an integer from 1 to 100.'];
         yield 'an enrolment setting' => ['mfa.enrollment.ttl_minutes', 0, 'enrollment', 'mfa.enrollment.ttl_minutes must be an integer from 1 to 60.'];
-        yield 'a proof setting' => ['mfa.proofs.max_age_minutes', -1, 'proofs', 'mfa.proofs.max_age_minutes must be an integer from 0 to 525600.'];
         yield 'a lifecycle setting' => ['mfa.lifecycle.prune_after_days', 0, 'lifecycle', 'mfa.lifecycle.prune_after_days must be an integer from 1 to 3650.'];
         yield 'applications not keyed by name' => ['mfa.applications', [['types' => ['totp']]], 'applications', 'mfa.applications must be keyed by application name.'];
     }

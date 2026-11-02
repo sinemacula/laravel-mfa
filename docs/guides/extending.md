@@ -134,7 +134,7 @@ registers it with the container, and the classes only it uses:
 | `Proofs`        | The sign-in's proofs, `SessionProofStore`, `ProofStoreCompletion`, `GuardHooks`, `Proof`            |
 | `Verification`  | `verify()`, `sendCode()`, `offeredFactors()`, `Submission` and `VerificationResult`                 |
 | `Assurance`     | `Channel`, `ObservedProperties`, `Evaluation` and the default `DefaultCombinationPolicy`            |
-| `Context`       | `PendingContext`, who a request serves, and the pending session and subject type defaults           |
+| `Context`       | `PendingContext`, who a request serves, the defaults, and `AuthenticationContextContributor`        |
 | `Passkeys`      | The change gate, `PasskeyRegistration`, `CredentialId`, assertions and the unavailable gateway      |
 | `Seams`         | Defaults that read nothing of the package: `RefusingReauthenticator`                                |
 | `Enrollment`    | `startEnrollment()`, `confirmEnrollment()`, what they answer and `EnrollmentSettings`               |
@@ -143,7 +143,7 @@ registers it with the container, and the classes only it uses:
 | `Attempts`      | `AttemptService`, and `ChallengeCounters`, the counts a challenge owner reports into                |
 | `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
 | `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction             |
-| `Http`          | The `mfa` and `mfa.skip` middleware, `RequireMfa` and `SkipMfa`                                     |
+| `Http`          | The `mfa` and `mfa.exempt` middleware, `EnsureMfaRequirementIsMet` and `ExemptFromMfa`              |
 | `Testing`       | `FakeSmsSender`, `FakeEmailSender`, and the seam contract kit in `Testing\Seams`                    |
 | `Console`       | The `mfa:check` and `mfa:prune` commands                                                            |
 
@@ -175,7 +175,7 @@ service provider:
 | `FirstFactorResolver`    | `Applications\DeclaredFirstFactorResolver`  | The application's `first_factor`, dated at the Unix epoch               |
 | `Reauthenticator`        | `Seams\RefusingReauthenticator`             | Nothing proves the first factor again                                   |
 | `SessionRevoker`         | `Proofs\GenerationSessionRevoker`           | The verification generation advances; other sessions verify again       |
-| `SessionTransition`      | `Http\MiddlewareSessionTransition`          | Nothing to change: the `mfa` middleware gates the session               |
+| `SessionTransition`      | `Http\MiddlewareSessionTransition`          | Nothing to change: the `mfa` middleware is the gate                     |
 | `ChallengeGateway`       | `Codes\PackageChallengeGateway`             | The package's own delivered codes                                       |
 | `PendingCompletion`      | `Proofs\ProofStoreCompletion`               | A pending session's proof goes in the proof store                       |
 | `StepUp`                 | `Proofs\ProofStoreCompletion`               | An active session's proof goes in the proof store                       |

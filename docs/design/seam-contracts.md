@@ -67,10 +67,10 @@ that call them, so the flows can be built against one fixed set.
   the same sign-in under exactly the generation it advanced to, only while the store still names that sign-in and
   dropping a refusal. A later revocation in the same change therefore still wins, and a change that rolls back revokes
   nothing. The Laravel sessions themselves go on; the other sessions must verify again.
-- `SessionTransition` is bound to `Http\MiddlewareSessionTransition`, which changes nothing: the requirement is worked
-  out again on every request from the configuration, the identity contract and the identity's state row, so the `mfa`
-  middleware gates a session left short until it meets it again, and the session keeps its proofs, as a pending session
-  does.
+- `SessionTransition` is bound to `Http\MiddlewareSessionTransition`, which changes nothing, because the `mfa`
+  middleware is the gate: it works the whole requirement out again on every request and judges the session's proofs
+  against it, so a session left short is refused until it meets it again, and the session keeps its proofs, as a pending
+  session does (see [Route Gate](route-gate.md)).
 - `ChallengeGateway` is bound to `Codes\PackageChallengeGateway`, the package's own delivered codes, owned exactly as an
   authentication layer must own its challenges (see the reverse calls below). It serves only a binding that is exactly
   the caller's own: its identity, its application and its session (the pending session's, or the current sign-in's). A
@@ -187,11 +187,6 @@ exception that rolls the caller's change back with it.
   nothing counting to keep. A failure between the commit and the restamp does the same. Both fail closed.
 - A `PendingContext` that contradicts itself is refused with an `InvalidArgumentException` when it is built, so one
   that exists is consistent.
-
-## Seams Left
-
-- The `mfa` middleware judges the structured requirement only once the middleware is replaced; until then the
-  `SessionTransition` default leaves it to the newest proof's age.
 
 ## Implementation Anchors
 

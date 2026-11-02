@@ -45,8 +45,8 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
-use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
-use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
+use SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet;
+use SineMacula\Laravel\Mfa\Http\Middleware\ExemptFromMfa;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
@@ -232,9 +232,9 @@ final class MfaServiceProviderTest extends TestCase
         $middleware = $router->getMiddleware();
 
         self::assertArrayHasKey('mfa', $middleware);
-        self::assertArrayHasKey('mfa.skip', $middleware);
-        self::assertSame(RequireMfa::class, $middleware['mfa']);
-        self::assertSame(SkipMfa::class, $middleware['mfa.skip']);
+        self::assertArrayHasKey('mfa.exempt', $middleware);
+        self::assertSame(EnsureMfaRequirementIsMet::class, $middleware['mfa']);
+        self::assertSame(ExemptFromMfa::class, $middleware['mfa.exempt']);
     }
 
     /**

@@ -64,8 +64,8 @@ Historical record of the architectural calls made during the 1.0 cycle.
 - **D4 — Per-device verification is the default.** A session's proofs are its own. In paired
   mode they live in the authentication package's session record, through a rebound `ProofStore`;
   in standalone mode they live in the Laravel session, through `SessionProofStore` (which is
-  already per-device). The step-up middleware (`mfa:N`) is the escape hatch for "re-verify before
-  this specific action regardless of device state".
+  already per-device). A route naming an operation (`mfa:operation=name`) is the escape hatch for
+  "re-verify before this specific action regardless of device state".
 - **D5 — Built-in driver factories live in the capability bindings.** The three shipped drivers
   (TOTP, email, SMS) are registered against the manager via the standard `Mfa::extend(...)` API
   from `Drivers\DriverBindings`, inside the `mfa` singleton's factory and so before any

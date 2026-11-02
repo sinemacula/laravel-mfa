@@ -28,11 +28,11 @@ whatever UI you like.
 - **Recovery codes**: a set of single-use codes shown once, stored as salted hashes, replaced atomically, and redeemed
   as one attempt against the whole unused set. See [Recovery codes](docs/guides/recovery-codes.md).
 - **Pluggable driver API**: register custom factor drivers via the Laravel-style `Mfa::extend()` method.
-- **Route enforcement middleware**: `mfa` gates a route, `mfa.skip` exempts the verification endpoints.
-- **Step-up lever**: `mfa:N` overrides the global expiry per route group to require a recent verification for
-  sensitive actions.
-- **Structured exceptions**: `MfaRequiredException` and `MfaExpiredException` carry a masked `FactorSummary`
-  list suitable for rendering a factor-picker UI.
+- **Route enforcement middleware**: `mfa` judges a route's whole requirement, `mfa:level=aal2` adds a level, and
+  `mfa.exempt` marks the routes that complete a verification. See [Route middleware](docs/guides/middleware.md).
+- **Step-up per operation**: `mfa:operation=name` asks for a named operation's freshness on a route.
+- **A structured refusal**: `InsufficientAuthenticationException` carries the requirement and masked factor summaries,
+  for an answer as RFC 9470 describes or a factor picker.
 - **One way to verify**: `Mfa::verify()` takes a factor's code, a challenge's code, a recovery code or a passkey's
   assertion, bound once to the owner, application, sign-in and purpose, and answers with a structured result and a
   machine-readable failure reason. See [Verification](docs/guides/verification.md).
@@ -94,10 +94,6 @@ return [
     'attempts' => [
         'factor_limit'    => 5,
         'lockout_seconds' => 900,
-    ],
-
-    'proofs' => [
-        'max_age_minutes' => 20160, // 14 days
     ],
 ];
 ```
@@ -183,40 +179,38 @@ input" cross-account-bypass shape. See [Verification](docs/guides/verification.m
 
 ### Middleware enforcement
 
-The shipped `RequireMfa` middleware gates a route behind a valid MFA verification. The `mfa` alias is
-registered automatically; `mfa.skip` exempts the verification endpoints themselves:
+The `mfa` middleware lets a request on only when the session it serves meets its whole requirement, read from the proofs
+it holds. The alias is registered automatically; `mfa.exempt` marks the routes that complete a verification:
 
 ```php
 Route::middleware('mfa')->group(function () {
     Route::get('/dashboard', DashboardController::class);
 });
 
-Route::middleware('mfa.skip')->post('/mfa/verify', MfaVerifyController::class);
+Route::middleware('mfa.exempt')->post('/mfa/verify', MfaVerifyController::class);
 ```
 
-An optional `max-age` parameter overrides `proofs.max_age_minutes` per route group — the step-up lever for sensitive
-actions:
+A route may ask for more, a level or a named operation's freshness:
 
 ```php
-Route::middleware('mfa:5')->delete('/account', AccountController::class);   // re-verify within 5 min
-Route::middleware('mfa:0')->post('/admin/danger', DangerController::class); // every request
+Route::middleware('mfa:level=aal2')->get('/billing', BillingController::class);
+Route::middleware('mfa:operation=account.delete')->delete('/account', AccountController::class);
 ```
 
-The middleware judges the newest factor or recovery code proof the current sign-in recorded. When MFA is required
-(no factor, or no such proof), `MfaRequiredException` is thrown; when that proof is older than the window,
-`MfaExpiredException`. Both carry a masked `FactorSummary` list safe to ship through JSON bodies and log
-sinks:
+Bare `mfa` enforces the composed requirement and adds nothing, so on `never`, or `enrolled` with no factor, it asks
+nothing further. It always refuses a guest, an identity that is not MFA-capable, a machine, an inactive identity and a
+pending session, so a route machines use does not carry it. A refusal is an `InsufficientAuthenticationException`, a 401
+carrying the requirement and masked factor summaries:
 
 ```php
-use SineMacula\Laravel\Mfa\Exceptions\MfaRequiredException;
+use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
 
-$this->renderable(function (MfaRequiredException $e) {
-    return response()->json([
-        'message' => $e->getMessage(),
-        'factors' => $e->getFactors(),
-    ], 401);
+$this->renderable(function (InsufficientAuthenticationException $e) {
+    return response()->json($e->toArray(), 401, ['WWW-Authenticate' => $e->wwwAuthenticate()]);
 });
 ```
+
+See [Route middleware](docs/guides/middleware.md).
 
 ### TOTP enrolment
 
@@ -362,7 +356,7 @@ RateLimiter::for('mfa-verify', static function (Request $request): array {
 });
 
 Route::post('/mfa/verify', VerifyController::class)
-    ->middleware(['mfa.skip', 'throttle:mfa-verify']);
+    ->middleware(['mfa.exempt', 'throttle:mfa-verify']);
 ```
 
 Apply the throttle **only** to the verify endpoint — state-read routes (`Mfa::requirement()`, `Mfa::factors()`,
