@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Benchmarks\Runtime;
 
+use Benchmarks\Support\BenchOutcome;
 use Benchmarks\Support\InMemoryFactor;
 use PhpBench\Attributes\Iterations;
 use PhpBench\Attributes\Revs;
@@ -32,9 +33,11 @@ final class FactorSummaryBench
 
     /**
      * Build one factor double per shipped driver type so each benchmark targets
-     * a representative summary shape.
+     * a representative summary shape, and prove a destination comes out masked.
      *
      * @return void
+     *
+     * @throws \LogicException
      */
     public function __construct()
     {
@@ -54,6 +57,14 @@ final class FactorSummaryBench
             label    : 'Work phone',
             destination: '+441234567890',
         );
+
+        BenchOutcome::assert('factor summary', FactorSummary::fromFactor($this->totpFactor)->maskedDestination === null);
+
+        foreach ([$this->emailFactor, $this->smsFactor] as $factor) {
+            $masked = FactorSummary::fromFactor($factor)->maskedDestination;
+
+            BenchOutcome::assert('factor summary', $masked !== null && $masked !== $factor->getDestination());
+        }
     }
 
     /**
