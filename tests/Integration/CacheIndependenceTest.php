@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Cache;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\MfaManager;
-use Tests\Fixtures\Hardening\Concerns\FlowCatalogue;
+use Tests\Fixtures\Hardening\Concerns\FlowCatalog;
 use Tests\TestCase;
 
 /**
@@ -28,7 +28,7 @@ use Tests\TestCase;
 #[CoversClass(MfaManager::class)]
 final class CacheIndependenceTest extends TestCase
 {
-    use FlowCatalogue;
+    use FlowCatalog;
 
     /** @var int How many calls reached the store. */
     private int $cacheCalls = 0;
@@ -85,7 +85,7 @@ final class CacheIndependenceTest extends TestCase
      *
      * @return void
      */
-    public function testTheCatalogueNamesEveryFlow(): void
+    public function testTheCatalogNamesEveryFlow(): void
     {
         self::assertSame(array_keys(self::flowNames()), array_keys($this->flows()));
     }

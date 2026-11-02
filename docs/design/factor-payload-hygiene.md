@@ -19,7 +19,7 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
   Eloquent's default array/JSON serialisation omits them. A consumer who accidentally dumps a factor through
   `toArray()` or `->toJson()` gets a payload with no secret, no code and no full destination.
 - `InsufficientAuthenticationException` does not carry `Factor` instances, and neither does any event (see
-  [Event Catalogue](event-catalogue.md)). They carry `FactorSummary` values. `FactorSummary` is final, readonly, and
+  [Event Catalogue](event-catalog.md)). They carry `FactorSummary` values. `FactorSummary` is final, readonly, and
   `JsonSerializable`.
 - `FactorSummary` exposes exactly seven fields: `id`, `type`, `label`, `maskedDestination`, `status`, `preferred` and
   `lastUsedAt`. There is no `secret`, no `code`, no `attempts`, no credential reference and no raw `destination`.

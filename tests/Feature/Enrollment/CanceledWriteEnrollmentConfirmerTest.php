@@ -29,7 +29,7 @@ use SineMacula\Laravel\Mfa\Enrollment\GrantAuthority;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorChannel;
 use SineMacula\Laravel\Mfa\Factors\FactorLabel;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -167,7 +167,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
             $this->mfa()->confirmEnrollment($this->grantOf($start), $wrong);
 
             self::fail('A canceled count was expected to propagate.');
-        } catch (WriteCancelledException) {
+        } catch (WriteCanceledException) {
             self::assertSame(0, Enrollment::query()->sole()->attempts);
             self::assertSame(0, $this->addressHits('127.0.0.1'));
         }
@@ -190,7 +190,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
             $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
 
             self::fail('A canceled save was expected to propagate.');
-        } catch (WriteCancelledException) {
+        } catch (WriteCanceledException) {
             self::assertSame(0, Factor::query()->count());
             self::assertSame(0, Enrollment::query()->count());
         }
@@ -214,7 +214,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
             $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS));
 
             self::fail('A canceled record was expected to propagate.');
-        } catch (WriteCancelledException) {
+        } catch (WriteCanceledException) {
             self::assertSame(0, Factor::query()->count());
             self::assertSame(0, Enrollment::query()->count());
             self::assertSame(0, Code::query()->count());
@@ -246,7 +246,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
             $this->mfa()->resendEnrollmentCode($grant);
 
             self::fail('A canceled record was expected to propagate.');
-        } catch (WriteCancelledException) {
+        } catch (WriteCanceledException) {
             self::assertSame(1, Code::query()->sole()->sends);
         }
     }
@@ -271,7 +271,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
             $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
 
             self::fail('A canceled deletion was expected to propagate.');
-        } catch (WriteCancelledException) {
+        } catch (WriteCanceledException) {
             self::assertSame(1, Enrollment::query()->count());
             self::assertSame(0, Factor::query()->count());
         }
@@ -297,7 +297,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
             $this->mfa()->renameFactor($factor->id, 'New');
 
             self::fail('A canceled save was expected to propagate.');
-        } catch (WriteCancelledException) {
+        } catch (WriteCanceledException) {
             self::assertSame('Old', Factor::query()->sole()->getLabel());
             self::assertSame([], $this->reported);
         }
@@ -339,7 +339,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
             $this->mfa()->confirmEnrollment($grant, $code);
 
             self::fail('A canceled write was expected to propagate.');
-        } catch (WriteCancelledException) {
+        } catch (WriteCanceledException) {
             $factor = $this->pendingFactorOf($start);
 
             self::assertSame(FactorStatus::PENDING, $factor->getStatus());

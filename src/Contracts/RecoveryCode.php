@@ -39,25 +39,11 @@ interface RecoveryCode
     public function authenticatable(): MorphTo;
 
     /**
-     * Return the code's opaque identifier (a ULID on the shipped model).
-     *
-     * @return mixed
-     */
-    public function getRecoveryCodeIdentifier(): mixed;
-
-    /**
      * Return the salted hash of the code, never the code itself.
      *
      * @return ?string
      */
     public function getCodeHash(): ?string;
-
-    /**
-     * Return the generation of the set the code belongs to.
-     *
-     * @return int
-     */
-    public function getGeneration(): int;
 
     /**
      * Return when the code was used, or `null` while it is unused.
@@ -117,13 +103,4 @@ interface RecoveryCode
      * @return void
      */
     public function markUsed(?CarbonInterface $at = null): void;
-
-    /**
-     * Mark the code replaced by a newer set at the given time or now. Does not
-     * persist.
-     *
-     * @param  ?\Carbon\CarbonInterface  $at
-     * @return void
-     */
-    public function markReplaced(?CarbonInterface $at = null): void;
 }

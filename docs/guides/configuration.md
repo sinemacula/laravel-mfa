@@ -13,54 +13,50 @@ the `mfa` manager is resolved, so a misconfiguration fails before anyone verifie
 [Checking the configuration](#checking-the-configuration)). Settings are read each time they are used, never cached
 between requests.
 
-| Key                             | Default                            | Bounds                                 | Env                                 | Applied |
-|---------------------------------|------------------------------------|----------------------------------------|-------------------------------------|---------|
-| `applications`                  | `[]`                               | see [Applications](#applications)      |                                     | partly  |
-| `storage.connection`            | `null`                             | a configured connection, or `null`     | `MFA_STORAGE_CONNECTION`            | yes     |
-| `factor.model`                  | `Models\Factor`                    | an Eloquent `EloquentFactor` model     | `MFA_FACTOR_MODEL`                  | yes     |
-| `factor.table`                  | `mfa_factors`                      | a table name                           | `MFA_FACTOR_TABLE`                  | yes     |
-| `identity_state.table`          | `mfa_identity_states`              | a table name                           | `MFA_IDENTITY_STATE_TABLE`          | yes     |
-| `enrollment.table`              | `mfa_enrollments`                  | a table name                           | `MFA_ENROLLMENT_TABLE`              | yes     |
-| `codes.table`                   | `mfa_codes`                        | a table name                           | `MFA_CODES_TABLE`                   | yes     |
-| `recovery_codes.model`          | `Models\RecoveryCode`              | an Eloquent `RecoveryCode` model       | `MFA_RECOVERY_CODES_MODEL`          | yes     |
-| `recovery_codes.table`          | `mfa_recovery_codes`               | a table name                           | `MFA_RECOVERY_CODES_TABLE`          | yes     |
-| `attempts.table`                | `mfa_attempts`                     | a table name                           | `MFA_ATTEMPTS_TABLE`                | yes     |
-| `passkeys.table`                | `mfa_passkey_associations`         | a table name                           | `MFA_PASSKEYS_TABLE`                | yes     |
-| `totp.algorithm`                | `sha1`                             | `sha1`, `sha256`, `sha512`             | `MFA_TOTP_ALGORITHM`                | yes     |
-| `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   | yes     |
-| `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   | yes     |
-| `totp.window`                   | `1`                                | 0 to 3 steps                           | `MFA_TOTP_WINDOW`                   | yes     |
-| `totp.issuer`                   | the application's name             | a non-empty string                     | `MFA_TOTP_ISSUER`                   | yes     |
-| `codes.length`                  | `6`                                | 6 to 10 digits                         | `MFA_CODES_LENGTH`                  | yes     |
-| `codes.ttl_minutes`             | `10`                               | 1 to 10 minutes                        | `MFA_CODES_TTL_MINUTES`             | yes     |
-| `codes.max_attempts`            | `5`                                | 1 to 10                                | `MFA_CODES_MAX_ATTEMPTS`            | yes     |
-| `codes.challenge_ttl_minutes`   | `30`                               | the code lifetime to 60 minutes        | `MFA_CODES_CHALLENGE_TTL_MINUTES`   | yes     |
-| `codes.resend_cooldown_seconds` | `60`                               | 0 to the code lifetime                 | `MFA_CODES_RESEND_COOLDOWN_SECONDS` | yes     |
-| `codes.factor_send_limit`       | `5`                                | 1 to 50                                | `MFA_CODES_FACTOR_SEND_LIMIT`       | yes     |
-| `codes.identity_send_limit`     | `10`                               | 1 to 100                               | `MFA_CODES_IDENTITY_SEND_LIMIT`     | yes     |
-| `codes.send_window_minutes`     | `60`                               | 1 to 1440 minutes                      | `MFA_CODES_SEND_WINDOW_MINUTES`     | yes     |
-| `codes.mailable`                | `Codes\MfaCodeMessage`             | `MfaCodeMessage` or a subclass         |                                     | yes     |
-| `recovery_codes.count`          | `10`                               | 1 to 50                                | `MFA_RECOVERY_CODES_COUNT`          | yes     |
-| `recovery_codes.length`         | `12`                               | 1 to 64, and 40 bits with the alphabet | `MFA_RECOVERY_CODES_LENGTH`         | yes     |
-| `recovery_codes.alphabet`       | `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` | see [Recovery codes](#recovery-codes)  | `MFA_RECOVERY_CODES_ALPHABET`       | yes     |
-| `recovery_codes.low_count`      | `3`                                | 0 to the set's size                    | `MFA_RECOVERY_CODES_LOW_COUNT`      | yes     |
-| `attempts.factor_limit`         | `5`                                | 1 to 20                                | `MFA_ATTEMPTS_FACTOR_LIMIT`         | yes     |
-| `attempts.identity_limit`       | `20`                               | 1 to 100                               | `MFA_ATTEMPTS_IDENTITY_LIMIT`       | yes     |
-| `attempts.ip_limit`             | `100`                              | 1 to 10000                             | `MFA_ATTEMPTS_IP_LIMIT`             | yes     |
-| `attempts.window_seconds`       | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_WINDOW_SECONDS`       | yes     |
-| `attempts.lockout_seconds`      | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_LOCKOUT_SECONDS`      | yes     |
-| `attempts.failure_ceiling`      | `100`                              | 1 to 100                               | `MFA_ATTEMPTS_FAILURE_CEILING`      | yes     |
-| `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        | yes     |
-| `enrollment.max_attempts`       | `5`                                | 1 to 10                                | `MFA_ENROLLMENT_MAX_ATTEMPTS`       | yes     |
-| `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    | yes     |
-| `secrets.redact`                | `true`                             | off only for a false value             | `MFA_SECRETS_REDACT`                | yes     |
+| Key                             | Default                            | Bounds                                 | Env                                 |
+|---------------------------------|------------------------------------|----------------------------------------|-------------------------------------|
+| `applications`                  | `[]`                               | see [Applications](#applications)      |                                     |
+| `storage.connection`            | `null`                             | a configured connection, or `null`     | `MFA_STORAGE_CONNECTION`            |
+| `factor.model`                  | `Models\Factor`                    | an Eloquent `EloquentFactor` model     | `MFA_FACTOR_MODEL`                  |
+| `factor.table`                  | `mfa_factors`                      | a table name                           | `MFA_FACTOR_TABLE`                  |
+| `identity_state.table`          | `mfa_identity_states`              | a table name                           | `MFA_IDENTITY_STATE_TABLE`          |
+| `enrollment.table`              | `mfa_enrollments`                  | a table name                           | `MFA_ENROLLMENT_TABLE`              |
+| `codes.table`                   | `mfa_codes`                        | a table name                           | `MFA_CODES_TABLE`                   |
+| `recovery_codes.model`          | `Models\RecoveryCode`              | an Eloquent `RecoveryCode` model       | `MFA_RECOVERY_CODES_MODEL`          |
+| `recovery_codes.table`          | `mfa_recovery_codes`               | a table name                           | `MFA_RECOVERY_CODES_TABLE`          |
+| `attempts.table`                | `mfa_attempts`                     | a table name                           | `MFA_ATTEMPTS_TABLE`                |
+| `passkeys.table`                | `mfa_passkey_associations`         | a table name                           | `MFA_PASSKEYS_TABLE`                |
+| `totp.algorithm`                | `sha1`                             | `sha1`, `sha256`, `sha512`             | `MFA_TOTP_ALGORITHM`                |
+| `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   |
+| `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   |
+| `totp.window`                   | `1`                                | 0 to 3 steps                           | `MFA_TOTP_WINDOW`                   |
+| `totp.issuer`                   | the application's name             | a non-empty string                     | `MFA_TOTP_ISSUER`                   |
+| `codes.length`                  | `6`                                | 6 to 10 digits                         | `MFA_CODES_LENGTH`                  |
+| `codes.ttl_minutes`             | `10`                               | 1 to 10 minutes                        | `MFA_CODES_TTL_MINUTES`             |
+| `codes.max_attempts`            | `5`                                | 1 to 10                                | `MFA_CODES_MAX_ATTEMPTS`            |
+| `codes.challenge_ttl_minutes`   | `30`                               | the code lifetime to 60 minutes        | `MFA_CODES_CHALLENGE_TTL_MINUTES`   |
+| `codes.resend_cooldown_seconds` | `60`                               | 0 to the code lifetime                 | `MFA_CODES_RESEND_COOLDOWN_SECONDS` |
+| `codes.factor_send_limit`       | `5`                                | 1 to 50                                | `MFA_CODES_FACTOR_SEND_LIMIT`       |
+| `codes.identity_send_limit`     | `10`                               | 1 to 100                               | `MFA_CODES_IDENTITY_SEND_LIMIT`     |
+| `codes.send_window_minutes`     | `60`                               | 1 to 1440 minutes                      | `MFA_CODES_SEND_WINDOW_MINUTES`     |
+| `codes.mailable`                | `Codes\MfaCodeMessage`             | `MfaCodeMessage` or a subclass         |                                     |
+| `recovery_codes.count`          | `10`                               | 1 to 50                                | `MFA_RECOVERY_CODES_COUNT`          |
+| `recovery_codes.length`         | `12`                               | 1 to 64, and 40 bits with the alphabet | `MFA_RECOVERY_CODES_LENGTH`         |
+| `recovery_codes.alphabet`       | `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` | see [Recovery codes](#recovery-codes)  | `MFA_RECOVERY_CODES_ALPHABET`       |
+| `recovery_codes.low_count`      | `3`                                | 0 to the set's size                    | `MFA_RECOVERY_CODES_LOW_COUNT`      |
+| `attempts.factor_limit`         | `5`                                | 1 to 20                                | `MFA_ATTEMPTS_FACTOR_LIMIT`         |
+| `attempts.identity_limit`       | `20`                               | 1 to 100                               | `MFA_ATTEMPTS_IDENTITY_LIMIT`       |
+| `attempts.ip_limit`             | `100`                              | 1 to 10000                             | `MFA_ATTEMPTS_IP_LIMIT`             |
+| `attempts.window_seconds`       | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_WINDOW_SECONDS`       |
+| `attempts.lockout_seconds`      | `900`                              | 60 to 86400 seconds                    | `MFA_ATTEMPTS_LOCKOUT_SECONDS`      |
+| `attempts.failure_ceiling`      | `100`                              | 1 to 100                               | `MFA_ATTEMPTS_FAILURE_CEILING`      |
+| `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        |
+| `enrollment.max_attempts`       | `5`                                | 1 to 10                                | `MFA_ENROLLMENT_MAX_ATTEMPTS`       |
+| `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    |
+| `secrets.redact`                | `true`                             | off only for a false value             | `MFA_SECRETS_REDACT`                |
 
 Every class name is relative to `SineMacula\Laravel\Mfa`. Numbers may be integers or the digit strings `env()` returns;
 anything else, a sign, padding, a fraction or an exponent included, is refused.
-
-**Applied** says whether anything reads the setting yet. A setting marked *not yet* is checked with the rest, so a
-deployment can set it now and a bad value still fails, but no flow applies it: setting it changes nothing until the
-flow that reads it ships. Do not rely on one for protection in the meantime.
 
 ## Applications
 
@@ -85,15 +81,13 @@ name:
 ],
 ```
 
-Every key below is checked; `types`, `requirement`, `totp_window`, `recovery_codes`, `freshness` and `first_factor` are
-applied, and `limits` and `bootstrap` so far only by the passkey change gate (see [Passkeys](extending.md#passkeys)).
-`requirement` is composed into `Mfa::requirement()`, which the `mfa` middleware asks before it enforces anything, and
-`freshness` is what `Mfa::isFresh()` judges a step-up against (see [Requirements and step-up](requirements.md)). A
-factor is sent a code and verified only where the application enables its type (see [Verification](verification.md)), a
-TOTP code is checked within the window of the application the verification is bound to, and recovery codes are generated
-and redeemed only where the application accepts them, a new set only at `recovery_codes.level`. The limits and
-`bootstrap` are enforced whenever a factor is enrolled, a passkey's registration included (see
-[Enrolment](enrollment.md)).
+Every key below is checked when the package boots. `requirement` is composed into `Mfa::requirement()`, which the `mfa`
+middleware asks before it enforces anything, and `freshness` is what `Mfa::isFresh()` judges a step-up against (see
+[Requirements and step-up](requirements.md)). A factor is sent a code and verified only where the application enables
+its type (see [Verification](verification.md)), a TOTP code is checked within the window of the application the
+verification is bound to, and recovery codes are generated and redeemed only where the application accepts them, a new
+set only at `recovery_codes.level`. The limits and `bootstrap` are enforced whenever a factor is enrolled, a passkey's
+registration included (see [Enrolment](enrollment.md)).
 
 | Key                         | Default                   | Meaning                                                                                                                                |
 |-----------------------------|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
@@ -111,11 +105,10 @@ and redeemed only where the application accepts them, a new set only at `recover
 | `first_factor`              | `null`                    | The first factor the application's guard signs people in with: a `method` and the `channel` kind it proves                             |
 
 An application with no block, and one whose block leaves a key out or sets it to `null`, takes the defaults: no type, no
-requirement, no recovery codes and no bootstrap, so once the flows apply the block a name nobody configured enables
-nothing. Left unset, `limits.confirmed_per_type` is 5, or `limits.confirmed` when that is lower; set explicitly above
-it, it is refused. A key the block does not know, in it or in one of its nested blocks, is refused rather than ignored,
-so a misspelt key cannot leave a setting at its default unnoticed, and an `applications` value that is not an array is
-refused too.
+requirement, no recovery codes and no bootstrap, so a name nobody configured enables nothing. Left unset,
+`limits.confirmed_per_type` is 5, or `limits.confirmed` when that is lower; set explicitly above it, it is refused. A
+key the block does not know, in it or in one of its nested blocks, is refused rather than ignored, so a misspelt key
+cannot leave a setting at its default unnoticed, and an `applications` value that is not an array is refused too.
 
 `limits` count only the enrolments made through the application: a factor enrolled through another counts against that
 application's limits, never this one's, and an application never removes, hides or changes a factor enrolled through

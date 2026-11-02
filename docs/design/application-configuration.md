@@ -16,13 +16,12 @@ before anything relies on it.
   step-up, and the first factor its guard uses. Those live in `mfa.applications.{name}`; everything else lives in a
   block per capability (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `lifecycle`) beside `storage`,
   `factor` and `identity_state`.
-- Not every setting is applied yet. Of an application block, `totp_window` is read by the TOTP driver for the
-  application a bound `ApplicationResolver` names, `recovery_codes.enabled` by the recovery code service, `requirement`
-  by `Mfa::requirement()` and `freshness` by `Mfa::isFresh()` (see
-  [Requirements and Freshness](requirements-and-freshness.md)); otherwise nothing is enforced per application: the
-  shipped drivers verify any type, and the limits are not applied. Of the package-wide blocks, the code resend cooldown
-  and send caps, the enrolment lifetime and the pruning retention are checked only. The configuration guide marks each
-  setting as applied or not, and a flow that starts reading one updates it.
+- Every setting is applied. Of an application block, `types` decides what a factor may be sent, verified and enrolled
+  for, `totp_window` is read by the TOTP driver for the application a bound `ApplicationResolver` names,
+  `recovery_codes` by the recovery code service, `requirement` by `Mfa::requirement()`, `freshness` by `Mfa::isFresh()`
+  (see [Requirements and Freshness](requirements-and-freshness.md)), `limits` and `bootstrap` by every enrolment, a
+  passkey's registration included (see [Enrolment](enrollment.md) and [Passkeys](passkeys.md)), and `first_factor` by
+  the shipped first factor resolver.
 - Every setting is read through one class that owns its block: `Applications\ApplicationSettings` (with
   `Applications\ApplicationBlock` reading the raw block), `Drivers\TotpSettings`, `Codes\CodeSettings`,
   `RecoveryCodes\RecoveryCodeSettings`, `Attempts\AttemptSettings`, `Enrollment\EnrollmentSettings` and
@@ -42,8 +41,8 @@ before anything relies on it.
   holds because the alphabet repeats no character once case is folded: a repeated one would be drawn more often, and
   the codes would carry less than the measure says. Every default sits inside its bounds.
 - A key missing from an application block, or set to `null`, takes the production-safe default: no type enabled,
-  `never` required, no recovery codes, no bootstrap. An application with no block takes them all, so once the flows
-  read the block a name nobody configured enables nothing. A key an application block, or one of its nested blocks,
+  `never` required, no recovery codes, no bootstrap. An application with no block takes them all, so a name nobody
+  configured enables nothing. A key an application block, or one of its nested blocks,
   does not know is refused rather than ignored, and so is an `mfa.applications` that is not an array, by every reader
   rather than only by the check.
 - An application declares the first factor its guard uses (a method and a channel kind other than `unknown`), or a

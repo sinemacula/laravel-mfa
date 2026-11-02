@@ -17,6 +17,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Factors\FactorRouteBinding;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\DecodedRouteKeyFactor;
+use Tests\Fixtures\Factors\OrderedRouteKeyFactor;
 use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Factors\SoftDeletingFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -155,7 +156,9 @@ final class ResolvesFactorRouteBindingTest extends TestCase
 
     /**
      * A custom key that another identity's row also holds fails closed when
-     * that row is the first found: it is never treated as the caller's.
+     * that row is the first found: it is never treated as the caller's. The
+     * fixture orders the lookup by primary key, so the other identity's row is
+     * first on every database, and the premise is asserted before the binding.
      *
      * @return void
      */
@@ -164,10 +167,14 @@ final class ResolvesFactorRouteBindingTest extends TestCase
         $user  = $this->signedInUser();
         $other = TestUser::query()->create(['email' => 'other@example.test']);
 
-        $this->factorOf($other, ['id' => '01JAAAAAAAAAAAAAAAAAAAAAAA', 'label' => 'Phone']);
+        $theirs = $this->factorOf($other, ['id' => '01JAAAAAAAAAAAAAAAAAAAAAAA', 'label' => 'Phone']);
         $this->factorOf($user, ['id' => '01JBBBBBBBBBBBBBBBBBBBBBBB', 'label' => 'Phone']);
 
-        self::assertNull((new Factor)->resolveRouteBinding('Phone', 'label'));
+        $firstFound = (new OrderedRouteKeyFactor)->resolveRouteBindingQuery(new OrderedRouteKeyFactor, 'Phone', 'label')->first();
+
+        self::assertInstanceOf(OrderedRouteKeyFactor::class, $firstFound);
+        self::assertSame($theirs->id, $firstFound->getKey());
+        self::assertNull((new OrderedRouteKeyFactor)->resolveRouteBinding('Phone', 'label'));
     }
 
     /**

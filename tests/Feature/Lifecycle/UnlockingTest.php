@@ -11,7 +11,7 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -184,7 +184,7 @@ final class UnlockingTest extends TestCase
         try {
             Mfa::unlockIdentity($user, self::actor());
             self::fail('A cancelled save was expected to throw.');
-        } catch (WriteCancelledException $exception) {
+        } catch (WriteCanceledException $exception) {
             self::assertStringContainsString('the identity\'s lockout', $exception->getMessage());
         } finally {
             IdentityState::flushEventListeners();

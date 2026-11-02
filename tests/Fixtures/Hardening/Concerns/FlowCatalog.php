@@ -64,7 +64,7 @@ use Tests\Fixtures\Requirements\FixedIdentityRequirement;
  *
  * @internal
  */
-trait FlowCatalogue
+trait FlowCatalog
 {
     use ArrangesEnrollment;
 

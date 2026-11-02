@@ -11,7 +11,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
@@ -270,7 +270,7 @@ final class RecoveryCodeServiceTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledStateSaveRollsTheRemovalBack(): void
+    public function testACanceledStateSaveRollsTheRemovalBack(): void
     {
         $holder = $this->signInHolder();
 
@@ -284,11 +284,11 @@ final class RecoveryCodeServiceTest extends TestCase
 
         try {
             $this->removeSet($holder);
-        } catch (WriteCancelledException $exception) {
+        } catch (WriteCanceledException $exception) {
             $thrown = $exception;
         }
 
-        self::assertInstanceOf(WriteCancelledException::class, $thrown);
+        self::assertInstanceOf(WriteCanceledException::class, $thrown);
         self::assertStringContainsString(IdentityState::class, $thrown->getMessage());
 
         self::assertCount(10, $this->storedCodes($holder));
@@ -353,7 +353,7 @@ final class RecoveryCodeServiceTest extends TestCase
         $kept = $this->storedCodes($holder);
 
         self::assertCount(3, $kept);
-        self::assertTrue($kept->every(static fn (RecoveryCode $row): bool => $row->getGeneration() === 2));
+        self::assertTrue($kept->every(static fn (RecoveryCode $row): bool => $row->getAttribute($row->getGenerationName()) === 2));
         self::assertCount(2, $kept->filter(static fn (RecoveryCode $row): bool => $row->isUsable()));
         self::assertSame(2, $this->recoveryCodes()->status($holder)->remaining);
         self::assertTrue($this->recoveryCodes()->status($holder)->exists());

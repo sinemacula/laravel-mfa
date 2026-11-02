@@ -94,7 +94,7 @@ final readonly class SensitiveValues
      * The values in a log's values, as in a trace frame's arguments that do not
      * touch the package, and those an exception among them recorded in its
      * trace and the traces of its previous ones (see `ExceptionScrubber`). The
-     * values are read as `Redactor::normalise()` gives them, so an object's
+     * values are read as `Redactor::normalize()` gives them, so an object's
      * form, which the redaction reaches, is read too; any other object is not.
      *
      * @param  array<array-key, mixed>  $values

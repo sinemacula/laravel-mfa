@@ -534,7 +534,7 @@ final class QueryExceptionMaskTest extends TestCase
      *
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     public function testAFailedSaveOfAFactorIsMasked(): void
     {

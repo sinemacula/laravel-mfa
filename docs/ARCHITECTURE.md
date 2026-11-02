@@ -77,7 +77,7 @@ Historical record of the architectural calls made during the 1.0 cycle.
 - **D6 — Lifecycle events are dispatched by the package's services behind the manager, not by
   consumer code.** Removal, reset, enrolment and verification finish their change and report through
   the catalogue, so audit subscribers do not have to rely on consumer cooperation (see
-  [Event Catalogue](design/event-catalogue.md)).
+  [Event Catalogue](design/event-catalog.md)).
 - **D7 — Both `Factor::$secret` and `Factor::$code` are encrypted at rest.** The `secret`
   column carries long-lived material (TOTP keys); the `code` column holds
   live OTPs during their expiry window. Encrypting both closes the read-only-DB-replay attack

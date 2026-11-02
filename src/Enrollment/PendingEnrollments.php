@@ -16,7 +16,7 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Models\Enrollment;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
@@ -71,7 +71,7 @@ final readonly class PendingEnrollments
      * @param  \Carbon\CarbonImmutable  $expiresAt
      * @return \SineMacula\Laravel\Mfa\Models\Enrollment
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     public function create(string $factorId, string $grantHash, ProofBinding $binding, int $generation, EnrollmentAuthorization $authority, CarbonImmutable $expiresAt): Enrollment
     {
@@ -90,7 +90,7 @@ final readonly class PendingEnrollments
 
         return $enrollment->exists
             ? $enrollment
-            : throw new WriteCancelledException('A model event cancelled the enrolment\'s save, so it did not start.');
+            : throw new WriteCanceledException('A model event cancelled the enrolment\'s save, so it did not start.');
     }
 
     /**
@@ -217,12 +217,12 @@ final readonly class PendingEnrollments
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     public function discard(Enrollment $enrollment, EloquentFactor&Model $factor): void
     {
         if ($factor->delete() === false) {
-            throw new WriteCancelledException('A model event cancelled the pending factor\'s deletion, so its enrolment stays.');
+            throw new WriteCanceledException('A model event cancelled the pending factor\'s deletion, so its enrolment stays.');
         }
 
         $this->forget($enrollment);
@@ -234,12 +234,12 @@ final readonly class PendingEnrollments
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     public function forget(Enrollment $enrollment): void
     {
         if ($enrollment->delete() === false) {
-            throw new WriteCancelledException('A model event cancelled the enrolment\'s deletion, so its grant would have stayed usable.');
+            throw new WriteCanceledException('A model event cancelled the enrolment\'s deletion, so its grant would have stayed usable.');
         }
     }
 
@@ -250,12 +250,12 @@ final readonly class PendingEnrollments
      * @param  string  $challengeId
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     public function recordChallenge(Enrollment $enrollment, string $challengeId): void
     {
         if (!$enrollment->update(['challenge_id' => $challengeId])) {
-            throw new WriteCancelledException('A model event cancelled the enrolment\'s save, so its code could not be confirmed.');
+            throw new WriteCanceledException('A model event cancelled the enrolment\'s save, so its code could not be confirmed.');
         }
     }
 
@@ -265,14 +265,14 @@ final readonly class PendingEnrollments
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @return int
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      *
      * @phpstan-impure
      */
     public function countAttempt(Enrollment $enrollment): int
     {
         if ($enrollment->increment('attempts') === false) {
-            throw new WriteCancelledException('A model event cancelled counting the enrolment\'s attempt.');
+            throw new WriteCanceledException('A model event cancelled counting the enrolment\'s attempt.');
         }
 
         return $enrollment->attempts;

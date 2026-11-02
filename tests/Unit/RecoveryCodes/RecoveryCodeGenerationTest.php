@@ -14,7 +14,7 @@ use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\SecretNotRevealedException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
@@ -121,7 +121,7 @@ final class RecoveryCodeGenerationTest extends TestCase
 
             self::assertNotContains($hash, $codes);
             self::assertSame('bcrypt', password_get_info($hash)['algoName']);
-            self::assertSame(1, $row->getGeneration());
+            self::assertSame(1, $row->getAttribute($row->getGenerationName()));
             self::assertTrue($row->isUsable());
             self::assertCount(1, array_filter($codes, static fn (string $code): bool => Hash::check($code, $hash)), 'Row ' . $index . ' matches no code.');
         }
@@ -185,9 +185,10 @@ final class RecoveryCodeGenerationTest extends TestCase
 
         self::assertCount(20, $stored);
         $replacedAt = static fn (RecoveryCode $row): ?string => $row->getReplacedAt()?->format('Y-m-d H:i:s');
+        $generation = static fn (RecoveryCode $row): mixed => $row->getAttribute($row->getGenerationName());
 
-        self::assertCount(10, $stored->filter(static fn (RecoveryCode $row): bool => $row->getGeneration() === 1 && $replacedAt($row) === '2026-11-02 10:00:00'));
-        self::assertCount(10, $stored->filter(static fn (RecoveryCode $row): bool => $row->getGeneration() === 2 && $row->isUsable()));
+        self::assertCount(10, $stored->filter(static fn (RecoveryCode $row): bool => $generation($row) === 1 && $replacedAt($row) === '2026-11-02 10:00:00'));
+        self::assertCount(10, $stored->filter(static fn (RecoveryCode $row): bool => $generation($row) === 2 && $row->isUsable()));
         self::assertSame(2, $this->stateOf($holder)->recovery_codes_generation);
 
         self::assertFalse($this->recoveryCodes()->redeem($holder, $previous[1], self::redemptionBinding($holder, Purpose::STEP_UP))->passed);
@@ -291,7 +292,7 @@ final class RecoveryCodeGenerationTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledCodeSaveKeepsThePreviousSet(): void
+    public function testACanceledCodeSaveKeepsThePreviousSet(): void
     {
         $holder   = $this->signInHolder();
         $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
@@ -301,7 +302,7 @@ final class RecoveryCodeGenerationTest extends TestCase
             return ++$inserted !== 4;
         });
 
-        $this->assertReplacementCancelled($holder, $previous, RecoveryCode::class);
+        $this->assertReplacementCanceled($holder, $previous, RecoveryCode::class);
     }
 
     /**
@@ -312,14 +313,14 @@ final class RecoveryCodeGenerationTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledStateSaveKeepsThePreviousSet(): void
+    public function testACanceledStateSaveKeepsThePreviousSet(): void
     {
         $holder   = $this->signInHolder();
         $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
 
         IdentityState::saving(static fn (): bool => false);
 
-        $this->assertReplacementCancelled($holder, $previous, IdentityState::class);
+        $this->assertReplacementCanceled($holder, $previous, IdentityState::class);
     }
 
     /**
@@ -458,7 +459,7 @@ final class RecoveryCodeGenerationTest extends TestCase
      *
      * @throws \Throwable
      */
-    private function assertReplacementCancelled(FactorHolder $holder, array $previous, string $model): void
+    private function assertReplacementCanceled(FactorHolder $holder, array $previous, string $model): void
     {
         Event::fake([RecoveryCodesGenerated::class]);
 
@@ -466,11 +467,11 @@ final class RecoveryCodeGenerationTest extends TestCase
 
         try {
             $this->recoveryCodes()->generate($holder);
-        } catch (WriteCancelledException $exception) {
+        } catch (WriteCanceledException $exception) {
             $thrown = $exception;
         }
 
-        self::assertInstanceOf(WriteCancelledException::class, $thrown);
+        self::assertInstanceOf(WriteCanceledException::class, $thrown);
         self::assertStringContainsString($model, $thrown->getMessage());
 
         Event::assertNotDispatched(RecoveryCodesGenerated::class);

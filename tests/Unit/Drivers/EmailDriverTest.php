@@ -108,7 +108,6 @@ final class EmailDriverTest extends TestCase
 
         $driver->deliver(self::factor(), '654321', CarbonImmutable::now()->addMinutes(10));
 
-        self::assertSame(CustomMfaCodeMessage::class, $driver->getMailable());
         self::assertInstanceOf(CustomMfaCodeMessage::class, $sender->sent()[0]['message']);
         self::assertSame('654321', $sender->lastCodeTo(self::ADDRESS));
     }

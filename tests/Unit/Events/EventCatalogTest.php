@@ -75,7 +75,7 @@ use Tests\TestCase;
 #[CoversClass(RecoveryCodeUsed::class)]
 #[CoversClass(RecoveryCodesLow::class)]
 #[CoversClass(RecoveryCodesRemoved::class)]
-final class EventCatalogueTest extends TestCase
+final class EventCatalogTest extends TestCase
 {
     use RefreshDatabase;
 

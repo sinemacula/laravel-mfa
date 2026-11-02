@@ -24,7 +24,7 @@ use SineMacula\Laravel\Mfa\Events\FactorsReset;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Lifecycle\IdentityReset;
@@ -352,7 +352,7 @@ final class ResettingIdentityTest extends TestCase
         try {
             Mfa::resetIdentity($user, self::actor(), self::REASON);
             self::fail('A cancelled save was expected to throw.');
-        } catch (WriteCancelledException $exception) {
+        } catch (WriteCanceledException $exception) {
             self::assertStringContainsString('failures in a row', $exception->getMessage());
         } finally {
             IdentityState::flushEventListeners();

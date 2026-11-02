@@ -18,7 +18,6 @@ use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Drivers\RecordingFactorDriver;
 use Tests\Fixtures\Factors\MyDriverFactor;
-use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
@@ -189,20 +188,5 @@ final class CustomDriverExtensionTest extends TestCase
         Assert::assertInstanceOf(MfaManager::class, $manager);
 
         return $manager;
-    }
-
-    /**
-     * Create a test user and authenticate as them.
-     *
-     * @return \Tests\Fixtures\Identities\TestUser
-     */
-    private function signIn(): TestUser
-    {
-        /** @var \Tests\Fixtures\Identities\TestUser $user */
-        $user = TestUser::query()->create(['email' => 'extension@example.com']);
-
-        $this->actingAs($user);
-
-        return $user;
     }
 }

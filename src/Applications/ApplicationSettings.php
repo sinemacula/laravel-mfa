@@ -57,8 +57,8 @@ final readonly class ApplicationSettings
         /** Configuration the settings are read from on every call. */
         private Repository $config,
 
-        /** The application's name: its key in `mfa.applications`. */
-        public string $name,
+        // The application's name: its key in `mfa.applications`.
+        string $name,
     ) {
         $this->block = new ApplicationBlock($config, $name);
     }

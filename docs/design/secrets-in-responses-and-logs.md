@@ -44,7 +44,7 @@ it.
   `email`, `phone`, `phone_number`, `to`, `recipient`, `provisioning_uri`, `otpauth_uri`, `grant`, `enrollment_grant`,
   compared without case, underscores, hyphens or spaces); every `otpauth://` or `otpauth-migration://` URI in a string.
   Integer keys are never read as names. Everything else is kept, masked destinations included.
-- `RedactSecrets` first normalises the context and the extra data once (`Redactor::normalise()`): every object other
+- `RedactSecrets` first normalises the context and the extra data once (`Redactor::normalize()`): every object other
   than a secret value, a code message, an exception, a date or an enum becomes its logged form keyed by its class,
   within the same bounds as the redaction. A value under a key above is left as it is, with no method of an object in
   it called, since the redaction replaces it whole; only the strings it already holds are collected. From that form,

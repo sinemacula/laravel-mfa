@@ -40,7 +40,7 @@ use SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
 use SineMacula\Laravel\Mfa\Exceptions\SignInChangedException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorChannel;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
@@ -473,7 +473,7 @@ final readonly class EnrollmentStarter
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private function discard(MultiFactorAuthenticatable $identity, ProofBinding $binding, string $type, Collection $factors, array $context): void
     {
@@ -504,7 +504,7 @@ final readonly class EnrollmentStarter
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private function discardIfReplaced(MultiFactorAuthenticatable $identity, Enrollment $enrollment, EloquentFactor&Model $factor, string $type, array $context): void
     {
@@ -650,12 +650,12 @@ final readonly class EnrollmentStarter
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return string
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private static function storedId(EloquentFactor&Model $factor): string
     {
         $id = $factor->exists ? LockedFactors::idOf($factor) : null;
 
-        return $id ?? throw new WriteCancelledException('A model event cancelled the pending factor\'s save, so its enrolment did not start.');
+        return $id ?? throw new WriteCanceledException('A model event cancelled the pending factor\'s save, so its enrolment did not start.');
     }
 }

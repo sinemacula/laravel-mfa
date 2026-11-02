@@ -456,7 +456,7 @@ final readonly class EnrollmentConfirmer
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private function expire(Caller $caller, ProofBinding $binding, Enrollment $enrollment, EloquentFactor&Model $factor): EnrollmentConfirmation
     {
@@ -483,7 +483,7 @@ final readonly class EnrollmentConfirmer
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private function count(Caller $caller, ProofBinding $binding, Enrollment $enrollment, EloquentFactor&Model $factor, CheckOutcome $check): EnrollmentConfirmation
     {

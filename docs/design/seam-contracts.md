@@ -35,7 +35,7 @@ that call them, so the flows can be built against one fixed set.
   proof store once the transaction commits, refusing a binding that is not the store's current sign-in, and for a
   pending session the pending context's as well, as `not_accepted` (see [Proof Store](proof-store.md)).
 - `EventContextResolver` is bound to `Context\DefaultEventContextResolver`, which gives the identity, the application
-  and the request (see [Event Catalogue](event-catalogue.md)).
+  and the request (see [Event Catalogue](event-catalog.md)).
 - `ProofStore` is bound to `Proofs\SessionProofStore`, which keeps each sign-in's proofs in the Laravel session (see
   [Proof Store and Sign-Ins](proof-store.md)).
 - `CombinationPolicy` is bound to `Assurance\DefaultCombinationPolicy` (see

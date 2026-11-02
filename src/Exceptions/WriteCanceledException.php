@@ -15,4 +15,4 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
-final class WriteCancelledException extends \RuntimeException {}
+final class WriteCanceledException extends \RuntimeException {}

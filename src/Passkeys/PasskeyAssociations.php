@@ -11,7 +11,7 @@ use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
@@ -128,7 +128,7 @@ final readonly class PasskeyAssociations
      * @return \SineMacula\Laravel\Mfa\Models\PasskeyAssociation
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     public function associate(ProofOwner $owner, string $factorId, #[\SensitiveParameter] string $credentialId): PasskeyAssociation
     {
@@ -147,7 +147,7 @@ final readonly class PasskeyAssociations
         }
 
         if (!$saved) {
-            throw new WriteCancelledException('A model event cancelled the passkey association\'s save, so the passkey was not associated.');
+            throw new WriteCanceledException('A model event cancelled the passkey association\'s save, so the passkey was not associated.');
         }
 
         return $association;

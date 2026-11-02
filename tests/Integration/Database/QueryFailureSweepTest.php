@@ -20,7 +20,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
 use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
-use Tests\Fixtures\Hardening\Concerns\FlowCatalogue;
+use Tests\Fixtures\Hardening\Concerns\FlowCatalog;
 use Tests\Fixtures\Hardening\FailsTheNthQuery;
 use Tests\Fixtures\Hardening\ServerErrorAnswered;
 use Tests\TestCase;
@@ -44,7 +44,7 @@ use Tests\TestCase;
 #[CoversClass(QueryExceptionMask::class)]
 final class QueryFailureSweepTest extends TestCase
 {
-    use FlowCatalogue;
+    use FlowCatalog;
 
     /** @var array<string, list<array<string, mixed>>> The package's tables when the outermost transaction began. */
     private array $atBegin = [];

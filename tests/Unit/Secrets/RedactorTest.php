@@ -76,8 +76,8 @@ final class RedactorTest extends TestCase
     #[DataProvider('sensitiveKeys')]
     public function testRedactsTheValueOfAKeyNamingASecret(string $key): void
     {
-        self::assertSame([$key => '[redacted]'], Redactor::redact([$key => self::SECRET]));
-        self::assertSame([$key => '[redacted]'], Redactor::redact([$key => ['123456', '654321']]));
+        self::assertSame([$key => '[redacted]'], self::redact([$key => self::SECRET]));
+        self::assertSame([$key => '[redacted]'], self::redact([$key => ['123456', '654321']]));
     }
 
     /**
@@ -106,7 +106,7 @@ final class RedactorTest extends TestCase
     #[DataProvider('ordinaryKeys')]
     public function testKeepsTheValueOfAnyOtherKey(string $key): void
     {
-        self::assertSame([$key => 'value'], Redactor::redact([$key => 'value']));
+        self::assertSame([$key => 'value'], self::redact([$key => 'value']));
     }
 
     /**
@@ -118,7 +118,7 @@ final class RedactorTest extends TestCase
     {
         self::assertSame(
             ['factor' => ['id' => '01J0', 'type' => 'sms', 'destination' => '[redacted]'], 'attempt' => 2, 'items' => ['first', 'second']],
-            Redactor::redact(['factor' => ['id' => '01J0', 'type' => 'sms', 'destination' => '+447700900123'], 'attempt' => 2, 'items' => ['first', 'second']]),
+            self::redact(['factor' => ['id' => '01J0', 'type' => 'sms', 'destination' => '+447700900123'], 'attempt' => 2, 'items' => ['first', 'second']]),
         );
     }
 
@@ -132,7 +132,7 @@ final class RedactorTest extends TestCase
     {
         self::assertSame(
             ['shown' => '[redacted]', 'parameter' => '[redacted]', 'list' => ['[redacted]']],
-            Redactor::redact([
+            self::redact([
                 'shown'     => new RevealedSecret(self::SECRET),
                 'parameter' => new \SensitiveParameterValue(self::SECRET),
                 'list'      => [new RevealedSecret(self::SECRET)],
@@ -151,7 +151,7 @@ final class RedactorTest extends TestCase
         self::assertSame('Scan [redacted] to finish', Redactor::redactString('Scan otpauth://totp/Acme:ben?issuer=Acme&secret=' . self::SECRET . ' to finish'));
         self::assertSame('[redacted]', Redactor::redactString('OTPAUTH://totp/Acme?secret=' . self::SECRET));
         self::assertSame('[redacted]', Redactor::redactString('otpauth-migration://offline?data=' . self::SECRET));
-        self::assertSame(['note' => 'Scanned [redacted]'], Redactor::redact(['note' => 'Scanned otpauth://totp/Acme?secret=' . self::SECRET]));
+        self::assertSame(['note' => 'Scanned [redacted]'], self::redact(['note' => 'Scanned otpauth://totp/Acme?secret=' . self::SECRET]));
     }
 
     /**
@@ -172,7 +172,7 @@ final class RedactorTest extends TestCase
      */
     public function testKeepsScalars(): void
     {
-        self::assertSame([12, 1.5, true, null, 'Phone'], Redactor::redact([12, 1.5, true, null, 'Phone']));
+        self::assertSame([12, 1.5, true, null, 'Phone'], self::redact([12, 1.5, true, null, 'Phone']));
     }
 
     /**
@@ -187,7 +187,7 @@ final class RedactorTest extends TestCase
 
         self::assertSame(
             ['factor' => [\stdClass::class => ['type' => 'sms', 'destination' => '[redacted]', 'secret' => '[redacted]']]],
-            Redactor::redact(['factor' => $factor]),
+            self::redact(['factor' => $factor]),
         );
     }
 
@@ -201,7 +201,7 @@ final class RedactorTest extends TestCase
     {
         $codes = new Collection([new RevealedSecret(self::SECRET), 'kept']);
 
-        self::assertSame([Collection::class => ['[redacted]', 'kept']], Redactor::value($codes));
+        self::assertSame([Collection::class => ['[redacted]', 'kept']], self::redact(['value' => $codes])['value']);
     }
 
     /**
@@ -238,8 +238,8 @@ final class RedactorTest extends TestCase
             }
         };
 
-        self::assertSame([get_debug_type($json) => ['code' => '[redacted]', 'label' => 'Phone']], Redactor::value($json));
-        self::assertSame([get_debug_type($string) => 'Scan [redacted]'], Redactor::value($string));
+        self::assertSame([get_debug_type($json) => ['code' => '[redacted]', 'label' => 'Phone']], self::redact(['value' => $json])['value']);
+        self::assertSame([get_debug_type($string) => 'Scan [redacted]'], self::redact(['value' => $string])['value']);
     }
 
     /**
@@ -251,7 +251,7 @@ final class RedactorTest extends TestCase
     {
         $date = new \DateTimeImmutable('2026-11-01T09:00:00Z');
 
-        self::assertSame(['at' => $date, 'case' => FailureReason::LOCKED], Redactor::redact(['at' => $date, 'case' => FailureReason::LOCKED]));
+        self::assertSame(['at' => $date, 'case' => FailureReason::LOCKED], self::redact(['at' => $date, 'case' => FailureReason::LOCKED]));
     }
 
     /**
@@ -265,7 +265,7 @@ final class RedactorTest extends TestCase
         $recursive         = ['label' => 'Phone'];
         $recursive['self'] = &$recursive;
 
-        $redacted = Redactor::redact(['context' => $recursive]);
+        $redacted = self::redact(['context' => $recursive]);
 
         $current = $redacted['context'];
 
@@ -278,11 +278,11 @@ final class RedactorTest extends TestCase
 
         self::assertSame(['label' => 'Phone', 'self' => '[truncated]'], $current);
 
-        self::assertSame($this->nested('[truncated]', 11), Redactor::redact($this->nested([], 11)));
-        self::assertSame($this->nested([], 10), Redactor::redact($this->nested([], 10)));
-        self::assertSame($this->nested('[truncated]', 11), Redactor::redact($this->nested(new \stdClass, 11)));
-        self::assertSame($this->nested([\stdClass::class => '[truncated]'], 10), Redactor::redact($this->nested(new \stdClass, 10)));
-        self::assertSame($this->nested('[redacted]', 11), Redactor::redact($this->nested('otpauth://totp/Acme?secret=' . self::SECRET, 11)));
+        self::assertSame($this->nested('[truncated]', 11), self::redact($this->nested([], 11)));
+        self::assertSame($this->nested([], 10), self::redact($this->nested([], 10)));
+        self::assertSame($this->nested('[truncated]', 11), self::redact($this->nested(new \stdClass, 11)));
+        self::assertSame($this->nested([\stdClass::class => '[truncated]'], 10), self::redact($this->nested(new \stdClass, 10)));
+        self::assertSame($this->nested('[redacted]', 11), self::redact($this->nested('otpauth://totp/Acme?secret=' . self::SECRET, 11)));
     }
 
     /**
@@ -292,12 +292,12 @@ final class RedactorTest extends TestCase
      */
     public function testKeepsTheFirstThousandEntries(): void
     {
-        $redacted = Redactor::redact(range(1, 1001));
+        $redacted = self::redact(range(1, 1001));
 
         self::assertCount(1001, $redacted);
         self::assertSame(1000, $redacted[999]);
         self::assertSame('[truncated]', $redacted['...']);
-        self::assertCount(1000, Redactor::redact(range(1, 1000)));
+        self::assertCount(1000, self::redact(range(1, 1000)));
     }
 
     /**
@@ -311,7 +311,7 @@ final class RedactorTest extends TestCase
             ['file' => '/app/Http/Controllers/VerifyController.php', 'line' => 12, 'class' => RevealedSecret::class, 'type' => '->', 'function' => 'reveal', 'args' => ['123456']],
         ]);
 
-        $redacted = Redactor::redact(['exception' => $exception]);
+        $redacted = self::redact(['exception' => $exception]);
 
         self::assertSame($exception, $redacted['exception']);
         self::assertSame(['[redacted]'], $exception->getTrace()[0]['args'] ?? null);
@@ -351,7 +351,7 @@ final class RedactorTest extends TestCase
         $other   = new SendQueuedMailable(new Mailable);
 
         self::assertSame(['[redacted]', ['[redacted]'], $other], Redactor::arguments([$message, [new SendQueuedMailable($message)], $other]));
-        self::assertSame(['message' => '[redacted]', 'nested' => ['[redacted]']], Redactor::redact(['message' => $message, 'nested' => [new SendQueuedMailable($message)]]));
+        self::assertSame(['message' => '[redacted]', 'nested' => ['[redacted]']], self::redact(['message' => $message, 'nested' => [new SendQueuedMailable($message)]]));
     }
 
     /**
@@ -361,7 +361,7 @@ final class RedactorTest extends TestCase
      *
      * @return void
      */
-    public function testNormalisesObjectsIntoTheirLoggedForm(): void
+    public function testNormalizesObjectsIntoTheirLoggedForm(): void
     {
         $secret    = new RevealedSecret(self::SECRET);
         $message   = new MfaCodeMessage('482915', 10);
@@ -373,16 +373,35 @@ final class RedactorTest extends TestCase
                 'payload' => [\stdClass::class => ['code' => '482915', 'inner' => [Collection::class => ['kept']]]],
                 'kept'    => [$secret, $message, $exception, $date, FailureReason::LOCKED, 'text', 42],
             ],
-            Redactor::normalise([
+            Redactor::normalize([
                 'payload' => (object) ['code' => '482915', 'inner' => new Collection(['kept'])],
                 'kept'    => [$secret, $message, $exception, $date, FailureReason::LOCKED, 'text', 42],
             ]),
         );
 
-        self::assertSame($this->nested('[truncated]', 11), Redactor::normalise($this->nested([], 11)));
-        self::assertSame($this->nested([\stdClass::class => '[truncated]'], 10), Redactor::normalise($this->nested(new \stdClass, 10)));
-        self::assertCount(1001, Redactor::normalise(range(1, 1001)));
-        self::assertSame('[truncated]', Redactor::normalise(range(1, 1001))['...']);
+        self::assertSame($this->nested('[truncated]', 11), Redactor::normalize($this->nested([], 11)));
+        self::assertSame($this->nested([\stdClass::class => '[truncated]'], 10), Redactor::normalize($this->nested(new \stdClass, 10)));
+        self::assertCount(1001, Redactor::normalize(range(1, 1001)));
+        self::assertSame('[truncated]', Redactor::normalize(range(1, 1001))['...']);
+    }
+
+    /**
+     * An object nested in an object takes two levels of the bound, its own and
+     * its form's, so the fifth one down still keeps what it holds.
+     *
+     * @return void
+     */
+    public function testAnObjectInAnObjectTakesTwoLevels(): void
+    {
+        $value    = 'kept';
+        $expected = 'kept';
+
+        for ($level = 0; $level < 5; $level++) {
+            $value    = (object) ['inner' => $value];
+            $expected = [\stdClass::class => ['inner' => $expected]];
+        }
+
+        self::assertSame(['context' => $expected], Redactor::normalize(['context' => $value]));
     }
 
     /**
@@ -391,13 +410,13 @@ final class RedactorTest extends TestCase
      *
      * @return void
      */
-    public function testRedactsNormalisedValues(): void
+    public function testRedactsNormalizedValues(): void
     {
         $exception = new \RuntimeException('Rejected 482915');
 
         self::assertSame(
             ['payload' => [\stdClass::class => ['code' => '[redacted]']], 'exception' => $exception, 'deep' => $this->nested('[truncated]', 10)],
-            Redactor::redactNormalised(
+            Redactor::redactNormalized(
                 ['payload' => [\stdClass::class => ['code' => '482915']], 'exception' => $exception, 'deep' => $this->nested([], 10)],
                 SensitiveValues::known('482915'),
             ),
@@ -416,7 +435,7 @@ final class RedactorTest extends TestCase
     {
         $exception = new \RuntimeException('Rejected 482915', 0, new \LogicException('Previously 482915'));
 
-        $redacted = Redactor::redact(['exception' => $exception, 'note' => 'Rejected 482915'], SensitiveValues::inArguments(['482915'], true));
+        $redacted = self::redact(['exception' => $exception, 'note' => 'Rejected 482915'], SensitiveValues::inArguments(['482915'], true));
 
         self::assertSame(['exception' => $exception, 'note' => 'Rejected 482915'], $redacted);
         self::assertSame('Rejected [redacted]', $exception->getMessage());
@@ -437,6 +456,18 @@ final class RedactorTest extends TestCase
             'Sent [redacted] to [redacted] with [redacted]',
             Redactor::redactMessage('Sent 4821 to ada@example.test with otpauth://totp/A?secret=' . self::SECRET, $values),
         );
+    }
+
+    /**
+     * A log's values normalised and redacted, as a log record's are.
+     *
+     * @param  array<array-key, mixed>  $values
+     * @param  ?\SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $sensitive
+     * @return array<array-key, mixed>
+     */
+    private static function redact(array $values, ?SensitiveValues $sensitive = null): array
+    {
+        return Redactor::redactNormalized(Redactor::normalize($values), $sensitive ?? SensitiveValues::none());
     }
 
     /**

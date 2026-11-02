@@ -29,7 +29,7 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\ProofStoreCompletion;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
-use Tests\Fixtures\Hardening\Concerns\FlowCatalogue;
+use Tests\Fixtures\Hardening\Concerns\FlowCatalog;
 use Tests\Fixtures\Hardening\LockOrderRecorder;
 use Tests\Fixtures\Hardening\SpyCompletion;
 use Tests\Fixtures\Hardening\SpySessionRevoker;
@@ -60,7 +60,7 @@ use Tests\TestCase;
 #[CoversClass(IdentityStateRow::class)]
 final class LockOrderTest extends TestCase
 {
-    use FlowCatalogue;
+    use FlowCatalog;
 
     /** @var \Tests\Fixtures\Hardening\LockOrderRecorder The log of the flow. */
     private LockOrderRecorder $recorder;

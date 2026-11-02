@@ -31,7 +31,7 @@ use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\FactorConfirmed;
 use SineMacula\Laravel\Mfa\Events\PasskeyAssociated;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
@@ -244,7 +244,7 @@ final readonly class PasskeyChangeGate
      * @formatter:on
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      */
     private function associate(string $application, PasskeyRegistration $registration, ?string $label, Collection $factors): PasskeyAssociationResult
@@ -507,12 +507,12 @@ final readonly class PasskeyChangeGate
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return string
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private static function storedId(EloquentFactor&Model $factor): string
     {
         $id = $factor->exists ? LockedFactors::idOf($factor) : null;
 
-        return $id ?? throw new WriteCancelledException('A model event cancelled the passkey factor\'s save, so the passkey was not associated.');
+        return $id ?? throw new WriteCanceledException('A model event cancelled the passkey factor\'s save, so the passkey was not associated.');
     }
 }

@@ -32,6 +32,7 @@ use SineMacula\Laravel\Mfa\Events\FactorRemoved;
 use SineMacula\Laravel\Mfa\Events\PasskeyAssociated;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Lifecycle\RemovalGuard;
 use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
@@ -54,6 +55,7 @@ use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
+use Tests\Fixtures\Factors\UnwrittenFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Lifecycle\FixedFreshnessGate;
@@ -920,6 +922,31 @@ final class PasskeyChangeGateTest extends TestCase
         });
 
         self::assertSame('Work laptop', Factor::query()->sole()->label);
+    }
+
+    /**
+     * A persistence seam that neither writes the factor nor throws leaves the
+     * passkey unassociated.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFactorThatWasNotWrittenIsNotAssociated(): void
+    {
+        $this->enablePasskeys();
+        $this->reauthenticate();
+
+        $user = $this->signedInPerson();
+
+        config()->set('mfa.factor.model', UnwrittenFactor::class);
+
+        $this->expectException(WriteCanceledException::class);
+        $this->expectExceptionMessage('the passkey was not associated');
+
+        DB::transaction(function () use ($user): void {
+            $this->gate()->registering($user, self::APPLICATION, $this->registration($user));
+        });
     }
 
     /**

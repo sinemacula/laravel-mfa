@@ -14,7 +14,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
-use Tests\Fixtures\Hardening\Concerns\FlowCatalogue;
+use Tests\Fixtures\Hardening\Concerns\FlowCatalog;
 use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
 use Tests\TestCase;
 
@@ -33,7 +33,7 @@ use Tests\TestCase;
 #[CoversClass(WriteConnection::class)]
 final class PoisonedReaderTest extends TestCase
 {
-    use FlowCatalogue, MigratesTheStorageConnection;
+    use FlowCatalog, MigratesTheStorageConnection;
 
     /** @var string The SQLite file the package's tables are on. */
     private string $writer = '';
