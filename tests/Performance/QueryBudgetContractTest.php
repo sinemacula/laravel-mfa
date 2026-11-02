@@ -6,18 +6,19 @@ namespace Tests\Performance;
 
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\AssertionFailedError;
-use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversNothing;
 
 /**
  * What a budget itself promises: it counts reads and writes exactly, only while
- * the path runs, and refuses a statement that is neither.
+ * the path runs, and refuses a statement that is neither. It runs the base
+ * class and none of the package's source, so it covers nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
  * @internal
  */
-#[CoversClass(PerformanceContractTestCase::class)]
+#[CoversNothing]
 final class QueryBudgetContractTest extends PerformanceContractTestCase
 {
     /**
