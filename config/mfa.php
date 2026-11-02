@@ -134,10 +134,11 @@ return [
     | challenge's resends may run from its first code (the lifetime to 60
     | minutes), the cooldown before a resend (up to the lifetime), the caps on
     | how many one factor's destination and one identity are sent within the
-    | send window, across every session, the SMS message (which must carry `:code`) and the
-    | email message class (`MfaCodeMessage` or a subclass), and the table the
-    | codes are stored in, as keyed hashes. An application that enables `sms`
-    | or `email` must bind an `SmsSender` or `EmailSender` to deliver them.
+    | send window, across every session, the email message class
+    | (`MfaCodeMessage` or a subclass), and the table the codes are stored in,
+    | as keyed hashes. An application that enables `sms` or `email` must bind an
+    | `SmsSender` or `EmailSender` to deliver them. The wording of both messages
+    | is translated, not configured: see the localisation guide.
     |
     */
 
@@ -151,7 +152,6 @@ return [
         'factor_send_limit'       => env('MFA_CODES_FACTOR_SEND_LIMIT', 5),
         'identity_send_limit'     => env('MFA_CODES_IDENTITY_SEND_LIMIT', 10),
         'send_window_minutes'     => env('MFA_CODES_SEND_WINDOW_MINUTES', 60),
-        'sms_message'             => env('MFA_CODES_SMS_MESSAGE', 'Your verification code is: :code'),
         'mailable'                => MfaCodeMessage::class,
     ],
 

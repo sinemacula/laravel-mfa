@@ -37,9 +37,10 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
  * the last factor, SMS and email senders, event context). The shipped drivers
  * are registered against the manager by their capability's `*Bindings` class
  * from inside the singleton's factory, once the configuration is checked. Boots
- * the middleware aliases, config and migration publishing, the `mfa:check`
- * command, and the configuration check that runs once the application has
- * booted, which also refuses a factor model off the storage connection.
+ * the translations, the middleware aliases, config, migration and translation
+ * publishing, the `mfa:check` command, and the configuration check that runs
+ * once the application has booted, which also refuses a factor model off the
+ * storage connection.
  *
  * Consumers with their own requirement policy, stateless proof store, or SMS
  * and email senders rebind the matching contracts in their own service
@@ -87,6 +88,8 @@ final class MfaServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->loadTranslationsFrom(__DIR__ . '/../lang', 'mfa');
+
         $this->offerPublishing();
         $this->registerCommands();
 
@@ -136,7 +139,7 @@ final class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Offer config and migration publishing.
+     * Offer config, migration and translation publishing.
      *
      * @return void
      */
@@ -153,5 +156,9 @@ final class MfaServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../database/migrations/' => $this->app->databasePath('migrations'),
         ], 'mfa-migrations');
+
+        $this->publishes([
+            __DIR__ . '/../lang' => $this->app->langPath('vendor/mfa'),
+        ], 'mfa-lang');
     }
 }

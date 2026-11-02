@@ -131,28 +131,6 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $driver = $this->manager()->driver('sms');
 
         self::assertInstanceOf(SmsDriver::class, $driver);
-        self::assertSame('Your verification code is: :code', $driver->getMessageTemplate());
-    }
-
-    /**
-     * Resolving the SMS driver should apply the message override in the code
-     * settings.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testSmsDriverBuildsWithConfiguredOverrides(): void
-    {
-        $config = app(Repository::class);
-        $config->set('mfa.codes', [
-            'sms_message' => 'Code: :code',
-        ]);
-
-        /** @var \SineMacula\Laravel\Mfa\Drivers\SmsDriver $driver */
-        $driver = $this->manager()->driver('sms');
-
-        self::assertSame('Code: :code', $driver->getMessageTemplate());
     }
 
     /**

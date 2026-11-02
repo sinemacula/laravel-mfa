@@ -5,15 +5,16 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Drivers;
 
 use Carbon\CarbonImmutable;
-use SineMacula\Laravel\Mfa\Codes\CodeSettings;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
 
 /**
  * SMS factor driver.
  *
- * Delivers each code to the factor's phone number in the configured message
- * through the application's `SmsSender`. The default sender throws until the
+ * Delivers each code to the factor's phone number through the application's
+ * `SmsSender`, in the words of the locale it is sent in: a cached driver holds
+ * no wording, so it follows the request. The default sender throws until the
  * application binds one, so a code is never dropped silently.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -21,29 +22,18 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
  */
 final class SmsDriver extends AbstractCodeDriver
 {
-    /** @var string Placeholder in the message template, replaced with the code. */
-    private const string CODE_PLACEHOLDER = CodeSettings::CODE_PLACEHOLDER;
-
     /** @var string The form a phone number takes: E.164, with its country code. */
     private const string E164 = '/^\+[1-9]\d{7,14}$/D';
 
     /**
      * Constructor.
      *
-     * The message template is taken as given: the shipped driver is built from
-     * `mfa.codes.sms_message`, which the package checks carries the
-     * `CODE_PLACEHOLDER` when it boots (see `Codes\CodeSettings`).
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SmsSender  $sender
-     * @param  string  $messageTemplate
      */
     public function __construct(
 
         /** The sender the message is delivered through. */
         private readonly SmsSender $sender,
-
-        /** Message template; the code replaces its `CODE_PLACEHOLDER`. */
-        private readonly string $messageTemplate = 'Your verification code is: ' . self::CODE_PLACEHOLDER,
     ) {}
 
     /**
@@ -84,17 +74,9 @@ final class SmsDriver extends AbstractCodeDriver
     }
 
     /**
-     * Get the configured message template.
-     *
-     * @return string
-     */
-    public function getMessageTemplate(): string
-    {
-        return $this->messageTemplate;
-    }
-
-    /**
-     * Deliver the message carrying the code to the phone number.
+     * Deliver the message carrying the code to the phone number, the code going
+     * into the template after the translator has answered, so it never reaches
+     * the translator.
      *
      * @param  string  $destination
      * @param  string  $code
@@ -104,6 +86,6 @@ final class SmsDriver extends AbstractCodeDriver
     #[\Override]
     protected function send(#[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
     {
-        $this->sender->send($destination, str_replace(self::CODE_PLACEHOLDER, $code, $this->messageTemplate));
+        $this->sender->send($destination, str_replace(ConsumerMessages::CODE_PLACEHOLDER, $code, ConsumerMessages::codeLine(ConsumerMessages::SMS_CODE)));
     }
 }

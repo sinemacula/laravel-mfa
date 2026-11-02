@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
 
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
@@ -18,6 +19,11 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * `wwwAuthenticate()`, or its own from `maxAge()` and `acrValues()`. Laravel
  * renders it with its message alone; `toArray()` is what an application's own
  * rendering sends.
+ *
+ * Its message is translated in the locale it is raised in, so a locale
+ * middleware must run before `mfa`. The header's description is the shipped
+ * English instead: RFC 6750 makes it a developer's diagnostic in a subset of
+ * ASCII, which a translation or an application's override of `en` could break.
  *
  * The requirement is the whole effective one, not what is left of it, and it is
  * the authority. `maxAge()` and `acrValues()` are lossy projections of it: each
@@ -42,9 +48,6 @@ final class InsufficientAuthenticationException extends HttpException
     /** @var string The RFC 9470 error code. */
     public const string ERROR = 'insufficient_user_authentication';
 
-    /** @var string What the exception says, in a form a header may quote. */
-    public const string MESSAGE = 'Further authentication is required.';
-
     /**
      * Constructor.
      *
@@ -67,7 +70,7 @@ final class InsufficientAuthenticationException extends HttpException
         /** Whether the identity has a confirmed factor. */
         public readonly bool $hasConfirmedFactor = false,
     ) {
-        parent::__construct(401, self::MESSAGE);
+        parent::__construct(401, ConsumerMessages::line(ConsumerMessages::FURTHER_AUTHENTICATION_REQUIRED));
     }
 
     /**
@@ -141,7 +144,7 @@ final class InsufficientAuthenticationException extends HttpException
     {
         $parameters = [
             sprintf('error="%s"', self::ERROR),
-            sprintf('error_description="%s"', self::MESSAGE),
+            sprintf('error_description="%s"', ConsumerMessages::english(ConsumerMessages::FURTHER_AUTHENTICATION_REQUIRED)),
         ];
 
         $acrValues = $this->acrValues();

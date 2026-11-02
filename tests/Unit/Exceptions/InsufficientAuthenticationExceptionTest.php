@@ -26,6 +26,9 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 #[CoversClass(InsufficientAuthenticationException::class)]
 final class InsufficientAuthenticationExceptionTest extends TestCase
 {
+    /** @var string What the exception says, in the shipped English. */
+    private const string MESSAGE = 'Further authentication is required.';
+
     /**
      * It is a 401 with a fixed message, and no challenge header of its own: the
      * package also serves cookie guards, so the application chooses.
@@ -39,7 +42,7 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
         self::assertInstanceOf(HttpException::class, $exception);
         self::assertSame(401, $exception->getStatusCode());
         self::assertSame([], $exception->getHeaders());
-        self::assertSame(InsufficientAuthenticationException::MESSAGE, $exception->getMessage());
+        self::assertSame(self::MESSAGE, $exception->getMessage());
     }
 
     /**
@@ -104,7 +107,7 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
      */
     public static function headers(): iterable
     {
-        $base = 'Bearer error="insufficient_user_authentication", error_description="' . InsufficientAuthenticationException::MESSAGE . '"';
+        $base = 'Bearer error="insufficient_user_authentication", error_description="' . self::MESSAGE . '"';
 
         yield 'neither' => [Requirement::none()->withMultifactor(), $base];
         yield 'a level' => [Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2), $base . ', acr_values="aal2"'];
@@ -134,7 +137,7 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     {
         $header = (new InsufficientAuthenticationException(Requirement::none()))->wwwAuthenticate('DPoP');
 
-        self::assertSame('DPoP error="insufficient_user_authentication", error_description="' . InsufficientAuthenticationException::MESSAGE . '"', $header);
+        self::assertSame('DPoP error="insufficient_user_authentication", error_description="' . self::MESSAGE . '"', $header);
     }
 
     /**

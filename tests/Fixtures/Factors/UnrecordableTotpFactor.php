@@ -4,7 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Factors;
 
-use Tests\Fixtures\Drivers\AuthenticatorApp;
+use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 
 /**
  * TOTP factor fixture implementing only the `Factor` read surface: it holds the

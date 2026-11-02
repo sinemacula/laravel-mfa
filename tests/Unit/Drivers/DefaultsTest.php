@@ -11,7 +11,6 @@ use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
-use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 
 /**
  * Assertions against each driver's constructor default values.
@@ -43,21 +42,5 @@ final class DefaultsTest extends TestCase
         $driver = new EmailDriver(sender: new FakeEmailSender);
 
         self::assertSame(MfaCodeMessage::class, $driver->getMailable());
-    }
-
-    /**
-     * `SmsDriver`'s constructor default, the shipped message template, must be
-     * preserved.
-     *
-     * @return void
-     */
-    public function testSmsDriverDefaults(): void
-    {
-        $driver = new SmsDriver(sender: new FakeSmsSender);
-
-        self::assertSame(
-            'Your verification code is: :code',
-            $driver->getMessageTemplate(),
-        );
     }
 }

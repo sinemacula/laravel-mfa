@@ -25,7 +25,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
-use Tests\Fixtures\Drivers\AuthenticatorApp;
+use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\FreshReauthenticator;

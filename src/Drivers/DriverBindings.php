@@ -22,9 +22,9 @@ use SineMacula\Laravel\Mfa\MfaManager;
  * container extender or resolving callback on `mfa`, since Laravel's `Manager`
  * resolves the most recent registration. Each factory reads only the settings
  * its driver needs: the TOTP settings from `mfa.totp` and the application's
- * `totp_window`, and the message from `mfa.codes`, with the application's bound
- * sender. The code's length and lifetime belong to the code service, not the
- * drivers.
+ * `totp_window`, and the message class from `mfa.codes`, with the application's
+ * bound sender. The code's length and lifetime belong to the code service, not
+ * the drivers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -68,7 +68,7 @@ final class DriverBindings
         // would then resolve to `MfaManager`.
         $manager->extend('totp', fn (): TotpDriver => DriverBindings::totp($config));
         $manager->extend('email', fn (): EmailDriver => DriverBindings::email($app, $config));
-        $manager->extend('sms', fn (): SmsDriver => DriverBindings::sms($app, $config));
+        $manager->extend('sms', fn (): SmsDriver => DriverBindings::sms($app));
         $manager->extend('passkey', fn (): PasskeyDriver => new PasskeyDriver);
     }
 
@@ -104,21 +104,15 @@ final class DriverBindings
     }
 
     /**
-     * Build the SMS driver with the bound `SmsSender` and the message in
-     * `mfa.codes`.
+     * Build the SMS driver with the bound `SmsSender`.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
-     * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\SmsDriver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
      */
-    public static function sms(Application $app, Repository $config): SmsDriver
+    public static function sms(Application $app): SmsDriver
     {
-        return new SmsDriver(
-            sender         : $app->make(SmsSender::class),
-            messageTemplate: (new CodeSettings($config))->smsMessage(),
-        );
+        return new SmsDriver($app->make(SmsSender::class));
     }
 }

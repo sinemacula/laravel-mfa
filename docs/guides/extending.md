@@ -98,10 +98,9 @@ An `SmsSender` is handed the message with the code in clear. One that queues it 
 example with a job that implements `ShouldBeEncrypted`, and none may log it. The package's `MfaCodeMessage` encrypts its
 own queued payload, so an `EmailSender` that queues it needs nothing more.
 
-In tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` bind a sender that keeps the messages
-the drivers send instead of delivering them, and returns it, so a test can read the code it was sent
-(`lastMessageTo()`, `lastCodeTo()`). Faking also makes the manager build its drivers again, so a driver resolved before
-the fake sends through it too.
+The message a sender is given is already in the words of the locale it is sent in (see
+[Localisation](localization.md)). In tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` bind a
+sender that keeps the messages instead of delivering them (see [Testing](testing.md)).
 
 A driver whose secret an authenticator app reads from a QR code also implements `Contracts\ProvisioningDriver`:
 `provisioningUri(Factor $factor, $issuer, $accountName, RevealedSecret $secret)` returns the URI as a `RevealedSecret`,
@@ -144,7 +143,7 @@ registers it with the container, and the classes only it uses:
 | `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`          |
 | `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction             |
 | `Http`          | The `mfa` and `mfa.exempt` middleware, `EnsureMfaRequirementIsMet` and `ExemptFromMfa`              |
-| `Testing`       | `FakeSmsSender`, `FakeEmailSender`, and the seam contract kit in `Testing\Seams`                    |
+| `Testing`       | The fakes, `AuthenticatorApp`, `Concerns\InteractsWithMfa`, and the kit in `Testing\Seams`          |
 | `Console`       | The `mfa:check` and `mfa:prune` commands                                                            |
 
 `Contracts`, `Concerns`, `Models`, `Events`, `Exceptions`, `Enums` and `Facades` hold what their names say for every

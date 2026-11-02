@@ -19,7 +19,7 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
-use Tests\Fixtures\Drivers\AuthenticatorApp;
+use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\Fixtures\Factors\UnrecordableTotpFactor;
@@ -482,7 +482,7 @@ final class TotpDriverTest extends TestCase
     {
         $this->configuration()->set('mfa.totp', ['algorithm' => 'sha512', 'digits' => 8, 'period' => 60]);
 
-        $factor = new Factor;
+        $factor = new Factor(['type' => 'totp']);
 
         $factor->setAttribute('secret', $this->driver()->startEnrollment($factor)->reveal());
 

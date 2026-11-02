@@ -115,6 +115,13 @@ meet this requirement, so a refusal asking for AAL2 can offer only an email code
 first factor can meet a requirement, and `$offered` being empty can also mean an unknown first factor or every factor
 disabled. Enrolling has checks of its own (see [Enrolment](enrollment.md)).
 
+### The refusal's wording
+
+The exception's message is translated in the locale it is raised in (see [Localisation](localization.md)), so a locale
+middleware must run before `mfa`. Laravel's JSON answer carries that message. Its stock HTML `401` page does not: it
+shows its own `__('Unauthorized')`, so an application serving HTML renders the exception itself to word it. The
+description in `wwwAuthenticate()` is always the shipped English, since RFC 6750 restricts it to a subset of ASCII.
+
 ## The authentication context
 
 `Mfa::authenticationContext()`, or `Context\AuthenticationContextContributor::contribute()`, gives these keys for the
