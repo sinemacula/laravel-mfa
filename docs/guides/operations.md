@@ -87,6 +87,11 @@ a 500 too.
 
 Nothing a failed query was given stays in its exception: see [Secrets](secrets.md#failed-queries).
 
+## Database privileges
+
+Migrations are published and run by your migration user (see [Installation](installation.md#publishing-and-migrating)).
+At run time the package needs only `SELECT`, `INSERT`, `UPDATE` and `DELETE`, and it makes no schema change.
+
 ## The cache
 
 Nothing the package does uses the cache. Attempts, lockouts, replay state and codes live in the database, so a cache

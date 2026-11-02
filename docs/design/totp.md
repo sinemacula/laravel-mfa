@@ -61,8 +61,8 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
 - No secret, an empty secret or one that is not Base32, no parameters or parameters out of bounds: refused before the
   window is computed, as nothing secret depends on it.
 - The same code twice, or a code for a step at or before the last accepted one, though still in the window: the
-  compare-and-set changes no row and the code is refused. A replay is reported as an invalid code and counted as a
-  failed attempt.
+  compare-and-set changes no row and the code is refused. A replay is reported as `replayed` and counted as a failed
+  attempt.
 - Two requests with the same code: both match, both issue the compare-and-set, and the database serialises them on the
   row; the second waits for the first to commit, then finds the step recorded and changes nothing. On MySQL this holds
   although the second request's transaction read the factor from a snapshot taken before the first committed, because an

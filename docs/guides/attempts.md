@@ -1,4 +1,4 @@
-# Attempts and Lockouts
+# Attempts and lockouts
 
 Every attempt to prove a factor is counted, and too many failures lock the factor, the identity or the IP address out
 for a while, before the driver ever sees another guess. The counts live in the database, on the storage connection, so
@@ -125,6 +125,33 @@ the identity's.
 Each is dispatched once the attempt's transaction has committed (see [Events](events.md)), so a listener that throws
 cannot undo the count: the failure, and the IP address's charge for it, stand. The IP address's throttle has no event:
 it says nothing about any one identity.
+
+## Limiting the endpoint
+
+These caps bound guessing at a factor; they do not bound load on the endpoint itself. Layer Laravel's `RateLimiter` on
+the route that verifies as well:
+
+```php
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
+
+RateLimiter::for('mfa-verify', static function (Request $request): array {
+    $identifier = $request->user()?->getAuthIdentifier() ?? $request->ip();
+
+    return [
+        Limit::perMinute(10)->by($request->ip() ?? 'unknown'),
+        Limit::perMinute(5)->by((string) ($identifier ?: 'unknown')),
+    ];
+});
+
+Route::post('/mfa/verify', VerifyController::class)
+    ->middleware(['mfa.exempt', 'throttle:mfa-verify']);
+```
+
+Apply the throttle only to the verification itself. Routes that read state (`Mfa::requirement()`, `Mfa::factors()`) are
+called on every request, and would exhaust the bucket without being any sign of an attack.
 
 ## Settings
 

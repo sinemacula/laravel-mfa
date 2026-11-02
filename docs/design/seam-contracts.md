@@ -5,7 +5,8 @@
 This note lists the contracts the package declares for the seams between it, an authentication layer and the
 application: what each answers, what a fail-closed answer is, the default bound for each, what the authentication
 layer provides for each, and the calls it makes back into this package. They are declared together, ahead of the flows
-that call them, so the flows can be built against one fixed set.
+that call them, so the flows can be built against one fixed set. Each public name of `laravel-authentication` a seam
+meets is in [Seams with an authentication layer](../guides/extending.md#seams-with-an-authentication-layer).
 
 ## Invariants
 
@@ -144,10 +145,10 @@ own transaction on the storage connection:
 | `Passkeys\PasskeyChangeGate::removing()`              | Before deleting a passkey: removes its factor under the removal rules                 |
 | `Passkeys\PasskeyChangeGate::changing()`              | Before changing what a passkey proves: refused for an associated one                  |
 
-Both refuse with a `LogicException` outside a transaction, so their locks are held until the caller commits; the lock
-order is the identity's state, then its factors, then the caller's own challenge or credential. The caller therefore
-calls the gate before it takes its session rows, which this repository cannot test for it. A refusal is an exception
-that rolls the caller's change back with it.
+Both classes refuse with a `LogicException` outside a transaction, so their locks are held until the caller commits; the
+lock order is the identity's state, then its factors, then the caller's own challenge or credential. The caller
+therefore calls the gate before it takes its session rows, which this repository cannot test for it. A refusal is an
+exception that rolls the caller's change back with it.
 
 - `Context\PendingContext` holds a pending session: the identity, the application, the session's public id, the first
   factor's proof, the outstanding requirement and the `PendingAction` cases the pending credential allows. It refuses a

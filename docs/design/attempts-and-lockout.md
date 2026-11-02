@@ -71,7 +71,7 @@ are described here.
 - `lockout()`, `liftLockout()`, `enableFactor()` and `resetIdentityFailures()` are the public operations; `throttled()`
   and `attempt()` are internal to the verification paths.
 - A verification's `attempt()` is made inside the verification's own factor state transaction, whose admission has
-  already asked `ChallengeCounters::underLock()`, and reads the lock again; `attempt()` no longer touches the address.
+  already asked `ChallengeCounters::underLock()`, and reads the lock again; `attempt()` does not touch the address.
 - A challenge another owner sends and consumes (an authentication layer's `mfa` challenge, or the package's own
   `Codes\PackageChallengeGateway`) is counted through `Attempts\ChallengeCounters`, inside the owner's transaction on
   the storage connection: `isUsable()` reads the lockouts under the identity's lock (`lockedOut()`, without an address)

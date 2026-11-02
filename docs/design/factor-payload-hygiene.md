@@ -21,8 +21,9 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
 - `InsufficientAuthenticationException` does not carry `Factor` instances, and neither does any event (see
   [Event Catalogue](event-catalog.md)). They carry `FactorSummary` values. `FactorSummary` is final, readonly, and
   `JsonSerializable`.
-- `FactorSummary` exposes exactly seven fields: `id`, `type`, `label`, `maskedDestination`, `status`, `preferred` and
-  `lastUsedAt`. There is no `secret`, no `code`, no `attempts`, no credential reference and no raw `destination`.
+- `FactorSummary` exposes exactly eight fields: `id`, `type`, `label`, `maskedDestination`, `status`, `preferred`,
+  `lastUsedAt` and `disabled`. There is no `secret`, no `code`, no `attempts`, no credential reference and no raw
+  `destination`.
 - Destination masking happens inside `FactorSummary::fromFactor()` before the summary is constructed. Consumers cannot
   accidentally hand an unmasked destination into the summary — the mask is applied at the boundary, not trusted to
   callers.
@@ -30,8 +31,8 @@ captured by third-party logging and error-reporting tooling. A leak at this laye
   single-character local-part). Phone / opaque addresses keep the last four characters and mask the rest; strings of
   four characters or fewer are fully masked.
 - `jsonSerialize()` emits snake-case keys (`id`, `type`, `label`, `masked_destination`, `status`, `preferred`,
-  `last_used_at`), the status as its value and `last_used_at` as ISO-8601, so downstream consumers get a stable wire
-  shape.
+  `last_used_at`, `disabled`), the status as its value and `last_used_at` as ISO-8601, so downstream consumers get a
+  stable wire shape.
 
 ## Success Path
 

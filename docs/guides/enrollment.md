@@ -32,8 +32,9 @@ return SecretResponse::json([
 
 The grant, the secret and the provisioning URI are returned here and never again, as `Secrets\RevealedSecret` values:
 send them with `SecretResponse::json()` on a route with the `mfa.no-store` middleware (see [Secrets](secrets.md)). A
-person who loses them starts again. The person's authenticator app reads the URI from a QR code you render, and shows a
-code:
+person who loses them starts again. Cookie-authenticated routes need CSRF protection (see
+[CSRF protection](middleware.md#csrf-protection)). The person's authenticator app reads the URI from a QR code you
+render, and shows a code:
 
 ```php
 $confirmation = Mfa::confirmEnrollment($request->string('grant')->toString(), $request->string('code')->toString());
@@ -132,9 +133,10 @@ re-enrolment obligation and the recovery codes together.
 
 ## Codes and attempts
 
-A TOTP code is checked within the window of the grant's application, and its time step is recorded, so the confirming
-code cannot be used again. A delivered code goes through the bound `ChallengeGateway` with a purpose of its own,
-`enrollment`, so it never works as a sign-in or step-up code, and neither does one of those work here.
+The package computes TOTP codes itself (RFC 6238) and needs no other dependency. A TOTP code is checked within the
+window of the grant's application, and its time step is recorded, so the confirming code cannot be used again. A
+delivered code goes through the bound `ChallengeGateway` with a purpose of its own, `enrollment`, so it never works as a
+sign-in or step-up code, and neither does one of those work here.
 
 Only a wrong or replayed code counts, against the enrolment's own `mfa.enrollment.max_attempts`, default 5. At the cap
 the pending factor and its grant are deleted, and `abandoned` is `true` on the result. It keeps the address's throttle

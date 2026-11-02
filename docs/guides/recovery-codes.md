@@ -1,4 +1,4 @@
-# Recovery Codes
+# Recovery codes
 
 Recovery codes are a fallback for a person who has lost their factors: a set of single-use codes, shown once when the
 set is generated, each of which proves the person once in place of a factor. They are not a factor. An identity has one
@@ -15,14 +15,16 @@ whether it accepts them, and none does until it says so:
 ```
 
 The set's size, each code's length and the alphabet it is drawn from are in `recovery_codes` (see
-[Recovery codes](configuration.md#recovery-codes) in the configuration guide).
+[Recovery codes](configuration.md#recovery-codes) in the configuration guide). What a NIST SP 800-63B-4 claim asks of
+them beyond the defaults is in [the compliance profile](compliance.md#recovery-codes).
 
 ## Generating a set
 
 `Mfa::generateRecoveryCodes()` generates a new set for the signed-in identity and answers with a
 `RecoveryCodes\RecoveryCodeGeneration` holding its codes, once, as `Secrets\RevealedSecret` values. Send them with
 `Secrets\SecretResponse::json()`, on a route behind the `mfa.no-store` middleware, so neither the browser nor a proxy
-keeps them (see [Secrets](secrets.md)):
+keeps them (see [Secrets](secrets.md)). A route a cookie authenticates needs CSRF protection too (see
+[CSRF protection](middleware.md#csrf-protection)):
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;

@@ -16,6 +16,8 @@ Each note is intentionally short and follows the same structure:
 
 The current note set is:
 
+- `operating-modes.md`: the three ways the package runs (alone, with `laravel-authentication`, within `laravel-iam`),
+  and the rule that this repository never references a sibling or detects one.
 - `capability-services.md`: how the package is organised by capability, the manager as a one-line delegation to each
   capability's service, the `*Bindings` class each capability registers its wiring through, and what the services
   share.

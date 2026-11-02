@@ -42,6 +42,9 @@ event carries is built, and why every event is dispatched only after the change 
   does, therefore dispatches from outside it, so the events of an enrolment keep the order
   [Enrolment](enrollment.md) sets out.
 - Events report; they never enforce. Nothing security-relevant depends on a listener running.
+- The package's services dispatch the events, behind the manager, rather than leaving it to the code that calls them, so
+  audit subscribers do not rely on an application's cooperation. Audit goes through these events to whatever listens,
+  `laravel-audit-log` among them: the package keeps no audit log of its own.
 
 ## Success Path
 

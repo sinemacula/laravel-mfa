@@ -173,8 +173,8 @@ Its limits:
 - Laravel's own retry in a transaction of yours, `DB::transaction($callback, $attempts)`, recognises a failure by
   SQLSTATE `40001` or by words in its message. A `DeadlockException` from a transaction the package opened inside yours
   keeps the words, so it is retried. A `QueryException` does not: of those only SQLSTATE `40001`, a MySQL deadlock, is
-  still recognised. A PostgreSQL deadlock (`40P01`), a lock wait timeout and SQLite's locked database are recognised only
-  by message, so retry those yourself, checking the SQLSTATE or the driver error number the exception keeps.
+  still recognised. A PostgreSQL deadlock (`40P01`), a lock wait timeout and SQLite's locked database are recognised
+  only by message, so retry those yourself, checking the SQLSTATE or the driver error number the exception keeps.
 
 ## Rotating the application key
 

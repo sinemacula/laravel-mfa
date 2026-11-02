@@ -65,6 +65,9 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
   still count, or none without an MFA-capable identity or a sign-in.
 - A sign-in's proofs last as long as the sign-in, subject to invalidation and the verification generation. A time bound
   comes from a requirement's maximum age, set by an identity, a tenant or a named operation, never from a global window.
+- Verification is per device by default: a session's proofs are its own, in the authentication layer's session record
+  through a rebound store or in the Laravel session alone. A route naming an operation (`mfa:operation=name`) is how to
+  ask for a verification before one action, whatever the device has already proved.
 
 ## Success Path
 
@@ -89,8 +92,8 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
   `Logout` on one leaves the other's sign-in and proofs alone, and a guard that fired no event cannot record against
   the other's sign-in.
 - A guard that sets the user without firing `Login` (Laravel's `actingAs()`, `Auth::setUser()`, a custom guard that
-  calls no hook) leaves no sign-in: verification still succeeds and updates the factor, but no proof is recorded and
-  the middleware keeps requiring one.
+  calls no hook) leaves no sign-in: there is nothing to bind to, so a verification is refused as `not_found`, nothing is
+  sent, counted or recorded, and the middleware keeps requiring a proof.
 - `GuardHooks::signedIn()` refuses a proof that is not a first factor, one bound to another identity, and one made under
   another generation than the identity's current one, as it would never count.
 - A `Login` or `Logout` event for an identity that cannot hold factors, or whose key cannot name a record, changes
@@ -104,9 +107,9 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
   its older copy afterwards, putting the forgotten proofs back. Forgetting a factor on the current session is
   therefore only as strong as the serialisation of its requests; advancing the generation is what holds whatever
   copy of the session is saved last.
-- A store that refuses a proof throws `ProofRefusedException`. The verification it was part of is not yet one
-  transaction, so the factor's changes and a consumed code stay committed; the default store never refuses a proof
-  the service binds to its own current sign-in.
+- A store that refuses a proof throws `ProofRefusedException` from `verify()`. The proof is kept once the transaction
+  commits, so the factor's changes and a consumed code stay committed. The default store never refuses a proof bound to
+  its own current sign-in unless that sign-in ended in the meantime.
 
 ## Implementation Anchors
 
@@ -134,7 +137,7 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
 
 - Changing the `ProofStore` contract, or what counts when proofs are read.
 - Keying sign-ins other than by identity type, key and application, or letting a proof outlive its sign-in.
-- Advancing the verification generation from a shipped flow, such as factor removal.
+- A shipped flow advancing the verification generation other than as a reset and the default revoker do.
 - Letting a guard that fires no event and calls no hook record a proof.
 - Recording a proof outside a verification, or a proof whose channel cannot carry a factor.
 - Letting a proof lapse by anything but a requirement's maximum age, its invalidation or the end of its sign-in.

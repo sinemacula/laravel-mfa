@@ -43,7 +43,7 @@ referencing another's.
   rather than building a partial value; a nullable field may be left out and reads as `null`, and a missing observed
   property reads as not observed. A requirement refuses an unknown part, and an unknown field within a part, rather
   than dropping it, so a mistyped `max_age` never removes a freshness limit.
-- The enum values are stable names: renaming a case's value is a breaking change, and each is pinned by a test.
+- The enum values are stable names once released, and each is pinned by a test.
 
 ## Success Path
 

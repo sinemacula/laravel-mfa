@@ -16,10 +16,10 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   [Enrolment](enrollment.md)).
 - The code is `length` digits, each drawn with `random_int()`, stored only as `HMAC-SHA256(key', "code\0challenge
   id\0issue\0factor id\0identity type\0identity key\0application\0session id\0purpose\0code")`, compared with
-  `hash_equals()`. The session is stored as `HMAC-SHA256(key'', session id)`, never the id itself, which is a bearer
-  secret. `key'` and `key''` are separate derivations of `app.key`; rotating it invalidates the codes outstanding and
-  starts each destination's count afresh, while the identity's cap stands. The factor row holds no code and no expiry,
-  and the `Code` model hides the hash and the digests of the session and the destination.
+  `hash_equals()`. The binding's session is stored as `HMAC-SHA256(key'', session id)`, never the id itself. `key'` and
+  `key''` are separate derivations of `app.key`; rotating it invalidates the codes outstanding and starts each
+  destination's count afresh, while the identity's cap stands. The factor row holds no code and no expiry, and the
+  `Code` model hides the hash and the digests of the session and the destination.
 - A challenge is open while its code is unused and it started less than `challenge_ttl_minutes` ago. Sending for a
   binding with an open challenge is a resend: the same row gets a new code under the next issue number, which makes the
   previous code stop matching at once. The new code is drawn again until its digits differ from the previous code's,
@@ -59,9 +59,11 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   detail that tells them apart stays internal. Every one of them is counted against the factor and the identity.
 - Neither a send nor a check resets a factor's failure count or lifts its lockout.
 - Every time is a whole second, and one `now` is used per operation.
-- A code is bound to the request's Laravel session id. Sending and checking must run in the same started session: a
-  stateless request has a new id each time, so a code sent in one is never found in the next, and a session
-  regenerated between the send and the check leaves its code behind. Either answers `expired`.
+- A code is bound to the binding's session, which is the pending session's public id or the proof store's current
+  sign-in, never the Laravel session's id, so sending and checking must be made in one sign-in. A later sign-in looks
+  the code up under its own digest, finds nothing and answers `not_found`. Under the default store a request with no
+  started session has no sign-in: it has no binding, and nothing is sent or checked. A regenerated Laravel session keeps
+  its sign-in, and with it its codes.
 - Delivery goes through contracts the application binds: `Contracts\SmsSender` (a phone number and the message, the
   translated line with `:code` replaced) and `Contracts\EmailSender` (an address and the configured
   `MfaCodeMessage` class, with the whole minutes the code has left and the locale it is sent in; see
@@ -105,8 +107,7 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 - A code sent inside a transaction that rolls back is gone with it, and `CodeSent` is never dispatched.
 - Expired and used challenges stay in the table, for pruning to remove past `lifecycle.prune_after_days`; their sends
   still count towards the caps while they are inside the send window.
-- A verification in a session other than the one the code was sent in (a stateless request, or a regenerated session)
-  finds no challenge and answers `expired`.
+- A verification in a sign-in other than the one the code was sent in finds no challenge and answers `not_found`.
 
 ## Implementation Anchors
 

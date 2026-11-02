@@ -55,8 +55,9 @@ between requests.
 | `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    |
 | `secrets.redact`                | `true`                             | off only for a false value             | `MFA_SECRETS_REDACT`                |
 
-Every class name is relative to `SineMacula\Laravel\Mfa`. Numbers may be integers or the digit strings `env()` returns;
-anything else, a sign, padding, a fraction or an exponent included, is refused.
+The key names are stable once released. Every class name is relative to `SineMacula\Laravel\Mfa`. Numbers may be
+integers or the digit strings `env()` returns; anything else, a sign, padding, a fraction or an exponent included, is
+refused.
 
 ## Applications
 
@@ -303,10 +304,12 @@ Codes are stored as keyed hashes of the code and its binding, with a key derived
 application key invalidates the codes outstanding and starts each destination's count afresh, while the identity's cap
 stands.
 
-A code is sent and checked within the request's Laravel session, whose id it is bound to: the challenge and the
-verification must run in the same started session (the `StartSession` middleware), so stateless requests, such as a
-token-authenticated API, cannot use email or SMS codes. A session regenerated between the two, as at sign-in, leaves the
-code behind, and the check answers `expired`.
+A code is bound to the sign-in the request serves, never to the Laravel session's id (see [What a code is bound
+to](verification.md#what-a-code-is-bound-to)). The send and the check must therefore be made in one sign-in: a new
+sign-in leaves the code behind, and the check answers `not_found`. With the default proof store a sign-in lives in the
+Laravel session, so both requests need it started (the `StartSession` middleware). A request with no started session has
+no sign-in, is sent nothing and verifies nothing, so a token-authenticated API binds its own `Contracts\ProofStore` to
+use email or SMS codes (see [Stateless guards](proofs.md#stateless-guards)).
 
 ## Recovery codes
 
