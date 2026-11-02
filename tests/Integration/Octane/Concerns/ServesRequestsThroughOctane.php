@@ -7,6 +7,7 @@ namespace Tests\Integration\Octane\Concerns;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Testing\TestResponse;
+use Laravel\Octane\ApplicationFactory;
 use Laravel\Octane\Events\RequestTerminated;
 use Laravel\Octane\Octane;
 use Laravel\Octane\OctaneServiceProvider;
@@ -14,7 +15,6 @@ use Laravel\Octane\RequestContext;
 use Laravel\Octane\Testing\Fakes\FakeClient;
 use Laravel\Octane\Testing\Fakes\FakeWorker;
 use Symfony\Component\HttpFoundation\Response;
-use Tests\Integration\Octane\Fixtures\BootedApplicationFactory;
 
 /**
  * Serves requests through one Laravel Octane worker, as Octane's own suite
@@ -51,7 +51,7 @@ trait ServesRequestsThroughOctane
         $app->register(OctaneServiceProvider::class);
 
         $this->octaneClient = new FakeClient([]);
-        $this->octaneWorker = new FakeWorker(new BootedApplicationFactory($app), $this->octaneClient);
+        $this->octaneWorker = new FakeWorker($this->bootedApplicationFactory($app), $this->octaneClient);
 
         $this->octaneWorker->boot();
     }
@@ -84,6 +84,32 @@ trait ServesRequestsThroughOctane
         $this->restoreRootApplication($request, $response);
 
         return TestResponse::fromBaseResponse($response);
+    }
+
+    /**
+     * Octane's application factory over the booted application, in place of one
+     * that would bootstrap from a skeleton: the worker binds its instances on
+     * it, and it is warmed with Octane's default services, as a worker does
+     * with the application it creates at start.
+     *
+     * @param  \Illuminate\Foundation\Application  $app
+     * @return \Laravel\Octane\ApplicationFactory
+     */
+    private function bootedApplicationFactory(Application $app): ApplicationFactory
+    {
+        $warmer  = new ApplicationFactory($app->basePath());
+        $factory = \Mockery::mock(ApplicationFactory::class);
+
+        $factory->shouldReceive('createApplication')->andReturnUsing(static function (array $initialInstances = []) use ($app, $warmer): Application {
+
+            foreach ($initialInstances as $abstract => $instance) {
+                $app->instance((string) $abstract, $instance);
+            }
+
+            return $warmer->warm($app, Octane::defaultServicesToWarm());
+        });
+
+        return $factory;
     }
 
     /**

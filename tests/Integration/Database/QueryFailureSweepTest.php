@@ -78,6 +78,21 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
+     * Stop copying the tables before the migrations roll back: PostgreSQL runs
+     * each migration in a transaction, and the copy taken as the next one began
+     * would read a table the last one had already dropped.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function tearDown(): void
+    {
+        Event::forget(TransactionBeginning::class);
+
+        parent::tearDown();
+    }
+
+    /**
      * Whichever statement of the flow fails, the failure reaches the caller.
      *
      * @param  string  $flow
