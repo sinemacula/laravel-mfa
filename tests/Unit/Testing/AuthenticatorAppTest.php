@@ -30,6 +30,19 @@ final class AuthenticatorAppTest extends TestCase
     use ArrangesVerification;
 
     /**
+     * Arrange the verification the real driver is tested through.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->arrangeVerification();
+    }
+
+    /**
      * Release the frozen clock.
      *
      * @return void
@@ -99,8 +112,6 @@ final class AuthenticatorAppTest extends TestCase
      */
     public function testTheRealDriverAcceptsTheCodeOnce(): void
     {
-        $this->arrangeVerification();
-
         $user = $this->signedInPerson();
 
         $this->recordFirstFactor($user);
