@@ -16,10 +16,12 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
  * answers with, and an internal detail for logs only; neither names another
  * identity's factor.
  *
- * A seam may throw one too. Those stay exceptions: where a helper answers with
- * a value, only a refusal marked as the package's own becomes the value, so a
- * seam's exception is never read as the package deciding. The mark says who
- * refused, not when.
+ * A seam may throw one too. On `generateRecoveryCodes()` and
+ * `requestAssertion()` that stays an exception: only a refusal marked as the
+ * package's own becomes the value there, so a seam's is never read as the
+ * package deciding. The other helpers that answer with a value, such as
+ * `sendCode()` and `verify()`, do not read the mark, and report it as their
+ * reason. The mark says who refused, not when.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -41,7 +43,7 @@ final class OperationRefusedException extends \RuntimeException
         // What happened in detail, for logs only.
         string $detail,
 
-        /** Whether the package refused, rather than a seam: set only by `byPackage()`. */
+        /** Whether the package itself refused: see `byPackage()`. */
         public readonly bool $byPackage = false,
     ) {
         parent::__construct($detail);

@@ -48,6 +48,10 @@ credential the route uses, through the model's own lookup. It also records what 
 - A database failure propagates: a failing query is a server error, never a missing factor.
 - A pending credential the resolver refuses to validate propagates from the resolver, which reports it; it is not a
   `404`.
+- The caller must be established before `SubstituteBindings` runs, as the binding reads it there. Laravel's middleware
+  priority orders `auth` ahead of it. Any other middleware that establishes the credential must be placed ahead of it in
+  the priority list, or the factor binds to nobody and answers `404`, or is held to the guard's user rather than the
+  credential the route goes on to use. Either fails closed.
 - A custom key must be unique across identities. With `{factor:type}` the first row found may be another person's, and
   the binding misses, failing closed. A lookup within one identity goes through `Mfa::factors()`.
 - A scoped child binding through a parent model (`/users/{user}/factors/{factor}`) is the parent's own lookup and never

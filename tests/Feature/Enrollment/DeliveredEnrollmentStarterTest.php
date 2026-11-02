@@ -205,7 +205,6 @@ final class DeliveredEnrollmentStarterTest extends TestCase
                 throw new \RuntimeException('The mail server is down.');
             }
         });
-        $this->mfa()->forgetDrivers();
         $this->forgetReports();
 
         try {

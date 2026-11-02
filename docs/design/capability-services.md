@@ -29,9 +29,11 @@ the provider or another capability.
   Laravel's `Manager::__call` would forward it to the default driver, reaching a raw check outside attempts, proofs and
   events.
 - A helper a person can be refused by answers with a value holding the reason, never a plain exception
-  (`RecoveryCodes\RecoveryCodeGeneration`, `Passkeys\AssertionRequest`, as `Factors\FactorChange` does). A refusal
-  becomes a value only when marked as the package's own (`OperationRefusedException::byPackage()`): a seam's stays an
-  exception. The mark says who refused, not when, so nothing that runs after a commit is converted.
+  (`RecoveryCodes\RecoveryCodeGeneration`, `Passkeys\AssertionRequest`, as `Factors\FactorChange` does). On
+  `generateRecoveryCodes()` and `requestAssertion()`, a refusal becomes a value only when marked as the package's own
+  (`OperationRefusedException::byPackage()`): a seam's stays an exception. The mark says who refused, not when, so
+  nothing that runs after a commit is converted. The other helpers do not read it: a seam's refusal inside what they
+  guard is their reason.
 - Services resolve the seams a consumer rebinds (`FreshnessGate`, `ProofStore`, the event dispatcher and the
   configuration) from the container when they need them, never at construction, so a rebinding (`Event::fake()`, a
   store bound mid-test, a policy bound by a sibling package) reaches a service that is already resolved.

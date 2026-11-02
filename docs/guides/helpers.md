@@ -107,8 +107,12 @@ Nobody served is `not_found`, as on `sendCode()` and `removeFactor()`. `cancelEn
 `unlockIdentity()` answer a `bool`, having no reason worth telling. `resetIdentity()` and `forgetIdentity()` are
 operator calls, and answer nothing.
 
-An `Exceptions\OperationRefusedException` a seam of your own throws is not turned into a value: it is yours, and it
-propagates, with what the call did rolled back. So does a resolver's failure, a gateway's and a database's.
+On `generateRecoveryCodes()` and `requestAssertion()`, an `Exceptions\OperationRefusedException` a seam of your own
+throws is not turned into a value: it is yours, and it propagates, with what the call did rolled back. The other helpers
+that answer with a value still report it as their reason: `sendCode()`, `verify()`, `startEnrollment()` and
+`confirmEnrollment()`, and `removeFactor()` from its checks, while a revoker or a session transition throwing one rolls
+the removal back and propagates (see [Lifecycle](lifecycle.md)). Any other failure propagates from all of them: a
+resolver's, a gateway's and a database's.
 
 ## Binding a factor to a route
 
@@ -119,7 +123,11 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 Route::delete('/factors/{factor}', function (Factor $factor) {
-    return Mfa::removeFactor($factor->getFactorIdentifier());
+    $removal = Mfa::removeFactor($factor->getFactorIdentifier());
+
+    return $removal->wasMade()
+        ? response()->noContent()
+        : response()->json(['reason' => $removal->reason->value], 403);
 })->middleware('auth');
 ```
 
@@ -147,6 +155,10 @@ Pass a helper the factor's identifier, `$factor->getFactorIdentifier()`, not the
 
 The limits:
 
+- The caller must be established before `SubstituteBindings` runs. Laravel's middleware priority orders `auth` ahead of
+  it. Any other middleware that establishes the credential must be placed ahead of it in the priority list, or the
+  factor binds to nobody and answers `404`, or is held to the guard's user rather than the credential the route goes on
+  to use.
 - A custom key must be unique across identities. With `{factor:type}` the first row found may be another person's, and
   the binding misses. To look a factor up within one identity, go through `Mfa::factors()`.
 - A scoped child binding through a parent model (`/users/{user}/factors/{factor}`) is the parent's own lookup, and never

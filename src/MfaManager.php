@@ -39,7 +39,6 @@ use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
 use SineMacula\Laravel\Mfa\Verification\FactorOffers;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
-
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 
 /**

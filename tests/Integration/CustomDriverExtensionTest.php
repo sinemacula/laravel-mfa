@@ -76,11 +76,10 @@ final class CustomDriverExtensionTest extends TestCase
      * both built-ins and consumer overrides go through the same `Mfa::extend()`
      * registry, so a future Laravel `Manager` upgrade that changed
      * override-precedence semantics would silently break consumer overrides
-     * without this guard.
+     * without this guard. The driver was already resolved once when the
+     * override is made, and nothing needs clearing for it to win.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testConsumerCanOverrideBuiltInTotpDriver(): void
     {
@@ -107,16 +106,6 @@ final class CustomDriverExtensionTest extends TestCase
         // Sanity-check: before the override the built-in TOTP driver resolves
         // to the package's TotpDriver (not our marker).
         self::assertNotSame($marker, Mfa::driver('totp'));
-
-        // Resolve the manager singleton and clear Laravel's per-request driver
-        // cache so the override registered next is what the next
-        // `driver('totp')` call sees.
-        $manager = $this->container()->make('mfa');
-        Assert::assertInstanceOf(
-            MfaManager::class,
-            $manager,
-        );
-        $manager->forgetDrivers();
 
         Mfa::extend('totp', static fn (): FactorDriver => $marker);
 
