@@ -48,7 +48,7 @@ final readonly class RecoveryCodeSettings
     /** @var array<string, array{0: int, 1: int, 2: int}> Default, least and greatest value of each other numeric setting. */
     private const array NUMBERS = [
         'count'  => [10, 1, 50],
-        'length' => [12, 1, self::MAXIMUM_LENGTH],
+        'length' => [13, 1, self::MAXIMUM_LENGTH],
     ];
 
     /**
