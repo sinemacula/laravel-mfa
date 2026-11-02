@@ -42,6 +42,11 @@ use Tests\TestCase;
  * locking a row changed since the snapshot is a serialisation failure, and the
  * whole outer transaction is to be retried, when the attempt is refused.
  *
+ * A real failed attempt changes the identity's state row as well as the
+ * factor's, so each database is also held to a deadline written directly to the
+ * factor's row alone: the identity's lock is then uncontended, and the refusal
+ * or the failure can only come from reading the factor's row.
+ *
  * SQLite serialises every writer on the whole file, so these tests run on the
  * server databases only.
  *
@@ -158,7 +163,7 @@ final class FactorLockoutSnapshotTest extends TestCase
 
             self::fail('The stale snapshot must not answer the attempt.');
         } catch (\PDOException $failure) {
-            self::assertSerializationFailure($failure);
+            self::assertSerializationFailure($failure, 'mfa_identity_states');
         }
 
         DB::connection()->rollBack();
@@ -170,6 +175,103 @@ final class FactorLockoutSnapshotTest extends TestCase
         DB::connection()->commit();
 
         $this->assertRefusedByTheFactor($outcome, $user, $factor, $until);
+    }
+
+    /**
+     * On MySQL, a deadline committed to the factor's row alone after the
+     * snapshot refuses the attempt, with nothing else to refuse it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnOlderMysqlSnapshotCannotHideADeadlineWrittenToTheFactorAlone(): void
+    {
+        $this->requireDriver('mysql');
+
+        [$user, $factor] = $this->arrange();
+
+        $this->openTransaction('REPEATABLE READ');
+
+        $stale = $this->takeSnapshot($factor);
+        $until = $this->commitDeadlineToTheFactorAlone($factor);
+
+        self::assertNull(Factor::query()->whereKey($factor->id)->value('locked_until'));
+
+        $outcome = $this->attemptThatMustNotVerify($user, $stale);
+
+        DB::connection()->commit();
+
+        $this->assertRefusedByTheFactor($outcome, $user, $factor, $until, 0);
+    }
+
+    /**
+     * On PostgreSQL's `READ COMMITTED`, a deadline committed to the factor's
+     * row alone refuses the attempt, with nothing else to refuse it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testPostgresqlReadCommittedFindsADeadlineWrittenToTheFactorAlone(): void
+    {
+        $this->requireDriver('pgsql');
+
+        [$user, $factor] = $this->arrange();
+
+        $this->openTransaction('READ COMMITTED');
+
+        $stale = $this->takeSnapshot($factor);
+        $until = $this->commitDeadlineToTheFactorAlone($factor);
+
+        $outcome = $this->attemptThatMustNotVerify($user, $stale);
+
+        DB::connection()->commit();
+
+        $this->assertRefusedByTheFactor($outcome, $user, $factor, $until, 0);
+    }
+
+    /**
+     * On PostgreSQL's `REPEATABLE READ`, a deadline committed to the factor's
+     * row alone leaves the identity's lock uncontended, so the serialisation
+     * failure comes from locking the factor's row; retrying the whole outer
+     * transaction then refuses the attempt, and the verification runs in
+     * neither.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testPostgresqlRepeatableReadFailsOnTheFactorsRowWhenOnlyItChanged(): void
+    {
+        $this->requireDriver('pgsql');
+
+        [$user, $factor] = $this->arrange();
+
+        $this->openTransaction('REPEATABLE READ');
+
+        $stale = $this->takeSnapshot($factor);
+        $until = $this->commitDeadlineToTheFactorAlone($factor);
+
+        self::assertNull(Factor::query()->whereKey($factor->id)->value('locked_until'));
+
+        try {
+            $this->attemptThatMustNotVerify($user, $stale);
+
+            self::fail('The stale snapshot must not answer the attempt.');
+        } catch (\PDOException $failure) {
+            self::assertSerializationFailure($failure, 'mfa_factors');
+        }
+
+        DB::connection()->rollBack();
+
+        $this->openTransaction('REPEATABLE READ');
+
+        $outcome = $this->attemptThatMustNotVerify($user, $this->takeSnapshot($factor));
+
+        DB::connection()->commit();
+
+        $this->assertRefusedByTheFactor($outcome, $user, $factor, $until, 0);
     }
 
     /**
@@ -196,17 +298,19 @@ final class FactorLockoutSnapshotTest extends TestCase
 
     /**
      * Assert the failure is the database's serialisation failure, however the
-     * nested transaction raised it.
+     * nested transaction raised it, on a statement against the table.
      *
      * @param  \PDOException  $failure
+     * @param  string  $table
      * @return void
      */
-    private static function assertSerializationFailure(\PDOException $failure): void
+    private static function assertSerializationFailure(\PDOException $failure, string $table): void
     {
         $query = $failure instanceof QueryException ? $failure : $failure->getPrevious();
 
         self::assertInstanceOf(QueryException::class, $query);
         self::assertSame('40001', (string) $query->getCode());
+        self::assertStringContainsString($table, $query->getSql());
     }
 
     /**
@@ -321,6 +425,22 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
+     * Commit a deadline to the factor's row from the observer, touching nothing
+     * else, and return it.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
+     * @return \Carbon\CarbonImmutable
+     */
+    private function commitDeadlineToTheFactorAlone(Factor $factor): CarbonImmutable
+    {
+        $until = CarbonImmutable::now()->addHour();
+
+        DB::connection('observer')->table('mfa_factors')->where('id', $factor->id)->update(['locked_until' => $until]);
+
+        return $until;
+    }
+
+    /**
      * Make an attempt on the application's connection whose verification must
      * never run.
      *
@@ -339,19 +459,20 @@ final class FactorLockoutSnapshotTest extends TestCase
 
     /**
      * Assert the factor's own lockout refused the attempt, and that nothing but
-     * the one failure the observer made is counted, with the deadline as it
+     * the failures the observer made is counted, with the deadline as it
      * committed and the identity below its limit, unlocked.
      *
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome  $outcome
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @param  \Carbon\CarbonImmutable  $until
+     * @param  int  $failures
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    private function assertRefusedByTheFactor(AttemptOutcome $outcome, TestUser $user, Factor $factor, CarbonImmutable $until): void
+    private function assertRefusedByTheFactor(AttemptOutcome $outcome, TestUser $user, Factor $factor, CarbonImmutable $until, int $failures = 1): void
     {
         self::assertTrue($outcome->isRefused());
         self::assertSame(AttemptScope::FACTOR, $outcome->lockout?->scope);
@@ -359,17 +480,17 @@ final class FactorLockoutSnapshotTest extends TestCase
 
         $stored = Factor::query()->findOrFail($factor->id);
 
-        self::assertSame(1, $stored->getConsecutiveFailures());
+        self::assertSame($failures, $stored->getConsecutiveFailures());
         self::assertSame($until->getTimestamp(), $stored->getLockedUntil()?->getTimestamp());
 
         $state = IdentityState::query()->where('authenticatable_id', (string) $user->id)->sole();
 
-        self::assertSame(1, $state->consecutive_failures);
+        self::assertSame($failures, $state->consecutive_failures);
         self::assertNull($state->locked_until);
 
         $key = $this->container()->make(AttemptKeys::class)->identity($user::class, (string) $user->id);
 
-        self::assertSame(1, $this->container()->make(AttemptStore::class)->read([$key])[$key]['hits'] ?? null);
+        self::assertSame($failures, $this->container()->make(AttemptStore::class)->read([$key])[$key]['hits'] ?? 0);
     }
 
     /**
