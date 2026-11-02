@@ -51,9 +51,11 @@ nothing is stored in their place.
   no MFA-capable identity, no sign-in the proof store knows of on the application, or no first factor; otherwise it
   answers whether the bound `RequirementCheck` finds the sign-in's recorded proofs meet the requirement. Freshness adds
   none of the sign-in's own parts.
-- The gate takes the first factor from the proof store. Only when the store holds none, and a `FirstFactorResolver` is
-  bound, is the resolver asked, and its proof counts only when it is a first factor of the identity on the application,
-  bound to the current sign-in, made under the identity's current verification generation and not after now.
+- The gate takes the first factor from the proof store. Only when the store holds none is the bound
+  `FirstFactorResolver` asked, and its proof counts only when it is a first factor of the identity on the application,
+  bound to the current sign-in, made under the identity's current verification generation and not after now. The
+  default resolver reads the application's `first_factor` declaration and dates it at the Unix epoch, so it establishes
+  the channel a further factor must be independent of but never meets a part with a maximum age on its own.
 - `Mfa::isFresh($operation, $requirement)` asks the bound gate with the strictest of this package's setting for the
   operation and the requirement given as the caller's requirement, after answering `false` for a name that does not
   match the pattern and refusing an unbounded one. A gate an adapter binds over an authentication layer's freshness
@@ -78,7 +80,8 @@ nothing is stored in their place.
 ## Failure / Edge Cases
 
 - A session that signed in through Laravel's `Login` event holds a sign-in with no first factor, so it is never fresh
-  until a first factor is recorded (`GuardHooks::signedIn()`) or a `FirstFactorResolver` is bound.
+  until a first factor is recorded (`GuardHooks::signedIn()`), the application declares one, or a `FirstFactorResolver`
+  of its own reports one.
 - A fresh password reauthentication after an old TOTP code does not meet a fresh AAL2 or a fresh additional
   verification, though it meets a fresh AAL1 on its own. A fresh email code after an old TOTP code does not meet a fresh
   multifactor part.
@@ -104,14 +107,12 @@ nothing is stored in their place.
 
 ## Seams Left
 
-- `FirstFactorResolver` has no default binding yet, so a sign-in that recorded no first factor is never fresh alone.
 - The `mfa` middleware still judges the newest additional factor or recovery code against `proofs.max_age_minutes`
   once the requirement is not empty; it does not yet check the structured requirement, so it can refuse a passkey that
   verified the person and accept evidence below a requested level.
 - Nothing yet sets or clears the re-enrolment obligation; a reset and the confirmation of a factor will.
-- The package's own enrolment, removal and recovery-code calls do not ask the gate yet, so the defaults for its
-  operations take effect only where an application calls `Mfa::isFresh()` itself; the enrolment and lifecycle flows
-  will ask it.
+- Only the passkey change gate asks the gate for the package's own operations so far (`mfa.add_factor` and
+  `mfa.remove_factor`, see [Passkeys](passkeys.md)); the enrolment and lifecycle flows will ask it for the rest.
 - The enrolment grant's lifetime is not bound to the freshness of the proof that authorised it: the gate answers yes or
   no and says nothing of how long the answer holds.
 

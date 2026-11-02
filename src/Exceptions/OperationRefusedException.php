@@ -37,4 +37,24 @@ final class OperationRefusedException extends \RuntimeException
     ) {
         parent::__construct($detail);
     }
+
+    /**
+     * Refuse the operation for the reason, with the detail, unless it is
+     * allowed.
+     *
+     * @param  bool  $allowed
+     * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
+     * @param  string  $detail
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     *
+     * @phpstan-assert true $allowed
+     */
+    public static function unless(bool $allowed, FailureReason $reason, string $detail): void
+    {
+        if (!$allowed) {
+            throw new self($reason, $detail);
+        }
+    }
 }

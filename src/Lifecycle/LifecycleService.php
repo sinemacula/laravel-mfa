@@ -9,15 +9,16 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Events\MfaFactorDisabled;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
@@ -36,6 +37,7 @@ final readonly class LifecycleService
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
      * @param  \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService  $recoveryCodes
+     * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations  $associations
      */
     public function __construct(
 
@@ -47,6 +49,9 @@ final readonly class LifecycleService
 
         /** The recovery codes removed with the identity's last confirmed factor. */
         private RecoveryCodeService $recoveryCodes,
+
+        /** The passkey associations removed with their factor. */
+        private PasskeyAssociations $associations,
     ) {}
 
     /**
@@ -54,9 +59,10 @@ final readonly class LifecycleService
      *
      * Deletes the underlying row when the factor is an Eloquent model. An
      * `EloquentFactor` is deleted as stored, in the identity's factor state
-     * transaction, and with it the identity's recovery codes when no confirmed
-     * factor remains (a pending one does not count; one disabled at the failure
-     * ceiling does); any other model is deleted on its own. Then stops counting
+     * transaction, and with it its passkey association and the identity's
+     * recovery codes when no confirmed factor remains (a pending one does not
+     * count; one disabled at the failure ceiling does); any other model is
+     * deleted on its own. Then stops counting
      * every proof made with the factor on the current session, and dispatches
      * `MfaFactorDisabled`. Non-Eloquent factors are left for the consumer to
      * discard, with the recovery codes; their proofs stop counting and the
@@ -65,7 +71,8 @@ final readonly class LifecycleService
      * Throws `FactorOwnershipMismatchException` when the factor does not belong
      * to the current identity, and `WriteCancelledException` when a model event
      * cancels the deletion, which then removes, forgets and reports nothing.
-     * No-op when no MFA-capable identity is resolvable.
+     * No-op when no MFA-capable person is signed in, and on a pending session
+     * (see `Context\CallerContextResolver`).
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
@@ -77,7 +84,7 @@ final readonly class LifecycleService
      */
     public function disable(Factor $factor): void
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
 
         if ($identity === null) {
             return;
@@ -103,9 +110,10 @@ final readonly class LifecycleService
 
     /**
      * Delete the factor as stored under the identity's lock, in its factor
-     * state transaction, and the identity's recovery codes with it when none of
-     * the factors left under the lock is confirmed. A factor already gone is
-     * not deleted again; the caller's instance is marked as no longer stored.
+     * state transaction, with its passkey association, and the identity's
+     * recovery codes with it when none of the factors left under the lock is
+     * confirmed. A factor already gone is not deleted again; the caller's
+     * instance is marked as no longer stored.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -117,16 +125,19 @@ final readonly class LifecycleService
     {
         FactorStateTransaction::forIdentity($identity, $factor, function (Collection $factors) use ($identity, $factor): void {
 
-            $stored = LockedFactors::find($factor, $factors);
+            $stored  = LockedFactors::find($factor, $factors);
+            $removed = LockedFactors::idOf($factor);
 
             if ($stored !== null) {
                 self::delete($stored);
             }
 
-            $factor->exists = false;
+            if ($removed !== null) {
+                $this->associations->forget($removed);
+            }
 
-            $removed = LockedFactors::idOf($factor);
-            $remains = $factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $removed && $other->isConfirmed());
+            $factor->exists = false;
+            $remains        = $factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $removed && $other->isConfirmed());
 
             if ($remains) {
                 return;

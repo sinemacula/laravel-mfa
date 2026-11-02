@@ -49,12 +49,15 @@ return new class extends Migration {
             $blueprint->string('authenticatable_id');
 
             // A credential id reaches 1023 bytes, beyond what MySQL indexes as
-            // text, so it is found by the SHA-256 hex digest of its bytes and
-            // kept in full beside it. A credential is associated at most once
-            // per identity.
+            // text, so it is found by the SHA-256 hex digest of its canonical
+            // unpadded base64url form and kept in full beside it. A credential
+            // is associated at most once, with one identity: the unique index
+            // refuses a second association whoever makes it, and is what a
+            // lookup by credential reads, so it locks one row, not the table.
             $blueprint->char('credential_id_hash', 64);
             $blueprint->text('credential_id');
-            $blueprint->unique(['authenticatable_type', 'authenticatable_id', 'credential_id_hash'], IndexName::for($table, '_credential_unique'));
+            $blueprint->unique('credential_id_hash', IndexName::for($table, '_credential_unique'));
+            $blueprint->index(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_index'));
 
             $blueprint->timestamps();
         });

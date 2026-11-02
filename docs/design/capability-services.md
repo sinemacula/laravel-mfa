@@ -43,13 +43,14 @@ the provider or another capability.
 ## Success Path
 
 - The provider registers the configuration, the `mfa` manager singleton and each capability's bindings
-  (`EventBindings`, `FactorBindings`, `DriverBindings`, `CodeBindings`, `AssuranceBindings`, `RequirementBindings`,
-  `ProofBindings`, `VerificationBindings`, `EnrollmentBindings`, `LifecycleBindings`, `RecoveryCodeBindings`), and at
+  (`EventBindings`, `ContextBindings`, `SeamBindings`, `FactorBindings`, `DriverBindings`, `CodeBindings`,
+  `AssuranceBindings`, `RequirementBindings`, `ProofBindings`, `VerificationBindings`, `EnrollmentBindings`,
+  `LifecycleBindings`, `RecoveryCodeBindings`, `PasskeyBindings`, and the session transition of `HttpBindings`), and at
   boot the middleware aliases (`HttpBindings`), the publishing tags and the configuration check
   (`Config\ConfigurationBindings`), which also refuses a configured model off the storage connection.
-- The `mfa` factory builds the manager, then `DriverBindings::extend()` registers the TOTP, email and SMS drivers, each
-  built from the settings of its capability's block (`mfa.totp`, `mfa.codes`), before the container applies any
-  extender or resolving callback.
+- The `mfa` factory builds the manager, then `DriverBindings::extend()` registers the TOTP, email, SMS and passkey
+  drivers, each built from the settings of its capability's block (`mfa.totp`, `mfa.codes`), before the container
+  applies any extender or resolving callback.
   The factory first checks the whole configuration (see the application configuration note).
 - A call such as `Mfa::verify('totp', $factor, $code)` reaches `MfaManager::verify()`, which hands it to
   `Verification\VerificationService::verify()` with the manager as the driver registry. The service resolves the current

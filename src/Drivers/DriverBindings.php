@@ -12,8 +12,8 @@ use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\MfaManager;
 
 /**
- * Registers the driver resolver, and builds the shipped TOTP, email and SMS
- * drivers.
+ * Registers the driver resolver, and builds the shipped TOTP, email, SMS and
+ * passkey drivers.
  *
  * The service provider's `mfa` factory registers the drivers against the
  * manager through the standard `extend()` API, so they are indistinguishable
@@ -50,7 +50,8 @@ final class DriverBindings
     }
 
     /**
-     * Register the shipped TOTP, email and SMS drivers against the manager.
+     * Register the shipped TOTP, email, SMS and passkey drivers against the
+     * manager.
      *
      * @param  \SineMacula\Laravel\Mfa\MfaManager  $manager
      * @param  \Illuminate\Contracts\Foundation\Application  $app
@@ -68,6 +69,7 @@ final class DriverBindings
         $manager->extend('totp', fn (): TotpDriver => DriverBindings::totp($app, $config));
         $manager->extend('email', fn (): EmailDriver => DriverBindings::email($app, $config));
         $manager->extend('sms', fn (): SmsDriver => DriverBindings::sms($app, $config));
+        $manager->extend('passkey', fn (): PasskeyDriver => new PasskeyDriver);
     }
 
     /**

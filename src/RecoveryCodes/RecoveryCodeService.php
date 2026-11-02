@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Query\JoinClause;
-use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
@@ -23,7 +22,7 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RecoveryCode;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
-use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\OpenTransaction;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -126,19 +125,21 @@ final readonly class RecoveryCodeService
      * identity's state row, so all of it commits or none does: a save a model
      * event cancels throws `WriteCancelledException` and rolls it all back.
      * `RecoveryCodesGenerated` is dispatched once it has committed. The codes
-     * are returned unformatted, in the order they were drawn.
+     * are returned unformatted, in the order they were drawn. The application
+     * is the current request's unless the caller names the one it acts on.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?string  $application
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      * @throws \Throwable
      */
-    public function generate(MultiFactorAuthenticatable $identity, ?Actor $actor = null): array
+    public function generate(MultiFactorAuthenticatable $identity, ?Actor $actor = null, ?string $application = null): array
     {
-        $application = $this->proofs->application();
+        $application ??= $this->proofs->application();
 
         $this->guardGeneration($identity, $application);
 
@@ -395,9 +396,7 @@ final readonly class RecoveryCodeService
      */
     private static function requireTransaction(): void
     {
-        if (DB::connection(StorageConnection::name())->transactionLevel() === 0) {
-            throw new \LogicException('A recovery code set is removed only inside the identity\'s factor state transaction.');
-        }
+        OpenTransaction::assertOpen('A recovery code set is removed only inside the identity\'s factor state transaction.');
     }
 
     /**

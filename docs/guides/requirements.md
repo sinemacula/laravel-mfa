@@ -109,9 +109,12 @@ old stronger one: a fresh email code does not bring back the AAL2 an old TOTP co
 stands in for an additional factor: signing in again, or reauthenticating with a password, renews nothing an
 additional factor gave. Refreshing or regenerating the session renews nothing either: only a proof's own time counts.
 
-A sign-in that a guard began through Laravel's `Login` event holds no first factor, so it is never fresh until the
-guard records one (`Proofs\GuardHooks::signedIn()`, see [Recorded proofs](proofs.md#custom-guards)) or a
-`Contracts\FirstFactorResolver` is bound to report it.
+A sign-in that a guard began through Laravel's `Login` event holds no first factor of its own. The default
+`Contracts\FirstFactorResolver` then reports the one the application declares (`first_factor`), dated at the Unix epoch:
+it tells the combination policy which channel a further factor must be independent of, but supplies no freshness, so the
+session is fresh only once a further proof is. Without a declaration it is never fresh until the guard records a first
+factor (`Proofs\GuardHooks::signedIn()`, see [Recorded proofs](proofs.md#custom-guards)) or a resolver of the
+application's own reports one.
 
 ## Checking a session
 

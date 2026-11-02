@@ -10,11 +10,13 @@ use Illuminate\Contracts\Mail\Factory;
 use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactorResolver;
 use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
 use SineMacula\Laravel\Mfa\Config\ConfigurationValidator;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
+use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Contracts\RecoveryCode;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
@@ -22,6 +24,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use Tests\Fixtures\Factors\SecondaryConnectionFactor;
+use Tests\Fixtures\Passkeys\FakePasskeyGateway;
 use Tests\Fixtures\RecoveryCodes\SecondaryConnectionRecoveryCode;
 use Tests\TestCase;
 
@@ -269,6 +272,46 @@ final class ConfigurationValidatorTest extends TestCase
         $this->container()->instance(FirstFactorResolver::class, \Mockery::mock(FirstFactorResolver::class));
 
         self::assertSame([], $this->validator()->report()['applications.web']);
+    }
+
+    /**
+     * An application that enables `passkey` while the package's unavailable
+     * gateway is still bound is refused; binding a gateway is enough, even one
+     * that reports itself unavailable at run time.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAPasskeyApplicationNeedsAGateway(): void
+    {
+        $this->configureApplication(['types' => ['passkey'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        self::assertSame(
+            ['The application enables passkey, but no passkey gateway is bound: bind yours to ' . PasskeyGateway::class . '.'],
+            $this->validator()->report()['applications.web'],
+        );
+
+        $this->container()->instance(PasskeyGateway::class, new FakePasskeyGateway(available: false));
+
+        self::assertSame([], $this->validator()->report()['applications.web']);
+    }
+
+    /**
+     * The default first factor resolver reads the declaration, so binding it
+     * explicitly does not stand in for one.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTheDefaultResolverIsNoDeclaration(): void
+    {
+        $this->configureApplication(['types' => ['totp']]);
+
+        $this->container()->singleton(FirstFactorResolver::class, DeclaredFirstFactorResolver::class);
+
+        self::assertSame([self::NO_FIRST_FACTOR], $this->validator()->report()['applications.web']);
     }
 
     /**

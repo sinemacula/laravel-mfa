@@ -67,6 +67,13 @@ are described here.
 - `resetIdentityFailures($identity)` clears the identity's run under the lock, and nothing else.
 - `lockout()`, `liftLockout()`, `enableFactor()` and `resetIdentityFailures()` are the public operations; `attempt()` is
   internal to the verification paths.
+- A challenge another owner sends and consumes (an authentication layer's `mfa` challenge, or the package's own
+  `Codes\PackageChallengeGateway`) is counted through `Attempts\ChallengeCounters`, inside the owner's transaction on
+  the storage connection: `isUsable()` reads the lockouts under the identity's lock (`lockedOut()`, without an address)
+  and checks the factor is the identity's, confirmed, of an enabled type and accepted after the session's first factor;
+  `report()` counts the outcome as `attempt()` does, without an address. Both refuse outside a transaction, so the lock
+  is held until the owner commits and parallel guesses cannot overrun the identity's cap (see
+  [Seam Contracts](seam-contracts.md)).
 - A factor that is not an Eloquent model implementing `EloquentFactor` keeps no state: it has no failures in a row,
   lockout or ceiling of its own, and its attempts are counted against the identity and the address, so the identity's
   ceiling refuses it as it does a recovery code.

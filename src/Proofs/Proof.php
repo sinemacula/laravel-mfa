@@ -133,6 +133,20 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
+     * The same proof stamped with another verification generation: what it
+     * proved, when and for what are unchanged.
+     *
+     * @param  int  $generation
+     * @return self
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function withGeneration(int $generation): self
+    {
+        return new self($this->kind, $this->method, $this->channel, $this->reference, $this->properties, $this->provedAt, $this->binding, $generation, $this->challengeId);
+    }
+
+    /**
      * The proof with snake_case keys, its parts nested and its time in ISO-8601
      * to the microsecond.
      *

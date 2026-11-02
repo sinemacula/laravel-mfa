@@ -5,8 +5,9 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Enums;
 
 /**
- * Machine-readable reason a verification, a code request or an enrolment
- * failed, carried on a failed `VerificationResult` and on the failure events.
+ * Machine-readable reason a verification, a code request, an enrolment or a
+ * change to a factor failed, carried on a failed `VerificationResult`, on an
+ * `OperationRefusedException` and on the failure events.
  *
  * Backed, so listeners count failure modes and applications word them without
  * scraping messages. The values are noun first, as in `laravel-authentication`,
@@ -61,4 +62,18 @@ enum FailureReason: string
 
     // The identity is a machine, which never holds factors
     case MACHINE_IDENTITY = 'machine_identity';
+
+    // The session's authentication is not fresh enough for the change: a
+    // step-up, or the first factor proved again, is needed first
+    case NOT_FRESH = 'not_fresh';
+
+    // The factor is the last one that keeps a required factor covered
+    case LAST_FACTOR = 'last_factor';
+
+    // The identity has as many factors as the application allows
+    case LIMIT_REACHED = 'limit_reached';
+
+    // The credential is associated as a factor already, so it can be neither
+    // associated again nor changed in place
+    case CREDENTIAL_ASSOCIATED = 'credential_associated';
 }

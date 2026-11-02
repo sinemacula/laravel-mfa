@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\DriverBindings;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
+use SineMacula\Laravel\Mfa\Drivers\PasskeyDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -49,7 +50,7 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * The resolved manager has the TOTP, email and SMS drivers.
+     * The resolved manager has the TOTP, email, SMS and passkey drivers.
      *
      * @return void
      *
@@ -63,6 +64,7 @@ final class DriverBindingsTest extends TestCase
         self::assertInstanceOf(TotpDriver::class, $manager->driver('totp'));
         self::assertInstanceOf(EmailDriver::class, $manager->driver('email'));
         self::assertInstanceOf(SmsDriver::class, $manager->driver('sms'));
+        self::assertInstanceOf(PasskeyDriver::class, $manager->driver('passkey'));
     }
 
     /**

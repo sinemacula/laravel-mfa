@@ -10,6 +10,8 @@ use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\DeliveredCodes;
 use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
 use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
+use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
+use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use Tests\TestCase;
@@ -56,5 +58,18 @@ final class CodeBindingsTest extends TestCase
         self::assertSame($this->container()->make(CodeService::class), $this->container()->make(CodeService::class));
         self::assertInstanceOf(DeliveredCodes::class, $this->container()->make(DeliveredCodes::class));
         self::assertNotSame($this->container()->make(DeliveredCodes::class), $this->container()->make(DeliveredCodes::class));
+    }
+
+    /**
+     * The challenge gateway defaults to the package's own codes, shared.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBindsThePackagesOwnChallengeGatewayByDefault(): void
+    {
+        self::assertInstanceOf(PackageChallengeGateway::class, $this->container()->make(ChallengeGateway::class));
+        self::assertTrue($this->container()->isShared(ChallengeGateway::class));
     }
 }

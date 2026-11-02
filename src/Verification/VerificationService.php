@@ -9,12 +9,13 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Manager;
-use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\RequestIp;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
@@ -24,27 +25,33 @@ use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\MfaChallengeIssued;
 use SineMacula\Laravel\Mfa\Events\MfaVerificationFailed;
 use SineMacula\Laravel\Mfa\Events\MfaVerified;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
+use SineMacula\Laravel\Mfa\Factors\FactorChannel;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
- * Issues challenges for the current identity's factors and verifies the codes
- * submitted against them.
+ * Issues challenges for the factors of the identity the request serves and
+ * verifies the codes submitted against them: a pending session's identity when
+ * its credential allows sending a code (`mfa.send_code`) or verifying
+ * (`mfa.verify`), otherwise the signed-in person (see
+ * `Context\CallerContextResolver`); with neither, nothing is sent or checked.
  *
  * A factor whose driver delivers codes (email, SMS) has its codes sent and
  * checked through `Codes\CodeService`, bound to the factor, the identity, the
- * application, the session and the purpose: the application a bound
- * `ApplicationResolver` names for the request, otherwise the default guard's
- * name, and the Laravel session the request runs in. Every other factor goes
- * through its driver. Every verification is an attempt made through
+ * application, the session and the purpose: on a pending session its own
+ * application and public id; otherwise the application a bound
+ * `ApplicationResolver` names for the request, or the default guard's name, and
+ * the Laravel session the request runs in. Every other factor goes through its
+ * driver. Every verification is an attempt made through
  * `Attempts\AttemptService`, so it is counted, and refused while a lockout
  * applies, whichever way its code is checked. A verification that passes
  * records its proof on the identity's current sign-in through
@@ -109,11 +116,13 @@ final readonly class VerificationService
      */
     public function challenge(Manager $registry, string $driver, Factor $factor, Purpose $purpose = Purpose::SIGN_IN): ?SendResult
     {
-        $identity = CurrentIdentity::resolve();
+        $caller = $this->callers()->resolve(PendingAction::SEND_CODE);
 
-        if ($identity === null) {
+        if ($caller === null) {
             return null;
         }
+
+        $identity = $caller->identity;
 
         $this->drivers->assertMatchesFactor($driver, $factor);
         FactorOwnership::assert($factor, $identity);
@@ -127,7 +136,7 @@ final readonly class VerificationService
         // wipe a lockout. A TOTP factor has no per-challenge secret to mint, so
         // its `issueChallenge()` is a no-op.
         if ($resolved instanceof CodeDeliveryDriver) {
-            $result = $this->container->make(CodeService::class)->send($identity, $factor, $this->binding($identity, $purpose), $resolved);
+            $result = $this->container->make(CodeService::class)->send($identity, $factor, $this->binding($caller, $purpose), $resolved);
         } else {
             $resolved->issueChallenge($factor);
         }
@@ -193,11 +202,13 @@ final readonly class VerificationService
      */
     public function verify(Manager $registry, string $driver, Factor $factor, #[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
     {
-        $identity = CurrentIdentity::resolve();
+        $caller = $this->callers()->resolve(PendingAction::VERIFY);
 
-        if ($identity === null) {
+        if ($caller === null) {
             return false;
         }
+
+        $identity = $caller->identity;
 
         $this->drivers->assertMatchesFactor($driver, $factor);
         FactorOwnership::assert($factor, $identity);
@@ -205,7 +216,7 @@ final readonly class VerificationService
         $events   = $this->container->make(Dispatcher::class);
         $resolved = $this->drivers->resolve($registry, $driver);
 
-        return $this->makeAttempt($identity, $factor, $driver, $resolved, $code, $purpose, $events);
+        return $this->makeAttempt($caller, $factor, $driver, $resolved, $code, $purpose, $events);
     }
 
     /**
@@ -214,7 +225,7 @@ final readonly class VerificationService
      * the factor up to date, record the proof on success, and dispatch the
      * outcome.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $resolved
@@ -227,7 +238,7 @@ final readonly class VerificationService
      * @throws \Throwable
      */
     private function makeAttempt(
-        MultiFactorAuthenticatable $identity,
+        Caller $caller,
         Factor $factor,
         string $driver,
         FactorDriver $resolved,
@@ -235,7 +246,8 @@ final readonly class VerificationService
         Purpose $purpose,
         Dispatcher $events,
     ): bool {
-        $binding    = $resolved instanceof CodeDeliveryDriver ? $this->binding($identity, $purpose) : null;
+        $identity   = $caller->identity;
+        $binding    = $resolved instanceof CodeDeliveryDriver ? $this->binding($caller, $purpose) : null;
         $verified   = $factor;
         $check      = null;
         $generation = null;
@@ -314,10 +326,9 @@ final readonly class VerificationService
      * Record the proof a successful verification made on the identity's current
      * sign-in, for the purpose it was made for, stamped with the verification
      * generation read before the code was checked: an additional factor proof
-     * on the factor's channel, named by the factor's destination when it has
-     * one and by the factor itself when not. A driver whose channel cannot
-     * carry a factor proves nothing, and neither does a factor whose identifier
-     * cannot name it.
+     * on the factor's channel (see `Factors\FactorChannel`). A driver whose
+     * channel cannot carry a factor proves nothing, and neither does a factor
+     * whose identifier cannot name it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  int  $generation
@@ -332,16 +343,13 @@ final readonly class VerificationService
     private function recordProof(MultiFactorAuthenticatable $identity, int $generation, Factor $factor, string $driver, FactorDriver $resolved, Purpose $purpose): void
     {
         $identifier = $factor->getFactorIdentifier();
-        $kind       = $resolved->channelKind();
+        $channel    = FactorChannel::of($factor, $resolved->channelKind());
 
-        if (!$kind->carriesFactor() || (!is_string($identifier) && !is_int($identifier))) {
+        if ($channel === null || (!is_string($identifier) && !is_int($identifier))) {
             return;
         }
 
-        $reference = (string) $identifier;
-        $channel   = new Channel($kind, $factor->getDestination() ?? $reference);
-
-        $this->proofs->record($identity, $generation, ProofKind::ADDITIONAL_FACTOR, $driver, $channel, $reference, $purpose);
+        $this->proofs->record($identity, $generation, ProofKind::ADDITIONAL_FACTOR, $driver, $channel, (string) $identifier, $purpose);
     }
 
     /**
@@ -378,10 +386,12 @@ final readonly class VerificationService
     }
 
     /**
-     * What a delivered code for the identity is bound to in this request: the
-     * identity, the application, the Laravel session and the purpose.
+     * What a delivered code for the caller is bound to in this request: the
+     * identity, the application, the session and the purpose. On a pending
+     * session they are the pending session's own application and public id;
+     * otherwise the current request's application and the Laravel session.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      *
@@ -389,15 +399,27 @@ final readonly class VerificationService
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private function binding(MultiFactorAuthenticatable $identity, Purpose $purpose): ProofBinding
+    private function binding(Caller $caller, Purpose $purpose): ProofBinding
     {
         return new ProofBinding(
-            CurrentIdentity::typeOf($identity),
-            self::identityKey($identity),
-            $this->proofs->application(),
-            $this->container->make(Session::class)->getId(),
+            CurrentIdentity::typeOf($caller->identity),
+            self::identityKey($caller->identity),
+            $this->callers()->application($caller),
+            $caller->pending->sessionId ?? $this->container->make(Session::class)->getId(),
             $purpose,
         );
+    }
+
+    /**
+     * The resolver of who the request serves.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\CallerContextResolver
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function callers(): CallerContextResolver
+    {
+        return $this->container->make(CallerContextResolver::class);
     }
 
     /**

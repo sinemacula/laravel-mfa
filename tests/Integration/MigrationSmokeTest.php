@@ -107,7 +107,7 @@ final class MigrationSmokeTest extends TestCase
         yield 'one enrolment per factor' => ['mfa_enrollments', ['factor_id']];
         yield 'one enrolment per grant' => ['mfa_enrollments', ['grant_hash']];
         yield 'one association per factor' => ['mfa_passkey_associations', ['factor_id']];
-        yield 'one association per credential and owner' => ['mfa_passkey_associations', ['authenticatable_type', 'authenticatable_id', 'credential_id_hash']];
+        yield 'one association per credential' => ['mfa_passkey_associations', ['credential_id_hash']];
         yield 'one counter per key' => ['mfa_attempts', ['key']];
     }
 

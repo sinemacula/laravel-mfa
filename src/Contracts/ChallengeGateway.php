@@ -16,6 +16,13 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * type, that the combination policy accepts, and counts the outcome against the
  * factor and the identity.
  *
+ * The gateway asks `Attempts\ChallengeCounters::isUsable()` before it sends or
+ * checks a code, and reports every outcome through `report()` in the same
+ * transaction that consumes the challenge, never later: a deferred report would
+ * let parallel guesses overrun the per-identity cap. A delivery is never
+ * reported. Without an authentication layer, the package's own codes
+ * (`Codes\PackageChallengeGateway`) are bound.
+ *
  * @api
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>

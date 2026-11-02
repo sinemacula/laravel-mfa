@@ -852,6 +852,38 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * The lockout read under the lock, without an address: none for a usable
+     * factor, the factor's own once disabled, and the identity's once locked;
+     * with no factor, the identity's run at the failure ceiling too.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheLockoutReadUnderTheLock(): void
+    {
+        $user   = $this->user();
+        $factor = $this->factor($user);
+
+        self::assertNull($this->service()->lockedOut($user, $factor));
+
+        $disabled = $this->factor($user, disabled: true);
+
+        self::assertTrue($this->service()->lockedOut($user, $disabled)?->isDisabled());
+
+        config()->set('mfa.attempts.failure_ceiling', 1);
+
+        IdentityState::query()->create(['authenticatable_type' => $user::class, 'authenticatable_id' => (string) $user->id, 'consecutive_failures' => 1]);
+
+        self::assertNull($this->service()->lockedOut($user, $factor));
+        self::assertSame(AttemptScope::IDENTITY, $this->service()->lockedOut($user, null)?->scope);
+
+        IdentityState::query()->update(['consecutive_failures' => 0, 'locked_until' => Carbon::now()->addMinute()]);
+
+        self::assertSame(AttemptScope::IDENTITY, $this->service()->lockedOut($user, $factor)?->scope);
+    }
+
+    /**
      * Make an attempt whose verification answers as given.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user

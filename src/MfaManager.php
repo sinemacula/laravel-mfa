@@ -7,8 +7,10 @@ namespace SineMacula\Laravel\Mfa;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
@@ -17,7 +19,6 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 
 /**
@@ -104,8 +105,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Determine whether the current identity has at least one registered
-     * authentication factor.
+     * Determine whether the signed-in person has at least one registered
+     * authentication factor; `false` on a pending session.
      *
      * @return bool
      *
@@ -117,9 +118,9 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * The proofs of the current identity's sign-in on the current application
-     * that still count, oldest first: none without an MFA-capable identity or a
-     * sign-in.
+     * The proofs of the signed-in person's sign-in on the current application
+     * that still count, oldest first: none without an MFA-capable person or a
+     * sign-in, and none on a pending session.
      *
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      *
@@ -131,8 +132,9 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Get the authentication factors for the current identity, or null if the
-     * identity does not support multi-factor authentication.
+     * Get the authentication factors of the identity the request serves for
+     * listing factors: a pending session's when its credential allows it,
+     * otherwise the signed-in person's; `null` when it serves nobody.
      *
      * @formatter:off
      *
@@ -201,7 +203,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Disable a previously-enrolled factor for the current identity.
+     * Disable a previously-enrolled factor for the signed-in person; a no-op on
+     * a pending session.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
@@ -217,7 +220,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     /**
      * Generate a new recovery code set for the current identity, replacing any
      * earlier one, and return its codes, once, as secrets for the response;
-     * none without an MFA-capable identity.
+     * none without an MFA-capable person signed in, or on a pending session.
      *
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
@@ -227,15 +230,16 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function generateRecoveryCodes(): array
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
 
         return $identity === null ? [] : $this->container->make(RecoveryCodeService::class)->generate($identity);
     }
 
     /**
-     * Redeem a recovery code for the current identity, for the purpose given:
-     * whether a code was used and its proof recorded; `false` without an
-     * MFA-capable identity.
+     * Redeem a recovery code for the identity the request serves for
+     * verifying, for the purpose given: whether a code was used and its proof
+     * recorded; `false` on a pending session that does not allow verifying,
+     * and without an MFA-capable person.
      *
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -248,14 +252,16 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function redeemRecoveryCode(#[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $this->container->make(CallerContextResolver::class)->resolve(PendingAction::VERIFY)?->identity;
 
         return $identity !== null && $this->container->make(RecoveryCodeService::class)->redeem($identity, $code, $purpose)->passed;
     }
 
     /**
-     * Where the current identity's recovery code set stands, without a code;
-     * `null` without an MFA-capable identity.
+     * Where the recovery code set of the identity the request serves for
+     * listing factors stands, without a code: a pending session's when its
+     * credential allows listing them, otherwise the signed-in person's; `null`
+     * when it serves nobody.
      *
      * @return ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus
      *
@@ -263,7 +269,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function recoveryCodes(): ?RecoveryCodeStatus
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $this->container->make(CallerContextResolver::class)->resolve(PendingAction::LIST_FACTORS)?->identity;
 
         return $identity === null ? null : $this->container->make(RecoveryCodeService::class)->status($identity);
     }

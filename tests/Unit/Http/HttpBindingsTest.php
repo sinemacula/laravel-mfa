@@ -7,9 +7,11 @@ namespace Tests\Unit\Http;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Routing\Router;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Http\HttpBindings;
 use SineMacula\Laravel\Mfa\Http\Middleware\RequireMfa;
 use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
+use SineMacula\Laravel\Mfa\Http\MiddlewareSessionTransition;
 use Tests\TestCase;
 
 /**
@@ -41,5 +43,19 @@ final class HttpBindingsTest extends TestCase
         HttpBindings::boot($this->container());
 
         self::assertSame(['mfa' => RequireMfa::class, 'mfa.skip' => SkipMfa::class], $router->getMiddleware());
+    }
+
+    /**
+     * The session transition defaults to leaving the session to the `mfa`
+     * middleware, shared.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBindsTheMiddlewareSessionTransitionByDefault(): void
+    {
+        self::assertInstanceOf(MiddlewareSessionTransition::class, $this->container()->make(SessionTransition::class));
+        self::assertTrue($this->container()->isShared(SessionTransition::class));
     }
 }

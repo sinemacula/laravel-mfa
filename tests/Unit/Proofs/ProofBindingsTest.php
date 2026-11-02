@@ -10,6 +10,8 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Events\Dispatcher;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
+use SineMacula\Laravel\Mfa\Proofs\GenerationSessionRevoker;
 use SineMacula\Laravel\Mfa\Proofs\ProofBindings;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
@@ -84,5 +86,19 @@ final class ProofBindingsTest extends TestCase
         $events->dispatch(new CurrentDeviceLogout('web', $user));
 
         self::assertNull($this->container()->make(ProofStore::class)->currentSession($user, 'web'));
+    }
+
+    /**
+     * The session revoker defaults to advancing the verification generation,
+     * shared.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBindsTheGenerationRevokerByDefault(): void
+    {
+        self::assertInstanceOf(GenerationSessionRevoker::class, $this->container()->make(SessionRevoker::class));
+        self::assertTrue($this->container()->isShared(SessionRevoker::class));
     }
 }

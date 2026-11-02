@@ -5,10 +5,12 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Factors;
 
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -20,7 +22,8 @@ use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
  * The one guard every operation on an identity's factors starts with, so each
  * refuses the same things in the same order with the same reasons:
  *
- * 1. a machine identity, which cannot hold factors (`machine_identity`);
+ * 1. a machine identity, which cannot hold factors (`machine_identity`), as
+ *    the bound `SubjectTypeResolver` decides;
  * 2. an inactive identity (`identity_inactive`);
  * 3. a factor that is not the identity's (`not_found`): its id is only ever
  *    looked up within the identity, so another person's factor id finds
@@ -44,11 +47,15 @@ final readonly class OperationGuard
      * Constructor.
      *
      * @param  \Illuminate\Contracts\Config\Repository  $config
+     * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
         /** The configuration the factor model and applications are read from. */
         private Repository $config,
+
+        /** The container the subject type resolver is read from. */
+        private Container $container,
     ) {}
 
     /**
@@ -57,11 +64,12 @@ final readonly class OperationGuard
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
     public function identity(MultiFactorAuthenticatable $identity): void
     {
-        if (!$identity->canHoldFactors()) {
+        if (!$this->container->make(SubjectTypeResolver::class)->isPerson($identity)) {
             throw new OperationRefusedException(FailureReason::MACHINE_IDENTITY, 'The identity is not a person, so it cannot hold factors.');
         }
 

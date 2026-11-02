@@ -58,6 +58,30 @@ final class ProofTest extends TestCase
     }
 
     /**
+     * A proof stamped with another generation keeps everything else, and the
+     * original is left as it was.
+     *
+     * @return void
+     */
+    public function testAProofCanBeStampedWithAnotherGeneration(): void
+    {
+        $channel    = new Channel(ChannelKind::PASSKEY, 'credential-1');
+        $properties = new ObservedProperties(userPresence: true);
+        $provedAt   = CarbonImmutable::parse('2026-11-01T10:00:00+00:00');
+        $binding    = new ProofBinding('user', '42', 'admin', 'session-1', Purpose::STEP_UP);
+        $proof      = new Proof(ProofKind::ADDITIONAL_FACTOR, 'passkey', $channel, 'factor-1', $properties, $provedAt, $binding, 3, 'challenge-1');
+
+        $stamped = $proof->withGeneration(4);
+
+        self::assertSame(4, $stamped->generation);
+        self::assertSame(3, $proof->generation);
+        self::assertSame(
+            array_replace($proof->toArray(), ['generation' => 4]),
+            $stamped->toArray(),
+        );
+    }
+
+    /**
      * A first factor needs no reference or challenge, and a recovery code no
      * channel.
      *

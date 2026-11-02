@@ -8,6 +8,7 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
+use SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactorResolver;
 use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
 use SineMacula\Laravel\Mfa\Codes\CodeKeys;
 use SineMacula\Laravel\Mfa\Codes\CodeSettings;
@@ -15,6 +16,7 @@ use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
 use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
+use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
@@ -24,14 +26,16 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentSettings;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleSettings;
+use SineMacula\Laravel\Mfa\Passkeys\UnavailablePasskeyGateway;
 use SineMacula\Laravel\Mfa\Proofs\ProofSettings;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeSettings;
 
 /**
  * Checks the whole configuration, and the bindings it needs, before anything
  * relies on it: every setting within its bounds, and every configured
- * application with a delivery binding for each code type it enables and a first
- * factor it declares or a bound `FirstFactorResolver` reports.
+ * application with a delivery binding for each code type it enables, a passkey
+ * gateway when it enables passkeys, and a first factor it declares or a
+ * `FirstFactorResolver` of its own reports.
  *
  * Every check runs, so one run finds every problem. They are grouped by
  * subject: `storage` (the connection, and a name of its own for every table),
@@ -150,6 +154,7 @@ final readonly class ConfigurationValidator
             $checks['applications.' . $name] = [
                 static fn () => $application->validate(),
                 fn () => $this->checkDelivery($application),
+                fn () => $this->checkPasskeys($application),
                 fn () => $this->checkFirstFactor($application),
             ];
         }
@@ -269,18 +274,61 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Refuse an application that neither declares its first factor nor has a
-     * `FirstFactorResolver` bound to report it: without one, no further factor
-     * can be accepted after the sign-in and no level established.
+     * Refuse an application that enables `passkey` while the package's
+     * `UnavailablePasskeyGateway` is still bound as the `PasskeyGateway`: this
+     * package runs no ceremonies of its own. A gateway of the application's
+     * that reports itself unavailable at run time is not refused here; the type
+     * is then never offered.
      *
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $application
      * @return void
      *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \LogicException
+     */
+    private function checkPasskeys(ApplicationSettings $application): void
+    {
+        if (!$application->enables('passkey')) {
+            return;
+        }
+
+        self::checkPasskeyGateway($this->container->make(PasskeyGateway::class));
+    }
+
+    /**
+     * Refuse the package's `UnavailablePasskeyGateway`.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway  $gateway
+     * @return void
+     *
+     * @throws \LogicException
+     */
+    private static function checkPasskeyGateway(PasskeyGateway $gateway): void
+    {
+        if ($gateway instanceof UnavailablePasskeyGateway) {
+            throw new \LogicException(sprintf('The application enables passkey, but no passkey gateway is bound: bind yours to %s.', PasskeyGateway::class));
+        }
+    }
+
+    /**
+     * Refuse an application that neither declares its first factor nor has a
+     * `FirstFactorResolver` of its own bound to report it: the default reads
+     * the declaration, so without one no further factor can be accepted after
+     * the sign-in and no level established.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $application
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \LogicException
      */
     private function checkFirstFactor(ApplicationSettings $application): void
     {
-        if ($application->firstFactor() === null && !$this->container->bound(FirstFactorResolver::class)) {
+        if ($application->firstFactor() !== null) {
+            return;
+        }
+
+        if (!$this->container->bound(FirstFactorResolver::class) || $this->container->make(FirstFactorResolver::class) instanceof DeclaredFirstFactorResolver) {
             throw new \LogicException(sprintf('The application declares no first_factor, and no %s is bound to report it.', FirstFactorResolver::class));
         }
     }

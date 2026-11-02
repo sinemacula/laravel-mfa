@@ -25,10 +25,15 @@ use SineMacula\Laravel\Mfa\Context\PendingContext;
 interface PendingSessionResolver
 {
     /**
-     * The request's pending session, or `null` when it carries none.
+     * The request's pending session, or `null` only when the request carries no
+     * pending credential. A credential that does not validate is reported by
+     * throwing, never by answering `null`, so the request is refused rather
+     * than served as the guard's user.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
+     *
+     * @throws \RuntimeException
      */
     public function resolve(Request $request): ?PendingContext;
 }

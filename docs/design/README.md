@@ -37,7 +37,11 @@ The current note set is:
   contract and its trait, forgetting a deleted identity, and the guard every operation on a factor starts with.
 - `event-catalogue.md`: the events the flows dispatch, their payloads and context, and their dispatch after the commit.
 - `seam-contracts.md`: the contracts declared for the seams with an authentication layer and the application, what
-  each answers and what a fail-closed answer is, and the pending session and passkey assertion values they carry.
+  each answers, its fail-closed default, what the authentication layer provides for it, the calls that layer makes back
+  into this package (the challenge counters and the passkey change gate), the helpers' pending-action checks, and the
+  contract test kit an adapter proves itself with.
+- `passkeys.md`: how a passkey becomes a factor through its association record, the change gate every registration,
+  removal and change of a passkey passes through, and the assertions a passkey factor is verified with.
 - `requirements-and-freshness.md`: how a sign-in's requirement is composed from the application's mode, the identity,
   a re-enrolment obligation and an active tenant, how a session's proofs are checked against a requirement, and how a
   named operation's freshness is judged, the stricter of the package's and the caller's setting applying.

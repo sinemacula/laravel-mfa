@@ -196,6 +196,29 @@ final readonly class AttemptService
     }
 
     /**
+     * Under the identity's factor state lock: the lockout an attempt against
+     * the factor as stored there would be refused by now, or `null` when none
+     * applies. The identity's row is read with a locking read, as `attempt()`
+     * reads it, and the IP address is not considered: it is the read a caller
+     * holding the lock makes before it sends or checks a challenge of its own.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
+     * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
+     *
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     *
+     * @internal
+     */
+    public function lockedOut(MultiFactorAuthenticatable $identity, (EloquentFactor&Model)|null $factor): ?Lockout
+    {
+        $state = $this->identityState($this->subject($identity), true);
+
+        return $this->heldLockout($state, $factor, new AttemptSettings($this->config), CarbonImmutable::now());
+    }
+
+    /**
      * Lift the factor's lockout, or the identity's when no factor is given,
      * before it ends, as an action taken by the actor or by the identity
      * itself. The factor's failures in a row, and the identity's run, are
@@ -350,11 +373,7 @@ final readonly class AttemptService
         $subject = $this->subject($attempt->identity);
         $state   = $this->identityState($subject, true);
 
-        $lockout = Lockout::strictest(
-            $factor === null ? $this->identityCeiling($state, $settings) : null,
-            $this->identityLockout($state, $now),
-            $this->factorLockout($factor, $now),
-        );
+        $lockout = $this->heldLockout($state, $factor, $settings, $now);
 
         if ($lockout !== null) {
             return AttemptOutcome::refuse($lockout);
@@ -565,6 +584,28 @@ final readonly class AttemptService
         $state->save();
 
         return $until->isFuture();
+    }
+
+    /**
+     * The strictest lockout that refuses an attempt against the factor as
+     * stored: the identity's run at the failure ceiling when the attempt names
+     * no factor of its own, the identity's lockout, and the factor's.
+     *
+     * @param  ?\SineMacula\Laravel\Mfa\Models\IdentityState  $state
+     * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
+     * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptSettings  $settings
+     * @param  \Carbon\CarbonImmutable  $now
+     * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function heldLockout(?IdentityState $state, (EloquentFactor&Model)|null $factor, AttemptSettings $settings, CarbonImmutable $now): ?Lockout
+    {
+        return Lockout::strictest(
+            $factor === null ? $this->identityCeiling($state, $settings) : null,
+            $this->identityLockout($state, $now),
+            $this->factorLockout($factor, $now),
+        );
     }
 
     /**
