@@ -98,6 +98,11 @@ composer bench:ci   # PHPBench with CI artifact dump
 - New code is expected to ship with tests covering the behavioural surface; the package's mutation-testing gate
   (`composer test:mutation`) is the enforced floor. Behaviour that spans the MFA lifecycle (challenge, verification,
   events) should be covered by integration tests that exercise the package the way a consuming application does.
+- `tests/Feature/Verification/EventSequenceVerificationServiceTest.php` and
+  `tests/Feature/Enrollment/EventSequenceEnrollmentServiceTest.php` pin the events those flows dispatch and their order;
+  a change to either updates them and the design note that describes it.
+- The dependency rules between namespaces are data in `tests/Unit/Architecture/NamespaceDependenciesTest.php`; a change
+  that moves a class or narrows a dependency adds or tightens its rule there.
 
 ## Pull Requests
 
