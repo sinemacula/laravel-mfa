@@ -8,7 +8,6 @@ use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
-use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
@@ -18,7 +17,6 @@ use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\PasskeyDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
-use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
@@ -90,19 +88,20 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
         $factor = $this->totpFactor($user);
         $code   = AuthenticatorApp::code($factor);
 
-        // Reads (15): the factor found (1); under the lock, its factors (1);
+        // Reads (13): the factor found (1); under the lock, its factors (1);
         // the admission's first factor, whose session proofs, declaration and
-        // trust each read the generation (3), and its state and lockout (2);
-        // under the attempt's lock, its factors, state and lockout (3); the
-        // proof's generation (1); the evaluation's proofs, declaration and
-        // trust (3); and the re-enrolment obligation (1).
+        // trust each read the generation (3), and its state (1); under the
+        // attempt's lock, its factors and state (2); the proof's generation
+        // (1); the evaluation's proofs, declaration and trust (3); and the
+        // re-enrolment obligation (1). The factor's lockout is on the row its
+        // factors read, so it takes no statement of its own.
         //
         // Writes (7): the address's slot, an update that finds no row and an
         // insert (2); the identity's lock for the verification and for the
         // attempt inside it (2); the step's compare-and-set and the factor's
         // last use (2); and the slot given back (1). The proof goes to the
         // session, not the database.
-        $result = $this->assertQueryBudget(15, 7, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
+        $result = $this->assertQueryBudget(13, 7, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
 
         self::assertTrue($result->isVerified());
     }
@@ -123,8 +122,8 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
         self::assertTrue($this->mfa()->verify(Submission::factor($first->id, AuthenticatorApp::code($first)))->isVerified());
 
         // As the first window, with the address's slot taken by the update
-        // alone: reads (15), writes (6).
-        $result = $this->assertQueryBudget(15, 6, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
+        // alone: reads (13), writes (6).
+        $result = $this->assertQueryBudget(13, 6, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
 
         self::assertTrue($result->isVerified());
     }
@@ -141,17 +140,38 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
         $factor = $this->totpFactor($user);
         $code   = AuthenticatorApp::code($factor, 5);
 
-        // Reads (11): the factor found (1); the admission's factors, first
-        // factor, state and lockout (6); the attempt's factors, state and
-        // lockout (3); the identity's window read back (1).
+        // Reads (9): the factor found (1); the admission's factors, first
+        // factor and state (5); the attempt's factors and state (2); the
+        // identity's window read back (1).
         //
         // Writes (7): the address's slot (2); the two locks (2); the identity's
         // window counted in one upsert (1); the identity's and the factor's
         // runs (2). No step, no proof, no slot given back.
-        $result = $this->assertQueryBudget(11, 7, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
+        $result = $this->assertQueryBudget(9, 7, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
 
         self::assertSame(FailureReason::INVALID_CODE, $result->reason);
         self::assertSame(1, $this->factorRun($factor));
+    }
+
+    /**
+     * The wrong code that locks the factor costs what any other miss does: its
+     * deadline goes in the one update that counts its run.
+     *
+     * @return void
+     */
+    public function testATotpMissThatLocksTheFactor(): void
+    {
+        $user   = $this->signedInPerson();
+        $factor = $this->totpFactor($user, ['consecutive_failures' => 4]);
+        $code   = AuthenticatorApp::code($factor, 5);
+
+        // Reads (9) and writes (7): as a miss, with the deadline in the update
+        // of the factor's run rather than a statement of its own.
+        $result = $this->assertQueryBudget(9, 7, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
+
+        self::assertSame(FailureReason::INVALID_CODE, $result->reason);
+        self::assertSame(5, $this->factorRun($factor));
+        self::assertNotNull($factor->fresh()?->getLockedUntil());
     }
 
     /**
@@ -162,22 +182,15 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
     public function testATotpSubmissionAgainstALockedFactor(): void
     {
         $user   = $this->signedInPerson();
-        $factor = $this->totpFactor($user, ['consecutive_failures' => 5]);
+        $factor = $this->totpFactor($user, ['consecutive_failures' => 5, 'locked_until' => now()->addHour()]);
         $code   = AuthenticatorApp::code($factor);
 
-        $this->container()->make(AttemptStore::class)->hold(
-            $this->container()->make(AttemptKeys::class)->factor($factor->id),
-            AttemptScope::FACTOR,
-            5,
-            now()->addHour()->getTimestamp(),
-        );
-
-        // Reads (7): the factor found (1); the admission's factors, first
-        // factor, state and lockout (6).
+        // Reads (6): the factor found (1); the admission's factors, first
+        // factor and state (5).
         //
         // Writes (4): the address's slot taken (2) and given back (1); the lock
         // (1). The code is never checked, so nothing is counted or proved.
-        $result = $this->assertQueryBudget(7, 4, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
+        $result = $this->assertQueryBudget(6, 4, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
 
         self::assertSame(FailureReason::LOCKED, $result->reason);
     }
@@ -192,14 +205,14 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
         $user   = $this->signedInPerson();
         $factor = $this->emailFactor($user);
 
-        // Reads (17): the factor found (1); the request's factors, first
-        // factor, state and lockout (6); the gateway's admission, the same
-        // again (6); the send's factors (1); the factor's open code, and the
-        // destination's and the identity's codes for their caps (3).
+        // Reads (15): the factor found (1); the request's factors, first
+        // factor and state (5); the gateway's admission, the same again (5);
+        // the send's factors (1); the factor's open code, and the destination's
+        // and the identity's codes for their caps (3).
         //
         // Writes (7): the address's slot (2) and the slot given back (1); the
         // three locks (3); the code (1).
-        $result = $this->assertQueryBudget(17, 7, fn () => $this->mfa()->sendCode($factor->id));
+        $result = $this->assertQueryBudget(15, 7, fn () => $this->mfa()->sendCode($factor->id));
 
         self::assertTrue($result->wasSent());
     }
@@ -215,17 +228,17 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
 
         [$challenge, $code, $factor] = $this->sentTo($user);
 
-        // Reads (22): the factor found (1); the admission's factors, first
-        // factor, state and lockout (6); the gateway's admission, the same
-        // again (6); the code (1); the report's factors, state and lockout (3);
-        // the proof's generation (1); the evaluation's proofs, declaration and
-        // trust (3); the re-enrolment obligation (1).
+        // Reads (19): the factor found (1); the admission's factors, first
+        // factor and state (5); the gateway's admission, the same again (5);
+        // the code (1); the report's factors and state (2); the proof's
+        // generation (1); the evaluation's proofs, declaration and trust (3);
+        // the re-enrolment obligation (1).
         //
         // Writes (8): the address's slot, by the update alone (1); the locks of
         // the admission, the gateway's admission and the report (3); the code's
         // attempt counted and its use (2); the factor's last use (1); and the
         // slot given back (1).
-        $result = $this->assertQueryBudget(22, 8, fn (): VerificationResult => $this->mfa()->verify(Submission::challenge($factor, $challenge, $code)));
+        $result = $this->assertQueryBudget(19, 8, fn (): VerificationResult => $this->mfa()->verify(Submission::challenge($factor, $challenge, $code)));
 
         self::assertTrue($result->isVerified());
     }
@@ -244,13 +257,13 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
 
         $wrong = $code === '000000' ? '111111' : '000000';
 
-        // Reads (18): as a hit, up to and including the report's factors, state
-        // and lockout (17), and the identity's window read back (1).
+        // Reads (15): as a hit, up to and including the report's factors and
+        // state (14), and the identity's window read back (1).
         //
         // Writes (8): the address's slot (1); the three locks (3); the code's
         // attempt counted (1); the identity's window counted, and the
         // identity's and the factor's runs (3).
-        $result = $this->assertQueryBudget(18, 8, fn (): VerificationResult => $this->mfa()->verify(Submission::challenge($factor, $challenge, $wrong)));
+        $result = $this->assertQueryBudget(15, 8, fn (): VerificationResult => $this->mfa()->verify(Submission::challenge($factor, $challenge, $wrong)));
 
         self::assertSame(FailureReason::INVALID_CODE, $result->reason);
     }
@@ -340,17 +353,16 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
         $user   = $this->signedInPerson();
         $factor = $this->passkeyFactor($user);
 
-        // Reads (19): the factor found (1); the admission's factors, first
-        // factor, state and lockout (6); the attempt's factors, state and
-        // lockout (3); the association (1); the first factor read again for the
-        // assertion's channel check (3); the proof's generation (1); the
-        // evaluation's proofs, declaration and trust (3); the re-enrolment
-        // obligation (1).
+        // Reads (17): the factor found (1); the admission's factors, first
+        // factor and state (5); the attempt's factors and state (2); the
+        // association (1); the first factor read again for the assertion's
+        // channel check (3); the proof's generation (1); the evaluation's
+        // proofs, declaration and trust (3); the re-enrolment obligation (1).
         //
         // Writes (6): the address's slot (2) and the slot given back (1); the
         // two locks (2); the factor's last use (1). The gateway's own
         // statements are the adapter's, outside this budget.
-        $result = $this->assertQueryBudget(19, 6, fn (): VerificationResult => $this->mfa()->verify(Submission::assertion($factor->id, ['id' => self::CREDENTIAL])));
+        $result = $this->assertQueryBudget(17, 6, fn (): VerificationResult => $this->mfa()->verify(Submission::assertion($factor->id, ['id' => self::CREDENTIAL])));
 
         self::assertTrue($result->isVerified());
     }
@@ -371,13 +383,13 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
         $factor = $this->totpFactor($user);
         $code   = AuthenticatorApp::code($factor);
 
-        // Reads (9): the factor found (1); the admission's factors, whether its
-        // first factor is trusted, state and lockout (4); the attempt's
-        // factors, state and lockout (3); the proof's generation (1).
+        // Reads (7): the factor found (1); the admission's factors, whether its
+        // first factor is trusted, and state (3); the attempt's factors and
+        // state (2); the proof's generation (1).
         //
         // Writes (7): as a hit on an active session. What an adapter's
         // completion does with the proof is the adapter's, outside this budget.
-        $result = $this->assertQueryBudget(9, 7, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
+        $result = $this->assertQueryBudget(7, 7, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
 
         self::assertTrue($result->isVerified());
     }

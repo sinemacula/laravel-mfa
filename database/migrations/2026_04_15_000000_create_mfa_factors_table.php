@@ -81,6 +81,10 @@ return new class extends Migration {
             $blueprint->unsignedInteger('consecutive_failures')->default(0);
             $blueprint->timestamp('disabled_at')->nullable();
 
+            // When the factor's temporary lockout ends, on the row the factor
+            // state lock already holds, so an attempt reads it as committed.
+            $blueprint->timestamp('locked_until')->nullable();
+
             // The application the factor was enrolled through: an application's
             // limits on new enrolments count only its own.
             $blueprint->string('application')->nullable();

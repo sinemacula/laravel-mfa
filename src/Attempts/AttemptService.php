@@ -34,9 +34,10 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  *
  * - the factor, durably: its failures in a row (`consecutive_failures` on the
  *   factor's row), reset only by a success of that factor. From the factor
- *   limit on, each failure locks the factor for the lockout period; at the
- *   failure ceiling it is disabled until another factor is proved, it is
- *   rebound or the identity is reset;
+ *   limit on, each failure locks the factor for the lockout period (the
+ *   factor's locked-until column, in the same save); at the failure ceiling it
+ *   is disabled until another factor is proved, it is rebound or the identity
+ *   is reset;
  * - the identity, across all its factors and recovery codes: its failures
  *   within the window (a throttle row) lock it for the lockout period when they
  *   reach the identity limit (`locked_until` on its state row), and its durable
@@ -197,8 +198,9 @@ final readonly class AttemptService
      * IP address, would be refused by now, or `null` when none applies: with no
      * factor, or one that keeps no state, that includes the identity's run at
      * the failure ceiling. It reads the write connection but takes no lock, so
-     * it answers for this moment only; `attempt()` reads it again under the
-     * lock.
+     * it is advisory: it answers for this moment only, and inside a transaction
+     * of the caller's may answer from that transaction's older snapshot.
+     * `attempt()` reads it again under the lock.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -284,17 +286,8 @@ final readonly class AttemptService
             }
 
             $locked = LockedFactors::find($factor, $factors);
-            $key    = $locked === null ? null : $this->factorKey($locked);
 
-            if ($key === null) {
-                return false;
-            }
-
-            $live = ($this->store->read([$key])[$key]['ends'] ?? 0) > CarbonImmutable::now()->getTimestamp();
-
-            $this->store->forget($key);
-
-            return $live;
+            return $locked !== null && $this->unlockFactor($locked);
         });
 
         if ($lifted) {
@@ -565,17 +558,17 @@ final readonly class AttemptService
             return;
         }
 
-        $factor->persist();
+        if ($run < $settings->factorLimit()) {
 
-        $key = $this->factorKey($factor);
+            $factor->persist();
 
-        if ($key === null || $run < $settings->factorLimit()) {
             return;
         }
 
         $until = $now->addSeconds($settings->lockoutSeconds());
 
-        $this->store->hold($key, AttemptScope::FACTOR, $run, $until->getTimestamp());
+        $factor->setAttribute($factor->getLockedUntilName(), $until);
+        $factor->persist();
 
         $context = $this->events->context($attempt->identity, $attempt->application);
 
@@ -595,6 +588,31 @@ final readonly class AttemptService
         $factor->setAttribute($factor->getConsecutiveFailuresName(), 0);
 
         $factor->persist();
+    }
+
+    /**
+     * Clear the factor's deadline, one that has passed included. Returns
+     * whether it was live.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @return bool
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
+     *
+     * @imperative
+     */
+    private function unlockFactor(EloquentFactor&Model $factor): bool
+    {
+        $until = $factor->getLockedUntil();
+
+        if ($until === null) {
+            return false;
+        }
+
+        $factor->setAttribute($factor->getLockedUntilName(), null);
+        $factor->persist();
+
+        return $until->isFuture();
     }
 
     /**
@@ -695,13 +713,12 @@ final readonly class AttemptService
 
     /**
      * The factor's lockout: disabled at the failure ceiling, or locked by its
-     * failures in a row while that lockout is live.
+     * failures in a row while that lockout is live. It is read off the instance
+     * given, so the row as locked answers for an attempt.
      *
      * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
      * @param  \Carbon\CarbonImmutable  $now
      * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
-     *
-     * @throws \InvalidArgumentException
      */
     private function factorLockout((EloquentFactor&Model)|null $factor, CarbonImmutable $now): ?Lockout
     {
@@ -713,10 +730,11 @@ final readonly class AttemptService
             return Lockout::disabled();
         }
 
-        $key  = $this->factorKey($factor);
-        $ends = $key === null ? null : ($this->store->read([$key])[$key]['ends'] ?? null);
+        $until = $factor->getLockedUntil();
 
-        return $ends !== null && $ends > $now->getTimestamp() ? Lockout::endingAtTimestamp(AttemptScope::FACTOR, $ends) : null;
+        return $until !== null && $until->getTimestamp() > $now->getTimestamp()
+            ? Lockout::endingAt(AttemptScope::FACTOR, CarbonImmutable::instance($until))
+            : null;
     }
 
     /**
@@ -774,22 +792,6 @@ final readonly class AttemptService
         $model = ConfiguredModels::factor($this->config);
 
         return new $model;
-    }
-
-    /**
-     * The key of the factor's throttle row, or `null` for a factor without a
-     * usable id.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return ?string
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function factorKey(Factor $factor): ?string
-    {
-        $id = LockedFactors::idOf($factor);
-
-        return $id === null ? null : $this->keys->factor($id);
     }
 
     /**

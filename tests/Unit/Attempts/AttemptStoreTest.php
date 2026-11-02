@@ -15,7 +15,7 @@ use Tests\TestCase;
 /**
  * Tests for `AttemptStore`: slots taken from a window up to its limit and given
  * back to it, failures recorded past it, windows that restart once ended, and
- * rows held, read and forgotten.
+ * rows read and forgotten.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -165,27 +165,23 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * A held row takes the given count and end whatever it held, and a
-     * forgotten row is gone.
+     * A forgotten row is gone, and the others stay.
      *
      * @return void
      */
-    public function testARowIsHeldAndForgotten(): void
+    public function testARowIsForgotten(): void
     {
         $store = $this->store();
 
-        $store->hold(self::KEY, AttemptScope::FACTOR, 5, self::NOW + 900);
+        $this->storeRow(self::KEY, 5, self::NOW + 900);
+        $this->storeRow($this->key('other'), 1, self::NOW + 900);
 
         self::assertSame(['hits' => 5, 'ends' => self::NOW + 900], $store->read([self::KEY])[self::KEY]);
-        self::assertSame('factor', DB::table('mfa_attempts')->where('key', self::KEY)->value('scope'));
-
-        $store->hold(self::KEY, AttemptScope::FACTOR, 6, self::NOW + 1800);
-
-        self::assertSame(['hits' => 6, 'ends' => self::NOW + 1800], $store->read([self::KEY])[self::KEY]);
 
         $store->forget(self::KEY);
 
         self::assertSame([], $store->read([self::KEY]));
+        self::assertCount(1, $store->read([$this->key('other')]));
     }
 
     /**
@@ -196,17 +192,33 @@ final class AttemptStoreTest extends TestCase
      */
     public function testOnlyTheRowsAskedForAreRead(): void
     {
-        $store = $this->store();
+        $this->storeRow($this->key('first'), 1, self::NOW + 60);
+        $this->storeRow($this->key('second'), 2, self::NOW + 120);
+        $this->storeRow($this->key('third'), 3, self::NOW + 180);
 
-        $store->hold($this->key('first'), AttemptScope::FACTOR, 1, self::NOW + 60);
-        $store->hold($this->key('second'), AttemptScope::FACTOR, 2, self::NOW + 120);
-        $store->hold($this->key('third'), AttemptScope::FACTOR, 3, self::NOW + 180);
-
-        $rows = $store->read([$this->key('second'), $this->key('missing'), $this->key('third')]);
+        $rows = $this->store()->read([$this->key('second'), $this->key('missing'), $this->key('third')]);
 
         self::assertCount(2, $rows);
         self::assertSame(['hits' => 2, 'ends' => self::NOW + 120], $rows[$this->key('second')]);
         self::assertSame(['hits' => 3, 'ends' => self::NOW + 180], $rows[$this->key('third')]);
+    }
+
+    /**
+     * Store a row with the given count and end.
+     *
+     * @param  string  $key
+     * @param  int  $hits
+     * @param  int  $ends
+     * @return void
+     */
+    private function storeRow(string $key, int $hits, int $ends): void
+    {
+        DB::table('mfa_attempts')->insert([
+            'key'            => $key,
+            'scope'          => AttemptScope::IP->value,
+            'hits'           => $hits,
+            'window_ends_at' => CarbonImmutable::createFromTimestamp($ends, date_default_timezone_get())->format('Y-m-d H:i:s'),
+        ]);
     }
 
     /**

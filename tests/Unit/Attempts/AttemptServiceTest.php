@@ -6,8 +6,13 @@ namespace Tests\Unit\Attempts;
 
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
@@ -20,11 +25,14 @@ use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\FactorDisabled;
 use SineMacula\Laravel\Mfa\Events\LockoutApplied;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Factors\RemappedLockoutFactor;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -172,8 +180,41 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * The deadline goes on the factor's own row, in the one save that counts
+     * the failure, and nothing of the factor goes in the attempts table.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheDeadlineIsStoredOnTheFactorInTheSaveThatCountsTheFailure(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 2);
+        config()->set('mfa.attempts.lockout_seconds', 300);
+
+        $user   = $this->user();
+        $factor = $this->factor($user, failures: 1);
+        $saves  = 0;
+
+        Factor::saved(static function () use (&$saves): void {
+            $saves++;
+        });
+
+        try {
+            $this->attempt($user, $factor, false);
+        } finally {
+            Factor::flushEventListeners();
+        }
+
+        self::assertSame(1, $saves);
+        self::assertSame(2, $this->fresh($factor)->getConsecutiveFailures());
+        self::assertEquals(CarbonImmutable::now()->addSeconds(300), $this->fresh($factor)->getLockedUntil());
+        self::assertTrue(DB::table('mfa_attempts')->where('scope', AttemptScope::FACTOR->value)->doesntExist());
+    }
+
+    /**
      * A locked factor refuses the attempt without running the verification,
-     * counts it nowhere and does not extend the lockout.
+     * counts it nowhere, does not extend the lockout and reports nothing more.
      *
      * @return void
      *
@@ -183,12 +224,17 @@ final class AttemptServiceTest extends TestCase
     {
         config()->set('mfa.attempts.factor_limit', 1);
 
+        Event::fake([FactorDisabled::class, LockoutApplied::class]);
+
         $user   = $this->user();
         $factor = $this->factor($user);
 
         $this->attempt($user, $factor, false);
 
-        $before = $this->service()->lockout($user, $factor);
+        $before   = $this->service()->lockout($user, $factor);
+        $deadline = $this->fresh($factor)->getLockedUntil();
+
+        self::assertNotNull($deadline);
 
         Carbon::setTestNow('2026-11-01 12:05:00');
 
@@ -202,9 +248,193 @@ final class AttemptServiceTest extends TestCase
         self::assertTrue($outcome->isRefused());
         self::assertEquals($before, $outcome->lockout);
         self::assertEquals($before, $this->service()->lockout($user, $factor));
+        self::assertEquals($deadline, $this->fresh($factor)->getLockedUntil());
         self::assertSame(1, $this->fresh($factor)->getConsecutiveFailures());
         self::assertSame(1, $this->state($user)?->consecutive_failures);
         self::assertSame(1, $this->hits($this->keys()->ip(self::IP)));
+        Event::assertDispatchedTimes(LockoutApplied::class, 1);
+        Event::assertNotDispatched(FactorDisabled::class);
+    }
+
+    /**
+     * A lockout applies up to the second before its deadline and not from the
+     * deadline itself, for the read and for an attempt alike.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testALockoutEndsExactlyAtItsDeadline(): void
+    {
+        $user   = $this->user();
+        $factor = $this->factor($user, failures: 5);
+        $until  = $this->lockFactor($factor);
+
+        Carbon::setTestNow($until->subSecond());
+
+        self::assertSame(AttemptScope::FACTOR, $this->service()->lockout($user, $factor)?->scope);
+        self::assertSame(AttemptScope::FACTOR, $this->attempt($user, $factor, true)->lockout?->scope);
+        self::assertSame(5, $this->fresh($factor)->getConsecutiveFailures());
+
+        Carbon::setTestNow($until);
+
+        self::assertNull($this->service()->lockout($user, $factor));
+        self::assertTrue($this->attempt($user, $factor, true)->passed);
+    }
+
+    /**
+     * Both an attempt and the lockout read answer from the row as stored, not
+     * from the instance the caller holds: a copy read before the lockout is
+     * refused, and a copy read before a lift is not.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheDeadlineIsReadFromTheRowAndNotTheCallersCopy(): void
+    {
+        $user   = $this->user();
+        $before = $this->factor($user);
+
+        $this->lockFactor($before);
+
+        self::assertNull($before->getLockedUntil());
+        self::assertSame(AttemptScope::FACTOR, $this->service()->lockout($user, $before)?->scope);
+        self::assertSame(AttemptScope::FACTOR, $this->attempt($user, $before, true)->lockout?->scope);
+
+        $locked = $this->fresh($before);
+
+        self::assertTrue($this->service()->liftLockout($user, $before));
+        self::assertNotNull($locked->getLockedUntil());
+        self::assertNull($this->service()->lockout($user, $locked));
+        self::assertTrue($this->attempt($user, $locked, true)->passed);
+    }
+
+    /**
+     * A model event that cancels the save of the failure that locks the factor
+     * throws and rolls everything back: nothing is counted, no deadline is
+     * stored and nothing is reported.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACancelledSaveRollsTheLockoutBack(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 1);
+
+        Event::fake([LockoutApplied::class]);
+
+        $user   = $this->user();
+        $factor = $this->factor($user);
+
+        Factor::saving(static fn (): bool => false);
+
+        try {
+            $this->attempt($user, $factor, false);
+
+            self::fail('A cancelled save must not be counted as made.');
+        } catch (WriteCanceledException $exception) {
+            self::assertStringContainsString('cancelled', $exception->getMessage());
+        } finally {
+            Factor::flushEventListeners();
+        }
+
+        self::assertNull($this->fresh($factor)->getLockedUntil());
+        self::assertSame(0, $this->fresh($factor)->getConsecutiveFailures());
+        self::assertNull($this->state($user));
+        self::assertSame(0, $this->hits($this->keys()->identity($user::class, (string) $user->id)));
+        self::assertSame(0, $this->hits($this->keys()->ip(self::IP)));
+        Event::assertNotDispatched(LockoutApplied::class);
+    }
+
+    /**
+     * A custom column with no cast declared works once the model is read back
+     * from storage: the deadline is written to it, refuses from it and is
+     * lifted from it. The shipped column is never touched.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACustomColumnHoldsTheDeadlineAfterReloadingFromStorage(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 1);
+        config()->set('mfa.attempts.lockout_seconds', 300);
+        config()->set('mfa.factor.model', RemappedLockoutFactor::class);
+
+        Schema::table('mfa_factors', static function (Blueprint $table): void {
+            $table->timestamp('held_until')->nullable();
+        });
+
+        $user   = $this->user();
+        $factor = RemappedLockoutFactor::query()->create([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'totp',
+            'status'               => 'confirmed',
+        ]);
+        $row   = DB::table('mfa_factors')->where('id', $factor->getKey());
+        $until = CarbonImmutable::now()->addSeconds(300);
+
+        $this->attempt($user, $factor, false);
+
+        /** @var \Tests\Fixtures\Factors\RemappedLockoutFactor $stored */
+        $stored = RemappedLockoutFactor::query()->findOrFail($factor->getKey());
+
+        self::assertEquals($until, $stored->getLockedUntil());
+        self::assertNotNull((clone $row)->value('held_until'));
+        self::assertNull((clone $row)->value('locked_until'));
+
+        $refused = $this->attempt($user, $stored, true);
+
+        self::assertSame(AttemptScope::FACTOR, $refused->lockout?->scope);
+        self::assertEquals($until, $refused->lockout->until);
+        self::assertEquals($until, $this->service()->lockout($user, $stored)?->until);
+        self::assertTrue($this->service()->liftLockout($user, $stored));
+        self::assertNull((clone $row)->value('held_until'));
+    }
+
+    /**
+     * An independent model with no cast on `disabled_at`, disabled at the
+     * failure ceiling, is read back from storage as disabled and refused as
+     * disabled without running the verification.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnUncastCustomModelDisabledAtTheCeilingIsRefusedAsDisabled(): void
+    {
+        config()->set('mfa.attempts.failure_ceiling', 1);
+        config()->set('mfa.factor.model', RemappedLockoutFactor::class);
+
+        Schema::table('mfa_factors', static function (Blueprint $table): void {
+            $table->timestamp('held_until')->nullable();
+        });
+
+        $user   = $this->user();
+        $factor = RemappedLockoutFactor::query()->create([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'totp',
+            'status'               => 'confirmed',
+        ]);
+
+        $this->attempt($user, $factor, false);
+
+        /** @var \Tests\Fixtures\Factors\RemappedLockoutFactor $stored */
+        $stored = RemappedLockoutFactor::query()->findOrFail($factor->getKey());
+
+        self::assertNotNull($stored->getDisabledAt());
+
+        $refused = $this->service()->attempt(new Attempt($user, $stored, Purpose::SIGN_IN), static function (): bool {
+            throw new MidRotationFailureException('The verification must not run.');
+        });
+
+        self::assertTrue($refused->isRefused());
+        self::assertTrue($refused->lockout?->isDisabled());
+        self::assertTrue($this->service()->lockout($user, $stored)?->isDisabled());
     }
 
     /**
@@ -400,7 +630,35 @@ final class AttemptServiceTest extends TestCase
             static fn (FactorDisabled $event): bool => $event->factor->id === $factor->id && $event->purpose === Purpose::SIGN_IN,
         );
         Event::assertNotDispatched(LockoutApplied::class);
-        self::assertSame(0, $this->hits($this->keys()->factor($factor->id)));
+        self::assertNull($this->fresh($factor)->getLockedUntil());
+    }
+
+    /**
+     * A failure that brings the identity's run to the failure ceiling takes
+     * precedence over the factor limit too: it disables the factor, and writes
+     * no deadline, however far past the limit the factor is.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheIdentityCeilingTakesPrecedenceOverTheFactorLimit(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 1);
+        config()->set('mfa.attempts.failure_ceiling', 2);
+
+        Event::fake([FactorDisabled::class, LockoutApplied::class]);
+
+        $user   = $this->user();
+        $factor = $this->factor($user);
+
+        $this->attempt($user, null, false);
+        $this->attempt($user, $factor, false);
+
+        self::assertNotNull($this->fresh($factor)->getDisabledAt());
+        self::assertNull($this->fresh($factor)->getLockedUntil());
+        Event::assertDispatched(FactorDisabled::class);
+        Event::assertNotDispatched(LockoutApplied::class);
     }
 
     /**
@@ -487,6 +745,7 @@ final class AttemptServiceTest extends TestCase
 
         self::assertTrue($this->service()->liftLockout($user, $factor, Actor::of($admin)));
         self::assertNull($this->service()->lockout($user, $factor));
+        self::assertNull($this->fresh($factor)->getLockedUntil());
         self::assertSame(2, $this->fresh($factor)->getConsecutiveFailures());
         Event::assertDispatched(
             LockoutLifted::class,
@@ -499,6 +758,124 @@ final class AttemptServiceTest extends TestCase
         $this->attempt($user, $factor, false);
 
         self::assertSame(AttemptScope::FACTOR, $this->service()->lockout($user, $factor)?->scope);
+    }
+
+    /**
+     * Lifting clears a deadline that has already passed, the moment it ends
+     * included, but it was not live, so nothing is reported as lifted and the
+     * failures in a row are kept.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testLiftingAnEndedLockoutClearsItAndReportsNothing(): void
+    {
+        Event::fake([LockoutLifted::class]);
+
+        $user   = $this->user();
+        $factor = $this->factor($user, failures: 5);
+
+        foreach ([Carbon::now()->subMinute(), Carbon::now()] as $until) {
+
+            $factor->update(['locked_until' => $until]);
+
+            self::assertFalse($this->service()->liftLockout($user, $factor));
+            self::assertNull($this->fresh($factor)->getLockedUntil());
+            self::assertSame(5, $this->fresh($factor)->getConsecutiveFailures());
+        }
+
+        Event::assertNotDispatched(LockoutLifted::class);
+    }
+
+    /**
+     * A model event that cancels the save of a lift throws, and leaves the
+     * lockout in force and unreported.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACancelledSaveLeavesTheLockoutInForce(): void
+    {
+        Event::fake([LockoutLifted::class]);
+
+        $user   = $this->user();
+        $factor = $this->factor($user);
+        $until  = $this->lockFactor($factor);
+
+        Factor::saving(static fn (): bool => false);
+
+        try {
+            $this->service()->liftLockout($user, $factor);
+
+            self::fail('A cancelled save must not be reported as a lift.');
+        } catch (WriteCanceledException $exception) {
+            self::assertStringContainsString('cancelled', $exception->getMessage());
+        } finally {
+            Factor::flushEventListeners();
+        }
+
+        self::assertEquals($until, $this->fresh($factor)->getLockedUntil());
+        Event::assertNotDispatched(LockoutLifted::class);
+    }
+
+    /**
+     * Stored deadlines that cannot be read as a time.
+     *
+     * @return iterable<string, array{string, class-string<\Throwable>}>
+     */
+    public static function unreadableDeadlines(): iterable
+    {
+        yield 'not a time' => ['not a time', InvalidFormatException::class];
+        yield 'empty' => ['', InvalidModelException::class];
+        yield 'blank' => ['   ', InvalidModelException::class];
+    }
+
+    /**
+     * A stored deadline that cannot be read as a time fails closed: an attempt
+     * and the lockout read throw, the verification does not run and nothing is
+     * counted, rather than the factor reading as unlocked. The column is text
+     * here, as MySQL and PostgreSQL would refuse such a value in a timestamp.
+     *
+     * @param  string  $stored
+     * @param  class-string<\Throwable>  $exception
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('unreadableDeadlines')]
+    public function testAnUnreadableDeadlineFailsClosed(string $stored, string $exception): void
+    {
+        Schema::table('mfa_factors', static function (Blueprint $table): void {
+            $table->string('held_until')->nullable();
+        });
+
+        $user   = $this->user();
+        $factor = RemappedLockoutFactor::query()->create([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'totp',
+            'status'               => 'confirmed',
+        ]);
+
+        DB::table('mfa_factors')->where('id', $factor->getKey())->update(['held_until' => $stored]);
+
+        try {
+            $this->service()->attempt(new Attempt($user, $factor, Purpose::SIGN_IN), static function (): bool {
+                throw new MidRotationFailureException('The verification must not run.');
+            });
+
+            self::fail('An unreadable deadline must not read as no lockout.');
+        } catch (\Throwable $thrown) {
+            self::assertInstanceOf($exception, $thrown);
+        }
+
+        self::assertNull($this->state($user));
+
+        $this->expectException($exception);
+
+        $this->service()->lockout($user, $factor);
     }
 
     /**
@@ -539,6 +916,8 @@ final class AttemptServiceTest extends TestCase
 
         self::assertTrue($this->service()->liftLockout($user, $factor));
         self::assertTrue($this->service()->lockout($user, $factor)?->isDisabled());
+        self::assertNull($this->fresh($factor)->getLockedUntil());
+        self::assertSame(100, $this->fresh($factor)->getConsecutiveFailures());
     }
 
     /**
@@ -877,6 +1256,11 @@ final class AttemptServiceTest extends TestCase
 
         self::assertNull($this->service()->lockedOut($user, $factor));
 
+        $locked = $this->factor($user);
+        $until  = $this->lockFactor($locked);
+
+        self::assertEquals($until, $this->service()->lockedOut($user, $this->fresh($locked))?->until);
+
         $disabled = $this->factor($user, disabled: true);
 
         self::assertTrue($this->service()->lockedOut($user, $disabled)?->isDisabled());
@@ -913,14 +1297,15 @@ final class AttemptServiceTest extends TestCase
      * Lock the factor for five minutes, as its failures in a row would.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
+     * @return \Carbon\CarbonImmutable
      */
-    private function lockFactor(Factor $factor): void
+    private function lockFactor(Factor $factor): CarbonImmutable
     {
-        $this->container()->make(AttemptStore::class)->hold($this->keys()->factor($factor->id), AttemptScope::FACTOR, 5, CarbonImmutable::now()->addMinutes(5)->getTimestamp());
+        $until = CarbonImmutable::now()->addMinutes(5);
+
+        Factor::query()->whereKey($factor->id)->update(['locked_until' => $until]);
+
+        return $until;
     }
 
     /**

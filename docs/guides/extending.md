@@ -37,6 +37,18 @@ A custom factor or recovery code model lives on the storage connection with the 
 [Storage](configuration.md#storage)): one on another connection is refused when the package boots. The recovery code
 model is set with `mfa.recovery_codes.model`. Identity models are described in [Identity models](identity-models.md).
 
+A custom factor model keeps its temporary lockout on its own row, in the column `getLockedUntilName()` names
+(`locked_until` by default), and when the failure ceiling disabled it in the column `getDisabledAtName()` names
+(`disabled_at` by default). `Concerns\ActsAsFactor` casts both columns as a `datetime` itself, whatever they are named,
+so the model need declare no cast for them, and any cast it does declare is left as it is. A stored value in either that
+does not read as a time throws rather than reads as unlocked or enabled. So does a status, in the column
+`getStatusName()` names, that is neither `pending` nor `confirmed` (or the `FactorStatus` case for either): it is never
+read as pending, as a factor read as not confirmed can let a weaker proof through, and only a new factor not yet given a
+status reads as pending. A model that casts the status to `Enums\FactorStatus` throws Laravel's `ValueError` from the
+cast instead of `InvalidModelException` for a value the enum does not know, which fails closed the same way. A reset
+removes such a factor (see [Factor lifecycle](lifecycle.md)). A model implementing `Contracts\EloquentFactor` without
+the trait must do the same. A factor implementing only `Contracts\Factor` has no row, and so no lockout of its own.
+
 A custom factor model that implements `Contracts\EloquentFactor` itself, rather than through `Concerns\ActsAsFactor`,
 must make `storeAcceptedStep()` a compare-and-set on its stored row: record the TOTP time step only when it is later
 than the stored one, in one atomic statement, and report whether it did. The TOTP driver accepts a code only when the

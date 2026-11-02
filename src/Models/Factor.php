@@ -23,6 +23,11 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * persistence boundary. An implicit route binding of it finds only the caller's
  * own factors (see `Concerns\ResolvesFactorRouteBinding`).
  *
+ * The class-level suppression is for one method: the model-behaviour rule
+ * reports a trait's public methods at the class that imports them, and its list
+ * of framework hooks does not include Eloquent's trait initialiser,
+ * `initializeActsAsFactor()`, which only sets casts.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -42,11 +47,14 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property bool $preferred
  * @property int $consecutive_failures
  * @property ?\Carbon\CarbonInterface $disabled_at
+ * @property ?\Carbon\CarbonInterface $locked_until
  * @property ?string $application
  * @property ?\Carbon\CarbonInterface $confirmed_at
  * @property ?\Carbon\CarbonInterface $last_used_at
  *
  * @inheritable
+ *
+ * @phpstan-ignore sineMaculaLaravel.modelBehaviour
  */
 class Factor extends Model implements EloquentFactor
 {
@@ -69,6 +77,7 @@ class Factor extends Model implements EloquentFactor
         'preferred',
         'consecutive_failures',
         'disabled_at',
+        'locked_until',
         'application',
         'confirmed_at',
         'last_used_at',
@@ -148,6 +157,7 @@ class Factor extends Model implements EloquentFactor
             'preferred'            => 'boolean',
             'consecutive_failures' => 'integer',
             'disabled_at'          => 'datetime',
+            'locked_until'         => 'datetime',
             'application'          => 'string',
             'confirmed_at'         => 'datetime',
             'last_used_at'         => 'datetime',

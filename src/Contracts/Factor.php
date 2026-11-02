@@ -20,9 +20,10 @@ use SineMacula\Laravel\Mfa\Enums\FactorStatus;
  * double.
  *
  * The last verification time is still read here until the proof store replaces
- * it with a record of its own. Delivered codes have a record of their own, and
- * lockouts are not a property of the factor: the attempt service reads them
- * (see `Attempts\AttemptService::lockout()`).
+ * it with a record of its own. Delivered codes have a record of their own. A
+ * lockout is not read here: only a factor with a row of its own can hold a
+ * deadline (see `EloquentFactor`), and the attempt service answers for every
+ * scope (see `Attempts\AttemptService::lockout()`).
  *
  * Persistence-capable implementations also implement the narrower
  * `EloquentFactor` boundary, which adds the owner relation, the column names
@@ -117,9 +118,13 @@ interface Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethod
     public function getLastAcceptedStep(): ?int;
 
     /**
-     * Return where the factor is in its enrolment.
+     * Return where the factor is in its enrolment. A stored value that is none
+     * of the statuses must throw, never read as pending, since a factor read as
+     * not confirmed can let a weaker path through.
      *
      * @return \SineMacula\Laravel\Mfa\Enums\FactorStatus
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function getStatus(): FactorStatus;
 
@@ -148,9 +153,12 @@ interface Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethod
 
     /**
      * Return when the factor was disabled for reaching the failure ceiling, or
-     * `null` while it is not.
+     * `null` while it is not. A stored value that does not read as a time must
+     * throw, never read as `null`, since that would enable the factor.
      *
      * @return ?\Carbon\CarbonInterface
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function getDisabledAt(): ?CarbonInterface;
 

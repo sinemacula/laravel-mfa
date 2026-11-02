@@ -32,12 +32,15 @@ interface MultiFactorAuthenticatable extends Authenticatable
      * Determine whether multi-factor authentication is currently enabled for
      * this identity.
      *
-     * Canonical rule: MFA is enabled once the identity has at least one
-     * confirmed factor. A pending factor, one whose enrolment has started but
-     * not been confirmed, never counts: it can only be confirmed or abandoned.
-     * The `HasFactors` trait implements the rule by filtering the identity's
-     * factors on the factor's status column (`getStatusName()`) holding
-     * `FactorStatus::CONFIRMED`, read from the write connection.
+     * Canonical rule: MFA is enabled once the identity has at least one factor
+     * that is not pending. A pending factor, one whose enrolment has started
+     * but not been confirmed, never counts: it can only be confirmed or
+     * abandoned. A factor whose stored status is none the package knows does
+     * count, so a corrupt status holds the identity to MFA rather than letting
+     * it on as having no factor; reading that factor then throws. The
+     * `HasFactors` trait implements the rule by reading the factor's status
+     * column (`getStatusName()`) from the write connection and counting every
+     * value but exactly `FactorStatus::PENDING`'s.
      *
      * What the current sign-in has proved lives separately, in the proof store
      * (`Mfa::proofs()`), so implementations should not fold "has verified" into

@@ -285,6 +285,7 @@ final class FactorTest extends TestCase
             'preferred',
             'consecutive_failures',
             'disabled_at',
+            'locked_until',
             'application',
             'confirmed_at',
             'last_used_at',

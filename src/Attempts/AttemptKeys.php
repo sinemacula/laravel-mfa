@@ -12,12 +12,12 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
  * scope and the subject it counts, keyed with a key derived from the
  * application key (`app.key`).
  *
- * What a row counts (a factor id, an identity's key, an IP address) is usually
- * easy to enumerate, so a plain digest of it could be reversed by anyone who
- * reads the table, from a backup or a replica, by hashing every candidate. A
- * keyed digest cannot be recomputed without the application key, and stays
- * deterministic, so every server counts in the same row. Rotating the
- * application key starts every throttle afresh; the durable counts on the
+ * What a row counts (an identity's key, an IP address) is usually easy to
+ * enumerate, so a plain digest of it could be reversed by anyone who reads the
+ * table, from a backup or a replica, by hashing every candidate. A keyed digest
+ * cannot be recomputed without the application key, and stays deterministic, so
+ * every server counts in the same row. Rotating the application key starts
+ * every throttle afresh; the durable counts and the lockout deadlines on the
  * factor and identity state rows are kept.
  *
  * An IP address is counted by the client it stands for: an IPv4 address, or the
@@ -49,19 +49,6 @@ final readonly class AttemptKeys
         /** Configuration the application key is read from on every call. */
         private Repository $config,
     ) {}
-
-    /**
-     * The key of a factor's row: the lockout its failures in a row applied.
-     *
-     * @param  string  $factor
-     * @return string
-     *
-     * @throws \InvalidArgumentException
-     */
-    public function factor(string $factor): string
-    {
-        return $this->digest(AttemptScope::FACTOR, [$factor]);
-    }
 
     /**
      * The key of an identity's row: its failures within the window.

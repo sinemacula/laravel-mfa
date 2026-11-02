@@ -47,8 +47,8 @@ final class MigrationSmokeTest extends TestCase
 
         yield 'mfa_factors' => ['mfa_factors', [
             'id', ...$owner, 'type', 'label', 'destination', 'credential_reference', 'secret', 'totp_algorithm', 'totp_digits',
-            'totp_period', 'last_accepted_step', 'status', 'preferred', 'consecutive_failures', 'disabled_at', 'application',
-            'confirmed_at', 'last_used_at', 'created_at', 'updated_at',
+            'totp_period', 'last_accepted_step', 'status', 'preferred', 'consecutive_failures', 'disabled_at', 'locked_until',
+            'application', 'confirmed_at', 'last_used_at', 'created_at', 'updated_at',
         ]];
         yield 'mfa_identity_states' => ['mfa_identity_states', [
             'id', ...$owner, 'verification_generation', 'reenrollment_required', 'consecutive_failures', 'locked_until',

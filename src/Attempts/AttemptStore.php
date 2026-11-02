@@ -106,28 +106,6 @@ final readonly class AttemptStore
     }
 
     /**
-     * Store the row with the given count and a window that ends at `$until`,
-     * whatever it held before: how a lockout is recorded.
-     *
-     * @param  string  $key
-     * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
-     * @param  int  $hits
-     * @param  int  $until
-     * @return void
-     *
-     * @throws \InvalidArgumentException
-     */
-    public function hold(string $key, AttemptScope $scope, int $hits, int $until): void
-    {
-        $this->table()->upsert([[
-            'key'            => $key,
-            'scope'          => $scope->value,
-            'hits'           => $hits,
-            'window_ends_at' => $this->format($until),
-        ]], ['key'], ['hits', 'window_ends_at']);
-    }
-
-    /**
      * Give back one slot taken from the window that ends at `$window`, as
      * `take()` returned it; a row that has moved on to a later window, or holds
      * no attempt, is left alone.

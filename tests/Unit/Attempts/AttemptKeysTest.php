@@ -38,12 +38,12 @@ final class AttemptKeysTest extends TestCase
         $keys = self::keys(self::APP_KEY);
 
         $secret   = hash_hmac('sha256', 'sinemacula/laravel-mfa attempt throttles', self::APP_KEY, true);
-        $expected = hash_hmac('sha256', "factor\0factor-1", $secret);
+        $expected = hash_hmac('sha256', implode("\0", ['identity', 'App\Models\User', '1']), $secret);
 
-        self::assertSame($expected, $keys->factor('factor-1'));
-        self::assertSame($keys->factor('factor-1'), $keys->factor('factor-1'));
-        self::assertMatchesRegularExpression('/\A[0-9a-f]{64}\z/', $keys->identity('App\Models\User', '1'));
-        self::assertNotSame(hash('sha256', 'factor-1'), $keys->factor('factor-1'));
+        self::assertSame($expected, $keys->identity('App\Models\User', '1'));
+        self::assertSame($keys->identity('App\Models\User', '1'), $keys->identity('App\Models\User', '1'));
+        self::assertMatchesRegularExpression('/\A[0-9a-f]{64}\z/', $keys->ip('192.0.2.1'));
+        self::assertNotSame(hash('sha256', '192.0.2.1'), $keys->ip('192.0.2.1'));
     }
 
     /**
@@ -57,11 +57,9 @@ final class AttemptKeysTest extends TestCase
         $keys = self::keys(self::APP_KEY);
 
         $digests = [
-            $keys->factor('1'),
             $keys->identity('App\Models\User', '1'),
             $keys->identity('App\Models\Admin', '1'),
             $keys->identity('App\Models\User', '2'),
-            $keys->factor('2'),
             $keys->ip('1'),
             $keys->ip('192.0.2.1'),
             $keys->ip('198.51.100.7'),
@@ -91,7 +89,7 @@ final class AttemptKeysTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('The attempt throttles key their rows with the application key; set `app.key`.');
 
-        self::keys('')->factor('factor-1');
+        self::keys('')->ip('192.0.2.1');
     }
 
     /**

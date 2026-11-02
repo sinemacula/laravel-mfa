@@ -11,9 +11,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\CustomFactor;
+use Tests\Fixtures\Factors\EnumStatusFactor;
 use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\SoftDeletingFactorHolder;
@@ -96,6 +98,99 @@ final class HasFactorsTest extends TestCase
         self::assertFalse($identity->isMfaEnabled());
 
         $this->createFactor($identity, 'confirmed');
+
+        self::assertTrue($identity->isMfaEnabled());
+    }
+
+    /**
+     * Stored statuses that are none the package knows, which only a reset
+     * clears.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function unknownStatuses(): iterable
+    {
+        yield 'another case of confirmed' => ['CONFIRMED'];
+        yield 'another case of pending' => ['PENDING'];
+        yield 'pending, padded' => ['pending '];
+        yield 'another word' => ['retired'];
+        yield 'empty' => [''];
+    }
+
+    /**
+     * A factor whose stored status is none the package knows holds the identity
+     * to MFA as a confirmed one does: only exactly `pending` does not, so a
+     * corrupt status is never read as having no factor, on a database whose
+     * collation ignores case and padding as on any other.
+     *
+     * @param  string  $status
+     * @return void
+     */
+    #[DataProvider('unknownStatuses')]
+    public function testAFactorOfAnUnknownStatusEnablesMfa(string $status): void
+    {
+        $identity = $this->createHolder('one@example.test');
+
+        $this->createFactor($identity, 'pending');
+        $this->createFactor($identity, $status);
+
+        self::assertTrue($identity->isMfaEnabled());
+    }
+
+    /**
+     * A stored factor with no status at all, where a column allows that, holds
+     * the identity to MFA too.
+     *
+     * @return void
+     */
+    public function testAFactorWithNoStatusEnablesMfa(): void
+    {
+        Schema::table('mfa_factors', static function (Blueprint $table): void {
+            $table->string('status', 16)->nullable()->default(null)->change();
+        });
+
+        $identity = $this->createHolder('one@example.test');
+
+        Factor::query()->create([
+            'authenticatable_type' => $identity->getMorphClass(),
+            'authenticatable_id'   => (string) $identity->id,
+            'type'                 => 'totp',
+            'status'               => null,
+        ]);
+
+        self::assertNull(Factor::query()->value('status'));
+        self::assertTrue($identity->isMfaEnabled());
+    }
+
+    /**
+     * On a model that casts its status to the enum, the stored values are read
+     * as stored: a pending one does not count, a confirmed one does, and so
+     * does one the enum does not know, which the model itself cannot read.
+     *
+     * @return void
+     */
+    public function testAnEnumCastStatusIsReadAsStored(): void
+    {
+        $this->container()->make(Repository::class)->set('mfa.factor.model', EnumStatusFactor::class);
+
+        $identity = $this->createHolder('one@example.test');
+        $factor   = fn (string $status): EnumStatusFactor => EnumStatusFactor::query()->create([
+            'authenticatable_type' => $identity->getMorphClass(),
+            'authenticatable_id'   => (string) $identity->id,
+            'type'                 => 'totp',
+            'status'               => $status,
+        ]);
+
+        $pending = $factor('pending');
+
+        self::assertFalse($identity->isMfaEnabled());
+
+        EnumStatusFactor::query()->whereKey($pending->getKey())->toBase()->update(['status' => 'CONFIRMED']);
+
+        self::assertTrue($identity->isMfaEnabled());
+
+        EnumStatusFactor::query()->whereKey($pending->getKey())->toBase()->update(['status' => 'pending']);
+        $factor('confirmed');
 
         self::assertTrue($identity->isMfaEnabled());
     }

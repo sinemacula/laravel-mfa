@@ -89,14 +89,14 @@ by itself. A route that also accepts ambient cookie authentication is not, which
 There is one exception for every refusal. These hold under `never` too, since that setting controls the requirement and
 not who the package serves:
 
-| Caller                                | `requirement` on the exception  | `hasConfirmedFactor`            |
-|---------------------------------------|---------------------------------|---------------------------------|
-| A pending session on the request      | What it owes, with any level    | The pending identity's          |
-| A guest                               | Any level, or nothing           | `false`                         |
-| A signed-in identity not MFA-capable  | Any level, or nothing           | `false`                         |
-| A machine (see `SubjectTypeResolver`) | Any level, or nothing           | `false`                         |
-| An inactive identity                  | The whole requirement, as below | The identity's `isMfaEnabled()` |
-| A served person falling short         | The whole requirement           | The identity's `isMfaEnabled()` |
+| Caller                                | `requirement` on the exception  | `hasConfirmedFactor`                 |
+|---------------------------------------|---------------------------------|--------------------------------------|
+| A pending session on the request      | What it owes, with any level    | Whether the pending identity has one |
+| A guest                               | Any level, or nothing           | `false`                              |
+| A signed-in identity not MFA-capable  | Any level, or nothing           | `false`                              |
+| A machine (see `SubjectTypeResolver`) | Any level, or nothing           | `false`                              |
+| An inactive identity                  | The whole requirement, as below | Whether the identity has one         |
+| A served person falling short         | The whole requirement           | Whether the identity has one         |
 
 The whole requirement is the composed one, any level and the operation's requirement. A forgotten `auth` therefore
 leaves a route closed, not open, and a route machines use does not carry `mfa`. A request carrying a pending credential
@@ -132,7 +132,7 @@ max_age="300"`, omitting what is absent. An adapter mapping levels to `acr` name
 | `$requirement`        | The whole effective requirement, not what is left of it. The authority                          |
 | `$offered`            | The factors the session could use next, as masked `FactorSummary` values                        |
 | `$operation`          | The operation the route names, or `null`. Only its name for a caller the package does not serve |
-| `$hasConfirmedFactor` | Whether the identity has a confirmed factor                                                     |
+| `$hasConfirmedFactor` | Whether the identity has a factor whose stored status is exactly `confirmed`                    |
 | `maxAge()`            | The shortest maximum age of any part, or `null`                                                 |
 | `acrValues()`         | The minimum level's value, or none                                                              |
 | `toArray()`           | `error`, `max_age`, `acr_values`, `requirement`, `operation`, `has_confirmed_factor`, `factors` |
@@ -168,7 +168,14 @@ description in `wwwAuthenticate()` is always the shipped English, since RFC 6750
 | `phishing_resistant`            | `bool`         | Whether they are phishing-resistant                                          |
 | `user_verification`             | `bool`         | Evidence, or a first factor supporting a level, observed the person verified |
 | `last_verification_age_seconds` | `?int`         | Whole seconds since the newest evidence, `null` without any                  |
-| `has_confirmed_factor`          | `bool`         | Whether the identity has a confirmed factor                                  |
+| `has_confirmed_factor`          | `bool`         | Whether the identity has a factor whose stored status is exactly `confirmed` |
+
+`has_confirmed_factor`, here and on a refusal, is a fact about the identity's stored factors, read from the write
+connection: a factor whose status is exactly `confirmed`. A status the package does not know is no confirmed factor, so
+an identity whose only factor is corrupt reports `false`. The requirement is a separate and conservative question:
+`isMfaEnabled()` counts every factor that is not pending, so that identity is still held to MFA, cannot pass, and needs a
+reset. Neither follows an identity model's own `isMfaEnabled()`, which only decides whether the `enrolled` mode holds it
+to MFA.
 
 Evidence is each additional factor and recovery code the bound check accepts after the session's one first factor. A
 recovery code is named `recovery_code` and sets the age, as it meets an additional verification. These fields say what

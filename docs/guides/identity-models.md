@@ -17,13 +17,19 @@ class AppUser extends User implements MultiFactorAuthenticatable
 
 The trait gives the model everything the contract asks:
 
-| Method                       | Default                                                                   |
-|------------------------------|---------------------------------------------------------------------------|
-| `authFactors()`              | The identity's factors, of the configured factor model                    |
-| `isMfaEnabled()`             | Whether the identity has a confirmed factor; a pending one does not count |
-| `canHoldFactors()`           | `true`: the identity is a person                                          |
-| `isMfaActive()`              | `true`: every identity the guard returns is active                        |
-| `requiresAdditionalFactor()` | `null`: the identity requires nothing of its own sign-ins                 |
+| Method                       | Default                                                   |
+|------------------------------|-----------------------------------------------------------|
+| `authFactors()`              | The identity's factors, of the configured factor model    |
+| `isMfaEnabled()`             | Whether the identity has a factor that is not pending     |
+| `canHoldFactors()`           | `true`: the identity is a person                          |
+| `isMfaActive()`              | `true`: every identity the guard returns is active        |
+| `requiresAdditionalFactor()` | `null`: the identity requires nothing of its own sign-ins |
+
+`isMfaEnabled()` counts every factor whose stored status is anything but exactly `pending`: a confirmed one, and one
+whose status is none the package knows. A corrupt status so holds the identity to MFA rather than letting it on as
+having no factor, and reading that factor throws, so the person cannot pass until the identity is reset. With valid
+statuses it is whether the identity has a confirmed factor. An identity model that answers it itself should keep that
+direction.
 
 Factors belong to the identity, never to a principal or a tenant: one set per person, used in every application. The
 owner is polymorphic, by the model's morph class (so an application's morph map is honoured) and its key, which may be

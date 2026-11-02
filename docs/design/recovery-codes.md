@@ -61,7 +61,10 @@ moment when both work or neither exists, and what a redemption leaves behind.
   a refusal of a set that committed, and an application's outer transaction still defers the event to its own commit.
 - Redemption (`Mfa::verify(Submission::recoveryCode(...))`, then `RecoveryCodeService::admission()` and `redeem()`,
   under the identity's lock the verification holds): an inactive identity, an application that does not accept recovery
-  codes, no confirmed factor as stored and an unknown first factor are refused before any hash is checked. The attempt
+  codes, no confirmed factor as stored and an unknown first factor are refused before any hash is checked. A confirmed
+  factor is one whose status is exactly `confirmed`, compared in PHP among the identity's locked factors
+  (`Factors\ConfirmedFactors`): a collation that ignores case or padding, MySQL's default, must not let a status such
+  as `CONFIRMED` admit a code. The attempt
   then goes through `Attempts\AttemptService`, charged to the identity: the usable codes of the current generation are
   read with a locking read and all checked, and a match is marked used by `UPDATE ... SET used_at WHERE id AND used_at
   IS NULL AND replaced_at IS NULL`, which must change one row. `redeem()` records no proof and reports nothing, so the

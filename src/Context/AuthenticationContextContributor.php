@@ -5,10 +5,12 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Context;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
+use SineMacula\Laravel\Mfa\Factors\ConfirmedFactors;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
@@ -63,6 +65,10 @@ final readonly class AuthenticationContextContributor
 
     /**
      * The keys of the `mfa` namespace for the session the request serves.
+     * `has_confirmed_factor` is a fact: whether the identity has a factor whose
+     * stored status is exactly `confirmed` (see `Factors\ConfirmedFactors`). A
+     * status the package does not know is no confirmed factor, though
+     * `isMfaEnabled()` still holds the identity to MFA for it.
      *
      * @formatter:off
      *
@@ -106,7 +112,7 @@ final readonly class AuthenticationContextContributor
             'phishing_resistant'            => $evaluation->phishingResistant,
             'user_verification'             => self::observedUserVerification($check, $firstFactor, $evidence),
             'last_verification_age_seconds' => self::ageOfNewest($evidence),
-            'has_confirmed_factor'          => $caller->identity->isMfaEnabled(),
+            'has_confirmed_factor'          => ConfirmedFactors::isHeldBy($caller->identity, $this->container->make(Repository::class)),
         ];
     }
 

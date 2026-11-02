@@ -29,9 +29,10 @@ and assert nothing about it.
 
 ## Success Path
 
-- The verification budgets cover a TOTP hit, in an address's first window and in a later one, a miss and a locked
-  factor; a delivered code's send, hit and miss through the package's own `ChallengeGateway`; a recovery code's hit and
-  miss; a passkey's hit through a fake gateway; and a TOTP hit on a pending session.
+- The verification budgets cover a TOTP hit, in an address's first window and in a later one, a miss, the miss that
+  locks a factor and a locked factor; a delivered code's send, hit and miss through the package's own
+  `ChallengeGateway`; a recovery code's hit and miss; a passkey's hit through a fake gateway; and a TOTP hit on a pending
+  session.
 - The enrolment budgets cover a TOTP and a delivered start, a first factor's and a later factor's confirmation, and a
   wrong code.
 - The gate's budget covers a request the `mfa` middleware lets on, in `always` mode, with the first factor declared and
@@ -62,6 +63,7 @@ and assert nothing about it.
 - The statements of a confirmation's recovery set grow with `recovery_codes.count`, as the set is inserted row by row:
   one write for each code, with the reads unchanged. A bulk insert would skip the models' events and the write guard.
 - An address's first window takes one write more than a later one: the update finds no row, then the insert makes it.
+- The miss that locks a factor costs what any other miss does: its deadline goes in the update of the factor's run.
 - Raising a whole-path subject's revolutions, or warming it up, from the command line throws rather than timing a used
   fixture. The guard is held outside anything set-up resets, so running iterations in one process fails the same way.
 - `VerificationBench`'s timings are on SQLite with bcrypt at cost 4, the application booted and the path warmed outside
@@ -94,6 +96,8 @@ and assert nothing about it.
   `testATotpHitInTheAddressesFirstWindow`
 - `tests/Performance/VerificationQueryBudgetTest.php`
   `testATotpHitInALaterWindow`
+- `tests/Performance/VerificationQueryBudgetTest.php`
+  `testATotpMissThatLocksTheFactor`
 - `tests/Performance/VerificationQueryBudgetTest.php`
   `testARecoveryCodeHit`
 - `tests/Performance/EnrollmentQueryBudgetTest.php`

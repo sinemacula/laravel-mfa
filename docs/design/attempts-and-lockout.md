@@ -2,11 +2,11 @@
 
 ## Purpose
 
-This note records how the package counts failed attempts and refuses further ones: the durable counts on the factor and
-identity state rows, the temporary throttles in `mfa_attempts`, when each locks what and for how long, what resets each
-counter, the failure ceiling that disables a factor or bounds the identity, and why parallel guesses cannot overrun a
-cap. Lifting a lockout, enabling a disabled factor and resetting the identity's run are separate operations, and all
-are described here.
+This note records how the package counts failed attempts and refuses further ones: the durable counts and lockout
+deadlines on the factor and identity state rows, the rate windows in `mfa_attempts`, when each locks what and for how
+long, what resets each counter, the failure ceiling that disables a factor or bounds the identity, and why parallel
+guesses cannot overrun a cap. Lifting a lockout, enabling a disabled factor and resetting the identity's run are
+separate operations, and all are described here.
 
 ## Invariants
 
@@ -21,9 +21,9 @@ are described here.
   lockout of the identity still refuses it, a start and a resend.
 - An attempt is counted against three scopes (`Enums\AttemptScope`):
   - the factor: `consecutive_failures` on its row, its failures in a row. From `mfa.attempts.factor_limit` on, each
-    failure locks it for `lockout_seconds`, recorded as a row of `mfa_attempts` (scope `factor`) whose window ends when
-    the lockout does. At `failure_ceiling` (at most 100) the factor is disabled instead: `disabled_at` is stamped and
-    `FactorDisabled` dispatched, and no lockout is applied;
+    failure locks it for `lockout_seconds`: `locked_until` on its row is set, in the same save as the count. At
+    `failure_ceiling` (at most 100) the factor is disabled instead: `disabled_at` is stamped and `FactorDisabled`
+    dispatched, and no lockout is applied;
   - the identity: `consecutive_failures` on its state row, its run of failures across every factor and recovery code;
     and its failures within `window_seconds`, a row of `mfa_attempts` (scope `identity`). When that count reaches
     `identity_limit`, `locked_until` on its state row is set `lockout_seconds` ahead and `LockoutApplied` dispatched
@@ -56,15 +56,25 @@ are described here.
   it again, one guess per lockout period, until a success or the failure ceiling.
 - Sending or resending a code resets no count and lifts no lockout: the code service writes only the code's challenge,
   and the verification service's challenge writes nothing else.
+- A factor's `locked_until` is the one deadline of its temporary lockout, and nothing else stores it. It is read off
+  the factor as locked under the factor state transaction. A deadline that has passed is inert until the next lockout
+  overwrites it or a lift clears it: pruning deletes only the rate windows, and no scan or index of the deadlines is
+  needed. A factor's removal takes its deadline with it. A stored deadline or `disabled_at` that does not read as a
+  time throws, so the attempt ends as a server error without reaching the driver and never reads as unlocked or
+  enabled.
+- A rate window and a deadline are kept apart: the address's and the identity's windows live in `mfa_attempts`, updated
+  atomically; the durable counts and the lockout deadlines live on the factor and identity state rows, read under the
+  existing locks.
 - `mfa_attempts` rows are keyed by `Attempts\AttemptKeys`: an HMAC-SHA256 digest of the scope and subject, keyed with a
-  key derived from `app.key`, so the table names no factor, identity or address. Rotating the application key starts
-  every throttle afresh and keeps the durable counts.
+  key derived from `app.key`, so the table names no identity or address. Rotating the application key starts every
+  throttle afresh and keeps the durable counts and the lockout deadlines.
 - Nothing depends on a cache: every count, lockout and throttle is in the database on the storage connection, read from
   the write connection.
-- `liftLockout($identity, $factor, $actor)` deletes the factor's lockout row, or clears the identity's `locked_until`
-  and its window row, under the identity's factor state lock, and dispatches `LockoutLifted` with the actor when a live
-  lockout was lifted. The factor must be among the identity's locked factors, or nothing is lifted. It keeps the
-  durable counts and leaves a disabled factor disabled.
+- `liftLockout($identity, $factor, $actor)` clears the factor's `locked_until`, or the identity's `locked_until` and its
+  window row, under the identity's factor state lock, and dispatches `LockoutLifted` with the actor when a live lockout
+  was lifted. A deadline that has passed is cleared too, and reported as nothing lifted. The factor must be among the
+  identity's locked factors, or nothing is lifted. It keeps the durable counts and leaves a disabled factor disabled. A
+  model event that cancels the save throws, so the lockout stays and is not reported.
 - `enableFactor($factor)` clears `disabled_at` and the factor's failures in a row under the lock, and leaves any lockout
   to end on its own. It reports nothing: rebinding and resetting, which call it, report themselves.
 - `resetIdentityFailures($identity)` clears the identity's run under the lock, and nothing else.
@@ -93,17 +103,17 @@ are described here.
 - `FactorStateTransaction::forIdentity()` then opens the transaction on the storage connection, locks the identity's
   state row and its factors in that order (see [Storage and Transactions](storage-and-transactions.md)), and hands over
   the factors as stored under the lock. The service reads the identity's state, finds the attempted factor among the
-  locked ones, reads the factor's lockout row, and refuses the attempt while a lockout applies.
+  locked ones, reads its lockout off that row, and refuses the attempt while a lockout applies.
 - Otherwise it runs the verification inside the transaction, so a driver's own change (a TOTP step) commits with the
   count, and counts the
   outcome on the locked rows: a success resets as above; a failure records the identity's window, in one
   upsert, and its run, then the factor's failures in a row, its lockout or its disablement.
-- The identity's state row is read `FOR UPDATE`, a lock the transaction already holds, so a lockout committed while the
-  attempt waited is never answered from an older snapshot. The throttle rows are read with plain reads: a locking read
-  of a missing key would take a gap lock on MySQL and let two identities' first failures deadlock. That is why a
-  factor's temporary lockout stays a plain read from the writer; a new row's `insertOrIgnore` keeps the same reasoning,
-  with a fixed-width hash for its key, an enum for its scope and a window bounded by the settings, so nothing a database
-  could coerce can land on another row.
+- The identity's state row is read `FOR UPDATE`, a lock the transaction already holds, and the factors come from the
+  transaction's own locking read, so a lockout of either committed while the attempt waited is never answered from an
+  older snapshot. The rate windows are read with plain reads: a locking read of a missing key would take a gap lock on
+  MySQL and let two identities' first failures deadlock. A new row's `insertOrIgnore` keeps the same reasoning, with a
+  fixed-width hash for its key, an enum for its scope and a window bounded by the settings, so nothing a database could
+  coerce can land on another row.
 - After the commit, the address's slot is given back unless the attempt failed and was counted: a success or a refusal
   is not a failure of the address. The events the attempt raised run with the commit (see [Event
   Catalogue](event-catalog.md)); a listener that throws leaves the count standing, and gives the address's slot back,
@@ -120,10 +130,19 @@ are described here.
 - The identity's window is counted with one upsert, never an `UPDATE` that may find no row: inside the transaction,
   such an update holds a gap lock on MySQL until the commit, and two identities recording their first failure in the
   same gap would deadlock on each other's insert.
-- An attempt made inside a transaction the application opened on the storage connection, after it has read, may read
-  the throttle rows from that transaction's snapshot on MySQL (`REPEATABLE READ`), and so miss a temporary lockout
-  committed in the meantime. The identity's state and its factors are read with locking reads and are not affected; the
-  guide asks applications not to verify inside a transaction of their own.
+- An attempt made inside a transaction the application opened on the storage connection, after it has read, still
+  finds a lockout committed since: the identity's state and its factors are read with locking reads. MySQL answers those
+  with the rows as committed, under `REPEATABLE READ` too, so the attempt is refused where it stands, as it is under
+  PostgreSQL's `READ COMMITTED`. PostgreSQL's `REPEATABLE READ` instead raises a serialisation failure when the lock is
+  taken on a row changed since the snapshot: that failure reaches the application, which retries its whole transaction,
+  and the attempt is then refused.
+- The plain reads that remain, and what an application's older snapshot can do to each:
+  - `lockout()`, the address's throttle included, takes no lock, so it is advisory and may answer from that snapshot.
+    Nothing is decided on it: `attempt()` reads the lockouts again under the lock.
+  - The address's slot is taken by conditional statements. Their fallback read can give a stale refusal or retry time,
+    but never admits past the cap, since a slot is only ever taken by a conditional update.
+  - The identity's window is read after this transaction's own upsert of that row, which a transaction always sees, so
+    it counts what the database holds.
 - The identity's window starts with its first failure and ends `window_seconds` later; failures spread wider than it
   never lock the identity, whatever its run.
 - The failure ceiling takes precedence over the factor limit: a failure that reaches both disables the factor and
@@ -144,7 +163,10 @@ are described here.
   `resetIdentityFailures()`.
 - `src/Attempts/LockedFactors.php`: the attempted factor found among the locked ones.
 - `src/Attempts/AttemptStore.php`: the single-statement window counts (`take()`, `record()` as an upsert, `giveBack()`)
-  and the lockout rows (`hold()`, `forget()`, `read()`).
+  and the rows read and deleted (`read()`, `forget()`, `prune()`).
+- `src/Concerns/ActsAsFactor.php`: `getLockedUntil()` and `getLockedUntilName()`, which `Contracts\EloquentFactor`
+  declares, and `initializeActsAsFactor()`, which casts the deadline's and the disabled time's columns unless the model
+  already does; both getters throw on a stored value that does not read as a time.
 - `src/Attempts/AttemptKeys.php`: the keyed digests and the canonical address.
 - `src/Attempts/IpThrottle.php`: the address's slot taken and given back (`take()`, `giveBack()`) and its throttle
   (`lockout()`).
@@ -164,6 +186,7 @@ are described here.
 - `tests/Unit/Attempts/LockedFactorsTest.php`
 - `tests/Unit/Attempts/AttemptSettingsTest.php`
 - `tests/Integration/Database/ParallelAttemptsTest.php` (MySQL and PostgreSQL)
+- `tests/Integration/Database/FactorLockoutSnapshotTest.php` (MySQL and PostgreSQL, each at its isolation levels)
 - `tests/Feature/Verification/CountingVerificationServiceTest.php`,
   `tests/Feature/Verification/FailureReasonsVerificationServiceTest.php`
 - `tests/Feature/OtpLifecycleTest.php` `testAskingForACodeResetsNothing`
@@ -179,4 +202,4 @@ Update this note when any of the following change:
   identity's run at the ceiling refuses
 - the lock the count and lockout are read under, or the single-statement counting of the address
 - the `mfa.attempts.*` keys or their bounds
-- how `mfa_attempts` rows are keyed, or what a factor's row records
+- how `mfa_attempts` rows are keyed, or where a lockout's deadline is kept

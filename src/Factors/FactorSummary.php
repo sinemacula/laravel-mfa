@@ -69,10 +69,13 @@ final readonly class FactorSummary implements \JsonSerializable
     ) {}
 
     /**
-     * Build a summary from a factor, masking its destination.
+     * Build a summary from a factor, masking its destination. A status or a
+     * disabled time the factor cannot read throws, as its contract requires.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return self
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public static function fromFactor(Factor $factor): self
     {

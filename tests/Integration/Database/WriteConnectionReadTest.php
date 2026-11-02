@@ -12,12 +12,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversTrait;
-use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Concerns\ResolvesFactorRouteBinding;
-use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
@@ -268,11 +266,9 @@ final class WriteConnectionReadTest extends TestCase
         $this->recordFirstFactor($user);
         $this->replicaCatchesUp();
 
-        $key = $this->container()->make(AttemptKeys::class)->factor($factor->id);
+        DB::connection('split')->table('mfa_factors')->where('id', $factor->id)->update(['locked_until' => CarbonImmutable::now()->addHour()]);
 
-        $this->container()->make(AttemptStore::class)->hold($key, AttemptScope::FACTOR, 5, CarbonImmutable::now()->getTimestamp() + 3600);
-
-        self::assertSame(0, DB::connection('replica')->table('mfa_attempts')->count());
+        self::assertNull(DB::connection('replica')->table('mfa_factors')->where('id', $factor->id)->value('locked_until'));
 
         self::assertSame(FailureReason::LOCKED, Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
     }

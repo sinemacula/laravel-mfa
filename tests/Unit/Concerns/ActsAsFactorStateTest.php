@@ -10,7 +10,9 @@ use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Factors\EnumStatusFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -59,6 +61,7 @@ final class ActsAsFactorStateTest extends TestCase
         yield 'preferred' => [static fn (Factor $factor): string => $factor->getPreferredName(), 'preferred'];
         yield 'consecutive failures' => [static fn (Factor $factor): string => $factor->getConsecutiveFailuresName(), 'consecutive_failures'];
         yield 'disabled at' => [static fn (Factor $factor): string => $factor->getDisabledAtName(), 'disabled_at'];
+        yield 'locked until' => [static fn (Factor $factor): string => $factor->getLockedUntilName(), 'locked_until'];
         yield 'application' => [static fn (Factor $factor): string => $factor->getApplicationName(), 'application'];
         yield 'confirmed at' => [static fn (Factor $factor): string => $factor->getConfirmedAtName(), 'confirmed_at'];
         yield 'last used at' => [static fn (Factor $factor): string => $factor->getLastUsedAtName(), 'last_used_at'];
@@ -94,6 +97,7 @@ final class ActsAsFactorStateTest extends TestCase
             'preferred'            => true,
             'consecutive_failures' => 4,
             'disabled_at'          => '2026-04-15 09:00:00',
+            'locked_until'         => '2026-04-15 09:15:00',
             'application'          => 'web',
             'confirmed_at'         => '2026-04-15 08:00:00',
             'last_used_at'         => '2026-04-15 09:30:00',
@@ -109,6 +113,7 @@ final class ActsAsFactorStateTest extends TestCase
         self::assertTrue($factor->isPreferred());
         self::assertSame(4, $factor->getConsecutiveFailures());
         self::assertSame('2026-04-15 09:00:00', $factor->getDisabledAt()?->format('Y-m-d H:i:s'));
+        self::assertSame('2026-04-15 09:15:00', $factor->getLockedUntil()?->format('Y-m-d H:i:s'));
         self::assertSame('web', $factor->getApplication());
         self::assertSame('2026-04-15 08:00:00', $factor->getConfirmedAt()?->format('Y-m-d H:i:s'));
         self::assertSame('2026-04-15 09:30:00', $factor->getLastUsedAt()?->format('Y-m-d H:i:s'));
@@ -134,27 +139,33 @@ final class ActsAsFactorStateTest extends TestCase
         self::assertFalse($factor->isPreferred());
         self::assertSame(0, $factor->getConsecutiveFailures());
         self::assertNull($factor->getDisabledAt());
+        self::assertNull($factor->getLockedUntil());
         self::assertNull($factor->getApplication());
         self::assertNull($factor->getConfirmedAt());
         self::assertNull($factor->getLastUsedAt());
     }
 
     /**
-     * An unset or unknown status reads as pending, never usable; a status cast
-     * to the enum reads as the enum.
+     * A new factor with no status yet is pending, never usable; each value the
+     * package knows reads as itself, and a status cast to the enum reads as the
+     * enum.
      *
      * @return void
      */
-    public function testAnUnknownStatusIsPending(): void
+    public function testAStatusReadsAsOneOfItsValues(): void
     {
         $factor = new Factor;
-        $factor->setRawAttributes(['status' => 'confirmed-ish']);
-
-        self::assertSame(FactorStatus::PENDING, $factor->getStatus());
-
         $factor->setRawAttributes([]);
 
         self::assertSame(FactorStatus::PENDING, $factor->getStatus());
+
+        $factor->setRawAttributes(['status' => 'pending']);
+
+        self::assertSame(FactorStatus::PENDING, $factor->getStatus());
+
+        $factor->setRawAttributes(['status' => 'confirmed']);
+
+        self::assertSame(FactorStatus::CONFIRMED, $factor->getStatus());
 
         $cast = new class extends Factor {
             /**
@@ -174,7 +185,9 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * A value of the wrong type reads as absent.
+     * A value of the wrong type reads as absent, in the columns no refusal
+     * reads: an uncast confirmation or last use time among them, as the trait
+     * casts only the deadline and the disabled time.
      *
      * @return void
      */
@@ -197,15 +210,77 @@ final class ActsAsFactorStateTest extends TestCase
             'credential_reference' => 5,
             'totp_digits'          => '6',
             'consecutive_failures' => '3',
-            'disabled_at'          => '2026-04-15 09:00:00',
+            'confirmed_at'         => '2026-04-15 08:00:00',
+            'last_used_at'         => '2026-04-15 09:30:00',
             'preferred'            => 1,
         ]);
 
         self::assertNull($factor->getCredentialReference());
         self::assertNull($factor->getTotpDigits());
         self::assertSame(0, $factor->getConsecutiveFailures());
-        self::assertNull($factor->getDisabledAt());
+        self::assertNull($factor->getConfirmedAt());
+        self::assertNull($factor->getLastUsedAt());
         self::assertFalse($factor->isPreferred());
+    }
+
+    /**
+     * Statuses that are none the package knows, on a factor stored or not:
+     * nothing stored on a stored factor among them.
+     *
+     * @return iterable<string, array{mixed, bool}>
+     */
+    public static function unknownStatuses(): iterable
+    {
+        yield 'another case, stored' => ['CONFIRMED', true];
+        yield 'another word, stored' => ['confirmed-ish', true];
+        yield 'empty, stored' => ['', true];
+        yield 'not a string, stored' => [1, true];
+        yield 'nothing, stored' => [null, true];
+        yield 'another case, new' => ['CONFIRMED', false];
+        yield 'not a string, new' => [1, false];
+    }
+
+    /**
+     * A status that is none the package knows throws, naming the column, and
+     * never reads as pending: a factor that reads as not confirmed can let a
+     * weaker path through where a confirmed one would be held to more.
+     *
+     * @param  mixed  $status
+     * @param  bool  $stored
+     * @return void
+     */
+    #[DataProvider('unknownStatuses')]
+    public function testAnUnknownStatusThrows(mixed $status, bool $stored): void
+    {
+        $factor = new Factor;
+
+        $factor->setRawAttributes(['status' => $status]);
+
+        $factor->exists = $stored;
+
+        $this->expectException(InvalidModelException::class);
+        $this->expectExceptionMessage('The factor\'s column [status] holds no status the package knows, so whether it is confirmed cannot be told.');
+
+        $factor->getStatus();
+    }
+
+    /**
+     * On a model that casts the status to the enum, a stored value the enum
+     * does not know throws Laravel's `ValueError` from the cast, before the
+     * trait sees it: it fails closed, though not as `InvalidModelException`.
+     *
+     * @return void
+     */
+    public function testAnEnumCastStatusTheEnumDoesNotKnowThrowsAValueError(): void
+    {
+        $factor = new EnumStatusFactor;
+
+        $factor->setRawAttributes(['status' => 'CONFIRMED']);
+        $factor->exists = true;
+
+        $this->expectException(\ValueError::class);
+
+        $factor->getStatus();
     }
 
     /**

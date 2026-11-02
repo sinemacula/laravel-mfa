@@ -12,8 +12,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
-use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
-use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
@@ -25,7 +23,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
-use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
@@ -948,12 +945,7 @@ trait FlowCatalog
     {
         [$user, $factor] = $this->holdingTotp();
 
-        $this->container()->make(AttemptStore::class)->hold(
-            $this->container()->make(AttemptKeys::class)->factor($factor->id),
-            AttemptScope::FACTOR,
-            5,
-            CarbonImmutable::now()->getTimestamp() + 3600,
-        );
+        $factor->update(['locked_until' => CarbonImmutable::now()->addHour()]);
 
         return static fn (): bool => Mfa::unlockFactor($user, $factor->id, new Actor('admin', '9'));
     }

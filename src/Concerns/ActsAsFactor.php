@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 
@@ -27,6 +28,28 @@ use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
  */
 trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
+    /**
+     * Cast the columns a refusal reads, the lockout's deadline and when the
+     * factor was disabled at the failure ceiling, as datetimes, so a model that
+     * declares no cast for them still reads them back from storage as times.
+     * Eloquent calls this as it builds the model. A cast the model declares for
+     * either column is left as it is, whichever order the two are applied in,
+     * and so are its other casts.
+     *
+     * @return void
+     */
+    public function initializeActsAsFactor(): void
+    {
+        foreach ([$this->getLockedUntilName(), $this->getDisabledAtName()] as $column) {
+
+            if ($this->hasCast($column)) {
+                continue;
+            }
+
+            $this->mergeCasts([$column => 'datetime']);
+        }
+    }
+
     /**
      * Polymorphic relation to the owning authenticatable identity.
      *
@@ -266,21 +289,36 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return where the factor is in its enrolment: pending unless the stored
-     * status says confirmed, so a missing or unknown value is never usable.
+     * Return where the factor is in its enrolment: one of the statuses the
+     * package knows, as the enum or its exact value, and pending for a new
+     * factor not yet given one. Anything else throws rather than reads as
+     * pending, a stored factor with no status included: a factor read as not
+     * confirmed can let through a path that a confirmed one would hold to a
+     * stronger proof. On a model that casts the column to the enum, a value the
+     * enum does not know throws Laravel's `ValueError` from the cast before it
+     * gets here: that fails closed too, though not as `InvalidModelException`.
      *
      * @return \SineMacula\Laravel\Mfa\Enums\FactorStatus
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function getStatus(): FactorStatus
     {
-        /** @var mixed $value */
-        $value = $this->getAttribute($this->getStatusName());
+        $column = $this->getStatusName();
 
-        if ($value instanceof FactorStatus) {
-            return $value;
+        /** @var mixed $value */
+        $value  = $this->getAttribute($column);
+        $status = is_string($value) ? FactorStatus::tryFrom($value) : $value;
+
+        if ($status instanceof FactorStatus) {
+            return $status;
         }
 
-        return $value === FactorStatus::CONFIRMED->value ? FactorStatus::CONFIRMED : FactorStatus::PENDING;
+        if ($value === null && !$this->exists) {
+            return FactorStatus::PENDING;
+        }
+
+        throw new InvalidModelException(sprintf('The factor\'s column [%s] holds no status the package knows, so whether it is confirmed cannot be told.', $column));
     }
 
     /**
@@ -297,6 +335,8 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
      * Determine whether the factor is confirmed, and so usable.
      *
      * @return bool
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function isConfirmed(): bool
     {
@@ -344,13 +384,17 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return when the factor was disabled at the failure ceiling.
+     * Return when the factor was disabled at the failure ceiling. It fails
+     * closed, as `getLockedUntil()` does: a stored value that does not read as
+     * a time throws, as reading it as never disabled would enable the factor.
      *
      * @return ?\Carbon\CarbonInterface
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function getDisabledAt(): ?CarbonInterface
     {
-        return $this->readFactorTime($this->getDisabledAtName());
+        return $this->readRefusalTime($this->getDisabledAtName(), 'disabled');
     }
 
     /**
@@ -361,6 +405,30 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     public function getDisabledAtName(): string
     {
         return 'disabled_at';
+    }
+
+    /**
+     * Return when the factor's temporary lockout ends, as held on this
+     * instance. It fails closed: a stored value that does not read as a time
+     * throws, as reading it as no deadline would unlock the factor.
+     *
+     * @return ?\Carbon\CarbonInterface
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     */
+    public function getLockedUntil(): ?CarbonInterface
+    {
+        return $this->readRefusalTime($this->getLockedUntilName(), 'locked');
+    }
+
+    /**
+     * Column name holding when the factor's temporary lockout ends.
+     *
+     * @return string
+     */
+    public function getLockedUntilName(): string
+    {
+        return 'locked_until';
     }
 
     /**
@@ -522,6 +590,36 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
         $value = $this->getAttribute($column);
 
         return is_int($value) ? $value : null;
+    }
+
+    /**
+     * Read a time column a refusal depends on: `null` only when nothing is
+     * stored, and otherwise the time, or a throw. A blank is refused here, as a
+     * datetime cast would read it as the current time; text that is not a time
+     * throws from the cast, and anything else that does not read as a time
+     * throws here, naming the column but not the value.
+     *
+     * @param  string  $column
+     * @param  string  $state
+     * @return ?\Carbon\CarbonInterface
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     */
+    private function readRefusalTime(string $column, string $state): ?CarbonInterface
+    {
+        $stored = $this->getAttributes()[$column] ?? null;
+
+        if ($stored === null) {
+            return null;
+        }
+
+        $time = is_string($stored) && trim($stored) === '' ? null : $this->getAttribute($column);
+
+        if ($time instanceof CarbonInterface) {
+            return $time;
+        }
+
+        throw new InvalidModelException(sprintf('The factor\'s column [%s] does not read as a time, so whether it is %s cannot be told.', $column, $state));
     }
 
     /**

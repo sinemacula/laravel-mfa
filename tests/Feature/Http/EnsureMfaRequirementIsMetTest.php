@@ -544,7 +544,9 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
 
     /**
      * An inactive identity is refused under `never`, and whatever an operation
-     * would ask is read for the exception, though no gate is judged.
+     * would ask is read for the exception, though no gate is judged. It holds
+     * no stored factor, so the refusal reports no confirmed factor, whatever
+     * its own `isMfaEnabled()` answers.
      *
      * @return void
      */
@@ -558,7 +560,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
         $operation = $this->refusal(self::OPERATION);
 
         self::assertSame([], $bare->requirement->toArray());
-        self::assertTrue($bare->hasConfirmedFactor);
+        self::assertFalse($bare->hasConfirmedFactor);
         self::assertSame([], $bare->offered);
         self::assertSame(['additional_verification' => ['max_age' => 300]], $operation->requirement->toArray());
     }

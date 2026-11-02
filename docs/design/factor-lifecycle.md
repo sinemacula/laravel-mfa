@@ -48,13 +48,17 @@ in [Factor lifecycle](../guides/lifecycle.md).
 - A reset's order is the lock order: lockouts and counts, every factor and enrolment, the recovery set, the obligation,
   the generation, then `SessionRevoker::revokeAll()`. Every lockout lifts before any factor goes, so every
   `LockoutLifted` precedes every removal event, and the factors are taken in id order so the events are deterministic.
+- A reset removes every factor of the identity, whatever its stored state, as it is the remedy for one that cannot be
+  read. A factor whose summary, status or deadline throws is not read for a lift, so its deadline goes with its row; it
+  gets no `FactorRemoved` or `EnrollmentAbandoned`, since its summary cannot be built honestly, and
+  `FactorsReset::$unreadableFactors` counts it.
   The event context is captured before the revocation, which could clear the authentication context it reads.
 - A reset advances the generation itself, as a rebound revoker may not. With the default revoker it therefore moves
   twice; what is specified is that it only ever goes up, so nothing depends on the increment.
 - A reset writes the obligation to the stated value, so `false` clears an earlier `true`, and it does not call
   `SessionReevaluation`: every session is revoked.
 - A failure ceiling's `disabled_at` and failures in a row survive unlocking. Only temporary lockouts lift, and a
-  factor's lives in `mfa_attempts`.
+  factor's is `locked_until` on its row, so a removal takes it along.
 - Saves of the identity's state that a model event cancels throw (`WriteCanceledException`), so a reset cannot commit
   with its lockout or failures intact, and an unlock cannot report a lockout lifted that stays in force.
 - `ActiveTenantResolver` is authoritative: it is what requirements are composed with, read from validated session
@@ -94,11 +98,6 @@ in [Factor lifecycle](../guides/lifecycle.md).
   cleared.
 - Mass deletes fire no model event; only the row-by-row enrolment deletion can be cancelled by one.
 
-## Seams Left
-
-- The factor's temporary lockout is in `mfa_attempts`, and a reset lifts it there. Moving it onto the factor's row is a
-  possible hardening that nothing depends on.
-
 ## Implementation Anchors
 
 - `src/Lifecycle/LifecycleService.php`, `RemovalGuard.php`, `FactorRemoval.php`, `FactorRemovalResult.php`,
@@ -131,5 +130,5 @@ in [Factor lifecycle](../guides/lifecycle.md).
 
 ## Change Triggers
 
-Revisit this note when the lock order changes, when a new entry point removes factors, when a new record needs pruning,
-or when where a factor's temporary lockout lives is decided.
+Revisit this note when the lock order changes, when a new entry point removes factors, or when a new record needs
+pruning.
