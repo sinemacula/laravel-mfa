@@ -10,11 +10,14 @@ use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
+use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
@@ -38,6 +41,8 @@ use Tests\TestCase;
 #[CoversClass(FactorService::class)]
 #[CoversClass(VerificationService::class)]
 #[CoversClass(MfaManager::class)]
+#[CoversClass(ProofService::class)]
+#[CoversClass(LifecycleService::class)]
 final class PendingActionsTest extends TestCase
 {
     /** @var \Tests\Fixtures\Identities\TestUser The person signing in on the pending session. */
@@ -45,6 +50,9 @@ final class PendingActionsTest extends TestCase
 
     /** @var \SineMacula\Laravel\Mfa\Models\Factor The pending person's email factor. */
     private Factor $factor;
+
+    /** @var \SineMacula\Laravel\Mfa\Models\Factor The guard's user's email factor. */
+    private Factor $guardedFactor;
 
     /** @var \SineMacula\Laravel\Mfa\Testing\FakeEmailSender The codes sent. */
     private FakeEmailSender $mailbox;
@@ -81,8 +89,11 @@ final class PendingActionsTest extends TestCase
         $this->pending = $pending;
         $this->factor  = $this->emailFactor($pending, 'pending@example.test');
 
-        $this->emailFactor($guarded, 'guarded@example.test');
+        $this->guardedFactor = $this->emailFactor($guarded, 'guarded@example.test');
         $this->actingAs($guarded);
+
+        $this->container()->make(ProofStore::class)->begin($guarded, 'web', SignInProofs::SESSION);
+        $this->container()->make(ProofStore::class)->record(SignInProofs::of($guarded)->password());
     }
 
     /**
@@ -102,8 +113,30 @@ final class PendingActionsTest extends TestCase
         self::assertFalse($this->manager()->verify('email', $this->factor, '123456'));
         self::assertFalse($this->manager()->redeemRecoveryCode('ABCDEFGHJKLM'));
         self::assertSame([], $this->manager()->generateRecoveryCodes());
+        self::assertNull($this->manager()->recoveryCodes());
+        self::assertSame([], $this->manager()->proofs());
+        self::assertFalse($this->manager()->isSetup());
+
+        $this->manager()->disable($this->guardedFactor);
+
+        self::assertTrue(Factor::query()->whereKey($this->guardedFactor->id)->exists());
         self::assertSame([], $this->mailbox->sent());
         self::assertSame(0, RecoveryCode::query()->count());
+    }
+
+    /**
+     * Without a pending session the guard's user is served, by the same helpers
+     * a pending session gets nothing from.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testWithoutAPendingSessionTheGuardsUserIsServed(): void
+    {
+        self::assertNotNull($this->manager()->recoveryCodes());
+        self::assertCount(1, $this->manager()->proofs());
+        self::assertTrue($this->manager()->isSetup());
     }
 
     /**
@@ -119,6 +152,7 @@ final class PendingActionsTest extends TestCase
         $this->pendingSession([PendingAction::LIST_FACTORS]);
 
         self::assertSame([$this->factor->id], $this->manager()->getFactors()?->map(static fn (FactorContract $factor): mixed => $factor->getFactorIdentifier())->all());
+        self::assertNotNull($this->manager()->recoveryCodes());
     }
 
     /**

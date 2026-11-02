@@ -169,10 +169,12 @@ something proves its first factor again: bind a `Contracts\Reauthenticator` that
 example, and returns a `first_factor_reauthentication` proof bound to their current sign-in.
 
 Every helper that returns summaries, sends a code or reveals a secret asks the bound `PendingSessionResolver` first.
-On a pending session it serves only the action it needs (`mfa.list_factors` for `getFactors()`, `mfa.send_code` for
-`challenge()`, `mfa.verify` for `verify()`, `redeemRecoveryCode()` and passkey assertions), as the pending session's own
-identity; anything else gets nothing, never the guard's user in its place. Generating recovery codes and enrolling a
-factor directly serve active sessions only. A resolver reports a pending credential that does not validate by throwing.
+On a pending session it serves only the action it needs (`mfa.list_factors` for `getFactors()` and `recoveryCodes()`,
+`mfa.send_code` for `challenge()`, `mfa.verify` for `verify()`, `redeemRecoveryCode()` and passkey assertions), as the
+pending session's own identity; anything else gets nothing, never the guard's user in its place. Generating recovery
+codes, enrolling a factor directly, `disable()`, `isSetup()` and `proofs()` serve active sessions only. A code is sent
+or checked only for a binding that is exactly the caller's own, on its application and its session. A resolver reports
+a pending credential that does not validate by throwing.
 
 ## Challenge counters
 
@@ -195,6 +197,11 @@ DB::transaction(function () use ($counters, $identity, $factor, $binding, $code)
 Both calls refuse with a `LogicException` outside a transaction. `isUsable()` takes the identity's factor state lock,
 which is held until the owner commits, so parallel guesses are counted one after the other; ask it before sending a code
 too, and never report a delivery. The lock order is the identity's state, then its factors, then the owner's challenge.
+
+`Testing\Seams\Concerns\ChallengeCountersTests` proves an owner's wiring: a failure is counted before the owner's
+transaction commits and not at all when it, or a nested transaction around the challenge, rolls back; the identity's
+limit locks it; a consumed challenge answered again never counts as a success; and a disabled factor is not challenged.
+Its hooks fail one challenge, and consume one and answer it again, through the owner's own path.
 
 ## Passkeys
 

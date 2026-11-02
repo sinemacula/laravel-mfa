@@ -35,7 +35,11 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   has no confirmed factor). Then the application's limits on confirmed factors enrolled through it apply, of the type
   and in all.
 - A credential already associated, with this identity or another, is refused (`credential_associated`): a registration
-  is never idempotent.
+  is never idempotent. The association table's unique index on the credential's digest enforces it across identities.
+- The locks are taken in one order: the identity's state, then its factors, then the association. `removing()` and
+  `changing()` first ask, without a lock, whether the credential is associated at all; the association row is locked
+  and read again only under the identity's factor state lock, as verification and the lifecycle flow lock it. A lookup
+  by credential reads the unique index, so it locks one row, never the table.
 - With the identity's first additional factor, recovery codes are generated when the application accepts them and the
   session's first factor followed by the registration's own evidence meets the level the application issues them at.
 - Removing an associated credential needs the bound `FreshnessGate` to find the session fresh for `mfa.remove_factor`
@@ -45,6 +49,8 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   factor's proofs on the current session at once, revokes the identity's other sessions through the bound
   `SessionRevoker`, evaluates the current session's requirement again on the proofs it kept and hands a shortfall to
   the bound `SessionTransition`, and reports `FactorRemoved`.
+- The default `LastFactorPolicy` (`Lifecycle\RequiredFactorPolicy`) counts a remaining passkey only while its
+  association matches it, so an unusable passkey never lets the last usable factor go.
 - A change to what an associated credential proves (its id, key, owner or relying party) is refused outright: it is a
   removal and then a registration. Renaming it and its usage bookkeeping are not gated.
 - `Passkeys\PasskeyAssertions` requests and verifies an assertion for one factor at a time, allowing exactly its
@@ -71,8 +77,9 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   gate rolls back the factor, the association, the recovery codes and the events with it.
 - Removing a credential associated with nobody is a no-op; one associated with another identity is refused; an
   association whose factor is gone is deleted on its own.
-- Two identities registering one credential at the same moment each hold only their own lock; the authentication
-  layer's own uniqueness on credential ids is what keeps that from leaving two associations.
+- Two identities registering one credential at the same moment each hold only their own lock, so both may find it
+  unassociated; the unique index lets only one association commit, and the other is refused as `credential_associated`,
+  rolling its caller's registration back.
 - The configuration check refuses an application that enables `passkey` while `Passkeys\UnavailablePasskeyGateway` is
   still bound; a gateway of the application's own that reports itself unavailable at run time is not refused, and lists
   nothing to offer.

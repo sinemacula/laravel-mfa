@@ -9,6 +9,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -18,7 +19,6 @@ use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
@@ -71,7 +71,8 @@ final readonly class LifecycleService
      * Throws `FactorOwnershipMismatchException` when the factor does not belong
      * to the current identity, and `WriteCancelledException` when a model event
      * cancels the deletion, which then removes, forgets and reports nothing.
-     * No-op when no MFA-capable identity is resolvable.
+     * No-op when no MFA-capable person is signed in, and on a pending session
+     * (see `Context\CallerContextResolver`).
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
@@ -83,7 +84,7 @@ final readonly class LifecycleService
      */
     public function disable(Factor $factor): void
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
 
         if ($identity === null) {
             return;

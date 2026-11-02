@@ -170,6 +170,30 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
+     * A request carrying a pending session is never answered from the same
+     * identity's active sign-in, on its application or another.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAPendingSessionNeverReachesAnActiveSignIn(): void
+    {
+        $user  = $this->signIn();
+        $owner = ProofOwner::of($user);
+
+        $this->store()->record(SignInProofs::of($user)->password());
+
+        $first = SignInProofs::of($user)->onApplication('admin')->inSession('pending-1')->password();
+
+        $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(
+            new PendingContext($user, 'admin', 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY]),
+        ));
+
+        self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP)));
+    }
+
+    /**
      * Sign a person in, with a sign-in the proof store knows.
      *
      * @return \Tests\Fixtures\Identities\TestUser

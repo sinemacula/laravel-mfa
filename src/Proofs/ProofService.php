@@ -11,13 +11,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
  * Records and reads the current identity's proofs through the bound
@@ -45,9 +45,10 @@ final readonly class ProofService
     ) {}
 
     /**
-     * The proofs of the current identity's sign-in on the current application
-     * that still count, oldest first: none without an MFA-capable identity or a
-     * sign-in.
+     * The proofs of the signed-in person's sign-in on the current application
+     * that still count, oldest first: none without an MFA-capable person or a
+     * sign-in, and none on a pending session, whose proofs are the
+     * authentication layer's (see `Context\CallerContextResolver`).
      *
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      *
@@ -55,7 +56,7 @@ final readonly class ProofService
      */
     public function proofs(): array
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
 
         if ($identity === null) {
             return [];

@@ -10,7 +10,6 @@ use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
  * Reads the current identity's factors and resolves the configured factor
@@ -35,14 +34,17 @@ final readonly class FactorService
     ) {}
 
     /**
-     * Determine whether the current identity has at least one registered
-     * authentication factor.
+     * Determine whether the signed-in person has at least one registered
+     * authentication factor; `false` on a pending session, and without an
+     * MFA-capable person (see `Context\CallerContextResolver`).
      *
      * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function isSetup(): bool
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
 
         if ($identity === null) {
             return false;

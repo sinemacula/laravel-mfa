@@ -171,7 +171,9 @@ final readonly class PasskeyChangeGate
 
         $credentialId = CredentialId::canonical($credentialId);
 
-        if ($this->associations->forCredential($credentialId) === null) {
+        // A plain read: the association is locked, and looked up again, only
+        // once the identity's factor state lock is held, in that order.
+        if (!$this->associations->exists($credentialId)) {
             return;
         }
 
@@ -201,7 +203,7 @@ final readonly class PasskeyChangeGate
     {
         OpenTransaction::assertOpen(self::NO_TRANSACTION);
 
-        if ($this->associations->forCredential(CredentialId::canonical($credentialId)) === null) {
+        if (!$this->associations->exists(CredentialId::canonical($credentialId))) {
             return;
         }
 
@@ -237,8 +239,10 @@ final readonly class PasskeyChangeGate
 
         $this->container->make(OperationGuard::class)->identity($identity);
 
+        // Without a lock: the unique credential index refuses an association a
+        // concurrent registration commits after this read.
         OperationRefusedException::unless(
-            $this->associations->forCredential($registration->credentialId) === null,
+            !$this->associations->exists($registration->credentialId),
             FailureReason::CREDENTIAL_ASSOCIATED,
             'The credential is associated as a factor already.',
         );

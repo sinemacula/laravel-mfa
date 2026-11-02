@@ -12,9 +12,12 @@ use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
 
 /**
  * The challenge counters wiring kit: a challenge owner's path counts a failed
- * challenge against the factor inside its own transaction, counts nothing when
- * that rolls back, and does not challenge a disabled factor; the counters
- * refuse a call outside a transaction and a binding of another identity.
+ * challenge against the factor inside the caller's transaction, before it
+ * commits, counts nothing when that rolls back, nested or not, stops counting
+ * once the identity's limit locks it, never counts a consumed challenge
+ * answered again as a success, and does not challenge a disabled factor; the
+ * counters refuse a call outside a transaction and a binding of another
+ * identity.
  *
  * A test case proves its implementation by using this trait and implementing
  * the hooks; each check delegates to `ChallengeCountersContract`.
@@ -48,6 +51,52 @@ trait ChallengeCountersTests
     public function testChallengeCountersCountNothingWhenRolledBack(): void
     {
         ChallengeCountersContract::assertARolledBackChallengeCountsNothing($this->countedFactor(), $this->failChallenge(...));
+    }
+
+    /**
+     * A failed challenge is counted before the caller's transaction commits.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testChallengeCountersCountBeforeTheCallerCommits(): void
+    {
+        ChallengeCountersContract::assertAFailureIsCountedBeforeTheCallerCommits($this->countedFactor(), $this->failChallenge(...));
+    }
+
+    /**
+     * A failed challenge whose nested transaction rolls back counts nothing.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testChallengeCountersCountNothingWhenANestedTransactionRollsBack(): void
+    {
+        ChallengeCountersContract::assertANestedRollbackCountsNothing($this->countedFactor(), $this->failChallenge(...));
+    }
+
+    /**
+     * The identity's limit locks it, and a further failure counts nothing.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testChallengeCountersLockTheIdentityAtItsLimit(): void
+    {
+        ChallengeCountersContract::assertTheIdentityLimitLocksTheIdentity($this->countedIdentity(), $this->countedFactor(), $this->countedBinding(), $this->failChallenge(...));
+    }
+
+    /**
+     * A consumed challenge answered again is never a success.
+     *
+     * @return void
+     */
+    public function testChallengeCountersNeverCountAReplayAsASuccess(): void
+    {
+        ChallengeCountersContract::assertAConsumedChallengeIsNeverASuccessAgain($this->countedFactor(), $this->consumeChallenge(...), $this->failChallenge(...));
     }
 
     /**
@@ -110,4 +159,13 @@ trait ChallengeCountersTests
      * @return void
      */
     abstract protected function failChallenge(): void;
+
+    /**
+     * Answer one challenge of the factor rightly through the owner's own path,
+     * consuming it, and return what answers that same challenge again, with the
+     * same code.
+     *
+     * @return \Closure(): void
+     */
+    abstract protected function consumeChallenge(): \Closure;
 }

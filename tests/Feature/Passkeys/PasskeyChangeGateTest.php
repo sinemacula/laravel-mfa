@@ -8,6 +8,7 @@ use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
@@ -15,6 +16,7 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
+use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentAuthority;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
@@ -28,7 +30,9 @@ use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\Passkeys\CredentialId;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociationResult;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
@@ -59,6 +63,7 @@ use Tests\TestCase;
  */
 #[CoversClass(PasskeyChangeGate::class)]
 #[CoversClass(PasskeyAssociationResult::class)]
+#[CoversClass(PasskeyAssociations::class)]
 #[CoversClass(EnrollmentAuthority::class)]
 #[CoversClass(FactorRemoval::class)]
 #[CoversClass(RequiredFactorPolicy::class)]
@@ -349,6 +354,40 @@ final class PasskeyChangeGateTest extends TestCase
 
         self::assertSame(FailureReason::CREDENTIAL_ASSOCIATED, $this->refusal(fn () => $this->registrar()->register($intruder, self::APPLICATION, $this->registration($intruder))));
         self::assertSame(1, PasskeyAssociation::query()->count());
+    }
+
+    /**
+     * A credential another identity's registration associates after this one
+     * found it unassociated is refused by the unique credential index, as one
+     * found associated is, and the registration rolls back.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACredentialAssociatedConcurrentlyIsRefused(): void
+    {
+        $this->enablePasskeys();
+        $this->reauthenticate();
+
+        $user = $this->signedInPerson();
+
+        PasskeyAssociation::creating(static function (): void {
+            // Stands in for another identity's registration committing the same
+            // credential between this one's check and its insert.
+            DB::table(TableNames::of(TableNames::PASSKEY_ASSOCIATIONS))->insert([
+                'id'                   => (string) Str::ulid(),
+                'factor_id'            => 'concurrent-factor',
+                'authenticatable_type' => 'concurrent',
+                'authenticatable_id'   => 'concurrent',
+                'credential_id_hash'   => CredentialId::hash(self::CREDENTIAL),
+                'credential_id'        => self::CREDENTIAL,
+            ]);
+        });
+
+        self::assertSame(FailureReason::CREDENTIAL_ASSOCIATED, $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user))));
+        self::assertFalse(StandInRegistrar::stores($user, self::CREDENTIAL));
+        self::assertSame(0, Factor::query()->count());
     }
 
     /**

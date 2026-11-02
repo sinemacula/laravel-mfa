@@ -6,9 +6,11 @@ namespace SineMacula\Laravel\Mfa\Testing\Seams;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Container\Container;
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Assert;
+use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -21,8 +23,11 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 /**
  * What a challenge owner's wiring to `Attempts\ChallengeCounters` must
  * guarantee, as assertions: a failed challenge is counted against the factor,
- * inside the owner's transaction, so one that rolls back counts nothing; a
- * factor disabled at the failure ceiling is not challenged; and the counters
+ * inside the owner's transaction and before it commits, so one that rolls back
+ * counts nothing, a nested one included, and the caller's transaction is left
+ * as it was found; the identity's limit locks it, after which a failure counts
+ * nothing more; a factor disabled at the failure ceiling is not challenged; a
+ * consumed challenge answered again is never a success; and the counters
  * themselves refuse a call outside a transaction and a binding of another
  * identity.
  *
@@ -81,6 +86,144 @@ final class ChallengeCountersContract
         }
 
         Assert::assertSame($before, self::failures($factor), 'A challenge whose change rolls back must count nothing.');
+    }
+
+    /**
+     * A failed challenge is counted inside the transaction it is made in,
+     * before that commits, so an owner that reports later, once it has
+     * committed, is caught; and the owner leaves that transaction as it found
+     * it.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \Closure(): void  $failChallenge
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public static function assertAFailureIsCountedBeforeTheCallerCommits(EloquentFactor&Model $factor, \Closure $failChallenge): void
+    {
+        $before     = self::failures($factor);
+        $connection = DB::connection(StorageConnection::name());
+        $level      = $connection->transactionLevel() + 1;
+
+        $connection->beginTransaction();
+
+        try {
+            self::attempt($failChallenge);
+
+            Assert::assertSame($level, $connection->transactionLevel(), 'A challenge must leave the caller\'s transaction as it found it.');
+            Assert::assertSame($before + 1, self::failures($factor), 'A failed challenge must be counted in the caller\'s transaction, before it commits.');
+        } finally {
+            $connection->rollBack($level - 1);
+        }
+    }
+
+    /**
+     * A failed challenge inside a nested transaction that rolls back, within an
+     * outer one that commits, counts nothing.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \Closure(): void  $failChallenge
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public static function assertANestedRollbackCountsNothing(EloquentFactor&Model $factor, \Closure $failChallenge): void
+    {
+        $before     = self::failures($factor);
+        $connection = DB::connection(StorageConnection::name());
+        $outer      = $connection->transactionLevel() + 1;
+
+        $connection->beginTransaction();
+
+        try {
+            $connection->beginTransaction();
+
+            try {
+                self::attempt($failChallenge);
+
+                $left = $connection->transactionLevel();
+            } finally {
+                $connection->rollBack($outer);
+            }
+
+            Assert::assertSame($outer + 1, $left, 'A challenge must leave the caller\'s nested transaction as it found it.');
+
+            $connection->commit();
+        } finally {
+            $connection->rollBack($outer - 1);
+        }
+
+        Assert::assertSame($before, self::failures($factor), 'A challenge whose nested transaction rolls back must count nothing.');
+    }
+
+    /**
+     * The identity's limit locks it: a failure short of the limit leaves the
+     * factor admitted, the failure that reaches it refuses the factor as
+     * locked, and a further failure counts nothing. The limits are set for the
+     * check, the identity's to two and the factor's above it, and put back
+     * after it.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  \Closure(): void  $failChallenge
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public static function assertTheIdentityLimitLocksTheIdentity(
+        MultiFactorAuthenticatable $identity,
+        EloquentFactor&Model $factor,
+        ProofBinding $binding,
+        \Closure $failChallenge,
+    ): void {
+        $config = Container::getInstance()->make(Repository::class);
+        $saved  = $config->get('mfa.attempts');
+
+        $config->set(['mfa.attempts.factor_limit' => 20, 'mfa.attempts.identity_limit' => 2]);
+
+        try {
+            self::attempt($failChallenge);
+
+            Assert::assertTrue(self::admission($identity, $factor, $binding)->isAdmitted(), 'A failure short of the identity\'s limit must not lock it.');
+
+            self::attempt($failChallenge);
+
+            Assert::assertSame(FailureReason::LOCKED, self::admission($identity, $factor, $binding)->reason, 'The failure reaching the identity\'s limit must lock it.');
+
+            $before = self::failures($factor);
+
+            self::attempt($failChallenge);
+
+            Assert::assertSame($before, self::failures($factor), 'A challenge of a locked identity must count nothing more.');
+        } finally {
+            $config->set('mfa.attempts', $saved);
+        }
+    }
+
+    /**
+     * A challenge answered rightly is consumed: answering it again is never
+     * counted as a success, so it resets no failures counted since.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \Closure(): (\Closure(): void)  $consumeChallenge
+     * @param  \Closure(): void  $failChallenge
+     * @return void
+     */
+    public static function assertAConsumedChallengeIsNeverASuccessAgain(EloquentFactor&Model $factor, \Closure $consumeChallenge, \Closure $failChallenge): void
+    {
+        $replay = $consumeChallenge();
+
+        self::attempt($failChallenge);
+
+        $before = self::failures($factor);
+
+        Assert::assertGreaterThan(0, $before, 'A failed challenge must be counted against its factor.');
+
+        self::attempt($replay);
+
+        Assert::assertGreaterThanOrEqual($before, self::failures($factor), 'A consumed challenge answered again must never be counted as a success.');
     }
 
     /**
@@ -161,6 +304,22 @@ final class ChallengeCountersContract
         } catch (\RuntimeException) {
             // A refused challenge counts nothing; the count is read after.
         }
+    }
+
+    /**
+     * Whether the counters admit a challenge of the factor now, asked in a
+     * transaction of the kit's own.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
+     *
+     * @throws \Throwable
+     */
+    private static function admission(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): ChallengeAdmission
+    {
+        return DB::connection(StorageConnection::name())->transaction(static fn (): ChallengeAdmission => self::counters()->isUsable($identity, $factor, $binding));
     }
 
     /**

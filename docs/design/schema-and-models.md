@@ -36,8 +36,9 @@ factors starts with.
   lockout its failures in a row applied, ending when its window does (see [Attempts and
   Lockout](attempts-and-lockout.md)).
 - `mfa_passkey_associations`: the `factor_id` (unique), owner, and the credential by the SHA-256 `credential_id_hash`
-  of its canonical unpadded base64url id (unique per owner) with the `credential_id` in full. A passkey factor's
-  `credential_reference` holds the same id; the two are written and deleted together (see [Passkeys](passkeys.md)).
+  of its canonical unpadded base64url id (unique: one association per credential, whoever holds it) with the
+  `credential_id` in full. A passkey factor's `credential_reference` holds the same id; the two are written and deleted
+  together (see [Passkeys](passkeys.md)).
 - No table holds a code, a recovery code or a grant in plaintext; the TOTP secret is encrypted by the model's cast.
   The factor model hides `secret`, `destination` and `credential_reference` from serialisation; the other models hide
   their hashes and session ids.

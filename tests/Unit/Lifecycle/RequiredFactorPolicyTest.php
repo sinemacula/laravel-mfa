@@ -7,6 +7,8 @@ namespace Tests\Unit\Lifecycle;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\TestCase;
 
@@ -21,6 +23,7 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(RequiredFactorPolicy::class)]
+#[CoversClass(PasskeyAssociations::class)]
 final class RequiredFactorPolicyTest extends TestCase
 {
     use ArrangesPasskeys;
@@ -90,6 +93,40 @@ final class RequiredFactorPolicyTest extends TestCase
 
         self::assertFalse($this->policy()->allowsRemoval($user, self::APPLICATION, $this->confirmedFactor($user)));
         self::assertSame(1, Factor::query()->count());
+    }
+
+    /**
+     * A remaining passkey counts only while its association matches it: one
+     * whose association is missing, names another credential or belongs to
+     * another identity does not let the last usable factor go.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAnUnusablePasskeyDoesNotKeepTheIdentityCovered(): void
+    {
+        $this->enablePasskeys();
+
+        $user = $this->signedInPerson();
+        $user->update(['mfa_enabled' => true]);
+
+        $totp    = $this->confirmedFactor($user);
+        $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        self::assertTrue($this->policy()->allowsRemoval($user, self::APPLICATION, $totp));
+
+        PasskeyAssociation::query()->where('factor_id', $passkey->id)->update(['credential_id' => self::OTHER_CREDENTIAL]);
+
+        self::assertFalse($this->policy()->allowsRemoval($user, self::APPLICATION, $totp));
+
+        PasskeyAssociation::query()->where('factor_id', $passkey->id)->update(['credential_id' => self::CREDENTIAL, 'authenticatable_id' => 'someone-else']);
+
+        self::assertFalse($this->policy()->allowsRemoval($user, self::APPLICATION, $totp));
+
+        PasskeyAssociation::query()->where('factor_id', $passkey->id)->delete();
+
+        self::assertFalse($this->policy()->allowsRemoval($user, self::APPLICATION, $totp));
     }
 
     /**

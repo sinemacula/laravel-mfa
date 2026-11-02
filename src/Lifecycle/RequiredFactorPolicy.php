@@ -13,6 +13,9 @@ use SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\RequirementMode;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
  * The default `LastFactorPolicy`: required MFA cannot be turned off by the
@@ -20,12 +23,14 @@ use SineMacula\Laravel\Mfa\Enums\RequirementMode;
  *
  * While the identity's own contract requires an additional factor, or any
  * configured application always requires one, a factor may be removed only when
- * another remains that some configured application accepts: confirmed, and of a
- * type an application enables. "Last" means the last acceptable one, not the
- * last row, so a pending factor, or one of a type no application enables, does
- * not keep the identity covered. Without such a requirement any factor may be
- * removed. It knows nothing of tenants; an adapter rebinds it to consult a
- * tenant's policy as well.
+ * another remains that some configured application accepts: confirmed, of a
+ * type an application enables, and, for a passkey, with an association that
+ * matches it (see `Passkeys\PasskeyAssociations`). "Last" means the last
+ * acceptable one, not the last row, so a pending factor, one of a type no
+ * application enables, or a passkey that is unusable for want of its
+ * association does not keep the identity covered. Without such a requirement
+ * any factor may be removed. It knows nothing of tenants; an adapter rebinds it
+ * to consult a tenant's policy as well.
  *
  * The identity's factors are read from the write connection with a locking
  * read, so asked again inside the removal's factor state transaction it sees
@@ -40,11 +45,15 @@ final readonly class RequiredFactorPolicy implements LastFactorPolicy
      * Constructor.
      *
      * @param  \Illuminate\Contracts\Config\Repository  $config
+     * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations  $associations
      */
     public function __construct(
 
         /** The configuration the applications are read from on every call. */
         private Repository $config,
+
+        /** The association records a passkey factor is usable only with. */
+        private PasskeyAssociations $associations,
     ) {}
 
     /**
@@ -56,6 +65,7 @@ final readonly class RequiredFactorPolicy implements LastFactorPolicy
      * @return bool
      *
      * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
     public function allowsRemoval(MultiFactorAuthenticatable $identity, string $application, Factor $factor): bool
@@ -66,12 +76,14 @@ final readonly class RequiredFactorPolicy implements LastFactorPolicy
 
         $removed = LockedFactors::idOf($factor);
         $types   = $this->enabledTypes();
+        $owner   = ProofOwner::of($identity);
 
         $factors = WriteConnection::query($identity->authFactors())->lockForUpdate()->get();
 
-        return $factors->contains(static fn (Factor&Model $other): bool => LockedFactors::idOf($other) !== $removed
+        return $factors->contains(fn (Factor&Model $other): bool => LockedFactors::idOf($other) !== $removed
             && $other->isConfirmed()
-            && in_array($other->getType(), $types, true));
+            && in_array($other->getType(), $types, true)
+            && ($other->getType() !== PasskeyAssertions::TYPE || $this->associations->associates($other, $owner)));
     }
 
     /**

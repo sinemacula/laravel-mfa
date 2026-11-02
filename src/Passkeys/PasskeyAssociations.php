@@ -4,8 +4,12 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Passkeys;
 
+use Illuminate\Database\UniqueConstraintViolationException;
+use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
@@ -16,9 +20,13 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  * A passkey factor counts only with an association whose owner and credential
  * are the factor's own: the factor's credential reference and the association
  * are written and deleted together, in one factor state transaction, and any
- * mismatch between them leaves the factor unusable, as if it did not exist.
- * Records are read from the write connection, with a locking read, so a read
- * made inside a change sees what that change and any committed one left.
+ * mismatch between them leaves the factor unusable, as if it did not exist. A
+ * credential is associated at most once, whoever holds it: the unique index on
+ * its digest refuses a second association, a concurrent one included. Records
+ * are read from the write connection. The reads made under the identity's
+ * factor state lock lock the row they find, through that unique index, so they
+ * wait on that identity's lock first; `exists()` takes no lock, for the checks
+ * made before it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,14 +44,35 @@ final readonly class PasskeyAssociations
      */
     public function forCredential(#[\SensitiveParameter] string $credentialId): ?PasskeyAssociation
     {
-        $association = WriteConnection::query(PasskeyAssociation::query())
-            ->where('credential_id_hash', CredentialId::hash($credentialId))
-            ->lockForUpdate()
-            ->first();
+        return self::find($credentialId, true);
+    }
 
-        // The digest is compared by the database; the id itself is compared
-        // here, exactly, since a column's collation may ignore case.
-        return $association instanceof PasskeyAssociation && $association->credential_id === $credentialId ? $association : null;
+    /**
+     * Whether the canonical credential id is associated with anybody, read
+     * without a lock, so it may be asked before the identity's factor state
+     * lock is taken.
+     *
+     * @param  string  $credentialId
+     * @return bool
+     */
+    public function exists(#[\SensitiveParameter] string $credentialId): bool
+    {
+        return self::find($credentialId, false) !== null;
+    }
+
+    /**
+     * Whether the factor has an association that matches it (see `matches()`),
+     * read with a lock.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
+     * @return bool
+     */
+    public function associates(Factor $factor, ProofOwner $owner): bool
+    {
+        $id = LockedFactors::idOf($factor);
+
+        return $id !== null && self::matches($factor, $owner, $this->forFactor($id));
     }
 
     /**
@@ -70,6 +99,7 @@ final readonly class PasskeyAssociations
      * @param  string  $credentialId
      * @return \SineMacula\Laravel\Mfa\Models\PasskeyAssociation
      *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      */
     public function associate(ProofOwner $owner, string $factorId, #[\SensitiveParameter] string $credentialId): PasskeyAssociation
@@ -82,7 +112,13 @@ final readonly class PasskeyAssociations
             'credential_id'        => $credentialId,
         ]);
 
-        if (!$association->save()) {
+        $saved = self::save($association);
+
+        if ($saved === null) {
+            throw new OperationRefusedException(FailureReason::CREDENTIAL_ASSOCIATED, 'The credential is associated as a factor already.');
+        }
+
+        if (!$saved) {
             throw new WriteCancelledException('A model event cancelled the passkey association\'s save, so the passkey was not associated.');
         }
 
@@ -119,5 +155,41 @@ final readonly class PasskeyAssociations
             && $association->authenticatable_type === $owner->type
             && $association->authenticatable_id   === $owner->key
             && $association->credential_id        === $factor->getCredentialReference();
+    }
+
+    /**
+     * Save the association: `false` when a model event cancels it, and `null`
+     * when the unique index refuses it because another change associated the
+     * credential first and committed, with this identity or another.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\PasskeyAssociation  $association
+     * @return ?bool
+     */
+    private static function save(PasskeyAssociation $association): ?bool
+    {
+        try {
+            return $association->save();
+        } catch (UniqueConstraintViolationException) { // @phpstan-ignore catch.neverThrown
+            return null;
+        }
+    }
+
+    /**
+     * The association of the canonical credential id, read from the write
+     * connection with or without a lock.
+     *
+     * @param  string  $credentialId
+     * @param  bool  $lock
+     * @return ?\SineMacula\Laravel\Mfa\Models\PasskeyAssociation
+     */
+    private static function find(#[\SensitiveParameter] string $credentialId, bool $lock): ?PasskeyAssociation
+    {
+        $query = WriteConnection::query(PasskeyAssociation::query())->where('credential_id_hash', CredentialId::hash($credentialId));
+
+        $association = ($lock ? $query->lockForUpdate() : $query)->first();
+
+        // The digest is compared by the database; the id itself is compared
+        // here, exactly, since a column's collation may ignore case.
+        return $association instanceof PasskeyAssociation && $association->credential_id === $credentialId ? $association : null;
     }
 }

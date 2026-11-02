@@ -10,6 +10,7 @@ use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -17,6 +18,7 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
@@ -118,6 +120,69 @@ final class PackageChallengeGatewayTest extends TestCase
         self::assertFalse($this->gateway()->verify($this->factor, $this->emailBinding($this->user), 'challenge-1', '123456'));
         self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->gateway()->send($this->factor, $this->emailBinding($this->user))));
         self::assertSame([], $this->mailbox->sent());
+    }
+
+    /**
+     * A binding of the caller's own sign-in on another application, or of
+     * another session on its own, is sent nothing and verifies nothing.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRefusesABindingOfTheCallersOtherApplicationOrSession(): void
+    {
+        config()->set('mfa.applications.admin', [
+            'types'        => ['email'],
+            'first_factor' => ['method' => 'password', 'channel' => 'password'],
+        ]);
+
+        $this->container()->make(ProofStore::class)->begin($this->user, 'admin', 'admin-sign-in');
+
+        $owner = ProofOwner::of($this->user);
+
+        foreach ([['admin', 'admin-sign-in'], ['web', 'another-sign-in']] as [$application, $session]) {
+            $binding = new ProofBinding($owner->type, $owner->key, $application, $session, Purpose::SIGN_IN);
+
+            self::assertFalse($this->gateway()->verify($this->factor, $binding, 'challenge-1', '123456'));
+            self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->gateway()->send($this->factor, $binding)));
+        }
+
+        self::assertSame([], $this->mailbox->sent());
+    }
+
+    /**
+     * A pending session on one application is served only for its own binding,
+     * never for the same identity's active sign-in on another.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAPendingSessionNeverReachesAnActiveSignInElsewhere(): void
+    {
+        config()->set('mfa.applications.admin', [
+            'types'        => ['email'],
+            'first_factor' => ['method' => 'password', 'channel' => 'password'],
+        ]);
+
+        $proofs = SignInProofs::of($this->user)->onApplication('admin')->inSession('pending-1');
+
+        $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(
+            new PendingContext($this->user, 'admin', 'pending-1', $proofs->password(), Requirement::none(), [PendingAction::SEND_CODE, PendingAction::VERIFY]),
+        ));
+
+        $active = $this->emailBinding($this->user);
+
+        self::assertFalse($this->gateway()->verify($this->factor, $active, 'challenge-1', '123456'));
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->gateway()->send($this->factor, $active)));
+        self::assertSame([], $this->mailbox->sent());
+
+        $owner     = ProofOwner::of($this->user);
+        $pending   = new ProofBinding($owner->type, $owner->key, 'admin', 'pending-1', Purpose::SIGN_IN);
+        $challenge = $this->gateway()->send($this->factor, $pending);
+
+        self::assertTrue($this->gateway()->verify($this->factor, $pending, $challenge, self::lastEmailedCode($this->mailbox)));
     }
 
     /**

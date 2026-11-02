@@ -54,8 +54,10 @@ final readonly class SessionFirstFactor
 
     /**
      * The first factor of the session the binding names: the pending session's
-     * when the request carries that one, otherwise the identity's current
-     * sign-in's when the binding names it; `null` for any other session.
+     * when the request carries one and the binding names it, otherwise the
+     * identity's current sign-in's when the binding names it; `null` for any
+     * other session. A request carrying a pending session is never answered
+     * from an active sign-in, so its credential reaches no other session.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -73,8 +75,10 @@ final readonly class SessionFirstFactor
             return null;
         }
 
-        if ($pending !== null && $pending->sessionId === $binding->sessionId && $pending->application === $binding->application && $owner->owns($pending->firstFactor->binding)) {
-            return $pending->firstFactor;
+        if ($pending !== null) {
+            return $pending->sessionId === $binding->sessionId && $pending->application === $binding->application && $owner->owns($pending->firstFactor->binding)
+                ? $pending->firstFactor
+                : null;
         }
 
         $session = $this->container->make(ProofStore::class)->currentSession($identity, $binding->application);

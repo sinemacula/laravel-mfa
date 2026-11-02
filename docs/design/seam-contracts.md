@@ -62,7 +62,9 @@ that call them, so the flows can be built against one fixed set.
   middleware gates a session left short until it meets it again, and the session keeps its proofs, as a pending session
   does.
 - `ChallengeGateway` is bound to `Codes\PackageChallengeGateway`, the package's own delivered codes, owned exactly as an
-  authentication layer must own its challenges (see the reverse calls below).
+  authentication layer must own its challenges (see the reverse calls below). It serves only a binding that is exactly
+  the caller's own: its identity, its application and its session (the pending session's, or the current sign-in's).
+  A request carrying a pending session never reaches an active sign-in of the same identity elsewhere.
 - `PasskeyGateway` is bound to `Passkeys\UnavailablePasskeyGateway`: no passkey is registered, nothing verifies, and
   starting a ceremony is a `LogicException`. The configuration check refuses an application that enables `passkey`
   while it is bound (see [Passkeys](passkeys.md)).
@@ -140,7 +142,8 @@ exception that rolls the caller's change back with it.
 - `Context\CallerContextResolver` decides who every helper that returns summaries, sends a code or reveals a secret
   serves: a pending session only for the `PendingAction` the helper needs, as its own identity, and otherwise the
   guard's signed-in person; only a person either way. A helper that names no action (generating recovery codes, the
-  direct enrolment) serves active sessions only.
+  direct enrolment, `disable()`, `isSetup()` and `proofs()`) serves active sessions only; `recoveryCodes()` needs
+  `mfa.list_factors`, as `getFactors()` does.
 - `Testing\Seams` holds a contract kit per seam: a trait of tests with abstract hooks, in `Testing\Seams\Concerns`,
   delegating each check to a `*Contract` class of static assertions. This package's tests use the traits to prove its
   defaults and call the assertions on deliberately faulty implementations to prove the kit rejects them; an adapter's

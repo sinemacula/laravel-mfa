@@ -22,7 +22,6 @@ use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
-use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
  * The default `ChallengeGateway`: the package's own delivered codes (see
@@ -38,8 +37,13 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  * checks the code against the named challenge, consuming it when it matches,
  * and reports the outcome through the counters in the same transaction. A
  * delivery is never reported. The caller is served only when the request's
- * pending session allows sending or verifying, or its signed-in person is the
- * identity the binding names.
+ * pending session allows sending or verifying, or it has no pending session and
+ * its signed-in person is served, and only for a binding that is exactly the
+ * caller's own (see `Context\CallerContextResolver::binding()`): its identity,
+ * its application, its session (the pending session's, or the current
+ * sign-in's) and the binding's purpose. A binding of another application or
+ * session of the same identity is refused, so a pending credential never
+ * reaches an active sign-in elsewhere.
  *
  * Stateless: the request, the driver and the connection are resolved on every
  * call.
@@ -142,21 +146,26 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     }
 
     /**
-     * The identity the request serves for the action, when the binding names
-     * it.
+     * The identity the request serves for the action, when the binding is the
+     * caller's own: the same identity, application, session and purpose.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\PendingAction  $action
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     private function identity(PendingAction $action, ProofBinding $binding): ?MultiFactorAuthenticatable
     {
         $caller = $this->callers->resolve($action);
 
-        return $caller !== null && ProofOwner::of($caller->identity)->owns($binding) ? $caller->identity : null;
+        if ($caller === null) {
+            return null;
+        }
+
+        return $this->callers->binding($caller, $binding->purpose)?->toArray() === $binding->toArray() ? $caller->identity : null;
     }
 
     /**
