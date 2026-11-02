@@ -41,6 +41,10 @@ final class FailureReasonTest extends TestCase
             'MFA_ENROLLMENT_REQUIRED' => 'mfa_enrollment_required',
             'IDENTITY_INACTIVE'       => 'identity_inactive',
             'MACHINE_IDENTITY'        => 'machine_identity',
+            'NOT_FRESH'               => 'not_fresh',
+            'LAST_FACTOR'             => 'last_factor',
+            'LIMIT_REACHED'           => 'limit_reached',
+            'CREDENTIAL_ASSOCIATED'   => 'credential_associated',
         ], array_column(FailureReason::cases(), 'value', 'name'));
     }
 }

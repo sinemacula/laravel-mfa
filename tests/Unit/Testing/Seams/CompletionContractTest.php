@@ -1,0 +1,125 @@
+<?php
+
+declare(strict_types = 1);
+
+namespace Tests\Unit\Testing\Seams;
+
+use PHPUnit\Framework\AssertionFailedError;
+use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
+use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
+use SineMacula\Laravel\Mfa\Contracts\StepUp;
+use SineMacula\Laravel\Mfa\Enums\PendingAction;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Testing\Seams\PendingCompletionContract;
+use SineMacula\Laravel\Mfa\Testing\Seams\PendingCompletionTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\StepUpContract;
+use SineMacula\Laravel\Mfa\Testing\Seams\StepUpTests;
+use SineMacula\Laravel\Mfa\Verification\VerificationResult;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\CheckingCompletion;
+use Tests\TestCase;
+
+/**
+ * The `PendingCompletion` and `StepUp` contract kits prove a completion that
+ * checks each result's binding, and reject one that accepts every result. The
+ * package binds neither by default: their defaults come with verification.
+ *
+ * @author      Ben Carey <bdmc@sinemacula.co.uk>
+ * @copyright   2026 Sine Macula Limited
+ *
+ * @internal
+ */
+#[CoversClass(PendingCompletionContract::class)]
+#[CoversClass(StepUpContract::class)]
+final class CompletionContractTest extends TestCase
+{
+    use PendingCompletionTests, StepUpTests;
+
+    /**
+     * The kit rejects a pending completion that accepts a result of another
+     * binding.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRejectsAPendingCompletionThatAcceptsAnything(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        PendingCompletionContract::assertRefusesAResultOfAnotherBinding(new CheckingCompletion('sign-in-1', false), $this->pendingContext(), $this->resultOfAnotherBinding());
+    }
+
+    /**
+     * The kit rejects a step-up that accepts a failed result.
+     *
+     * @return void
+     */
+    public function testRejectsAStepUpThatAcceptsAFailedResult(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        StepUpContract::assertRefusesAFailedResult(new CheckingCompletion('sign-in-1', false));
+    }
+
+    /**
+     * A completion that checks each result.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\PendingCompletion
+     */
+    protected function pendingCompletion(): PendingCompletion
+    {
+        return new CheckingCompletion('sign-in-1');
+    }
+
+    /**
+     * A pending session.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\PendingContext
+     */
+    protected function pendingContext(): PendingContext
+    {
+        $identity = new NonEloquentIdentity;
+
+        return new PendingContext($identity, 'web', 'pending-1', SignInProofs::of($identity)->inSession('pending-1')->password(), Requirement::none(), [PendingAction::VERIFY]);
+    }
+
+    /**
+     * A result bound to another session.
+     *
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    protected function resultOfAnotherBinding(): VerificationResult
+    {
+        $proof = SignInProofs::of(new NonEloquentIdentity)->inSession('another-session')->totp();
+
+        return VerificationResult::verified($proof, $this->container()->make(RequirementCheck::class)->check(Requirement::none(), $proof));
+    }
+
+    /**
+     * A step-up that checks each result.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\StepUp
+     */
+    protected function stepUp(): StepUp
+    {
+        return new CheckingCompletion('sign-in-1');
+    }
+
+    /**
+     * A result bound to another session.
+     *
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    protected function stepUpResultOfAnotherBinding(): VerificationResult
+    {
+        return $this->resultOfAnotherBinding();
+    }
+}

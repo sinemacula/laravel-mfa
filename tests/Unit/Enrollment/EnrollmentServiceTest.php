@@ -7,15 +7,22 @@ namespace Tests\Unit\Enrollment;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
 use SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException;
+use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\Fixtures\Identities\SecondaryUser;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
@@ -219,6 +226,61 @@ final class EnrollmentServiceTest extends TestCase
         $this->service()->enroll($this->newFactor());
 
         self::assertTrue($factors->isSetup());
+    }
+
+    /**
+     * A passkey is never enrolled directly: it becomes a factor only through
+     * the change gate.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAPasskeyIsRefused(): void
+    {
+        $this->signIn();
+
+        $factor = $this->newFactor();
+
+        $factor->setAttribute('type', 'passkey');
+
+        try {
+            $this->service()->enroll($factor);
+            self::fail('A passkey was expected to be refused.');
+        } catch (UnsupportedFactorException $exception) {
+            self::assertSame('A passkey is associated as a factor only through the passkey change gate, from its registration.', $exception->getMessage());
+        }
+
+        self::assertSame(0, Factor::query()->count());
+    }
+
+    /**
+     * A pending session enrols nothing, though the guard's user is signed in:
+     * this enrolment would confirm a factor without a code.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAPendingSessionEnrollsNothing(): void
+    {
+        $user = $this->signIn();
+
+        $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(new PendingContext(
+            $user,
+            'web',
+            'pending-1',
+            SignInProofs::of($user)->inSession('pending-1')->password(),
+            Requirement::none(),
+            [PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT],
+        )));
+
+        Event::fake([MfaFactorEnrolled::class]);
+
+        $this->service()->enroll($this->newFactor());
+
+        self::assertSame(0, Factor::query()->count());
+        Event::assertNotDispatched(MfaFactorEnrolled::class);
     }
 
     /**

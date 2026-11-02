@@ -11,11 +11,13 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Session\Session;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 
 /**
  * Registers the proof service, the default `ProofStore`, which keeps each
- * sign-in's proofs in the Laravel session, and the listeners that begin a
- * sign-in on Laravel's `Login` event and forget it on `Logout` and
+ * sign-in's proofs in the Laravel session, the default `SessionRevoker`, which
+ * advances the identity's verification generation, and the listeners that
+ * begin a sign-in on Laravel's `Login` event and forget it on `Logout` and
  * `CurrentDeviceLogout`.
  *
  * The store is built on every resolution, from the session of the request at
@@ -36,8 +38,8 @@ final class ProofBindings
     private function __construct() {}
 
     /**
-     * Register the proof service, the default proof store and the sign-in
-     * listeners.
+     * Register the proof service, the default proof store and session revoker,
+     * and the sign-in listeners.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
@@ -52,6 +54,7 @@ final class ProofBindings
         );
 
         $app->singleton(ProofService::class);
+        $app->singleton(SessionRevoker::class, GenerationSessionRevoker::class);
 
         $events = $app->make(Dispatcher::class);
 

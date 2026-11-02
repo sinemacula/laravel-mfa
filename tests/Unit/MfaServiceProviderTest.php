@@ -16,15 +16,24 @@ use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
 use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
+use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
+use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
+use SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy;
+use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
+use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
+use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
+use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
@@ -39,6 +48,7 @@ use SineMacula\Laravel\Mfa\Http\Middleware\SkipMfa;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
@@ -150,6 +160,16 @@ final class MfaServiceProviderTest extends TestCase
             EnrollmentService::class,
             LifecycleService::class,
             RecoveryCodeService::class,
+            PendingSessionResolver::class,
+            SubjectTypeResolver::class,
+            Reauthenticator::class,
+            FirstFactorResolver::class,
+            SessionRevoker::class,
+            SessionTransition::class,
+            ChallengeGateway::class,
+            PasskeyGateway::class,
+            PasskeyChangeGate::class,
+            LastFactorPolicy::class,
         ];
 
         foreach ($abstracts as $abstract) {

@@ -85,13 +85,15 @@ name:
 ],
 ```
 
-Every key below is checked; `requirement`, `totp_window`, `recovery_codes.enabled` and `freshness` are applied so far.
+Every key below is checked; `requirement`, `totp_window`, `recovery_codes.enabled`, `freshness` and `first_factor` are
+applied, and `limits`, `bootstrap` and `recovery_codes.level` so far only by the passkey change gate (see
+[Passkeys](extending.md#passkeys)).
 `requirement` is composed into `Mfa::requirement()`, which the `mfa` middleware asks before it enforces anything, and
 `freshness` is what `Mfa::isFresh()` judges a step-up against (see [Requirements and step-up](requirements.md)). The
 TOTP driver accepts the window of the application a bound `Contracts\ApplicationResolver` names for the request, and
 `totp.window` when none is bound, and recovery codes are generated and redeemed only where the application accepts them.
 Until the flows that read the other keys ship, the shipped drivers verify a factor of any type whichever application
-asks, and the limits are not enforced.
+asks, and the limits are enforced only on passkeys.
 
 | Key                         | Default                   | Meaning                                                                                                                                |
 |-----------------------------|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
@@ -138,16 +140,24 @@ The package's own operations (`mfa.add_factor`, `mfa.replace_factor`, `mfa.remov
 that default whole, and the application adds its own operations by name. Names are the block's keys, read whole rather
 than as a dotted path, and must be lower-case segments of letters, digits and underscores, each starting with a letter,
 separated by dots; any other name is refused. An operation neither the package nor the application names is never
-fresh unless the caller asks for a requirement of its own. The package's own operations are not gated by this yet: its
-enrolment, removal and recovery-code calls run without asking, so until the enrolment and lifecycle flows do, an
-application calls `Mfa::isFresh()` itself before calling them.
+fresh unless the caller asks for a requirement of its own. The passkey change gate asks it for `mfa.add_factor` and
+`mfa.remove_factor`; the package's other enrolment, removal and recovery-code calls run without asking, so until the
+enrolment and lifecycle flows do, an application calls `Mfa::isFresh()` itself before calling them.
 
 `first_factor` is how the package knows, without an authentication layer, what started the sign-in: its `method` (any
 name, such as `password`) and its `channel`, one of the channel kinds (`password`, `sms`, `email`,
 `authenticator_app`, `passkey`, `external_provider`). An unknown first factor accepts no further factor and establishes
-no level, so every configured application must either declare one or have a `Contracts\FirstFactorResolver` bound,
-which an authentication layer's adapter provides; with neither, the configuration check fails. The channel `unknown`
+no level, so every configured application must either declare one or have a `Contracts\FirstFactorResolver` of its own
+bound, which an authentication layer's adapter provides; with neither, the configuration check fails. The default
+resolver reports the declaration as the first factor of the identity's current sign-in, dated at the Unix epoch since
+when it was made is not known: it decides which further factors are independent of it, and never makes a session fresh
+on its own. A declared `passkey` channel names no credential, so no passkey is accepted after it. The channel `unknown`
 is refused, as it declares nothing.
+
+The `passkey` type needs a `Contracts\PasskeyGateway`: this package stores no WebAuthn credentials and runs no
+ceremonies, so its default gateway reports passkeys unavailable, and an application that enables `passkey` while it is
+still bound fails the configuration check. A gateway of the application's own that reports itself unavailable at run
+time is not refused; the type is then never offered.
 
 Each code type an application enables needs something to deliver its codes: `sms` a `Contracts\SmsSender` other than
 the package's `NullSmsSender`, and `email` a `Contracts\EmailSender` other than its `NullEmailSender` (bind

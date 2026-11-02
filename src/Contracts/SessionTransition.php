@@ -12,7 +12,10 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  * Returns the identity's current session to pending when a change inside a
  * request (a switch, a refresh, a factor change) leaves it short of a
  * requirement: its access stops at once, and until the outstanding requirement
- * is met the session can take only the pending actions.
+ * is met the session can take only the pending actions. Without an
+ * authentication layer there is no pending session to return to, and the
+ * default (`Http\MiddlewareSessionTransition`) leaves the `mfa` middleware to
+ * gate access until the requirement is met.
  *
  * @api
  *
@@ -25,9 +28,9 @@ interface SessionTransition
      * Return the identity's current session on the application to pending,
      * owing the requirement.
      *
-     * Returning means the session is pending. A session that cannot be returned
-     * to pending is reported by throwing, never by returning, so the change the
-     * call is part of rolls back.
+     * Returning means access is gated until the requirement is met. A session
+     * that cannot be gated is reported by throwing, never by returning, so the
+     * change the call is part of rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

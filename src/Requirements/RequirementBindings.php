@@ -5,6 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Requirements;
 
 use Illuminate\Contracts\Foundation\Application;
+use SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactorResolver;
+use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
@@ -17,9 +19,11 @@ use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
  * (`ConfiguredRequirementPolicy`), the identity's own from its model
  * (`IdentityContractRequirement`), no tenant requirement
  * (`NoTenantRequirement`), the check of a session's proofs through the
- * combination policy (`ProofRequirementCheck`) and the freshness of a named
- * operation from the proof store (`ConfiguredFreshnessGate`). An adapter, or
- * the application, rebinds any of the contracts in its own service provider.
+ * combination policy (`ProofRequirementCheck`), the freshness of a named
+ * operation from the proof store (`ConfiguredFreshnessGate`), and the first
+ * factor the application declares (`Applications\DeclaredFirstFactorResolver`),
+ * which the freshness gate reads. An adapter, or the application, rebinds any
+ * of the contracts in its own service provider.
  *
  * Every default keeps no state between calls and resolves what it reads on each
  * one, so each is shared.
@@ -50,5 +54,6 @@ final class RequirementBindings
         $app->singleton(TenantRequirement::class, NoTenantRequirement::class);
         $app->singleton(RequirementCheck::class, ProofRequirementCheck::class);
         $app->singleton(FreshnessGate::class, ConfiguredFreshnessGate::class);
+        $app->singleton(FirstFactorResolver::class, DeclaredFirstFactorResolver::class);
     }
 }

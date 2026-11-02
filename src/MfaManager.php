@@ -7,8 +7,10 @@ namespace SineMacula\Laravel\Mfa;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
@@ -217,7 +219,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     /**
      * Generate a new recovery code set for the current identity, replacing any
      * earlier one, and return its codes, once, as secrets for the response;
-     * none without an MFA-capable identity.
+     * none without an MFA-capable person signed in, or on a pending session.
      *
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
@@ -227,15 +229,16 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function generateRecoveryCodes(): array
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
 
         return $identity === null ? [] : $this->container->make(RecoveryCodeService::class)->generate($identity);
     }
 
     /**
-     * Redeem a recovery code for the current identity, for the purpose given:
-     * whether a code was used and its proof recorded; `false` without an
-     * MFA-capable identity.
+     * Redeem a recovery code for the identity the request serves for
+     * verifying, for the purpose given: whether a code was used and its proof
+     * recorded; `false` on a pending session that does not allow verifying,
+     * and without an MFA-capable person.
      *
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -248,7 +251,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      */
     public function redeemRecoveryCode(#[\SensitiveParameter] string $code, Purpose $purpose = Purpose::SIGN_IN): bool
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $this->container->make(CallerContextResolver::class)->resolve(PendingAction::VERIFY)?->identity;
 
         return $identity !== null && $this->container->make(RecoveryCodeService::class)->redeem($identity, $code, $purpose)->passed;
     }

@@ -10,15 +10,18 @@ use SineMacula\Laravel\Mfa\Assurance\AssuranceBindings;
 use SineMacula\Laravel\Mfa\Codes\CodeBindings;
 use SineMacula\Laravel\Mfa\Config\ConfigurationBindings;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
+use SineMacula\Laravel\Mfa\Context\ContextBindings;
 use SineMacula\Laravel\Mfa\Drivers\DriverBindings;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentBindings;
 use SineMacula\Laravel\Mfa\Events\EventBindings;
 use SineMacula\Laravel\Mfa\Factors\FactorBindings;
 use SineMacula\Laravel\Mfa\Http\HttpBindings;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleBindings;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyBindings;
 use SineMacula\Laravel\Mfa\Proofs\ProofBindings;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeBindings;
 use SineMacula\Laravel\Mfa\Requirements\RequirementBindings;
+use SineMacula\Laravel\Mfa\Seams\SeamBindings;
 use SineMacula\Laravel\Mfa\Secrets\SecretBindings;
 use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
 
@@ -27,13 +30,16 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
  *
  * Registers the configuration and the `mfa` manager singleton, then hands each
  * capability's container wiring to that capability's `*Bindings` class: its
- * service and its defaults for the seams consumers rebind (policy, proof store,
- * SMS and email senders, event context). The shipped drivers are registered
- * against the manager by their capability's `*Bindings` class from inside the
- * singleton's factory, once the configuration is checked. Boots the middleware
- * aliases, config and migration publishing, the `mfa:check` command, and the
- * configuration check that runs once the application has booted, which also
- * refuses a factor model off the storage connection.
+ * service and its fail-closed defaults for the seams consumers rebind
+ * (requirements, proof store, pending sessions, subject type, first factor,
+ * reauthentication, session revocation and transition, challenges, passkeys,
+ * the last factor, SMS and email senders, event context). The shipped drivers
+ * are registered against the manager by their capability's `*Bindings` class
+ * from inside the singleton's factory, once the configuration is checked.
+ * Boots the middleware aliases, config and migration publishing, the
+ * `mfa:check` command, and the configuration check that runs once the
+ * application has booted, which also refuses a factor model off the storage
+ * connection.
  *
  * Consumers with their own requirement policy, stateless proof store, or SMS
  * and email senders rebind the matching contracts in their own service
@@ -58,6 +64,8 @@ final class MfaServiceProvider extends ServiceProvider
         $this->registerManager();
 
         EventBindings::register($this->app);
+        ContextBindings::register($this->app);
+        SeamBindings::register($this->app);
         FactorBindings::register($this->app);
         DriverBindings::register($this->app);
         CodeBindings::register($this->app);
@@ -68,6 +76,8 @@ final class MfaServiceProvider extends ServiceProvider
         EnrollmentBindings::register($this->app);
         LifecycleBindings::register($this->app);
         RecoveryCodeBindings::register($this->app);
+        PasskeyBindings::register($this->app);
+        HttpBindings::register($this->app);
     }
 
     /**

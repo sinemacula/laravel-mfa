@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
@@ -56,6 +57,29 @@ final readonly class DriverResolver
         }
 
         return $instance;
+    }
+
+    /**
+     * Resolve the named factor driver from the `mfa` manager the container
+     * holds, for a service that runs a factor through its type's driver
+     * without a manager of its own to hand.
+     *
+     * @param  \Illuminate\Contracts\Container\Container  $container
+     * @param  string  $name
+     * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \LogicException
+     */
+    public function fromContainer(Container $container, string $name): FactorDriver
+    {
+        $registry = $container->make('mfa');
+
+        if (!$registry instanceof Manager) {
+            throw new \LogicException('The [mfa] binding must be the MFA manager.');
+        }
+
+        return $this->resolve($registry, $name);
     }
 
     /**

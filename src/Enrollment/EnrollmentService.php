@@ -7,10 +7,13 @@ namespace SineMacula\Laravel\Mfa\Enrollment;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Eloquent\Model;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Events\MfaFactorEnrolled;
+use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Factors\FactorOwnership;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
@@ -48,21 +51,32 @@ final readonly class EnrollmentService
      * already report the current identity through `getAuthenticatable()`;
      * mismatches throw `FactorOwnershipMismatchException`.
      *
-     * No-op when no MFA-capable identity is resolvable, so consumers can call
-     * this unconditionally.
+     * No-op when the request serves nobody for it, so consumers can call this
+     * unconditionally: without an MFA-capable person signed in, and on a
+     * pending session, which this direct enrolment would confirm without a
+     * code (see `Context\CallerContextResolver`).
+     *
+     * A passkey is refused with an `UnsupportedFactorException`: it becomes a
+     * factor only through its association, which the passkey change gate makes
+     * from its registration.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\FactorOwnershipMismatchException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
      */
     public function enroll(Factor $factor): void
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
 
         if ($identity === null) {
             return;
+        }
+
+        if ($factor->getType() === PasskeyAssertions::TYPE) {
+            throw new UnsupportedFactorException('A passkey is associated as a factor only through the passkey change gate, from its registration.');
         }
 
         if ($factor instanceof EloquentFactor && $factor instanceof Model) {

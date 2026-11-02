@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
@@ -92,6 +93,22 @@ final class OperationGuardTest extends TestCase
         $this->guard()->identity(new NonEloquentIdentity);
 
         $this->addToAssertionCount(1);
+    }
+
+    /**
+     * The bound subject type resolver is the authority on who is a person: one
+     * that finds a person a machine is honoured.
+     *
+     * @return void
+     */
+    public function testTheBoundSubjectTypeResolverDecidesWhoIsAPerson(): void
+    {
+        $resolver = \Mockery::mock(SubjectTypeResolver::class);
+        $resolver->shouldReceive('isPerson')->andReturnFalse();
+
+        $this->container()->instance(SubjectTypeResolver::class, $resolver);
+
+        self::assertSame(FailureReason::MACHINE_IDENTITY, $this->refusal(fn () => $this->guard()->identity(new NonEloquentIdentity)));
     }
 
     /**

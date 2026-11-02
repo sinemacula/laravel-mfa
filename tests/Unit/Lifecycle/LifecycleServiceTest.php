@@ -17,6 +17,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
+use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\PlainModelFactor;
@@ -408,6 +409,34 @@ final class LifecycleServiceTest extends TestCase
         $this->service()->disable($this->factorOf($user, 'confirmed'));
 
         Event::assertNotDispatched(RecoveryCodesRemoved::class);
+    }
+
+    /**
+     * A passkey factor's association is deleted with it.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAPasskeysAssociationGoesWithIt(): void
+    {
+        $user    = $this->signIn();
+        $passkey = $this->factorOf($user, 'confirmed');
+        $other   = $this->factorOf($user, 'confirmed');
+
+        foreach ([$passkey, $other] as $factor) {
+            PasskeyAssociation::query()->create([
+                'factor_id'            => $factor->id,
+                'authenticatable_type' => $user::class,
+                'authenticatable_id'   => (string) $user->id,
+                'credential_id_hash'   => hash('sha256', $factor->id),
+                'credential_id'        => $factor->id,
+            ]);
+        }
+
+        $this->service()->disable($passkey);
+
+        self::assertSame([$other->id], PasskeyAssociation::query()->pluck('factor_id')->all());
     }
 
     /**

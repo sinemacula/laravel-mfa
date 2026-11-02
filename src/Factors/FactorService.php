@@ -6,8 +6,10 @@ namespace SineMacula\Laravel\Mfa\Factors;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Collection;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
+use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
@@ -50,28 +52,35 @@ final readonly class FactorService
     }
 
     /**
-     * Get the authentication factors for the current identity.
+     * Get the authentication factors of the identity the request serves for
+     * listing factors (see `Context\CallerContextResolver`): a pending
+     * session's when its credential allows listing them, otherwise the
+     * signed-in person's.
      *
-     * Returns null if the identity does not support multi-factor
-     * authentication. The factors are read from the write connection (see
-     * `Database\WriteConnection`), as they decide verification and lockout, and
-     * on every call, so nothing is kept from one request to the next.
+     * Returns null when the request serves nobody for listing factors: a
+     * pending session that does not allow it, no MFA-capable identity, or one
+     * that is not a person. The factors are read from the write connection
+     * (see `Database\WriteConnection`), as they decide verification and
+     * lockout, and on every call, so nothing is kept from one request to the
+     * next.
      *
      * @formatter:off
      *
      * @return ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
      *
      * @formatter:on
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function getFactors(): ?Collection
     {
-        $identity = CurrentIdentity::resolve();
+        $caller = $this->container->make(CallerContextResolver::class)->resolve(PendingAction::LIST_FACTORS);
 
-        if ($identity === null) {
+        if ($caller === null) {
             return null;
         }
 
-        return WriteConnection::query($identity->authFactors())->get()->toBase();
+        return WriteConnection::query($caller->identity->authFactors())->get()->toBase();
     }
 
     /**
