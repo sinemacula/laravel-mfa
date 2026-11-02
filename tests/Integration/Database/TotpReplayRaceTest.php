@@ -17,7 +17,7 @@ use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
-use Tests\Fixtures\Drivers\AuthenticatorApp;
+use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use Tests\TestCase;
 
 /**

@@ -39,7 +39,6 @@ between requests.
 | `codes.factor_send_limit`       | `5`                                | 1 to 50                                | `MFA_CODES_FACTOR_SEND_LIMIT`       | yes     |
 | `codes.identity_send_limit`     | `10`                               | 1 to 100                               | `MFA_CODES_IDENTITY_SEND_LIMIT`     | yes     |
 | `codes.send_window_minutes`     | `60`                               | 1 to 1440 minutes                      | `MFA_CODES_SEND_WINDOW_MINUTES`     | yes     |
-| `codes.sms_message`             | `Your verification code is: :code` | carries `:code`                        | `MFA_CODES_SMS_MESSAGE`             | yes     |
 | `codes.mailable`                | `Codes\MfaCodeMessage`             | `MfaCodeMessage` or a subclass         |                                     | yes     |
 | `recovery_codes.count`          | `10`                               | 1 to 50                                | `MFA_RECOVERY_CODES_COUNT`          | yes     |
 | `recovery_codes.length`         | `12`                               | 1 to 64, and 40 bits with the alphabet | `MFA_RECOVERY_CODES_LENGTH`         | yes     |
@@ -289,7 +288,6 @@ refused even inside the window, so the code that confirmed a factor cannot be us
     'factor_send_limit'       => env('MFA_CODES_FACTOR_SEND_LIMIT', 5),
     'identity_send_limit'     => env('MFA_CODES_IDENTITY_SEND_LIMIT', 10),
     'send_window_minutes'     => env('MFA_CODES_SEND_WINDOW_MINUTES', 60),
-    'sms_message'             => env('MFA_CODES_SMS_MESSAGE', 'Your verification code is: :code'),
     'mailable'                => MfaCodeMessage::class,
 ],
 ```
@@ -302,9 +300,10 @@ first code, at least the code lifetime and at most 60 minutes: no code of the ch
 after it starts a new challenge. `resend_cooldown_seconds` is how long after a code is sent another may be sent for the
 same challenge, never longer than the code's lifetime, and before a restarted enrolment's first code to the same
 destination, and `factor_send_limit` and `identity_send_limit` cap how many codes one factor's destination and one
-identity, across its factors and sessions, are sent within `send_window_minutes`, resends included. `sms_message` is the
-SMS text, which must carry the `:code` placeholder the code replaces, and `mailable` the email message class,
-`Codes\MfaCodeMessage` or a subclass of it, whose queued payload is always encrypted.
+identity, across its factors and sessions, are sent within `send_window_minutes`, resends included. `mailable` is the
+email message class, `Codes\MfaCodeMessage` or a subclass of it, whose queued payload is always encrypted. The wording
+of the SMS and the email is not configured: it is translated, so it follows the locale (see
+[Localisation](localization.md)).
 
 Each send counts towards the caps for `send_window_minutes` from when it was made, and a refused send answers
 `sending_capped` with the seconds until another may be sent (see [Delivered codes](../design/delivered-codes.md)).

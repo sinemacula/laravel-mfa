@@ -11,10 +11,10 @@ use SineMacula\Laravel\Mfa\Config\IntegerSetting;
  * The delivered code settings in `mfa.codes`, read on every call and validated
  * as they are read: the length and lifetime of a code sent by SMS or email, how
  * many attempts one challenge allows and how long its resends may run, the
- * cooldown before another code may be sent, the caps on how many are sent, the
- * SMS message and the email message class. A value outside its bounds fails
- * closed with an `InvalidArgumentException` naming the key; the package checks
- * them when it boots and `mfa:check` reports them.
+ * cooldown before another code may be sent, the caps on how many are sent and
+ * the email message class. A value outside its bounds fails closed with an
+ * `InvalidArgumentException` naming the key; the package checks them when it
+ * boots and `mfa:check` reports them.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,14 +23,8 @@ use SineMacula\Laravel\Mfa\Config\IntegerSetting;
  */
 final readonly class CodeSettings
 {
-    /** @var string The placeholder the SMS message must carry; the code replaces it. */
-    public const string CODE_PLACEHOLDER = ':code';
-
     /** @var string Prefix of every code setting's key. */
     private const string PREFIX = 'mfa.codes.';
-
-    /** @var string The SMS message when none is configured. */
-    private const string SMS_MESSAGE = 'Your verification code is: ' . self::CODE_PLACEHOLDER;
 
     /** @var int The resend cooldown when none is configured, in seconds; its greatest is the code lifetime. */
     private const int RESEND_COOLDOWN_SECONDS = 60;
@@ -164,25 +158,6 @@ final readonly class CodeSettings
     }
 
     /**
-     * The SMS message, which must carry the `:code` placeholder the code
-     * replaces: without it, every message would go out without its code.
-     *
-     * @return string
-     *
-     * @throws \InvalidArgumentException
-     */
-    public function smsMessage(): string
-    {
-        $message = $this->config->get(self::PREFIX . 'sms_message', self::SMS_MESSAGE);
-
-        if (!is_string($message) || !str_contains($message, self::CODE_PLACEHOLDER)) {
-            throw new \InvalidArgumentException(sprintf('%ssms_message must be a string carrying the %s placeholder.', self::PREFIX, self::CODE_PLACEHOLDER));
-        }
-
-        return $message;
-    }
-
-    /**
      * The class of the email message carrying a code: `MfaCodeMessage` or a
      * subclass of it.
      *
@@ -217,7 +192,6 @@ final readonly class CodeSettings
         $this->factorSendLimit();
         $this->identitySendLimit();
         $this->sendWindowMinutes();
-        $this->smsMessage();
         $this->mailable();
     }
 

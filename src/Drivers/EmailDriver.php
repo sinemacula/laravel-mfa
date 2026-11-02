@@ -8,14 +8,16 @@ use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
 
 /**
  * Email factor driver.
  *
  * Delivers each code to the factor's email address in the configured message
  * class (`MfaCodeMessage` or a subclass, whose queued payload is encrypted),
- * through the application's `EmailSender`. The default sender throws until the
- * application binds one.
+ * through the application's `EmailSender`. The message renders in the locale it
+ * is sent in unless it chose its own, also on a queue worker. The default
+ * sender throws until the application binds one.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -86,6 +88,12 @@ final class EmailDriver extends AbstractCodeDriver
     {
         $minutes = max(1, (int) ceil(($expiresAt->getTimestamp() - CarbonImmutable::now()->getTimestamp()) / 60));
 
-        $this->sender->send($destination, new ($this->mailable)($code, $minutes));
+        $message = new ($this->mailable)($code, $minutes);
+
+        if ($message->locale === null) {
+            $message->locale(ConsumerMessages::locale());
+        }
+
+        $this->sender->send($destination, $message);
     }
 }

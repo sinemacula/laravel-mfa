@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
-use Tests\Fixtures\Drivers\AuthenticatorApp;
+use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\TestCase;
 

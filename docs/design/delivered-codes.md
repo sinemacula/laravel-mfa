@@ -63,8 +63,9 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   stateless request has a new id each time, so a code sent in one is never found in the next, and a session
   regenerated between the send and the check leaves its code behind. Either answers `expired`.
 - Delivery goes through contracts the application binds: `Contracts\SmsSender` (a phone number and the message, the
-  configured `sms_message` with `:code` replaced) and `Contracts\EmailSender` (an address and the configured
-  `MfaCodeMessage` class, with the whole minutes the code has left). The package ships no provider: the defaults,
+  translated line with `:code` replaced) and `Contracts\EmailSender` (an address and the configured
+  `MfaCodeMessage` class, with the whole minutes the code has left and the locale it is sent in; see
+  [Consumer Messages](consumer-messages.md)). The package ships no provider: the defaults,
   `Codes\NullSmsSender` and `Codes\NullEmailSender`, throw `SenderNotConfiguredException`, and the configuration check
   refuses an application that enables `sms` or `email` while its sender is the default, or while no `app.key` is set.
   `Codes\MailEmailSender` sends through Laravel's mailer for an application that binds it.

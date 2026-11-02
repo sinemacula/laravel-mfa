@@ -12,6 +12,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use SineMacula\Laravel\Mfa\Secrets\ExceptionScrubber;
 use SineMacula\Laravel\Mfa\Secrets\SensitiveValues;
+use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
 
 /**
  * Default Mailable for MFA email-code delivery.
@@ -22,10 +23,14 @@ use SineMacula\Laravel\Mfa\Secrets\SensitiveValues;
  * override `content()` or `renderHtml()` to point at their own view.
  *
  * The code and expiry are exposed as public readonly properties so custom views
- * can render them as `{{ $code }}` / `{{ $expiresInMinutes }}`. The message
- * carries the code in clear, so it is never queued in clear: whenever it is
- * queued, by a sender that queues it or by a subclass that is queueable, the
- * queue payload is encrypted with the application key.
+ * can render them as `{{ $code }}` / `{{ $expiresInMinutes }}`. The words are
+ * translated (see `Support\ConsumerMessages`), in the locale Laravel enters
+ * before it builds the envelope and the content; the driver captures the
+ * current one on a message that chose none, so a queue worker renders it as it
+ * was sent. Every line is plain text: a translation cannot inject markup. The
+ * message carries the code in clear, so it is never queued in clear: whenever
+ * it is queued, by a sender that queues it or by a subclass that is queueable,
+ * the queue payload is encrypted with the application key.
  *
  * A failure while the message is sent, whether by the sender at once or by a
  * queue worker running the queued message, where the code service cannot catch
@@ -90,7 +95,7 @@ class MfaCodeMessage extends Mailable implements ShouldBeEncrypted
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your verification code',
+            subject: ConsumerMessages::line(ConsumerMessages::EMAIL_SUBJECT),
         );
     }
 
@@ -109,19 +114,36 @@ class MfaCodeMessage extends Mailable implements ShouldBeEncrypted
     }
 
     /**
-     * Render the HTML body.
+     * Render the HTML body: every translated line escaped whole, then the code,
+     * escaped too, in place of its placeholder, so only the package's tags are
+     * markup. The code goes in after the translator has answered, so it never
+     * reaches the translator.
      *
      * @return string
      */
     protected function renderHtml(): string
     {
         return sprintf(
-            '<p>Your verification code is: <strong>%s</strong></p>'
-            . '<p>This code expires in %d minute(s).</p>'
-            . '<p>If you did not request this code, you can safely ignore '
-            . 'this message.</p>',
-            htmlspecialchars($this->code, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-            $this->expiresInMinutes,
+            '<p>%s</p><p>%s</p><p>%s</p>',
+            str_replace(
+                ConsumerMessages::CODE_PLACEHOLDER,
+                '<strong>' . self::escape($this->code) . '</strong>',
+                self::escape(ConsumerMessages::codeLine(ConsumerMessages::EMAIL_CODE)),
+            ),
+            self::escape(ConsumerMessages::minutesLine(ConsumerMessages::EMAIL_EXPIRY, $this->expiresInMinutes)),
+            self::escape(ConsumerMessages::line(ConsumerMessages::EMAIL_IGNORE)),
         );
+    }
+
+    /**
+     * Escape plain text for the HTML body, replacing what is not valid UTF-8
+     * rather than emptying the line.
+     *
+     * @param  string  $text
+     * @return string
+     */
+    private static function escape(#[\SensitiveParameter] string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
     }
 }

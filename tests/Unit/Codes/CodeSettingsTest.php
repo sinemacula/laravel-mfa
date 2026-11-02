@@ -150,25 +150,6 @@ final class CodeSettingsTest extends TestCase
     }
 
     /**
-     * The SMS message defaults to the shipped one, reads a configured one, and
-     * refuses one without the `:code` placeholder or that is not a string.
-     *
-     * @return void
-     */
-    public function testTheSmsMessageMustCarryTheCode(): void
-    {
-        self::assertSame('Your verification code is: :code', self::settingsWith([])->smsMessage());
-        self::assertSame(':code is your code', self::settingsWith(['sms_message' => ':code is your code'])->smsMessage());
-
-        self::assertRefused(
-            ['Your code is ready', null, ['message' => ':code']],
-            'sms_message',
-            static fn (CodeSettings $settings): string => $settings->smsMessage(),
-            'mfa.codes.sms_message must be a string carrying the :code placeholder.',
-        );
-    }
-
-    /**
      * The email message class defaults to `MfaCodeMessage`, reads a subclass,
      * and refuses any other class or value.
      *

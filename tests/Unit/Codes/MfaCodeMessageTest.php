@@ -111,6 +111,63 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
+     * The body is the three lines in the shipped English, with only the
+     * package's tags as markup, and the singular for one minute.
+     *
+     * @return void
+     */
+    public function testTheBodyIsTheShippedLines(): void
+    {
+        $ignore = 'If you did not request this code, you can safely ignore this message.';
+
+        self::assertSame(
+            '<p>Your verification code is: <strong>ABC123</strong></p><p>This code expires in 3 minutes.</p><p>' . $ignore . '</p>',
+            (string) (new MfaCodeMessage('ABC123', 3))->content()->htmlString,
+        );
+
+        self::assertSame(
+            '<p>Your verification code is: <strong>ABC123</strong></p><p>This code expires in 1 minute.</p><p>' . $ignore . '</p>',
+            (string) (new MfaCodeMessage('ABC123', 1))->content()->htmlString,
+        );
+    }
+
+    /**
+     * Quotes are escaped as HTML5 writes them, and what is not valid UTF-8 is
+     * replaced rather than emptying the line.
+     *
+     * @return void
+     */
+    public function testEscapingCoversQuotesAndInvalidUtf8(): void
+    {
+        $html = (string) (new MfaCodeMessage("&\"'\xFF", 3))->content()->htmlString;
+
+        self::assertStringContainsString("<strong>&amp;&quot;&apos;\u{FFFD}</strong>", $html);
+    }
+
+    /**
+     * A subclass can replace the body by overriding `renderHtml()`.
+     *
+     * @return void
+     */
+    public function testASubclassCanOverrideTheBody(): void
+    {
+        $message = new class ('ABC123', 3) extends MfaCodeMessage {
+            /**
+             * A body of the subclass's own.
+             *
+             * @return string
+             */
+            #[\Override]
+            protected function renderHtml(): string
+            {
+                return '<p>Branded</p>';
+            }
+        };
+
+        self::assertSame('<p>Branded</p>', $message->content()->htmlString);
+    }
+
+    /**
      * Test code parameter is marked sensitive.
      *
      * @return void

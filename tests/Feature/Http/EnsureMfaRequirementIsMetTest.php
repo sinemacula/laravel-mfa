@@ -62,6 +62,9 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
 {
     use ArrangesVerification;
 
+    /** @var string What the refusal says, in the shipped English. */
+    private const string REFUSAL = 'Further authentication is required.';
+
     /** @var string A route that asks only for the composed requirement. */
     private const string BARE = 'gate/bare';
 
@@ -928,7 +931,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
         $response = $this->getJson(self::BARE);
 
         $response->assertUnauthorized();
-        $response->assertExactJson(['message' => InsufficientAuthenticationException::MESSAGE]);
+        $response->assertExactJson(['message' => self::REFUSAL]);
         $response->assertHeaderMissing('WWW-Authenticate');
     }
 
@@ -948,9 +951,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
 
         $refusal = $this->refusal(self::LEVEL);
 
-        $description = InsufficientAuthenticationException::MESSAGE;
-
-        self::assertSame('Bearer error="insufficient_user_authentication", error_description="' . $description . '", acr_values="aal2"', $refusal->wwwAuthenticate());
+        self::assertSame('Bearer error="insufficient_user_authentication", error_description="' . self::REFUSAL . '", acr_values="aal2"', $refusal->wwwAuthenticate());
 
         self::assertCount(1, $refusal->offered);
         self::assertStringNotContainsString(self::ADDRESS, (string) json_encode($refusal->toArray()));

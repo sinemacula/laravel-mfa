@@ -5,6 +5,9 @@ declare(strict_types = 1);
 namespace Tests\Unit\Drivers;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Container\Container;
+use Illuminate\Translation\ArrayLoader;
+use Illuminate\Translation\Translator;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -14,6 +17,7 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use Tests\Fixtures\Codes\CustomMfaCodeMessage;
 use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Testing\ExplicitLocaleCodeMessage;
 
 /**
  * Unit tests for `EmailDriver`: its channel, and the message it delivers each
@@ -145,6 +149,57 @@ final class EmailDriverTest extends TestCase
 
         self::assertInstanceOf(MfaCodeMessage::class, $message);
         self::assertSame($minutes, $message->expiresInMinutes);
+    }
+
+    /**
+     * The message carries the current locale, so a queue worker renders it as
+     * it was sent.
+     *
+     * @return void
+     */
+    public function testTheCurrentLocaleIsCaptured(): void
+    {
+        self::assertSame('fr', $this->messageSentInFrench(MfaCodeMessage::class)->locale);
+    }
+
+    /**
+     * A message that chose its own locale keeps it.
+     *
+     * @return void
+     */
+    public function testAMessagesOwnLocaleIsKept(): void
+    {
+        self::assertSame('de', $this->messageSentInFrench(ExplicitLocaleCodeMessage::class)->locale);
+    }
+
+    /**
+     * The message of the class given, sent while the current locale is French.
+     *
+     * @param  class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>  $mailable
+     * @return \SineMacula\Laravel\Mfa\Codes\MfaCodeMessage
+     */
+    private function messageSentInFrench(string $mailable): MfaCodeMessage
+    {
+        $container  = new Container;
+        $translator = new Translator(new ArrayLoader, 'fr');
+        $previous   = Container::getInstance();
+        $sender     = new FakeEmailSender;
+
+        $container->instance('translator', $translator);
+
+        Container::setInstance($container);
+
+        try {
+            (new EmailDriver($sender, $mailable))->deliver(self::factor(), '123456', CarbonImmutable::now()->addMinutes(5));
+        } finally {
+            Container::setInstance($previous);
+        }
+
+        $message = $sender->sent()[0]['message'];
+
+        self::assertInstanceOf(MfaCodeMessage::class, $message);
+
+        return $message;
     }
 
     /**

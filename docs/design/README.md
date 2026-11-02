@@ -64,6 +64,10 @@ The current note set is:
 - `delivered-codes.md`: the email and SMS codes the package sends and checks on its own: what a code is bound to, its
   keyed hash, resends, the cooldown, the attempt budget and the delivery caps, the sender contracts, and the encrypted
   queued message.
+- `consumer-messages.md`: the words that can reach a consumer, how each is translated and in which locale, the shipped
+  English when a translation cannot be used, a line that loses its code, and what is deliberately not translated.
+- `testing-helpers.md`: the public helpers for an application's tests, what acting as a verified identity arranges and
+  checks, and which test helpers stay private to the package.
 - `proof-store.md`: the `ProofStore` seam and its session-backed default, how a sign-in begins and ends (Laravel's
   events or the guard hooks), what makes a recorded proof stop counting, the verification generation, and how the
   `mfa` middleware judges a request on the proofs.

@@ -74,22 +74,6 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * A configured message has every placeholder replaced with the code.
-     *
-     * @return void
-     */
-    public function testAConfiguredMessageHasEveryPlaceholderReplaced(): void
-    {
-        $sender = new FakeSmsSender;
-        $driver = new SmsDriver($sender, ':code is your code. Again: :code');
-
-        $driver->deliver(self::factor(), '654321', CarbonImmutable::now()->addMinutes(10));
-
-        self::assertSame(':code is your code. Again: :code', $driver->getMessageTemplate());
-        self::assertSame('654321 is your code. Again: 654321', $sender->lastMessageTo(self::PHONE));
-    }
-
-    /**
      * An SMS factor.
      *
      * @return \Tests\Fixtures\Factors\InMemoryFactor

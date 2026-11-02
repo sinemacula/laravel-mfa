@@ -78,7 +78,6 @@ final class DriverBindingsTest extends TestCase
     {
         config()->set('mfa.totp.digits', 8);
         config()->set('mfa.codes.mailable', CustomMfaCodeMessage::class);
-        config()->set('mfa.codes.sms_message', 'Code :code');
 
         $manager = new MfaManager($this->app());
 
@@ -93,7 +92,6 @@ final class DriverBindingsTest extends TestCase
         self::assertInstanceOf(EmailDriver::class, $email);
         self::assertSame(CustomMfaCodeMessage::class, $email->getMailable());
         self::assertInstanceOf(SmsDriver::class, $sms);
-        self::assertSame('Code :code', $sms->getMessageTemplate());
     }
 
     /**
@@ -156,39 +154,22 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * The SMS factory applies the documented default message.
+     * The SMS factory builds a driver that delivers through the bound SMS
+     * sender.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testSmsFactoryAppliesTheDefaults(): void
-    {
-        $driver = DriverBindings::sms($this->app(), new Repository);
-
-        self::assertSame('Your verification code is: :code', $driver->getMessageTemplate());
-    }
-
-    /**
-     * The SMS factory reads the configured message and delivers through the
-     * bound SMS sender.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testSmsFactoryReadsTheConfigAndSendsThroughTheBoundSender(): void
+    public function testSmsFactorySendsThroughTheBoundSender(): void
     {
         $sender = FakeSmsSender::fake($this->container());
 
-        $driver = DriverBindings::sms($this->app(), new Repository(['mfa' => ['codes' => [
-            'sms_message' => 'Code :code',
-        ]]]));
+        $driver = DriverBindings::sms($this->app());
 
         $driver->deliver(new InMemoryFactor(type: 'sms', destination: '+447700900123'), '123456', CarbonImmutable::now()->addMinutes(5));
 
-        self::assertSame('Code :code', $driver->getMessageTemplate());
-        self::assertSame('Code 123456', $sender->lastMessageTo('+447700900123'));
+        self::assertSame('Your verification code is: 123456', $sender->lastMessageTo('+447700900123'));
     }
 
     /**

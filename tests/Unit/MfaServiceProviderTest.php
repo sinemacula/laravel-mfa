@@ -286,6 +286,44 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
+     * The package's translations are loaded under its namespace, from the file
+     * that ships.
+     *
+     * @return void
+     */
+    public function testLoadsTheTranslations(): void
+    {
+        self::assertSame('Your verification code', __('mfa::messages.email_subject'));
+    }
+
+    /**
+     * The translations publish under their own tag, to where Laravel looks for
+     * a package's overrides.
+     *
+     * @return void
+     */
+    public function testRegistersTranslationPublishingTag(): void
+    {
+        $paths = ServiceProvider::pathsToPublish(null, 'mfa-lang');
+
+        self::assertContains($this->container()->langPath('vendor/mfa'), $paths);
+        self::assertSame([$this->container()->langPath('vendor/mfa')], array_values($paths));
+        self::assertFileExists((string) array_key_first($paths) . '/en/messages.php');
+    }
+
+    /**
+     * The SMS wording is only a translation: no configuration can defeat every
+     * locale.
+     *
+     * @return void
+     */
+    public function testTheSmsWordingIsNotConfigured(): void
+    {
+        self::assertFalse(config()->has('mfa.codes.sms_message'));
+        self::assertTrue(config()->has('mfa.codes.mailable'));
+    }
+
+    /**
      * Test offer publishing is skipped when not running in console.
      *
      * @return void
