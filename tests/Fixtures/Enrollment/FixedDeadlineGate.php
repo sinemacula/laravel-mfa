@@ -54,4 +54,17 @@ final readonly class FixedDeadlineGate implements FreshnessGate
     {
         return $this->deadline;
     }
+
+    /**
+     * The caller's requirement, unchanged.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
+     */
+    #[\Override]
+    public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement
+    {
+        return $callerRequirement;
+    }
 }

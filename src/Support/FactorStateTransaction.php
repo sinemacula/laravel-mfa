@@ -7,12 +7,15 @@ namespace SineMacula\Laravel\Mfa\Support;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
+use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 
 /**
@@ -118,6 +121,61 @@ final class FactorStateTransaction
     }
 
     /**
+     * Run the callback as `forIdentity()` does, for the owner the type and key
+     * name, so a record whose factor is gone can still be changed under its
+     * owner's lock, with no identity object or factor to hand.
+     *
+     * @template TReturn
+     *
+     * @formatter:off
+     *
+     * @param  string  $type
+     * @param  string  $key
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factorModel
+     * @param  \Closure(\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>): TReturn  $callback
+     * @return TReturn
+     *
+     * @formatter:on
+     *
+     * @throws \Throwable
+     *
+     * @param-immediately-invoked-callable $callback
+     */
+    public static function forOwner(string $type, string $key, EloquentFactor&Model $factorModel, \Closure $callback): mixed
+    {
+        return self::run($type, $key, $factorModel, $callback);
+    }
+
+    /**
+     * The identity's factors as stored now, read from the write connection with
+     * no lock and matched to the owner exactly, as the transaction matches
+     * them: what a check made before the lock decides on, and what a listing
+     * shows. An identity whose key is neither a string nor an integer holds
+     * none.
+     *
+     * @formatter:off
+     *
+     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factorModel
+     * @return \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
+     *
+     * @formatter:on
+     */
+    public static function snapshot(Authenticatable $identity, EloquentFactor&Model $factorModel): Collection
+    {
+        $key = $identity->getAuthIdentifier();
+
+        /** @var \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $none */
+        $none = $factorModel->newCollection();
+
+        if ((!is_string($key) && !is_int($key)) || $key === '') {
+            return $none;
+        }
+
+        return self::owned(WriteConnection::query($factorModel->newQuery()), CurrentIdentity::typeOf($identity), (string) $key, $factorModel);
+    }
+
+    /**
      * Open the transaction, take the locks in order and run the callback.
      *
      * @template TReturn
@@ -144,19 +202,33 @@ final class FactorStateTransaction
 
             self::lockIdentityState($connection, $type, $key);
 
-            [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factorModel);
-
-            /** @var \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $factors */
-            $factors = $factorModel->newQuery()
-                ->where($typeColumn, $type)
-                ->where($keyColumn, $key)
-                ->lockForUpdate()
-                ->get()
-                ->filter(static fn (Model $factor): bool => $factor->getAttribute($typeColumn) === $type && self::keyOf($factor->getAttribute($keyColumn)) === $key)
-                ->values();
-
-            return $callback($factors);
+            return $callback(self::owned($factorModel->newQuery()->lockForUpdate(), $type, $key, $factorModel));
         });
+    }
+
+    /**
+     * What the query finds of the owner's factors, matched to it exactly.
+     *
+     * @formatter:off
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>  $query
+     * @param  string  $type
+     * @param  string  $key
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factorModel
+     * @return \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
+     *
+     * @formatter:on
+     */
+    private static function owned(Builder $query, string $type, string $key, EloquentFactor&Model $factorModel): Collection
+    {
+        [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factorModel);
+
+        /** @var \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> */
+        return $query->where($typeColumn, $type)
+            ->where($keyColumn, $key)
+            ->get()
+            ->filter(static fn (EloquentFactor&Model $factor): bool => FactorOwnerColumns::owns($factor, $type, $key))
+            ->values();
     }
 
     /**

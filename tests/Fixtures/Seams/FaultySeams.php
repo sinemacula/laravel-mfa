@@ -73,6 +73,20 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     }
 
     /**
+     * A requirement that asks for nothing, whatever the operation or the caller
+     * asks.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+     * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
+     */
+    #[\Override]
+    public function requirement(string $operation, ?Requirement $callerRequirement = null): Requirement
+    {
+        return Requirement::none();
+    }
+
+    /**
      * A requirement that changes with every call.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity

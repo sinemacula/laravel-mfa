@@ -121,10 +121,10 @@ $this->app->bind(ProofStore::class, TokenProofStore::class);
 
 ## Invalidating proofs
 
-Disabling a factor (`Mfa::disable()`) stops every proof made with it counting on the current session. The session store
-cannot reach the identity's other sessions, and no shipped flow advances the verification generation yet, so those
-sessions keep counting the removed factor's proofs. To make them verify again, advance the identity's verification
-generation yourself:
+Removing a factor (`Mfa::removeFactor()`) stops every proof made with it counting on the current session, and the
+default `SessionRevoker` advances the identity's verification generation so its other sessions verify again; a reset
+does so for every session (see [Factor lifecycle](lifecycle.md)). To make them verify again for a reason of your own,
+advance it yourself:
 
 ```php
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
@@ -137,9 +137,8 @@ it moves on, every proof recorded under an earlier generation stops counting, on
 Called inside the identity's factor state transaction, the advance commits or rolls back with the change it belongs to.
 
 Laravel saves the whole session when a request ends and does not serialise a session's requests unless the route asks
-(`Route::block()`), so a request that started before a factor was disabled can save its older copy afterwards and put
-the forgotten proofs back on the current session. Serialise the route that disables a factor, or advance the
-generation, when that matters.
+(`Route::block()`), so a request that started before a factor was removed can save its older copy afterwards and put
+the forgotten proofs back on the current session. Serialise the route that removes a factor when that matters.
 
 ## The middleware
 

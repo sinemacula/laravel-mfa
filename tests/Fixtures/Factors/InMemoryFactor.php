@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Factors;
 
-use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use Tests\Fixtures\Factors\Concerns\ReportsUsableFactorDefaults;
 
@@ -28,18 +27,13 @@ final class InMemoryFactor implements Factor
     use ReportsUsableFactorDefaults;
 
     /**
-     * Build an in-memory factor double with the provided immutable state. The
-     * optional `$authenticatable` argument lets the fixture report ownership to
-     * the manager's cross-account guard — leaving it null mirrors the pre-guard
-     * "owner unknown" shape and trips the `FactorOwnershipMismatchException`
-     * path.
+     * Build an in-memory factor double with the provided immutable state.
      *
      * @param  string  $type
      * @param  ?string  $secret
      * @param  ?string  $destination
      * @param  ?string  $label
      * @param  mixed  $identifier
-     * @param  ?\Illuminate\Contracts\Auth\Authenticatable  $authenticatable
      * @return void
      */
     public function __construct(
@@ -58,9 +52,6 @@ final class InMemoryFactor implements Factor
 
         /** Factor identifier returned by `getFactorIdentifier()`. */
         private readonly mixed $identifier = 'factor-id',
-
-        /** Owning authenticatable, or `null` for the unowned shape. */
-        private readonly ?Authenticatable $authenticatable = null,
     ) {}
 
     /**
@@ -105,18 +96,6 @@ final class InMemoryFactor implements Factor
     public function getDestination(): ?string
     {
         return $this->destination;
-    }
-
-    /**
-     * Return the authenticatable bound at construction time, or `null` when the
-     * fixture was built without an owner.
-     *
-     * @return ?\Illuminate\Contracts\Auth\Authenticatable
-     */
-    #[\Override]
-    public function getAuthenticatable(): ?Authenticatable
-    {
-        return $this->authenticatable;
     }
 
     /**

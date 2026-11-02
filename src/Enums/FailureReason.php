@@ -80,4 +80,8 @@ enum FailureReason: string
 
     // The destination is not one the factor's type can deliver codes to
     case INVALID_DESTINATION = 'invalid_destination';
+
+    // The application offers no self-service recovery: the person is reset by
+    // someone else
+    case SELF_SERVICE_RECOVERY_UNAVAILABLE = 'self_service_recovery_unavailable';
 }

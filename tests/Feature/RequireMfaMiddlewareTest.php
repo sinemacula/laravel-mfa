@@ -73,7 +73,7 @@ final class RequireMfaMiddlewareTest extends TestCase
         $this->actingAs($user);
 
         self::assertFalse(Mfa::requirement()->isEmpty());
-        self::assertFalse(Mfa::isSetup());
+        self::assertSame([], Mfa::factors());
 
         try {
             $middleware = $this->container()->make(

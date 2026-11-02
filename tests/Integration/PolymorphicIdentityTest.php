@@ -68,25 +68,17 @@ final class PolymorphicIdentityTest extends TestCase
         // identifier.
         $this->actingAs($primary);
         self::assertFalse(Mfa::requirement()->isEmpty());
-        self::assertTrue(Mfa::isSetup());
 
-        $primaryFactors = Mfa::getFactors();
-        self::assertNotNull($primaryFactors);
+        $primaryFactors = Mfa::factors();
         self::assertCount(1, $primaryFactors);
-        $primaryFactor = $primaryFactors->first();
-        self::assertNotNull($primaryFactor);
-        self::assertSame('totp', $primaryFactor->getType());
+        self::assertSame('totp', $primaryFactors[0]->type);
 
         $this->actingAs($secondary);
         self::assertFalse(Mfa::requirement()->isEmpty());
-        self::assertTrue(Mfa::isSetup());
 
-        $secondaryFactors = Mfa::getFactors();
-        self::assertNotNull($secondaryFactors);
+        $secondaryFactors = Mfa::factors();
         self::assertCount(1, $secondaryFactors);
-        $secondaryFactor = $secondaryFactors->first();
-        self::assertNotNull($secondaryFactor);
-        self::assertSame('email', $secondaryFactor->getType());
+        self::assertSame('email', $secondaryFactors[0]->type);
     }
 
     /**
@@ -122,12 +114,12 @@ final class PolymorphicIdentityTest extends TestCase
         ]);
 
         $this->actingAs($primary);
-        self::assertTrue(Mfa::isSetup());
+        self::assertCount(1, Mfa::factors());
 
         $this->actingAs($secondary);
-        // Without per-class scoping this would erroneously return true, as the
-        // primary's factor shares the id.
-        self::assertFalse(Mfa::isSetup());
+        // Without per-class scoping this would erroneously list the primary's
+        // factor, as it shares the id.
+        self::assertSame([], Mfa::factors());
     }
 
     /**

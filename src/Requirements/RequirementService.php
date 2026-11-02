@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -31,9 +32,9 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  * - the identity's own requirement, from the bound `IdentityRequirement`;
  * - an additional verification while the identity's re-enrolment obligation is
  *   set, in every application (see `ReenrollmentObligation`);
- * - where a tenant is active, the tenant's requirement, from the bound
- *   `TenantRequirement`. It is not part of the sign-in's own requirement, which
- *   is asked before any principal is chosen.
+ * - where the bound `ActiveTenantResolver` names a tenant, the tenant's
+ *   requirement, from the bound `TenantRequirement`. A sign-in has no tenant
+ *   before any principal is chosen, so it adds nothing there.
  *
  * A step-up adds the operation's requirement, which the bound `FreshnessGate`
  * judges. This package's own setting for the operation is passed to the gate as
@@ -83,24 +84,26 @@ final readonly class RequirementService
     /**
      * The requirement the identity's sign-in on the application must meet: the
      * strictest of the application's, the identity's and the re-enrolment
-     * obligation's, and the active tenant's when one is given.
+     * obligation's, and the active tenant's when the bound
+     * `ActiveTenantResolver` names one.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
-     * @param  ?string  $tenant
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function requirementFor(MultiFactorAuthenticatable $identity, string $application, ?string $tenant = null): Requirement
+    public function requirementFor(MultiFactorAuthenticatable $identity, string $application): Requirement
     {
         $parts = [
             $this->applicationPart($identity, $application),
             $this->container->make(IdentityRequirement::class)->requirementFor($identity, $application),
             self::additionalVerificationWhen(ReenrollmentObligation::isRequired($identity)),
         ];
+
+        $tenant = $this->container->make(ActiveTenantResolver::class)->activeTenant($identity, $application);
 
         if ($tenant !== null) {
             $parts[] = $this->container->make(TenantRequirement::class)->requirementFor($identity, $application, $tenant);
@@ -152,6 +155,28 @@ final readonly class RequirementService
         }
 
         return $this->container->make(FreshnessGate::class)->freshUntil($operation, $this->effective($operation, $requirement));
+    }
+
+    /**
+     * The requirement the bound `FreshnessGate` holds the current session to
+     * for the operation, with this package's setting and the caller's
+     * requirement passed to it; `null` when it has none, or for a name that is
+     * not an operation's.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    public function freshnessRequirement(string $operation, ?Requirement $requirement = null): ?Requirement
+    {
+        if (!Operation::isName($operation)) {
+            return null;
+        }
+
+        return $this->container->make(FreshnessGate::class)->requirement($operation, $this->effective($operation, $requirement));
     }
 
     /**

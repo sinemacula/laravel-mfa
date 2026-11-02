@@ -4,7 +4,8 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Http;
 
-use Illuminate\Support\Collection;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
@@ -25,14 +26,11 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
     /** @var \SineMacula\Laravel\Mfa\Requirements\Requirement The requirement of the current sign-in: an additional verification unless a test sets another. */
     public Requirement $requirement;
 
-    /** @var bool */
-    public bool $isSetup = true;
-
     /** @var list<\SineMacula\Laravel\Mfa\Proofs\Proof> */
     public array $proofs = [];
 
-    /** @var ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> */
-    public ?Collection $factors = null;
+    /** @var list<\SineMacula\Laravel\Mfa\Factors\FactorSummary> The factors listed: one confirmed unless a test sets others. */
+    public array $listed;
 
     /**
      * Intentionally skip parent::__construct so the fixture can be instantiated
@@ -47,6 +45,7 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
     public function __construct()
     {
         $this->requirement = Requirement::none()->withAdditionalVerification();
+        $this->listed      = [new FactorSummary('id-1', 'totp', null, null, FactorStatus::CONFIRMED, false, null)];
     }
 
     /**
@@ -61,17 +60,6 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
     }
 
     /**
-     * Report whether the identity has any factors registered.
-     *
-     * @return bool
-     */
-    #[\Override]
-    public function isSetup(): bool
-    {
-        return $this->isSetup;
-    }
-
-    /**
      * Return the seeded proofs of the current sign-in.
      *
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
@@ -83,17 +71,13 @@ final class FakeMfaManager extends MfaManager // @phpstan-ignore-line
     }
 
     /**
-     * Return the seeded collection of factors, or null when unset.
+     * Return the seeded factors.
      *
-     * @formatter:off
-     *
-     * @return ?\Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
-     *
-     * @formatter:on
+     * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
      */
     #[\Override]
-    public function getFactors(): ?Collection
+    public function factors(): array
     {
-        return $this->factors;
+        return $this->listed;
     }
 }

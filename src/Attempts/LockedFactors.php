@@ -69,6 +69,29 @@ final class LockedFactors
     }
 
     /**
+     * The factor among those given with the id, or `null`: an id that is
+     * neither a string nor an integer finds nothing. It is matched exactly, so
+     * a custom model's key and a database's collation cannot make one id find
+     * another.
+     *
+     * @formatter:off
+     *
+     * @param  mixed  $id
+     * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
+     * @return (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null
+     *
+     * @formatter:on
+     */
+    public static function withId(mixed $id, Collection $factors): (EloquentFactor&Model)|null
+    {
+        if (!is_string($id) && !is_int($id)) {
+            return null;
+        }
+
+        return $factors->first(static fn (EloquentFactor&Model $factor): bool => self::idOf($factor) === (string) $id);
+    }
+
+    /**
      * A factor's id as a string, or `null` when it is neither a non-empty
      * string nor an integer.
      *

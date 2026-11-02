@@ -8,12 +8,12 @@ use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
-use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -110,17 +110,15 @@ final class PendingActionsTest extends TestCase
     {
         $this->pendingSession([PendingAction::START_BOOTSTRAP_ENROLLMENT]);
 
-        self::assertNull($this->manager()->getFactors());
+        self::assertSame([], $this->manager()->factors());
+        self::assertNull($this->manager()->factor($this->factor->id));
         self::assertSame(FailureReason::NOT_FOUND, $this->manager()->sendCode($this->factor->id)->reason);
         self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Submission::challenge($this->factor->id, 'any', '123456'))->reason);
         self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
         self::assertSame([], $this->manager()->generateRecoveryCodes());
         self::assertNull($this->manager()->recoveryCodes());
         self::assertSame([], $this->manager()->proofs());
-        self::assertFalse($this->manager()->isSetup());
-
-        $this->manager()->disable($this->guardedFactor);
-
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->removeFactor($this->guardedFactor->id)->reason);
         self::assertTrue(Factor::query()->whereKey($this->guardedFactor->id)->exists());
         self::assertSame([], $this->mailbox->sent());
         self::assertSame(0, RecoveryCode::query()->count());
@@ -138,7 +136,7 @@ final class PendingActionsTest extends TestCase
     {
         self::assertNotNull($this->manager()->recoveryCodes());
         self::assertCount(1, $this->manager()->proofs());
-        self::assertTrue($this->manager()->isSetup());
+        self::assertSame([$this->guardedFactor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors()));
     }
 
     /**
@@ -153,7 +151,9 @@ final class PendingActionsTest extends TestCase
     {
         $this->pendingSession([PendingAction::LIST_FACTORS]);
 
-        self::assertSame([$this->factor->id], $this->manager()->getFactors()?->map(static fn (FactorContract $factor): mixed => $factor->getFactorIdentifier())->all());
+        self::assertSame([$this->factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors()));
+        self::assertSame($this->factor->id, $this->manager()->factor($this->factor->id)?->id);
+        self::assertNull($this->manager()->factor($this->guardedFactor->id));
         self::assertNotNull($this->manager()->recoveryCodes());
     }
 
@@ -215,7 +215,7 @@ final class PendingActionsTest extends TestCase
 
         $this->expectException(InvalidPendingCredentialException::class);
 
-        $this->manager()->getFactors();
+        $this->manager()->factors();
     }
 
     /**

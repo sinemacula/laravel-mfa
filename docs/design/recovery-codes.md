@@ -10,8 +10,8 @@ moment when both work or neither exists, and what a redemption leaves behind.
 
 - Recovery codes are a fallback for lost factors, never a factor. They have their own table and model
   (`mfa.recovery_codes.model`, `Contracts\RecoveryCode`), no factor driver is registered for them, and they never count
-  towards `isMfaEnabled()` or `Mfa::isSetup()`. An identity has one set, shared by every application; an application
-  takes them only where `applications.{name}.recovery_codes.enabled` is true.
+  towards `isMfaEnabled()`, and a set makes no factor confirmed. An identity has one set, shared by every application;
+  an application takes them only where `applications.{name}.recovery_codes.enabled` is true.
 - A set is `count` codes, each `length` characters drawn with `random_int()` from `alphabet`, which samples uniformly
   without modulo bias, upper-cased as drawn and distinct within the set (a repeated code is drawn again). The settings
   give every code at least 40 bits measured after normalisation (see
@@ -69,9 +69,9 @@ moment when both work or neither exists, and what a redemption leaves behind.
   time, so the count and the generation are always of the same set. No lock is taken.
 - Removal (`RecoveryCodeService::removeSet()`): inside the transaction that removes the identity's last confirmed
   factor, every code row is deleted and the set's time cleared; the generation is kept. `RecoveryCodesRemoved` is
-  queued when there was a set, used up or not, or any code row. `Lifecycle\LifecycleService::disable()` deletes the
+  queued when there was a set, used up or not, or any code row. `Lifecycle\FactorRemoval::remove()` deletes the
   factor as stored under the lock and calls it when none of the factors left there is confirmed: a pending factor does
-  not keep the set, a confirmed one the failure ceiling disabled does.
+  not keep the set, a confirmed one the failure ceiling disabled does. `Lifecycle\IdentityReset` calls it as well.
 - Pruning (`RecoveryCodeService::prune($before)`): deletes the codes used, or replaced, before the time given, never a
   usable code, and leaves the state row as it is.
 
@@ -120,7 +120,7 @@ moment when both work or neither exists, and what a redemption leaves behind.
 - `src/RecoveryCodes/RecoveryCodeGenerator.php`, `src/RecoveryCodes/RecoveryCodeNormalizer.php`,
   `src/RecoveryCodes/RecoveryCodeMatcher.php`, `src/RecoveryCodes/RecoveryCodeSettings.php`.
 - `src/RecoveryCodes/Redemption.php`, `src/RecoveryCodes/RecoveryCodeStatus.php`.
-- `src/Lifecycle/LifecycleService.php`: `disable()`.
+- `src/Lifecycle/FactorRemoval.php`: `remove()`; `src/Lifecycle/IdentityReset.php`.
 - `src/Attempts/AttemptService.php`: `attempt()`; `src/Attempts/RequestIp.php`.
 - `src/Models/RecoveryCode.php`, `src/Concerns/ActsAsRecoveryCode.php`, `src/Contracts/RecoveryCode.php`.
 
@@ -132,7 +132,7 @@ moment when both work or neither exists, and what a redemption leaves behind.
 - `tests/Unit/RecoveryCodes/RecoveryCodeMatcherTest.php`
 - `tests/Unit/RecoveryCodes/RecoveryCodeNormalizerTest.php`
 - `tests/Unit/RecoveryCodes/RecoveryCodeGeneratorTest.php`
-- `tests/Unit/Lifecycle/LifecycleServiceTest.php`
+- `tests/Feature/Lifecycle/RemovingFactorTest.php`
 - `tests/Integration/Database/RecoveryCodeRaceTest.php`
 - `tests/Integration/Database/StorageConnectionRecoveryCodesTest.php`
 

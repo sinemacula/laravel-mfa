@@ -25,7 +25,7 @@ the provider or another capability.
 - A factor runs through the driver of its type, resolved by `Drivers\DriverResolver` from the `mfa` manager the
   container holds, whichever manager the call was made on. Recovery codes are not a factor and have no driver. A factor
   is only looked up within the identity the request serves (`Factors\OperationGuard`).
-- No service keeps request state: the reads (`isSetup()`, `getFactors()`, `proofs()`) go to the identity, the
+- No service keeps request state: the reads (`factors()`, `factor()`, `proofs()`) go to the identity, the
   database or the bound proof store on every call, so a singleton service never carries one request's identity or
   factors into the next.
 - Each capability registers its container wiring in its own `*Bindings` class, which the provider calls: the
@@ -73,7 +73,7 @@ the provider or another capability.
   `src/Verification/VerificationService.php`, `src/Enrollment/EnrollmentService.php` (with `EnrollmentStarter.php` and
   `EnrollmentConfirmer.php` behind it),
   `src/Lifecycle/LifecycleService.php`, `src/RecoveryCodes/RecoveryCodeService.php`: the capability services.
-- `src/Factors/FactorOwnership.php`, `src/Drivers/DriverResolver.php`,
+- `src/Drivers/DriverResolver.php`,
   `src/Support/CurrentIdentity.php`, `src/Config/IntegerSetting.php`: what the services share.
 
 ## Authoritative Tests

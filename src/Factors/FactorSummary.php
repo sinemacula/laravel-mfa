@@ -13,10 +13,14 @@ use SineMacula\Laravel\Mfa\Enums\FactorStatus;
  * list of factors a person chooses from.
  *
  * Carries only what an application needs to show a factor: its id, type, label,
- * a masked destination, its status, whether it is preferred and when it was
- * last used. Never the factor model, its secret, a code, its credential
- * reference or the full destination, so it is safe in a queued listener's
- * payload and in a log.
+ * a masked destination, its status, whether it is preferred, when it was last
+ * used, and whether the failure ceiling has disabled it. Never the factor
+ * model, its secret, a code, its credential reference or the full destination,
+ * so it is safe in a queued listener's payload and in a log.
+ *
+ * That a factor is not disabled does not mean it is offered: what the
+ * application accepts, the combination policy and a passkey's availability
+ * decide that too (see `Verification\FactorOffers`).
  *
  * @api
  *
@@ -35,6 +39,7 @@ final readonly class FactorSummary implements \JsonSerializable
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorStatus  $status
      * @param  bool  $preferred
      * @param  ?\Carbon\CarbonInterface  $lastUsedAt
+     * @param  bool  $disabled
      */
     public function __construct(
 
@@ -58,6 +63,9 @@ final readonly class FactorSummary implements \JsonSerializable
 
         /** When the factor was last used to verify. */
         public ?CarbonInterface $lastUsedAt,
+
+        /** Whether the failure ceiling has disabled the factor. */
+        public bool $disabled = false,
     ) {}
 
     /**
@@ -82,6 +90,7 @@ final readonly class FactorSummary implements \JsonSerializable
             status: $factor->getStatus(),
             preferred: $factor->isPreferred(),
             lastUsedAt: $factor->getLastUsedAt(),
+            disabled: $factor->getDisabledAt() !== null,
         );
     }
 
@@ -102,6 +111,7 @@ final readonly class FactorSummary implements \JsonSerializable
             'status'             => $this->status->value,
             'preferred'          => $this->preferred,
             'last_used_at'       => $this->lastUsedAt?->toIso8601String(),
+            'disabled'           => $this->disabled,
         ];
     }
 

@@ -442,7 +442,7 @@ final class RecoveryCodeGenerationTest extends TestCase
 
         self::assertCount(10, $this->storedCodes($holder));
         self::assertFalse($holder->isMfaEnabled());
-        self::assertFalse(Mfa::isSetup());
+        self::assertSame([], Mfa::factors());
     }
 
     /**

@@ -11,9 +11,10 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 /**
  * What every `FreshnessGate` must guarantee, as assertions: a name that is not
  * an operation's, and an operation with no requirement from either side, are
- * never fresh, a caller's requirement with no maximum age is refused, and how
- * long a session is fresh is either nothing or a time still to come that the
- * session is fresh until.
+ * never fresh, a caller's requirement with no maximum age is refused, how long
+ * a session is fresh is either nothing or a time still to come that the session
+ * is fresh until, and the requirement it says it holds a session to asks at
+ * least what the caller asks.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -99,5 +100,25 @@ final class FreshnessGateContract
         Assert::assertNotNull($until, 'A session fresh for the operation must say until when.');
         Assert::assertFalse($until->isPast(), 'A deadline must not be in the past.');
         Assert::assertTrue($gate->isFresh($operation), 'A session with a deadline must be fresh.');
+    }
+
+    /**
+     * The requirement the gate holds a session to is none for an operation with
+     * no requirement from either side, and asks at least what the caller asks,
+     * so judging it on some of the session's proofs can never ask less than the
+     * gate does.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @return void
+     */
+    public static function assertTheRequirementAsksWhatTheCallerAsks(FreshnessGate $gate): void
+    {
+        Assert::assertNull($gate->requirement(self::UNCONFIGURED), 'An operation with no requirement must have none to judge by.');
+
+        $asked  = Requirement::none()->withAdditionalVerification(300);
+        $answer = $gate->requirement(self::UNCONFIGURED, $asked);
+
+        Assert::assertNotNull($answer, 'A caller\'s requirement must be answered with a requirement.');
+        Assert::assertSame($answer->toArray(), Requirement::strictest($answer, $asked)->toArray(), 'The requirement must ask at least what the caller asks.');
     }
 }

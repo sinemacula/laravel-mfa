@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Contracts;
 
 use Carbon\CarbonInterface;
-use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 
 /**
@@ -77,15 +76,6 @@ interface Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethod
      * @return ?string
      */
     public function getCredentialReference(): ?string;
-
-    /**
-     * Return the identity the factor belongs to, or `null` when the relation is
-     * not loaded or the owner is gone. Implementations must not load it lazily
-     * from here.
-     *
-     * @return ?\Illuminate\Contracts\Auth\Authenticatable
-     */
-    public function getAuthenticatable(): ?Authenticatable;
 
     /**
      * Return the factor's persistent secret (the TOTP shared secret), if any.

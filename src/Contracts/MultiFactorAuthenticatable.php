@@ -41,8 +41,7 @@ interface MultiFactorAuthenticatable extends Authenticatable
      *
      * What the current sign-in has proved lives separately, in the proof store
      * (`Mfa::proofs()`), so implementations should not fold "has verified" into
-     * this predicate: that would collapse two separate concepts. The shipped
-     * `Mfa::isSetup()` reports whatever this method returns.
+     * this predicate: that would collapse two separate concepts.
      *
      * @return bool
      */

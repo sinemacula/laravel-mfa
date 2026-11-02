@@ -6,7 +6,6 @@ namespace SineMacula\Laravel\Mfa\Concerns;
 
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Query\Builder;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
@@ -420,26 +419,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     public function getLastUsedAtName(): string
     {
         return 'last_used_at';
-    }
-
-    /**
-     * Return the authenticatable the factor belongs to. Returns `null` when the
-     * `authenticatable` relation has not been loaded — this accessor MUST NOT
-     * trigger a lazy query. Callers that need the related record should
-     * eager-load the relation on the query first.
-     *
-     * @return ?\Illuminate\Contracts\Auth\Authenticatable
-     */
-    public function getAuthenticatable(): ?Authenticatable
-    {
-        if (!$this->relationLoaded('authenticatable')) {
-            return null;
-        }
-
-        /** @var mixed $related */
-        $related = $this->getRelation('authenticatable');
-
-        return $related instanceof Authenticatable ? $related : null;
     }
 
     /**

@@ -36,9 +36,11 @@ whatever UI you like.
 - **One way to verify**: `Mfa::verify()` takes a factor's code, a challenge's code, a recovery code or a passkey's
   assertion, bound once to the owner, application, sign-in and purpose, and answers with a structured result and a
   machine-readable failure reason. See [Verification](docs/guides/verification.md).
+- **Factor lifecycle**: list and remove factors, reset someone who lost theirs with an actor and a reason, unlock, and
+  prune what is no longer of use, each change serialised on the identity. See
+  [Factor lifecycle](docs/guides/lifecycle.md).
 - **Events**: a catalogue of events for the verification, recovery code and lifecycle flows, each carrying a scalar
-  context and no secret, dispatched once its change commits (see [Events](docs/guides/events.md)), with
-  `MfaFactorDisabled` until the lifecycle flow joins it.
+  context and no secret, dispatched once its change commits (see [Events](docs/guides/events.md)).
 - **Polymorphic identity support**: works with any Eloquent identity type (`User`, `Admin`, ...) via the
   shipped `authenticatable_type` / `authenticatable_id` morph.
 - **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; recovery codes are stored only as salted
@@ -146,9 +148,9 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 
 Mfa::requirement();                     // Requirement the current sign-in must meet
 Mfa::isFresh('mfa.remove_factor');      // bool: fresh enough for the operation
-Mfa::isSetup();                         // bool
 Mfa::proofs();                          // list<Proof> of the current sign-in
-Mfa::getFactors();                      // Collection|null
+Mfa::factors();                         // list<FactorSummary>, every factor, the preferred first
+Mfa::factor($factorId);                 // ?FactorSummary
 Mfa::offeredFactors();                  // list<FactorSummary>, the preferred first
 
 Mfa::sendCode($factorId);               // SendResult: the challenge's id, or why none was sent
@@ -165,7 +167,11 @@ Mfa::resendEnrollmentCode($grant);      // the code again, renewing nothing
 Mfa::cancelEnrollment($grant);          // the pending factor gone
 Mfa::renameFactor($factorId, $label);   // no step-up
 Mfa::setPreferredFactor($factorId);     // offered first; no step-up
-Mfa::disable($factor);                  // MfaFactorDisabled; the recovery codes go with the last factor
+Mfa::removeFactor($factorId);           // FactorRemovalResult, on a fresh session; the last takes the recovery codes
+Mfa::resetIdentity($user, $actor, $reason); // everything gone, every session revoked, re-enrolment obliged
+Mfa::unlockFactor($user, $factorId, $actor); // bool: a live temporary lockout was lifted
+Mfa::unlockIdentity($user, $actor);     // bool: a live temporary lockout was lifted
+Mfa::prune();                           // PruneResult; `mfa:prune` is the same from the console
 Mfa::generateRecoveryCodes();           // list<RevealedSecret>, returned once, on a fresh session at the level
 Mfa::recoveryCodes();                   // RecoveryCodeStatus|null: remaining, generation, generatedAt
 ```
@@ -359,7 +365,7 @@ Route::post('/mfa/verify', VerifyController::class)
     ->middleware(['mfa.skip', 'throttle:mfa-verify']);
 ```
 
-Apply the throttle **only** to the verify endpoint — state-read routes (`Mfa::requirement()`, `Mfa::isSetup()`,
+Apply the throttle **only** to the verify endpoint — state-read routes (`Mfa::requirement()`, `Mfa::factors()`,
 etc.) are called on every request and would exhaust the bucket without representing an attack signal.
 
 ### Proof store

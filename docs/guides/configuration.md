@@ -54,7 +54,7 @@ between requests.
 | `enrollment.ttl_minutes`        | `15`                               | 1 to 60 minutes                        | `MFA_ENROLLMENT_TTL_MINUTES`        | yes     |
 | `enrollment.max_attempts`       | `5`                                | 1 to 10                                | `MFA_ENROLLMENT_MAX_ATTEMPTS`       | yes     |
 | `proofs.max_age_minutes`        | `20160`                            | 0 to 525600 minutes                    | `MFA_PROOFS_MAX_AGE_MINUTES`        | yes     |
-| `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    | not yet |
+| `lifecycle.prune_after_days`    | `30`                               | 1 to 3650 days                         | `MFA_LIFECYCLE_PRUNE_AFTER_DAYS`    | yes     |
 | `secrets.redact`                | `true`                             | off only for a false value             | `MFA_SECRETS_REDACT`                | yes     |
 
 Every class name is relative to `SineMacula\Laravel\Mfa`. Numbers may be integers or the digit strings `env()` returns;
@@ -145,8 +145,7 @@ it itself. Names are the block's keys, read whole rather than as a dotted path, 
 letters, digits and underscores, each starting with a letter, separated by dots; any other name is refused. An operation
 neither the package nor the application names is never fresh unless the caller asks for a requirement of its own.
 Starting an enrolment and the passkey change gate ask it for `mfa.add_factor`, the gate for `mfa.remove_factor` and
-generating recovery codes for `mfa.generate_recovery_codes`; `Mfa::disable()` runs without asking, so until the
-lifecycle flow does, an application calls `Mfa::isFresh()` itself before calling it.
+generating recovery codes for `mfa.generate_recovery_codes`; `Mfa::removeFactor()` asks it for `mfa.remove_factor`.
 
 `first_factor` is how the package knows, without an authentication layer, what started the sign-in: its `method` (any
 name, such as `password`) and its `channel`, one of the channel kinds (`password`, `sms`, `email`,
@@ -399,8 +398,8 @@ refuses every request; use its step-up parameter to require a fresh verification
 ],
 ```
 
-`prune_after_days` is how long pruning is to keep abandoned enrolments, expired codes, and used or replaced recovery
-codes after they stop being usable. It is checked but not applied yet: the package prunes nothing so far.
+`prune_after_days` is how long pruning keeps abandoned enrolments, expired codes, and used or replaced recovery codes
+after they stop being usable (see [Pruning](lifecycle.md#pruning)).
 
 ## Secrets
 

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -17,6 +18,7 @@ use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
+use SineMacula\Laravel\Mfa\Requirements\NoActiveTenant;
 use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
@@ -25,6 +27,7 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
 use Tests\Fixtures\Identities\PlainUser;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Requirements\FixedActiveTenant;
 use Tests\TestCase;
 
 /**
@@ -113,7 +116,9 @@ final class RequirementServiceTest extends TestCase
             self::oblige(NonEloquentIdentity::class, self::IDENTITY);
         }
 
-        $requirement = $this->service()->requirementFor($identity, self::APPLICATION, $tenant ? self::TENANT : null);
+        $this->activate($tenant ? self::TENANT : null);
+
+        $requirement = $this->service()->requirementFor($identity, self::APPLICATION);
 
         self::assertSame($expected, $requirement->toArray());
     }
@@ -137,7 +142,10 @@ final class RequirementServiceTest extends TestCase
         self::oblige(NonEloquentIdentity::class, self::IDENTITY);
 
         $identity = new NonEloquentIdentity(self::IDENTITY, requirement: self::identityRequirement());
-        $composed = $this->service()->requirementFor($identity, self::APPLICATION, self::TENANT)->toArray();
+
+        $this->activate(self::TENANT);
+
+        $composed = $this->service()->requirementFor($identity, self::APPLICATION)->toArray();
         $parts    = [Requirement::none()->withAdditionalVerification(), self::identityRequirement(), Requirement::none()->withAdditionalVerification(), $tenant];
 
         foreach (self::permutations($parts) as $order) {
@@ -147,8 +155,8 @@ final class RequirementServiceTest extends TestCase
 
     /**
      * The tenant's requirement is asked with the identity, the application and
-     * the tenant, and only when a tenant is active; the default tenant
-     * requirement asks for nothing.
+     * the tenant, and only when the bound resolver names one: by default none
+     * is active, and the default tenant requirement asks for nothing.
      *
      * @return void
      *
@@ -158,16 +166,25 @@ final class RequirementServiceTest extends TestCase
     {
         $identity = new NonEloquentIdentity(self::IDENTITY);
 
+        self::assertInstanceOf(NoActiveTenant::class, $this->container()->make(ActiveTenantResolver::class));
         self::assertInstanceOf(NoTenantRequirement::class, $this->container()->make(TenantRequirement::class));
-        self::assertTrue($this->service()->requirementFor($identity, self::APPLICATION, self::TENANT)->isEmpty());
+
+        $this->activate(self::TENANT);
+
+        self::assertTrue($this->service()->requirementFor($identity, self::APPLICATION)->isEmpty());
 
         $tenants = \Mockery::mock(TenantRequirement::class);
         $tenants->shouldReceive('requirementFor')->once()->with($identity, self::APPLICATION, self::TENANT)->andReturn(Requirement::none()->withMultifactor());
 
         $this->container()->instance(TenantRequirement::class, $tenants);
 
+        $this->activate(null);
+
         self::assertTrue($this->service()->requirementFor($identity, self::APPLICATION)->isEmpty());
-        self::assertSame(['multifactor' => ['max_age' => null]], $this->service()->requirementFor($identity, self::APPLICATION, self::TENANT)->toArray());
+
+        $this->activate(self::TENANT);
+
+        self::assertSame(['multifactor' => ['max_age' => null]], $this->service()->requirementFor($identity, self::APPLICATION)->toArray());
     }
 
     /**
@@ -594,6 +611,21 @@ final class RequirementServiceTest extends TestCase
             }
 
             /**
+             * The caller's requirement, unchanged.
+             *
+             * @param  string  $operation
+             * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+             * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
+             */
+            #[\Override]
+            public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement
+            {
+                ($this->record)($operation, $callerRequirement);
+
+                return $callerRequirement;
+            }
+
+            /**
              * Record the question and answer it with the end of the next
              * minute.
              *
@@ -609,6 +641,17 @@ final class RequirementServiceTest extends TestCase
                 return $this->answer ? CarbonImmutable::now()->addMinute() : null;
             }
         };
+    }
+
+    /**
+     * Make the tenant the active one, or none.
+     *
+     * @param  ?string  $tenant
+     * @return void
+     */
+    private function activate(?string $tenant): void
+    {
+        $this->container()->instance(ActiveTenantResolver::class, new FixedActiveTenant($tenant));
     }
 
     /**
