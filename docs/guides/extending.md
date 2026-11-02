@@ -38,9 +38,14 @@ A custom factor or recovery code model lives on the storage connection with the 
 model is set with `mfa.recovery_codes.model`. Identity models are described in [Identity models](identity-models.md).
 
 A custom factor model keeps its temporary lockout on its own row, in the column `getLockedUntilName()` names
-(`locked_until` by default). `Concerns\ActsAsFactor` reads only a time from it, so the model must cast that column as a
-`datetime`, as it must `disabled_at`: left uncast, a stored deadline reads as none, and the factor is never refused by
-it. A factor implementing only `Contracts\Factor` has no row, and so no lockout of its own.
+(`locked_until` by default). `Concerns\ActsAsFactor` casts that column as a `datetime` itself, whatever it is named, so
+the model need declare no cast for it, and any cast it does declare is left as it is. A stored value that does not read
+as a time throws rather than reads as no lockout. A model implementing `Contracts\EloquentFactor` without the trait must
+do the same. A factor implementing only `Contracts\Factor` has no row, and so no lockout of its own.
+
+The trait casts nothing else. Cast the other time columns as a `datetime` on a model that is not built on the shipped
+one: an uncast `disabled_at`, `confirmed_at` or `last_used_at` reads as none, so an uncast `disabled_at` does not refuse
+a factor disabled at the failure ceiling.
 
 A custom factor model that implements `Contracts\EloquentFactor` itself, rather than through `Concerns\ActsAsFactor`,
 must make `storeAcceptedStep()` a compare-and-set on its stored row: record the TOTP time step only when it is later

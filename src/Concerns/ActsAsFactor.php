@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 
@@ -27,6 +28,26 @@ use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
  */
 trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
+    /**
+     * Cast the column holding the lockout's deadline as a datetime, so a model
+     * that declares no cast for it still reads it back from storage as a time.
+     * Eloquent calls this as it builds the model. A cast the model declares for
+     * the column is left as it is, whichever order the two are applied in, and
+     * so are its other casts.
+     *
+     * @return void
+     */
+    public function initializeActsAsFactor(): void
+    {
+        $column = $this->getLockedUntilName();
+
+        if ($this->hasCast($column)) {
+            return;
+        }
+
+        $this->mergeCasts([$column => 'datetime']);
+    }
+
     /**
      * Polymorphic relation to the owning authenticatable identity.
      *
@@ -365,14 +386,30 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
 
     /**
      * Return when the factor's temporary lockout ends, as held on this
-     * instance. The column must be cast as a datetime: a value of any other
-     * type reads as no deadline.
+     * instance. It fails closed: a stored value that does not read as a time
+     * throws, as reading it as no deadline would unlock the factor. A blank is
+     * caught here, as a datetime cast would read it as the current time.
      *
      * @return ?\Carbon\CarbonInterface
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
     public function getLockedUntil(): ?CarbonInterface
     {
-        return $this->readFactorTime($this->getLockedUntilName());
+        $column = $this->getLockedUntilName();
+        $stored = $this->getAttributes()[$column] ?? null;
+
+        if ($stored === null) {
+            return null;
+        }
+
+        $until = is_string($stored) && trim($stored) === '' ? null : $this->getAttribute($column);
+
+        if ($until instanceof CarbonInterface) {
+            return $until;
+        }
+
+        throw new InvalidModelException(sprintf('The factor\'s lockout column [%s] does not read as a time, so whether it is locked cannot be told.', $column));
     }
 
     /**

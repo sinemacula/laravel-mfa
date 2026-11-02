@@ -20,6 +20,8 @@ use Tests\Fixtures\Identities\TestUser;
  * @copyright   2026 Sine Macula Limited
  *
  * @internal
+ *
+ * @phpstan-ignore sineMaculaLaravel.modelBehaviour
  */
 abstract class DecodedRouteKeyFactorBase extends Model implements EloquentFactor
 {

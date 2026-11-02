@@ -30,8 +30,9 @@ and assert nothing about it.
 ## Success Path
 
 - The verification budgets cover a TOTP hit, in an address's first window and in a later one, a miss, the miss that
-  locks a factor and a locked factor; a delivered code's send, hit and miss through the package's own `ChallengeGateway`; a recovery code's hit and
-  miss; a passkey's hit through a fake gateway; and a TOTP hit on a pending session.
+  locks a factor and a locked factor; a delivered code's send, hit and miss through the package's own
+  `ChallengeGateway`; a recovery code's hit and miss; a passkey's hit through a fake gateway; and a TOTP hit on a pending
+  session.
 - The enrolment budgets cover a TOTP and a delivered start, a first factor's and a later factor's confirmation, and a
   wrong code.
 - The gate's budget covers a request the `mfa` middleware lets on, in `always` mode, with the first factor declared and

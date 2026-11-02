@@ -144,7 +144,9 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
      * instance, or `null` when none was applied; the time may have passed. It
      * is one authoritative deadline, on the factor's own row, so only a factor
      * with a row can hold one, and only what is read under the factor state
-     * lock is current (see `Attempts\AttemptService`).
+     * lock is current (see `Attempts\AttemptService`). A stored value that does
+     * not read as a time must throw, never read as no deadline, since that
+     * would unlock the factor.
      *
      * @return ?\Carbon\CarbonInterface
      */
@@ -152,7 +154,8 @@ interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMe
 
     /**
      * Column name holding when the factor's temporary lockout ends. A datetime
-     * column, cast as one by the model.
+     * column; `Concerns\ActsAsFactor` casts it, so a model using the trait need
+     * declare no cast for it.
      *
      * @return string
      */

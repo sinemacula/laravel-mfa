@@ -165,8 +165,8 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
         $factor = $this->totpFactor($user, ['consecutive_failures' => 4]);
         $code   = AuthenticatorApp::code($factor, 5);
 
-        // Reads (9) and writes (7): as a miss, with the deadline in the update of
-        // the factor's run rather than a statement of its own.
+        // Reads (9) and writes (7): as a miss, with the deadline in the update
+        // of the factor's run rather than a statement of its own.
         $result = $this->assertQueryBudget(9, 7, fn (): VerificationResult => $this->mfa()->verify(Submission::factor($factor->id, $code)));
 
         self::assertSame(FailureReason::INVALID_CODE, $result->reason);

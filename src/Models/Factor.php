@@ -48,6 +48,8 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property ?\Carbon\CarbonInterface $last_used_at
  *
  * @inheritable
+ *
+ * @phpstan-ignore sineMaculaLaravel.modelBehaviour
  */
 class Factor extends Model implements EloquentFactor
 {

@@ -59,7 +59,8 @@ separate operations, and all are described here.
 - A factor's `locked_until` is the one deadline of its temporary lockout, and nothing else stores it. It is read off
   the factor as locked under the factor state transaction. A deadline that has passed is inert until the next lockout
   overwrites it or a lift clears it: pruning deletes only the rate windows, and no scan or index of the deadlines is
-  needed. A factor's removal takes its deadline with it.
+  needed. A factor's removal takes its deadline with it. A stored value that does not read as a time throws, so the
+  attempt ends as a server error without reaching the driver and never reads as unlocked.
 - A rate window and a deadline are kept apart: the address's and the identity's windows live in `mfa_attempts`, updated
   atomically; the durable counts and the lockout deadlines live on the factor and identity state rows, read under the
   existing locks.
@@ -163,7 +164,7 @@ separate operations, and all are described here.
 - `src/Attempts/AttemptStore.php`: the single-statement window counts (`take()`, `record()` as an upsert, `giveBack()`)
   and the rows read and deleted (`read()`, `forget()`, `prune()`).
 - `src/Concerns/ActsAsFactor.php`: `getLockedUntil()` and `getLockedUntilName()`, which `Contracts\EloquentFactor`
-  declares, on a column the model must cast as a datetime.
+  declares, and `initializeActsAsFactor()`, which casts the column unless the model already does.
 - `src/Attempts/AttemptKeys.php`: the keyed digests and the canonical address.
 - `src/Attempts/IpThrottle.php`: the address's slot taken and given back (`take()`, `giveBack()`) and its throttle
   (`lockout()`).

@@ -178,7 +178,9 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * A value of the wrong type reads as absent.
+     * A value of the wrong type reads as absent, in the columns other than the
+     * deadline: an uncast time among them, as the trait casts only the
+     * deadline.
      *
      * @return void
      */
@@ -202,7 +204,8 @@ final class ActsAsFactorStateTest extends TestCase
             'totp_digits'          => '6',
             'consecutive_failures' => '3',
             'disabled_at'          => '2026-04-15 09:00:00',
-            'locked_until'         => '2026-04-15 09:15:00',
+            'confirmed_at'         => '2026-04-15 08:00:00',
+            'last_used_at'         => '2026-04-15 09:30:00',
             'preferred'            => 1,
         ]);
 
@@ -210,7 +213,8 @@ final class ActsAsFactorStateTest extends TestCase
         self::assertNull($factor->getTotpDigits());
         self::assertSame(0, $factor->getConsecutiveFailures());
         self::assertNull($factor->getDisabledAt());
-        self::assertNull($factor->getLockedUntil());
+        self::assertNull($factor->getConfirmedAt());
+        self::assertNull($factor->getLastUsedAt());
         self::assertFalse($factor->isPreferred());
     }
 

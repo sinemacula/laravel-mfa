@@ -12,7 +12,8 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
  * not exist, or names one that does not extend Eloquent's model and implement
  * the package's contract for it. It fails loudly at boot or at first use rather
  * than falling back to the shipped model: a misconfigured model is a deployment
- * bug, not one to swallow at runtime.
+ * bug, not one to swallow at runtime. Also thrown when a factor's lockout
+ * column does not read as a time, which must not read as no lockout.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

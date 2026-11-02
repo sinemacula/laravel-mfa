@@ -5,11 +5,16 @@ declare(strict_types = 1);
 namespace Tests\Unit\Concerns;
 
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\CoversTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Factors\RemappedLockoutFactor;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -63,6 +68,161 @@ final class ActsAsFactorTest extends TestCase
         Carbon::setTestNow();
 
         parent::tearDown();
+    }
+
+    /**
+     * The trait casts the deadline's column itself, a remapped one included and
+     * with no cast declared, and leaves the model's other casts alone.
+     *
+     * @return void
+     */
+    public function testTheTraitCastsTheDeadlinesColumn(): void
+    {
+        $factor = new RemappedLockoutFactor;
+
+        self::assertSame('datetime', $factor->getCasts()['held_until']);
+        self::assertSame('integer', $factor->getCasts()['consecutive_failures']);
+        self::assertSame('datetime', $factor->getCasts()['disabled_at']);
+        self::assertArrayNotHasKey('locked_until', $factor->getCasts());
+
+        $factor->setRawAttributes(['held_until' => '2026-04-15 09:15:00']);
+
+        self::assertSame('2026-04-15 09:15:00', $factor->getLockedUntil()?->format('Y-m-d H:i:s'));
+    }
+
+    /**
+     * A model that casts the column itself keeps its own cast, declared either
+     * way, and a time it reads to is a deadline whatever its class.
+     *
+     * @return void
+     */
+    public function testAModelsOwnCastOfTheDeadlineIsKept(): void
+    {
+        $method = new class extends Factor {
+            /**
+             * Cast the deadline as an immutable time.
+             *
+             * @return array<string, string>
+             */
+            #[\Override]
+            protected function casts(): array
+            {
+                return ['locked_until' => 'immutable_datetime'];
+            }
+        };
+
+        $property = new class extends Factor {
+            /** @var array<string, string> The attributes that should be cast. */
+            protected $casts = ['locked_until' => 'immutable_datetime'];
+
+            /**
+             * Cast nothing by the method.
+             *
+             * @return array<string, string>
+             */
+            #[\Override]
+            protected function casts(): array
+            {
+                return [];
+            }
+        };
+
+        foreach ([$method, $property] as $factor) {
+
+            $factor->setRawAttributes(['locked_until' => '2026-04-15 09:15:00']);
+
+            self::assertInstanceOf(CarbonImmutable::class, $factor->getLockedUntil());
+            self::assertSame('2026-04-15 09:15:00', $factor->getLockedUntil()->format('Y-m-d H:i:s'));
+        }
+    }
+
+    /**
+     * Stored deadlines that do not read as a time, on a model with no cast of
+     * its own for the column.
+     *
+     * @return iterable<string, array{mixed, class-string<\Throwable>}>
+     */
+    public static function unreadableDeadlines(): iterable
+    {
+        yield 'not a time' => ['not a time', InvalidFormatException::class];
+        yield 'empty' => ['', InvalidModelException::class];
+        yield 'blank' => [" \t", InvalidModelException::class];
+    }
+
+    /**
+     * A deadline that cannot be read as a time throws, and never reads as no
+     * lockout.
+     *
+     * @param  mixed  $stored
+     * @param  class-string<\Throwable>  $exception
+     * @return void
+     */
+    #[DataProvider('unreadableDeadlines')]
+    public function testAnUnreadableDeadlineThrows(mixed $stored, string $exception): void
+    {
+        $factor = new RemappedLockoutFactor;
+
+        $factor->setRawAttributes(['held_until' => $stored]);
+
+        $this->expectException($exception);
+
+        $factor->getLockedUntil();
+    }
+
+    /**
+     * A model whose own cast makes the deadline anything but a time throws,
+     * naming the column and not the value.
+     *
+     * @return void
+     */
+    public function testACastThatIsNotATimeThrows(): void
+    {
+        $factor = new class extends Factor {
+            /**
+             * Cast the deadline as a string.
+             *
+             * @return array<string, string>
+             */
+            #[\Override]
+            protected function casts(): array
+            {
+                return ['locked_until' => 'string'];
+            }
+        };
+
+        $factor->setRawAttributes(['locked_until' => '2026-04-15 09:15:00']);
+
+        $this->expectException(InvalidModelException::class);
+        $this->expectExceptionMessage('The factor\'s lockout column [locked_until] does not read as a time, so whether it is locked cannot be told.');
+
+        $factor->getLockedUntil();
+    }
+
+    /**
+     * No deadline stored reads as none, on a model with or without a row.
+     *
+     * @return void
+     */
+    public function testNoDeadlineReadsAsNone(): void
+    {
+        self::assertNull((new RemappedLockoutFactor)->getLockedUntil());
+        self::assertNull((new RemappedLockoutFactor)->setRawAttributes(['held_until' => null])->getLockedUntil());
+    }
+
+    /**
+     * Run by hand, the initialiser is public, as Eloquent's convention has it,
+     * and a cast already on the column stays.
+     *
+     * @return void
+     */
+    public function testTheInitialiserKeepsACastAlreadyOnTheColumn(): void
+    {
+        $factor = new RemappedLockoutFactor;
+
+        $factor->mergeCasts(['held_until' => 'immutable_datetime']);
+        $factor->initializeActsAsFactor();
+
+        self::assertSame('immutable_datetime', $factor->getCasts()['held_until']);
     }
 
     /**

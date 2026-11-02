@@ -6,11 +6,13 @@ namespace Tests\Unit\Attempts;
 
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
@@ -23,6 +25,7 @@ use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\FactorDisabled;
 use SineMacula\Laravel\Mfa\Events\LockoutApplied;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -346,9 +349,9 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A custom column works once the model is read back from storage: the
-     * deadline is written to it, refuses from it and is lifted from it, given
-     * the datetime cast the column needs. The shipped column is never touched.
+     * A custom column with no cast declared works once the model is read back
+     * from storage: the deadline is written to it, refuses from it and is
+     * lifted from it. The shipped column is never touched.
      *
      * @return void
      *
@@ -773,6 +776,64 @@ final class AttemptServiceTest extends TestCase
 
         self::assertEquals($until, $this->fresh($factor)->getLockedUntil());
         Event::assertNotDispatched(LockoutLifted::class);
+    }
+
+    /**
+     * Stored deadlines that cannot be read as a time.
+     *
+     * @return iterable<string, array{string, class-string<\Throwable>}>
+     */
+    public static function unreadableDeadlines(): iterable
+    {
+        yield 'not a time' => ['not a time', InvalidFormatException::class];
+        yield 'empty' => ['', InvalidModelException::class];
+        yield 'blank' => ['   ', InvalidModelException::class];
+    }
+
+    /**
+     * A stored deadline that cannot be read as a time fails closed: an attempt
+     * and the lockout read throw, the verification does not run and nothing is
+     * counted, rather than the factor reading as unlocked. The column is text
+     * here, as MySQL and PostgreSQL would refuse such a value in a timestamp.
+     *
+     * @param  string  $stored
+     * @param  class-string<\Throwable>  $exception
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('unreadableDeadlines')]
+    public function testAnUnreadableDeadlineFailsClosed(string $stored, string $exception): void
+    {
+        Schema::table('mfa_factors', static function (Blueprint $table): void {
+            $table->string('held_until')->nullable();
+        });
+
+        $user   = $this->user();
+        $factor = RemappedLockoutFactor::query()->create([
+            'authenticatable_type' => $user::class,
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'totp',
+            'status'               => 'confirmed',
+        ]);
+
+        DB::table('mfa_factors')->where('id', $factor->getKey())->update(['held_until' => $stored]);
+
+        try {
+            $this->service()->attempt(new Attempt($user, $factor, Purpose::SIGN_IN), static function (): bool {
+                throw new MidRotationFailureException('The verification must not run.');
+            });
+
+            self::fail('An unreadable deadline must not read as no lockout.');
+        } catch (\Throwable $thrown) {
+            self::assertInstanceOf($exception, $thrown);
+        }
+
+        self::assertNull($this->state($user));
+
+        $this->expectException($exception);
+
+        $this->service()->lockout($user, $factor);
     }
 
     /**
