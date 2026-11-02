@@ -203,7 +203,7 @@ final class PruningTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledDeletionPropagates(): void
+    public function testACanceledDeletionPropagates(): void
     {
         $user = $this->signedInPerson();
 

@@ -338,7 +338,7 @@ final class ResettingIdentityTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledStateSaveRollsTheResetBack(): void
+    public function testACanceledStateSaveRollsTheResetBack(): void
     {
         $user   = $this->signedInPerson();
         $factor = $this->confirmedFactor($user);

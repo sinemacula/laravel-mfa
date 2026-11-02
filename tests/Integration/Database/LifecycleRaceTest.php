@@ -43,6 +43,9 @@ use Tests\TestCase;
  *   runs it in a forked worker on a connection of its own, and commits the
  *   first only once the database reports the worker waiting on the lock.
  * - A verification that overlaps a reset waits, then fails, its factor gone.
+ *   One test runs it on the observer until it times out and retries; another
+ *   runs it in a forked worker and lets that same verification resume when the
+ *   reset commits.
  * - A verification that committed first keeps its success, which nothing can
  *   undo, but the reset invalidates its proof.
  *
@@ -148,10 +151,7 @@ final class LifecycleRaceTest extends TestCase
      */
     public function testOfTwoOverlappingRemovalsTheSecondWaitsAndIsRefused(): void
     {
-        if (!function_exists('pcntl_fork') || !function_exists('posix_kill')) {
-            self::markTestSkipped('Overlapping removals need a process that can fork.');
-        }
-
+        $this->needsAFork();
         $this->enablePasskeys(['requirement' => 'always']);
         $this->container()->instance(SessionRevoker::class, new RecordingSessionRevoker);
 
@@ -163,63 +163,44 @@ final class LifecycleRaceTest extends TestCase
         // identity, but its proof is made without either of the other two.
         $this->stepUpWith($user, $this->confirmedFactor($user, 'sms'));
 
-        $sockets = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
-
-        self::assertIsArray($sockets);
-
-        [$parent, $worker] = $sockets;
-
-        $send = static function (string $line) use ($worker): void {
-            fwrite($worker, $line . "\n");
-        };
-
-        $receive = static function () use ($parent): string {
-
-            stream_set_timeout($parent, 30);
-
-            $line = fgets($parent);
-
-            self::assertIsString($line, 'The worker sent nothing.');
-
-            return trim($line);
-        };
-
-        $connection = DB::connection();
-
-        $connection->beginTransaction();
-
-        self::assertTrue(Mfa::removeFactor($second->id)->wasMade());
-
-        $pid = pcntl_fork();
-
-        if ($pid === 0) {
-            fclose($parent);
-            $this->removeInWorker($first->id, $send);
-        }
-
-        fclose($worker);
-
-        try {
-            self::assertGreaterThan(0, $pid, 'The worker could not be forked.');
-
-            $this->awaitLockWait($receive());
-
-            $connection->commit();
-
-            $outcome = $receive();
-        } finally {
-            if ($connection->transactionLevel() > 0) {
-                $connection->rollBack();
-            }
-
-            if ($pid > 0) {
-                pcntl_waitpid($pid, $status);
-            }
-        }
+        $outcome = $this->holdingTheLock(
+            static fn () => self::assertTrue(Mfa::removeFactor($second->id)->wasMade()),
+            static fn (): ?FailureReason => Mfa::removeFactor($first->id)->reason,
+        );
 
         self::assertSame(FailureReason::LAST_FACTOR->value, $outcome);
         self::assertFalse(Factor::query()->whereKey($second->id)->exists());
         self::assertTrue(Factor::query()->whereKey($first->id)->exists());
+    }
+
+    /**
+     * A verification that read the factor before a reset commits waits on the
+     * lock the reset holds, and when it commits the same verification resumes
+     * and fails: the factor it read is gone.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAVerificationWaitingOnAResetFailsWhenItResumes(): void
+    {
+        $this->needsAFork();
+        $this->enablePasskeys();
+
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+
+        $factor->update(AuthenticatorApp::FACTOR);
+
+        $code = AuthenticatorApp::code($factor);
+
+        $outcome = $this->holdingTheLock(
+            static fn () => Mfa::resetIdentity($user, new Actor('admin', '9'), 'Lost phone.'),
+            static fn (): ?FailureReason => Mfa::verify(Submission::factor($factor->id, $code))->reason,
+        );
+
+        self::assertSame(FailureReason::NOT_FOUND->value, $outcome);
+        self::assertFalse(Factor::query()->whereKey($factor->id)->exists());
     }
 
     /**
@@ -322,17 +303,100 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * Remove the factor as the second request, in the forked worker, on the
+     * Skip a test on a process that cannot fork.
+     *
+     * @return void
+     */
+    private function needsAFork(): void
+    {
+        if (function_exists('pcntl_fork') && function_exists('posix_kill')) {
+            return;
+        }
+
+        self::markTestSkipped('Overlapping changes need a process that can fork.');
+    }
+
+    /**
+     * Make the first change in a transaction left open, run the second in a
+     * forked worker, commit once the database reports the worker waiting on the
+     * lock, and return what the worker reported once it resumed: `made`, or the
+     * reason it was refused.
+     *
+     * @param  \Closure(): void  $first
+     * @param  \Closure(): ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $second
+     * @return string
+     *
+     * @throws \Throwable
+     */
+    private function holdingTheLock(\Closure $first, \Closure $second): string
+    {
+        $sockets = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+
+        self::assertIsArray($sockets);
+
+        [$parent, $worker] = $sockets;
+
+        $send = static function (string $line) use ($worker): void {
+            fwrite($worker, $line . "\n");
+        };
+
+        $receive = static function () use ($parent): string {
+
+            stream_set_timeout($parent, 30);
+
+            $line = fgets($parent);
+
+            self::assertIsString($line, 'The worker sent nothing.');
+
+            return trim($line);
+        };
+
+        $connection = DB::connection();
+
+        $connection->beginTransaction();
+
+        $first();
+
+        $pid = pcntl_fork();
+
+        if ($pid === 0) {
+            fclose($parent);
+            $this->runInWorker($second, $send);
+        }
+
+        fclose($worker);
+
+        try {
+            self::assertGreaterThan(0, $pid, 'The worker could not be forked.');
+
+            $this->awaitLockWait($receive());
+
+            $connection->commit();
+
+            return $receive();
+        } finally {
+            if ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+
+            if ($pid > 0) {
+                pcntl_waitpid($pid, $status);
+            }
+        }
+    }
+
+    /**
+     * Run the change as the second request, in the forked worker, on the
      * racer's connection, which the test never opened, so the worker shares no
      * connection with the test. The worker reports its connection's id before
-     * it removes and the outcome after, then kills itself, so nothing the test
+     * it starts and the outcome after, then kills itself, so nothing the test
      * process set up is torn down twice.
      *
-     * @param  string  $id
+     * @param  \Closure(): ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $change
      * @param  \Closure(string): void  $send
      * @return never
      */
-    private function removeInWorker(string $id, \Closure $send): never
+    private function runInWorker(\Closure $change, \Closure $send): never
     {
         try {
             config()->set('mfa.storage.connection', 'racer');
@@ -342,9 +406,7 @@ final class LifecycleRaceTest extends TestCase
 
             $send(is_scalar($backend) ? (string) $backend : '');
 
-            $result = Mfa::removeFactor($id);
-
-            $send($result->reason === null ? 'removed' : $result->reason->value);
+            $send($change()->value ?? 'made');
         } catch (\Throwable $exception) {
             $send(sprintf('%s: %s', $exception::class, str_replace("\n", ' ', $exception->getMessage())));
         }

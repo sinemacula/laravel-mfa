@@ -168,7 +168,7 @@ final class UnlockingTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledSaveThrows(): void
+    public function testACanceledSaveThrows(): void
     {
         /** @var \Tests\Fixtures\Identities\TestUser $user */
         $user = TestUser::query()->create(['email' => 'person@example.test']);

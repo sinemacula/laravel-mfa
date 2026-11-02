@@ -23,17 +23,18 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
  * What every removal of a factor checks, whichever entry point it comes
  * through, on the identity's factor state as the caller holds it:
  *
- * 1. the factor is the identity's and was enrolled through the application
+ * 1. the identity is active (`identity_inactive`);
+ * 2. the factor is the identity's and was enrolled through the application
  *    acting, since an application never deletes a factor enrolled through
  *    another (`not_found`);
- * 2. it is confirmed; a pending one is cancelled or expires (`not_confirmed`);
- * 3. the session is fresh for removing a factor, and while the identity has
+ * 3. it is confirmed; a pending one is cancelled or expires (`not_confirmed`);
+ * 4. the session is fresh for removing a factor, and while the identity has
  *    another confirmed factor, fresh on proofs made without this one: whatever
  *    the bound gate holds the session to must be met by them too, so a step-up
  *    with the factor being removed never authorises its own removal
  *    (`not_fresh`). A person whose other factor cannot be proved is reset by
  *    someone else; the rule does not relax for them;
- * 4. the bound `LastFactorPolicy` allows it (`last_factor`).
+ * 5. the bound `LastFactorPolicy` allows it (`last_factor`).
  *
  * A refusal is an `OperationRefusedException` carrying the reason.
  *
@@ -74,6 +75,8 @@ final readonly class RemovalGuard
      */
     public function assertRemovable(MultiFactorAuthenticatable $identity, string $application, (EloquentFactor&Model)|null $factor, Collection $factors): EloquentFactor&Model
     {
+        OperationRefusedException::unless($identity->isMfaActive(), FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.');
+
         if ($factor === null || $factor->getApplication() !== $application) {
             throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The identity has no factor with that id enrolled through this application.');
         }

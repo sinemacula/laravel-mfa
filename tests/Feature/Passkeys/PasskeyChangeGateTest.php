@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
@@ -32,6 +33,7 @@ use SineMacula\Laravel\Mfa\Events\PasskeyAssociated;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
+use SineMacula\Laravel\Mfa\Lifecycle\RemovalGuard;
 use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
@@ -54,6 +56,7 @@ use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Lifecycle\FixedFreshnessGate;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\Fixtures\Passkeys\StandInRegistrar;
 use Tests\Fixtures\Requirements\FixedIdentityRequirement;
@@ -85,6 +88,7 @@ use Tests\TestCase;
 #[CoversClass(RecoveryCodeIssuance::class)]
 #[CoversClass(ProofAcceptance::class)]
 #[CoversClass(ReenrollmentObligation::class)]
+#[CoversClass(RemovalGuard::class)]
 #[CoversClass(RequiredFactorPolicy::class)]
 final class PasskeyChangeGateTest extends TestCase
 {
@@ -655,6 +659,111 @@ final class PasskeyChangeGateTest extends TestCase
         $this->stepUpWith($user, $passkey);
 
         self::assertSame(FailureReason::NOT_FOUND, $this->refusal(function () use ($user): void {
+            $this->registrar()->remove($user, self::APPLICATION, self::CREDENTIAL);
+        }));
+        self::assertTrue(Factor::query()->whereKey($passkey->id)->exists());
+        self::assertTrue(StandInRegistrar::stores($user, self::CREDENTIAL));
+    }
+
+    /**
+     * An inactive identity is refused a removal, the same as through
+     * `Mfa::removeFactor()`, and the caller's removal of the credential rolls
+     * back with it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnInactiveIdentityIsNotRemovedFrom(): void
+    {
+        $this->enablePasskeys();
+
+        $identity = new NonEloquentIdentity('plain-1', active: false);
+        $owner    = ProofOwner::of($identity);
+
+        $this->actingAs($identity);
+
+        $this->container()->make(ProofStore::class)->begin($identity, self::APPLICATION, self::SESSION);
+
+        /** @var \SineMacula\Laravel\Mfa\Models\Factor $passkey */
+        $passkey = Factor::query()->create([
+            'authenticatable_type' => $owner->type,
+            'authenticatable_id'   => $owner->key,
+            'type'                 => 'passkey',
+            'status'               => 'confirmed',
+            'confirmed_at'         => CarbonImmutable::now(),
+            'credential_reference' => self::CREDENTIAL,
+            'application'          => self::APPLICATION,
+        ]);
+
+        PasskeyAssociation::query()->create([
+            'factor_id'            => $passkey->id,
+            'authenticatable_type' => $owner->type,
+            'authenticatable_id'   => $owner->key,
+            'credential_id_hash'   => CredentialId::hash(self::CREDENTIAL),
+            'credential_id'        => self::CREDENTIAL,
+        ]);
+
+        DB::table(StandInRegistrar::TABLE)->insert(['owner' => $owner->key, 'credential_id' => self::CREDENTIAL]);
+
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->refusal(function () use ($identity): void {
+            $this->registrar()->remove($identity, self::APPLICATION, self::CREDENTIAL);
+        }));
+        self::assertTrue(Factor::query()->whereKey($passkey->id)->exists());
+        self::assertTrue(StandInRegistrar::stores($identity, self::CREDENTIAL));
+    }
+
+    /**
+     * A sign-in that changed before the lock was held is not acted on, whatever
+     * proofs the new one holds: the factor and the credential stay.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASignInChangedBeforeTheLockRemovesNothing(): void
+    {
+        $this->enablePasskeys();
+
+        $user    = $this->signedInPerson();
+        $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        DB::table(StandInRegistrar::TABLE)->insert(['owner' => ProofOwner::of($user)->key, 'credential_id' => self::CREDENTIAL]);
+
+        $this->stepUpWith($user, $passkey);
+
+        $this->container()->instance(ProofStore::class, new InterruptingProofStore($this->container()->make(ProofStore::class), 1, 'sign-in-b'));
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(function () use ($user): void {
+            $this->registrar()->remove($user, self::APPLICATION, self::CREDENTIAL);
+        }));
+        self::assertTrue(Factor::query()->whereKey($passkey->id)->exists());
+        self::assertTrue(StandInRegistrar::stores($user, self::CREDENTIAL));
+    }
+
+    /**
+     * Without a sign-in the proof store knows of there is nothing to compare
+     * under the lock, so a bound gate answering fresh removes nothing.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testNoSignInTheStoreKnowsIsNotFresh(): void
+    {
+        $this->enablePasskeys();
+
+        /** @var \Tests\Fixtures\Identities\TestUser $user */
+        $user    = TestUser::query()->create(['email' => 'person@example.test']);
+        $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        $this->actingAs($user);
+
+        DB::table(StandInRegistrar::TABLE)->insert(['owner' => ProofOwner::of($user)->key, 'credential_id' => self::CREDENTIAL]);
+
+        $this->container()->instance(FreshnessGate::class, new FixedFreshnessGate(Requirement::none()->withAdditionalVerification(60)));
+
+        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(function () use ($user): void {
             $this->registrar()->remove($user, self::APPLICATION, self::CREDENTIAL);
         }));
         self::assertTrue(Factor::query()->whereKey($passkey->id)->exists());

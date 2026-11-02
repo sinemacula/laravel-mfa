@@ -581,7 +581,7 @@ final class AttemptServiceTest extends TestCase
         config()->set('mfa.attempts.factor_limit', 1);
 
         $user   = $this->user();
-        $factor = new InMemoryFactor(authenticatable: $user);
+        $factor = new InMemoryFactor;
 
         $this->attempt($user, $factor, false);
 
@@ -606,7 +606,7 @@ final class AttemptServiceTest extends TestCase
 
         $user      = $this->user();
         $factor    = $this->factor($user);
-        $stateless = new InMemoryFactor(authenticatable: $user);
+        $stateless = new InMemoryFactor;
 
         $this->attempt($user, null, false);
         $this->attempt($user, $stateless, false);
@@ -761,7 +761,7 @@ final class AttemptServiceTest extends TestCase
     {
         $user      = $this->user();
         $factor    = $this->factor($user);
-        $stateless = new InMemoryFactor(authenticatable: $user);
+        $stateless = new InMemoryFactor;
         $handed    = [];
 
         Factor::query()->whereKey($factor->id)->update(['label' => 'Replaced']);

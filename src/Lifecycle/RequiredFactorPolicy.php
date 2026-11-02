@@ -92,11 +92,30 @@ final readonly class RequiredFactorPolicy implements LastFactorPolicy
         $types   = $this->enabledTypes();
         $owner   = ProofOwner::of($identity);
 
-        return $factors->contains(fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $removed
-            && $other->isConfirmed()
-            && $other->getDisabledAt() === null
-            && in_array($other->getType(), $types, true)
-            && ($other->getType() !== PasskeyAssertions::TYPE || $this->associations->associates($other, $owner)));
+        return $factors->contains(fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $removed && $this->covers($other, $types, $owner));
+    }
+
+    /**
+     * Whether the factor keeps a required factor covered: confirmed, not
+     * disabled at the failure ceiling, of a type some application enables, and,
+     * for a passkey, still associated with the owner.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  list<string>  $types
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
+     * @return bool
+     */
+    private function covers(EloquentFactor&Model $factor, array $types, ProofOwner $owner): bool
+    {
+        if (!$factor->isConfirmed() || $factor->getDisabledAt() !== null) {
+            return false;
+        }
+
+        if (!in_array($factor->getType(), $types, true)) {
+            return false;
+        }
+
+        return $factor->getType() !== PasskeyAssertions::TYPE || $this->associations->associates($factor, $owner);
     }
 
     /**

@@ -282,7 +282,7 @@ final class CodeServiceTest extends TestCase
         $user = TestUser::query()->create(['email' => self::ADDRESS, 'mfa_enabled' => true]);
 
         $factors = [
-            new InMemoryFactor(type: 'email', destination: self::ADDRESS, authenticatable: $user),
+            new InMemoryFactor(type: 'email', destination: self::ADDRESS),
             new TotpStubFactor(null),
             new Factor(['type' => 'email']),
         ];

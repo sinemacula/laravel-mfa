@@ -127,7 +127,7 @@ registers it with the container, and the classes only it uses:
 
 | Namespace       | Holds                                                                                               |
 |-----------------|-----------------------------------------------------------------------------------------------------|
-| `Factors`       | Factor reads, ownership, `FactorSummary` and `OperationGuard`                                       |
+| `Factors`       | Factor reads, `FactorSummary` and `OperationGuard`                                                  |
 | `Drivers`       | The TOTP, email, SMS and passkey drivers, the resolver the services run drivers through             |
 | `Codes`         | Delivered codes: `CodeService`, the senders' defaults, `PackageChallengeGateway`, `MfaCodeMessage`  |
 | `Requirements`  | `requirement()`, `isFresh()`, `Requirement` and the requirement seams' defaults                     |
@@ -255,10 +255,11 @@ returns `null` when the application does not enable the type, and recovery codes
 factor. On a pending session its proof then goes to the bound `PendingCompletion`, and `verification` on the result
 holds what came back, whose refusal rolls your registration back; reveal it only once your transaction has committed. On
 an active session the requirement is evaluated again, and a shortfall goes to the bound `SessionTransition`, whose
-refusal rolls it back too. `removing()` removes the factor with a fresh step-up made with another factor where the
-identity has one, under the last factor policy, and stops the identity's other sessions counting. `changing()` refuses
-any change to an associated credential: register the new one and remove the old. A refusal throws an
-`OperationRefusedException`; let it roll back your own change, since catching it and committing breaks the gate.
+refusal rolls it back too. `removing()` makes the checks of every removal: a sign-in the proof store knows of and that
+has not changed under the lock, an active identity, a fresh step-up made with another factor where the identity has
+one, and the last factor policy. It then stops the identity's other sessions counting. `changing()` refuses any change
+to an associated credential: register the new one and remove the old. A refusal throws an `OperationRefusedException`;
+let it roll back your own change, since catching it and committing breaks the gate.
 
 ## Proving an adapter
 

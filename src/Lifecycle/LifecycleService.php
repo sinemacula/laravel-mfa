@@ -186,7 +186,7 @@ final readonly class LifecycleService
     private function refusalBeforeTheLock(MultiFactorAuthenticatable $identity, string $application, mixed $factorId, Collection $factors): ?FailureReason
     {
         try {
-            $this->removable($identity, $application, $factorId, $factors);
+            $this->guard->assertRemovable($identity, $application, LockedFactors::withId($factorId, $factors), $factors);
         } catch (OperationRefusedException $exception) {
             return $exception->reason;
         }
@@ -222,35 +222,12 @@ final readonly class LifecycleService
                 throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The sign-in changed before the identity\'s lock was held.');
             }
 
-            return [$caller->identity, $this->removable($caller->identity, $application, $factorId, $factors)];
+            return [$caller->identity, $this->guard->assertRemovable($caller->identity, $application, LockedFactors::withId($factorId, $factors), $factors)];
         });
 
         $summary = FactorSummary::fromFactor($factor);
 
         return FactorRemovalResult::made($summary, $this->removal->remove($identity, $application, $factor, $factors));
-    }
-
-    /**
-     * The factor with the id among those given, refusing an inactive identity
-     * and anything `RemovalGuard` refuses.
-     *
-     * @formatter:off
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  mixed  $factorId
-     * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
-     * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
-     *
-     * @formatter:on
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     */
-    private function removable(MultiFactorAuthenticatable $identity, string $application, mixed $factorId, Collection $factors): EloquentFactor&Model
-    {
-        OperationRefusedException::unless($identity->isMfaActive(), FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.');
-
-        return $this->guard->assertRemovable($identity, $application, LockedFactors::withId($factorId, $factors), $factors);
     }
 
     /**

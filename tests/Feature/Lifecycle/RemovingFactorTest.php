@@ -901,7 +901,7 @@ final class RemovingFactorTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledDeletionRollsBack(): void
+    public function testACanceledDeletionRollsBack(): void
     {
         $user   = $this->signedInPerson();
         $factor = $this->confirmedFactor($user);

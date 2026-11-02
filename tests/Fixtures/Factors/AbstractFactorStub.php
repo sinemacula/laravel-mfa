@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Factors;
 
-use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use Tests\Fixtures\Factors\Concerns\ReportsUsableFactorDefaults;
 
@@ -67,17 +66,6 @@ abstract class AbstractFactorStub implements Factor
      */
     #[\Override]
     public function getDestination(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * Return the stub's default owning identity (none).
-     *
-     * @return ?\Illuminate\Contracts\Auth\Authenticatable
-     */
-    #[\Override]
-    public function getAuthenticatable(): ?Authenticatable
     {
         return null;
     }

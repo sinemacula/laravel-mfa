@@ -167,7 +167,7 @@ Mfa::resendEnrollmentCode($grant);      // the code again, renewing nothing
 Mfa::cancelEnrollment($grant);          // the pending factor gone
 Mfa::renameFactor($factorId, $label);   // no step-up
 Mfa::setPreferredFactor($factorId);     // offered first; no step-up
-Mfa::removeFactor($factorId);           // FactorRemovalResult, on a fresh session; the recovery codes go with the last factor
+Mfa::removeFactor($factorId);           // FactorRemovalResult, on a fresh session; the last takes the recovery codes
 Mfa::resetIdentity($user, $actor, $reason); // everything gone, every session revoked, re-enrolment obliged
 Mfa::unlockFactor($user, $factorId, $actor); // bool: a live temporary lockout was lifted
 Mfa::unlockIdentity($user, $actor);     // bool: a live temporary lockout was lifted

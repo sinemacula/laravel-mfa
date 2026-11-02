@@ -54,7 +54,8 @@ application that enrolled it.
 
 Only those checks become a refusal. A revoker or a session transition that fails, a database error, and a model event
 that cancels the deletion all throw and roll the removal back, an `OperationRefusedException` thrown by a seam included:
-it was not refused, it failed. Anything a listener throws after the commit propagates too, and the removal stays committed.
+it was not refused, it failed. Anything a listener throws after the commit propagates too, and the removal stays
+committed.
 
 ### The step-up
 

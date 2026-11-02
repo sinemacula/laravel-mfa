@@ -37,6 +37,7 @@ use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Lifecycle\RemovalGuard;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
@@ -71,12 +72,14 @@ use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
  *   holds, and a shortfall goes to the bound `SessionTransition`; a refusal of
  *   either rolls the registration back. A credential associated already, with
  *   this identity or another, is refused.
- * - `removing()` removes the factor an associated credential is, with the
- *   checks of every removal (see `Lifecycle\RemovalGuard`): enrolled through the
+ * - `removing()` removes the factor an associated credential is, on a sign-in
+ *   the proof store knows (`not_fresh` without one), compared again under the
+ *   lock (`not_found` when it changed), with the checks of every removal (see
+ *   `Lifecycle\RemovalGuard`): an active identity; enrolled through the
  *   application acting, so another application's is refused as `not_found` and
- *   the caller's removal of the credential rolls back with it; the fresh step-up
- *   a removal needs (proved without that factor while another remains); and the
- *   last factor policy. Then the identity's other sessions are revoked.
+ *   the caller's removal of the credential rolls back with it; the fresh
+ *   step-up a removal needs (proved without that factor while another remains);
+ *   and the last factor policy. Then the identity's other sessions are revoked.
  * - `changing()` refuses any change to an associated credential: one to what it
  *   proves is a removal and then a registration. A label, its counter and its
  *   last use are not gated.
@@ -181,10 +184,16 @@ final readonly class PasskeyChangeGate
             return;
         }
 
-        $this->caller($identity, $application, null);
+        $binding = $this->callers->binding($this->caller($identity, $application, null), Purpose::STEP_UP);
 
-        FactorStateTransaction::forIdentity($identity, $this->factorModel(), function (Collection $factors) use ($identity, $application, $credentialId): void {
-            $this->remove($identity, $application, $credentialId, $factors);
+        // No sign-in means nothing a step-up could have been made on, or to
+        // compare under the lock, whatever a bound gate would answer.
+        if ($binding === null) {
+            throw new OperationRefusedException(FailureReason::NOT_FRESH, 'Removing a factor needs a sign-in the proof store knows of.');
+        }
+
+        FactorStateTransaction::forIdentity($identity, $this->factorModel(), function (Collection $factors) use ($binding, $application, $credentialId): void {
+            $this->remove($binding, $application, $credentialId, $factors);
         });
     }
 
@@ -294,13 +303,14 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * Under the lock: remove the identity's factor the credential is associated
+     * Under the lock: resolve the caller again, refusing a sign-in that
+     * changed, then remove the identity's factor the credential is associated
      * as, once every check of a removal holds; an association no factor of the
      * identity's remains for is deleted on its own.
      *
      * @formatter:off
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $application
      * @param  string  $credentialId
      * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
@@ -311,8 +321,15 @@ final readonly class PasskeyChangeGate
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    private function remove(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId, Collection $factors): void
+    private function remove(ProofBinding $binding, string $application, #[\SensitiveParameter] string $credentialId, Collection $factors): void
     {
+        $caller = $this->callers->still(null, $binding);
+
+        if ($caller === null) {
+            throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The sign-in changed before the identity\'s lock was held.');
+        }
+
+        $identity    = $caller->identity;
         $association = $this->associations->forCredential($credentialId);
 
         if ($association === null) {
