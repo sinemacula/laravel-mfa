@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Integration\Database;
 
 use Illuminate\Config\Repository;
+use Illuminate\Database\DeadlockException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,10 @@ use Tests\TestCase;
  * reporting the outcome, a parallel owner asking about the same identity waits
  * for the identity's state lock and times out; once the first has reported the
  * failure that locks the identity, the parallel one finds the lockout.
+ *
+ * The parallel owner's wait times out inside the nested transaction the
+ * counters open in its own, which Laravel reports on MySQL as a
+ * `DeadlockException` wrapping the query's failure.
  *
  * SQLite serialises every writer on the whole file, so these tests run on the
  * server databases only.
@@ -89,8 +94,8 @@ final class ParallelChallengeCountersTest extends TestCase
 
             try {
                 $this->parallel = $this->asObserver($user, $factor);
-            } catch (QueryException $exception) {
-                $this->stopped = $exception;
+            } catch (DeadlockException|QueryException $exception) {
+                $this->stopped = $exception instanceof DeadlockException ? $exception->getPrevious() : $exception;
             }
 
             self::assertTrue($this->counters()->report($user, $factor, $binding, false)->isFailed());
