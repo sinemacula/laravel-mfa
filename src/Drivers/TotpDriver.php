@@ -5,16 +5,14 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Drivers;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
-use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
-use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
+use SineMacula\Laravel\Mfa\Contracts\ProvisioningDriver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
  * TOTP factor driver: time-based one-time passwords (RFC 6238) from an
@@ -26,11 +24,10 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * which the factor keeps. A code is checked against every time step of the
  * window, each compared with `hash_equals()` and none skipped when an earlier
  * one matches, so the work does not depend on which step matches or whether one
- * does. The window is the `totp_window` of the application the verification's
- * binding names; a confirmation has no binding, so it uses the application a
- * bound `ApplicationResolver` names for the current request, or
- * `mfa.totp.window` without one. The window is read from the configuration on
- * every call and never widens.
+ * does. The window is the `totp_window` of the application the binding names,
+ * at confirmation as at verification, so it comes from the application the
+ * enrolment was granted through and not from the request. It is read from the
+ * configuration on every call and never widens.
  *
  * A time step is single-use per factor (RFC 6238 §5.2): a code is accepted only
  * when its step is later than the factor's last accepted one, recorded in the
@@ -44,21 +41,17 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
-final readonly class TotpDriver implements FactorDriver
+final readonly class TotpDriver implements ProvisioningDriver
 {
     /**
      * Constructor.
      *
      * @param  \SineMacula\Laravel\Mfa\Drivers\TotpSettings  $settings
-     * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
         /** The parameters of new enrolments and the window, read per call. */
         private TotpSettings $settings,
-
-        /** The container the request and application resolver are read from. */
-        private Container $container,
     ) {}
 
     /**
@@ -110,21 +103,21 @@ final readonly class TotpDriver implements FactorDriver
     }
 
     /**
-     * Start an enrolment with a new shared secret, which the caller stores on
-     * the pending factor and shows the person once.
+     * Start an enrolment with a new shared secret, which the enrolment stores
+     * encrypted on the pending factor and shows the person once.
      *
      * The parameters new enrolments use are stamped on an Eloquent factor, with
      * no step accepted yet; a factor of another kind is given them by its
      * caller, from `parameters()`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return string
+     * @return \SineMacula\Laravel\Mfa\Secrets\RevealedSecret
      *
      * @throws \InvalidArgumentException
      * @throws \Random\RandomException
      */
     #[\Override]
-    public function startEnrollment(Factor $factor): string
+    public function startEnrollment(Factor $factor): RevealedSecret
     {
         $parameters = $this->parameters();
 
@@ -135,31 +128,25 @@ final readonly class TotpDriver implements FactorDriver
             $factor->setAttribute($factor->getLastAcceptedStepName(), null);
         }
 
-        return Base32::encode(random_bytes($parameters->secretLength()));
+        return new RevealedSecret(Base32::encode(random_bytes($parameters->secretLength())));
     }
 
     /**
      * Confirm the pending factor with the first code its authenticator app
-     * shows, checked as any other, so its step is recorded and the confirming
-     * code cannot be used again.
+     * shows, checked as any other under the binding of the enrolment, so its
+     * step is recorded and the confirming code cannot be used again.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @return bool
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
-     *
-     * @imperative
      */
     #[\Override]
-    public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool
+    public function confirm(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck
     {
-        $step = $this->matchedStep($factor, $code, $this->application());
-
-        return $step !== null
-            && $factor instanceof EloquentFactor
-            && $factor->storeAcceptedStep($step);
+        return $this->verify($factor, $code, $binding);
     }
 
     /**
@@ -185,12 +172,13 @@ final readonly class TotpDriver implements FactorDriver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $issuer
      * @param  string  $accountName
-     * @param  string  $secret
-     * @return string
+     * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret  $secret
+     * @return \SineMacula\Laravel\Mfa\Secrets\RevealedSecret
      *
      * @throws \InvalidArgumentException
      */
-    public function provisioningUri(Factor $factor, string $issuer, string $accountName, #[\SensitiveParameter] string $secret): string
+    #[\Override]
+    public function provisioningUri(Factor $factor, string $issuer, string $accountName, #[\SensitiveParameter] RevealedSecret $secret): RevealedSecret
     {
         $parameters = TotpParameters::fromFactor($factor);
 
@@ -205,14 +193,14 @@ final readonly class TotpDriver implements FactorDriver
         }
 
         $query = http_build_query([
-            'secret'    => $secret,
+            'secret'    => $secret->reveal(),
             'issuer'    => $issuer,
             'algorithm' => strtoupper($parameters->algorithm),
             'digits'    => $parameters->digits,
             'period'    => $parameters->period,
         ], '', '&', PHP_QUERY_RFC3986);
 
-        return sprintf('otpauth://totp/%s:%s?%s', rawurlencode($issuer), rawurlencode($accountName), $query);
+        return new RevealedSecret(sprintf('otpauth://totp/%s:%s?%s', rawurlencode($issuer), rawurlencode($accountName), $query));
     }
 
     /**
@@ -222,12 +210,12 @@ final readonly class TotpDriver implements FactorDriver
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @param  ?string  $application
+     * @param  string  $application
      * @return ?int
      *
      * @throws \InvalidArgumentException
      */
-    private function matchedStep(Factor $factor, #[\SensitiveParameter] string $code, ?string $application): ?int
+    private function matchedStep(Factor $factor, #[\SensitiveParameter] string $code, string $application): ?int
     {
         $parameters = TotpParameters::fromFactor($factor);
         $key        = Base32::decode($factor->getSecret() ?? '');
@@ -249,26 +237,5 @@ final readonly class TotpDriver implements FactorDriver
         }
 
         return $matched;
-    }
-
-    /**
-     * The application a bound `ApplicationResolver` names for the current
-     * request, or `null` without either, so the package-wide window applies.
-     *
-     * @return ?string
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    private function application(): ?string
-    {
-        if (!$this->container->bound(ApplicationResolver::class)) {
-            return null;
-        }
-
-        $request = $this->container->bound('request') ? $this->container->make('request') : null;
-
-        return $request instanceof Request
-            ? $this->container->make(ApplicationResolver::class)->resolve($request)
-            : null;
     }
 }

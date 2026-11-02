@@ -52,13 +52,22 @@ return new class extends Migration {
             $blueprint->char('grant_hash', 64);
             $blueprint->unique('grant_hash', IndexName::for($table, '_grant_unique'));
 
-            // What the grant is bound to: the application and the session that
-            // started the enrolment.
+            // What the grant is bound to: the application, a keyed digest of
+            // the sign-in that started the enrolment, the verification
+            // generation it started under, so advancing that kills the grant,
+            // and what authorised it.
             $blueprint->string('application');
-            $blueprint->string('session_id')->nullable();
+            $blueprint->string('session_id');
+            $blueprint->unsignedInteger('generation');
+            $blueprint->string('authority', 32);
 
-            // When the grant stops confirming, indexed for pruning abandoned
-            // enrolments, and the confirmation attempts made against it.
+            // The challenge the last delivered code went out under, written
+            // once it has been sent.
+            $blueprint->string('challenge_id')->nullable();
+
+            // When the grant stops confirming, taken once from what authorised
+            // it and never renewed, indexed for pruning abandoned enrolments,
+            // and the confirmation attempts made against it.
             $blueprint->timestamp('expires_at')->index(IndexName::for($table, '_expiry_index'));
             $blueprint->unsignedInteger('attempts')->default(0);
 

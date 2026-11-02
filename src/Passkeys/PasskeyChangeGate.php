@@ -28,6 +28,7 @@ use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Events\BootstrapEnrollmentCompleted;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\FactorConfirmed;
 use SineMacula\Laravel\Mfa\Events\PasskeyAssociated;
@@ -39,12 +40,13 @@ use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
-use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\Requirements\OperationRequirements;
-use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
+use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 
 /**
  * The gate every entry point that registers, removes or changes a passkey calls
@@ -65,8 +67,10 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  *   application enables the type, confirmed by the registration ceremony's own
  *   evidence, with the fresh step-up, reauthentication or bootstrap exemption
  *   and the limits an enrolment needs, and recovery codes with the first
- *   additional factor. A credential associated already, with this identity or
- *   another, is refused.
+ *   additional factor. A confirmed factor ends a re-enrolment obligation, and
+ *   on a pending session its proof goes to the bound `PendingCompletion`, whose
+ *   refusal rolls the registration back. A credential associated already, with
+ *   this identity or another, is refused.
  * - `removing()` removes the factor an associated credential is, with the fresh
  *   step-up a removal needs (proved without that factor while another remains),
  *   the last factor policy, and the revocation of the identity's other
@@ -140,14 +144,12 @@ final readonly class PasskeyChangeGate
             return null;
         }
 
-        $caller = $this->caller($identity, $application, PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT);
-
-        $this->assertRegistration($caller, $registration);
+        $this->assertRegistration($this->caller($identity, $application, PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT), $registration);
 
         return FactorStateTransaction::forIdentity(
             $identity,
             $this->factorModel(),
-            fn (Collection $factors): PasskeyAssociationResult => $this->associate($caller, $application, $registration, $label, $factors),
+            fn (Collection $factors): PasskeyAssociationResult => $this->associate($application, $registration, $label, $factors),
         );
     }
 
@@ -213,14 +215,14 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * Under the lock: refuse an inactive identity, a credential associated
-     * already and an enrolment the caller may not make now, then store the
-     * confirmed factor and its association, and recovery codes with the
-     * identity's first additional factor.
+     * Under the lock: refuse a sign-in that changed, an inactive identity, a
+     * credential associated already and an enrolment the caller may not make
+     * now, then store the confirmed factor and its association, end any
+     * re-enrolment obligation, issue recovery codes with the identity's first
+     * additional factor, and hand a pending session's proof over.
      *
      * @formatter:off
      *
-     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration  $registration
      * @param  ?string  $label
@@ -233,8 +235,14 @@ final readonly class PasskeyChangeGate
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCancelledException
      * @throws \Throwable
      */
-    private function associate(Caller $caller, string $application, PasskeyRegistration $registration, ?string $label, Collection $factors): PasskeyAssociationResult
+    private function associate(string $application, PasskeyRegistration $registration, ?string $label, Collection $factors): PasskeyAssociationResult
     {
+        $caller = $this->callers->still(PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT, $registration->binding);
+
+        if ($caller === null) {
+            throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The sign-in the registration was made on is no longer the request\'s.');
+        }
+
         $identity = $caller->identity;
 
         $this->container->make(OperationGuard::class)->identity($identity);
@@ -254,17 +262,24 @@ final readonly class PasskeyChangeGate
         $id      = self::storedId($factor);
         $summary = FactorSummary::fromFactor($factor);
         $context = $this->events->context($identity, $application);
+        $proof   = self::proofOf($identity, $registration, $id);
 
         $this->associations->associate(ProofOwner::of($identity), $id, $registration->credentialId);
 
         $this->events->dispatch(new PasskeyAssociated($context, $summary));
         $this->events->dispatch(new FactorConfirmed($context, $summary));
 
-        $codes = $first && $this->issuesRecoveryCodes($identity, $application, $registration, $id)
-            ? $this->container->make(RecoveryCodeService::class)->generate($identity, null, $application)
-            : [];
+        if ($caller->pending !== null) {
+            $this->events->dispatch(new BootstrapEnrollmentCompleted($context, $summary));
+        }
 
-        return new PasskeyAssociationResult($summary, $codes);
+        ReenrollmentObligation::end($identity);
+
+        $acceptance = $this->container->make(ProofAcceptance::class);
+        $result     = $caller->pending === null ? null : $acceptance->evaluate($caller, $proof, [], PasskeyAssertions::TYPE);
+        $codes      = $first ? $this->container->make(RecoveryCodeIssuance::class)->withFirstFactor($identity, $application, $proof) : [];
+
+        return new PasskeyAssociationResult($summary, $codes, $result?->withCompletion($acceptance->handOver($caller, $result)));
     }
 
     /**
@@ -358,47 +373,6 @@ final readonly class PasskeyChangeGate
         $fresh = $this->container->make(RequirementCheck::class)->check($requirement, ...$proofs)->meetsRequirement();
 
         OperationRefusedException::unless($fresh, FailureReason::NOT_FRESH, 'Removing a factor needs a fresh step-up made with another factor.');
-    }
-
-    /**
-     * Whether recovery codes come with the identity's first additional factor:
-     * the application accepts them, and the session's first factor followed by
-     * the registration's own evidence meets the level the application issues
-     * them at.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration  $registration
-     * @param  string  $factorId
-     * @return bool
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
-     */
-    private function issuesRecoveryCodes(MultiFactorAuthenticatable $identity, string $application, PasskeyRegistration $registration, string $factorId): bool
-    {
-        $settings    = $this->settings($application);
-        $firstFactor = $this->container->make(SessionFirstFactor::class)->forBinding($identity, $registration->binding);
-
-        if (!$settings->acceptsRecoveryCodes() || $firstFactor === null) {
-            return false;
-        }
-
-        $proof = new Proof(
-            kind      : ProofKind::ADDITIONAL_FACTOR,
-            method    : PasskeyAssertions::TYPE,
-            channel   : new Channel(ChannelKind::PASSKEY, $registration->credentialId),
-            reference : $factorId,
-            properties: $registration->properties,
-            provedAt  : CarbonImmutable::now(),
-            binding   : $registration->binding,
-            generation: VerificationGeneration::current($identity),
-        );
-
-        $requirement = Requirement::none()->withMinimumLevel($settings->recoveryCodeLevel());
-
-        return $this->container->make(RequirementCheck::class)->check($requirement, $firstFactor, $proof)->meetsRequirement();
     }
 
     /**
@@ -514,6 +488,32 @@ final readonly class PasskeyChangeGate
     private static function refuseChange(): never
     {
         throw new OperationRefusedException(FailureReason::CREDENTIAL_ASSOCIATED, 'An associated credential is not changed in place: remove it, then register the new one.');
+    }
+
+    /**
+     * The proof a registration makes of the factor it stores: its own evidence,
+     * bound to the enrolment.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration  $registration
+     * @param  string  $factorId
+     * @return \SineMacula\Laravel\Mfa\Proofs\Proof
+     *
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private static function proofOf(MultiFactorAuthenticatable $identity, PasskeyRegistration $registration, string $factorId): Proof
+    {
+        return new Proof(
+            kind      : ProofKind::ADDITIONAL_FACTOR,
+            method    : PasskeyAssertions::TYPE,
+            channel   : new Channel(ChannelKind::PASSKEY, $registration->credentialId),
+            reference : $factorId,
+            properties: $registration->properties,
+            provedAt  : CarbonImmutable::now(),
+            binding   : $registration->binding,
+            generation: VerificationGeneration::current($identity),
+        );
     }
 
     /**

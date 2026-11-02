@@ -4,8 +4,10 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Requirements;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
+use SineMacula\Laravel\Mfa\Assurance\Evaluation;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
@@ -62,17 +64,53 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
     #[\Override]
     public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool
     {
+        return $this->evaluation($operation, $callerRequirement)?->meetsRequirement() === true;
+    }
+
+    /**
+     * When the current session stops being fresh for the operation, on the
+     * proofs it holds now: `null` when it is not fresh, and when the bound
+     * policy reports no such time for a requirement bounded by a maximum age.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+     * @return ?\Carbon\CarbonImmutable
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    #[\Override]
+    public function freshUntil(string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
+    {
+        return $this->evaluation($operation, $callerRequirement)?->metUntil;
+    }
+
+    /**
+     * What the session's recorded proofs add up to against the operation's
+     * requirement, or `null` without an identity or a requirement.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+     * @return ?\SineMacula\Laravel\Mfa\Assurance\Evaluation
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private function evaluation(string $operation, ?Requirement $callerRequirement): ?Evaluation
+    {
         $application = $this->container->make(ProofService::class)->application();
         $operations  = new OperationRequirements($this->container->make(Repository::class));
         $requirement = $operations->effective($application, $operation, $callerRequirement);
         $identity    = CurrentIdentity::resolve();
 
         if ($requirement === null || $identity === null) {
-            return false;
+            return null;
         }
 
         $proofs = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
 
-        return $this->container->make(RequirementCheck::class)->check($requirement, ...$proofs)->meetsRequirement();
+        return $this->container->make(RequirementCheck::class)->check($requirement, ...$proofs);
     }
 }

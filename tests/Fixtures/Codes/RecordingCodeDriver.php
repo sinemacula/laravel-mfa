@@ -42,6 +42,18 @@ final class RecordingCodeDriver extends AbstractCodeDriver
     }
 
     /**
+     * The destination as given, or `null` when it is blank.
+     *
+     * @param  string  $destination
+     * @return ?string
+     */
+    #[\Override]
+    public function normalizeDestination(#[\SensitiveParameter] string $destination): ?string
+    {
+        return $destination === '' ? null : $destination;
+    }
+
+    /**
      * The code last delivered, or `null` when none was.
      *
      * @return ?string

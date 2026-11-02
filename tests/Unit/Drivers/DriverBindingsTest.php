@@ -104,12 +104,12 @@ final class DriverBindingsTest extends TestCase
      */
     public function testTotpFactoryReadsTheTotpSettings(): void
     {
-        $defaults = DriverBindings::totp($this->app(), new Repository)->parameters();
+        $defaults = DriverBindings::totp(new Repository)->parameters();
 
         self::assertSame(['sha1', 6, 30], [$defaults->algorithm, $defaults->digits, $defaults->period]);
 
         $config = new Repository(['mfa' => ['totp' => ['algorithm' => 'sha256']]]);
-        $driver = DriverBindings::totp($this->app(), $config);
+        $driver = DriverBindings::totp($config);
 
         $config->set('mfa.totp.period', 60);
 

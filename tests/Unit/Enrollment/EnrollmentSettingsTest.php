@@ -30,6 +30,7 @@ final class EnrollmentSettingsTest extends TestCase
     public static function settings(): iterable
     {
         yield 'ttl_minutes' => ['ttl_minutes', static fn (EnrollmentSettings $settings): int => $settings->ttlMinutes(), 15, 1, 60];
+        yield 'max_attempts' => ['max_attempts', static fn (EnrollmentSettings $settings): int => $settings->maxAttempts(), 5, 1, 10];
     }
 
     /**

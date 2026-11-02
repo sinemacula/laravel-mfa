@@ -45,6 +45,9 @@ The current note set is:
 - `requirements-and-freshness.md`: how a sign-in's requirement is composed from the application's mode, the identity,
   a re-enrolment obligation and an active tenant, how a session's proofs are checked against a requirement, and how a
   named operation's freshness is judged, the stricter of the package's and the caller's setting applying.
+- `enrollment.md`: how a factor is enrolled: what authorises a start, why a grant's expiry is taken once from what
+  authorised it, what a grant is bound to, what a confirmation checks again inside its transaction, and what it does for
+  the session.
 - `totp.md`: how TOTP codes are made and checked, the secret and parameters each factor is enrolled with, the
   window, and the compare-and-set that accepts each time step once per factor, also under concurrency.
 - `recovery-codes.md`: how recovery codes are drawn and stored as salted hashes, why a redemption checks the whole

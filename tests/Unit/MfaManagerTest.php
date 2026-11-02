@@ -9,9 +9,13 @@ use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Factors\FactorChange;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
@@ -103,7 +107,17 @@ final class MfaManagerTest extends TestCase
 
         yield 'verify' => ['verify', VerificationService::class, 'verify', [Submission::factor('factor-1', '123456'), Purpose::STEP_UP], $failed];
         yield 'generateRecoveryCodes' => ['generateRecoveryCodes', RecoveryCodeIssuance::class, 'generate', [], [new RevealedSecret('ABCDEFGHJKLM')]];
-        yield 'enroll' => ['enroll', EnrollmentService::class, 'enroll', [$factor], null];
+
+        $grant = new RevealedSecret('grant');
+
+        $request = EnrollmentRequest::totp('person@example.test');
+
+        yield 'startEnrollment' => ['startEnrollment', EnrollmentService::class, 'start', [$request], EnrollmentStart::refused(FailureReason::NOT_FOUND)];
+        yield 'confirmEnrollment' => ['confirmEnrollment', EnrollmentService::class, 'confirm', [$grant, '123456'], EnrollmentConfirmation::failed(FailureReason::NOT_FOUND)];
+        yield 'resendEnrollmentCode' => ['resendEnrollmentCode', EnrollmentService::class, 'resend', [$grant], $refused];
+        yield 'cancelEnrollment' => ['cancelEnrollment', EnrollmentService::class, 'cancel', [$grant], false];
+        yield 'renameFactor' => ['renameFactor', FactorService::class, 'rename', ['factor-1', 'Work phone'], FactorChange::refused(FailureReason::NOT_FOUND)];
+        yield 'setPreferredFactor' => ['setPreferredFactor', FactorService::class, 'setPreferred', ['factor-1'], FactorChange::refused(FailureReason::NOT_FOUND)];
         yield 'disable' => ['disable', LifecycleService::class, 'disable', [$factor], null];
     }
 

@@ -288,7 +288,7 @@ final class PasskeyAssertionsTest extends TestCase
         $first = SignInProofs::of($this->user)->inSession('pending-1')->password();
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(
-            new PendingContext($this->user, self::APPLICATION, 'pending-1', $first, Requirement::none(), $actions),
+            new PendingContext($this->user, self::APPLICATION, 'pending-1', $first, Requirement::none(), $actions, CarbonImmutable::now()->addMinutes(10)),
         ));
     }
 

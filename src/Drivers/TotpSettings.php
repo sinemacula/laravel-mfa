@@ -10,10 +10,11 @@ use SineMacula\Laravel\Mfa\Config\IntegerSetting;
 
 /**
  * The TOTP settings in `mfa.totp`, read on every call and validated as they are
- * read: the algorithm, digits and period new enrolments use, and the window an
- * application that sets none of its own accepts. A value outside its bounds
- * fails closed with an `InvalidArgumentException` naming the key; the package
- * checks them when it boots and `mfa:check` reports them.
+ * read: the algorithm, digits and period new enrolments use, the window an
+ * application that sets none of its own accepts, and the issuer an
+ * authenticator app shows. A value outside its bounds fails closed with an
+ * `InvalidArgumentException` naming the key; the package checks them when it
+ * boots and `mfa:check` reports them.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -117,6 +118,25 @@ final readonly class TotpSettings
     }
 
     /**
+     * The issuer an authenticator app shows for a new enrolment that names none
+     * of its own: `mfa.totp.issuer`, or the application's name without one.
+     *
+     * @return string
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function issuer(): string
+    {
+        $issuer = $this->configuredIssuer() ?? $this->config->get('app.name');
+
+        if (!is_string($issuer)) {
+            throw new \InvalidArgumentException(sprintf('Set %sissuer or app.name: an authenticator app must show an issuer.', self::PREFIX));
+        }
+
+        return $issuer;
+    }
+
+    /**
      * The algorithm, digits and period a new enrolment is made with, stored
      * with its factor.
      *
@@ -142,6 +162,26 @@ final readonly class TotpSettings
         $this->digits();
         $this->period();
         $this->window();
+        $this->configuredIssuer();
+    }
+
+    /**
+     * The issuer `mfa.totp.issuer` sets, if any, which must be a non-empty
+     * string.
+     *
+     * @return ?string
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function configuredIssuer(): ?string
+    {
+        $issuer = $this->config->get(self::PREFIX . 'issuer');
+
+        if ($issuer !== null && (!is_string($issuer) || trim($issuer) === '')) {
+            throw new \InvalidArgumentException(sprintf('%sissuer must be a non-empty string.', self::PREFIX));
+        }
+
+        return $issuer;
     }
 
     /**

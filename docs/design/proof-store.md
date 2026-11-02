@@ -27,6 +27,8 @@ proofs are the evidence every later answer (freshness, levels, requirements) is 
   it has none, read from the write connection. `Proofs\VerificationGeneration::advance()` creates the row when needed
   and moves the generation on by one inside a transaction on the storage connection; called inside the identity's
   factor state transaction it joins it and rolls back with it.
+- An enrolment's confirmation on a pending session is recorded as any further proof is, with purpose `enrollment`; on an
+  active session it records nothing (see [Enrolment](enrollment.md)).
 - The default store, `Proofs\SessionProofStore`, keeps each identity's sign-ins and the full records of their proofs
   in the Laravel session under `mfa.proofs`, by identity and then by application. It keeps at most 50 proofs per
   sign-in: past that, it forgets the earliest recorded other than the latest first factor, so the bound always holds

@@ -105,16 +105,24 @@ nothing is stored in their place.
 - An identity whose key is neither a non-empty string nor an integer cannot have its obligation read, so its
   requirement is refused with `UnsupportedIdentifierException` rather than answered as empty.
 
+## How Long An Answer Lasts
+
+- `FreshnessGate::freshUntil()` asks what `isFresh()` asks and says how long the answer lasts: the instant the session
+  stops being fresh on the proofs it holds now, `null` when it is not fresh or the gate cannot say, so a grant taken from
+  it lives no longer than the proof that authorised it (see [Enrolment](enrollment.md)). `Evaluation::$metUntil` is how
+  the default gate reads it: for each part with a maximum age, the latest evidence time among the combinations providing
+  it plus that age, and the earliest across the parts.
+
 ## Seams Left
 
 - The `mfa` middleware still judges the newest additional factor or recovery code against `proofs.max_age_minutes`
   once the requirement is not empty; it does not yet check the structured requirement, so it can refuse a passkey that
   verified the person and accept evidence below a requested level.
-- Nothing yet sets or clears the re-enrolment obligation; a reset and the confirmation of a factor will.
-- Only the passkey change gate asks the gate for the package's own operations so far (`mfa.add_factor` and
-  `mfa.remove_factor`, see [Passkeys](passkeys.md)); the enrolment and lifecycle flows will ask it for the rest.
-- The enrolment grant's lifetime is not bound to the freshness of the proof that authorised it: the gate answers yes or
-  no and says nothing of how long the answer holds.
+- Nothing yet sets the re-enrolment obligation; a reset will. Confirming a factor ends it
+  (`ReenrollmentObligation::end()`, see [Enrolment](enrollment.md)).
+- Starting an enrolment and the passkey change gate ask the gate for `mfa.add_factor`, the gate for `mfa.remove_factor`
+  (see [Passkeys](passkeys.md)) and issuing recovery codes for `mfa.generate_recovery_codes`; the lifecycle flow will ask
+  it for the rest.
 
 ## Implementation Anchors
 

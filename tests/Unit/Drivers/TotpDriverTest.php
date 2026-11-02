@@ -6,7 +6,6 @@ namespace Tests\Unit\Drivers;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Config\Repository;
-use Illuminate\Container\Container;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -19,6 +18,7 @@ use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Factors\TotpStubFactor;
@@ -200,12 +200,12 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A confirmation has no binding, so its window is that of the application a
-     * bound resolver names for the current request, read for each request.
+     * A confirmation's window is the `totp_window` of the application its
+     * binding names, whichever application the request is for.
      *
      * @return void
      */
-    public function testAConfirmationsWindowIsTheRequestedApplicationsOwn(): void
+    public function testAConfirmationsWindowIsItsBindingsApplicationsOwn(): void
     {
         $this->configuration()->set('mfa.applications', [
             'strict'  => ['totp_window' => 0],
@@ -217,40 +217,13 @@ final class TotpDriverTest extends TestCase
         $driver = $this->driver();
         $factor = $this->factor();
 
-        $this->requestFor('strict');
-
-        self::assertFalse($driver->confirm($this->factor(), '050219'));
-
         $this->requestFor('lenient');
 
-        self::assertTrue($driver->confirm($this->factor(), AuthenticatorApp::code($factor, 2)));
-    }
+        self::assertSame(CodeCheck::INVALID, $driver->confirm($this->factor(), AuthenticatorApp::code($factor, 2), self::binding('strict')));
 
-    /**
-     * Without a request, or with something other than an HTTP request bound as
-     * one, a confirmation names no application and the package-wide window
-     * applies.
-     *
-     * @return void
-     */
-    public function testWithoutARequestAConfirmationTakesThePackageWideWindow(): void
-    {
-        $config = new Repository(['mfa' => ['applications' => ['strict' => ['totp_window' => 0]]]]);
+        $this->requestFor('strict');
 
-        $container = new Container;
-        $container->instance(ApplicationResolver::class, new HeaderApplicationResolver('strict'));
-
-        $driver = new TotpDriver(new TotpSettings($config), $container);
-
-        self::assertTrue($driver->confirm($this->factor(), '385088'));
-
-        $container->instance('request', new \stdClass);
-
-        self::assertTrue($driver->confirm($this->factor(), '385088'));
-
-        $container->instance('request', Request::create('/'));
-
-        self::assertFalse($driver->confirm($this->factor(), '385088'));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->confirm($this->factor(), AuthenticatorApp::code($factor, 2), self::binding('lenient')));
     }
 
     /**
@@ -335,10 +308,10 @@ final class TotpDriverTest extends TestCase
         $driver = $this->driver();
         $factor = $this->factor();
 
-        self::assertTrue($driver->confirm($factor, self::CODE));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->confirm($factor, self::CODE, self::binding()));
         self::assertSame(self::STEP, $factor->getLastAcceptedStep());
-        self::assertNotSame(CodeCheck::ACCEPTED, $driver->verify($factor, self::CODE, self::binding()));
-        self::assertFalse($driver->confirm($factor, self::CODE));
+        self::assertSame(CodeCheck::REPLAYED, $driver->verify($factor, self::CODE, self::binding()));
+        self::assertSame(CodeCheck::REPLAYED, $driver->confirm($factor, self::CODE, self::binding()));
     }
 
     /**
@@ -436,7 +409,7 @@ final class TotpDriverTest extends TestCase
     public function testRefusesAFactorThatCannotRecordAStep(): void
     {
         self::assertNotSame(CodeCheck::ACCEPTED, $this->driver()->verify(new UnrecordableTotpFactor, self::CODE, self::binding()));
-        self::assertFalse($this->driver()->confirm(new UnrecordableTotpFactor, self::CODE));
+        self::assertNotSame(CodeCheck::ACCEPTED, $this->driver()->confirm(new UnrecordableTotpFactor, self::CODE, self::binding()));
     }
 
     /**
@@ -469,9 +442,9 @@ final class TotpDriverTest extends TestCase
         $secret = $this->driver()->startEnrollment(new TotpStubFactor(null));
         $other  = $this->driver()->startEnrollment(new TotpStubFactor(null));
 
-        self::assertMatchesRegularExpression('/^[A-Z2-7]+$/', $secret);
-        self::assertSame($bytes, strlen((string) Base32::decode($secret)));
-        self::assertNotSame($secret, $other);
+        self::assertMatchesRegularExpression('/^[A-Z2-7]+$/', $secret->reveal());
+        self::assertSame($bytes, strlen((string) Base32::decode($secret->reveal())));
+        self::assertNotSame($secret->reveal(), $other->reveal());
     }
 
     /**
@@ -511,14 +484,14 @@ final class TotpDriverTest extends TestCase
 
         $factor = new Factor;
 
-        $factor->setAttribute('secret', $this->driver()->startEnrollment($factor));
+        $factor->setAttribute('secret', $this->driver()->startEnrollment($factor)->reveal());
 
         $this->configuration()->set('mfa.totp', []);
 
         $code = AuthenticatorApp::code($factor);
 
         self::assertSame(8, strlen($code));
-        self::assertTrue($this->driver()->confirm($factor, $code));
+        self::assertSame(CodeCheck::ACCEPTED, $this->driver()->confirm($factor, $code, self::binding()));
         self::assertSame(intdiv(self::NOW, 60), $factor->getLastAcceptedStep());
     }
 
@@ -544,9 +517,9 @@ final class TotpDriverTest extends TestCase
      */
     public function testTheProvisioningUriCarriesTheLabelSecretAndParameters(): void
     {
-        $uri = $this->driver()->provisioningUri($this->factor(), 'Acme', self::ACCOUNT_NAME, AuthenticatorApp::SECRET);
+        $uri = $this->driver()->provisioningUri($this->factor(), 'Acme', self::ACCOUNT_NAME, new RevealedSecret(AuthenticatorApp::SECRET));
 
-        self::assertSame('otpauth://totp/Acme:user%40example.com?secret=' . AuthenticatorApp::SECRET . '&issuer=Acme&algorithm=SHA1&digits=6&period=30', $uri);
+        self::assertSame('otpauth://totp/Acme:user%40example.com?secret=' . AuthenticatorApp::SECRET . '&issuer=Acme&algorithm=SHA1&digits=6&period=30', $uri->reveal());
     }
 
     /**
@@ -559,9 +532,9 @@ final class TotpDriverTest extends TestCase
     {
         $factor = new TotpStubFactor(AuthenticatorApp::SECRET, 'sha256', 8, 60);
 
-        $uri = $this->driver()->provisioningUri($factor, 'Acme', self::ACCOUNT_NAME, AuthenticatorApp::SECRET);
+        $uri = $this->driver()->provisioningUri($factor, 'Acme', self::ACCOUNT_NAME, new RevealedSecret(AuthenticatorApp::SECRET));
 
-        self::assertStringEndsWith('&algorithm=SHA256&digits=8&period=60', $uri);
+        self::assertStringEndsWith('&algorithm=SHA256&digits=8&period=60', $uri->reveal());
     }
 
     /**
@@ -571,7 +544,7 @@ final class TotpDriverTest extends TestCase
      */
     public function testTheProvisioningUriEncodesTheIssuerOnce(): void
     {
-        $uri = $this->driver()->provisioningUri($this->factor(), 'Acme Co', self::ACCOUNT_NAME, AuthenticatorApp::SECRET);
+        $uri = $this->driver()->provisioningUri($this->factor(), 'Acme Co', self::ACCOUNT_NAME, new RevealedSecret(AuthenticatorApp::SECRET))->reveal();
 
         self::assertStringStartsWith('otpauth://totp/Acme%20Co:user%40example.com?', $uri);
         self::assertStringContainsString('&issuer=Acme%20Co&', $uri);
@@ -609,7 +582,7 @@ final class TotpDriverTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage($message);
 
-        $this->driver()->provisioningUri($this->factor(), $issuer, $accountName, AuthenticatorApp::SECRET);
+        $this->driver()->provisioningUri($this->factor(), $issuer, $accountName, new RevealedSecret(AuthenticatorApp::SECRET));
     }
 
     /**
@@ -623,7 +596,7 @@ final class TotpDriverTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('The factor holds no TOTP parameters; start its enrolment first.');
 
-        $this->driver()->provisioningUri(new TotpStubFactor(AuthenticatorApp::SECRET, null), 'Acme', self::ACCOUNT_NAME, AuthenticatorApp::SECRET);
+        $this->driver()->provisioningUri(new TotpStubFactor(AuthenticatorApp::SECRET, null), 'Acme', self::ACCOUNT_NAME, new RevealedSecret(AuthenticatorApp::SECRET));
     }
 
     /**
@@ -671,7 +644,7 @@ final class TotpDriverTest extends TestCase
      */
     private function driver(): TotpDriver
     {
-        return new TotpDriver(new TotpSettings($this->configuration()), $this->container());
+        return new TotpDriver(new TotpSettings($this->configuration()));
     }
 
     /**

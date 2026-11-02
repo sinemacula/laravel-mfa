@@ -77,4 +77,7 @@ enum FailureReason: string
     // The credential is associated as a factor already, so it can be neither
     // associated again nor changed in place
     case CREDENTIAL_ASSOCIATED = 'credential_associated';
+
+    // The destination is not one the factor's type can deliver codes to
+    case INVALID_DESTINATION = 'invalid_destination';
 }

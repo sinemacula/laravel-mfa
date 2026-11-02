@@ -70,7 +70,8 @@ the provider or another capability.
 - `src/*/*Bindings.php`: each capability's container wiring; `src/Drivers/DriverBindings.php` also builds the shipped
   drivers from config.
 - `src/Requirements/RequirementService.php`, `src/Factors/FactorService.php`, `src/Proofs/ProofService.php`,
-  `src/Verification/VerificationService.php`, `src/Enrollment/EnrollmentService.php`,
+  `src/Verification/VerificationService.php`, `src/Enrollment/EnrollmentService.php` (with `EnrollmentStarter.php` and
+  `EnrollmentConfirmer.php` behind it),
   `src/Lifecycle/LifecycleService.php`, `src/RecoveryCodes/RecoveryCodeService.php`: the capability services.
 - `src/Factors/FactorOwnership.php`, `src/Drivers/DriverResolver.php`,
   `src/Support/CurrentIdentity.php`, `src/Config/IntegerSetting.php`: what the services share.

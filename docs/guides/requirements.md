@@ -78,9 +78,10 @@ The package's own operations (`mfa.add_factor`, `mfa.replace_factor`, `mfa.remov
 `mfa.generate_recovery_codes`) ask for an additional verification made within 900 seconds unless the application sets
 them. An application names its own, and overrides the package's, in its `freshness` block (see
 [Applications](configuration.md#applications)): seconds for an additional verification within that age, or a
-requirement whose every part has a `max_age`. The package's own enrolment, removal and recovery-code calls do not ask
-for this yet; until the enrolment and lifecycle flows do, an application calls `Mfa::isFresh()` itself before calling
-them.
+requirement whose every part has a `max_age`. Starting an enrolment asks this for `mfa.add_factor`, and its grant lives
+no longer than the answer (see [Enrolment](enrollment.md)); generating recovery codes asks it for
+`mfa.generate_recovery_codes`. `Mfa::disable()` does not ask yet; until the lifecycle flow does, an application calls
+`Mfa::isFresh()` itself before calling it.
 
 A caller may pass a requirement of its own; the stricter of it and the configured one applies, either alone when the
 other is absent:

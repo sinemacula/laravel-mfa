@@ -66,7 +66,7 @@ final class DriverBindings
         // Laravel's `Manager::extend()` rebinds each closure to the manager, so
         // the factories are named by class rather than through `self::`, which
         // would then resolve to `MfaManager`.
-        $manager->extend('totp', fn (): TotpDriver => DriverBindings::totp($app, $config));
+        $manager->extend('totp', fn (): TotpDriver => DriverBindings::totp($config));
         $manager->extend('email', fn (): EmailDriver => DriverBindings::email($app, $config));
         $manager->extend('sms', fn (): SmsDriver => DriverBindings::sms($app, $config));
         $manager->extend('passkey', fn (): PasskeyDriver => new PasskeyDriver);
@@ -74,16 +74,14 @@ final class DriverBindings
 
     /**
      * Build the TOTP driver over the settings in `mfa.totp`, which it reads on
-     * every call, and the container it reads the current request's application
-     * from.
+     * every call.
      *
-     * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
      */
-    public static function totp(Application $app, Repository $config): TotpDriver
+    public static function totp(Repository $config): TotpDriver
     {
-        return new TotpDriver(new TotpSettings($config), $app);
+        return new TotpDriver(new TotpSettings($config));
     }
 
     /**

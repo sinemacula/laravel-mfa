@@ -24,8 +24,9 @@ factors starts with.
   `reenrollment_required`, the identity's `consecutive_failures` and `locked_until`, and `recovery_codes_generation`
   and `recovery_codes_generated_at`.
 - `mfa_enrollments`, one row per enrolment in progress: the pending `factor_id` (unique), owner, the SHA-256
-  `grant_hash` of its grant (unique), the `application` and `session_id` the grant is bound to, `expires_at` and its
-  confirmation `attempts`.
+  `grant_hash` of its grant (unique), the `application` it started through, the `session_id` (a keyed digest of the
+  sign-in's id) and verification `generation` the grant is bound to, the `authority` that authorised it, the
+  `challenge_id` its last code went out under, `expires_at`, set once, and its confirmation `attempts`.
 - `mfa_codes`, one row per challenge of a code sent by SMS or email: `factor_id`, owner, the `purpose`, `application`
   and session the code is bound to (`session_id`, a keyed digest of the session's id), its keyed `code_hash`, the
   challenge's `attempts`, how many codes it was `sends`, the last `sent_at` and every send's time (`sent_times`),

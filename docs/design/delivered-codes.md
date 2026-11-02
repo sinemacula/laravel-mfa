@@ -11,7 +11,9 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 - A code belongs to a challenge: one row of the codes table, bound to the factor and to a binding, a
   `Proofs\ProofBinding` of the identity (type and key), the application, the session and the purpose (`sign_in`,
   `reauthenticate`, `step_up` or `enrollment`). A code checked against any other factor, identity, application,
-  session or purpose is `missing`, even when its challenge is named, and such a check counts no attempt against it.
+  session or purpose is `missing`, even when its challenge is named, and such a check counts no attempt against it. A
+  challenge with the `enrollment` purpose is of a pending factor, and is admitted and counted apart (see
+  [Enrolment](enrollment.md)).
 - The code is `length` digits, each drawn with `random_int()`, stored only as `HMAC-SHA256(key', "code\0challenge
   id\0issue\0factor id\0identity type\0identity key\0application\0session id\0purpose\0code")`, compared with
   `hash_equals()`. The session is stored as `HMAC-SHA256(key'', session id)`, never the id itself, which is a bearer

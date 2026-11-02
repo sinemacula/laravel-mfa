@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Enrollment;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
@@ -178,7 +179,10 @@ final class StoredRecordModelsTest extends TestCase
     {
         $owner = ['authenticatable_type', 'authenticatable_id'];
 
-        self::assertSame(['factor_id', ...$owner, 'grant_hash', 'application', 'session_id', 'expires_at', 'attempts'], (new Enrollment)->getFillable());
+        self::assertSame(
+            ['factor_id', ...$owner, 'grant_hash', 'application', 'session_id', 'generation', 'authority', 'challenge_id', 'expires_at', 'attempts'],
+            (new Enrollment)->getFillable(),
+        );
         self::assertSame(
             ['factor_id', ...$owner, 'purpose', 'application', 'session_id', 'code_hash', 'attempts', 'sends', 'sent_at', 'sent_times', 'expires_at', 'consumed_at'],
             (new Code)->getFillable(),
@@ -220,6 +224,8 @@ final class StoredRecordModelsTest extends TestCase
         yield 'enrolment' => [Enrollment::class, 'mfa.enrollment.table', 'mfa_enrollments', ['grant_hash', 'session_id'], [
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',
+            'generation'           => 'integer',
+            'authority'            => EnrollmentAuthorization::class,
             'expires_at'           => 'datetime',
             'attempts'             => 'integer',
         ]];

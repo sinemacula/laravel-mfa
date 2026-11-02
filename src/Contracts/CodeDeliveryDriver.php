@@ -24,6 +24,17 @@ use Carbon\CarbonImmutable;
 interface CodeDeliveryDriver extends FactorDriver
 {
     /**
+     * The destination in the one form the factor keeps, and independence is
+     * compared in, or `null` when it is not a destination of this type. It is
+     * captured when the enrolment starts, and never resolved from the identity
+     * afterwards.
+     *
+     * @param  string  $destination
+     * @return ?string
+     */
+    public function normalizeDestination(#[\SensitiveParameter] string $destination): ?string;
+
+    /**
      * Deliver the code to the factor's destination. It stops working at the
      * time given. An exception is the delivery's failure, and the code is then
      * not kept.

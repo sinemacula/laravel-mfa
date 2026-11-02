@@ -39,7 +39,7 @@ final class PasskeyDriverTest extends TestCase
         self::assertSame(ChannelKind::PASSKEY, $driver->channelKind());
         self::assertSame([], $driver->amr());
         self::assertNull($driver->startEnrollment($factor));
-        self::assertFalse($driver->confirm($factor, '123456'));
+        self::assertSame(CodeCheck::INVALID, $driver->confirm($factor, '123456', new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::ENROLLMENT)));
         self::assertSame(CodeCheck::INVALID, $driver->verify($factor, '123456', new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::STEP_UP)));
     }
 }

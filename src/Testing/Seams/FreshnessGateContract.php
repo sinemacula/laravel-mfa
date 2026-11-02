@@ -11,7 +11,9 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 /**
  * What every `FreshnessGate` must guarantee, as assertions: a name that is not
  * an operation's, and an operation with no requirement from either side, are
- * never fresh, and a caller's requirement with no maximum age is refused.
+ * never fresh, a caller's requirement with no maximum age is refused, and how
+ * long a session is fresh is either nothing or a time still to come that the
+ * session is fresh until.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -69,5 +71,33 @@ final class FreshnessGateContract
         }
 
         Assert::assertInstanceOf(\InvalidArgumentException::class, $outcome, 'A caller\'s requirement with no maximum age must be refused.');
+    }
+
+    /**
+     * An operation that is not fresh has no time it is fresh until.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @return void
+     */
+    public static function assertAnOperationThatIsNotFreshHasNoDeadline(FreshnessGate $gate): void
+    {
+        Assert::assertFalse($gate->isFresh(self::UNCONFIGURED));
+        Assert::assertNull($gate->freshUntil(self::UNCONFIGURED), 'An operation that is not fresh must have no deadline.');
+    }
+
+    /**
+     * A deadline is not in the past, and the session is fresh while it holds.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @param  string  $operation
+     * @return void
+     */
+    public static function assertADeadlineIsAheadAndMeansFresh(FreshnessGate $gate, string $operation): void
+    {
+        $until = $gate->freshUntil($operation);
+
+        Assert::assertNotNull($until, 'A session fresh for the operation must say until when.');
+        Assert::assertFalse($until->isPast(), 'A deadline must not be in the past.');
+        Assert::assertTrue($gate->isFresh($operation), 'A session with a deadline must be fresh.');
     }
 }

@@ -27,9 +27,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * counts nothing, a nested one included, and the caller's transaction is left
  * as it was found; the identity's limit locks it, after which a failure counts
  * nothing more; a factor disabled at the failure ceiling is not challenged; a
- * consumed challenge answered again is never a success; and the counters
- * themselves refuse a call outside a transaction and a binding of another
- * identity.
+ * consumed challenge answered again is never a success; the counters themselves
+ * refuse a call outside a transaction and a binding of another identity; and a
+ * challenge for enrolling admits no confirmed factor and counts nothing.
  *
  * The closure given fails one challenge of the identity's factor through the
  * owner's own path, as a person submitting a wrong code would.
@@ -45,6 +45,39 @@ final class ChallengeCountersContract
      * Disallow instantiation; utility container only.
      */
     private function __construct() {}
+
+    /**
+     * Under a binding whose purpose is `enrollment`, a confirmed factor is
+     * refused and a pending one with no live enrolment too; and an outcome
+     * reported for one changes no failure count of the factor or the identity.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $confirmed
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $pending
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public static function assertAnEnrollmentChallengeIsItsOwn(
+        MultiFactorAuthenticatable $identity,
+        EloquentFactor&Model $confirmed,
+        EloquentFactor&Model $pending,
+        ProofBinding $binding,
+    ): void {
+        $enrolling = new ProofBinding($binding->identityType, $binding->identityKey, $binding->application, $binding->sessionId, Purpose::ENROLLMENT);
+        $before    = self::failures($confirmed);
+
+        DB::connection(StorageConnection::name())->transaction(static function () use ($identity, $confirmed, $pending, $enrolling): void {
+
+            Assert::assertFalse(self::admission($identity, $confirmed, $enrolling)->isAdmitted(), 'A confirmed factor must not be challenged for enrolling.');
+            Assert::assertFalse(self::admission($identity, $pending, $enrolling)->isAdmitted(), 'A pending factor with no live enrolment must not be challenged.');
+
+            self::counters()->report($identity, $confirmed, $enrolling, false);
+        });
+
+        Assert::assertSame($before, self::failures($confirmed), 'An enrolment challenge\'s outcome must change no factor\'s count.');
+    }
 
     /**
      * A failed challenge adds one to the factor's failures in a row.

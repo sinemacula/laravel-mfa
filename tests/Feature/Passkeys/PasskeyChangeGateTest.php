@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Feature\Passkeys;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,8 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
+use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
@@ -20,6 +23,8 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentAuthority;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Events\BootstrapEnrollmentCompleted;
 use SineMacula\Laravel\Mfa\Events\FactorConfirmed;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
 use SineMacula\Laravel\Mfa\Events\PasskeyAssociated;
@@ -28,6 +33,7 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Passkeys\CredentialId;
@@ -37,17 +43,25 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
+use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\Fixtures\Passkeys\StandInRegistrar;
+use Tests\Fixtures\Requirements\FixedIdentityRequirement;
 use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\CheckingCompletion;
 use Tests\Fixtures\Seams\FreshReauthenticator;
+use Tests\Fixtures\Seams\InterruptingProofStore;
 use Tests\Fixtures\Seams\RecordingSessionTransition;
+use Tests\Fixtures\Seams\RefusingCompletion;
 use Tests\TestCase;
 
 /**
@@ -66,6 +80,10 @@ use Tests\TestCase;
 #[CoversClass(PasskeyAssociations::class)]
 #[CoversClass(EnrollmentAuthority::class)]
 #[CoversClass(FactorRemoval::class)]
+#[CoversClass(SessionReevaluation::class)]
+#[CoversClass(RecoveryCodeIssuance::class)]
+#[CoversClass(ProofAcceptance::class)]
+#[CoversClass(ReenrollmentObligation::class)]
 #[CoversClass(RequiredFactorPolicy::class)]
 final class PasskeyChangeGateTest extends TestCase
 {
@@ -492,6 +510,36 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
+     * A removal that leaves the session short of its requirement hands the
+     * shortfall to the session transition.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testARemovalLeavingTheSessionShortReturnsItToPending(): void
+    {
+        $this->enablePasskeys();
+
+        $transition = new RecordingSessionTransition;
+
+        $this->container()->instance(SessionTransition::class, $transition);
+        $this->container()->instance(IdentityRequirement::class, new FixedIdentityRequirement(Requirement::none()->withPhishingResistance()));
+
+        $user    = $this->signedInPerson();
+        $totp    = $this->confirmedFactor($user);
+        $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        $this->stepUpWith($user, $totp);
+
+        $this->registrar()->remove($user, self::APPLICATION, self::CREDENTIAL);
+
+        self::assertFalse(Factor::query()->whereKey($passkey->id)->exists());
+        self::assertCount(1, $transition->returned);
+        self::assertSame(self::APPLICATION, $transition->returned[0][0]);
+    }
+
+    /**
      * While another factor remains, a step-up made only with the passkey being
      * removed does not authorise its removal; one made with the other factor
      * does, and the recovery codes and the session, still meeting its
@@ -797,6 +845,120 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
+     * A registration on the bootstrap path reports its own event, ends the
+     * obligation, and hands its proof to the completion, whose result comes
+     * back.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testABootstrapRegistrationCompletesThePendingSession(): void
+    {
+        Event::fake([BootstrapEnrollmentCompleted::class, FactorConfirmed::class, PasskeyAssociated::class]);
+
+        $this->enablePasskeys(['bootstrap' => ['enabled' => true, 'types' => ['passkey']]]);
+
+        $user = $this->signedInPerson();
+        $seam = new CheckingCompletion('pending-1', completion: new \stdClass);
+
+        $this->obligeToEnroll($user);
+        $this->pending($user, [PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT]);
+        $this->container()->instance(PendingCompletion::class, $seam);
+
+        $result = $this->registrar()->register($user, self::APPLICATION, $this->registration($user, session: 'pending-1'));
+
+        self::assertNotNull($result);
+        self::assertNotNull($result->verification);
+        self::assertSame('passkey', $result->verification->type);
+        self::assertSame(Purpose::ENROLLMENT, $result->verification->proof?->binding->purpose);
+        self::assertNotNull($result->verification->completion());
+        self::assertCount(1, $seam->accepted);
+        self::assertFalse(ReenrollmentObligation::isRequired($user));
+
+        Event::assertDispatched(BootstrapEnrollmentCompleted::class);
+    }
+
+    /**
+     * A registration on an active session reports no bootstrap, reaches no
+     * completion, and ends the obligation too.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnActiveRegistrationIsNoBootstrap(): void
+    {
+        Event::fake([BootstrapEnrollmentCompleted::class, FactorConfirmed::class, PasskeyAssociated::class]);
+
+        $this->enablePasskeys();
+
+        $user = $this->signedInPerson();
+
+        $this->obligeToEnroll($user);
+        $this->reauthenticate();
+
+        $result = $this->registrar()->register($user, self::APPLICATION, $this->registration($user));
+
+        self::assertNotNull($result);
+        self::assertNull($result->verification);
+        self::assertFalse(ReenrollmentObligation::isRequired($user));
+
+        Event::assertNotDispatched(BootstrapEnrollmentCompleted::class);
+    }
+
+    /**
+     * A completion's refusal rolls the registration back with its factor.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACompletionsRefusalRollsTheRegistrationBack(): void
+    {
+        $this->enablePasskeys(['bootstrap' => ['enabled' => true, 'types' => ['passkey']]]);
+
+        $user = $this->signedInPerson();
+
+        $this->obligeToEnroll($user);
+        $this->pending($user, [PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT]);
+        $this->container()->instance(PendingCompletion::class, new RefusingCompletion(new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'The session refused it.')));
+
+        self::assertSame(
+            FailureReason::NOT_ACCEPTED,
+            $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user, session: 'pending-1'))),
+        );
+
+        self::assertSame(0, Factor::query()->count());
+        self::assertFalse(StandInRegistrar::stores($user, self::CREDENTIAL));
+        self::assertTrue(ReenrollmentObligation::isRequired($user));
+    }
+
+    /**
+     * A sign-in that changes between the first look and the lock registers
+     * nothing.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASignInChangedBeforeTheLockRegistersNothing(): void
+    {
+        $this->enablePasskeys();
+
+        $user = $this->signedInPerson();
+
+        $this->reauthenticate();
+        $this->container()->instance(ProofStore::class, new InterruptingProofStore($this->container()->make(ProofStore::class), 1, 'sign-in-b'));
+
+        self::assertSame(
+            FailureReason::NOT_FOUND,
+            $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user))),
+        );
+        self::assertSame(0, Factor::query()->count());
+    }
+
+    /**
      * Bind a reauthenticator that proves the password again, the given number
      * of seconds ago.
      *
@@ -815,6 +977,22 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
+     * Set the identity's obligation to enrol again.
+     *
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @return void
+     */
+    private function obligeToEnroll(TestUser $user): void
+    {
+        $owner = ProofOwner::of($user);
+
+        IdentityState::query()->updateOrCreate(
+            ['authenticatable_type' => $owner->type, 'authenticatable_id' => $owner->key],
+            ['reenrollment_required' => true],
+        );
+    }
+
+    /**
      * Make every request carry a pending session of the user's, in its own
      * session, allowing the given actions.
      *
@@ -827,8 +1005,18 @@ final class PasskeyChangeGateTest extends TestCase
         $proofs = SignInProofs::of($user)->inSession('pending-1');
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(
-            new PendingContext($user, self::APPLICATION, 'pending-1', $proofs->password(), Requirement::none()->withAdditionalVerification(), $actions),
+            new PendingContext(
+                $user,
+                self::APPLICATION,
+                'pending-1',
+                $proofs->password(),
+                Requirement::none()->withAdditionalVerification(),
+                $actions,
+                CarbonImmutable::now()->addHour(),
+            ),
         ));
+
+        $this->container()->make(ProofStore::class)->begin($user, self::APPLICATION, 'pending-1');
     }
 
     /**

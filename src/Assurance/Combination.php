@@ -178,6 +178,20 @@ final readonly class Combination
     }
 
     /**
+     * The last instant the given answer holds for the combination under the
+     * given maximum age in seconds, or `null` when the combination does not
+     * give it at all.
+     *
+     * @param  \Closure(self): bool  $answer
+     * @param  int  $maxAge
+     * @return ?\Carbon\CarbonImmutable
+     */
+    public function heldUntil(\Closure $answer, int $maxAge): ?CarbonImmutable
+    {
+        return $answer($this) ? $this->evidenceFor($answer)->addSeconds($maxAge) : null;
+    }
+
+    /**
      * When the evidence for the given answer was made: the first factor's time
      * when it gives the answer on its own and the further proof does not, and
      * otherwise the time of the proof that completes the combination.

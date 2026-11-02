@@ -52,8 +52,9 @@ final class AbstractCodeDriverTest extends TestCase
     {
         $factor = new InMemoryFactor(type: 'email', destination: 'ada@example.test');
 
-        yield 'confirm' => [static fn (RecordingCodeDriver $driver): bool => $driver->confirm($factor, '123456'), 'confirmed'];
         $binding = new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::STEP_UP);
+
+        yield 'confirm' => [static fn (RecordingCodeDriver $driver): CodeCheck => $driver->confirm($factor, '123456', $binding), 'confirmed'];
 
         yield 'verify' => [static fn (RecordingCodeDriver $driver): CodeCheck => $driver->verify($factor, '123456', $binding), 'checked'];
     }

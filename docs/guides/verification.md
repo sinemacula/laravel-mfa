@@ -154,6 +154,8 @@ through `reference()`: `dump()`, `dd()`, `print_r()`, `var_dump()`, `var_export(
 | Unknown or foreign challenge                     | `not_found`        | yes                  | yes         |
 | A seam's refusal                                 | the seam's reason  | yes                  | rolled back |
 
+Confirming an enrolment reports the same way, with its own reasons and its own cap (see [Enrolment](enrollment.md)).
+
 A counted failure also keeps its slot of the address's window; everything else gives it back. A factor or an identity at
 the failure ceiling is `locked` with no time: it does not lift by itself. An identity's ceiling blocks recovery codes
 while another usable factor can still recover the identity.

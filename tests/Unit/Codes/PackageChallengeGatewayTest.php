@@ -115,7 +115,15 @@ final class PackageChallengeGatewayTest extends TestCase
         $proofs = SignInProofs::of($this->user)->inSession(self::CHALLENGE_SESSION);
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(
-            new PendingContext($this->user, 'web', self::CHALLENGE_SESSION, $proofs->password(), Requirement::none(), [PendingAction::LIST_FACTORS]),
+            new PendingContext(
+                $this->user,
+                'web',
+                self::CHALLENGE_SESSION,
+                $proofs->password(),
+                Requirement::none(),
+                [PendingAction::LIST_FACTORS],
+                CarbonImmutable::now()->addHour(),
+            ),
         ));
 
         self::assertFalse($this->gateway()->verify($this->factor, $this->emailBinding($this->user), 'challenge-1', '123456')->hasPassed());
@@ -170,7 +178,15 @@ final class PackageChallengeGatewayTest extends TestCase
         $proofs = SignInProofs::of($this->user)->onApplication('admin')->inSession('pending-1');
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(
-            new PendingContext($this->user, 'admin', 'pending-1', $proofs->password(), Requirement::none(), [PendingAction::SEND_CODE, PendingAction::VERIFY]),
+            new PendingContext(
+                $this->user,
+                'admin',
+                'pending-1',
+                $proofs->password(),
+                Requirement::none(),
+                [PendingAction::SEND_CODE, PendingAction::VERIFY],
+                CarbonImmutable::now()->addHour(),
+            ),
         ));
 
         $active = $this->emailBinding($this->user);

@@ -49,6 +49,20 @@ final class EmailDriver extends AbstractCodeDriver
     }
 
     /**
+     * The address trimmed and in lower case, or `null` when it is not one.
+     *
+     * @param  string  $destination
+     * @return ?string
+     */
+    #[\Override]
+    public function normalizeDestination(#[\SensitiveParameter] string $destination): ?string
+    {
+        $address = mb_strtolower(trim($destination));
+
+        return filter_var($address, FILTER_VALIDATE_EMAIL, FILTER_FLAG_EMAIL_UNICODE) === false ? null : $address;
+    }
+
+    /**
      * Get the configured message class.
      *
      * @return class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>

@@ -6,6 +6,9 @@ namespace Tests\Fixtures\Drivers\Concerns;
 
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
  * The parts of the `FactorDriver` contract a test driver rarely needs: an
@@ -43,24 +46,23 @@ trait DescribesNoChannel
      * No secret to start an enrolment with.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return ?string
+     * @return ?\SineMacula\Laravel\Mfa\Secrets\RevealedSecret
      */
-    public function startEnrollment(Factor $factor): ?string
+    public function startEnrollment(Factor $factor): ?RevealedSecret
     {
         return null;
     }
 
     /**
-     * No confirmation.
+     * Confirmed as it is verified.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @return bool
-     *
-     * @imperative
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      */
-    public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool
+    public function confirm(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck
     {
-        return false;
+        return $this->verify($factor, $code, $binding);
     }
 }

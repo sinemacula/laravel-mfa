@@ -38,15 +38,15 @@ whatever UI you like.
   machine-readable failure reason. See [Verification](docs/guides/verification.md).
 - **Events**: a catalogue of events for the verification, recovery code and lifecycle flows, each carrying a scalar
   context and no secret, dispatched once its change commits (see [Events](docs/guides/events.md)), with
-  `MfaFactorEnrolled` and `MfaFactorDisabled` until the enrolment and lifecycle flows join it.
+  `MfaFactorDisabled` until the lifecycle flow joins it.
 - **Polymorphic identity support**: works with any Eloquent identity type (`User`, `Admin`, ...) via the
   shipped `authenticatable_type` / `authenticatable_id` morph.
 - **Encrypted at rest**: the factor `secret` column is `encrypted`-cast; recovery codes are stored only as salted
   hashes made with the application's hasher; email and SMS codes are stored only as keyed hashes bound to their factor,
   session, application and purpose, and the package's email code message encrypts its payload whenever it is queued.
-- **Secrets shown once**: a value that refuses to be serialised, cast or dumped, which recovery codes are returned in
-  and the planned enrolment flow will return secrets in (until then the TOTP driver returns plain strings the caller
-  must not log, dump or serialise), a response helper and an `mfa.no-store` middleware that no cache keeps, and the
+- **Secrets shown once**: a value that refuses to be serialised, cast or dumped, which recovery codes and the
+  enrolment flow's TOTP secret, provisioning URI and grant are returned in, a response helper and an `mfa.no-store`
+  middleware that no cache keeps, and the
   redaction of secrets, codes and full destinations from logs, exception messages and traces, delivery failures
   included (see [Secrets](docs/guides/secrets.md)).
 - **Attempt caps and lockouts**: failures are counted per factor, per identity and per IP address in the database, with
@@ -159,7 +159,12 @@ Mfa::verify(Submission::challenge($factorId, $challengeId, $code)); // an email 
 Mfa::verify(Submission::recoveryCode($code));                       // one attempt against the whole unused set
 Mfa::verify(Submission::assertion($factorId, $response));           // a passkey
 
-Mfa::enroll($factor);                   // MfaFactorEnrolled
+Mfa::startEnrollment($request);         // a pending factor, its grant and, by type, secrets or a first code
+Mfa::confirmEnrollment($grant, $code);  // the factor, and recovery codes with the first one
+Mfa::resendEnrollmentCode($grant);      // the code again, renewing nothing
+Mfa::cancelEnrollment($grant);          // the pending factor gone
+Mfa::renameFactor($factorId, $label);   // no step-up
+Mfa::setPreferredFactor($factorId);     // offered first; no step-up
 Mfa::disable($factor);                  // MfaFactorDisabled; the recovery codes go with the last factor
 Mfa::generateRecoveryCodes();           // list<RevealedSecret>, returned once, on a fresh session at the level
 Mfa::recoveryCodes();                   // RecoveryCodeStatus|null: remaining, generation, generatedAt
@@ -209,39 +214,36 @@ $this->renderable(function (MfaRequiredException $e) {
 
 ### TOTP enrolment
 
-Start the enrolment on a fresh `Factor`, which stamps the TOTP parameters it will keep (`mfa.totp`'s algorithm,
-digits and period) and returns a new secret. Store the secret on the factor, render its provisioning URI as a QR code,
-confirm the first code the person's authenticator app shows, then hand the factor to `Mfa::enroll()`:
+Start the enrolment, which makes a pending factor and returns its secret, provisioning URI and grant once, as
+`RevealedSecret` values for a response no cache keeps. Render the URI as a QR code, then confirm with the first code the
+person's authenticator app shows:
 
 ```php
+use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
-use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
 
-$factor        = new Factor;
-$factor->type  = 'totp';
-$factor->label = 'Authenticator app';
+$start = Mfa::startEnrollment(EnrollmentRequest::totp($user->email, label: 'Authenticator app'));
 
-$driver         = Mfa::driver('totp');
-$factor->secret = $driver->startEnrollment($factor);
-
-$uri = $driver->provisioningUri(
-    factor: $factor,
-    issuer: config('app.name'),
-    accountName: $user->email,
-    secret: $factor->secret,
-);
-
-// Render $uri as a QR code with your library of choice, then check the
-// first code the app shows. Its time step is recorded, so the same code
-// cannot be used again. Enrol the factor only once the code is confirmed.
-if (! $driver->confirm($factor, $request->string('code')->toString())) {
-    return back()->withErrors(['code' => 'The code is not valid. Try the next one your app shows.']);
+if (! $start->hasStarted()) {
+    return response()->json(['reason' => $start->reason->value], 422);
 }
 
-// `Mfa::enroll()` stamps the identity's morph columns itself —
-// callers do not (and should not) populate them.
-Mfa::enroll($factor);
+return SecretResponse::json([
+    'grant'            => $start->grant,
+    'secret'           => $start->secret,
+    'provisioning_uri' => $start->provisioningUri,
+]);
+
+// Then, with what the person sends back. Its time step is recorded, so the same
+// code cannot be used again.
+$confirmation = Mfa::confirmEnrollment($request->string('grant'), $request->string('code'));
+
+return SecretResponse::json(['recovery_codes' => $confirmation->recoveryCodes]);
 ```
+
+A start needs a fresh step-up, or for the first factor the first factor proved again, or the bootstrap path on a pending
+sign-in. The grant lives no longer than that authority. See [Enrolment](docs/guides/enrollment.md).
 
 The package computes TOTP codes itself (RFC 6238) and needs no other dependency. Each code is checked against the
 application's `totp_window` steps either side of now (`mfa.totp.window` when it sets none), and each time step is

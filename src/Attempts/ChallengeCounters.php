@@ -9,6 +9,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
@@ -18,7 +19,9 @@ use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\OpenTransaction;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
+use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Factors\FactorChannel;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -51,6 +54,14 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * verification of the package's own would, without an IP address (an owner's
  * per-address limits are its own), and dispatches the lockout and failure
  * ceiling events once the owner's transaction commits.
+ *
+ * A binding whose purpose is `enrollment` inverts the admission, so a challenge
+ * for enrolling is never one for signing in or the reverse: the factor must be
+ * pending, not confirmed, holding a live enrolment bound to the binding and
+ * served to who is asking, of a type the application enables, with no question
+ * of the combination policy, and refused only while the identity's lockout is
+ * live. Its `report()` changes no factor's or identity's count, as the
+ * enrolment has an attempt cap of its own.
  *
  * Stateless: the configuration and the seams are read on every call.
  *
@@ -164,6 +175,10 @@ final readonly class ChallengeCounters
 
         OperationRefusedException::unless(ProofOwner::of($identity)->owns($binding), FailureReason::NOT_FOUND, 'The challenge\'s binding names another identity.');
 
+        if ($binding->purpose === Purpose::ENROLLMENT) {
+            return $passed ? AttemptOutcome::pass() : AttemptOutcome::fail();
+        }
+
         return $this->attempts->attempt(
             new Attempt($identity, $factor, $binding->purpose, $binding->application),
             static fn (): bool => $passed,
@@ -208,15 +223,47 @@ final readonly class ChallengeCounters
      */
     private function factorAdmission(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): ChallengeAdmission
     {
-        $refusal = $this->factorRefusal($identity, $factor, $binding);
+        $enrolling = $binding->purpose === Purpose::ENROLLMENT;
+        $refusal   = $enrolling ? $this->enrollingRefusal($identity, $factor, $binding) : $this->factorRefusal($identity, $factor, $binding);
 
         if ($refusal !== null) {
             return $refusal;
         }
 
-        $lockout = $this->attempts->lockedOut($identity, $factor);
+        $lockout = $this->attempts->lockedOut($identity, $enrolling ? null : $factor);
 
         return $lockout === null ? ChallengeAdmission::admit() : ChallengeAdmission::locked($lockout);
+    }
+
+    /**
+     * Refuse a stored factor being enrolled unless it is pending, of a type the
+     * binding's application enables, and holds a live enrolment bound to the
+     * binding and served to who is asking.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return ?\SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private function enrollingRefusal(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): ?ChallengeAdmission
+    {
+        if (!(new ApplicationSettings($this->config, $binding->application))->enables($factor->getType())) {
+            return ChallengeAdmission::refuse(FailureReason::TYPE_NOT_ENABLED, sprintf('The application does not enable the factor\'s type [%s].', $factor->getType()));
+        }
+
+        $enrollments = $this->container->make(PendingEnrollments::class);
+        $pending     = $this->container->make(CallerContextResolver::class)->pending() !== null;
+        $enrollment  = $factor->isConfirmed() ? null : $enrollments->forFactor((string) LockedFactors::idOf($factor));
+
+        if ($enrollment === null || !$enrollments->isBound($enrollment, $binding, $pending)) {
+            return ChallengeAdmission::refuse(FailureReason::NOT_FOUND, 'The factor holds no enrolment bound to the challenge.');
+        }
+
+        return $enrollments->isLive($enrollment, $identity) ? null : ChallengeAdmission::refuse(FailureReason::EXPIRED, 'The factor\'s enrolment has expired.');
     }
 
     /**

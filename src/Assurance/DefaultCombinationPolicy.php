@@ -33,7 +33,9 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  * authenticator. A requirement part is met when one combination provides it on
  * evidence within the part's maximum age: a fresh further proof refreshes what
  * it completes or gives on its own, never what an old first factor gives on its
- * own, and a fresh first factor never stands in for an additional factor.
+ * own, and a fresh first factor never stands in for an additional factor. When
+ * every part is met, the evaluation says when the first part bounded by a
+ * maximum age stops being met.
  *
  * The proofs must hold exactly one first factor, on a known channel: without
  * one, or with more, nothing is accepted and no level is established. A proof
@@ -107,6 +109,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
             amr: self::amr($combinations, $accepted, $multifactor),
             met: $met,
             unmet: $unmet,
+            metUntil: $unmet === [] ? self::metUntil($requirement, $combinations) : null,
         );
     }
 
@@ -392,6 +395,61 @@ final class DefaultCombinationPolicy implements CombinationPolicy
         }
 
         return false;
+    }
+
+    /**
+     * When the combinations stop meeting a requirement they meet now: the
+     * earliest of the times each part bounded by a maximum age stops being met,
+     * or `null` when none is bounded.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
+     * @param  list<\SineMacula\Laravel\Mfa\Assurance\Combination>  $combinations
+     * @return ?\Carbon\CarbonImmutable
+     */
+    private static function metUntil(Requirement $requirement, array $combinations): ?CarbonImmutable
+    {
+        $until = null;
+
+        foreach ($requirement->parts() as $part) {
+            $maxAge = $requirement->maxAge($part);
+            $held   = $maxAge === null ? null : self::partHeldUntil($requirement, $part, $maxAge, $combinations);
+
+            if ($held === null || ($until !== null && $held->greaterThanOrEqualTo($until))) {
+                continue;
+            }
+
+            $until = $held;
+        }
+
+        return $until;
+    }
+
+    /**
+     * When a part stops being met: the latest time any combination providing it
+     * holds it until.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
+     * @param  \SineMacula\Laravel\Mfa\Enums\RequirementPart  $part
+     * @param  int  $maxAge
+     * @param  list<\SineMacula\Laravel\Mfa\Assurance\Combination>  $combinations
+     * @return ?\Carbon\CarbonImmutable
+     */
+    private static function partHeldUntil(Requirement $requirement, RequirementPart $part, int $maxAge, array $combinations): ?CarbonImmutable
+    {
+        $provides = static fn (Combination $combination): bool => self::provides($combination, $part, $requirement->minimumLevel);
+        $latest   = null;
+
+        foreach ($combinations as $combination) {
+            $held = $combination->heldUntil($provides, $maxAge);
+
+            if ($held === null || ($latest !== null && $held->lessThanOrEqualTo($latest))) {
+                continue;
+            }
+
+            $latest = $held;
+        }
+
+        return $latest;
     }
 
     /**

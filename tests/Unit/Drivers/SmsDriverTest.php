@@ -41,6 +41,25 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
+     * A phone number loses its spaces, dashes and parentheses, and what is not
+     * in E.164 once they are gone is refused: no country code is assumed.
+     *
+     * @return void
+     */
+    public function testAPhoneNumberIsNormalised(): void
+    {
+        $driver = new SmsDriver(new FakeSmsSender);
+
+        self::assertSame(self::PHONE, $driver->normalizeDestination(' +44 (7700)-900 123 '));
+        self::assertSame('+12345678', $driver->normalizeDestination('+12345678'));
+        self::assertSame('+123456789012345', $driver->normalizeDestination('+123456789012345'));
+
+        foreach (['07700900123', '+1234567', '+1234567890123456', '+01234567890', '+4477009001x', "+447700900123\n", ''] as $invalid) {
+            self::assertNull($driver->normalizeDestination($invalid), $invalid);
+        }
+    }
+
+    /**
      * The code goes to the factor's phone number in the shipped message.
      *
      * @return void

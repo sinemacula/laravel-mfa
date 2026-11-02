@@ -16,6 +16,9 @@ are described here.
   the session and the factor's owner first: `VerificationService::verify()` verifies only the current identity's own
   factor and refuses another's with `FactorOwnershipMismatchException` before anything is counted, so nobody is charged
   for an attempt someone else made.
+- Confirming an enrolment is not one of these attempts: it takes an IP address slot, and counts a wrong or replayed code
+  against the enrolment's own cap, never the factor's or the identity's run (see [Enrolment](enrollment.md)). A live
+  lockout of the identity still refuses it, a start and a resend.
 - An attempt is counted against three scopes (`Enums\AttemptScope`):
   - the factor: `consecutive_failures` on its row, its failures in a row. From `mfa.attempts.factor_limit` on, each
     failure locks it for `lockout_seconds`, recorded as a row of `mfa_attempts` (scope `factor`) whose window ends when

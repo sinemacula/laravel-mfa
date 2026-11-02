@@ -50,4 +50,20 @@ final class ReenrollmentObligation
 
         return filter_var($required, FILTER_VALIDATE_BOOLEAN);
     }
+
+    /**
+     * End the identity's obligation, as confirming a factor does. Called inside
+     * the identity's factor state transaction, it commits or rolls back with
+     * the confirmation.
+     *
+     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public static function end(Authenticatable $identity): void
+    {
+        IdentityStateRow::of(ProofOwner::of($identity))->update([self::COLUMN => false]);
+    }
 }

@@ -13,13 +13,16 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\Lockout;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
+use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\VerificationFailed;
 use SineMacula\Laravel\Mfa\Events\VerificationPassed;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Drivers\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
@@ -132,7 +135,7 @@ final class TotpLifecycleTest extends TestCase
         $driver = Mfa::driver('totp');
 
         self::assertInstanceOf(TotpDriver::class, $driver);
-        self::assertTrue($driver->confirm($factor, $code));
+        self::assertSame(CodeCheck::ACCEPTED, $driver->confirm($factor, $code, new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::ENROLLMENT)));
         self::assertSame(60000000, $factor->refresh()->getLastAcceptedStep());
         self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isFailed());
         self::assertTrue(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->isVerified());

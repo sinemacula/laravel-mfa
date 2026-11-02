@@ -57,6 +57,22 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
+     * An address is trimmed and put in lower case, and what is not one is
+     * refused.
+     *
+     * @return void
+     */
+    public function testAnAddressIsNormalised(): void
+    {
+        $driver = new EmailDriver(new FakeEmailSender);
+
+        self::assertSame('ada@example.test', $driver->normalizeDestination("  Ada@Example.TEST\n"));
+        self::assertSame('émile@example.test', $driver->normalizeDestination('ÉMILE@example.test'));
+        self::assertNull($driver->normalizeDestination('ada.example.test'));
+        self::assertNull($driver->normalizeDestination(''));
+    }
+
+    /**
      * The code goes to the factor's address in the shipped message, and no
      * other.
      *

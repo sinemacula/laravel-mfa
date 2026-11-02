@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Contracts;
 
+use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
@@ -31,6 +32,12 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  * layer's freshness check) must apply the stricter of that and its own setting,
  * never either alone, and keep no state between calls.
  *
+ * `freshUntil()` asks the same question and says how long the answer lasts, so
+ * what an answer authorises can live no longer than the proofs it rests on: an
+ * enrolment grant stores it once and never asks again, since a later proof must
+ * not bring an expired grant back. A gate that cannot say answers `null`, and
+ * what depends on it is refused.
+ *
  * @api
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -48,4 +55,18 @@ interface FreshnessGate
      * @throws \InvalidArgumentException
      */
     public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool;
+
+    /**
+     * The instant the current session stops being fresh for the operation on
+     * the proofs it holds now, or `null` when it is not fresh, or the gate
+     * cannot say. An answer that is not `null` implies `isFresh()` is `true`,
+     * and is never in the past.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+     * @return ?\Carbon\CarbonImmutable
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function freshUntil(string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable;
 }

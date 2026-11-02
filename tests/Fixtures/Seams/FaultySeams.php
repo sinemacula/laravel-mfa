@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Seams;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
@@ -56,6 +57,19 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool
     {
         return true;
+    }
+
+    /**
+     * A deadline already past, however fresh it says the session is.
+     *
+     * @param  string  $operation
+     * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+     * @return \Carbon\CarbonImmutable
+     */
+    #[\Override]
+    public function freshUntil(string $operation, ?Requirement $callerRequirement = null): CarbonImmutable
+    {
+        return CarbonImmutable::now()->subHour();
     }
 
     /**

@@ -349,7 +349,7 @@ final class TotpReplayRaceTest extends TestCase
      */
     private function driver(): TotpDriver
     {
-        return new TotpDriver(new TotpSettings($this->container()->make(Repository::class)), $this->container());
+        return new TotpDriver(new TotpSettings($this->container()->make(Repository::class)));
     }
 
     /**

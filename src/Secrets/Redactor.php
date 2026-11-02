@@ -16,9 +16,9 @@ use Illuminate\Contracts\Support\Arrayable;
  * destination (`secret`, `totp_secret`, `code`, `codes`, `otp`,
  * `one_time_code`, `recovery_code`, `recovery_codes`, `destination`, `address`,
  * `email`, `phone`, `phone_number`, `to`, `recipient`, `provisioning_uri`,
- * `otpauth_uri`, compared without case, underscores, hyphens or spaces, so
- * `recoveryCodes` and `phoneNumber` count). An `otpauth://` provisioning URI is
- * redacted wherever it appears in a string.
+ * `otpauth_uri`, `grant`, `enrollment_grant`, compared without case,
+ * underscores, hyphens or spaces, so `recoveryCodes` and `phoneNumber` count).
+ * An `otpauth://` provisioning URI is redacted wherever it appears in a string.
  *
  * In a log's values, an exception is scrubbed in place by `ExceptionScrubber`,
  * of the sensitive values the record holds too, a date or an enum is kept, and
@@ -55,6 +55,8 @@ final class Redactor
         'codes',
         'destination',
         'email',
+        'enrollmentgrant',
+        'grant',
         'onetimecode',
         'otp',
         'otpauthuri',

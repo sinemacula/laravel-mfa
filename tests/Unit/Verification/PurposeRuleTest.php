@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Verification;
 
+use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -60,7 +61,15 @@ final class PurposeRuleTest extends TestCase
         $identity = new NonEloquentIdentity;
 
         $context = $pending
-            ? new PendingContext($identity, 'web', 'pending-1', SignInProofs::of($identity)->inSession('pending-1')->password(), Requirement::none(), [])
+            ? new PendingContext(
+                $identity,
+                'web',
+                'pending-1',
+                SignInProofs::of($identity)->inSession('pending-1')->password(),
+                Requirement::none(),
+                [],
+                CarbonImmutable::now()->addHour(),
+            )
             : null;
 
         self::assertSame($expected, PurposeRule::resolve(new Caller($identity, $context), $requested));

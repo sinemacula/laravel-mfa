@@ -592,6 +592,22 @@ final class RequirementServiceTest extends TestCase
 
                 return $this->answer;
             }
+
+            /**
+             * Record the question and answer it with the end of the next
+             * minute.
+             *
+             * @param  string  $operation
+             * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
+             * @return ?\Carbon\CarbonImmutable
+             */
+            #[\Override]
+            public function freshUntil(string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
+            {
+                ($this->record)($operation, $callerRequirement);
+
+                return $this->answer ? CarbonImmutable::now()->addMinute() : null;
+            }
         };
     }
 

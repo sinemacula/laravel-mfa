@@ -4,17 +4,22 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Testing\Seams;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
+use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
+use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
+use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
@@ -66,6 +71,34 @@ final class ChallengeCountersContractTest extends TestCase
         parent::setUp();
 
         [$this->user, $this->factor, $this->mailbox] = $this->arrangeEmailChallenges();
+    }
+
+    /**
+     * The kit rejects a pending factor that holds a live enrolment as one with
+     * none, as it would a gateway's admission of it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRejectsAFactorAnEnrollmentChallengeWouldAdmit(): void
+    {
+        $pending = $this->pendingFactor();
+        $binding = $this->countedBinding();
+
+        $this->container()->make(PendingEnrollments::class)->create(
+            (string) LockedFactors::idOf($pending),
+            hash('sha256', 'grant'),
+            new ProofBinding($binding->identityType, $binding->identityKey, $binding->application, $binding->sessionId, Purpose::ENROLLMENT),
+            0,
+            EnrollmentAuthorization::STEP_UP,
+            CarbonImmutable::now()->addHour(),
+        );
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A pending factor with no live enrolment must not be challenged.');
+
+        ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->user, $this->factor, $pending, $binding);
     }
 
     /**
@@ -351,6 +384,22 @@ final class ChallengeCountersContractTest extends TestCase
     protected function countedFactor(): EloquentFactor&Model
     {
         return $this->factor;
+    }
+
+    /**
+     * A pending factor of the person's, holding no enrolment.
+     *
+     * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
+     */
+    #[\Override]
+    protected function pendingFactor(): EloquentFactor&Model
+    {
+        return Factor::query()->create([
+            'authenticatable_type' => $this->user->getMorphClass(),
+            'authenticatable_id'   => (string) $this->user->id,
+            'type'                 => 'email',
+            'destination'          => 'pending@example.test',
+        ]);
     }
 
     /**

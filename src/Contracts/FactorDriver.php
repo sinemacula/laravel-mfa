@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
  * Factor driver contract.
@@ -49,26 +50,28 @@ interface FactorDriver
     public function amr(): array;
 
     /**
-     * Start an enrolment of the pending factor, returning the secret the caller
-     * stores on it and shows the person once (a TOTP shared secret), or `null`
-     * when the type has none.
+     * Start an enrolment of the pending factor, returning the secret the
+     * enrolment stores encrypted on it and shows the person once (a TOTP shared
+     * secret), or `null` when the type has none. The driver only returns it,
+     * and stamps what the factor needs to keep on the factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @return ?string
+     * @return ?\SineMacula\Laravel\Mfa\Secrets\RevealedSecret
      */
-    public function startEnrollment(Factor $factor): ?string;
+    public function startEnrollment(Factor $factor): ?RevealedSecret;
 
     /**
-     * Confirm the pending factor with the first code the person submits: the
-     * proof that they hold what was enrolled.
+     * Confirm the pending factor with the first code the person submits, under
+     * the binding of the enrolment: the proof that they hold what was enrolled.
+     * It answers as `verify()` does, and a write it makes stays in the
+     * transaction a later refusal rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
-     * @return bool
-     *
-     * @imperative
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Enums\CodeCheck
      */
-    public function confirm(Factor $factor, #[\SensitiveParameter] string $code): bool;
+    public function confirm(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck;
 
     /**
      * Verify the code against the factor as stored under the identity's factor

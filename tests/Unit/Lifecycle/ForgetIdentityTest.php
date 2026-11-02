@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Database\TableNames;
+use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 use SineMacula\Laravel\Mfa\Lifecycle\ForgetIdentity;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Enrollment;
@@ -153,7 +154,16 @@ final class ForgetIdentityTest extends TestCase
 
         $factor = Factor::query()->create([...$owner, 'type' => 'totp']);
 
-        Enrollment::query()->create([...$owner, 'factor_id' => $factor->id, 'grant_hash' => hash('sha256', $factor->id), 'application' => 'web', 'expires_at' => $now]);
+        Enrollment::query()->create([
+            ...$owner,
+            'factor_id'   => $factor->id,
+            'grant_hash'  => hash('sha256', $factor->id),
+            'application' => 'web',
+            'session_id'  => 'sign-in-digest',
+            'generation'  => 0,
+            'authority'   => EnrollmentAuthorization::STEP_UP,
+            'expires_at'  => $now,
+        ]);
         Code::query()->create([
             ...$owner,
             'factor_id'   => $factor->id,
