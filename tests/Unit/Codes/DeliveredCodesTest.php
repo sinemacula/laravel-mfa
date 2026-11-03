@@ -474,6 +474,33 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
+     * A refusal under the identity's cap waits for its sends to leave the
+     * window oldest first, whichever of its challenges they were made for: a
+     * resend of the first challenge, made after the second challenge's send,
+     * leaves after it.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testTheIdentityCapWaitsForItsOldestSendsFirst(): void
+    {
+        $codes = $this->codes(['resend_cooldown_seconds' => 0], ['111111', '222222', '333333']);
+        $now   = self::now();
+
+        self::issued($codes->issue('01jfactor0000000000000000e1', self::binding(), $now));
+        self::issued($codes->issue('01jfactor0000000000000000e2', self::binding(), $now->addSeconds(10)));
+
+        $resent = self::issued($codes->issue('01jfactor0000000000000000e1', self::binding(), $now->addSeconds(20)));
+
+        self::assertSame([$now->getTimestamp(), $now->addSeconds(20)->getTimestamp()], self::row($resent)->sent_times);
+
+        $capped = $this->codes(['identity_send_limit' => 2], ['444444']);
+
+        self::assertSame(3580, $capped->issue('01jfactor0000000000000000e3', self::binding(), $now->addSeconds(30)));
+    }
+
+    /**
      * Every resend counts towards the caps.
      *
      * @return void

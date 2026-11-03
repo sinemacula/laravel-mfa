@@ -301,6 +301,37 @@ final class RedactorTest extends TestCase
     }
 
     /**
+     * A trace's arguments are bounded as logged values are: as deep as the walk
+     * reaches and no deeper, and to their first thousand entries.
+     *
+     * @return void
+     */
+    public function testBoundsATracesArgumentsAsDeepAndAsWideAsLoggedValues(): void
+    {
+        self::assertSame($this->nested([], 10), Redactor::arguments($this->nested([], 10)));
+        self::assertSame($this->nested('[truncated]', 11), Redactor::arguments($this->nested([], 11)));
+
+        $arguments = Redactor::arguments(range(1, 1001));
+
+        self::assertCount(1001, $arguments);
+        self::assertSame(1000, $arguments[999]);
+        self::assertArrayNotHasKey(1000, $arguments);
+        self::assertSame('[truncated]', $arguments['...']);
+    }
+
+    /**
+     * An object deeper than the walk reaches is normalised to the marker alone,
+     * while one at the deepest level is still named, holding it.
+     *
+     * @return void
+     */
+    public function testNormalizesAnObjectBelowTheDeepestLevelToTheMarker(): void
+    {
+        self::assertSame($this->nested('[truncated]', 11), Redactor::normalize($this->nested(new \stdClass, 11)));
+        self::assertSame($this->nested([\stdClass::class => '[truncated]'], 10), Redactor::normalize($this->nested(new \stdClass, 10)));
+    }
+
+    /**
      * An exception is kept, with its trace scrubbed in place.
      *
      * @return void

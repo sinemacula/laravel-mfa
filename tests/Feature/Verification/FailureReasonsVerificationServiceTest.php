@@ -446,6 +446,38 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
+     * A recovery code refused by the identity's lockout says why in the
+     * lockout's own words, timed or at the ceiling, not in a generic refusal.
+     *
+     * @return void
+     */
+    public function testARecoveryCodeRefusedByALockoutSaysWhy(): void
+    {
+        $user = $this->signedInPerson();
+
+        $this->totpFactor($user);
+
+        $code = $this->recoveryCode($user);
+
+        IdentityState::query()->where('authenticatable_id', (string) $user->id)->update(['consecutive_failures' => 100]);
+
+        self::assertSame(
+            'The identity has reached the failure ceiling across its factors and recovery codes.',
+            $this->mfa()->verify(Submission::recoveryCode($code))->detail,
+        );
+
+        IdentityState::query()->where('authenticatable_id', (string) $user->id)->update([
+            'consecutive_failures' => 1,
+            'locked_until'         => CarbonImmutable::now()->addMinutes(15),
+        ]);
+
+        self::assertSame(
+            'The identity is locked after too many failed attempts across its factors.',
+            $this->mfa()->verify(Submission::recoveryCode($code))->detail,
+        );
+    }
+
+    /**
      * An address at its limit is refused with the time its window ends, before
      * anything else runs, and is reported with what was tried.
      *

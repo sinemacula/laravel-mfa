@@ -213,6 +213,35 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
+     * A channel resolved already is tapped though a logger that is not a
+     * channel was resolved before it.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTapsTheResolvedChannelsAfterALoggerThatIsNoChannel(): void
+    {
+        $container = $this->container(true);
+        $log       = new LogManager($container);
+        $monolog   = new Monolog('late');
+
+        (new \ReflectionProperty(LogManager::class, 'channels'))->setValue($log, [
+            'other' => new NullLogger,
+            'late'  => new Logger($monolog, new Dispatcher($container)),
+        ]);
+
+        $container->instance('log', $log);
+
+        SecretBindings::boot($container);
+
+        $processors = $monolog->getProcessors();
+
+        self::assertCount(1, $processors);
+        self::assertInstanceOf(RedactSecrets::class, $processors[0]);
+    }
+
+    /**
      * An exception handler built after the package boots scrubs every exception
      * it reports before its later reporters see it.
      *

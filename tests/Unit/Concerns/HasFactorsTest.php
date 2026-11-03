@@ -18,6 +18,7 @@ use Tests\Fixtures\Factors\CustomFactor;
 use Tests\Fixtures\Factors\EnumStatusFactor;
 use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\FactorHolder;
+use Tests\Fixtures\Identities\FactorHoldingRecord;
 use Tests\Fixtures\Identities\SoftDeletingFactorHolder;
 use Tests\TestCase;
 
@@ -68,6 +69,26 @@ final class HasFactorsTest extends TestCase
 
         self::assertInstanceOf(Factor::class, $identity->authFactors()->getModel());
         self::assertSame([$own->id], $factors->modelKeys());
+    }
+
+    /**
+     * A model holding factors that is not an authenticatable finds them by its
+     * own key.
+     *
+     * @return void
+     */
+    public function testAModelThatIsNotAnAuthenticatableFindsItsFactorsByItsKey(): void
+    {
+        $identity = $this->createHolder('one@example.test');
+        $own      = $this->createFactor($identity, 'confirmed');
+
+        $record = new FactorHoldingRecord;
+
+        $record->setAttribute('id', $identity->id);
+
+        Factor::query()->whereKey($own->id)->update(['authenticatable_type' => $record->getMorphClass()]);
+
+        self::assertSame([$own->id], $record->authFactors()->pluck('id')->all());
     }
 
     /**

@@ -131,6 +131,41 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
+     * A factor of another type than passkey is not taken as one, even holding
+     * an association of a credential the gateway lists.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRefusesAFactorOfAnotherTypeHoldingAnAssociation(): void
+    {
+        $totp = $this->confirmedFactor($this->user, 'totp', self::OTHER_CREDENTIAL);
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion($totp->id, Purpose::STEP_UP)->reason);
+        self::assertSame([], $this->gateway->requested);
+    }
+
+    /**
+     * A credential the gateway lists in a form that is not canonical is not
+     * taken as registered, though the factor names it in that same form.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRefusesACredentialTheGatewayListsInAnotherForm(): void
+    {
+        $padded  = self::OTHER_CREDENTIAL . '=';
+        $passkey = $this->confirmedFactor($this->user, 'passkey', $padded);
+
+        $this->gateway->registered = [$padded];
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion($passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame([], $this->gateway->requested);
+    }
+
+    /**
      * The passkey that started the sign-in is never its second factor, nor is
      * any passkey after a first factor that names no credential.
      *

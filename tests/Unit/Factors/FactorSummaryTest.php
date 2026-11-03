@@ -222,6 +222,19 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
+     * A three-character local-part keeps one character: `floor(3/2) = 1`, where
+     * `round(3/2)` and `ceil(3/2)` would keep two, more than half of it.
+     *
+     * @return void
+     */
+    public function testMaskingEmailWithThreeCharLocalPartKeepsOneCharViaFloor(): void
+    {
+        $summary = $this->buildSummaryWithDestination('abc@example.com');
+
+        self::assertSame('a**@example.com', $summary->maskedDestination);
+    }
+
+    /**
      * Test masking email with four char local part.
      *
      * @return void

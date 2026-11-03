@@ -44,7 +44,9 @@ use SineMacula\Laravel\Mfa\Passkeys\CredentialId;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociationResult;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
@@ -439,6 +441,39 @@ final class PasskeyChangeGateTest extends TestCase
             $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user, properties: ObservedProperties::none()))),
         );
         self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->registrar()->register($other, self::APPLICATION, $this->registration($other))));
+        self::assertSame(0, PasskeyAssociation::query()->count());
+    }
+
+    /**
+     * An inactive identity is refused a registration, the same as any other
+     * enrolment, and the caller's credential rolls back with it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnInactiveIdentityRegistersNothing(): void
+    {
+        $this->enablePasskeys();
+
+        $identity = new NonEloquentIdentity('plain-1', active: false);
+        $owner    = ProofOwner::of($identity);
+
+        $this->actingAs($identity);
+
+        $this->container()->make(ProofStore::class)->begin($identity, self::APPLICATION, self::SESSION);
+
+        $this->reauthenticate();
+
+        $registration = new PasskeyRegistration(
+            self::CREDENTIAL,
+            new ObservedProperties(userPresence: true),
+            new ProofBinding($owner->type, $owner->key, self::APPLICATION, self::SESSION, Purpose::ENROLLMENT),
+        );
+
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->refusal(fn () => $this->registrar()->register($identity, self::APPLICATION, $registration)));
+        self::assertFalse(StandInRegistrar::stores($identity, self::CREDENTIAL));
+        self::assertSame(0, Factor::query()->count());
         self::assertSame(0, PasskeyAssociation::query()->count());
     }
 

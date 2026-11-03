@@ -23,10 +23,12 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ChallengeCountersTests;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -87,19 +89,60 @@ final class ChallengeCountersContractTest extends TestCase
         $pending = $this->pendingFactor();
         $binding = $this->countedBinding();
 
-        $this->container()->make(PendingEnrollments::class)->create(
-            (string) LockedFactors::idOf($pending),
-            hash('sha256', 'grant'),
-            new ProofBinding($binding->identityType, $binding->identityKey, $binding->application, $binding->sessionId, Purpose::ENROLLMENT),
-            0,
-            EnrollmentAuthorization::STEP_UP,
-            CarbonImmutable::now()->addHour(),
-        );
+        $this->enroll($pending, $binding);
 
         $this->expectException(AssertionFailedError::class);
         $this->expectExceptionMessage('A pending factor with no live enrolment must not be challenged.');
 
         ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->user, $this->factor, $pending, $binding);
+    }
+
+    /**
+     * The kit rejects a factor given as confirmed that an enrolment challenge
+     * would admit, even when the pending factor given is refused.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRejectsAConfirmedFactorAnEnrollmentChallengeWouldAdmit(): void
+    {
+        $admitted = $this->pendingFactor();
+        $binding  = $this->countedBinding();
+
+        $this->enroll($admitted, $binding);
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A confirmed factor must not be challenged for enrolling.');
+
+        ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->user, $admitted, $this->pendingFactor(), $binding);
+    }
+
+    /**
+     * The kit rejects an enrolment challenge that changes the factor's count,
+     * though not the identity's.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRejectsAnEnrollmentChallengeThatChargesTheFactor(): void
+    {
+        $pending = $this->pendingFactor();
+        $factor  = $this->factor;
+
+        Factor::retrieved(static function (Factor $retrieved) use ($factor): void {
+            if ($retrieved->getKey() !== $factor->getKey()) {
+                return;
+            }
+
+            WriteConnection::query($factor->newQuery())->whereKey($factor->getKey())->increment($factor->getConsecutiveFailuresName());
+        });
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('An enrolment challenge\'s outcome must change no factor\'s count.');
+
+        ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->user, $this->factor, $pending, $this->countedBinding());
     }
 
     /**
@@ -361,6 +404,72 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
+     * The kit sets the factor's limit above the identity's for the lockout
+     * check, so a host's limit on factors at or below it does not lock the
+     * factor first, and puts the host's limit back after.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheLockoutCheckHoldsTheFactorsLimitAboveTheIdentitys(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 1);
+
+        ChallengeCountersContract::assertTheIdentityLimitLocksTheIdentity($this->user, $this->factor, $this->emailBinding($this->user), $this->failChallenge(...));
+
+        self::assertSame(1, config('mfa.attempts.factor_limit'));
+    }
+
+    /**
+     * The kit names another identity by the binding's key with a suffix, so a
+     * binding whose key is the identity's own less that suffix names the
+     * identity itself: the counters admit it as far as the identity goes, and
+     * the kit must reject that.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRejectsCountersThatAdmitTheBindingItTakesForAnothers(): void
+    {
+        $identity = new NonEloquentIdentity('counted-other');
+        $owner    = ProofOwner::of($identity);
+        $factor   = Factor::query()->create([
+            'authenticatable_type' => $owner->type,
+            'authenticatable_id'   => $owner->key,
+            'type'                 => 'email',
+            'destination'          => 'other@example.test',
+            'status'               => 'confirmed',
+            'confirmed_at'         => CarbonImmutable::now(),
+            'application'          => self::CHALLENGE_APPLICATION,
+        ]);
+        $binding = new ProofBinding($owner->type, 'counted', self::CHALLENGE_APPLICATION, self::CHALLENGE_SESSION, Purpose::SIGN_IN);
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A binding of another identity must not be admitted.');
+
+        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused($identity, $factor, $binding);
+    }
+
+    /**
+     * The kit rejects a replay check of a factor it can read no count for, as
+     * one that counts no failure.
+     *
+     * @return void
+     */
+    public function testRejectsAReplayCheckOfAFactorWithNoStoredCount(): void
+    {
+        $unstored = (new Factor)->forceFill(['id' => '01JUNSTOREDFACTOR000000000']);
+
+        self::rejects(fn () => ChallengeCountersContract::assertAConsumedChallengeIsNeverASuccessAgain($unstored, static fn (): \Closure => static function (): void {
+            // A replay that changes nothing.
+        }, static function (): void {
+            // A path that counts nothing.
+        }));
+    }
+
+    /**
      * The kit rejects a challenge path that counts a consumed challenge
      * answered again as a success.
      *
@@ -508,6 +617,28 @@ final class ChallengeCountersContractTest extends TestCase
         $count = WriteConnection::query($this->factor->newQuery())->whereKey($this->factor->getKey())->value('consecutive_failures');
 
         return is_numeric($count) ? (int) $count : 0;
+    }
+
+    /**
+     * Give the factor a live enrolment bound to the binding's sign-in, as an
+     * enrolment challenge would admit.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function enroll(Factor $factor, ProofBinding $binding): void
+    {
+        $this->container()->make(PendingEnrollments::class)->create(
+            (string) LockedFactors::idOf($factor),
+            hash('sha256', 'grant'),
+            new ProofBinding($binding->identityType, $binding->identityKey, $binding->application, $binding->sessionId, Purpose::ENROLLMENT),
+            0,
+            EnrollmentAuthorization::STEP_UP,
+            CarbonImmutable::now()->addHour(),
+        );
     }
 
     /**
