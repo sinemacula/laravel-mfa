@@ -108,7 +108,6 @@ final class PasskeyChangeGateContract
         $calls = [
             static fn () => $gate->registering($identity, $application, $registration),
             static fn () => $gate->removing($identity, $application, self::CREDENTIAL),
-            static fn () => $gate->changing($identity, $application, self::CREDENTIAL),
         ];
 
         foreach ($calls as $call) {

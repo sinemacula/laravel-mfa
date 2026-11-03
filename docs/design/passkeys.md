@@ -3,8 +3,8 @@
 ## Purpose
 
 This note documents how a passkey becomes, stays and stops being a factor: the association record, the change gate
-every registration, removal or change of a passkey passes through, and the assertions a passkey factor is verified
-with. This package stores no WebAuthn credentials and runs no ceremonies of its own: those belong to the
+every registration and removal of a passkey passes through, and the assertions a passkey factor is verified with. This
+package stores no WebAuthn credentials and runs no ceremonies of its own: those belong to the
 authentication layer, reached through `Contracts\PasskeyGateway`.
 
 ## Invariants
@@ -36,10 +36,10 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   and in all.
 - A credential already associated, with this identity or another, is refused (`credential_associated`): a registration
   is never idempotent. The association table's unique index on the credential's digest enforces it across identities.
-- The locks are taken in one order: the identity's state, then its factors, then the association. `removing()` and
-  `changing()` first ask, without a lock, whether the credential is associated at all; the association row is locked
-  and read again only under the identity's factor state lock, as verification and the lifecycle flow lock it. A lookup
-  by credential reads the unique index, so it locks one row, never the table.
+- The locks are taken in one order: the identity's state, then its factors, then the association. `removing()` first
+  asks, without a lock, whether the credential is associated at all; the association row is locked and read again only
+  under the identity's factor state lock, as verification and the lifecycle flow lock it. A lookup by credential reads
+  the unique index, so it locks one row, never the table.
 - With the identity's first additional factor, recovery codes are generated when the application accepts them and the
   session's first factor followed by the registration's own evidence meets the level the application issues them at.
 - Removing an associated credential goes through the same checks as every removal (`Lifecycle\RemovalGuard`, see [Factor
@@ -55,8 +55,6 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   association is never returned or acted on: the unlocked `exists()` finds it, and it is answered `not_found`.
 - The default `LastFactorPolicy` (`Lifecycle\RequiredFactorPolicy`) counts a remaining passkey only while its
   association matches it, so an unusable passkey never lets the last usable factor go.
-- A change to what an associated credential proves (its id, key, owner or relying party) is refused outright: it is a
-  removal and then a registration. Renaming it and its usage bookkeeping are not gated.
 - `Passkeys\PasskeyAssertions` holds the ceremony's checks for one factor at a time, allowing exactly its associated
   credential, and only while the factor is a confirmed passkey of the caller's of an enabled type, not disabled, its
   association matches, the gateway still lists the credential, and the combination policy accepts it after the session's
@@ -110,8 +108,8 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
 
 ## Authoritative Tests
 
-- `tests/Feature/Passkeys/PasskeyChangeGateTest.php`: registrations, removals, changes and sequences in the caller's
-  own transactions, refused and allowed.
+- `tests/Feature/Passkeys/PasskeyChangeGateTest.php`: registrations, removals and sequences in the caller's own
+  transactions, refused and allowed.
 - `tests/Unit/Passkeys/PasskeyAssertionsTest.php`, `tests/Unit/Passkeys/CredentialIdTest.php`.
 - `tests/Unit/Enrollment/EnrollmentAuthorityTest.php`, `tests/Unit/Lifecycle/RequiredFactorPolicyTest.php`.
 - `tests/Unit/Testing/Seams/PasskeyChangeGateContractTest.php`: the wiring kit an adapter proves itself with.

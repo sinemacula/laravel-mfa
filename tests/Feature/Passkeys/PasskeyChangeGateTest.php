@@ -72,9 +72,9 @@ use Tests\TestCase;
 
 /**
  * Feature tests for `PasskeyChangeGate`, run in the stand-in authentication
- * layer's own transactions on SQLite: a registration, removal or change the
- * gate refuses rolls back the caller's own write with it, and one the gate
- * allows commits, or rolls back with the caller, as one change.
+ * layer's own transactions on SQLite: a registration or removal the gate
+ * refuses rolls back the caller's own write with it, and one the gate allows
+ * commits, or rolls back with the caller, as one change.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -131,9 +131,6 @@ final class PasskeyChangeGateTest extends TestCase
                 fn () => $gate->registering($user, self::APPLICATION, $this->registration($user)),
                 static function () use ($gate, $user): void {
                     $gate->removing($user, self::APPLICATION, self::CREDENTIAL);
-                },
-                static function () use ($gate, $user): void {
-                    $gate->changing($user, self::APPLICATION, self::CREDENTIAL);
                 },
             ] as $call
         ) {
@@ -805,51 +802,15 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A change to an associated credential is refused and rolls back the
-     * caller's change; one to an unassociated credential is a no-op.
+     * A removal of an associated credential named for another identity or
+     * application than the request's caller is refused as not found; one of a
+     * credential associated with nobody is a no-op whoever it is named for.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testAChangeToAnAssociatedCredentialIsRefused(): void
-    {
-        $this->enablePasskeys();
-
-        $user = $this->signedInPerson();
-
-        $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
-
-        DB::table(StandInRegistrar::TABLE)->insert(['owner' => ProofOwner::of($user)->key, 'credential_id' => self::CREDENTIAL]);
-
-        $refusal = $this->refusal(fn () => DB::transaction(function () use ($user): bool {
-            DB::table(StandInRegistrar::TABLE)->update(['credential_id' => self::OTHER_CREDENTIAL]);
-            $this->gate()->changing($user, self::APPLICATION, self::CREDENTIAL);
-
-            return true;
-        }));
-
-        self::assertSame(FailureReason::CREDENTIAL_ASSOCIATED, $refusal);
-        self::assertTrue(StandInRegistrar::stores($user, self::CREDENTIAL));
-
-        DB::transaction(function () use ($user): void {
-            $this->gate()->changing($user, self::APPLICATION, self::OTHER_CREDENTIAL);
-        });
-
-        self::assertSame(1, PasskeyAssociation::query()->count());
-    }
-
-    /**
-     * A change or a removal of an associated credential named for another
-     * identity or application than the request's caller is refused as not
-     * found; one of a credential associated with nobody is a no-op whoever it
-     * is named for.
-     *
-     * @return void
-     *
-     * @throws \Throwable
-     */
-    public function testAChangeOrRemovalForAnotherThanTheCallerIsRefused(): void
+    public function testARemovalForAnotherThanTheCallerIsRefused(): void
     {
         $this->enablePasskeys();
 
@@ -859,8 +820,6 @@ final class PasskeyChangeGateTest extends TestCase
         $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
 
         $calls = [
-            fn () => $this->gate()->changing($other, self::APPLICATION, self::CREDENTIAL),
-            fn () => $this->gate()->changing($user, 'another-application', self::CREDENTIAL),
             fn () => $this->gate()->removing($other, self::APPLICATION, self::CREDENTIAL),
             fn () => $this->gate()->removing($user, 'another-application', self::CREDENTIAL),
         ];
@@ -870,7 +829,6 @@ final class PasskeyChangeGateTest extends TestCase
         }
 
         DB::transaction(function () use ($other): void {
-            $this->gate()->changing($other, self::APPLICATION, self::OTHER_CREDENTIAL);
             $this->gate()->removing($other, self::APPLICATION, self::OTHER_CREDENTIAL);
         });
 
@@ -972,8 +930,8 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Registering, changing and removing in one outer transaction commit as one
-     * change; a refusal anywhere in it rolls all of it back.
+     * Registering and removing in one outer transaction commit as one change;
+     * a refusal anywhere in it rolls all of it back.
      *
      * @return void
      *
@@ -990,7 +948,6 @@ final class PasskeyChangeGateTest extends TestCase
 
         DB::transaction(function () use ($user): void {
             $this->gate()->registering($user, self::APPLICATION, $this->registration($user));
-            $this->gate()->changing($user, self::APPLICATION, self::OTHER_CREDENTIAL);
             $this->gate()->removing($user, self::APPLICATION, self::CREDENTIAL);
         });
 
@@ -1001,7 +958,7 @@ final class PasskeyChangeGateTest extends TestCase
 
         $refusal = $this->refusal(fn () => DB::transaction(function () use ($user): bool {
             $this->gate()->registering($user, self::APPLICATION, $this->registration($user, self::OTHER_CREDENTIAL));
-            $this->gate()->changing($user, self::APPLICATION, self::OTHER_CREDENTIAL);
+            $this->gate()->registering($user, self::APPLICATION, $this->registration($user, self::OTHER_CREDENTIAL));
 
             return true;
         }));
