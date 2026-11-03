@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
@@ -23,10 +24,12 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ChallengeCountersTests;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
+use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -417,6 +420,43 @@ final class ChallengeCountersContractTest extends TestCase
         ChallengeCountersContract::assertTheIdentityLimitLocksTheIdentity($this->user, $this->factor, $this->emailBinding($this->user), $this->failChallenge(...));
 
         self::assertSame(1, config('mfa.attempts.factor_limit'));
+    }
+
+    /**
+     * The kit accepts healthy counters for an identity whose key is the suffix
+     * it names another identity by: the binding it makes from that key must
+     * still name another identity, not the identity itself, whose factor and
+     * sign-in are admissible.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAcceptsHealthyCountersForAnIdentityKeyedLikeTheSuffix(): void
+    {
+        $identity = new NonEloquentIdentity('-other');
+        $owner    = ProofOwner::of($identity);
+        $factor   = Factor::query()->create([
+            'authenticatable_type' => $owner->type,
+            'authenticatable_id'   => $owner->key,
+            'type'                 => 'email',
+            'destination'          => 'suffixed@example.test',
+            'status'               => 'confirmed',
+            'confirmed_at'         => CarbonImmutable::now(),
+            'application'          => self::CHALLENGE_APPLICATION,
+        ]);
+        $binding = new ProofBinding($owner->type, $owner->key, self::CHALLENGE_APPLICATION, self::CHALLENGE_SESSION, Purpose::SIGN_IN);
+
+        $this->actingAs($identity);
+
+        $this->container()->make(ProofStore::class)->begin($identity, self::CHALLENGE_APPLICATION, self::CHALLENGE_SESSION);
+
+        self::assertTrue(
+            DB::connection(StorageConnection::name())->transaction(fn (): bool => $this->counters()->isUsable($identity, $factor, $binding)->isAdmitted()),
+            'The identity\'s own factor and sign-in were expected to be admissible.',
+        );
+
+        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused($identity, $factor, $binding);
     }
 
     /**
