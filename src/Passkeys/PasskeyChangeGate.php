@@ -48,16 +48,16 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 
 /**
- * The gate every entry point that registers, removes or changes a passkey calls
- * before it does, the authentication layer's included, in the same change: an
- * event reporting the change afterwards cannot stand in for it.
+ * The gate every entry point that registers or removes a passkey calls before
+ * it does, the authentication layer's included, in the same change: an event
+ * reporting the change afterwards cannot stand in for it.
  *
  * Each call runs inside the caller's own transaction on the storage connection
  * and refuses with a `LogicException` without one. It acts only for the
  * request's validated caller, the identity and application it names, under the
  * identity's factor state lock, which joins the caller's transaction and is
  * held until it commits. A refusal is an `OperationRefusedException` carrying
- * the reason, so the caller's registration or change rolls back with it; a
+ * the reason, so the caller's registration or removal rolls back with it; a
  * caller that catches the refusal and commits anyway breaks the contract. Every
  * event waits for the caller's commit, so a caller that rolls back after an
  * allowed call leaves no factor, association or event behind.
@@ -80,9 +80,6 @@ use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
  *   the caller's removal of the credential rolls back with it; the fresh
  *   step-up a removal needs (proved without that factor while another remains);
  *   and the last factor policy. Then the identity's other sessions are revoked.
- * - `changing()` refuses any change to an associated credential: one to what it
- *   proves is a removal and then a registration. A label, its counter and its
- *   last use are not gated.
  *
  * Stateless: the request, the configuration and the seams are read on every
  * call.
@@ -195,34 +192,6 @@ final readonly class PasskeyChangeGate
         FactorStateTransaction::forIdentity($identity, $this->factorModel(), function (Collection $factors) use ($binding, $application, $credentialId): void {
             $this->remove($binding, $application, $credentialId, $factors);
         });
-    }
-
-    /**
-     * Refuse a change to an associated credential before the caller makes it;
-     * nothing when the credential is associated with nobody.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  string  $credentialId
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
-     * @throws \LogicException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
-     */
-    public function changing(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId): void
-    {
-        OpenTransaction::assertOpen(self::NO_TRANSACTION);
-
-        if (!$this->associations->exists(CredentialId::canonical($credentialId))) {
-            return;
-        }
-
-        $this->caller($identity, $application, null);
-
-        self::refuseChange();
     }
 
     /**
@@ -459,19 +428,6 @@ final readonly class PasskeyChangeGate
         $model = ConfiguredModels::factor($this->config);
 
         return new $model;
-    }
-
-    /**
-     * Refuse a change to an associated credential: a change to what it proves
-     * is a removal and then a registration.
-     *
-     * @return never
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     */
-    private static function refuseChange(): never
-    {
-        throw new OperationRefusedException(FailureReason::CREDENTIAL_ASSOCIATED, 'An associated credential is not changed in place: remove it, then register the new one.');
     }
 
     /**

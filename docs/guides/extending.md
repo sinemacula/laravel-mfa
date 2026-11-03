@@ -262,7 +262,7 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Contracts\ProofStore`, `Contracts\FirstFactorResolver`                               | `Requirements\RequirementSubject::proofs()` and `$firstFactor`, passed to `Contracts\RequirementCheck::evaluate()`, and `Contracts\FreshnessPolicy::freshProof()`. Needs a read of the session's proofs outside `evaluate()` as well |
 | `Contracts\ChallengeGateway`, `Attempts\ChallengeCounters`                            | Needs its own challenge bound to the factor and purpose, which asks `isUsable()` before locking or consuming it and calls `report()` once, from the transaction that consumes it                                                     |
 | `Contracts\SessionTransition`                                                         | Needs a way to return an active session to pending when a factor change leaves it short                                                                                                                                              |
-| `Passkeys\PasskeyChangeGate`                                                          | Needs its passkey register, remove and change paths to call the gate, inside their own transaction on the storage connection                                                                                                         |
+| `Passkeys\PasskeyChangeGate`                                                          | Needs its passkey register and remove paths to call the gate, inside their own transaction on the storage connection                                                                                                                 |
 | `Context\AuthenticationContextContributor`                                            | Needs its authentication context to read these keys from `contribute()`                                                                                                                                                              |
 | `CombinationPolicy`, `IdentityRequirement`, `LastFactorPolicy`, `SelfServiceRecovery` | Nothing: these are this package's own                                                                                                                                                                                                |
 
@@ -274,7 +274,7 @@ documentation for it. Until the layer provides it, what an adapter does depends 
 - `Contracts\ProofStore` must be rebound. The default keeps proofs in the Laravel session, which a stateless layer does
   not have, so there is no sign-in and every verification answers `not_found`.
 
-> **Do not enable `passkey` over a layer whose register, remove and change paths do not call
+> **Do not enable `passkey` over a layer whose register and remove paths do not call
 > `Passkeys\PasskeyChangeGate`.** The gate has no default that can act for it, because the caller has to invoke it.
 > Binding `Contracts\PasskeyGateway` over such a layer lets a passkey be removed with no step-up, last factor check or
 > revocation, and an event after the fact cannot stand in for the gate.
@@ -319,8 +319,8 @@ A passkey is a factor only through an association record this package keeps; the
 with the authentication layer, reached through a `Contracts\PasskeyGateway` the application binds. Credential ids are
 their canonical unpadded base64url form (`Passkeys\CredentialId`), compared exactly; any other encoding is refused.
 
-Every path that registers, removes or changes a passkey calls `Passkeys\PasskeyChangeGate` first, inside its own
-transaction on the storage connection:
+Every path that registers or removes a passkey calls `Passkeys\PasskeyChangeGate` first, inside its own transaction on
+the storage connection:
 
 ```php
 DB::transaction(function () use ($gate, $identity, $application, $credential, $properties, $binding): void {
@@ -341,9 +341,8 @@ holds what came back, whose refusal rolls your registration back; reveal it only
 an active session the requirement is evaluated again, and a shortfall goes to the bound `SessionTransition`, whose
 refusal rolls it back too. `removing()` makes the checks of every removal: a sign-in the proof store knows of and that
 has not changed under the lock, an active identity, a fresh step-up made with another factor where the identity has
-one, and the last factor policy. It then stops the identity's other sessions counting. `changing()` refuses any change
-to an associated credential: register the new one and remove the old. A refusal throws an `OperationRefusedException`;
-let it roll back your own change, since catching it and committing breaks the gate.
+one, and the last factor policy. It then stops the identity's other sessions counting. A refusal throws an
+`OperationRefusedException`; let it roll back your own change, since catching it and committing breaks the gate.
 
 ## Proving an adapter
 

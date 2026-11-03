@@ -143,7 +143,6 @@ own transaction on the storage connection:
 | `Attempts\ChallengeCounters::report()`                | With every outcome, in the transaction that consumes the challenge, never later       |
 | `Passkeys\PasskeyChangeGate::registering()`           | Before storing a registered passkey: associates it as a factor where enabled          |
 | `Passkeys\PasskeyChangeGate::removing()`              | Before deleting a passkey: removes its factor under the removal rules                 |
-| `Passkeys\PasskeyChangeGate::changing()`              | Before changing what a passkey proves: refused for an associated one                  |
 
 Both classes refuse with a `LogicException` outside a transaction, so their locks are held until the caller commits; the
 lock order is the identity's state, then its factors, then the caller's own challenge or credential. The caller

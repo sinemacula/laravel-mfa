@@ -100,8 +100,8 @@ trait FlowCatalog
             'unlock identity', 'unlock identity not locked', 'reset identity', 'forget identity',
             'generate recovery codes', 'generate recovery codes refused', 'prune', 'passkey registering',
             'passkey registering refused', 'passkey removing', 'passkey removing foreign',
-            'passkey changing', 'challenge counters usable', 'challenge counters report passed',
-            'challenge counters report failed', 'advance generation',
+            'challenge counters usable', 'challenge counters report passed', 'challenge counters report failed',
+            'advance generation',
         ];
 
         return array_combine($names, array_map(static fn (string $name): array => [$name], $names));
@@ -277,7 +277,6 @@ trait FlowCatalog
             'passkey registering refused'      => $this->registeringAnAssociatedPasskey(...),
             'passkey removing'                 => $this->removingAPasskey(...),
             'passkey removing foreign'         => $this->removingAForeignPasskey(...),
-            'passkey changing'                 => $this->changingAPasskey(...),
             'challenge counters usable'        => $this->askingTheCounters(...),
             'challenge counters report passed' => $this->reportingAPassedChallenge(...),
             'challenge counters report failed' => $this->reportingAFailedChallenge(...),
@@ -1222,25 +1221,6 @@ trait FlowCatalog
 
         return fn (): bool => $this->refusedWith(FailureReason::NOT_FOUND, fn (): mixed => $this->inCallersTransaction(static function () use ($gate, $user): void {
             $gate->removing($user, self::APPLICATION, self::FOREIGN_CREDENTIAL);
-        }));
-    }
-
-    /**
-     * A person changes what an associated credential proves.
-     *
-     * @return \Closure(): bool
-     */
-    private function changingAPasskey(): \Closure
-    {
-        [$user] = $this->steppedUp();
-
-        $this->enablePasskeys();
-        $this->passkeyFactor($user);
-
-        $gate = $this->container()->make(PasskeyChangeGate::class);
-
-        return fn (): bool => $this->refusedWith(FailureReason::CREDENTIAL_ASSOCIATED, fn (): mixed => $this->inCallersTransaction(static function () use ($gate, $user): void {
-            $gate->changing($user, self::APPLICATION, self::CREDENTIAL);
         }));
     }
 
