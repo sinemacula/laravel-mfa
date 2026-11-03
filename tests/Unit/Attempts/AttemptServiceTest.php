@@ -140,6 +140,42 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * A success with nothing to reset saves nothing: not the identity's state,
+     * not the factor proved, and not another factor that is not disabled. A
+     * model event refusing those saves, as an application's observer may, is
+     * never asked, so it cannot abort the success.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASuccessWithNothingToResetSavesNothing(): void
+    {
+        $user    = $this->user();
+        $proved  = $this->factor($user);
+        $sibling = $this->factor($user);
+        $saves   = [];
+
+        Factor::saving(static function (Factor $factor) use (&$saves): bool {
+            $saves[] = $factor->id;
+
+            return false;
+        });
+
+        IdentityState::saving(static function () use (&$saves): bool {
+            $saves[] = 'identity state';
+
+            return false;
+        });
+
+        $outcome = $this->attempt($user, $proved, true);
+
+        self::assertTrue($outcome->passed);
+        self::assertSame([], $saves);
+        self::assertNull($this->fresh($sibling)->getDisabledAt());
+    }
+
+    /**
      * The failure that reaches the factor limit locks the factor for the
      * lockout period and reports it.
      *

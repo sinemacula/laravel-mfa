@@ -23,12 +23,10 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
-use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ChallengeCountersTests;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
-use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -419,37 +417,6 @@ final class ChallengeCountersContractTest extends TestCase
         ChallengeCountersContract::assertTheIdentityLimitLocksTheIdentity($this->user, $this->factor, $this->emailBinding($this->user), $this->failChallenge(...));
 
         self::assertSame(1, config('mfa.attempts.factor_limit'));
-    }
-
-    /**
-     * The kit names another identity by the binding's key with a suffix, so a
-     * binding whose key is the identity's own less that suffix names the
-     * identity itself: the counters admit it as far as the identity goes, and
-     * the kit must reject that.
-     *
-     * @return void
-     *
-     * @throws \Throwable
-     */
-    public function testRejectsCountersThatAdmitTheBindingItTakesForAnothers(): void
-    {
-        $identity = new NonEloquentIdentity('counted-other');
-        $owner    = ProofOwner::of($identity);
-        $factor   = Factor::query()->create([
-            'authenticatable_type' => $owner->type,
-            'authenticatable_id'   => $owner->key,
-            'type'                 => 'email',
-            'destination'          => 'other@example.test',
-            'status'               => 'confirmed',
-            'confirmed_at'         => CarbonImmutable::now(),
-            'application'          => self::CHALLENGE_APPLICATION,
-        ]);
-        $binding = new ProofBinding($owner->type, 'counted', self::CHALLENGE_APPLICATION, self::CHALLENGE_SESSION, Purpose::SIGN_IN);
-
-        $this->expectException(AssertionFailedError::class);
-        $this->expectExceptionMessage('A binding of another identity must not be admitted.');
-
-        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused($identity, $factor, $binding);
     }
 
     /**

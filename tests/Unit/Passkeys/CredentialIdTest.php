@@ -89,4 +89,16 @@ final class CredentialIdTest extends TestCase
     {
         self::assertTrue(CredentialId::isCanonical(CredentialId::encode(str_repeat('a', 1023))));
     }
+
+    /**
+     * An id of a single byte, two characters that decode only with no padding
+     * or with all of it, is canonical.
+     *
+     * @return void
+     */
+    public function testTheShortestIdIsCanonical(): void
+    {
+        self::assertSame('YQ', CredentialId::canonical('YQ'));
+        self::assertTrue(CredentialId::isCanonical('YQ'));
+    }
 }
