@@ -132,6 +132,27 @@ final class ObservedPropertiesTest extends TestCase
     }
 
     /**
+     * No key protection observed is serialised as null without a warning, which
+     * an application's error handler would turn into an exception.
+     *
+     * @return void
+     */
+    public function testNoKeyProtectionIsSerializedWithoutAWarning(): void
+    {
+        set_error_handler(static function (int $level, string $message, string $file, int $line): never {
+            throw new \ErrorException($message, 0, $level, $file, $line);
+        });
+
+        try {
+            $serialized = ObservedProperties::none()->toArray();
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertNull($serialized['key_protection']);
+    }
+
+    /**
      * The properties read back from their serialised form equal the originals,
      * and a missing key reads as not observed.
      *

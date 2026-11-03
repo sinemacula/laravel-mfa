@@ -100,6 +100,29 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
+     * A caller with no sign-in the proof store knows of is sent nothing and
+     * verifies nothing, under the binding of the sign-in it had.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    public function testServesNothingWithoutASignIn(): void
+    {
+        $binding = $this->emailBinding($this->user);
+
+        $this->container()->make(ProofStore::class)->forget($this->user, self::CHALLENGE_APPLICATION);
+
+        $outcome = $this->gateway()->verify($this->factor, $binding, 'challenge-1', '123456');
+
+        self::assertSame(FailureReason::NOT_FOUND, $outcome->reason);
+        self::assertFalse($outcome->counted);
+        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send($this->factor, $binding)->reason);
+        self::assertSame([], $this->mailbox->sent());
+    }
+
+    /**
      * A pending session that does not allow sending or verifying is served
      * nothing, though the guard's user is the factor's owner.
      *

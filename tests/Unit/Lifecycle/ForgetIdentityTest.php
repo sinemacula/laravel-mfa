@@ -6,8 +6,10 @@ namespace Tests\Unit\Lifecycle;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
@@ -18,7 +20,9 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
+use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\FactorHoldingRecord;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -121,6 +125,42 @@ final class ForgetIdentityTest extends TestCase
         $this->container()->make(ForgetIdentity::class)->forget($identity);
 
         self::assertSame(array_fill_keys($this->tables(), 0), $this->counts($identity));
+    }
+
+    /**
+     * The factors of an application's own model are found by the owner columns
+     * its relation names, and only the identity's are deleted.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testForgetsTheFactorsByTheModelsOwnerColumns(): void
+    {
+        $table = TableNames::of(TableNames::FACTORS);
+
+        Schema::table($table, static function (Blueprint $blueprint): void {
+            $blueprint->renameColumn('authenticatable_type', 'owner_type');
+            $blueprint->renameColumn('authenticatable_id', 'owner_id');
+        });
+
+        config()->set('mfa.factor.model', RemappedOwnerFactor::class);
+
+        $forgotten = new NonEloquentIdentity(identifier: 'plain-7');
+        $kept      = new NonEloquentIdentity(identifier: 'plain-8');
+
+        foreach ([$forgotten, $kept] as $identity) {
+            (new RemappedOwnerFactor)->forceFill([
+                'owner_type' => CurrentIdentity::typeOf($identity),
+                'owner_id'   => ProofOwner::of($identity)->key,
+                'type'       => 'totp',
+            ])->save();
+        }
+
+        $this->container()->make(ForgetIdentity::class)->forget($forgotten);
+
+        self::assertSame(0, DB::table($table)->where('owner_id', 'plain-7')->count());
+        self::assertSame(1, DB::table($table)->where('owner_id', 'plain-8')->count());
     }
 
     /**

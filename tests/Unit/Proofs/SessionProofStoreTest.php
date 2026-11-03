@@ -401,6 +401,32 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
+     * A record held as an object is read as no sign-in, though the object
+     * offers the record's session and proofs by key.
+     *
+     * @return void
+     */
+    public function testReadsARecordHeldAsAnObjectAsNoSignIn(): void
+    {
+        $store = $this->store();
+
+        $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
+        $store->record($this->proofFor($this->user()));
+
+        $slot   = (new ProofOwner(TestUser::class, '7'))->slot();
+        $record = $this->session->get(SessionProofStore::SESSION_KEY)[$slot][self::APPLICATION];
+
+        self::assertIsArray($record);
+
+        foreach ([new \ArrayObject($record), (object) $record] as $object) {
+            $this->session->put(SessionProofStore::SESSION_KEY, [$slot => [self::APPLICATION => $object]]);
+
+            self::assertNull($store->currentSession($this->user(), self::APPLICATION), $object::class);
+            self::assertSame([], $store->proofs($this->user(), self::APPLICATION), $object::class);
+        }
+    }
+
+    /**
      * The proofs are returned oldest first, whatever order they were recorded
      * in.
      *

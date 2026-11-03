@@ -5,9 +5,11 @@ declare(strict_types = 1);
 namespace Tests\Unit\Attempts;
 
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\InMemoryFactor;
@@ -26,7 +28,8 @@ use Tests\TestCase;
 final class LockedFactorsTest extends TestCase
 {
     /**
-     * Only an Eloquent factor model keeps state of its own.
+     * Only an Eloquent factor model keeps state of its own: not a factor that
+     * is no model, nor a model that is a factor but not an Eloquent one.
      *
      * @return void
      */
@@ -35,6 +38,9 @@ final class LockedFactorsTest extends TestCase
         self::assertTrue(LockedFactors::keepsState($this->given($this->factor('stored'))));
         self::assertFalse(LockedFactors::keepsState($this->given(new InMemoryFactor)));
         self::assertFalse(LockedFactors::keepsState($this->given(null)));
+        self::assertFalse(LockedFactors::keepsState($this->given(new class extends Model implements FactorContract {
+            use ActsAsFactor;
+        })));
     }
 
     /**

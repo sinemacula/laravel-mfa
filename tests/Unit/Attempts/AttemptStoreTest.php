@@ -5,7 +5,9 @@ declare(strict_types = 1);
 namespace Tests\Unit\Attempts;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
@@ -201,6 +203,35 @@ final class AttemptStoreTest extends TestCase
         self::assertCount(2, $rows);
         self::assertSame(['hits' => 2, 'ends' => self::NOW + 120], $rows[$this->key('second')]);
         self::assertSame(['hits' => 3, 'ends' => self::NOW + 180], $rows[$this->key('third')]);
+    }
+
+    /**
+     * A full window that a concurrent request ends while a slot is sought, by
+     * the time the slot is sought, is not taken from: the slot is refused, to
+     * be sought again the next second.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAWindowEndingWhileASlotIsSoughtIsSoughtAgainNextSecond(): void
+    {
+        $store = $this->store();
+
+        $store->take(self::KEY, AttemptScope::IP, 1, self::NOW, self::NOW + 60);
+
+        $statements = 0;
+
+        Event::listen(QueryExecuted::class, function () use (&$statements): void {
+            if (++$statements !== 3) {
+                return;
+            }
+
+            DB::table('mfa_attempts')->where('key', self::KEY)->update(['hits' => 0, 'window_ends_at' => $this->formatted(self::NOW + 1)]);
+        });
+
+        self::assertSame(self::NOW + 2, $store->take(self::KEY, AttemptScope::IP, 1, self::NOW + 1, self::NOW + 61));
+        self::assertSame(['hits' => 0, 'ends' => self::NOW + 1], $store->read([self::KEY])[self::KEY]);
     }
 
     /**

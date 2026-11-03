@@ -15,6 +15,8 @@ use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\Enums\ProofStoreFlaw;
+use Tests\Fixtures\Seams\FlawedProofStore;
 use Tests\TestCase;
 
 /**
@@ -158,6 +160,34 @@ final class GenerationSessionRevokerTest extends TestCase
 
         self::assertSame('sign-in-2', $this->store()->currentSession($this->user, SignInProofs::APPLICATION));
         self::assertSame([], $this->methods());
+    }
+
+    /**
+     * A sign-in replaced before the change commits is not given the proofs of
+     * the one before, even by a store that would record a proof bound to
+     * another sign-in.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASignInReplacedBeforeTheCommitIsNotGivenTheProofsBefore(): void
+    {
+        $store = new FlawedProofStore(ProofStoreFlaw::ACCEPTS_ANY_SIGN_IN);
+
+        $this->container()->instance(ProofStore::class, $store);
+
+        $store->begin($this->user, SignInProofs::APPLICATION, SignInProofs::SESSION);
+        $store->record(SignInProofs::of($this->user)->password());
+        $store->record(SignInProofs::of($this->user)->totp());
+
+        DB::transaction(function () use ($store): void {
+            $this->revoker()->revokeOthers($this->user);
+            $store->begin($this->user, SignInProofs::APPLICATION, 'sign-in-2');
+        });
+
+        self::assertSame('sign-in-2', $store->currentSession($this->user, SignInProofs::APPLICATION));
+        self::assertSame([], $store->proofs($this->user, SignInProofs::APPLICATION));
     }
 
     /**

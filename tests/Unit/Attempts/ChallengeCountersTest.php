@@ -5,14 +5,17 @@ declare(strict_types = 1);
 namespace Tests\Unit\Attempts;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Context\IdentityContractSubjectType;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
+use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\LockoutApplied;
@@ -22,6 +25,8 @@ use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
+use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -104,6 +109,42 @@ final class ChallengeCountersTest extends TestCase
     public function testAdmitsAUsableFactor(): void
     {
         self::assertTrue($this->admission()->isAdmitted());
+    }
+
+    /**
+     * A factor that keeps no state of its own is looked up among the identity's
+     * stored factors, and refused as not found when it is none of them.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFactorThatKeepsNoStateIsLookedUpAmongTheStoredOnes(): void
+    {
+        $factor    = new InMemoryFactor(type: 'email', destination: self::ADDRESS);
+        $admission = DB::transaction(fn (): ChallengeAdmission => $this->counters()->isUsable($this->user, $factor, $this->emailBinding($this->user)));
+
+        self::assertSame(FailureReason::NOT_FOUND, $admission->reason);
+    }
+
+    /**
+     * A stored factor of a model of its own is locked through that model, by
+     * the owner columns it names, not through the configured one.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAStoredFactorIsLockedThroughItsOwnModel(): void
+    {
+        Schema::table(TableNames::of(TableNames::FACTORS), static function (Blueprint $blueprint): void {
+            $blueprint->renameColumn('authenticatable_type', 'owner_type');
+            $blueprint->renameColumn('authenticatable_id', 'owner_id');
+        });
+
+        $remapped = RemappedOwnerFactor::query()->findOrFail($this->factor->id);
+
+        self::assertTrue($this->admission($remapped)->isAdmitted());
     }
 
     /**

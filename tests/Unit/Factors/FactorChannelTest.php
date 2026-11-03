@@ -44,6 +44,12 @@ final class FactorChannelTest extends TestCase
         self::assertSame('Y3JlZGVudGlhbC1vbmU', $channel->reference());
         self::assertSame(ChannelKind::PASSKEY, $channel->kind);
 
+        $both = new Factor(['type' => 'email', 'destination' => 'person@example.test', 'credential_reference' => 'Y3JlZGVudGlhbC1vbmU']);
+
+        $both->setAttribute('id', 'factor-both');
+
+        self::assertSame('person@example.test', FactorChannel::of($both, ChannelKind::EMAIL)?->reference());
+
         self::assertSame('factor-id', FactorChannel::of(new InMemoryFactor, ChannelKind::AUTHENTICATOR_APP)?->reference());
         self::assertSame('7', FactorChannel::of(new InMemoryFactor(identifier: 7), ChannelKind::AUTHENTICATOR_APP)?->reference());
     }

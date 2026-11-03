@@ -47,10 +47,14 @@ use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet;
 use SineMacula\Laravel\Mfa\Http\Middleware\ExemptFromMfa;
+use SineMacula\Laravel\Mfa\Http\MiddlewareSessionTransition;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
+use SineMacula\Laravel\Mfa\Lifecycle\NoSelfServiceRecovery;
+use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate;
+use SineMacula\Laravel\Mfa\Passkeys\UnavailablePasskeyGateway;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
@@ -60,6 +64,9 @@ use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
 use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
 use SineMacula\Laravel\Mfa\Requirements\ProofRequirementCheck;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Seams\RefusingReauthenticator;
+use SineMacula\Laravel\Mfa\Secrets\NoStore;
+use SineMacula\Laravel\Mfa\Secrets\RedactSecretsInLogs;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Factors\SecondaryConnectionFactor;
 use Tests\TestCase;
@@ -310,6 +317,79 @@ final class MfaServiceProviderTest extends TestCase
         self::assertContains($this->container()->langPath('vendor/mfa'), $paths);
         self::assertSame([$this->container()->langPath('vendor/mfa')], array_values($paths));
         self::assertFileExists((string) array_key_first($paths) . '/en/messages.php');
+    }
+
+    /**
+     * The configuration publishes from the package's own file to the
+     * application's, and the migrations from the package's own directory to the
+     * application's.
+     *
+     * @return void
+     */
+    public function testPublishesThePackagesOwnConfigurationAndMigrations(): void
+    {
+        $root      = dirname((string) (new \ReflectionClass(MfaServiceProvider::class))->getFileName(), 2);
+        $publishes = [
+            'mfa-config'     => [$root . '/config/mfa.php', config_path('mfa.php')],
+            'mfa-migrations' => [$root . '/database/migrations', $this->container()->databasePath('migrations')],
+        ];
+
+        foreach ($publishes as $tag => [$source, $target]) {
+            $paths = ServiceProvider::pathsToPublish(MfaServiceProvider::class, $tag);
+
+            self::assertSame([$target], array_values($paths), $tag);
+            self::assertSame(realpath($source), realpath((string) array_key_first($paths)), $tag);
+        }
+    }
+
+    /**
+     * The seams and policies the capabilities register are bound to the
+     * package's defaults, which an application rebinds to replace.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBindsTheCapabilitiesSeamsToTheirDefaults(): void
+    {
+        $defaults = [
+            Reauthenticator::class     => RefusingReauthenticator::class,
+            LastFactorPolicy::class    => RequiredFactorPolicy::class,
+            SelfServiceRecovery::class => NoSelfServiceRecovery::class,
+            PasskeyGateway::class      => UnavailablePasskeyGateway::class,
+            SessionTransition::class   => MiddlewareSessionTransition::class,
+        ];
+
+        foreach ($defaults as $abstract => $concrete) {
+            self::assertInstanceOf($concrete, $this->container()->make($abstract), $abstract);
+        }
+    }
+
+    /**
+     * Booting registers the secrets' protections: the middleware that stops a
+     * response holding a secret being stored, and the redaction of the log
+     * channels.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBootRegistersTheSecretsProtections(): void
+    {
+        /** @var \Illuminate\Routing\Router $router */
+        $router = $this->container()->make(Router::class);
+
+        self::assertSame(NoStore::class, $router->getMiddleware()['mfa.no-store'] ?? null);
+
+        $channels = config('logging.channels');
+
+        self::assertIsArray($channels);
+        self::assertNotSame([], $channels);
+
+        foreach ($channels as $name => $channel) {
+            self::assertIsArray($channel);
+            self::assertContains(RedactSecretsInLogs::class, $channel['tap'] ?? [], (string) $name);
+        }
     }
 
     /**

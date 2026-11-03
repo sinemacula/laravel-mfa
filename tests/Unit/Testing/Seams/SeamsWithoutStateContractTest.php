@@ -47,7 +47,10 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Lifecycle\FixedFreshnessGate;
 use Tests\Fixtures\Requirements\FreshOnceGate;
 use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\DriftingSeams;
 use Tests\Fixtures\Seams\FaultySeams;
+use Tests\Fixtures\Seams\ObjectContextResolver;
+use Tests\Fixtures\Seams\ScriptedFreshnessGate;
 use Tests\TestCase;
 
 /**
@@ -247,6 +250,119 @@ final class SeamsWithoutStateContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
 
         SeamAssert::scalars(['identity_type' => 'person', 'identity_id' => new \stdClass], 'An event context must hold integers, strings and nulls only.');
+    }
+
+    /**
+     * The kit asks a resolver for the context of an identity and a request, and
+     * for the context of neither, and rejects an object in either.
+     *
+     * @return void
+     */
+    public function testRejectsAResolverWithAnObjectInEitherContext(): void
+    {
+        foreach ([true, false] as $forIdentity) {
+            $failure = self::rejection(static fn () => EventContextResolverContract::assertGivesScalarValuesOnly(new ObjectContextResolver($forIdentity), new NonEloquentIdentity));
+
+            self::assertNotNull($failure, sprintf('A resolver with an object in the context %s was expected to be rejected.', $forIdentity ? 'of an identity' : 'of nobody'));
+            self::assertStringContainsString('integers, strings and nulls only', $failure->getMessage());
+        }
+    }
+
+    /**
+     * The kit rejects a resolver that names a new application each time it is
+     * asked about the same request, though never a blank one.
+     *
+     * @return void
+     */
+    public function testRejectsAResolverThatNamesAnotherApplicationEachTime(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A request must name the same application each time.');
+
+        ApplicationResolverContract::assertNamesOneApplication(new DriftingSeams, Request::create('/'));
+    }
+
+    /**
+     * The kit rejects a resolver that finds a person a machine.
+     *
+     * @return void
+     */
+    public function testRejectsAResolverThatFindsAPersonAMachine(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A person\'s identity must be a person.');
+
+        SubjectTypeResolverContract::assertAPersonIsAPerson(new DriftingSeams, $this->personIdentity());
+    }
+
+    /**
+     * The kit rejects a requirement that answers the same question the same way
+     * each time it is asked in a row, but differently once another has been
+     * asked in between.
+     *
+     * @return void
+     */
+    public function testRejectsARequirementThatRemembersTheQuestionBefore(): void
+    {
+        $drifting = new DriftingSeams;
+        $identity = new NonEloquentIdentity;
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('whatever was asked in between');
+
+        RequirementSeamContract::assertKeepsNoStateBetweenCalls(
+            static fn () => $drifting->requirementFor($identity, 'web'),
+            static fn () => $drifting->requirementFor($identity, 'api'),
+        );
+    }
+
+    /**
+     * The kit rejects a gate that finds an operation with no requirement fresh.
+     *
+     * @return void
+     */
+    public function testRejectsAGateThatFindsAnUnconfiguredOperationFresh(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('An operation with no requirement must never be fresh.');
+
+        FreshnessGateContract::assertAnOperationWithNoRequirementIsNeverFresh(new ScriptedFreshnessGate(true, null));
+    }
+
+    /**
+     * The kit rejects a gate that finds an operation with no requirement fresh
+     * though it names no deadline, and one that names a deadline for an
+     * operation it does not find fresh.
+     *
+     * @return void
+     */
+    public function testRejectsAGateWhoseFreshnessAndDeadlineDisagree(): void
+    {
+        $gates = [
+            'fresh with no deadline'    => new ScriptedFreshnessGate(true, null),
+            'not fresh with a deadline' => new ScriptedFreshnessGate(false, CarbonImmutable::now()->addHour()),
+        ];
+
+        foreach ($gates as $name => $gate) {
+            self::assertNotNull(
+                self::rejection(static fn () => FreshnessGateContract::assertAnOperationThatIsNotFreshHasNoDeadline($gate)),
+                sprintf('A gate %s was expected to be rejected.', $name),
+            );
+        }
+    }
+
+    /**
+     * The kit rejects a gate that names no deadline for an operation it is
+     * asked about as fresh, failing its assertion rather than erring.
+     *
+     * @return void
+     */
+    public function testRejectsAGateThatNamesNoDeadline(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A session fresh for the operation must say until when.');
+
+        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new ScriptedFreshnessGate(true, null), Operation::ADD_FACTOR->value);
     }
 
     /**
@@ -514,5 +630,23 @@ final class SeamsWithoutStateContractTest extends TestCase
     protected function tenantApplication(): string
     {
         return 'web';
+    }
+
+    /**
+     * The failure a check that must reject what it is given fails with, or
+     * `null` when it accepts it.
+     *
+     * @param  \Closure(): void  $check
+     * @return ?\PHPUnit\Framework\AssertionFailedError
+     */
+    private static function rejection(\Closure $check): ?AssertionFailedError
+    {
+        try {
+            $check();
+        } catch (AssertionFailedError $failure) {
+            return $failure;
+        }
+
+        return null;
     }
 }
