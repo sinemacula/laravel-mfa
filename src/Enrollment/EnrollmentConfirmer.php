@@ -25,6 +25,7 @@ use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
+use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
@@ -80,7 +81,8 @@ use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
  * so the whole requirement is evaluated again; the session may stay pending. On
  * an active session no proof is recorded and `StepUp` is not called, since this
  * code was bound to the enrolment: the requirement is evaluated again on the
- * proofs the session holds, and a shortfall goes to `SessionTransition`.
+ * proofs the session holds, and the confirmation goes to `SessionTransition`
+ * with any shortfall, whose answer the confirmation returns.
  *
  * Stateless: the seams and the configuration are read on every call.
  *
@@ -415,11 +417,10 @@ final readonly class EnrollmentConfirmer
             return EnrollmentConfirmation::confirmed($summary, $codes, $result->withCompletion($acceptance->handOver($caller, $result)));
         }
 
-        $proofs = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
+        $proofs    = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
+        $judgement = $this->container->make(SessionReevaluation::class)->judge($identity, $application, $binding->sessionId, FactorChangeMade::CONFIRMED, $summary, $proofs);
 
-        $this->container->make(SessionReevaluation::class)->reevaluate($identity, $application, $proofs);
-
-        return EnrollmentConfirmation::confirmed($summary, $codes);
+        return EnrollmentConfirmation::confirmed($summary, $codes, completion: $judgement->completion());
     }
 
     /**

@@ -51,7 +51,8 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   factor; and the bound `LastFactorPolicy` must allow it. `Lifecycle\FactorRemoval` then deletes the factor and its
   association, forgets the factor's proofs on the current session at once, deletes the recovery codes with the last
   confirmed factor, revokes the identity's other sessions through the bound `SessionRevoker`, evaluates the current
-  session's requirement again on the proofs it kept and hands a shortfall to the bound `SessionTransition`, and reports
+  session's requirement again on the proofs it kept and hands the removal, with any shortfall, to the bound
+  `SessionTransition` unless the revoker judged the session itself, and reports
   `FactorRemoved`, then the recovery codes' removal. The locking query names the owner, so another identity's
   association is never returned or acted on: the unlocked `exists()` finds it, and it is answered `not_found`.
 - The default `LastFactorPolicy` (`Lifecycle\RequiredFactorPolicy`) counts a remaining passkey only while its
@@ -71,8 +72,9 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   factor ends a re-enrolment obligation; on the bootstrap path `BootstrapEnrollmentCompleted` is reported, and the proof
   goes through `Verification\ProofAcceptance` to the bound `PendingCompletion` as the last write, its result on
   `PasskeyAssociationResult::$verification`. On an active session the requirement is evaluated again on the proofs the
-  session holds, as for any other factor, and a shortfall goes to the bound `SessionTransition`. A refusal rolls back
-  the whole registration, and whatever the completion returned must not leave before the caller's commit. Recovery codes
+  session holds, as for any other factor, and the registration goes to the bound `SessionTransition` with any shortfall,
+  what it returns on `PasskeyAssociationResult::completion()`. A refusal rolls back the whole registration, and
+  whatever either completion returned must not leave before the caller's commit. Recovery codes
   come through `RecoveryCodes\RecoveryCodeIssuance::withFirstFactor()`, as for any other factor.
 
 ## Success Path

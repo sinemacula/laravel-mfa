@@ -42,17 +42,18 @@ in [Factor lifecycle](../guides/lifecycle.md).
   one of these either, so what committed is never reported as refused.
 - A removal's order is the lock order: the factor and its association, with the last confirmed factor the recovery code
   set (`deleteSet()`), then what the session keeps is read and `SessionRevoker::factorRemoved()` runs with the factor
-  and the sign-in the removal is made from, the requirement is evaluated again, and a shortfall goes to the transition
-  unless the revoker judged the session itself. Every package row has changed before a session seam runs, so a package
-  row is never locked after a session row. `FactorRemoved` is queued after that synchronous security work, then
-  `reportSetRemoved()` queues `RecoveryCodesRemoved`. Moving them ahead of `factorRemoved()` would put their listeners
-  ahead of the default revoker's after-commit restoration of the proofs the current session keeps.
+  and the sign-in the removal is made from, the requirement is evaluated again, and the removal goes to the transition
+  with any shortfall unless the revoker judged the session itself. Every package row has changed before a session seam
+  runs, so a package row is never locked after a session row. `FactorRemoved` is queued after that synchronous security
+  work, then `reportSetRemoved()` queues `RecoveryCodesRemoved`. Moving them ahead of `factorRemoved()` would put their
+  listeners ahead of the default revoker's after-commit restoration of the proofs the current session keeps.
 - A revoker that judges the current session itself, as an authentication layer's does, says so with
-  `RemovalRevocation::judged()`, and what it returns reaches the caller as `FactorRemovalResult::$completion`: a layer's
-  result carrying the pending session's new credential, say. The package still reports the requirement it finds
-  outstanding, as its own assessment; the layer's result is the authoritative outcome, as it may end the session or
-  return it to pending by rules of its own. Handing the shortfall to the transition as well would return the session to
-  pending twice.
+  `RemovalRevocation::judged()`, and what it returns reaches the caller as `FactorRemovalResult::completion()`: a
+  layer's result carrying the pending session's new credential, say. Otherwise what the transition returns does. The
+  package still reports the requirement it finds outstanding, as its own assessment; the layer's result is the
+  authoritative outcome, as it may end the session or return it to pending by rules of its own. Handing the removal to
+  the transition as well would judge the session twice. A completion may hold a credential, so each carrier holds it as
+  a `\SensitiveParameterValue` behind `completion()` (see [Secrets in Responses and Logs](secrets-in-responses-and-logs.md)).
 - Proofs forgotten on the session are not restored if the transaction rolls back, as a snapshot put back could undo a
   later invalidation. The failure is closed: the session verifies again.
 - A reset's order is the lock order: lockouts and counts, every factor and enrolment, the recovery set, the obligation,

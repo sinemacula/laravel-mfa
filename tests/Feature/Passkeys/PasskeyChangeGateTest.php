@@ -15,7 +15,6 @@ use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -24,6 +23,7 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentAuthority;
+use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -55,6 +55,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
@@ -578,8 +579,9 @@ final class PasskeyChangeGateTest extends TestCase
         $this->registrar()->remove($user, self::APPLICATION, self::CREDENTIAL);
 
         self::assertFalse(Factor::query()->whereKey($passkey->id)->exists());
-        self::assertCount(1, $transition->returned);
-        self::assertSame(self::APPLICATION, $transition->returned[0][0]);
+        self::assertCount(1, $transition->shortfalls());
+        self::assertSame(FactorChangeMade::REMOVED, $transition->changes[0]->change);
+        self::assertSame($passkey->id, $transition->changes[0]->factor->id);
     }
 
     /**
@@ -608,7 +610,7 @@ final class PasskeyChangeGateTest extends TestCase
         $this->stepUpWith($user, $totp);
 
         self::assertSame($completion, DB::transaction(fn (): ?object => $this->gate()->removing($user, self::APPLICATION, self::CREDENTIAL)));
-        self::assertSame([], $transition->returned);
+        self::assertSame([], $transition->changes);
         self::assertNull(DB::transaction(fn (): ?object => $this->gate()->removing($user, self::APPLICATION, self::CREDENTIAL)));
     }
 
@@ -650,7 +652,8 @@ final class PasskeyChangeGateTest extends TestCase
         self::assertSame(0, PasskeyAssociation::query()->count());
         self::assertTrue(Factor::query()->whereKey($totp->id)->exists());
         self::assertSame(10, RecoveryCode::query()->count());
-        self::assertSame([], $transition->returned);
+        self::assertCount(1, $transition->changes);
+        self::assertSame([], $transition->shortfalls());
         Event::assertDispatched(FactorRemoved::class, static fn (FactorRemoved $event): bool => $event->factor->id === $passkey->id);
     }
 
@@ -1112,7 +1115,8 @@ final class PasskeyChangeGateTest extends TestCase
     {
         $this->enablePasskeys(['requirement' => 'enrolled']);
 
-        $transition = new RecordingSessionTransition;
+        $completion = new \stdClass;
+        $transition = new RecordingSessionTransition($completion);
 
         $this->container()->instance(SessionTransition::class, $transition);
 
@@ -1124,8 +1128,15 @@ final class PasskeyChangeGateTest extends TestCase
 
         self::assertNotNull($result);
         self::assertNull($result->verification);
-        self::assertCount(1, $transition->returned);
-        self::assertSame(self::APPLICATION, $transition->returned[0][0]);
+        self::assertSame($completion, $result->completion());
+        self::assertCount(1, $transition->shortfalls());
+
+        $change = $transition->changes[0];
+
+        self::assertSame(FactorChangeMade::PASSKEY_REGISTERED, $change->change);
+        self::assertSame(self::APPLICATION, $change->application);
+        self::assertSame($this->container()->make(ProofStore::class)->currentSession($user, self::APPLICATION), $change->session);
+        self::assertSame($result->factor->id, $change->factor->id);
     }
 
     /**
@@ -1141,17 +1152,15 @@ final class PasskeyChangeGateTest extends TestCase
 
         $this->container()->instance(SessionTransition::class, new class implements SessionTransition {
             /**
-             * Refuse the return.
+             * Refuse the change.
              *
-             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-             * @param  string  $application
-             * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $outstanding
-             * @return void
+             * @param  \SineMacula\Laravel\Mfa\Requirements\SessionChange  $change
+             * @return ?object
              *
              * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
              */
             #[\Override]
-            public function returnToPending(MultiFactorAuthenticatable $identity, string $application, Requirement $outstanding): void
+            public function factorChanged(SessionChange $change): ?object
             {
                 throw new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'The session refused it.');
             }

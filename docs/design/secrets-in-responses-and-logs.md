@@ -21,8 +21,10 @@ it.
   `[redacted]` marker, and the `\SensitiveParameterValue` gives `print_r`, `var_dump`, `var_export`, array casts and
   Symfony's VarDumper nothing. The class is final and readonly.
 - A value that holds a secret but is not returned to show it keeps to the same standard: `Verification\Submission`'s
-  code and response, `Verification\VerificationResult`'s completion and `Assurance\Channel`'s reference are each held as
-  a `\SensitiveParameterValue` behind an accessor, so no dump shows them.
+  code and response, `Assurance\Channel`'s reference, and the completion a seam returns for the caller, wherever it is
+  carried (`Verification\VerificationResult`, `Enrollment\EnrollmentConfirmation`, `Passkeys\PasskeyAssociationResult`,
+  `Lifecycle\FactorRemovalResult`, `Proofs\RemovalRevocation` and the internal `Requirements\SessionJudgement`), are
+  each held as a `\SensitiveParameterValue` behind an accessor, so no dump shows them.
 - `Secrets\SecretResponse::json()` is the one helper that reveals: it replaces every `RevealedSecret` in the data, at
   any depth of nested arrays, by its plaintext, and sends the response with `Cache-Control: no-store` and
   `Pragma: no-cache`. A `RevealedSecret` inside another object is not revealed, so encoding it throws.

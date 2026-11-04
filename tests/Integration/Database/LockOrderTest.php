@@ -148,7 +148,7 @@ final class LockOrderTest extends TestCase
         $this->recorder->start();
 
         self::assertTrue($act());
-        self::assertSame(['factorRemoved'], $this->recorder->seams());
+        self::assertSame(['factorRemoved', 'factorChanged'], $this->recorder->seams());
 
         $seen = [];
 
@@ -161,9 +161,9 @@ final class LockOrderTest extends TestCase
             $seen[] = $entry['statement'] ?? 'seam';
         }
 
-        self::assertCount(2, $seen);
+        self::assertCount(3, $seen);
         self::assertStringContainsString('delete', $seen[0]);
-        self::assertSame('seam', $seen[1]);
+        self::assertSame(['seam', 'seam'], array_slice($seen, 1));
     }
 
     /**

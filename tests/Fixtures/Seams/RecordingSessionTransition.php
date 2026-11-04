@@ -4,13 +4,12 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Seams;
 
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
-use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 
 /**
- * A session transition that records each session it is asked to return to
- * pending, and does nothing else.
+ * A session transition that records each change it is asked to judge the
+ * session again after, and returns the completion it is given.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,20 +18,41 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  */
 final class RecordingSessionTransition implements SessionTransition
 {
-    /** @var list<array{string, \SineMacula\Laravel\Mfa\Requirements\Requirement}> The application and outstanding requirement of each return. */
-    public array $returned = [];
+    /** @var list<\SineMacula\Laravel\Mfa\Requirements\SessionChange> Each change judged, in order. */
+    public array $changes = [];
 
     /**
-     * Record the return.
+     * Constructor.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $outstanding
-     * @return void
+     * @param  ?object  $completion
+     */
+    public function __construct(
+
+        /** What each judgement returns for the caller. */
+        private readonly ?object $completion = null,
+    ) {}
+
+    /**
+     * Record the change, and return the completion.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Requirements\SessionChange  $change
+     * @return ?object
      */
     #[\Override]
-    public function returnToPending(MultiFactorAuthenticatable $identity, string $application, Requirement $outstanding): void
+    public function factorChanged(SessionChange $change): ?object
     {
-        $this->returned[] = [$application, $outstanding];
+        $this->changes[] = $change;
+
+        return $this->completion;
+    }
+
+    /**
+     * The changes judged that the package found the session short after.
+     *
+     * @return list<\SineMacula\Laravel\Mfa\Requirements\SessionChange>
+     */
+    public function shortfalls(): array
+    {
+        return array_values(array_filter($this->changes, static fn (SessionChange $change): bool => $change->outstanding !== null));
     }
 }

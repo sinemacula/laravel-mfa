@@ -12,6 +12,10 @@ namespace SineMacula\Laravel\Mfa\Proofs;
  * this package, such as an authentication layer's result carrying the pending
  * session's new credential.
  *
+ * The completion may hold a credential, so it is held as a
+ * `\SensitiveParameterValue` and read through `completion()`, and no dump shows
+ * it.
+ *
  * @api
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -19,6 +23,9 @@ namespace SineMacula\Laravel\Mfa\Proofs;
  */
 final readonly class RemovalRevocation
 {
+    /** @var \SensitiveParameterValue What the revoker returns to the caller, hidden from dumps. */
+    private \SensitiveParameterValue $completion;
+
     /**
      * Constructor.
      *
@@ -30,9 +37,12 @@ final readonly class RemovalRevocation
         /** Whether the revoker judged the current session again itself. */
         public bool $judgedCurrent,
 
-        /** What the revoker returns to the caller, opaque to this package. */
-        public ?object $completion,
-    ) {}
+        // What the revoker returns to the caller, opaque to this package.
+        #[\SensitiveParameter]
+        ?object $completion,
+    ) {
+        $this->completion = new \SensitiveParameterValue($completion);
+    }
 
     /**
      * The identity's other sessions were ended, and the current one is left to
@@ -52,8 +62,19 @@ final readonly class RemovalRevocation
      * @param  ?object  $completion
      * @return self
      */
-    public static function judged(?object $completion = null): self
+    public static function judged(#[\SensitiveParameter] ?object $completion = null): self
     {
         return new self(true, $completion);
+    }
+
+    /**
+     * What the revoker returns to the caller, or `null`.
+     *
+     * @return ?object
+     */
+    public function completion(): ?object
+    {
+        /** @var ?object */
+        return $this->completion->getValue();
     }
 }

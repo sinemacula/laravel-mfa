@@ -8,16 +8,22 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
+use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
+use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
+use SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
+use Tests\Fixtures\Lifecycle\RecordingSessionRevoker;
 use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\RecordingSessionTransition;
 use Tests\TestCase;
 
 /**
@@ -181,6 +187,47 @@ final class FactorRemovalTest extends TestCase
 
         self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
         self::assertSame(['FactorRemoved'], $this->reportedNames());
+    }
+
+    /**
+     * Unless the revoker judged the session itself, the removal goes to the
+     * session transition, told the sign-in and the factor, and what it returns
+     * is the result's; a revoker that judged it is the only judge, and its
+     * answer is the result's.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testOneJudgeOfTheSessionAnswersTheRemoval(): void
+    {
+        $this->enablePasskeys();
+
+        $user       = $this->signedInPerson();
+        $factor     = $this->confirmedFactor($user);
+        $other      = $this->confirmedFactor($user);
+        $completion = new \stdClass;
+        $transition = new RecordingSessionTransition($completion);
+
+        $this->container()->instance(SessionTransition::class, $transition);
+
+        $factors = new Collection([$factor, $other]);
+        $result  = DB::transaction(fn (): FactorRemovalResult => $this->removal()->remove($user, self::APPLICATION, $factor, $factors, SignInProofs::SESSION));
+
+        self::assertSame($completion, $result->completion());
+        self::assertCount(1, $transition->changes);
+        self::assertSame(FactorChangeMade::REMOVED, $transition->changes[0]->change);
+        self::assertSame(SignInProofs::SESSION, $transition->changes[0]->session);
+        self::assertSame($factor->id, $transition->changes[0]->factor->id);
+
+        $answer = new \stdClass;
+
+        $this->container()->instance(SessionRevoker::class, new RecordingSessionRevoker(judges: true, completion: $answer));
+
+        $result = DB::transaction(fn (): FactorRemovalResult => $this->removal()->remove($user, self::APPLICATION, $other, new Collection([$other]), SignInProofs::SESSION));
+
+        self::assertSame($answer, $result->completion());
+        self::assertCount(1, $transition->changes);
     }
 
     /**

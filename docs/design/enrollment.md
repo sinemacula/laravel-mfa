@@ -85,7 +85,9 @@ for the session. The API is in [Enrolment](../guides/enrollment.md).
 - Complete on an active session: nothing is recorded and `StepUp` is not called, because the authentication layer's
   step-up accepts only `step_up` and this code was bound to enrolling. The confirmation proof is evaluated only
   hypothetically, for recovery codes. `Requirements\SessionReevaluation`, shared with `Lifecycle\FactorRemoval`, then
-  evaluates the requirement on the proofs the session holds and hands a shortfall to `SessionTransition`.
+  evaluates the requirement on the proofs the session holds and hands the confirmation, with any shortfall, to
+  `SessionTransition`, whatever it finds: an authentication layer judges the session by its own rules and writes its
+  own guard against an issuance racing the change. What the transition returns is the confirmation's `completion()`.
 - `RecoveryCodes\RecoveryCodeIssuance::withFirstFactor()` issues a set when "first" holds under the lock, the
   application accepts them, and the known first factor followed by the actual confirmation proof reaches the
   application's level. It does not go through the freshness-gated `generate()`.

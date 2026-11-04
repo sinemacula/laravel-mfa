@@ -4,13 +4,15 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
+use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
+use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 use SineMacula\Laravel\Mfa\Testing\Seams\SessionTransitionContract;
 
 /**
- * The `SessionTransition` contract kit: returning a session to pending returns,
- * or refuses by throwing a `RuntimeException`.
+ * The `SessionTransition` contract kit: judging a session again after each
+ * change to its factors, with a shortfall and without, returns, or refuses by
+ * throwing a `RuntimeException`.
  *
  * A test case proves its implementation by using this trait and implementing
  * the hooks; each check delegates to `SessionTransitionContract`.
@@ -25,13 +27,13 @@ use SineMacula\Laravel\Mfa\Testing\Seams\SessionTransitionContract;
 trait SessionTransitionTests
 {
     /**
-     * Returning a session to pending returns, or refuses by throwing.
+     * Judging a session after each change returns, or refuses by throwing.
      *
      * @return void
      */
     public function testSessionTransitionReturnsOrRefusesByThrowing(): void
     {
-        SessionTransitionContract::assertReturnsOrRefusesByThrowing($this->sessionTransition(), $this->transitionIdentity(), $this->transitionApplication());
+        SessionTransitionContract::assertReturnsOrRefusesByThrowing($this->sessionTransition(), $this->sessionChange(...));
     }
 
     /**
@@ -42,16 +44,12 @@ trait SessionTransitionTests
     abstract protected function sessionTransition(): SessionTransition;
 
     /**
-     * An identity with a current session.
+     * The change, made on an active session arranged afresh for it: an identity
+     * signed in on an application, the sign-in's session id, and the factor the
+     * change was made to. The kit gives it the package's assessment.
      *
-     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     * @param  \SineMacula\Laravel\Mfa\Enums\FactorChangeMade  $change
+     * @return \SineMacula\Laravel\Mfa\Requirements\SessionChange
      */
-    abstract protected function transitionIdentity(): MultiFactorAuthenticatable;
-
-    /**
-     * The application its session is on.
-     *
-     * @return string
-     */
-    abstract protected function transitionApplication(): string;
+    abstract protected function sessionChange(FactorChangeMade $change): SessionChange;
 }

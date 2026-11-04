@@ -36,7 +36,7 @@ if (!$result->wasMade()) {
 
 $result->factor;       // FactorSummary, as it stood
 $result->outstanding;  // ?Requirement the session no longer meets, for an RFC 9470 style answer
-$result->completion;   // ?object the bound session revoker returned, such as a pending session's new credential
+$result->completion(); // ?object the session revoker, or else the session transition, returned, such as a new credential
 ```
 
 A removal serves active sessions only. The refusals, in the order they are made:
@@ -89,16 +89,17 @@ tenant's policy too.
 In one transaction under the identity's lock: the factor and its passkey association go; every proof made with it stops
 counting on this session; with the last confirmed factor the recovery code set goes; the identity's other sessions are
 revoked through the bound `SessionRevoker`, told the factor and the sign-in the removal is made from; this session's
-requirement is evaluated again on the proofs it kept, the active tenant's included, and a shortfall goes to the bound
-`SessionTransition`, unless the revoker judged the session again itself; `FactorRemoved` is queued, then
-`RecoveryCodesRemoved` when there was a set. A pending factor left behind does not keep the set; a confirmed one the
-ceiling disabled does.
+requirement is evaluated again on the proofs it kept, the active tenant's included, and the removal goes to the bound
+`SessionTransition` with any shortfall, unless the revoker judged the session again itself; `FactorRemoved` is queued,
+then `RecoveryCodesRemoved` when there was a set. A pending factor left behind does not keep the set; a confirmed one
+the ceiling disabled does.
 
 `$result->outstanding` is the whole requirement the session no longer meets, not what is left of it, as this package
-assesses it. An authentication layer's revoker that judged the session itself (see
-[Seams with an authentication layer](extending.md#seams-with-an-authentication-layer)) may have ended it or returned it
-to pending by rules of its own; what it returned, in `$result->completion`, is the outcome to answer with. Nothing is promoted
-when the preferred factor goes: removing it leaves none preferred, and offers fall back to the oldest.
+assesses it. An authentication layer that judged the session itself, through its revoker or its transition (see
+[Seams with an authentication layer](extending.md#seams-with-an-authentication-layer)), may have ended it or returned it
+to pending by rules of its own; what it returned, from `$result->completion()`, is the outcome to answer with. It may
+hold a credential, so no dump shows it. Nothing is promoted when the preferred factor goes: removing it leaves none
+preferred, and offers fall back to the oldest.
 
 Forgetting the proofs happens at once and is not undone if the change rolls back, which leaves the session to verify
 again. Restoring them could undo a later invalidation.
@@ -233,6 +234,6 @@ Every one goes through `Events\EventDispatcher`, once its change commits, and no
 | `LastFactorPolicy`     | `Lifecycle\RequiredFactorPolicy`       | Consult a tenant's policy as well                         |
 | `SelfServiceRecovery`  | `Lifecycle\NoSelfServiceRecovery`      | Offer a recovery of your own                              |
 | `SessionRevoker`       | `Proofs\GenerationSessionRevoker`      | End real sessions, throwing when one cannot be ended      |
-| `SessionTransition`    | `Http\MiddlewareSessionTransition`     | Return an active session to pending when it falls short   |
+| `SessionTransition`    | `Http\MiddlewareSessionTransition`     | Judge an active session again after a factor change       |
 | `ActiveTenantResolver` | `Requirements\NoActiveTenant`          | Name the tenant from validated session context            |
 | `FreshnessGate`        | `Requirements\ConfiguredFreshnessGate` | Hold a session to your own freshness                      |
