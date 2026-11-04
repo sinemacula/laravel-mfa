@@ -6,13 +6,13 @@ namespace Tests\Feature\Enrollment;
 
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Mail\Mailable;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Combination;
 use SineMacula\Laravel\Mfa\Assurance\DefaultCombinationPolicy;
 use SineMacula\Laravel\Mfa\Assurance\Evaluation;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
+use SineMacula\Laravel\Mfa\Codes\CodeMessage;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
@@ -193,14 +193,13 @@ final class DeliveredEnrollmentStarterTest extends TestCase
             /**
              * Fail.
              *
-             * @param  string  $address
-             * @param  \Illuminate\Contracts\Mail\Mailable  $message
+             * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
              * @return void
              *
              * @throws \RuntimeException
              */
             #[\Override]
-            public function send(#[\SensitiveParameter] string $address, #[\SensitiveParameter] Mailable $message): void
+            public function send(#[\SensitiveParameter] CodeMessage $message): void
             {
                 throw new \RuntimeException('The mail server is down.');
             }

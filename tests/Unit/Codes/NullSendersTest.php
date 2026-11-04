@@ -6,12 +6,12 @@ namespace Tests\Unit\Codes;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
 use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException;
+use Tests\Fixtures\Codes\CodeMessages;
 
 /**
  * Unit tests for the default senders: each sends nothing and throws, naming the
@@ -36,7 +36,7 @@ final class NullSendersTest extends TestCase
         $this->expectException(SenderNotConfiguredException::class);
         $this->expectExceptionMessage(sprintf('No sender is bound to deliver codes: bind an implementation of %s in a service provider.', SmsSender::class));
 
-        (new NullSmsSender)->send('+447700900123', 'Your verification code is: 123456');
+        (new NullSmsSender)->send(CodeMessages::to('+447700900123', type: 'sms'));
     }
 
     /**
@@ -49,6 +49,6 @@ final class NullSendersTest extends TestCase
         $this->expectException(SenderNotConfiguredException::class);
         $this->expectExceptionMessage(sprintf('No sender is bound to deliver codes: bind an implementation of %s in a service provider.', EmailSender::class));
 
-        (new NullEmailSender)->send('ada@example.test', new MfaCodeMessage('123456', 10));
+        (new NullEmailSender)->send(CodeMessages::to('ada@example.test'));
     }
 }

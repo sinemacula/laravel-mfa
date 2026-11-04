@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Secrets\Redactor;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Secrets\SensitiveValues;
+use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Secrets\ForgedTrace;
 
 /**
@@ -370,9 +371,10 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A code message, or a queued job sending one, is redacted from a trace's
-     * arguments and from a log's values, nested in an array too; a job sending
-     * another message is kept in a trace.
+     * A code message (one handed to a sender, an email carrying a code, or a
+     * queued job sending one) is redacted from a trace's arguments and from a
+     * log's values, nested in an array too; a job sending another message is
+     * kept in a trace.
      *
      * @return void
      */
@@ -381,8 +383,13 @@ final class RedactorTest extends TestCase
         $message = (new MfaCodeMessage('482915', 10))->to('ada@example.test');
         $other   = new SendQueuedMailable(new Mailable);
 
-        self::assertSame(['[redacted]', ['[redacted]'], $other], Redactor::arguments([$message, [new SendQueuedMailable($message)], $other]));
-        self::assertSame(['message' => '[redacted]', 'nested' => ['[redacted]']], self::redact(['message' => $message, 'nested' => [new SendQueuedMailable($message)]]));
+        $handed = CodeMessages::to('ada@example.test', '482915');
+
+        self::assertSame(['[redacted]', ['[redacted]'], $other, '[redacted]'], Redactor::arguments([$message, [new SendQueuedMailable($message)], $other, $handed]));
+        self::assertSame(
+            ['message' => '[redacted]', 'nested' => ['[redacted]'], 'handed' => '[redacted]'],
+            self::redact(['message' => $message, 'nested' => [new SendQueuedMailable($message)], 'handed' => $handed]),
+        );
     }
 
     /**

@@ -7,9 +7,8 @@ is built the way it is, and which test helpers deliberately stay private to the 
 
 ## Invariants
 
-- The fakes keep what they are given. `FakeEmailSender::lastCodeTo()` reads the message's own field. `FakeSmsSender` has
-  no such method, because it has no authoritative code, only rendered text, and with wording a translation can change a
-  digit heuristic could return a help line's phone number.
+- The fakes keep what they are given: the `Codes\CodeMessage` a sender is handed, never wording. `lastCodeTo()` on
+  either reads the message's own code, so no test guesses at digits in rendered text.
 - `AuthenticatorApp` reads `CarbonImmutable::now()`, the driver's clock, so `Carbon::setTestNow()` is the frozen time.
   There is no `$at` parameter and no refusal of an unfrozen clock.
 - `AuthenticatorApp` does not depend on PHPUnit. A factor that is not `totp` (`TotpParameters::fromFactor()` does not

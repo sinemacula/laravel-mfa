@@ -11,14 +11,15 @@ use Illuminate\Contracts\Support\Arrayable;
  * a log record's context or a trace frame's arguments, with `[redacted]`.
  *
  * A value is redacted when it is a `RevealedSecret`, a
- * `\SensitiveParameterValue` or a code message (an `MfaCodeMessage`, or a
- * queued job sending one), or when its key names a secret, a code or a
- * destination (`secret`, `totp_secret`, `code`, `codes`, `otp`,
- * `one_time_code`, `recovery_code`, `recovery_codes`, `destination`, `address`,
- * `email`, `phone`, `phone_number`, `to`, `recipient`, `provisioning_uri`,
- * `otpauth_uri`, `grant`, `enrollment_grant`, compared without case,
- * underscores, hyphens or spaces, so `recoveryCodes` and `phoneNumber` count).
- * An `otpauth://` provisioning URI is redacted wherever it appears in a string.
+ * `\SensitiveParameterValue` or a code message (a `CodeMessage`, an
+ * `MfaCodeMessage`, or a queued job sending one), or when its key names a
+ * secret, a code or a destination (`secret`, `totp_secret`, `code`, `codes`,
+ * `otp`, `one_time_code`, `recovery_code`, `recovery_codes`, `destination`,
+ * `address`, `email`, `phone`, `phone_number`, `to`, `recipient`,
+ * `provisioning_uri`, `otpauth_uri`, `grant`, `enrollment_grant`, compared
+ * without case, underscores, hyphens or spaces, so `recoveryCodes` and
+ * `phoneNumber` count). An `otpauth://` provisioning URI is redacted wherever
+ * it appears in a string.
  *
  * In a log's values, an exception is scrubbed in place by `ExceptionScrubber`,
  * of the sensitive values the record holds too, a date or an enum is kept, and

@@ -4,11 +4,9 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Config\Repository;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
@@ -17,7 +15,7 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
-use Tests\Fixtures\Codes\CustomMfaCodeMessage;
+use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 
@@ -77,51 +75,24 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the email driver with an empty config slice should surface the
-     * shipped defaults verbatim.
+     * Resolving the email driver builds one that hands each code message to the
+     * bound email sender.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testEmailDriverBuildsWithDefaults(): void
+    public function testEmailDriverSendsThroughTheBoundSender(): void
     {
-        $config = app(Repository::class);
-        $config->set('mfa.codes', []);
-
-        $sender = FakeEmailSender::fake($this->container());
-        $driver = $this->manager()->driver('email');
+        $sender  = FakeEmailSender::fake($this->container());
+        $driver  = $this->manager()->driver('email');
+        $message = CodeMessages::to('ada@example.test');
 
         self::assertInstanceOf(EmailDriver::class, $driver);
 
-        $driver->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), '123456', CarbonImmutable::now()->addMinutes(5));
+        $driver->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), $message);
 
-        self::assertSame(MfaCodeMessage::class, $sender->sent()[0]['message']::class);
-    }
-
-    /**
-     * Resolving the email driver should apply the mailable override in the code
-     * settings.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testEmailDriverBuildsWithConfiguredOverrides(): void
-    {
-        $config = app(Repository::class);
-        $config->set('mfa.codes', [
-            'mailable' => CustomMfaCodeMessage::class,
-        ]);
-
-        $sender = FakeEmailSender::fake($this->container());
-        $driver = $this->manager()->driver('email');
-
-        self::assertInstanceOf(EmailDriver::class, $driver);
-
-        $driver->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), '123456', CarbonImmutable::now()->addMinutes(5));
-
-        self::assertInstanceOf(CustomMfaCodeMessage::class, $sender->sent()[0]['message']);
+        self::assertSame([$message], $sender->sent());
     }
 
     /**

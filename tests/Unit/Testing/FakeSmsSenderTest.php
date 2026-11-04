@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
+use Tests\Fixtures\Codes\CodeMessages;
 
 /**
  * Unit tests for `FakeSmsSender`: it binds itself, keeps every message instead
@@ -51,32 +52,28 @@ final class FakeSmsSenderTest extends TestCase
     }
 
     /**
-     * Messages are kept in order, read back by phone number, and forgotten on
-     * reset.
+     * Messages are kept in order, read back by phone number with the last code
+     * each carried, and forgotten on reset.
      *
      * @return void
      */
     public function testMessagesAreKeptAndReadBack(): void
     {
-        $fake = new FakeSmsSender;
+        $fake   = new FakeSmsSender;
+        $first  = CodeMessages::to('+447700900123', '111111', type: 'sms');
+        $other  = CodeMessages::to('+447700900456', '222222', type: 'sms');
+        $second = CodeMessages::to('+447700900123', '333333', type: 'sms');
 
         self::assertSame([], $fake->sent());
-        self::assertNull($fake->lastMessageTo('+447700900123'));
+        self::assertNull($fake->lastCodeTo('+447700900123'));
 
-        $fake->send('+447700900123', 'first');
-        $fake->send('+447700900456', 'other');
-        $fake->send('+447700900123', 'second');
+        $fake->send($first);
+        $fake->send($other);
+        $fake->send($second);
 
-        self::assertSame([
-            ['to' => '+447700900123', 'message' => 'first'],
-            ['to' => '+447700900456', 'message' => 'other'],
-            ['to' => '+447700900123', 'message' => 'second'],
-        ], $fake->sent());
-        self::assertSame([
-            ['to' => '+447700900123', 'message' => 'first'],
-            ['to' => '+447700900123', 'message' => 'second'],
-        ], $fake->sentTo('+447700900123'));
-        self::assertSame('second', $fake->lastMessageTo('+447700900123'));
+        self::assertSame([$first, $other, $second], $fake->sent());
+        self::assertSame([$first, $second], $fake->sentTo('+447700900123'));
+        self::assertSame('333333', $fake->lastCodeTo('+447700900123'));
         self::assertSame([], $fake->sentTo('+447700900999'));
 
         $fake->reset();

@@ -295,9 +295,9 @@ after it starts a new challenge. `resend_cooldown_seconds` is how long after a c
 same challenge, never longer than the code's lifetime, and before a restarted enrolment's first code to the same
 destination, and `factor_send_limit` and `identity_send_limit` cap how many codes one factor's destination and one
 identity, across its factors and sessions, are sent within `send_window_minutes`, resends included. `mailable` is the
-email message class, `Codes\MfaCodeMessage` or a subclass of it, whose queued payload is always encrypted. The wording
-of the SMS and the email is not configured: it is translated, so it follows the locale (see
-[Localisation](localization.md)).
+email message class `Codes\MailEmailSender` sends a code in, `Codes\MfaCodeMessage` or a subclass of it, whose queued
+payload is always encrypted; a sender of your own ignores it. The package's wording of the SMS and the email is not
+configured: it is translated, so it follows the locale (see [Localisation](localization.md)).
 
 Each send counts towards the caps for `send_window_minutes` from when it was made, and a refused send answers
 `sending_capped` with the seconds until another may be sent (see [Delivered codes](../design/delivered-codes.md)).

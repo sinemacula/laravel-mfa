@@ -7,7 +7,6 @@ namespace SineMacula\Laravel\Mfa\Drivers;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Foundation\Application;
-use SineMacula\Laravel\Mfa\Codes\CodeSettings;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\MfaManager;
@@ -64,7 +63,7 @@ final class DriverBindings
         // the factories are named by class rather than through `self::`, which
         // would then resolve to `MfaManager`.
         $manager->extend('totp', fn (Container $app): TotpDriver => DriverBindings::totp($app->make(Repository::class)));
-        $manager->extend('email', fn (Container $app): EmailDriver => DriverBindings::email($app, $app->make(Repository::class)));
+        $manager->extend('email', fn (Container $app): EmailDriver => DriverBindings::email($app));
         $manager->extend('sms', fn (Container $app): SmsDriver => DriverBindings::sms($app));
         $manager->extend('passkey', fn (): PasskeyDriver => new PasskeyDriver);
     }
@@ -82,22 +81,16 @@ final class DriverBindings
     }
 
     /**
-     * Build the email driver with the bound `EmailSender` and the message class
-     * in `mfa.codes`.
+     * Build the email driver with the bound `EmailSender`.
      *
      * @param  \Illuminate\Contracts\Container\Container  $app
-     * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\EmailDriver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
      */
-    public static function email(Container $app, Repository $config): EmailDriver
+    public static function email(Container $app): EmailDriver
     {
-        return new EmailDriver(
-            sender  : $app->make(EmailSender::class),
-            mailable: (new CodeSettings($config))->mailable(),
-        );
+        return new EmailDriver($app->make(EmailSender::class));
     }
 
     /**

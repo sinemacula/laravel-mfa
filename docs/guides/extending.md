@@ -17,7 +17,7 @@ models and the `Codes\MfaCodeMessage` mailable. Extension is through **compositi
 | Passkeys                   | Implement `Contracts\PasskeyGateway` and bind it; call `Passkeys\PasskeyChangeGate`    |
 | SMS delivery               | Implement `Contracts\SmsSender` and bind it in the container                           |
 | Email delivery             | Implement `Contracts\EmailSender`, or use `Codes\MailEmailSender`, and bind it         |
-| Email code message         | Extend `Codes\MfaCodeMessage` and set `mfa.codes.mailable`                             |
+| Email code message         | Extend `Codes\MfaCodeMessage` and set `mfa.codes.mailable`, read by `MailEmailSender`  |
 | Custom factor model        | Extend `Models\Factor` or implement `Contracts\EloquentFactor`; set `mfa.factor.model` |
 | Custom recovery code model | Extend `Models\RecoveryCode` or implement `Contracts\RecoveryCode`; set the model      |
 
@@ -96,8 +96,9 @@ what depends on the application, as the TOTP window does.
 A type whose codes are delivered to a destination implements `Contracts\CodeDeliveryDriver` as well, usually by
 extending `Drivers\AbstractCodeDriver`, as the email and SMS drivers do. The bound `ChallengeGateway` then draws, stores
 and checks its codes, bound to the factor, the session, the application and the purpose (see
-[Delivered codes](configuration.md#delivered-codes)), and the driver only delivers each one with `deliver()`: it never
-sees or keeps a code otherwise, and its `verify()` and `confirm()` refuse to work on a factor alone.
+[Delivered codes](configuration.md#delivered-codes)), and the driver only delivers each one with `deliver()`, given the
+factor as locked and a `Codes\CodeMessage` to send to the message's destination: it never sees or keeps a code
+otherwise, and its `verify()` and `confirm()` refuse to work on a factor alone.
 
 Bind your implementations in a service provider's `register()` or `boot()`: the package checks its configuration once
 every provider has booted (see [Checking the configuration](configuration.md#checking-the-configuration)), and refuses
@@ -115,13 +116,32 @@ $this->app->bind(EmailSender::class, MailEmailSender::class);
 Bind a sender with `bind()`, as above, unless it is one with no request state: under Octane or in a queue worker a
 `singleton()` is kept for the life of the process (see [Operations](operations.md#octane)).
 
-An `SmsSender` is handed the message with the code in clear. One that queues it must encrypt the queued payload, for
-example with a job that implements `ShouldBeEncrypted`, and none may log it. The package's `MfaCodeMessage` encrypts its
-own queued payload, so an `EmailSender` that queues it needs nothing more.
+A sender is given a `Codes\CodeMessage`, the neutral details of one code, and writes the message itself:
 
-The message a sender is given is already in the words of the locale it is sent in (see
-[Localisation](localization.md)). In tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` bind a
-sender that keeps the messages instead of delivering them (see [Testing](testing.md)).
+| Field           | What it holds                                                                   |
+|-----------------|---------------------------------------------------------------------------------|
+| `application`   | The application the code is for                                                 |
+| `purpose`       | `Enums\Purpose`: `sign_in`, `reauthenticate`, `step_up` or `enrollment`         |
+| `type`          | The factor's type, such as `sms` or `email`                                     |
+| `destination()` | The factor's phone number or address, in the form it keeps                      |
+| `code`          | A `Secrets\RevealedSecret`: call `reveal()` only to put the code in the message |
+| `expiresAt`     | When the code stops working                                                     |
+| `recipient()`   | The identity the code is for                                                    |
+| `factor`        | The factor's `Factors\FactorSummary`, its destination masked                    |
+
+The destination and the recipient are read through methods, and the code is a `RevealedSecret`, so no dump of the
+message shows them. The summary's label is the person's own text and is shown as it is. A sender is called while the
+code is drawn, inside the identity's transaction: a throw is the delivery's failure, and the code is then not kept.
+One that queues the message must encrypt the whole queued payload, destination included, for example with a job that
+implements `ShouldBeEncrypted`, and none may log the code. A queued job that fails later cannot take back a code already
+reported sent.
+
+`Codes\MailEmailSender` lays the code out in the configured `mfa.codes.mailable` (`Codes\MfaCodeMessage` or a
+subclass), in the locale it is sent in, and encrypts it whenever it is queued. For SMS, `Codes\SmsCodeText::of()` gives
+the package's own wording, the `mfa::messages.sms_code` line in the current locale (see
+[Localisation](localization.md)), for a sender that keeps it. In tests, `Testing\FakeSmsSender::fake()` and
+`Testing\FakeEmailSender::fake()` bind a sender that keeps the messages instead of delivering them (see
+[Testing](testing.md)).
 
 A driver whose secret an authenticator app reads from a QR code also implements `Contracts\ProvisioningDriver`:
 `provisioningUri(Factor $factor, $issuer, $accountName, RevealedSecret $secret)` returns the URI as a `RevealedSecret`,
@@ -145,27 +165,27 @@ them on what a restart keeps, such as the owner and the destination.
 The package is organised by capability. Each capability's namespace holds its service, the `*Bindings` class that
 registers it with the container, and the classes only it uses:
 
-| Namespace       | Holds                                                                                              |
-|-----------------|----------------------------------------------------------------------------------------------------|
-| `Factors`       | Factor reads, `FactorSummary` and `OperationGuard`                                                 |
-| `Drivers`       | The TOTP, email, SMS and passkey drivers, the resolver the services run drivers through            |
-| `Codes`         | Delivered codes: `CodeService`, the senders' defaults, `PackageChallengeGateway`, `MfaCodeMessage` |
-| `Requirements`  | `requirement()`, `isFresh()`, `Requirement` and the requirement seams' defaults                    |
-| `Proofs`        | The sign-in's proofs, `SessionProofStore`, `ProofStoreCompletion`, `GuardHooks`, `Proof`           |
-| `Verification`  | `verify()`, `sendCode()`, `offeredFactors()`, `Submission` and `VerificationResult`                |
-| `Assurance`     | `Channel`, `ObservedProperties`, `Evaluation` and the default `DefaultCombinationPolicy`           |
-| `Context`       | `PendingContext`, who a request serves, the defaults, and `AuthenticationContextContributor`       |
-| `Passkeys`      | The change gate, `PasskeyRegistration`, `CredentialId`, assertions and the unavailable gateway     |
-| `Seams`         | Defaults that read nothing of the package: `RefusingReauthenticator`                               |
-| `Enrollment`    | `startEnrollment()`, `confirmEnrollment()`, what they answer and `EnrollmentSettings`              |
-| `Lifecycle`     | Removing, resetting, unlocking, forgetting and pruning, and `LifecycleSettings`                    |
-| `RecoveryCodes` | `generateRecoveryCodes()`, `recoveryCodeStatus()` and `RecoveryCodeSettings`                       |
-| `Attempts`      | `AttemptService`, and `ChallengeCounters`, the counts a challenge owner reports into               |
-| `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`         |
-| `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction            |
-| `Http`          | The `mfa` and `mfa.exempt` middleware, `EnsureMfaRequirementIsMet` and `ExemptFromMfa`             |
-| `Testing`       | The fakes, `AuthenticatorApp`, `Concerns\InteractsWithMfa`, and the kit in `Testing\Seams`         |
-| `Console`       | The `mfa:check` and `mfa:prune` commands                                                           |
+| Namespace       | Holds                                                                                                             |
+|-----------------|-------------------------------------------------------------------------------------------------------------------|
+| `Factors`       | Factor reads, `FactorSummary` and `OperationGuard`                                                                |
+| `Drivers`       | The TOTP, email, SMS and passkey drivers, the resolver the services run drivers through                           |
+| `Codes`         | Delivered codes: `CodeService`, `CodeMessage`, the senders' defaults, `PackageChallengeGateway`, `MfaCodeMessage` |
+| `Requirements`  | `requirement()`, `isFresh()`, `Requirement` and the requirement seams' defaults                                   |
+| `Proofs`        | The sign-in's proofs, `SessionProofStore`, `ProofStoreCompletion`, `GuardHooks`, `Proof`                          |
+| `Verification`  | `verify()`, `sendCode()`, `offeredFactors()`, `Submission` and `VerificationResult`                               |
+| `Assurance`     | `Channel`, `ObservedProperties`, `Evaluation` and the default `DefaultCombinationPolicy`                          |
+| `Context`       | `PendingContext`, who a request serves, the defaults, and `AuthenticationContextContributor`                      |
+| `Passkeys`      | The change gate, `PasskeyRegistration`, `CredentialId`, assertions and the unavailable gateway                    |
+| `Seams`         | Defaults that read nothing of the package: `RefusingReauthenticator`                                              |
+| `Enrollment`    | `startEnrollment()`, `confirmEnrollment()`, what they answer and `EnrollmentSettings`                             |
+| `Lifecycle`     | Removing, resetting, unlocking, forgetting and pruning, and `LifecycleSettings`                                   |
+| `RecoveryCodes` | `generateRecoveryCodes()`, `recoveryCodeStatus()` and `RecoveryCodeSettings`                                      |
+| `Attempts`      | `AttemptService`, and `ChallengeCounters`, the counts a challenge owner reports into                              |
+| `Applications`  | `ApplicationSettings`, what each application accepts and offers, and `DeclaredFirstFactor`                        |
+| `Secrets`       | `RevealedSecret`, `SecretResponse`, the `mfa.no-store` middleware and the log redaction                           |
+| `Http`          | The `mfa` and `mfa.exempt` middleware, `EnsureMfaRequirementIsMet` and `ExemptFromMfa`                            |
+| `Testing`       | The fakes, `AuthenticatorApp`, `Concerns\InteractsWithMfa`, and the kit in `Testing\Seams`                        |
+| `Console`       | The `mfa:check` and `mfa:prune` commands                                                                          |
 
 `Contracts`, `Concerns`, `Models`, `Events`, `Exceptions`, `Enums` and `Facades` hold what their names say for every
 capability (the events and how they are dispatched are in [Events](events.md), and the values and enums assurance is
@@ -259,7 +279,7 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Contracts\ApplicationResolver`                                                       | The session's `getGuard()`, from `Auth::session()`                                                                                                                                                                                   |
 | `Contracts\EventContextResolver`                                                      | `Auth::identity()`, `Auth::principal()`, `Auth::tenant()` and `Auth::session()`                                                                                                                                                      |
 | `Contracts\PasskeyGateway`                                                            | `Auth::passkeys()->passkeys()`, `factorOptions()` and `verifyFactor()`                                                                                                                                                               |
-| `Contracts\SmsSender`, `Contracts\EmailSender`                                        | `Contracts\OneTimeCodeSender`, bound to the same gateway                                                                                                                                                                             |
+| `Contracts\SmsSender`, `Contracts\EmailSender`                                        | `Contracts\OneTimeCodeSender`, bound to the same gateway: map `Codes\CodeMessage` and its `Enums\Purpose` into the gateway's own message                                                                                             |
 | `Secrets\RevealedSecret`, `Secrets\SecretResponse`                                    | Nothing to bind: a secret it reveals is its own, so check its documentation for how it sends one uncached                                                                                                                            |
 | `Contracts\ProofStore`, `Contracts\FirstFactorResolver`                               | `Requirements\RequirementSubject::proofs()` and `$firstFactor`, passed to `Contracts\RequirementCheck::evaluate()`, and `Contracts\FreshnessPolicy::freshProof()`. Needs a read of the session's proofs outside `evaluate()` as well |
 | `Contracts\ChallengeGateway`, `Attempts\ChallengeCounters`                            | `Codes\CodeService::sendFactorCode()` and `verifyFactorCode()`; `Contracts\FactorCodeCounters`, answered with `isUsable()` and `report()`                                                                                            |

@@ -5,12 +5,11 @@ declare(strict_types = 1);
 namespace Tests\Unit\Testing;
 
 use Illuminate\Container\Container;
-use Illuminate\Mail\Mailable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
+use Tests\Fixtures\Codes\CodeMessages;
 
 /**
  * Unit tests for `FakeEmailSender`: it binds itself, keeps every message
@@ -61,53 +60,26 @@ final class FakeEmailSenderTest extends TestCase
     public function testMessagesAreKeptAndTheirCodesReadBack(): void
     {
         $fake   = new FakeEmailSender;
-        $first  = new MfaCodeMessage('111111', 10);
-        $other  = new MfaCodeMessage('222222', 10);
-        $second = new MfaCodeMessage('333333', 10);
-        $plain  = new Mailable;
+        $first  = CodeMessages::to('ada@example.test', '111111');
+        $other  = CodeMessages::to('bob@example.test', '222222');
+        $second = CodeMessages::to('ada@example.test', '333333');
 
         self::assertSame([], $fake->sent());
         self::assertNull($fake->lastCodeTo('ada@example.test'));
 
-        $fake->send('ada@example.test', $first);
-        $fake->send('bob@example.test', $other);
-        $fake->send('ada@example.test', $second);
-        $fake->send('ada@example.test', $plain);
+        $fake->send($first);
+        $fake->send($other);
+        $fake->send($second);
 
-        self::assertSame([
-            ['to' => 'ada@example.test', 'message' => $first],
-            ['to' => 'bob@example.test', 'message' => $other],
-            ['to' => 'ada@example.test', 'message' => $second],
-            ['to' => 'ada@example.test', 'message' => $plain],
-        ], $fake->sent());
-        self::assertSame([
-            ['to' => 'ada@example.test', 'message' => $first],
-            ['to' => 'ada@example.test', 'message' => $second],
-            ['to' => 'ada@example.test', 'message' => $plain],
-        ], $fake->sentTo('ada@example.test'));
+        self::assertSame([$first, $other, $second], $fake->sent());
+        self::assertSame([$first, $second], $fake->sentTo('ada@example.test'));
         self::assertSame('333333', $fake->lastCodeTo('ada@example.test'));
         self::assertSame('222222', $fake->lastCodeTo('bob@example.test'));
         self::assertNull($fake->lastCodeTo('eve@example.test'));
+        self::assertSame([], $fake->sentTo('eve@example.test'));
 
         $fake->reset();
 
         self::assertSame([], $fake->sent());
-    }
-
-    /**
-     * The last code to an address is read past any message after it that
-     * carries none, and past any before it.
-     *
-     * @return void
-     */
-    public function testTheLastCodeIsReadPastOtherMessages(): void
-    {
-        $fake = new FakeEmailSender;
-
-        $fake->send('ada@example.test', new Mailable);
-        $fake->send('ada@example.test', new MfaCodeMessage('444444', 10));
-        $fake->send('ada@example.test', new Mailable);
-
-        self::assertSame('444444', $fake->lastCodeTo('ada@example.test'));
     }
 }

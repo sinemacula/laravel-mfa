@@ -11,7 +11,6 @@ use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Facade;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
@@ -27,7 +26,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
-use Tests\Fixtures\Codes\CustomMfaCodeMessage;
+use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Context\RequestAttributePendingSessionResolver;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
@@ -135,7 +134,6 @@ final class MfaManagerLongRunningTest extends TestCase
         $sandbox->instance('config', $config);
 
         $config->set('mfa.totp.digits', 8);
-        $config->set('mfa.codes.mailable', CustomMfaCodeMessage::class);
 
         $email = FakeEmailSender::fake($sandbox);
         $sms   = FakeSmsSender::fake($sandbox);
@@ -151,9 +149,9 @@ final class MfaManagerLongRunningTest extends TestCase
 
         $factor = new InMemoryFactor(type: 'email', destination: 'ada@example.test');
 
-        $emailDriver->deliver($factor, '123456', CarbonImmutable::now()->addMinutes(5));
+        $emailDriver->deliver($factor, CodeMessages::to('ada@example.test'));
 
-        self::assertInstanceOf(CustomMfaCodeMessage::class, $email->sent()[0]['message']);
+        self::assertCount(1, $email->sent());
 
         $smsDriver = $manager->driver('sms');
 
@@ -167,10 +165,9 @@ final class MfaManagerLongRunningTest extends TestCase
 
         self::assertInstanceOf(EmailDriver::class, $booted);
 
-        $booted->deliver($factor, '654321', CarbonImmutable::now()->addMinutes(5));
+        $booted->deliver($factor, CodeMessages::to('ada@example.test', '654321'));
 
-        self::assertCount(1, $bootedEmail->sent());
-        self::assertSame(MfaCodeMessage::class, $bootedEmail->sent()[0]['message']::class);
+        self::assertSame('654321', $bootedEmail->lastCodeTo('ada@example.test'));
         self::assertCount(1, $email->sent());
     }
 

@@ -4,18 +4,17 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
-use Carbon\CarbonImmutable;
+use SineMacula\Laravel\Mfa\Codes\CodeMessage;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
-use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
 
 /**
  * SMS factor driver.
  *
  * Delivers each code to the factor's phone number through the application's
- * `SmsSender`, in the words of the locale it is sent in: the driver holds no
- * wording, so it follows the request. The default sender throws until the
- * application binds one, so a code is never dropped silently.
+ * `SmsSender`, which is given the code's neutral details and writes the text
+ * itself. The default sender throws until the application binds one, so a code
+ * is never dropped silently.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -74,18 +73,14 @@ final class SmsDriver extends AbstractCodeDriver
     }
 
     /**
-     * Deliver the message carrying the code to the phone number, the code going
-     * into the template after the translator has answered, so it never reaches
-     * the translator.
+     * Hand the message to the SMS sender.
      *
-     * @param  string  $destination
-     * @param  string  $code
-     * @param  \Carbon\CarbonImmutable  $expiresAt
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      */
     #[\Override]
-    protected function send(#[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
+    protected function send(#[\SensitiveParameter] CodeMessage $message): void
     {
-        $this->sender->send($destination, str_replace(ConsumerMessages::CODE_PLACEHOLDER, $code, ConsumerMessages::codeLine(ConsumerMessages::SMS_CODE)));
+        $this->sender->send($message);
     }
 }

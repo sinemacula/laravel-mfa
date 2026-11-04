@@ -5,28 +5,28 @@ declare(strict_types = 1);
 namespace Tests\Feature\Localization;
 
 use Carbon\Carbon;
-use Carbon\CarbonImmutable;
+use Illuminate\Config\Repository;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Mail\SendQueuedMailable;
 use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Testing\Fakes\MailFake;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
+use SineMacula\Laravel\Mfa\Codes\SmsCodeText;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
-use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
-use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
-use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
-use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mime\Email;
+use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Codes\PayloadRecordingQueue;
-use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Codes\WordingSmsSender;
 use Tests\Fixtures\Testing\ChooseLocale;
 use Tests\Fixtures\Testing\ExplicitLocaleCodeMessage;
 use Tests\Fixtures\Testing\RecordingTranslator;
@@ -44,9 +44,9 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(ConsumerMessages::class)]
-#[CoversClass(EmailDriver::class)]
+#[CoversClass(MailEmailSender::class)]
 #[CoversClass(MfaCodeMessage::class)]
-#[CoversClass(SmsDriver::class)]
+#[CoversClass(SmsCodeText::class)]
 final class CodeMessageWordingTest extends TestCase
 {
     use ArrangesVerification;
@@ -63,6 +63,12 @@ final class CodeMessageWordingTest extends TestCase
         'messages.email_ignore'  => 'Si vous n\'avez rien demandé, ignorez ce message.',
     ];
 
+    /** @var \Tests\Fixtures\Codes\WordingSmsSender The SMS sender, wording each code as the package does. */
+    private WordingSmsSender $texts;
+
+    /** @var \Illuminate\Support\Testing\Fakes\MailFake The mail the package's mail sender sent. */
+    private MailFake $outbox;
+
     /**
      * Arrange the application, with every code type, a mailbox, a phone and the
      * lines in French.
@@ -78,7 +84,11 @@ final class CodeMessageWordingTest extends TestCase
 
         $this->enableApplication(['types' => ['totp', 'email', 'sms']]);
 
-        FakeSmsSender::fake($this->container());
+        $this->texts  = new WordingSmsSender;
+        $this->outbox = Mail::fake();
+
+        $this->container()->instance(SmsSender::class, $this->texts);
+        $this->container()->bind(EmailSender::class, MailEmailSender::class);
 
         app('translator')->addLines(self::FRENCH, 'fr', 'mfa');
     }
@@ -135,7 +145,7 @@ final class CodeMessageWordingTest extends TestCase
         config()->set('mail.default', 'array');
         config()->set('mail.mailers.array', ['transport' => 'array']);
 
-        $this->container()->bind(EmailSender::class, MailEmailSender::class);
+        Mail::swap($this->outbox->manager);
 
         $factor = $this->emailFactor($this->signedInPerson());
 
@@ -164,12 +174,11 @@ final class CodeMessageWordingTest extends TestCase
      */
     public function testAnSmsSentThroughTheKernelIsInTheRequestsLocale(): void
     {
-        $sender = FakeSmsSender::fake($this->container());
         $factor = $this->factorOf($this->signedInPerson(), ['type' => 'sms', 'destination' => self::PHONE]);
 
         $this->postJson('code/' . $factor->id)->assertOk();
 
-        self::assertMatchesRegularExpression('/^Votre code par SMS : \d{6}$/D', (string) $sender->lastMessageTo(self::PHONE));
+        self::assertMatchesRegularExpression('/^Votre code par SMS : \d{6}$/D', (string) $this->texts->lastTextTo(self::PHONE));
     }
 
     /**
@@ -180,8 +189,6 @@ final class CodeMessageWordingTest extends TestCase
      */
     public function testAnUntranslatedLocaleSendsTheEnglish(): void
     {
-        $sender = FakeSmsSender::fake($this->container());
-
         app('translator')->setFallback('de');
         app()->setLocale('it');
 
@@ -190,7 +197,7 @@ final class CodeMessageWordingTest extends TestCase
         Mfa::sendCode($this->emailFactor($user)->id);
         Mfa::sendCode($this->factorOf($user, ['type' => 'sms', 'destination' => self::PHONE])->id);
 
-        self::assertMatchesRegularExpression('/^Your verification code is: \d{6}$/D', (string) $sender->lastMessageTo(self::PHONE));
+        self::assertMatchesRegularExpression('/^Your verification code is: \d{6}$/D', (string) $this->texts->lastTextTo(self::PHONE));
 
         $html = $this->lastMessage()->render();
 
@@ -221,8 +228,7 @@ final class CodeMessageWordingTest extends TestCase
     #[DataProvider('linesLosingTheCode')]
     public function testALineLosingTheCodeDeliversTheEnglishWithIt(string $line): void
     {
-        $sender = FakeSmsSender::fake($this->container());
-        $user   = $this->signedInPerson();
+        $user = $this->signedInPerson();
 
         app('translator')->addLines(['messages.sms_code' => $line, 'messages.email_code' => $line], 'fr', 'mfa');
         app()->setLocale('fr');
@@ -230,7 +236,7 @@ final class CodeMessageWordingTest extends TestCase
         Mfa::sendCode($this->emailFactor($user)->id);
         Mfa::sendCode($this->factorOf($user, ['type' => 'sms', 'destination' => self::PHONE])->id);
 
-        self::assertMatchesRegularExpression('/^Your verification code is: \d{6}$/D', (string) $sender->lastMessageTo(self::PHONE));
+        self::assertMatchesRegularExpression('/^Your verification code is: \d{6}$/D', (string) $this->texts->lastTextTo(self::PHONE));
 
         $message = $this->lastMessage();
 
@@ -244,14 +250,12 @@ final class CodeMessageWordingTest extends TestCase
      */
     public function testEveryPlaceholderGetsTheCode(): void
     {
-        $sender = FakeSmsSender::fake($this->container());
-
         app('translator')->addLines(['messages.sms_code' => ':code est votre code. Encore : :code'], 'fr', 'mfa');
         app()->setLocale('fr');
 
         Mfa::sendCode($this->factorOf($this->signedInPerson(), ['type' => 'sms', 'destination' => self::PHONE])->id);
 
-        self::assertMatchesRegularExpression('/^(\d{6}) est votre code\. Encore : \1$/D', (string) $sender->lastMessageTo(self::PHONE));
+        self::assertMatchesRegularExpression('/^(\d{6}) est votre code\. Encore : \1$/D', (string) $this->texts->lastTextTo(self::PHONE));
     }
 
     /**
@@ -262,7 +266,6 @@ final class CodeMessageWordingTest extends TestCase
      */
     public function testTheCodeNeverReachesTheTranslator(): void
     {
-        $sender     = FakeSmsSender::fake($this->container());
         $translator = new RecordingTranslator($this->container()->make('translator'));
 
         $this->container()->instance('translator', $translator);
@@ -279,7 +282,7 @@ final class CodeMessageWordingTest extends TestCase
         self::assertStringContainsString($message->code, $body);
         self::assertNotSame([], $translator->given);
 
-        preg_match('/\d{6}$/', (string) $sender->lastMessageTo(self::PHONE), $sms);
+        preg_match('/\d{6}$/', (string) $this->texts->lastTextTo(self::PHONE), $sms);
 
         self::assertArrayHasKey(0, $sms);
 
@@ -375,18 +378,15 @@ final class CodeMessageWordingTest extends TestCase
      */
     public function testAMessageGoesOutWithoutALocaleWhenNoneIsKnown(): void
     {
-        $sender    = new FakeEmailSender;
-        $factor    = new InMemoryFactor(type: 'email', destination: self::ADDRESS);
         $container = Container::getInstance();
 
         Container::setInstance(new Container);
 
         try {
-            (new EmailDriver($sender))->deliver($factor, '123456', CarbonImmutable::now()->addMinutes(5));
+            (new MailEmailSender($this->outbox, new Repository))->send(CodeMessages::to(self::ADDRESS));
 
-            $message = $sender->sentTo(self::ADDRESS)[0]['message'];
+            $message = $this->lastMessage();
 
-            self::assertInstanceOf(MfaCodeMessage::class, $message);
             self::assertNull($message->locale);
             self::assertSame('Your verification code', $message->envelope()->subject);
         } finally {
@@ -461,18 +461,16 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * The code message the mailbox last received.
+     * The code message last sent to the address.
      *
      * @return \SineMacula\Laravel\Mfa\Codes\MfaCodeMessage
      */
     private function lastMessage(): MfaCodeMessage
     {
-        $sent    = $this->mailbox->sentTo(self::ADDRESS);
-        $message = end($sent);
+        $message = $this->outbox->sent(MfaCodeMessage::class, static fn (MfaCodeMessage $mail): bool => $mail->hasTo(self::ADDRESS))->last();
 
-        self::assertIsArray($message);
-        self::assertInstanceOf(MfaCodeMessage::class, $message['message']);
+        self::assertInstanceOf(MfaCodeMessage::class, $message);
 
-        return $message['message'];
+        return $message;
     }
 }

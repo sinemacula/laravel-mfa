@@ -4,7 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Contracts;
 
-use Carbon\CarbonImmutable;
+use SineMacula\Laravel\Mfa\Codes\CodeMessage;
 
 /**
  * Code delivery driver contract.
@@ -35,16 +35,16 @@ interface CodeDeliveryDriver extends FactorDriver
     public function normalizeDestination(#[\SensitiveParameter] string $destination): ?string;
 
     /**
-     * Deliver the code to the factor's destination. It stops working at the
-     * time given. An exception is the delivery's failure, and the code is then
-     * not kept.
+     * Deliver the message's code to its destination. The factor is the one the
+     * message describes, as locked when the code was drawn; the destination to
+     * send to is the message's. An exception is the delivery's failure, and the
+     * code is then not kept.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $code
-     * @param  \Carbon\CarbonImmutable  $expiresAt
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      *
      * @throws \Throwable
      */
-    public function deliver(Factor $factor, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void;
+    public function deliver(Factor $factor, #[\SensitiveParameter] CodeMessage $message): void;
 }

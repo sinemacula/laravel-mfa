@@ -10,7 +10,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\DeliveredCodes;
-use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -93,7 +92,7 @@ final class OtpLifecycleTest extends TestCase
         self::assertTrue($result->wasSent());
         self::assertNotNull($code);
         self::assertNotNull($result->challengeId);
-        self::assertInstanceOf(MfaCodeMessage::class, $this->mailbox->sentTo(self::ADDRESS)[0]['message']);
+        self::assertSame(Purpose::STEP_UP, $this->mailbox->sentTo(self::ADDRESS)[0]->purpose);
 
         self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $result->challengeId, $code))->isVerified());
         self::assertSame(FailureReason::REPLAYED, Mfa::verify(Submission::challenge($factor->id, $result->challengeId, $code))->reason);
@@ -138,12 +137,12 @@ final class OtpLifecycleTest extends TestCase
         $factor = $this->factorOf($this->signedInPerson(), ['type' => 'sms', 'destination' => self::PHONE]);
 
         $challenge = Mfa::sendCode($factor->id)->challengeId;
-        $message   = $sender->lastMessageTo(self::PHONE);
+        $code      = $sender->lastCodeTo(self::PHONE);
 
         self::assertNotNull($challenge);
-        self::assertNotNull($message);
-        self::assertSame(1, preg_match('/^Your verification code is: (\d{6})$/D', $message, $matches));
-        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $challenge, $matches[1]))->isVerified());
+        self::assertNotNull($code);
+        self::assertMatchesRegularExpression('/^\d{6}$/D', $code);
+        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
     }
 
     /**

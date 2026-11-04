@@ -4,7 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Codes;
 
-use Carbon\CarbonImmutable;
+use SineMacula\Laravel\Mfa\Codes\CodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\AbstractCodeDriver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 
@@ -21,7 +21,7 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
  */
 final class RecordingCodeDriver extends AbstractCodeDriver
 {
-    /** @var list<array{destination: string, code: string, expires_at: \Carbon\CarbonImmutable}> The codes delivered, oldest first. */
+    /** @var list<array{destination: string, code: string, expires_at: \Carbon\CarbonImmutable, message: \SineMacula\Laravel\Mfa\Codes\CodeMessage}> The codes delivered, oldest first. */
     public array $delivered = [];
 
     /** @var bool Whether the next delivery throws instead. */
@@ -66,15 +66,13 @@ final class RecordingCodeDriver extends AbstractCodeDriver
     /**
      * Record the code, or throw when told to fail.
      *
-     * @param  string  $destination
-     * @param  string  $code
-     * @param  \Carbon\CarbonImmutable  $expiresAt
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      *
      * @throws \RuntimeException
      */
     #[\Override]
-    protected function send(#[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
+    protected function send(#[\SensitiveParameter] CodeMessage $message): void
     {
         if ($this->onSend !== null) {
             ($this->onSend)();
@@ -84,6 +82,6 @@ final class RecordingCodeDriver extends AbstractCodeDriver
             throw new \RuntimeException('The transport failed.');
         }
 
-        $this->delivered[] = ['destination' => $destination, 'code' => $code, 'expires_at' => $expiresAt];
+        $this->delivered[] = ['destination' => $message->destination(), 'code' => $message->code->reveal(), 'expires_at' => $message->expiresAt, 'message' => $message];
     }
 }

@@ -5,8 +5,9 @@ Helpers for testing an application that uses the package. Every class name below
 
 ## Fake delivery
 
-`Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` bind a sender that keeps each message instead of
-delivering it, and return it. The manager builds a driver on every call, so the next one sends through the fake.
+`Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` bind a sender that keeps each `Codes\CodeMessage`
+instead of delivering it, and return it. The manager builds a driver on every call, so the next one sends through the
+fake.
 
 ```php
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
@@ -18,28 +19,16 @@ $this->postJson('/mfa/send', ['factor' => $factor->id])->assertOk();
 $code = $mailbox->lastCodeTo('person@example.test');
 ```
 
-| Method                  | On                | What it answers                                |
-|-------------------------|-------------------|------------------------------------------------|
-| `sent()`                | Both              | Every message, oldest first                    |
-| `sentTo($destination)`  | Both              | The messages to the phone number or address    |
-| `lastMessageTo($phone)` | `FakeSmsSender`   | The text last sent to the phone number         |
-| `lastCodeTo($address)`  | `FakeEmailSender` | The code last sent in a `Codes\MfaCodeMessage` |
-| `reset()`               | Both              | Forgets every message so far                   |
+| Method                     | What it answers                                         |
+|----------------------------|---------------------------------------------------------|
+| `sent()`                   | Every message, oldest first                             |
+| `sentTo($destination)`     | The messages to the phone number or address             |
+| `lastCodeTo($destination)` | The code last sent to the phone number or address       |
+| `reset()`                  | Forgets every message so far                            |
 
-There is no `lastCodeTo()` on the SMS fake, because it holds only rendered text and the wording is yours to change, so
-guessing at digits could return a help line's number. To read a code, have the test choose the wording:
-
-```php
-use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
-
-app('translator')->addLines(['messages.sms_code' => 'Code: :code'], 'en', 'mfa');
-
-$phone = FakeSmsSender::fake();
-
-$this->postJson('/mfa/send', ['factor' => $factor->id])->assertOk();
-
-$code = str_replace('Code: ', '', (string) $phone->lastMessageTo('+447700900123'));
-```
+Each message also says what the code was for (`purpose`), the application, and the identity it was sent to
+(`recipient()`). The fakes keep no wording: to test the wording of an SMS, call `Codes\SmsCodeText::of()` on a message,
+and for an email, bind `Codes\MailEmailSender` with `Mail::fake()` and assert on the `MfaCodeMessage` it sent.
 
 An email renders in its captured locale (see [Localisation](localization.md)), so assert on `$message->render()`, not on
 `envelope()` called directly in another locale.
