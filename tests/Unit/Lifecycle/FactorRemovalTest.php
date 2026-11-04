@@ -17,6 +17,7 @@ use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
+use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
@@ -50,7 +51,7 @@ final class FactorRemovalTest extends TestCase
         $factor = $this->confirmedFactor($user);
 
         try {
-            $this->removal()->remove($user, self::APPLICATION, $factor, new Collection([$factor]));
+            $this->removal()->remove($user, self::APPLICATION, $factor, new Collection([$factor]), SignInProofs::SESSION);
             self::fail('A removal outside a transaction was expected to be refused.');
         } catch (\LogicException $exception) {
             self::assertSame('A factor is removed only inside the identity\'s factor state transaction.', $exception->getMessage());
@@ -76,7 +77,7 @@ final class FactorRemovalTest extends TestCase
         $this->expectException(UnsupportedFactorException::class);
         $this->expectExceptionMessage('A factor is removed by its id.');
 
-        DB::transaction(fn () => $this->removal()->remove($user, self::APPLICATION, $factor, new Collection([$factor])));
+        DB::transaction(fn () => $this->removal()->remove($user, self::APPLICATION, $factor, new Collection([$factor]), SignInProofs::SESSION));
     }
 
     /**

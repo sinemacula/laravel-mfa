@@ -51,9 +51,10 @@ moment when both work or neither exists, and what a redemption leaves behind.
 - The public path, `Mfa::generateRecoveryCodes()` (`RecoveryCodes\RecoveryCodeIssuance`), serves the signed-in person
   only, never a pending session, and answers with a `RecoveryCodes\RecoveryCodeGeneration`: the codes, or a reason.
   Nobody served is `not_found`. It captures the binding, and refuses as `not_fresh`, before the draw and again first
-  under the lock, a sign-in that changed, a session not fresh for `mfa.generate_recovery_codes` and one below
-  `ApplicationSettings::recoveryCodeLevel()`, since the remedy is the same stronger step-up; a refusal leaves the old
-  set intact.
+  under the lock, a sign-in that changed and one below `ApplicationSettings::recoveryCodeLevel()`; under the lock only,
+  since one over an authentication layer locks that layer's session row, it asks the bound `FactorChangeGate` for
+  `mfa.generate_recovery_codes` (by default, a session fresh for it). The remedy for each is the same stronger step-up,
+  and a refusal leaves the old set intact. The gate's refusal is a reason, as refusing by throwing is how it answers.
 - Only the package's own refusals become a reason. `RecoveryCodeService::generate()` keeps its throwing contract for
   its internal callers, and is `replaceSet()`, everything up to the commit, then `reportGenerated()`. The issuance wraps
   only `replaceSet()`, where a refusal `OperationRefusedException::byPackage()` marked becomes the answer and any other

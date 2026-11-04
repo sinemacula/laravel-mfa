@@ -51,6 +51,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
@@ -274,7 +275,7 @@ final class PasskeyChangeGateTest extends TestCase
     public function testAStaleReauthenticationIsRefused(): void
     {
         $this->enablePasskeys();
-        $this->reauthenticate(EnrollmentAuthority::REAUTHENTICATION_MAX_AGE + 1);
+        $this->reauthenticate(ConfiguredFactorChangeGate::REAUTHENTICATION_MAX_AGE + 1);
 
         $user = $this->signedInPerson();
 

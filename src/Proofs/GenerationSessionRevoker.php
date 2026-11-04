@@ -18,15 +18,17 @@ use SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException;
  * earlier one stops counting, on every device and every application at once.
  * The Laravel sessions themselves go on; the other sessions must verify again.
  *
- * Revoking every session advances the generation, and nothing else. Revoking
- * the others reads the current sign-in and its counting proofs first, advances
- * the generation, and once the change commits records those proofs again on the
- * same sign-in, stamped with exactly the generation this call advanced to, so a
- * later revocation in the same change still wins. They are recorded again only
- * while the store still names that sign-in; a refusal is dropped, which leaves
- * the current session to verify again. Advancing joins the open factor state
- * transaction, so a change that rolls back advances nothing and records nothing
- * again.
+ * Revoking every session advances the generation, and nothing else. A factor's
+ * removal reads the counting proofs of the sign-in it was made from, other than
+ * the factor's own, when the store still names that sign-in as current,
+ * advances the generation, and once the change commits records those proofs
+ * again on the same sign-in, stamped with exactly the generation this call
+ * advanced to, so a later revocation in the same change still wins. They are
+ * recorded again only while the store still names that sign-in; a refusal is
+ * dropped, which leaves the current session to verify again. Advancing joins
+ * the open factor state transaction, so a change that rolls back advances
+ * nothing and records nothing again. It leaves the current session for the
+ * package to judge again.
  *
  * Stateless: the store and the application are resolved on every call, and the
  * work left for the commit holds only what this call read.
@@ -48,26 +50,31 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
     ) {}
 
     /**
-     * Stop every proof of the identity counting, but the current sign-in's own.
+     * Stop every proof of the identity counting, but the current sign-in's own,
+     * and leave the current session for the package to judge again. The
+     * factor's own proofs on the current sign-in are forgotten by the removal
+     * before this is called.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @return void
+     * @param  string  $factorId
+     * @param  string  $session
+     * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      * @throws \Throwable
      */
     #[\Override]
-    public function revokeOthers(MultiFactorAuthenticatable $identity): void
+    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $session): RemovalRevocation
     {
         $store       = $this->container->make(ProofStore::class);
         $application = $this->container->make(ProofService::class)->application();
-        $session     = $store->currentSession($identity, $application);
-        $kept        = $session === null ? [] : $store->proofs($identity, $application);
+        $current     = $store->currentSession($identity, $application) === $session;
+        $kept        = $current ? self::without($factorId, $store->proofs($identity, $application)) : [];
         $generation  = VerificationGeneration::advance($identity);
 
         if ($kept === []) {
-            return;
+            return RemovalRevocation::othersEnded();
         }
 
         AfterStorageCommit::run($this->container, static function () use ($store, $identity, $application, $session, $kept, $generation): void {
@@ -84,6 +91,8 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
                 // Fail closed: the current session verifies again.
             }
         });
+
+        return RemovalRevocation::othersEnded();
     }
 
     /**
@@ -99,5 +108,17 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
     public function revokeAll(MultiFactorAuthenticatable $identity): void
     {
         VerificationGeneration::advance($identity);
+    }
+
+    /**
+     * The proofs that were not made with the factor.
+     *
+     * @param  string  $factorId
+     * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
+     * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
+     */
+    private static function without(string $factorId, array $proofs): array
+    {
+        return array_values(array_filter($proofs, static fn (Proof $proof): bool => $proof->reference !== $factorId));
     }
 }

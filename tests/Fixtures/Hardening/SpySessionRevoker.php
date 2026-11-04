@@ -6,6 +6,7 @@ namespace Tests\Fixtures\Hardening;
 
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
+use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 
 /**
  * A session revoker that notes each call and then runs what it wraps, if
@@ -24,7 +25,7 @@ final readonly class SpySessionRevoker implements SessionRevoker
      *
      * @param  \Tests\Fixtures\Hardening\LockOrderRecorder  $recorder
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\SessionRevoker  $wrapped
-     * @param  ?\Closure(): void  $onRevokeOthers
+     * @param  ?\Closure(): void  $onFactorRemoved
      */
     public function __construct(
 
@@ -34,32 +35,36 @@ final readonly class SpySessionRevoker implements SessionRevoker
         /** The revoker the calls are passed to, if any. */
         private ?SessionRevoker $wrapped = null,
 
-        /** What else happens as the identity's other sessions are revoked. */
-        private ?\Closure $onRevokeOthers = null,
+        /** What else happens as the identity's other sessions are revoked for a factor's removal. */
+        private ?\Closure $onFactorRemoved = null,
     ) {}
 
     /**
      * Note the call and pass it on.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @return void
+     * @param  string  $factorId
+     * @param  string  $session
+     * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      */
     #[\Override]
-    public function revokeOthers(MultiFactorAuthenticatable $identity): void
+    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $session): RemovalRevocation
     {
-        if ($this->onRevokeOthers !== null) {
-            ($this->onRevokeOthers)();
+        if ($this->onFactorRemoved !== null) {
+            ($this->onFactorRemoved)();
         }
 
         if ($this->wrapped === null) {
-            $this->recorder->seam('revokeOthers');
+            $this->recorder->seam('factorRemoved');
 
-            return;
+            return RemovalRevocation::othersEnded();
         }
 
-        $this->wrapped->revokeOthers($identity);
+        $revocation = $this->wrapped->factorRemoved($identity, $factorId, $session);
 
-        $this->recorder->seam('revokeOthers');
+        $this->recorder->seam('factorRemoved');
+
+        return $revocation;
     }
 
     /**

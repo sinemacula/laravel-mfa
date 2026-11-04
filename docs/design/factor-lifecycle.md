@@ -15,9 +15,10 @@ in [Factor lifecycle](../guides/lifecycle.md).
 - A removal is decided twice by one set of checks, `Lifecycle\RemovalGuard`: on a snapshot taking no lock, then in the
   identity's factor state transaction on the factors as stored under the lock, with the caller resolved again and
   compared through `CallerContextResolver::still()`. The first exists so what is refused anyway waits for nothing and
-  takes no lock; the second is the one that counts. `Passkeys\PasskeyChangeGate::removing()` runs only the second, as it
-  is already inside its caller's transaction; it captures the sign-in before the lock and compares it under the lock in
-  the same way, so its refusals match: no sign-in is `not_fresh`, and one that changed is `not_found`.
+  takes no lock; the second is the one that counts, and the only one that asks the bound `FactorChangeGate`.
+  `Passkeys\PasskeyChangeGate::removing()` runs only the second, as it is already inside its caller's transaction; it
+  captures the sign-in before the lock and compares it under the lock in the same way, so its refusals match: no
+  sign-in is `not_fresh`, and one that changed is `not_found`.
 - The check order is fixed: identity inactive, not found (unknown, someone else's, or another application's), not
   confirmed, not fresh, last factor. An application never deletes a factor enrolled through another, a passkey's
   included: the credential being identity-level makes no exception, and the refusal rolls authentication's own
@@ -29,20 +30,29 @@ in [Factor lifecycle](../guides/lifecycle.md).
 - "Another factor" for the step-up is any other confirmed factor, including one disabled at the ceiling or of a type
   this application does not enable. Relaxing that to factors provable here would let making another factor unavailable
   stand in for proving it. A person stuck without a provable factor is an actor's reset.
-- The freshness of a removal is the bound gate's own: the proofs made without the factor must meet what
-  `FreshnessGate::requirement()` says it holds the session to, so a stricter requirement of an adapter's cannot be
-  satisfied by the removed factor alone. A gate with no requirement to judge by refuses while another factor remains. A
-  recovery code's proof has no reference, so it counts as made without the factor.
+- The freshness of a removal is the bound `FactorChangeGate`'s, asked under the lock only, with the factor's id and
+  the requirement the application configures for `mfa.remove_factor`. The check before the lock asks it nothing, since
+  a gate over an authentication layer locks that layer's session row. The default holds the session to the freshness
+  gate's own requirement on the proofs made without the factor, so a stricter requirement of an adapter's cannot be
+  satisfied by the removed factor alone. A freshness gate with no requirement to judge by refuses while another factor
+  remains. A recovery code's proof has no reference, so it counts as made without the factor.
 - `OperationRefusedException` becomes a refusal only from the checks, wrapped in
   `RefusedUnderLockException::carrying()`. The mutation is outside that wrapper, so a revoker or a transition throwing
   one propagates and rolls back: it failed, it was not refused. An exception a listener throws after the commit is not
   one of these either, so what committed is never reported as refused.
 - A removal's order is the lock order: the factor and its association, with the last confirmed factor the recovery code
-  set (`deleteSet()`), then what the session keeps is read and `revokeOthers()` runs, the requirement is evaluated again
-  and a shortfall goes to the transition. Every package row has changed before a session seam runs, so a package row is
-  never locked after a session row. `FactorRemoved` is queued after that synchronous security work, then
-  `reportSetRemoved()` queues `RecoveryCodesRemoved`. Moving them ahead of `revokeOthers()` would put their listeners
+  set (`deleteSet()`), then what the session keeps is read and `SessionRevoker::factorRemoved()` runs with the factor
+  and the sign-in the removal is made from, the requirement is evaluated again, and a shortfall goes to the transition
+  unless the revoker judged the session itself. Every package row has changed before a session seam runs, so a package
+  row is never locked after a session row. `FactorRemoved` is queued after that synchronous security work, then
+  `reportSetRemoved()` queues `RecoveryCodesRemoved`. Moving them ahead of `factorRemoved()` would put their listeners
   ahead of the default revoker's after-commit restoration of the proofs the current session keeps.
+- A revoker that judges the current session itself, as an authentication layer's does, says so with
+  `RemovalRevocation::judged()`, and what it returns reaches the caller as `FactorRemovalResult::$completion`: a layer's
+  result carrying the pending session's new credential, say. The package still reports the requirement it finds
+  outstanding, as its own assessment; the layer's result is the authoritative outcome, as it may end the session or
+  return it to pending by rules of its own. Handing the shortfall to the transition as well would return the session to
+  pending twice.
 - Proofs forgotten on the session are not restored if the transaction rolls back, as a snapshot put back could undo a
   later invalidation. The failure is closed: the session verifies again.
 - A reset's order is the lock order: lockouts and counts, every factor and enrolment, the recovery set, the obligation,

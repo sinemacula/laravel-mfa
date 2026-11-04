@@ -81,10 +81,16 @@ The package's own operations (`mfa.add_factor`, `mfa.replace_factor`, `mfa.remov
 them. Replacing a factor is enrolling then removing, so it asks `mfa.add_factor` and `mfa.remove_factor`;
 `mfa.replace_factor` applies only where an application asks for it itself. An application names its own, and overrides
 the package's, in its `freshness` block (see [Applications](configuration.md#applications)): seconds for an additional
-verification within that age, or a requirement whose every part has a `max_age`. Starting an enrolment asks this for
-`mfa.add_factor`, and its grant lives no longer than the answer (see [Enrolment](enrollment.md)); generating recovery
-codes asks it for `mfa.generate_recovery_codes`; removing a factor asks it for `mfa.remove_factor` (see
-[Factor lifecycle](lifecycle.md#the-step-up)).
+verification within that age, or a requirement whose every part has a `max_age`.
+
+The package's own changes to a person's factors are authorised by `Contracts\FactorChangeGate`, asked under the
+identity's lock with the change (`Enums\FactorChange`), the sign-in it is made from, the factor a removal names and the
+requirement the application configures for the operation. Its default, `Requirements\ConfiguredFactorChangeGate`,
+judges each on this freshness: starting an enrolment for `mfa.add_factor`, and its grant lives no longer than the
+answer (see [Enrolment](enrollment.md)); generating recovery codes for `mfa.generate_recovery_codes`; removing a factor
+for `mfa.remove_factor`, on the proofs made without it (see [Factor lifecycle](lifecycle.md#the-step-up)). An
+identity's first additional factor (`mfa.add_first_additional_factor`) rests instead on its first factor proved again
+through the bound `Reauthenticator`, within five minutes, and no freshness is configured for it.
 
 A caller may pass a requirement of its own; the stricter of it and the configured one applies, either alone when the
 other is absent:
@@ -149,6 +155,7 @@ Each part is a contract with a default, bound in the container; bind your own fr
 | `TenantRequirement`    | `Requirements\NoTenantRequirement`         | What an active tenant requires                            |
 | `RequirementCheck`     | `Requirements\ProofRequirementCheck`       | Whether a session's proofs meet a requirement             |
 | `FreshnessGate`        | `Requirements\ConfiguredFreshnessGate`     | Whether the session is fresh enough for a named operation |
+| `FactorChangeGate`     | `Requirements\ConfiguredFactorChangeGate`  | Whether the session may make a change to its factors      |
 
 `Mfa::isFresh()` hands the bound gate this package's own requirement for the operation as part of the caller's
 requirement. A gate bound in place of the default, such as an adapter over an authentication layer's freshness check,
@@ -159,5 +166,13 @@ operation's own name (`mfa.add_factor`, never a
 name of the authentication layer's), so the layer's own setting for that name is the one that applies; configure it
 there. It may be stricter than the package: a setting that takes only an additional factor or a recovery code refuses
 a fresh passkey reauthentication that the package alone would accept.
+
+A `FactorChangeGate` bound in place of the default, such as an adapter over an authentication layer's own factor-change
+gate, replaces the package's judgement of those changes rather than adding to it, so the freshness gate is not asked for
+them as well. It must hold the session to the requirement the request carries as well as its own policy, the stricter
+applying; never let the factor a removal names count towards its own removal; give a grant an end in the future, as the
+package refuses one without; and refuse by throwing an `OperationRefusedException`, which the caller receives as a
+refusal. It is asked inside the identity's transaction, after the package's locks, so it may lock its own session row
+there; it is never asked before the lock, nor when an enrolment is confirmed.
 
 How each rule holds is in [the requirements and freshness design note](../design/requirements-and-freshness.md).

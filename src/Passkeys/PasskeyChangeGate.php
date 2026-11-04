@@ -323,9 +323,9 @@ final readonly class PasskeyChangeGate
             return;
         }
 
-        $this->container->make(RemovalGuard::class)->assertRemovable($identity, $application, $factor, $factors);
+        $this->container->make(RemovalGuard::class)->assertRemovable($identity, $application, $factor, $factors, $binding->sessionId);
 
-        $this->container->make(FactorRemoval::class)->remove($identity, $application, $factor, $factors);
+        $this->container->make(FactorRemoval::class)->remove($identity, $application, $factor, $factors, $binding->sessionId);
     }
 
     /**

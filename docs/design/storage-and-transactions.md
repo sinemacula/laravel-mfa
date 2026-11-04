@@ -94,15 +94,20 @@ transaction that only refuses may lock nothing. The challenge gateway is at chal
 | Sending a code                      | Identity, factors, the code                                              | None                            |
 | Starting or cancelling an enrolment | Identity, factors, the enrolment, the pending factor                     | None                            |
 | Confirming an enrolment             | Identity, factors, the enrolment, the factor, any recovery codes         | `PendingCompletion`, `StepUp`   |
-| Removing a factor                   | Identity, factors, the association, the factor, any recovery set         | `revokeOthers`, transition      |
+| Removing a factor                   | Identity, factors, the association, the factor, any recovery set         | `factorRemoved`, transition     |
 | Registering a passkey               | Identity, factors, the factor, the association, any recovery codes       | `PendingCompletion`, transition |
-| Removing a passkey                  | As removing a factor, the owner's association only                       | `revokeOthers`, transition      |
+| Removing a passkey                  | As removing a factor, the owner's association only                       | `factorRemoved`, transition     |
 | Resetting an identity               | Identity, factors, counts, factors, enrolments, recovery set, generation | `revokeAll`                     |
 | Renaming, preferring, unlocking     | Identity, factors, the row changed                                       | None                            |
 | Generating recovery codes           | Identity, factors, the codes, the state row                              | None                            |
 
 The default `Proofs\GenerationSessionRevoker` advances the owner's own generation as part of its call; nothing
 orchestrating it writes after it.
+
+The bound `FactorChangeGate` is asked inside the same transaction, after the identity's and the factors' locks, by
+starting an enrolment, registering a passkey, removing a factor or a passkey, and generating recovery codes; never
+before the lock, and never when an enrolment is confirmed. A gate over an authentication layer may lock that layer's
+session row there, which keeps it after every package row.
 
 Two things hold no second lock or are outside the order, and are kept as they are:
 

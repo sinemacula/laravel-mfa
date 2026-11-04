@@ -19,7 +19,6 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
-use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
@@ -222,12 +221,10 @@ final readonly class LifecycleService
                 throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The sign-in changed before the identity\'s lock was held.');
             }
 
-            return [$caller->identity, $this->guard->assertRemovable($caller->identity, $application, LockedFactors::withId($factorId, $factors), $factors)];
+            return [$caller->identity, $this->guard->assertRemovable($caller->identity, $application, LockedFactors::withId($factorId, $factors), $factors, $binding->sessionId)];
         });
 
-        $summary = FactorSummary::fromFactor($factor);
-
-        return FactorRemovalResult::made($summary, $this->removal->remove($identity, $application, $factor, $factors));
+        return $this->removal->remove($identity, $application, $factor, $factors, $binding->sessionId);
     }
 
     /**

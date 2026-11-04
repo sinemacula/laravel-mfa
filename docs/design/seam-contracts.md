@@ -19,6 +19,14 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
 - A call that changes state (`SessionRevoker`, `SessionTransition`) reports a refusal or a failure by throwing, never by
   returning: a session that cannot be ended or returned to pending. Returning means it was done, and a throw rolls back
   the factor state change the call runs in.
+- `FactorChangeGate` authorises a change to a person's factors from an active session (a first additional factor, a
+  further one, a removal, recovery codes), asked inside the identity's transaction after the package's locks and never
+  before them, with a `Requirements\FactorChangeRequest`: the identity, the application, the sign-in, the change, the
+  factors as stored under the lock, the factor a removal names, and the requirement the application configures for the
+  change's operation, which the gate must apply as well as its own policy. It refuses by throwing an
+  `OperationRefusedException`, which a bound gate's caller receives as the package's refusal; for a grant it answers
+  the instant the grant ends, and the package refuses one that is `null` or not in the future. It replaces the
+  package's freshness judgement of those changes, so the package asks no `FreshnessGate` for them besides it.
 - `PendingCompletion` and `StepUp` are the last write of a verification's transaction, and refuse by throwing an
   `OperationRefusedException` with a reason, which rolls the verification back and is answered as a failed result;
   anything else they throw propagates. Returning means the proof was accepted, a session still pending included, and
@@ -62,12 +70,21 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
   The configuration check refuses an application with no declaration while this default is the one bound.
 - `Reauthenticator` is bound to `Seams\RefusingReauthenticator`, which never proves the first factor again, so enrolling
   a first additional factor on an active session fails closed until the application binds one.
+- `FactorChangeGate` is bound to `Requirements\ConfiguredFactorChangeGate`, which judges a first additional factor on a
+  first factor reauthentication through the bound `Reauthenticator`, made on the sign-in under the identity's current
+  verification generation within five minutes, and every other change on the bound `FreshnessGate` with the configured
+  requirement: a removal on the proofs made without the factor while another confirmed factor remains. Its own
+  refusals are marked as the package's, and a refusal a seam it asks throws propagates unmarked.
 - `SessionRevoker` is bound to `Proofs\GenerationSessionRevoker`, which advances the identity's verification generation
-  (see [Proof Store and Sign-Ins](proof-store.md)). Revoking the others reads the current sign-in and its counting
-  proofs first, advances the generation inside the change, and once the change commits records those proofs again on
-  the same sign-in under exactly the generation it advanced to, only while the store still names that sign-in and
+  (see [Proof Store and Sign-Ins](proof-store.md)). A factor's removal names the factor and the sign-in it is made from;
+  the default reads that sign-in's counting proofs, other than the factor's, while the store still names it as current
+  (none otherwise), advances the generation inside the change, and once the change commits records those proofs again
+  on the same sign-in under exactly the generation it advanced to, only while the store still names that sign-in and
   dropping a refusal. A later revocation in the same change therefore still wins, and a change that rolls back revokes
-  nothing. The Laravel sessions themselves go on; the other sessions must verify again.
+  nothing. The Laravel sessions themselves go on; the other sessions must verify again. It answers
+  `Proofs\RemovalRevocation::othersEnded()`, leaving the current session for the package to judge; a revoker that judges
+  it itself answers `judged()` with what the caller is to receive, and the package then hands no shortfall to
+  `SessionTransition`.
 - `SessionTransition` is bound to `Http\MiddlewareSessionTransition`, which changes nothing, because the `mfa`
   middleware is the gate: it works the whole requirement out again on every request and judges the session's proofs
   against it, so a session left short is refused until it meets it again, and the session keeps its proofs, as a pending
@@ -125,6 +142,7 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
 | `ChallengeGateway`       | Sends and checks a delivered factor's codes as bound challenges             | Its `mfa` challenges                               |
 | `PasskeyGateway`         | Lists passkeys, and requests and verifies assertions for allowed ones       | Its WebAuthn credentials and ceremonies            |
 | `SessionRevoker`         | Ends the identity's other sessions, or all of them, inside a factor change  | Logging out everywhere, optionally but the current |
+| `FactorChangeGate`       | Whether an active session may change the identity's factors now             | Its factor-change gate                             |
 | `SessionTransition`      | Returns the current session to pending when a change leaves it short        | Returning a session to pending                     |
 | `LastFactorPolicy`       | Whether the identity's last factor may be removed                           | Nothing, or a tenant-aware policy of the iam layer |
 | `SelfServiceRecovery`    | Whether an application offers its own recovery, and starting it             | Nothing: the application's own                     |
@@ -189,8 +207,9 @@ exception that rolls the caller's change back with it.
   shipped flow does so.
 - A pending credential that does not validate makes the resolver throw, and every helper with it: it is never served as
   the guard's user.
-- Two revocations of the other sessions in one change leave the current session to verify again: the second finds
-  nothing counting to keep. A failure between the commit and the restamp does the same. Both fail closed.
+- Two factor removals in one change leave the current session to verify again: the second finds nothing counting to
+  keep. A failure between the commit and the restamp does the same, and so does a removal named as made from a sign-in
+  that is not the current one. All of them fail closed.
 - A `PendingContext` that contradicts itself is refused with an `InvalidArgumentException` when it is built, so one
   that exists is consistent.
 
@@ -214,6 +233,7 @@ exception that rolls the caller's change back with it.
 - `tests/Unit/Testing/Seams/`: every default meets its kit, and each kit rejects a faulty implementation.
 - `tests/Unit/Context/CallerContextResolverTest.php`, `tests/Feature/Context/PendingActionsTest.php`: a pending session
   gets nothing for an action it does not allow.
+- `tests/Unit/Requirements/FactorChangesTest.php`, `tests/Unit/Testing/Seams/FactorChangeGateContractTest.php`.
 - `tests/Unit/Proofs/GenerationSessionRevokerTest.php`, `tests/Unit/Attempts/ChallengeCountersTest.php`,
   `tests/Integration/Database/ParallelChallengeCountersTest.php`.
 

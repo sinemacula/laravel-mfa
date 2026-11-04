@@ -9,10 +9,14 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * How removing a factor ended: made, with the factor as it stood and the
- * requirement the session no longer meets, if any; or refused, with the reason
- * a caller may be told. The requirement is the session's whole requirement, not
- * what is left of it.
+ * How removing a factor ended: made, with the factor as it stood, the
+ * requirement the session no longer meets, if any, and what the bound
+ * `SessionRevoker` returned for the caller, if anything; or refused, with the
+ * reason a caller may be told. The requirement is the session's whole
+ * requirement, not what is left of it, as this package assesses it: an
+ * authentication layer that judged the session again itself may have ended it,
+ * or returned it to pending, by rules of its own, and what it returned (its new
+ * pending credential, say) is the authoritative outcome.
  *
  * @api
  *
@@ -27,6 +31,7 @@ final readonly class FactorRemovalResult
      * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $outstanding
      * @param  ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
+     * @param  ?object  $completion
      */
     private function __construct(
 
@@ -38,6 +43,9 @@ final readonly class FactorRemovalResult
 
         /** Why the removal was refused, when it was. */
         public ?FailureReason $reason,
+
+        /** What the bound session revoker returned for the caller, opaque to this package. */
+        public ?object $completion = null,
     ) {}
 
     /**
@@ -45,11 +53,12 @@ final readonly class FactorRemovalResult
      *
      * @param  \SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $outstanding
+     * @param  ?object  $completion
      * @return self
      */
-    public static function made(FactorSummary $factor, ?Requirement $outstanding): self
+    public static function made(FactorSummary $factor, ?Requirement $outstanding, ?object $completion = null): self
     {
-        return new self($factor, $outstanding, null);
+        return new self($factor, $outstanding, null, $completion);
     }
 
     /**

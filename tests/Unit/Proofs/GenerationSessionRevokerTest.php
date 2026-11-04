@@ -11,6 +11,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Proofs\GenerationSessionRevoker;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use Tests\Fixtures\Identities\TestUser;
@@ -69,16 +70,20 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * Revoking the others stops the other device's proofs counting, and the
-     * current sign-in keeps its own, under the generation advanced to.
+     * A factor's removal stops the other device's proofs counting, and the
+     * current sign-in keeps its own, under the generation advanced to, leaving
+     * the current session for the package to judge again.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testRevokingTheOthersKeepsTheCurrentSignInsProofs(): void
+    public function testRemovingAFactorKeepsTheCurrentSignInsProofs(): void
     {
-        $this->revoker()->revokeOthers($this->user);
+        $revocation = $this->removeFactor();
+
+        self::assertFalse($revocation->judgedCurrent);
+        self::assertNull($revocation->completion);
 
         self::assertSame([], $this->otherDevice->proofs($this->user, SignInProofs::APPLICATION));
         self::assertSame(['password', 'totp'], $this->methods());
@@ -114,7 +119,7 @@ final class GenerationSessionRevokerTest extends TestCase
     {
         DB::beginTransaction();
 
-        $this->revoker()->revokeOthers($this->user);
+        $this->removeFactor();
 
         DB::rollBack();
 
@@ -124,9 +129,9 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * A reset after a revocation of the others in the same change wins: the
-     * current sign-in's proofs are recorded again under the generation the
-     * first revocation advanced to, which the reset left behind.
+     * A reset after a factor's removal in the same change wins: the current
+     * sign-in's proofs are recorded again under the generation the first
+     * revocation advanced to, which the reset left behind.
      *
      * @return void
      *
@@ -135,7 +140,7 @@ final class GenerationSessionRevokerTest extends TestCase
     public function testALaterResetInTheSameChangeWins(): void
     {
         DB::transaction(function (): void {
-            $this->revoker()->revokeOthers($this->user);
+            $this->removeFactor();
             $this->revoker()->revokeAll($this->user);
         });
 
@@ -154,7 +159,7 @@ final class GenerationSessionRevokerTest extends TestCase
     public function testASignInReplacedBeforeTheCommitIsNotRestamped(): void
     {
         DB::transaction(function (): void {
-            $this->revoker()->revokeOthers($this->user);
+            $this->removeFactor();
             $this->store()->begin($this->user, SignInProofs::APPLICATION, 'sign-in-2');
         });
 
@@ -182,7 +187,7 @@ final class GenerationSessionRevokerTest extends TestCase
         $store->record(SignInProofs::of($this->user)->totp());
 
         DB::transaction(function () use ($store): void {
-            $this->revoker()->revokeOthers($this->user);
+            $this->removeFactor();
             $store->begin($this->user, SignInProofs::APPLICATION, 'sign-in-2');
         });
 
@@ -191,8 +196,8 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * Two revocations of the others in one change leave the current sign-in to
-     * verify again: the second finds nothing counting to keep.
+     * Two removals in one change leave the current sign-in to verify again: the
+     * second finds nothing counting to keep.
      *
      * @return void
      *
@@ -201,8 +206,8 @@ final class GenerationSessionRevokerTest extends TestCase
     public function testTwoRevocationsInOneChangeLeaveTheCurrentSignInToVerifyAgain(): void
     {
         DB::transaction(function (): void {
-            $this->revoker()->revokeOthers($this->user);
-            $this->revoker()->revokeOthers($this->user);
+            $this->removeFactor();
+            $this->removeFactor();
         });
 
         self::assertSame([], $this->methods());
@@ -219,10 +224,53 @@ final class GenerationSessionRevokerTest extends TestCase
     {
         $this->store()->forget($this->user, SignInProofs::APPLICATION);
 
-        $this->revoker()->revokeOthers($this->user);
+        $this->removeFactor();
 
         self::assertNull($this->store()->currentSession($this->user, SignInProofs::APPLICATION));
         self::assertSame(1, VerificationGeneration::current($this->user));
+    }
+
+    /**
+     * The proofs made with the removed factor are not kept.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheRemovedFactorsProofsAreNotKept(): void
+    {
+        $this->revoker()->factorRemoved($this->user, 'factor-totp', SignInProofs::SESSION);
+
+        self::assertSame(['password'], $this->methods());
+    }
+
+    /**
+     * A removal named as made from a sign-in that is not the current one keeps
+     * nothing of the current one.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testARemovalFromAnotherSignInKeepsNothing(): void
+    {
+        $this->revoker()->factorRemoved($this->user, 'removed-factor', 'other-sign-in');
+
+        self::assertSame([], $this->methods());
+        self::assertSame(1, VerificationGeneration::current($this->user));
+    }
+
+    /**
+     * Remove a factor the current sign-in's proofs were not made with, from the
+     * current sign-in.
+     *
+     * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
+     *
+     * @throws \Throwable
+     */
+    private function removeFactor(): RemovalRevocation
+    {
+        return $this->revoker()->factorRemoved($this->user, 'removed-factor', SignInProofs::SESSION);
     }
 
     /**

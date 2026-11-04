@@ -11,12 +11,15 @@ use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
+use SineMacula\Laravel\Mfa\Contracts\FactorChangeGate;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
+use SineMacula\Laravel\Mfa\Enums\FactorChange;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
+use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -32,6 +35,7 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FreshOnceGate;
 use Tests\Fixtures\Requirements\RefusingFreshnessGate;
+use Tests\Fixtures\Requirements\ScriptedFactorChangeGate;
 use Tests\Fixtures\Seams\InterruptingProofStore;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
@@ -208,25 +212,69 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A session that stops being fresh after the first check is refused under
-     * the lock, and the old set stays intact.
+     * Freshness is judged under the lock only, once: before it the bound factor
+     * change gate is never asked.
      *
      * @return void
      */
-    public function testAGateFailingUnderTheLockKeepsTheOldSet(): void
+    public function testFreshnessIsJudgedUnderTheLockOnly(): void
     {
-        $user = $this->steppedUpPerson();
-        $old  = $this->recoveryCode($user);
+        $this->steppedUpPerson();
 
         $gate = new FreshOnceGate;
 
         $this->container()->instance(FreshnessGate::class, $gate);
 
+        self::assertTrue($this->mfa()->generateRecoveryCodes()->wasGenerated());
+        self::assertSame(1, $gate->reads);
+    }
+
+    /**
+     * A bound factor change gate's refusal under the lock is a refused result,
+     * with the reason it gave, and the old set stays intact.
+     *
+     * @return void
+     */
+    public function testABoundGatesRefusalKeepsTheOldSet(): void
+    {
+        $user = $this->steppedUpPerson();
+        $old  = $this->recoveryCode($user);
+        $gate = new ScriptedFactorChangeGate(refusal: new OperationRefusedException(FailureReason::NOT_FRESH, 'The layer says no.'));
+
+        $this->container()->instance(FactorChangeGate::class, $gate);
+
         $this->assertRefused();
 
-        self::assertSame(2, $gate->reads);
+        self::assertCount(1, $gate->requests);
+        self::assertSame(FactorChange::GENERATE_RECOVERY_CODES, $gate->requests[0]->change);
+        self::assertNull($gate->requests[0]->factorId);
+        self::assertGreaterThan(0, $gate->levels[0]);
         self::assertSame(10, RecoveryCode::query()->whereNull('replaced_at')->count());
+
+        $this->container()->forgetInstance(FactorChangeGate::class);
+
         self::assertTrue($this->mfa()->verify(Submission::recoveryCode($old))->isVerified());
+    }
+
+    /**
+     * A bound factor change gate is handed the sign-in and the requirement the
+     * application configures for the operation.
+     *
+     * @return void
+     */
+    public function testABoundGateIsHandedTheSignInAndTheConfiguredRequirement(): void
+    {
+        $user = $this->steppedUpPerson();
+        $gate = new ScriptedFactorChangeGate;
+
+        config()->set('mfa.applications.' . self::APPLICATION . '.freshness', ['mfa.generate_recovery_codes' => 120]);
+
+        $this->container()->instance(FactorChangeGate::class, $gate);
+
+        self::assertTrue($this->mfa()->generateRecoveryCodes()->wasGenerated());
+        self::assertSame($this->container()->make(ProofStore::class)->currentSession($user, self::APPLICATION), $gate->requests[0]->session);
+        self::assertSame(self::APPLICATION, $gate->requests[0]->application);
+        self::assertSame(120, $gate->requests[0]->requirement?->maxAge(RequirementPart::ADDITIONAL_VERIFICATION));
     }
 
     /**
@@ -319,8 +367,8 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A freshness gate's own refusal stays an exception wherever it is thrown:
-     * before the lock or under it, with the old set intact and working.
+     * A freshness gate's own refusal, asked by the default factor change gate
+     * under the lock, stays an exception, with the old set intact and working.
      *
      * @return void
      */
@@ -329,11 +377,9 @@ final class RecoveryCodeIssuanceTest extends TestCase
         $user = $this->steppedUpPerson();
         $old  = $this->recoveryCode($user);
 
-        foreach ([1, 2] as $read) {
-            $this->container()->instance(FreshnessGate::class, new RefusingFreshnessGate($read));
+        $this->container()->instance(FreshnessGate::class, new RefusingFreshnessGate(1));
 
-            $this->assertPropagates();
-        }
+        $this->assertPropagates();
 
         $this->container()->forgetInstance(FreshnessGate::class);
 

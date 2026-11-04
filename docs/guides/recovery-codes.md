@@ -49,24 +49,27 @@ A new set replaces the old one in one transaction: the old codes stop working as
 racing the replacement sees one set or the other, never both and never neither. A refusal answers with its `reason`,
 no codes, and `wasGenerated()` false:
 
-| Reason              | When                                                                                  |
-|---------------------|---------------------------------------------------------------------------------------|
-| `not_found`         | No signed-in identity that can hold factors, or a pending session: nobody is served   |
-| `identity_inactive` | The identity is inactive                                                              |
-| `type_not_enabled`  | The application does not accept recovery codes                                        |
-| `no_factor`         | The identity has no confirmed factor (a pending one does not count)                   |
-| `not_fresh`         | The session has no sign-in, is not fresh enough, or is below the level                |
+| Reason              | When                                                                                    |
+|---------------------|-----------------------------------------------------------------------------------------|
+| `not_found`         | No signed-in identity that can hold factors, or a pending session: nobody is served     |
+| `identity_inactive` | The identity is inactive                                                                |
+| `type_not_enabled`  | The application does not accept recovery codes                                          |
+| `no_factor`         | The identity has no confirmed factor (a pending one does not count)                     |
+| `not_fresh`         | The session has no sign-in, the factor change gate refuses it, or it is below the level |
 
 An `Exceptions\OperationRefusedException` that a seam of your own throws, a freshness gate or a combination policy,
-is not one of these: it propagates, leaving the old set. So does a listener's exception once the set has committed,
+is not one of these: it propagates, leaving the old set. A bound `Contracts\FactorChangeGate`'s refusal is one: refusing
+by throwing is how it answers, so its reason is the result's. So does a listener's exception once the set has committed,
 which is not a refusal of it.
 
 `RecoveryCodesGenerated` is dispatched once the new set is stored, with its size and generation, never a code.
 
-Generating a set needs a session fresh enough for `mfa.generate_recovery_codes` that also reaches the assurance level
-the application sets for it (`recovery_codes.level`, `aal2` by default). Both are checked before the codes are drawn and
-again under the identity's lock, and a shortfall in either is refused as `not_fresh`, since the remedy is the same
-stronger step-up. A refusal leaves the old set intact.
+Generating a set needs a session the bound `Contracts\FactorChangeGate` allows for `mfa.generate_recovery_codes` (by
+default, one fresh enough for it) that also reaches the assurance level the application sets for it
+(`recovery_codes.level`, `aal2` by default). The level is checked before the codes are drawn and again under the
+identity's lock; the gate is asked under the lock only, as one over an authentication layer locks that layer's session
+there. A shortfall in either is refused as `not_fresh`, since the remedy is the same stronger step-up. A refusal leaves
+the old set intact.
 
 ## Redeeming a code
 

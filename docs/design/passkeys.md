@@ -27,10 +27,11 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   gate answers `null` and the credential stays a sign-in passkey only. Its binding must be the caller's own enrolment
   on its current sign-in (or its pending session), and the ceremony must have observed user presence: the
   registration's own evidence confirms the factor, so it is stored confirmed.
-- Associating authorises an enrolment through `Enrollment\EnrollmentAuthority`: on an active session, a fresh step-up
-  for `mfa.add_factor` when the identity has a confirmed factor, or the first factor proved again through the bound
-  `Reauthenticator` (a first factor reauthentication of the current sign-in, under the current verification
-  generation, made in the last five minutes) when it has none; on a pending session, only the bootstrap path (its
+- Associating authorises an enrolment through `Enrollment\EnrollmentAuthority`: on an active session, the bound
+  `FactorChangeGate` allowing `mfa.add_factor` when the identity has a confirmed factor, or
+  `mfa.add_first_additional_factor` when it has none (by default, a fresh step-up, or the first factor proved again
+  through the bound `Reauthenticator`: a first factor reauthentication of the current sign-in, under the current
+  verification generation, made in the last five minutes); on a pending session, only the bootstrap path (its
   credential allows `mfa.confirm_bootstrap_enrollment`, the application allows bootstrap for `passkey`, and the identity
   has no confirmed factor). Then the application's limits on confirmed factors enrolled through it apply, of the type
   and in all.

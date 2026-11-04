@@ -140,13 +140,14 @@ final readonly class RecoveryCodeService
      * is the current request's unless the caller names the one it acts on.
      *
      * A gate, when given, refuses by throwing: it runs before the codes are
-     * drawn, and again first under the lock, so what it checks holds when the
-     * old set is replaced, and a refusal leaves the old set intact.
+     * drawn, given no factors, and again first under the lock, given the
+     * identity's factors as stored there, so what it checks holds when the old
+     * set is replaced, and a refusal leaves the old set intact.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  ?string  $application
-     * @param  (\Closure(): void)|null  $gate
+     * @param  (\Closure(?\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>): void)|null  $gate
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
@@ -175,7 +176,7 @@ final readonly class RecoveryCodeService
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
-     * @param  (\Closure(): void)|null  $gate
+     * @param  (\Closure(?\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>): void)|null  $gate
      * @return array{codes: list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>, generation: int}
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
@@ -189,7 +190,7 @@ final readonly class RecoveryCodeService
         self::requireConfirmedFactor($identity->isMfaEnabled(), 'Recovery codes are issued only to an identity with a confirmed factor.');
 
         if ($gate !== null) {
-            $gate();
+            $gate(null);
         }
 
         $settings = new RecoveryCodeSettings($this->config);
@@ -202,7 +203,7 @@ final readonly class RecoveryCodeService
         $generation = FactorStateTransaction::forIdentity($identity, new $factorModel, function (Collection $factors) use ($identity, $application, $hashes, $gate): int {
 
             if ($gate !== null) {
-                $gate();
+                $gate($factors);
             }
 
             $this->guardGeneration($identity, $application);
@@ -335,9 +336,11 @@ final readonly class RecoveryCodeService
 
         $this->events->dispatch(new RecoveryCodeUsed($context, $remaining, $binding->purpose));
 
-        if ($lowCount > 0 && $remaining <= $lowCount) {
-            $this->events->dispatch(new RecoveryCodesLow($context, $remaining, $binding->purpose));
+        if ($lowCount <= 0 || $remaining > $lowCount) {
+            return;
         }
+
+        $this->events->dispatch(new RecoveryCodesLow($context, $remaining, $binding->purpose));
     }
 
     /**

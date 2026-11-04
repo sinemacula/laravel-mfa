@@ -87,8 +87,10 @@ nothing is stored in their place.
    in the pending session's `requires` when the answer is not empty.
 3. Where a tenant becomes active, the adapter names it through `ActiveTenantResolver`; the tenant's requirement is then
    part of what the session is held to, and of what a factor change evaluates it against again.
-4. Before a sensitive operation, the package or the application asks `Mfa::isFresh('mfa.remove_factor')`; the gate
-   reads the sign-in's proofs and the check judges them against the operation's requirement.
+4. Before a sensitive operation, the application asks `Mfa::isFresh('billing.change_plan')`; the gate reads the
+   sign-in's proofs and the check judges them against the operation's requirement. The package's own changes to a
+   person's factors ask the bound `FactorChangeGate` instead, whose default asks the freshness gate in the same way, so
+   an adapter binding that seam to its layer's own factor-change gate replaces both judgements with one.
 
 ## Failure / Edge Cases
 

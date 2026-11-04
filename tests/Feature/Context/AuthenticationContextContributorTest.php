@@ -499,6 +499,95 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
+     * A named sign-in's context is built from the proofs given, without the
+     * request serving anyone.
+     *
+     * @return void
+     */
+    public function testANamedSignInFromTheProofsGiven(): void
+    {
+        $user = TestUser::query()->create(['email' => 'named@example.test']);
+
+        $this->totpFactor($user);
+
+        $signIn = SignInProofs::of($user)->inSession('named-sign-in');
+
+        self::assertSame([
+            'accepted'                      => true,
+            'multifactor'                   => true,
+            'factor_types'                  => ['totp'],
+            'level'                         => 'aal2',
+            'phishing_resistant'            => false,
+            'user_verification'             => false,
+            'last_verification_age_seconds' => 90,
+            'has_confirmed_factor'          => true,
+        ], $this->contributor()->contributeFor($user, self::APPLICATION, 'named-sign-in', $signIn->totp(90), $signIn->password(3600)));
+    }
+
+    /**
+     * A named sign-in reads only the proofs that count for it: none of another
+     * sign-in, another application or an older verification generation, and
+     * none dated in the future.
+     *
+     * @return void
+     */
+    public function testANamedSignInReadsOnlyTheProofsThatCount(): void
+    {
+        $user = TestUser::query()->create(['email' => 'counting@example.test']);
+
+        $this->totpFactor($user);
+
+        VerificationGeneration::advance($user);
+
+        $current = SignInProofs::of($user)->inSession('named-sign-in')->underGeneration(1);
+        $older   = SignInProofs::of($user)->inSession('named-sign-in')->underGeneration(0);
+        $other   = SignInProofs::of($user)->inSession('other-sign-in')->underGeneration(1);
+
+        $context = $this->contributor()->contributeFor(
+            $user,
+            self::APPLICATION,
+            'named-sign-in',
+            $current->password(3600),
+            $older->totp(10),
+            $other->totp(20),
+            $current->totp(-60),
+            $current->totp(300),
+        );
+
+        self::assertTrue($context['accepted']);
+        self::assertSame(300, $context['last_verification_age_seconds']);
+        $elsewhere = $this->contributor()->contributeFor($user, 'other-application', 'named-sign-in', $current->password(3600), $current->totp(300));
+
+        self::assertFalse($elsewhere['accepted']);
+        self::assertSame([], $elsewhere['factor_types']);
+    }
+
+    /**
+     * A named sign-in of a machine or an inactive identity has the neutral
+     * context, whatever proofs are given.
+     *
+     * @return void
+     */
+    public function testANamedSignInOfAMachineOrAnInactiveIdentityIsNeutral(): void
+    {
+        $machine  = new NonEloquentIdentity('robot-1', mfaEnabled: true, person: false);
+        $inactive = new NonEloquentIdentity('person-1', mfaEnabled: true, active: false);
+
+        self::assertSame(self::NEUTRAL, $this->contributor()->contributeFor($machine, self::APPLICATION, 'named-sign-in'));
+        self::assertSame(self::NEUTRAL, $this->contributor()->contributeFor($inactive, self::APPLICATION, 'named-sign-in'));
+    }
+
+    /**
+     * The contributor under test.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor
+     */
+    private function contributor(): AuthenticationContextContributor
+    {
+        return $this->container()->make(AuthenticationContextContributor::class);
+    }
+
+    /**
      * The context the contributor gives now.
      *
      * @return array<string, mixed>

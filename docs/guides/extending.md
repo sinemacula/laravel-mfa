@@ -199,6 +199,7 @@ service provider:
 | `ActiveTenantResolver`   | `Requirements\NoActiveTenant`              | No session has an active tenant                                             |
 | `RequirementCheck`       | `Requirements\ProofRequirementCheck`       | One sign-in's proofs go to the combination policy                           |
 | `FreshnessGate`          | `Requirements\ConfiguredFreshnessGate`     | The application's `freshness`, judged on the recorded proofs                |
+| `FactorChangeGate`       | `Requirements\ConfiguredFactorChangeGate`  | A change rests on a fresh step-up, a first factor on a reauthentication     |
 | `PendingSessionResolver` | `Context\NoPendingSessionResolver`         | No request carries a pending session                                        |
 | `SubjectTypeResolver`    | `Context\IdentityContractSubjectType`      | A person is an identity whose `canHoldFactors()` is true                    |
 | `EventContextResolver`   | `Context\DefaultEventContextResolver`      | The identity, the application and the request                               |
@@ -242,7 +243,7 @@ structured values, never reduced to `amr`. What each seam meets:
 
 | This package                                                                          | `laravel-authentication`                                                                                                                                                                                                             |
 |---------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Contracts\RequirementPolicy`                                                         | `Contracts\AdditionalFactorPolicy::requiresAdditionalFactor()`, bound by the adapter                                                                                                                                                 |
+| `Contracts\RequirementPolicy`                                                         | `Contracts\AdditionalFactorPolicy::requirementFor()`, which the adapter answers with this policy                                                                                                                                     |
 | `Contracts\TenantRequirement`                                                         | `Contracts\TenantAuthenticationPolicy::requirementFor()`; `Auth::sessions()->tenantPolicyChanged()` for a change outside a request                                                                                                   |
 | `Contracts\RequirementCheck`                                                          | `Contracts\RequirementCheck::evaluate()`, which the adapter answers with this check                                                                                                                                                  |
 | `Contracts\ActiveTenantResolver`                                                      | `Auth::tenant()`                                                                                                                                                                                                                     |
@@ -250,9 +251,10 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Enums\PendingAction`                                                                 | `Sessions\Enums\PendingAction`, with the same values                                                                                                                                                                                 |
 | `Contracts\PendingCompletion`                                                         | `Auth::sessions()->satisfy()`                                                                                                                                                                                                        |
 | `Contracts\StepUp`                                                                    | `Auth::sessions()->stepUp()`                                                                                                                                                                                                         |
-| `Contracts\FreshnessGate`                                                             | `Contracts\FreshnessPolicy::requirement()` and `freshProof()`                                                                                                                                                                        |
+| `Contracts\FreshnessGate`                                                             | `Contracts\FreshnessPolicy::freshProof()` and `freshUntil()`                                                                                                                                                                         |
+| `Contracts\FactorChangeGate`                                                          | `Auth::sessions()->factorChange()`, inside this package's transaction, after its locks                                                                                                                                               |
 | `Contracts\Reauthenticator`                                                           | `Auth::sessions()->reauthenticate()`                                                                                                                                                                                                 |
-| `Contracts\SessionRevoker`                                                            | `Auth::sessions()->factorRemoved()` for the others, `revokeSessions()` for all of them                                                                                                                                               |
+| `Contracts\SessionRevoker`                                                            | `Auth::sessions()->factorRemoved()` with the factor and the session, answered as judged, and `factorReset()` for a reset                                                                                                             |
 | `Contracts\SubjectTypeResolver`                                                       | `Contracts\MachineIdentity`                                                                                                                                                                                                          |
 | `Contracts\ApplicationResolver`                                                       | The session's `getGuard()`, from `Auth::session()`                                                                                                                                                                                   |
 | `Contracts\EventContextResolver`                                                      | `Auth::identity()`, `Auth::principal()`, `Auth::tenant()` and `Auth::session()`                                                                                                                                                      |
@@ -260,17 +262,17 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Contracts\SmsSender`, `Contracts\EmailSender`                                        | `Contracts\OneTimeCodeSender`, bound to the same gateway                                                                                                                                                                             |
 | `Secrets\RevealedSecret`, `Secrets\SecretResponse`                                    | Nothing to bind: a secret it reveals is its own, so check its documentation for how it sends one uncached                                                                                                                            |
 | `Contracts\ProofStore`, `Contracts\FirstFactorResolver`                               | `Requirements\RequirementSubject::proofs()` and `$firstFactor`, passed to `Contracts\RequirementCheck::evaluate()`, and `Contracts\FreshnessPolicy::freshProof()`. Needs a read of the session's proofs outside `evaluate()` as well |
-| `Contracts\ChallengeGateway`, `Attempts\ChallengeCounters`                            | Needs its own challenge bound to the factor and purpose, which asks `isUsable()` before locking or consuming it and calls `report()` once, from the transaction that consumes it                                                     |
-| `Contracts\SessionTransition`                                                         | Needs a way to return an active session to pending when a factor change leaves it short                                                                                                                                              |
-| `Passkeys\PasskeyChangeGate`                                                          | Needs its passkey register and remove paths to call the gate, inside their own transaction on the storage connection                                                                                                                 |
-| `Context\AuthenticationContextContributor`                                            | Needs its authentication context to read these keys from `contribute()`                                                                                                                                                              |
+| `Contracts\ChallengeGateway`, `Attempts\ChallengeCounters`                            | `Codes\CodeService::sendFactorCode()` and `verifyFactorCode()`; `Contracts\FactorCodeCounters`, answered with `isUsable()` and `report()`                                                                                            |
+| `Contracts\SessionTransition`                                                         | Needs a way to return an active session to pending when a change other than a removal leaves it short                                                                                                                                |
+| `Passkeys\PasskeyChangeGate`                                                          | `Contracts\PasskeyFactorGate::registering()` and `removing()`, answered with this gate inside its passkey transaction                                                                                                                |
+| `Context\AuthenticationContextContributor`                                            | `Contracts\AuthenticationContextContributor::contribute()`, answered with `contributeFor()` from its `Context\ContributionSubject`                                                                                                   |
 | `CombinationPolicy`, `IdentityRequirement`, `LastFactorPolicy`, `SelfServiceRecovery` | Nothing: these are this package's own                                                                                                                                                                                                |
 
 A row that says what a seam needs names no method, as there is no public name to give here: check that package's own
 documentation for it. Until the layer provides it, what an adapter does depends on the seam:
 
-- `Contracts\ChallengeGateway` and `Contracts\SessionTransition` keep their defaults, which are safe: the package's own
-  delivered codes, and the `mfa` middleware as the gate.
+- `Contracts\SessionTransition` keeps its default, which is safe: the `mfa` middleware is the gate. A removal does not
+  need it, as the layer's `factorRemoved()` judges the session itself.
 - `Contracts\ProofStore` must be rebound. The default keeps proofs in the Laravel session, which a stateless layer does
   not have, so there is no sign-in and every verification answers `not_found`.
 
@@ -333,15 +335,17 @@ DB::transaction(function () use ($gate, $identity, $application, $credential, $p
 ```
 
 `registering()` associates the passkey as a confirmed factor when the application enables `passkey`, after the same
-checks an enrolment needs: a fresh step-up for a further factor, the first factor proved again for the first one, or the
-bootstrap path on a pending session that allows `mfa.confirm_bootstrap_enrollment`; then the application's limits. It
+checks an enrolment needs: the bound `Contracts\FactorChangeGate` allowing a further factor or the first one (by
+default, a fresh step-up, or the first factor proved again), or the bootstrap path on a pending session that allows
+`mfa.confirm_bootstrap_enrollment`; then the application's limits. It
 returns `null` when the application does not enable the type, and recovery codes with the identity's first additional
 factor. On a pending session its proof then goes to the bound `PendingCompletion`, and `verification` on the result
 holds what came back, whose refusal rolls your registration back; reveal it only once your transaction has committed. On
 an active session the requirement is evaluated again, and a shortfall goes to the bound `SessionTransition`, whose
 refusal rolls it back too. `removing()` makes the checks of every removal: a sign-in the proof store knows of and that
-has not changed under the lock, an active identity, a fresh step-up made with another factor where the identity has
-one, and the last factor policy. It then stops the identity's other sessions counting. A refusal throws an
+has not changed under the lock, an active identity, the factor change gate allowing the removal (by default, a fresh
+step-up made with another factor where the identity has one), and the last factor policy. It then tells the bound
+`SessionRevoker` of the removal, which stops the identity's other sessions counting. A refusal throws an
 `OperationRefusedException`; let it roll back your own change, since catching it and committing breaks the gate.
 
 ## Proving an adapter
@@ -376,7 +380,9 @@ final class SessionProofStoreAdapterTest extends TestCase
 ```
 
 The kits check safety guarantees, not capabilities a default lacks: a refusing reauthenticator passes, and a revoker
-passes when other sessions stop counting whether or not it ends them. Each check is a static assertion on a
+passes when other sessions stop counting whether or not it ends them. The factor change gate's kit hands its hooks each
+change and asks for the request from a session arranged fresh, or stale, for it; a removal stepped up only with the
+factor it removes; and a change beyond the requirement the request carries. Each check is a static assertion on a
 `*Contract` class beside its trait, so a test can also call one directly. The kits need PHPUnit and a database migrated
 with the package's tables, as any test of an adapter does.
 
