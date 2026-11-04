@@ -44,21 +44,21 @@ final class ProofStoreContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        ProofStoreContract::assertRefusesAProofOfAnotherSignIn(new KeepingProofStore, $this->proofStoreIdentity(), 'web');
+        ProofStoreContract::assertRefusesAProofOfAnotherSignIn(new KeepingProofStore, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
     }
 
     /**
      * The kit rejects a store that keeps counting an earlier generation.
      *
      * @return void
-     *
-     * @throws \Throwable
      */
     public function testRejectsAStoreThatIgnoresTheGeneration(): void
     {
         $this->expectException(AssertionFailedError::class);
 
-        ProofStoreContract::assertAnEarlierGenerationStopsCounting(new KeepingProofStore, $this->proofStoreIdentity(), 'web');
+        $void = ProofStoreContract::voidByGeneration(...);
+
+        ProofStoreContract::assertVoidedProofsStopCounting(new KeepingProofStore, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION, $void);
     }
 
     /**
@@ -70,7 +70,7 @@ final class ProofStoreContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        ProofStoreContract::assertForgettingASignInForgetsItsProofs(new KeepingProofStore, $this->proofStoreIdentity(), 'web');
+        ProofStoreContract::assertForgettingASignInForgetsItsProofs(new KeepingProofStore, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
     }
 
     /**
@@ -83,7 +83,9 @@ final class ProofStoreContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        ProofStoreContract::assertRefusesAProofOfAnotherSignIn(new FlawedProofStore(ProofStoreFlaw::ACCEPTS_ANY_SIGN_IN), $this->proofStoreIdentity(), 'web');
+        $store = new FlawedProofStore(ProofStoreFlaw::ACCEPTS_ANY_SIGN_IN);
+
+        ProofStoreContract::assertRefusesAProofOfAnotherSignIn($store, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
     }
 
     /**
@@ -111,7 +113,7 @@ final class ProofStoreContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        ProofStoreContract::assertForgettingASignInForgetsItsProofs(new FlawedProofStore($flaw), $this->proofStoreIdentity(), 'web');
+        ProofStoreContract::assertForgettingASignInForgetsItsProofs(new FlawedProofStore($flaw), $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
     }
 
     /**
@@ -123,7 +125,7 @@ final class ProofStoreContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting(new KeepingProofStore, $this->proofStoreIdentity(), 'web');
+        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting(new KeepingProofStore, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
     }
 
     /**

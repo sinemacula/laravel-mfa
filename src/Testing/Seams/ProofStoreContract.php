@@ -21,9 +21,17 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 
 /**
  * What every `ProofStore` must guarantee, as assertions: a proof of another
- * sign-in is refused, a sign-in's proofs go with it, a proof made under an
- * earlier verification generation stops counting, and forgetting a factor stops
+ * sign-in is refused, a sign-in's proofs go with it, a proof made before the
+ * identity's proofs are voided stops counting, and forgetting a factor stops
  * its proofs counting.
+ *
+ * Each assertion is given the sign-in it begins, so a store backed by real
+ * sessions is tested on one the test has arranged, and the default store on
+ * `SESSION`. A sign-in may already hold proofs when it is begun, such as the
+ * first factor an authentication layer records on signing in, so each count is
+ * taken against those. A proof of any other sign-in is refused by throwing a
+ * `ProofRefusedException`, as `ProofStore::record()` declares; a store that
+ * cannot find that sign-in at all refuses it the same way.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -32,7 +40,7 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
  */
 final class ProofStoreContract
 {
-    /** @var string The sign-in each assertion begins. */
+    /** @var string The sign-in a store that keeps its own begins. */
     public const string SESSION = 'contract-sign-in';
 
     /** @var string The factor the additional factor proof names. */
@@ -50,16 +58,19 @@ final class ProofStoreContract
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $session
      * @return void
      */
-    public static function assertRefusesAProofOfAnotherSignIn(ProofStore $store, MultiFactorAuthenticatable $identity, string $application): void
+    public static function assertRefusesAProofOfAnotherSignIn(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): void
     {
-        $store->begin($identity, $application, self::SESSION);
+        $store->begin($identity, $application, $session);
+
+        $held = count($store->proofs($identity, $application));
 
         try {
-            $store->record(self::firstFactor($identity, $application, 'another-sign-in'));
+            $store->record(self::firstFactor($identity, $application, 'another-' . $session));
         } catch (ProofRefusedException) {
-            Assert::assertSame([], $store->proofs($identity, $application), 'A refused proof must not be kept.');
+            Assert::assertCount($held, $store->proofs($identity, $application), 'A refused proof must not be kept.');
 
             return;
         }
@@ -74,15 +85,19 @@ final class ProofStoreContract
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $session
      * @return void
      */
-    public static function assertForgettingASignInForgetsItsProofs(ProofStore $store, MultiFactorAuthenticatable $identity, string $application): void
+    public static function assertForgettingASignInForgetsItsProofs(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): void
     {
-        $store->begin($identity, $application, self::SESSION);
-        $store->record(self::firstFactor($identity, $application, self::SESSION));
+        $store->begin($identity, $application, $session);
 
-        Assert::assertSame(self::SESSION, $store->currentSession($identity, $application), 'The sign-in begun must be the current one.');
-        Assert::assertCount(1, $store->proofs($identity, $application), 'A proof of the current sign-in must be kept.');
+        $held = count($store->proofs($identity, $application));
+
+        $store->record(self::firstFactor($identity, $application, $session));
+
+        Assert::assertSame($session, $store->currentSession($identity, $application), 'The sign-in begun must be the current one.');
+        Assert::assertCount($held + 1, $store->proofs($identity, $application), 'A proof of the current sign-in must be kept.');
 
         $store->forget($identity, $application);
 
@@ -91,24 +106,42 @@ final class ProofStoreContract
     }
 
     /**
-     * Advancing the identity's verification generation stops every proof made
-     * under an earlier one counting.
+     * Voiding the identity's proofs stops every proof made before counting.
+     *
+     * The void is the store's own: advancing the identity's verification
+     * generation for a store that keeps it, as `voidByGeneration()` does, or
+     * what the bound `SessionRevoker` does on a reset for a store backed by an
+     * authentication layer's sessions.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $session
+     * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): void  $void
+     * @return void
+     */
+    public static function assertVoidedProofsStopCounting(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session, \Closure $void): void
+    {
+        $store->begin($identity, $application, $session);
+        $store->record(self::firstFactor($identity, $application, $session));
+
+        $void($identity);
+
+        Assert::assertSame([], $store->proofs($identity, $application), 'A proof made before the identity\'s proofs were voided must stop counting.');
+    }
+
+    /**
+     * Void the identity's proofs by advancing its verification generation, as a
+     * store that keeps the generation honours.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      *
      * @throws \Throwable
      */
-    public static function assertAnEarlierGenerationStopsCounting(ProofStore $store, MultiFactorAuthenticatable $identity, string $application): void
+    public static function voidByGeneration(MultiFactorAuthenticatable $identity): void
     {
-        $store->begin($identity, $application, self::SESSION);
-        $store->record(self::firstFactor($identity, $application, self::SESSION));
-
         VerificationGeneration::advance($identity);
-
-        Assert::assertSame([], $store->proofs($identity, $application), 'A proof made under an earlier verification generation must stop counting.');
     }
 
     /**
@@ -118,19 +151,34 @@ final class ProofStoreContract
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $session
      * @return void
      */
-    public static function assertForgettingAFactorStopsItsProofsCounting(ProofStore $store, MultiFactorAuthenticatable $identity, string $application): void
+    public static function assertForgettingAFactorStopsItsProofsCounting(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): void
     {
-        $store->begin($identity, $application, self::SESSION);
-        $store->record(self::firstFactor($identity, $application, self::SESSION));
-        $store->record(self::additionalFactor($identity, $application));
+        $store->begin($identity, $application, $session);
+
+        $held = self::kinds($store->proofs($identity, $application));
+
+        $store->record(self::firstFactor($identity, $application, $session));
+        $store->record(self::additionalFactor($identity, $application, $session));
 
         $store->forgetFactor($identity, self::FACTOR);
 
-        $kinds = array_map(static fn (Proof $proof): ProofKind => $proof->kind, $store->proofs($identity, $application));
+        $kinds = self::kinds($store->proofs($identity, $application));
 
-        Assert::assertSame([ProofKind::FIRST_FACTOR], $kinds, 'Only the proofs made with the forgotten factor must stop counting.');
+        Assert::assertSame([...$held, ProofKind::FIRST_FACTOR], $kinds, 'Only the proofs made with the forgotten factor must stop counting.');
+    }
+
+    /**
+     * The kind of each proof, in order.
+     *
+     * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
+     * @return list<\SineMacula\Laravel\Mfa\Enums\ProofKind>
+     */
+    private static function kinds(array $proofs): array
+    {
+        return array_map(static fn (Proof $proof): ProofKind => $proof->kind, $proofs);
     }
 
     /**
@@ -148,15 +196,16 @@ final class ProofStoreContract
 
     /**
      * An authenticator app proof of the identity's contract factor, bound to
-     * the contract's sign-in.
+     * the sign-in.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $session
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
-    private static function additionalFactor(MultiFactorAuthenticatable $identity, string $application): Proof
+    private static function additionalFactor(MultiFactorAuthenticatable $identity, string $application, string $session): Proof
     {
-        return self::proof($identity, ProofKind::ADDITIONAL_FACTOR, 'totp', new Channel(ChannelKind::AUTHENTICATOR_APP, self::FACTOR), self::FACTOR, $application, self::SESSION);
+        return self::proof($identity, ProofKind::ADDITIONAL_FACTOR, 'totp', new Channel(ChannelKind::AUTHENTICATOR_APP, self::FACTOR), self::FACTOR, $application, $session);
     }
 
     /**
