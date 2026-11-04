@@ -119,7 +119,9 @@ The package's locks cover its own rows, read with locking reads; they do not sto
 plain reads from seeing an older snapshot. On MySQL and MariaDB at `REPEATABLE READ`, a transaction's first plain read
 fixes the snapshot every later plain read sees, and every flow here reads before a session seam runs (the caller is
 resolved first), so a layer's judgement in a seam may see proofs as they stood then. Run the storage connection at
-`READ COMMITTED` when a layer judges sessions this way; PostgreSQL's default already is.
+`READ COMMITTED` when a layer judges sessions this way; PostgreSQL's default already is. `laravel-authentication` does
+not: every judgement it makes under a session's lock, `factorChanged()` and `factorRemoved()` included, reads that
+session's proofs as committed, so binding it needs no change of isolation level.
 
 Two things hold no second lock or are outside the order, and are kept as they are:
 
