@@ -5,12 +5,14 @@ declare(strict_types = 1);
 namespace Tests\Feature\Context;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Auth\Authenticatable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -563,18 +565,41 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * A named sign-in of a machine or an inactive identity has the neutral
-     * context, whatever proofs are given.
+     * A named sign-in of a machine, or of an inactive identity, has the neutral
+     * context, whatever proofs that count for it are given.
      *
      * @return void
      */
     public function testANamedSignInOfAMachineOrAnInactiveIdentityIsNeutral(): void
     {
-        $machine  = new NonEloquentIdentity('robot-1', mfaEnabled: true, person: false);
+        $user = TestUser::query()->create(['email' => 'served@example.test']);
+
+        $this->totpFactor($user);
+
+        $signIn = SignInProofs::of($user)->inSession('named-sign-in');
+        $proofs = [$signIn->password(3600), $signIn->totp(90)];
+
+        self::assertTrue($this->contributor()->contributeFor($user, self::APPLICATION, 'named-sign-in', ...$proofs)['accepted']);
+
         $inactive = new NonEloquentIdentity('person-1', mfaEnabled: true, active: false);
 
-        self::assertSame(self::NEUTRAL, $this->contributor()->contributeFor($machine, self::APPLICATION, 'named-sign-in'));
         self::assertSame(self::NEUTRAL, $this->contributor()->contributeFor($inactive, self::APPLICATION, 'named-sign-in'));
+
+        $this->container()->instance(SubjectTypeResolver::class, new class implements SubjectTypeResolver {
+            /**
+             * Nobody is a person.
+             *
+             * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
+             * @return bool
+             */
+            #[\Override]
+            public function isPerson(Authenticatable $identity): bool
+            {
+                return false;
+            }
+        });
+
+        self::assertSame(self::NEUTRAL, $this->contributor()->contributeFor($user, self::APPLICATION, 'named-sign-in', ...$proofs));
     }
 
     /**

@@ -73,24 +73,9 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
         $kept        = $current ? self::without($factorId, $store->proofs($identity, $application)) : [];
         $generation  = VerificationGeneration::advance($identity);
 
-        if ($kept === []) {
-            return RemovalRevocation::othersEnded();
+        if ($kept !== []) {
+            $this->recordAgainOnCommit($identity, $application, $session, $kept, $generation);
         }
-
-        AfterStorageCommit::run($this->container, static function () use ($store, $identity, $application, $session, $kept, $generation): void {
-
-            if ($store->currentSession($identity, $application) !== $session) {
-                return;
-            }
-
-            try {
-                foreach ($kept as $proof) {
-                    $store->record($proof->withGeneration($generation));
-                }
-            } catch (ProofRefusedException) {
-                // Fail closed: the current session verifies again.
-            }
-        });
 
         return RemovalRevocation::othersEnded();
     }
@@ -111,14 +96,49 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
     }
 
     /**
+     * Once the change commits, record the proofs again on the sign-in, stamped
+     * with the generation, while the store still names that sign-in; a refusal
+     * is dropped, which leaves the session to verify again.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @param  array<int, \SineMacula\Laravel\Mfa\Proofs\Proof>  $kept
+     * @param  int  $generation
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     */
+    private function recordAgainOnCommit(MultiFactorAuthenticatable $identity, string $application, string $session, array $kept, int $generation): void
+    {
+        $store = $this->container->make(ProofStore::class);
+
+        AfterStorageCommit::run($this->container, static function () use ($store, $identity, $application, $session, $kept, $generation): void {
+
+            if ($store->currentSession($identity, $application) !== $session) {
+                return;
+            }
+
+            try {
+                foreach ($kept as $proof) {
+                    $store->record($proof->withGeneration($generation));
+                }
+            } catch (ProofRefusedException) {
+                // Fail closed: the current session verifies again.
+            }
+        });
+    }
+
+    /**
      * The proofs that were not made with the factor.
      *
      * @param  string  $factorId
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
-     * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
+     * @return array<int, \SineMacula\Laravel\Mfa\Proofs\Proof>
      */
     private static function without(string $factorId, array $proofs): array
     {
-        return array_values(array_filter($proofs, static fn (Proof $proof): bool => $proof->reference !== $factorId));
+        return array_filter($proofs, static fn (Proof $proof): bool => $proof->reference !== $factorId);
     }
 }

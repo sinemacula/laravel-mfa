@@ -5,12 +5,15 @@ declare(strict_types = 1);
 namespace Tests\Unit\RecoveryCodes;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
@@ -360,6 +363,42 @@ final class RecoveryCodeServiceTest extends TestCase
 
         self::assertSame(0, $this->recoveryCodes()->prune(CarbonImmutable::parse('2026-10-15 00:00:00')));
         self::assertSame(1, $this->recoveryCodes()->prune(CarbonImmutable::parse('2026-10-21 00:00:00')));
+    }
+
+    /**
+     * A gate runs before the codes are drawn, given no factors, and again first
+     * under the lock, given the identity's factors as stored there; a refusal
+     * before the lock replaces nothing.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAGateRunsBeforeTheLockAndAgainUnderIt(): void
+    {
+        $holder   = $this->signInHolder();
+        $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $asked    = [];
+
+        $this->recoveryCodes()->generate($holder, null, null, static function (?Collection $factors) use (&$asked): void {
+            $asked[] = $factors?->count();
+        });
+
+        self::assertSame([null, 1], $asked);
+
+        $current = self::plaintexts($this->recoveryCodes()->generate($holder));
+
+        try {
+            $this->recoveryCodes()->generate($holder, null, null, static function (?Collection $factors): void {
+                OperationRefusedException::byPackageUnless($factors !== null, FailureReason::NOT_FRESH, 'Refused before the lock.');
+            });
+            self::fail('The gate was expected to refuse before the lock.');
+        } catch (OperationRefusedException $exception) {
+            self::assertSame('Refused before the lock.', $exception->getMessage());
+        }
+
+        self::assertNotSame($previous, $current);
+        self::assertSame(count($current), RecoveryCode::query()->whereNull('replaced_at')->count());
     }
 
     /**

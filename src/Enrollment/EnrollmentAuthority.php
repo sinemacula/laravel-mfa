@@ -277,7 +277,7 @@ final readonly class EnrollmentAuthority
     {
         OperationRefusedException::unless($settings->enables($type), FailureReason::TYPE_NOT_ENABLED, sprintf('The application does not enable the type [%s].', $type));
 
-        $session = $this->callers->binding($caller, $none ? Purpose::REAUTHENTICATE : Purpose::STEP_UP)?->sessionId;
+        $session = $this->callers->binding($caller, Purpose::STEP_UP)?->sessionId;
 
         OperationRefusedException::unless($session !== null, FailureReason::NOT_FRESH, 'Adding a factor needs a sign-in to authorise it from.');
 

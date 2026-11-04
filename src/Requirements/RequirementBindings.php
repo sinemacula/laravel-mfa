@@ -54,7 +54,6 @@ final class RequirementBindings
     public static function register(Application $app): void
     {
         $app->bind(RequirementService::class);
-        $app->bind(FactorChanges::class);
         $app->bind(RequirementPolicy::class, ConfiguredRequirementPolicy::class);
         $app->bind(IdentityRequirement::class, IdentityContractRequirement::class);
         $app->bind(TenantRequirement::class, NoTenantRequirement::class);

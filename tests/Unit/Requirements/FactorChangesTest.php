@@ -233,14 +233,14 @@ final class FactorChangesTest extends TestCase
     /**
      * Rows of a change asked the wrong way.
      *
-     * @return iterable<string, array{\SineMacula\Laravel\Mfa\Enums\FactorChange, bool}>
+     * @return iterable<string, array{\SineMacula\Laravel\Mfa\Enums\FactorChange, bool, string}>
      */
     public static function misaskedChanges(): iterable
     {
-        yield 'a grant allowed' => [FactorChange::ADD_FACTOR, false];
-        yield 'a first factor allowed' => [FactorChange::ADD_FIRST_ADDITIONAL_FACTOR, false];
-        yield 'a removal granted' => [FactorChange::REMOVE_FACTOR, true];
-        yield 'recovery codes granted' => [FactorChange::GENERATE_RECOVERY_CODES, true];
+        yield 'a grant allowed' => [FactorChange::ADD_FACTOR, false, 'The change [mfa.add_factor] is a grant.'];
+        yield 'a first factor allowed' => [FactorChange::ADD_FIRST_ADDITIONAL_FACTOR, false, 'The change [mfa.add_first_additional_factor] is a grant.'];
+        yield 'a removal granted' => [FactorChange::REMOVE_FACTOR, true, 'The change [mfa.remove_factor] is not a grant.'];
+        yield 'recovery codes granted' => [FactorChange::GENERATE_RECOVERY_CODES, true, 'The change [mfa.generate_recovery_codes] is not a grant.'];
     }
 
     /**
@@ -248,17 +248,19 @@ final class FactorChangesTest extends TestCase
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorChange  $change
      * @param  bool  $asGrant
+     * @param  string  $message
      * @return void
      *
      * @throws \Throwable
      */
     #[DataProvider('misaskedChanges')]
-    public function testAChangeIsAskedOnlyAsWhatItIs(FactorChange $change, bool $asGrant): void
+    public function testAChangeIsAskedOnlyAsWhatItIs(FactorChange $change, bool $asGrant, string $message): void
     {
         $gate     = $this->bind(new ScriptedFactorChangeGate(CarbonImmutable::now()->addMinute()));
         $factorId = $change->namesFactor() ? 'factor-1' : null;
 
         $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
 
         try {
             DB::transaction(fn () => $asGrant

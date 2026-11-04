@@ -142,6 +142,25 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
+     * The kit rejects a contract whose current session never counted, rather
+     * than passing a removal from another sign-in.
+     *
+     * @return void
+     */
+    public function testRejectsACurrentSessionThatNeverCounted(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        SessionRevokerContract::assertRemovingAFactorFromAnotherSignInSparesNothing(
+            $this->sessionRevoker(),
+            $this->revokedIdentity(),
+            self::REMOVED_FACTOR,
+            'another-sign-in',
+            $this->doesCurrentSessionCount(...),
+        );
+    }
+
+    /**
      * The kit passes a revoker that refuses a sign-in that is not the
      * identity's current one by throwing.
      *
