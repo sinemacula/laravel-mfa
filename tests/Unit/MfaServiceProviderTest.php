@@ -366,6 +366,45 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
+     * A binding made before the provider registers is kept: the provider binds
+     * `mfa` and every default only when nothing is bound yet, so a package or
+     * an application registered earlier is not overwritten.
+     *
+     * @return void
+     */
+    public function testRegisteringKeepsEveryEarlierBinding(): void
+    {
+        $container = $this->container();
+        $earlier   = [];
+
+        foreach (array_keys($container->getBindings()) as $abstract) {
+
+            // Only the package's own: the framework's bindings serve the
+            // provider's registration itself
+            if ($abstract !== 'mfa' && !str_starts_with($abstract, 'SineMacula\Laravel\Mfa\\')) {
+                continue;
+            }
+
+            $earlier[$abstract] = static fn (): \stdClass => new \stdClass;
+
+            $container->bind($abstract, $earlier[$abstract]);
+        }
+
+        self::assertArrayHasKey('mfa', $earlier);
+        self::assertArrayHasKey(ProofStore::class, $earlier);
+        self::assertArrayHasKey(SessionTransition::class, $earlier);
+        self::assertArrayHasKey(EnrollmentService::class, $earlier);
+
+        (new MfaServiceProvider($container))->register();
+
+        $bindings = $container->getBindings();
+
+        foreach ($earlier as $abstract => $concrete) {
+            self::assertSame($concrete, $bindings[$abstract]['concrete'] ?? null, $abstract . ' must keep the binding made before the provider registered.');
+        }
+    }
+
+    /**
      * Booting registers the secrets' protections: the middleware that stops a
      * response holding a secret being stored, and the redaction of the log
      * channels.

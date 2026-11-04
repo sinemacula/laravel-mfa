@@ -38,9 +38,9 @@ final class CodeBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(SmsSender::class, NullSmsSender::class);
-        $app->bind(EmailSender::class, NullEmailSender::class);
-        $app->bind(CodeService::class);
-        $app->bind(ChallengeGateway::class, PackageChallengeGateway::class);
+        $app->bindIf(SmsSender::class, NullSmsSender::class);
+        $app->bindIf(EmailSender::class, NullEmailSender::class);
+        $app->bindIf(CodeService::class);
+        $app->bindIf(ChallengeGateway::class, PackageChallengeGateway::class);
     }
 }

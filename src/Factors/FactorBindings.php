@@ -30,6 +30,6 @@ final class FactorBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(FactorService::class);
+        $app->bindIf(FactorService::class);
     }
 }
