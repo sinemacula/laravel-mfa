@@ -1076,7 +1076,8 @@ final class PasskeyChangeGateTest extends TestCase
 
     /**
      * A registration on an active session reports no bootstrap, reaches no
-     * completion, and ends the obligation too.
+     * pending completion, and ends the obligation too; it goes to the bound
+     * transition with nothing outstanding, whose answer the result carries.
      *
      * @return void
      *
@@ -1088,6 +1089,11 @@ final class PasskeyChangeGateTest extends TestCase
 
         $this->enablePasskeys();
 
+        $completion = new \stdClass;
+        $transition = new RecordingSessionTransition($completion);
+
+        $this->container()->instance(SessionTransition::class, $transition);
+
         $user = $this->signedInPerson();
 
         $this->obligeToEnroll($user);
@@ -1098,6 +1104,10 @@ final class PasskeyChangeGateTest extends TestCase
         self::assertNotNull($result);
         self::assertNull($result->verification);
         self::assertFalse(ReenrollmentObligation::isRequired($user));
+        self::assertSame($completion, $result->completion());
+        self::assertCount(1, $transition->changes);
+        self::assertSame(FactorChangeMade::PASSKEY_REGISTERED, $transition->changes[0]->change);
+        self::assertNull($transition->changes[0]->outstanding);
 
         Event::assertNotDispatched(BootstrapEnrollmentCompleted::class);
     }

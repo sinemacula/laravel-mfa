@@ -263,7 +263,7 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Secrets\RevealedSecret`, `Secrets\SecretResponse`                                    | Nothing to bind: a secret it reveals is its own, so check its documentation for how it sends one uncached                                                                                                                            |
 | `Contracts\ProofStore`, `Contracts\FirstFactorResolver`                               | `Requirements\RequirementSubject::proofs()` and `$firstFactor`, passed to `Contracts\RequirementCheck::evaluate()`, and `Contracts\FreshnessPolicy::freshProof()`. Needs a read of the session's proofs outside `evaluate()` as well |
 | `Contracts\ChallengeGateway`, `Attempts\ChallengeCounters`                            | `Codes\CodeService::sendFactorCode()` and `verifyFactorCode()`; `Contracts\FactorCodeCounters`, answered with `isUsable()` and `report()`                                                                                            |
-| `Contracts\SessionTransition`                                                         | `Auth::sessions()->factorChanged()` with the guard's current session when its id is the change's `session`, `null` otherwise                                                                                                         |
+| `Contracts\SessionTransition`                                                         | `Auth::sessions()->factorChanged()` with the guard's current session, throwing when its id is not the change's `session`                                                                                                             |
 | `Passkeys\PasskeyChangeGate`                                                          | `Contracts\PasskeyFactorGate::registering()` and `removing()`, answered with this gate inside its passkey transaction                                                                                                                |
 | `Context\AuthenticationContextContributor`                                            | `Contracts\AuthenticationContextContributor::contribute()`, answered with `contributeFor()` from its `Context\ContributionSubject`                                                                                                   |
 | `CombinationPolicy`, `IdentityRequirement`, `LastFactorPolicy`, `SelfServiceRecovery` | Nothing: these are this package's own                                                                                                                                                                                                |
@@ -289,10 +289,13 @@ never reaches it. It runs inside this package's transaction, after its locks and
 | `outstanding` | The requirement the session no longer meets, by this package's assessment, or `null`             |
 
 The values of `Enums\FactorChangeMade` are those of the layer's `Factors\Enums\FactorChangeMade`, so an adapter maps one
-with `from()`. `outstanding` is information only: the layer judges the session against its own requirement. What
-`factorChanged()` returns, such as the layer's `FactorChangeResult` carrying a pending session's new credential, comes
-back to the caller as the result's `completion()`. A session the layer ended, or found no longer live, is an outcome to
-return, not a refusal. Refuse by throwing, which rolls the whole change back.
+with `from()`. The layer judges a session model, not an id, so the adapter passes the guard's current session. This
+package checks that sign-in is still the request's under the identity's lock, so the two match. If they ever differ,
+throw: returning without judging would let the change commit with no judgement of the session at all. `outstanding` is
+information only: the layer judges the session against its own requirement. What `factorChanged()` returns, such as the
+layer's `FactorChangeResult` carrying a pending session's new credential, comes back to the caller as the result's
+`completion()`. A session the layer ended, or found no longer live, is an outcome to return, not a refusal. Refuse by
+throwing, which rolls the whole change back.
 
 > **Do not enable `passkey` over a layer whose register and remove paths do not call
 > `Passkeys\PasskeyChangeGate`.** The gate has no default that can act for it, because the caller has to invoke it.
