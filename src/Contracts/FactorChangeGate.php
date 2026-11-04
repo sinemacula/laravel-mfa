@@ -19,8 +19,10 @@ use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
  * It is asked inside the identity's factor state transaction, on the storage
  * connection, after the package's locks, with the factors as stored under them:
  * an implementation may lock its own rows there (an authentication layer's
- * session row, say) in the lock order identity state, factors, then its own. It
- * is never asked before the lock, nor when an enrolment is confirmed: a grant's
+ * session row, say), after the identity's state and factors. The change's own
+ * rows are written after it returns, each reached only under the identity's
+ * lock, so no other transaction holds one while waiting for that row. It is
+ * never asked before the lock, nor when an enrolment is confirmed: a grant's
  * lifetime already ends with the authorisation that made it. A pending
  * session's bootstrap enrolment is not a change made here.
  *

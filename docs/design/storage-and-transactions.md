@@ -107,7 +107,10 @@ orchestrating it writes after it.
 The bound `FactorChangeGate` is asked inside the same transaction, after the identity's and the factors' locks, by
 starting an enrolment, registering a passkey, removing a factor or a passkey, and generating recovery codes; never
 before the lock, and never when an enrolment is confirmed. A gate over an authentication layer may lock that layer's
-session row there, which keeps it after every package row.
+session row there. The change's own rows (the enrolment, the association, the recovery code set) are written after the
+gate returns, so the session row is not always the last lock taken; it is always taken after the identity's state row,
+and every one of those rows is reached only by a flow holding that identity's lock, so no transaction can hold one of
+them while waiting for the session row.
 
 Two things hold no second lock or are outside the order, and are kept as they are:
 

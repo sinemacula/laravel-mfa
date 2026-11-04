@@ -158,18 +158,21 @@ final readonly class PasskeyChangeGate
     /**
      * Remove the factor the credential is associated as, before the caller
      * removes the credential; nothing when it is associated with nobody.
+     * Returns what the bound `SessionRevoker` returned for the caller, such as
+     * an authentication layer's result carrying the pending session's new
+     * credential, or `null` with nothing to return.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $credentialId
-     * @return void
+     * @return ?object
      *
      * @throws \InvalidArgumentException
      * @throws \LogicException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    public function removing(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId): void
+    public function removing(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId): ?object
     {
         OpenTransaction::assertOpen(self::NO_TRANSACTION);
 
@@ -178,7 +181,7 @@ final readonly class PasskeyChangeGate
         // A plain read: the association is locked, and looked up again, only
         // once the identity's factor state lock is held, in that order.
         if (!$this->associations->exists($credentialId)) {
-            return;
+            return null;
         }
 
         $binding = $this->callers->binding($this->caller($identity, $application, null), Purpose::STEP_UP);
@@ -189,9 +192,11 @@ final readonly class PasskeyChangeGate
             throw new OperationRefusedException(FailureReason::NOT_FRESH, 'Removing a factor needs a sign-in the proof store knows of.');
         }
 
-        FactorStateTransaction::forIdentity($identity, $this->factorModel(), function (Collection $factors) use ($binding, $application, $credentialId): void {
-            $this->remove($binding, $application, $credentialId, $factors);
-        });
+        return FactorStateTransaction::forIdentity(
+            $identity,
+            $this->factorModel(),
+            fn (Collection $factors): ?object => $this->remove($binding, $application, $credentialId, $factors),
+        );
     }
 
     /**
@@ -283,14 +288,14 @@ final readonly class PasskeyChangeGate
      * @param  string  $application
      * @param  string  $credentialId
      * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
-     * @return void
+     * @return ?object
      *
      * @formatter:on
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    private function remove(ProofBinding $binding, string $application, #[\SensitiveParameter] string $credentialId, Collection $factors): void
+    private function remove(ProofBinding $binding, string $application, #[\SensitiveParameter] string $credentialId, Collection $factors): ?object
     {
         $caller = $this->callers->still(null, $binding);
 
@@ -312,7 +317,7 @@ final readonly class PasskeyChangeGate
                 'The credential is associated with another identity.',
             );
 
-            return;
+            return null;
         }
 
         $factor = $factors->first(static fn (EloquentFactor&Model $candidate): bool => LockedFactors::idOf($candidate) === $association->factor_id);
@@ -320,12 +325,12 @@ final readonly class PasskeyChangeGate
         if ($factor === null) {
             $this->associations->forget($association->factor_id);
 
-            return;
+            return null;
         }
 
         $this->container->make(RemovalGuard::class)->assertRemovable($identity, $application, $factor, $factors, $binding->sessionId);
 
-        $this->container->make(FactorRemoval::class)->remove($identity, $application, $factor, $factors, $binding->sessionId);
+        return $this->container->make(FactorRemoval::class)->remove($identity, $application, $factor, $factors, $binding->sessionId)->completion;
     }
 
     /**

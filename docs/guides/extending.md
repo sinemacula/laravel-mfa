@@ -337,16 +337,17 @@ DB::transaction(function () use ($gate, $identity, $application, $credential, $p
 `registering()` associates the passkey as a confirmed factor when the application enables `passkey`, after the same
 checks an enrolment needs: the bound `Contracts\FactorChangeGate` allowing a further factor or the first one (by
 default, a fresh step-up, or the first factor proved again), or the bootstrap path on a pending session that allows
-`mfa.confirm_bootstrap_enrollment`; then the application's limits. It
-returns `null` when the application does not enable the type, and recovery codes with the identity's first additional
-factor. On a pending session its proof then goes to the bound `PendingCompletion`, and `verification` on the result
-holds what came back, whose refusal rolls your registration back; reveal it only once your transaction has committed. On
-an active session the requirement is evaluated again, and a shortfall goes to the bound `SessionTransition`, whose
-refusal rolls it back too. `removing()` makes the checks of every removal: a sign-in the proof store knows of and that
-has not changed under the lock, an active identity, the factor change gate allowing the removal (by default, a fresh
-step-up made with another factor where the identity has one), and the last factor policy. It then tells the bound
-`SessionRevoker` of the removal, which stops the identity's other sessions counting. A refusal throws an
-`OperationRefusedException`; let it roll back your own change, since catching it and committing breaks the gate.
+`mfa.confirm_bootstrap_enrollment`; then the application's limits. It returns `null` when the application does not
+enable the type, and recovery codes with the identity's first additional factor. On a pending session its proof then
+goes to the bound `PendingCompletion`, and `verification` on the result holds what came back, whose refusal rolls your
+registration back; reveal it only once your transaction has committed. On an active session the requirement is evaluated
+again, and a shortfall goes to the bound `SessionTransition`, whose refusal rolls it back too. `removing()` makes the
+checks of every removal: a sign-in the proof store knows of and that has not changed under the lock, an active identity,
+the factor change gate allowing the removal (by default, a fresh step-up made with another factor where the identity has
+one), and the last factor policy. It then tells the bound `SessionRevoker` of the removal, which stops the identity's
+other sessions counting, and returns what the revoker returned for your layer, such as the pending session's new
+credential when it judged the session itself. A refusal throws an `OperationRefusedException`; let it roll back your own
+change, since catching it and committing breaks the gate.
 
 ## Proving an adapter
 
