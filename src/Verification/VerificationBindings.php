@@ -30,6 +30,6 @@ final class VerificationBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(VerificationService::class);
+        $app->bindIf(VerificationService::class);
     }
 }

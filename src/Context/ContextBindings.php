@@ -37,7 +37,7 @@ final class ContextBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(PendingSessionResolver::class, NoPendingSessionResolver::class);
-        $app->bind(SubjectTypeResolver::class, IdentityContractSubjectType::class);
+        $app->bindIf(PendingSessionResolver::class, NoPendingSessionResolver::class);
+        $app->bindIf(SubjectTypeResolver::class, IdentityContractSubjectType::class);
     }
 }

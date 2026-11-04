@@ -34,8 +34,8 @@ final class LifecycleBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(LifecycleService::class);
-        $app->bind(LastFactorPolicy::class, RequiredFactorPolicy::class);
-        $app->bind(SelfServiceRecovery::class, NoSelfServiceRecovery::class);
+        $app->bindIf(LifecycleService::class);
+        $app->bindIf(LastFactorPolicy::class, RequiredFactorPolicy::class);
+        $app->bindIf(SelfServiceRecovery::class, NoSelfServiceRecovery::class);
     }
 }
