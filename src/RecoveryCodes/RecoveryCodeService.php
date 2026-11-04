@@ -336,9 +336,11 @@ final readonly class RecoveryCodeService
 
         $this->events->dispatch(new RecoveryCodeUsed($context, $remaining, $binding->purpose));
 
-        if ($lowCount > 0 && $remaining <= $lowCount) {
-            $this->events->dispatch(new RecoveryCodesLow($context, $remaining, $binding->purpose));
+        if ($lowCount <= 0 || $remaining > $lowCount) {
+            return;
         }
+
+        $this->events->dispatch(new RecoveryCodesLow($context, $remaining, $binding->purpose));
     }
 
     /**

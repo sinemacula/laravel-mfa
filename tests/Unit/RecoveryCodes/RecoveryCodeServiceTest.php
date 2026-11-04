@@ -9,10 +9,13 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
+use SineMacula\Laravel\Mfa\Events\RecoveryCodesLow;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
+use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -363,6 +366,47 @@ final class RecoveryCodeServiceTest extends TestCase
 
         self::assertSame(0, $this->recoveryCodes()->prune(CarbonImmutable::parse('2026-10-15 00:00:00')));
         self::assertSame(1, $this->recoveryCodes()->prune(CarbonImmutable::parse('2026-10-21 00:00:00')));
+    }
+
+    /**
+     * Rows of the codes left after a redemption, the low count, and whether the
+     * set is reported low.
+     *
+     * @return iterable<string, array{int, int, bool}>
+     */
+    public static function lowCounts(): iterable
+    {
+        yield 'above the low count' => [4, 3, false];
+        yield 'at the low count' => [3, 3, true];
+        yield 'below the low count' => [2, 3, true];
+        yield 'none left' => [0, 3, true];
+        yield 'no low count' => [0, 0, false];
+    }
+
+    /**
+     * A redemption is always reported used, and low only when it leaves the set
+     * at or below a low count that is set.
+     *
+     * @param  int  $remaining
+     * @param  int  $lowCount
+     * @param  bool  $low
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[DataProvider('lowCounts')]
+    public function testARedemptionIsReportedLowAtOrBelowTheLowCount(int $remaining, int $lowCount, bool $low): void
+    {
+        config()->set('mfa.recovery_codes.low_count', $lowCount);
+
+        Event::fake([RecoveryCodeUsed::class, RecoveryCodesLow::class]);
+
+        $holder = $this->signInHolder();
+
+        $this->recoveryCodes()->reportRedeemed($holder, self::redemptionBinding($holder), $remaining);
+
+        Event::assertDispatchedTimes(RecoveryCodeUsed::class, 1);
+        Event::assertDispatchedTimes(RecoveryCodesLow::class, $low ? 1 : 0);
     }
 
     /**
