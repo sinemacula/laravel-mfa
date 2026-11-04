@@ -408,6 +408,13 @@ passes when other sessions stop counting whether or not it ends them. The factor
 change and asks for the request from a session arranged fresh, or stale, for it; a removal stepped up only with the
 factor it removes; and a change beyond the requirement the request carries. The session transition's kit hands its hook
 each kind of change and asks for it made on a session arranged fresh for it, then judges it with a shortfall and
-without. Each check is a static assertion on a `*Contract` class beside its trait, so a test can also call one directly.
-The kits need PHPUnit and a database migrated with the package's tables, as any test of an adapter does.
+without. The proof store's kit begins a fixed sign-in id and voids proofs by advancing the verification generation,
+which suits a store keeping its own sign-ins. A store over an authentication layer's sessions overrides
+`proofStoreSignIn()` to sign the identity in through that layer and return the session's id, asked once a check, and
+`voidProofStoreProofs()` to void them as that layer does on a reset. The sign-in may already hold the first factor the
+layer recorded on signing in: each check counts against what it held when begun. Either way, a proof of a sign-in that
+is not current, or that the store cannot find, is refused by throwing `Exceptions\ProofRefusedException`, as
+`ProofStore::record()` declares. Each check is a static assertion on a `*Contract` class beside its trait, so a test
+can also call one directly. The kits need PHPUnit and a database migrated with the package's tables, as any test of an
+adapter does.
 
