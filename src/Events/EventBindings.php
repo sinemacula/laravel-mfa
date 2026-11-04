@@ -33,7 +33,7 @@ final class EventBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(EventContextResolver::class, DefaultEventContextResolver::class);
-        $app->bind(EventDispatcher::class);
+        $app->bindIf(EventContextResolver::class, DefaultEventContextResolver::class);
+        $app->bindIf(EventDispatcher::class);
     }
 }

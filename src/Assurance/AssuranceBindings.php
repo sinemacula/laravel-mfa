@@ -33,6 +33,6 @@ final class AssuranceBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(CombinationPolicy::class, DefaultCombinationPolicy::class);
+        $app->bindIf(CombinationPolicy::class, DefaultCombinationPolicy::class);
     }
 }

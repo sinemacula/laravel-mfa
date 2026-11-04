@@ -38,9 +38,9 @@ final class PasskeyBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(PasskeyGateway::class, UnavailablePasskeyGateway::class);
-        $app->bind(PasskeyAssociations::class);
-        $app->bind(PasskeyAssertions::class);
-        $app->bind(PasskeyChangeGate::class);
+        $app->bindIf(PasskeyGateway::class, UnavailablePasskeyGateway::class);
+        $app->bindIf(PasskeyAssociations::class);
+        $app->bindIf(PasskeyAssertions::class);
+        $app->bindIf(PasskeyChangeGate::class);
     }
 }

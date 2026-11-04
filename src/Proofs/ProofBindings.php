@@ -51,15 +51,15 @@ final class ProofBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(
+        $app->bindIf(
             ProofStore::class,
             static fn (Application $app): ProofStore => new SessionProofStore($app->make(Session::class)),
         );
 
-        $app->bind(ProofService::class);
-        $app->bind(SessionRevoker::class, GenerationSessionRevoker::class);
-        $app->bind(PendingCompletion::class, ProofStoreCompletion::class);
-        $app->bind(StepUp::class, ProofStoreCompletion::class);
+        $app->bindIf(ProofService::class);
+        $app->bindIf(SessionRevoker::class, GenerationSessionRevoker::class);
+        $app->bindIf(PendingCompletion::class, ProofStoreCompletion::class);
+        $app->bindIf(StepUp::class, ProofStoreCompletion::class);
 
         $events = $app->make(Dispatcher::class);
 

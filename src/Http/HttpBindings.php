@@ -41,7 +41,7 @@ final class HttpBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(SessionTransition::class, MiddlewareSessionTransition::class);
+        $app->bindIf(SessionTransition::class, MiddlewareSessionTransition::class);
     }
 
     /**

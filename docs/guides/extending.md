@@ -21,8 +21,9 @@ models and the `Codes\MfaCodeMessage` mailable. Extension is through **compositi
 | Custom factor model        | Extend `Models\Factor` or implement `Contracts\EloquentFactor`; set `mfa.factor.model` |
 | Custom recovery code model | Extend `Models\RecoveryCode` or implement `Contracts\RecoveryCode`; set the model      |
 
-Every class name above is relative to `SineMacula\Laravel\Mfa`. Bind your own implementations from a service provider: a
-binding made after the package's provider has registered replaces the package's default, and `Mfa::extend()` replaces a
+Every class name above is relative to `SineMacula\Laravel\Mfa`. Bind your own implementations from a service provider. The
+package binds each default only when nothing is bound yet, so a binding made before its provider registers is kept, as
+one made after replaces the default, whichever order Composer registers the providers in. `Mfa::extend()` replaces a
 shipped driver of the same name. So does a driver registered on the manager from a container extender or a resolving
 callback on `mfa`, since the shipped drivers are registered before either runs. The manager builds a driver on every
 call rather than caching it, so the most recent registration is the one used, but call `extend()` from a service
