@@ -21,12 +21,16 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
+use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
+use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\Operation;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Http\MiddlewareSessionTransition;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
 use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 use SineMacula\Laravel\Mfa\Testing\Seams\ApplicationResolverContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ApplicationResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\EventContextResolverTests;
@@ -50,6 +54,7 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\DriftingSeams;
 use Tests\Fixtures\Seams\FaultySeams;
 use Tests\Fixtures\Seams\ObjectContextResolver;
+use Tests\Fixtures\Seams\RecordingSessionTransition;
 use Tests\Fixtures\Seams\ScriptedFreshnessGate;
 use Tests\TestCase;
 
@@ -374,7 +379,34 @@ final class SeamsWithoutStateContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        SessionTransitionContract::assertReturnsOrRefusesByThrowing(new FaultySeams, $this->transitionIdentity(), 'web');
+        SessionTransitionContract::assertReturnsOrRefusesByThrowing(new FaultySeams, $this->sessionChange(...));
+    }
+
+    /**
+     * The kit judges every change, with a shortfall and without, each arranged
+     * afresh.
+     *
+     * @return void
+     */
+    public function testTheKitJudgesEveryChangeWithAndWithoutAShortfall(): void
+    {
+        $transition = new RecordingSessionTransition;
+        $arranged   = 0;
+
+        SessionTransitionContract::assertReturnsOrRefusesByThrowing($transition, function (FactorChangeMade $change) use (&$arranged): SessionChange {
+            $arranged++;
+
+            return $this->sessionChange($change);
+        });
+
+        $judged = array_map(static fn (SessionChange $change): array => [$change->change, $change->outstanding !== null], $transition->changes);
+
+        self::assertSame(6, $arranged);
+        self::assertSame([
+            [FactorChangeMade::CONFIRMED, true], [FactorChangeMade::CONFIRMED, false],
+            [FactorChangeMade::PASSKEY_REGISTERED, true], [FactorChangeMade::PASSKEY_REGISTERED, false],
+            [FactorChangeMade::REMOVED, true], [FactorChangeMade::REMOVED, false],
+        ], $judged);
     }
 
     /**
@@ -394,7 +426,10 @@ final class SeamsWithoutStateContractTest extends TestCase
 
         self::assertCount(1, $before);
 
-        (new MiddlewareSessionTransition)->returnToPending($user, 'web', Requirement::none()->withAdditionalVerification());
+        $change = $this->sessionChange(FactorChangeMade::CONFIRMED);
+        $short  = new SessionChange($change->identity, $change->application, $change->session, $change->change, $change->factor, Requirement::none()->withAdditionalVerification());
+
+        self::assertNull((new MiddlewareSessionTransition)->factorChanged($short));
 
         self::assertSame($before[0]->toArray(), $store->proofs($user, 'web')[0]->toArray());
     }
@@ -544,26 +579,17 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * A person.
+     * The change, made to a TOTP factor on a person's sign-in on `web`.
      *
-     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     * @param  \SineMacula\Laravel\Mfa\Enums\FactorChangeMade  $change
+     * @return \SineMacula\Laravel\Mfa\Requirements\SessionChange
      */
     #[\Override]
-    protected function transitionIdentity(): MultiFactorAuthenticatable
+    protected function sessionChange(FactorChangeMade $change): SessionChange
     {
-        /** @var \Tests\Fixtures\Identities\TestUser */
-        return TestUser::query()->firstOrCreate(['email' => 'transition@example.test']);
-    }
+        $factor = new FactorSummary('factor-totp', 'totp', null, null, FactorStatus::CONFIRMED, false, null);
 
-    /**
-     * The application.
-     *
-     * @return string
-     */
-    #[\Override]
-    protected function transitionApplication(): string
-    {
-        return 'web';
+        return new SessionChange($this->transitionIdentity(), 'web', SignInProofs::SESSION, $change, $factor, null);
     }
 
     /**
@@ -630,6 +656,17 @@ final class SeamsWithoutStateContractTest extends TestCase
     protected function tenantApplication(): string
     {
         return 'web';
+    }
+
+    /**
+     * A person.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     */
+    private function transitionIdentity(): MultiFactorAuthenticatable
+    {
+        /** @var \Tests\Fixtures\Identities\TestUser */
+        return TestUser::query()->firstOrCreate(['email' => 'transition@example.test']);
     }
 
     /**

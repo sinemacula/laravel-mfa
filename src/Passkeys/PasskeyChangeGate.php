@@ -22,6 +22,7 @@ use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\OpenTransaction;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentAuthority;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
@@ -69,9 +70,10 @@ use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
  *   additional factor. A confirmed factor ends a re-enrolment obligation. On a
  *   pending session its proof goes to the bound `PendingCompletion`; on an
  *   active one the requirement is evaluated again on the proofs the session
- *   holds, and a shortfall goes to the bound `SessionTransition`; a refusal of
- *   either rolls the registration back. A credential associated already, with
- *   this identity or another, is refused.
+ *   holds, and the registration goes to the bound `SessionTransition` with any
+ *   shortfall, whose answer the result carries; a refusal of either rolls the
+ *   registration back. A credential associated already, with this identity or
+ *   another, is refused.
  * - `removing()` removes the factor an associated credential is, on a sign-in
  *   the proof store knows (`not_fresh` without one), compared again under the
  *   lock (`not_found` when it changed), with the checks of every removal (see
@@ -269,11 +271,11 @@ final readonly class PasskeyChangeGate
             return new PasskeyAssociationResult($summary, $codes, $result->withCompletion($acceptance->handOver($caller, $result)));
         }
 
-        $proofs = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
+        $proofs    = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
+        $judgement = $this->container->make(SessionReevaluation::class)
+            ->judge($identity, $application, $registration->binding->sessionId, FactorChangeMade::PASSKEY_REGISTERED, $summary, $proofs);
 
-        $this->container->make(SessionReevaluation::class)->reevaluate($identity, $application, $proofs);
-
-        return new PasskeyAssociationResult($summary, $codes);
+        return new PasskeyAssociationResult($summary, $codes, completion: $judgement->completion());
     }
 
     /**
@@ -330,7 +332,7 @@ final readonly class PasskeyChangeGate
 
         $this->container->make(RemovalGuard::class)->assertRemovable($identity, $application, $factor, $factors, $binding->sessionId);
 
-        return $this->container->make(FactorRemoval::class)->remove($identity, $application, $factor, $factors, $binding->sessionId)->completion;
+        return $this->container->make(FactorRemoval::class)->remove($identity, $application, $factor, $factors, $binding->sessionId)->completion();
     }
 
     /**

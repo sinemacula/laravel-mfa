@@ -4,9 +4,8 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Http;
 
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
-use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 
 /**
  * The default `SessionTransition`: without an authentication layer there is no
@@ -25,17 +24,16 @@ final readonly class MiddlewareSessionTransition implements SessionTransition
 {
     /**
      * Leave access to the `mfa` middleware, which gates it until the
-     * requirement is met.
+     * requirement is met, and return nothing.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $outstanding
-     * @return void
+     * @param  \SineMacula\Laravel\Mfa\Requirements\SessionChange  $change
+     * @return null
      */
     #[\Override]
-    public function returnToPending(MultiFactorAuthenticatable $identity, string $application, Requirement $outstanding): void
+    public function factorChanged(SessionChange $change): null
     {
         // Nothing to change: the middleware judges the requirement afresh on
         // the next request.
+        return null;
     }
 }

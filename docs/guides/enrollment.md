@@ -149,10 +149,10 @@ since it only gives something up.
 
 ## What a confirmation does
 
-| Session | The proof                                                                                            | What follows                                                                                              |
-|---------|------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| Pending | Goes to `PendingCompletion`, with purpose `enrollment`, and the whole requirement is evaluated again | `$confirmation->verification` holds the result; the session may stay pending, which is not a failure      |
-| Active  | Is not recorded, and `StepUp` is not called, because this code was bound to enrolling                | The requirement is evaluated on the proofs the session holds, and a shortfall goes to `SessionTransition` |
+| Session | The proof                                                                                            | What follows                                                                                                                                                                            |
+|---------|------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Pending | Goes to `PendingCompletion`, with purpose `enrollment`, and the whole requirement is evaluated again | `$confirmation->verification` holds the result; the session may stay pending, which is not a failure                                                                                    |
+| Active  | Is not recorded, and `StepUp` is not called, because this code was bound to enrolling                | The requirement is evaluated on the proofs the session holds, and the confirmation goes to `SessionTransition` with any shortfall; `$confirmation->completion()` holds what it returned |
 
 So on an `enrolled` application, an active person's first factor returns the session to pending, or with the default
 transition lets the middleware gate it, and they verify with the new factor.

@@ -93,7 +93,7 @@ transaction that only refuses may lock nothing. The challenge gateway is at chal
 | Verifying, every route              | Identity, factors, the proof's writes, the counts                        | `PendingCompletion` or `StepUp` |
 | Sending a code                      | Identity, factors, the code                                              | None                            |
 | Starting or cancelling an enrolment | Identity, factors, the enrolment, the pending factor                     | None                            |
-| Confirming an enrolment             | Identity, factors, the enrolment, the factor, any recovery codes         | `PendingCompletion`, `StepUp`   |
+| Confirming an enrolment             | Identity, factors, the enrolment, the factor, any recovery codes         | `PendingCompletion`, transition |
 | Removing a factor                   | Identity, factors, the association, the factor, any recovery set         | `factorRemoved`, transition     |
 | Registering a passkey               | Identity, factors, the factor, the association, any recovery codes       | `PendingCompletion`, transition |
 | Removing a passkey                  | As removing a factor, the owner's association only                       | `factorRemoved`, transition     |
@@ -111,6 +111,15 @@ session row there. The change's own rows (the enrolment, the association, the re
 gate returns, so the session row is not always the last lock taken; it is always taken after the identity's state row,
 and every one of those rows is reached only by a flow holding that identity's lock, so no transaction can hold one of
 them while waiting for the session row.
+
+`SessionTransition` is asked last in the same way, after every package row has changed. A transition over an
+authentication layer locks that layer's session row there, last.
+
+The package's locks cover its own rows, read with locking reads; they do not stop a layer that judges a session with
+plain reads from seeing an older snapshot. On MySQL and MariaDB at `REPEATABLE READ`, a transaction's first plain read
+fixes the snapshot every later plain read sees, and every flow here reads before a session seam runs (the caller is
+resolved first), so a layer's judgement in a seam may see proofs as they stood then. Run the storage connection at
+`READ COMMITTED` when a layer judges sessions this way; PostgreSQL's default already is.
 
 Two things hold no second lock or are outside the order, and are kept as they are:
 

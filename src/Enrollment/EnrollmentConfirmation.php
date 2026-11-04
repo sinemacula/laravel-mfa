@@ -12,13 +12,16 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 /**
  * How confirming an enrolment ended: confirmed, with the factor, the recovery
  * codes generated with an identity's first factor and, on a pending session,
- * the verification the new proof made there; or failed, with the reason a
- * caller may be told, when a lockout refusing it ends, and whether the failure
- * used up the enrolment's attempts and abandoned it.
+ * the verification the new proof made there or, on an active one, what the
+ * bound `SessionTransition` returned for the caller; or failed, with the reason
+ * a caller may be told, when a lockout refusing it ends, and whether the
+ * failure used up the enrolment's attempts and abandoned it.
  *
  * The recovery codes are returned here and never again, as secrets for the
- * response; a failure holds none. Answered once: a second confirmation with the
- * same grant is `not_found`, and returns none of this again.
+ * response; a failure holds none. The completion may hold a credential, so it
+ * is held as a `\SensitiveParameterValue` and read through `completion()`, and
+ * no dump shows it. Answered once: a second confirmation with the same grant is
+ * `not_found`, and returns none of this again.
  *
  * @api
  *
@@ -27,6 +30,9 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
  */
 final readonly class EnrollmentConfirmation
 {
+    /** @var \SensitiveParameterValue What the session transition returned, hidden from dumps. */
+    private \SensitiveParameterValue $completion;
+
     /**
      * Constructor.
      *
@@ -36,6 +42,7 @@ final readonly class EnrollmentConfirmation
      * @param  ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  ?\Carbon\CarbonImmutable  $lockedUntil
      * @param  bool  $abandoned
+     * @param  ?object  $completion
      */
     private function __construct(
 
@@ -56,7 +63,14 @@ final readonly class EnrollmentConfirmation
 
         /** Whether the failure abandoned the enrolment, so it must start again. */
         public bool $abandoned = false,
-    ) {}
+
+        // What the session transition returned on an active session, opaque to
+        // this package.
+        #[\SensitiveParameter]
+        ?object $completion = null,
+    ) {
+        $this->completion = new \SensitiveParameterValue($completion);
+    }
 
     /**
      * A factor that was confirmed.
@@ -64,11 +78,16 @@ final readonly class EnrollmentConfirmation
      * @param  \SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>  $recoveryCodes
      * @param  ?\SineMacula\Laravel\Mfa\Verification\VerificationResult  $verification
+     * @param  ?object  $completion
      * @return self
      */
-    public static function confirmed(FactorSummary $factor, #[\SensitiveParameter] array $recoveryCodes = [], #[\SensitiveParameter] ?VerificationResult $verification = null): self
-    {
-        return new self($factor, $recoveryCodes, $verification);
+    public static function confirmed(
+        FactorSummary $factor,
+        #[\SensitiveParameter] array $recoveryCodes = [],
+        #[\SensitiveParameter] ?VerificationResult $verification = null,
+        #[\SensitiveParameter] ?object $completion = null,
+    ): self {
+        return new self($factor, $recoveryCodes, $verification, completion: $completion);
     }
 
     /**
@@ -82,6 +101,19 @@ final readonly class EnrollmentConfirmation
     public static function failed(FailureReason $reason, ?CarbonImmutable $lockedUntil = null, bool $abandoned = false): self
     {
         return new self(reason: $reason, lockedUntil: $lockedUntil, abandoned: $abandoned);
+    }
+
+    /**
+     * What the bound session transition returned for the caller on an active
+     * session, such as a pending session's new credential, or `null`; on a
+     * pending session the verification's `completion()` is the one.
+     *
+     * @return ?object
+     */
+    public function completion(): ?object
+    {
+        /** @var ?object */
+        return $this->completion->getValue();
     }
 
     /**

@@ -36,6 +36,7 @@ use SineMacula\Laravel\Mfa\Enrollment\GrantAuthority;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
@@ -143,8 +144,10 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
         $user       = $this->bootstrapPerson(Requirement::none()->withAdditionalVerification());
         $completion = new \stdClass;
         $seam       = new CheckingCompletion(self::PENDING, completion: $completion);
+        $transition = new RecordingSessionTransition(new \stdClass);
 
         $this->container()->instance(PendingCompletion::class, $seam);
+        $this->container()->instance(SessionTransition::class, $transition);
 
         $start = $this->startedTotp();
         $code  = $this->appCode($start);
@@ -153,6 +156,8 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertCount(1, $seam->accepted);
+        self::assertSame([], $transition->changes);
+        self::assertNull($confirmation->completion());
 
         $result = $confirmation->verification;
 
@@ -285,8 +290,10 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * On an active session no proof is recorded and `StepUp` is not called, and
-     * no transition is asked for when the requirement is still met.
+     * On an active session no proof is recorded and `StepUp` is not called;
+     * the bound transition judges the session again all the same, told the
+     * sign-in, the factor and that the requirement is still met, and what it
+     * returns is the confirmation's completion.
      *
      * @return void
      */
@@ -294,7 +301,8 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     {
         $user       = $this->reauthenticatedPerson();
         $stepUp     = new CheckingCompletion(self::SESSION);
-        $transition = new RecordingSessionTransition;
+        $completion = new \stdClass;
+        $transition = new RecordingSessionTransition($completion);
 
         $this->container()->instance(StepUp::class, $stepUp);
         $this->container()->instance(SessionTransition::class, $transition);
@@ -307,7 +315,43 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
         self::assertNull($confirmation->verification);
         self::assertSame([], $this->furtherProofs($user));
         self::assertSame([], $stepUp->accepted);
-        self::assertSame([], $transition->returned);
+        self::assertCount(1, $transition->changes);
+        self::assertSame($completion, $confirmation->completion());
+
+        $change = $transition->changes[0];
+
+        self::assertSame(FactorChangeMade::CONFIRMED, $change->change);
+        self::assertSame(self::SESSION, $change->session);
+        self::assertSame(self::APPLICATION, $change->application);
+        self::assertSame($start->factor?->id, $change->factor->id);
+        self::assertSame(FactorStatus::CONFIRMED, $change->factor->status);
+        self::assertEquals($user->getAuthIdentifier(), $change->identity->getAuthIdentifier());
+        self::assertNull($change->outstanding);
+    }
+
+    /**
+     * A transition's refusal on an active session rolls the confirmation back:
+     * the factor stays pending and no recovery codes are kept.
+     *
+     * @return void
+     */
+    public function testATransitionsRefusalRollsTheConfirmationBack(): void
+    {
+        $this->reauthenticatedPerson();
+
+        $transition = self::createStub(SessionTransition::class);
+        $transition->method('factorChanged')->willThrowException(new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'Cannot judge the session.'));
+
+        $this->container()->instance(SessionTransition::class, $transition);
+
+        $start = $this->startedTotp();
+
+        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+
+        self::assertSame(FailureReason::NOT_ACCEPTED, $confirmation->reason);
+        self::assertNull($confirmation->completion());
+        self::assertFalse($this->pendingFactorOf($start)->isConfirmed());
+        self::assertSame(0, RecoveryCode::query()->count());
     }
 
     /**
@@ -330,9 +374,9 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
         $start = $this->startedTotp();
 
         self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->isConfirmed());
-        self::assertCount(1, $transition->returned);
-        self::assertSame(self::APPLICATION, $transition->returned[0][0]);
-        self::assertTrue($transition->returned[0][1]->asks(RequirementPart::ADDITIONAL_VERIFICATION));
+        self::assertCount(1, $transition->shortfalls());
+        self::assertSame(self::APPLICATION, $transition->changes[0]->application);
+        self::assertTrue($transition->changes[0]->outstanding?->asks(RequirementPart::ADDITIONAL_VERIFICATION));
     }
 
     /**
