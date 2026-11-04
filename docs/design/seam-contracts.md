@@ -17,8 +17,15 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
   no pending session, `false` for a passkey gateway that is unavailable or a factor that may not be removed, and "not
   fresh" for an operation with no setting or a session with no record.
 - A call that changes state (`SessionRevoker`, `SessionTransition`) reports a refusal or a failure by throwing, never by
-  returning: a session that cannot be ended or returned to pending. Returning means it was done, and a throw rolls back
-  the factor state change the call runs in.
+  returning: a session that cannot be ended or judged again. Returning means it was done, and a throw rolls back the
+  factor state change the call runs in.
+- `SessionTransition::factorChanged()` judges the current session again after every factor change on an active session
+  (a factor confirmed, a passkey registered as a factor, a removal its revoker left to the package), whether or not the
+  package finds it short, with a `Requirements\SessionChange`: the identity, the application, the sign-in, what was done
+  (`Enums\FactorChangeMade`), the factor, and the package's own assessment, the requirement the session no longer meets
+  or `null`. The assessment is information, not a verdict. It runs after the package's locks and writes, and what it
+  returns reaches the caller as the change's `completion()`. A session it ended, or found ended, is a return, not a
+  refusal.
 - `FactorChangeGate` authorises a change to a person's factors from an active session (a first additional factor, a
   further one, a removal, recovery codes), asked inside the identity's transaction after the package's locks and never
   before them, with a `Requirements\FactorChangeRequest`: the identity, the application, the sign-in, the change, the
@@ -83,7 +90,7 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
   dropping a refusal. A later revocation in the same change therefore still wins, and a change that rolls back revokes
   nothing. The Laravel sessions themselves go on; the other sessions must verify again. It answers
   `Proofs\RemovalRevocation::othersEnded()`, leaving the current session for the package to judge; a revoker that judges
-  it itself answers `judged()` with what the caller is to receive, and the package then hands no shortfall to
+  it itself answers `judged()` with what the caller is to receive, and the package then hands the removal to no
   `SessionTransition`.
 - `SessionTransition` is bound to `Http\MiddlewareSessionTransition`, which changes nothing, because the `mfa`
   middleware is the gate: it works the whole requirement out again on every request and judges the session's proofs
@@ -143,7 +150,7 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
 | `PasskeyGateway`         | Lists passkeys, and requests and verifies assertions for allowed ones       | Its WebAuthn credentials and ceremonies            |
 | `SessionRevoker`         | Ends the identity's other sessions, or all of them, inside a factor change  | Logging out everywhere, optionally but the current |
 | `FactorChangeGate`       | Whether an active session may change the identity's factors now             | Its factor-change gate                             |
-| `SessionTransition`      | Returns the current session to pending when a change leaves it short        | Returning a session to pending                     |
+| `SessionTransition`      | Judges the current session again after a factor change                      | Judging a session after a factor change            |
 | `LastFactorPolicy`       | Whether the identity's last factor may be removed                           | Nothing, or a tenant-aware policy of the iam layer |
 | `SelfServiceRecovery`    | Whether an application offers its own recovery, and starting it             | Nothing: the application's own                     |
 | `SubjectTypeResolver`    | Whether an identity is a person                                             | Its subject type                                   |

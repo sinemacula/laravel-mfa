@@ -23,6 +23,7 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\FactorChange;
+use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
@@ -620,7 +621,7 @@ final class RemovingFactorTest extends TestCase
         $result = Mfa::removeFactor($factor->id);
 
         self::assertTrue($result->wasMade());
-        self::assertNull($result->completion);
+        self::assertNull($result->completion());
         self::assertSame(['others'], $revoker->calls);
         $session = $this->container()->make(ProofStore::class)->currentSession($user, self::APPLICATION);
 
@@ -685,9 +686,9 @@ final class RemovingFactorTest extends TestCase
         $result = Mfa::removeFactor($factor->id);
 
         self::assertTrue($result->wasMade());
-        self::assertSame($completion, $result->completion);
+        self::assertSame($completion, $result->completion());
         self::assertSame($requirement->toArray(), $result->outstanding?->toArray());
-        self::assertSame([], $transition->returned);
+        self::assertSame([], $transition->changes);
     }
 
     /**
@@ -736,7 +737,8 @@ final class RemovingFactorTest extends TestCase
      */
     public function testAShortfallReturnsTheSessionToPending(): void
     {
-        $transition  = new RecordingSessionTransition;
+        $completion  = new \stdClass;
+        $transition  = new RecordingSessionTransition($completion);
         $requirement = Requirement::none()->withPhishingResistance();
 
         $this->container()->instance(SessionTransition::class, $transition);
@@ -752,8 +754,44 @@ final class RemovingFactorTest extends TestCase
 
         self::assertTrue($result->wasMade());
         self::assertSame($requirement->toArray(), $result->outstanding?->toArray());
-        self::assertCount(1, $transition->returned);
-        self::assertSame(self::APPLICATION, $transition->returned[0][0]);
+        self::assertSame($completion, $result->completion());
+        self::assertCount(1, $transition->changes);
+
+        $change = $transition->changes[0];
+
+        self::assertSame(FactorChangeMade::REMOVED, $change->change);
+        self::assertSame(self::APPLICATION, $change->application);
+        self::assertSame($this->container()->make(ProofStore::class)->currentSession($user, self::APPLICATION), $change->session);
+        self::assertSame($factor->id, $change->factor->id);
+        self::assertSame($requirement->toArray(), $change->outstanding?->toArray());
+    }
+
+    /**
+     * A removal that leaves the session meeting its requirement goes to the
+     * session transition all the same, with nothing outstanding.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testARemovalThatLeavesTheSessionMeetingItGoesToTheTransition(): void
+    {
+        $transition = new RecordingSessionTransition;
+
+        $this->container()->instance(SessionTransition::class, $transition);
+
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+        $other  = $this->confirmedFactor($user);
+
+        $this->stepUpWith($user, $other);
+
+        $result = Mfa::removeFactor($factor->id);
+
+        self::assertTrue($result->wasMade());
+        self::assertNull($result->outstanding);
+        self::assertCount(1, $transition->changes);
+        self::assertNull($transition->changes[0]->outstanding);
     }
 
     /**
@@ -782,12 +820,12 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $other);
 
         self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
-        self::assertCount(0, $transition->returned);
+        self::assertCount(0, $transition->shortfalls());
 
         $this->container()->instance(ActiveTenantResolver::class, new FixedActiveTenant('tenant-1'));
 
         self::assertSame(['phishing_resistance' => ['max_age' => null]], Mfa::removeFactor($third->id)->outstanding?->toArray());
-        self::assertCount(1, $transition->returned);
+        self::assertCount(1, $transition->shortfalls());
     }
 
     /**
@@ -802,7 +840,7 @@ final class RemovingFactorTest extends TestCase
     {
         $transition = self::createStub(SessionTransition::class);
 
-        $transition->method('returnToPending')->willThrowException(new OperationRefusedException(FailureReason::NOT_FRESH, 'Cannot gate the session.'));
+        $transition->method('factorChanged')->willThrowException(new OperationRefusedException(FailureReason::NOT_FRESH, 'Cannot gate the session.'));
 
         $this->container()->instance(SessionTransition::class, $transition);
         $this->container()->instance(IdentityRequirement::class, new FixedIdentityRequirement(Requirement::none()->withPhishingResistance()));

@@ -11,12 +11,17 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 /**
  * How removing a factor ended: made, with the factor as it stood, the
  * requirement the session no longer meets, if any, and what the bound
- * `SessionRevoker` returned for the caller, if anything; or refused, with the
+ * `SessionRevoker` returned for the caller when it judged the session again
+ * itself, or else what the bound `SessionTransition` did; or refused, with the
  * reason a caller may be told. The requirement is the session's whole
  * requirement, not what is left of it, as this package assesses it: an
- * authentication layer that judged the session again itself may have ended it,
- * or returned it to pending, by rules of its own, and what it returned (its new
+ * authentication layer that judged the session again may have ended it, or
+ * returned it to pending, by rules of its own, and what it returned (its new
  * pending credential, say) is the authoritative outcome.
+ *
+ * The completion may hold a credential, so it is held as a
+ * `\SensitiveParameterValue` and read through `completion()`, and no dump shows
+ * it.
  *
  * @api
  *
@@ -25,6 +30,9 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  */
 final readonly class FactorRemovalResult
 {
+    /** @var \SensitiveParameterValue What was returned for the caller, hidden from dumps. */
+    private \SensitiveParameterValue $completion;
+
     /**
      * Constructor.
      *
@@ -44,9 +52,13 @@ final readonly class FactorRemovalResult
         /** Why the removal was refused, when it was. */
         public ?FailureReason $reason,
 
-        /** What the bound session revoker returned for the caller, opaque to this package. */
-        public ?object $completion = null,
-    ) {}
+        // What the bound session revoker, or else the bound session transition,
+        // returned for the caller, opaque to this package.
+        #[\SensitiveParameter]
+        ?object $completion = null,
+    ) {
+        $this->completion = new \SensitiveParameterValue($completion);
+    }
 
     /**
      * A removal that was made.
@@ -56,7 +68,7 @@ final readonly class FactorRemovalResult
      * @param  ?object  $completion
      * @return self
      */
-    public static function made(FactorSummary $factor, ?Requirement $outstanding, ?object $completion = null): self
+    public static function made(FactorSummary $factor, ?Requirement $outstanding, #[\SensitiveParameter] ?object $completion = null): self
     {
         return new self($factor, $outstanding, null, $completion);
     }
@@ -70,6 +82,19 @@ final readonly class FactorRemovalResult
     public static function refused(FailureReason $reason): self
     {
         return new self(null, null, $reason);
+    }
+
+    /**
+     * What the bound session revoker, or else the bound session transition,
+     * returned for the caller, such as a pending session's new credential, or
+     * `null`.
+     *
+     * @return ?object
+     */
+    public function completion(): ?object
+    {
+        /** @var ?object */
+        return $this->completion->getValue();
     }
 
     /**

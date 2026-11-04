@@ -263,18 +263,36 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Secrets\RevealedSecret`, `Secrets\SecretResponse`                                    | Nothing to bind: a secret it reveals is its own, so check its documentation for how it sends one uncached                                                                                                                            |
 | `Contracts\ProofStore`, `Contracts\FirstFactorResolver`                               | `Requirements\RequirementSubject::proofs()` and `$firstFactor`, passed to `Contracts\RequirementCheck::evaluate()`, and `Contracts\FreshnessPolicy::freshProof()`. Needs a read of the session's proofs outside `evaluate()` as well |
 | `Contracts\ChallengeGateway`, `Attempts\ChallengeCounters`                            | `Codes\CodeService::sendFactorCode()` and `verifyFactorCode()`; `Contracts\FactorCodeCounters`, answered with `isUsable()` and `report()`                                                                                            |
-| `Contracts\SessionTransition`                                                         | Needs a way to return an active session to pending when a change other than a removal leaves it short                                                                                                                                |
+| `Contracts\SessionTransition`                                                         | `Auth::sessions()->factorChanged()` with the guard's current session when its id is the change's `session`, `null` otherwise                                                                                                         |
 | `Passkeys\PasskeyChangeGate`                                                          | `Contracts\PasskeyFactorGate::registering()` and `removing()`, answered with this gate inside its passkey transaction                                                                                                                |
 | `Context\AuthenticationContextContributor`                                            | `Contracts\AuthenticationContextContributor::contribute()`, answered with `contributeFor()` from its `Context\ContributionSubject`                                                                                                   |
 | `CombinationPolicy`, `IdentityRequirement`, `LastFactorPolicy`, `SelfServiceRecovery` | Nothing: these are this package's own                                                                                                                                                                                                |
 
 A row that says what a seam needs names no method, as there is no public name to give here: check that package's own
-documentation for it. Until the layer provides it, what an adapter does depends on the seam:
+documentation for it. Until the layer provides it, `Contracts\ProofStore` must still be rebound. The default keeps
+proofs in the Laravel session, which a stateless layer does not have, so there is no sign-in and every verification
+answers `not_found`.
 
-- `Contracts\SessionTransition` keeps its default, which is safe: the `mfa` middleware is the gate. A removal does not
-  need it, as the layer's `factorRemoved()` judges the session itself.
-- `Contracts\ProofStore` must be rebound. The default keeps proofs in the Laravel session, which a stateless layer does
-  not have, so there is no sign-in and every verification answers `not_found`.
+`Contracts\SessionTransition::factorChanged()` is called after every factor change made on an active session, whether
+or not this package finds the session short: a factor confirmed, a passkey registered as a factor, and a removal the
+bound `SessionRevoker` did not judge the session after itself. So with the layer's `factorRemoved()` bound, a removal
+never reaches it. It runs inside this package's transaction, after its locks and its writes, and is given a
+`Requirements\SessionChange`:
+
+| Property      | What it holds                                                                                    |
+|---------------|--------------------------------------------------------------------------------------------------|
+| `identity`    | The identity whose factors changed                                                               |
+| `application` | The application acting                                                                           |
+| `session`     | The sign-in the change was made on: the session id its proofs are bound to                       |
+| `change`      | An `Enums\FactorChangeMade`: `factor_confirmed`, `passkey_factor_registered` or `factor_removed` |
+| `factor`      | The factor the change was made to, as a `Factors\FactorSummary`                                  |
+| `outstanding` | The requirement the session no longer meets, by this package's assessment, or `null`             |
+
+The values of `Enums\FactorChangeMade` are those of the layer's `Factors\Enums\FactorChangeMade`, so an adapter maps one
+with `from()`. `outstanding` is information only: the layer judges the session against its own requirement. What
+`factorChanged()` returns, such as the layer's `FactorChangeResult` carrying a pending session's new credential, comes
+back to the caller as the result's `completion()`. A session the layer ended, or found no longer live, is an outcome to
+return, not a refusal. Refuse by throwing, which rolls the whole change back.
 
 > **Do not enable `passkey` over a layer whose register and remove paths do not call
 > `Passkeys\PasskeyChangeGate`.** The gate has no default that can act for it, because the caller has to invoke it.
@@ -341,12 +359,13 @@ default, a fresh step-up, or the first factor proved again), or the bootstrap pa
 enable the type, and recovery codes with the identity's first additional factor. On a pending session its proof then
 goes to the bound `PendingCompletion`, and `verification` on the result holds what came back, whose refusal rolls your
 registration back; reveal it only once your transaction has committed. On an active session the requirement is evaluated
-again, and a shortfall goes to the bound `SessionTransition`, whose refusal rolls it back too. `removing()` makes the
-checks of every removal: a sign-in the proof store knows of and that has not changed under the lock, an active identity,
-the factor change gate allowing the removal (by default, a fresh step-up made with another factor where the identity has
-one), and the last factor policy. It then tells the bound `SessionRevoker` of the removal, which stops the identity's
-other sessions counting, and returns what the revoker returned for your layer, such as the pending session's new
-credential when it judged the session itself. A refusal throws an `OperationRefusedException`; let it roll back your own
+again, the registration goes to the bound `SessionTransition`, and `completion()` on the result holds what came back,
+whose refusal rolls it back too. `removing()` makes the checks of every removal: a sign-in the proof store knows of and
+that has not changed under the lock, an active identity, the factor change gate allowing the removal (by default, a
+fresh step-up made with another factor where the identity has one), and the last factor policy. It then tells the bound
+`SessionRevoker` of the removal, which stops the identity's other sessions counting, and returns what the revoker
+returned for your layer, such as the pending session's new credential when it judged the session itself, or else what
+the bound `SessionTransition` returned. A refusal throws an `OperationRefusedException`; let it roll back your own
 change, since catching it and committing breaks the gate.
 
 ## Proving an adapter
@@ -383,7 +402,8 @@ final class SessionProofStoreAdapterTest extends TestCase
 The kits check safety guarantees, not capabilities a default lacks: a refusing reauthenticator passes, and a revoker
 passes when other sessions stop counting whether or not it ends them. The factor change gate's kit hands its hooks each
 change and asks for the request from a session arranged fresh, or stale, for it; a removal stepped up only with the
-factor it removes; and a change beyond the requirement the request carries. Each check is a static assertion on a
-`*Contract` class beside its trait, so a test can also call one directly. The kits need PHPUnit and a database migrated
-with the package's tables, as any test of an adapter does.
+factor it removes; and a change beyond the requirement the request carries. The session transition's kit hands its hook
+each kind of change and asks for it made on a session arranged fresh for it, then judges it with a shortfall and
+without. Each check is a static assertion on a `*Contract` class beside its trait, so a test can also call one directly.
+The kits need PHPUnit and a database migrated with the package's tables, as any test of an adapter does.
 

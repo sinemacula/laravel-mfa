@@ -8,11 +8,13 @@ use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
+use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
  * Evaluates an active session's requirement again on the proofs it holds after
- * a change to the identity's factors, and hands a shortfall to the bound
- * `SessionTransition`, as part of that change.
+ * a change to the identity's factors, and hands the change, with any shortfall,
+ * to the bound `SessionTransition`, as part of that change.
  *
  * Stateless: the seams are resolved on every call.
  *
@@ -35,29 +37,35 @@ final readonly class SessionReevaluation
     ) {}
 
     /**
-     * Evaluate the session's requirement again on the proofs given, and hand a
-     * shortfall to the bound session transition. Returns the requirement the
-     * session does not meet, whole and not what is left of it, or `null` when
-     * it meets it.
+     * After the change to the factor, evaluate the session's requirement again
+     * on the proofs given and hand the change, with the requirement it does not
+     * meet or `null`, to the bound session transition, whether the session
+     * meets it or not.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $session
+     * @param  \SineMacula\Laravel\Mfa\Enums\FactorChangeMade  $change
+     * @param  \SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
-     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
+     * @return \SineMacula\Laravel\Mfa\Requirements\SessionJudgement
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function reevaluate(MultiFactorAuthenticatable $identity, string $application, array $proofs): ?Requirement
-    {
-        $requirement = $this->outstanding($identity, $application, $proofs);
+    public function judge(
+        MultiFactorAuthenticatable $identity,
+        string $application,
+        string $session,
+        FactorChangeMade $change,
+        FactorSummary $factor,
+        array $proofs,
+    ): SessionJudgement {
+        $outstanding = $this->outstanding($identity, $application, $proofs);
+        $completion  = $this->container->make(SessionTransition::class)->factorChanged(new SessionChange($identity, $application, $session, $change, $factor, $outstanding));
 
-        if ($requirement !== null) {
-            $this->container->make(SessionTransition::class)->returnToPending($identity, $application, $requirement);
-        }
-
-        return $requirement;
+        return new SessionJudgement($outstanding, $completion);
     }
 
     /**

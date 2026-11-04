@@ -863,7 +863,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
         $this->signedInPerson();
 
         self::assertSame(self::VERIFIED, $this->refusal(self::BARE)->requirement->toArray());
-        self::assertSame([], $transition->returned);
+        self::assertSame([], $transition->changes);
     }
 
     /**

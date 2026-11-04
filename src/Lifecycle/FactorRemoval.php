@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Database\OpenTransaction;
+use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
@@ -21,6 +22,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Requirements\SessionJudgement;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 
 /**
@@ -34,13 +36,13 @@ use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
  * confirmed factor the recovery code set goes; the identity's other sessions
  * are revoked through the bound `SessionRevoker`, told the factor and the
  * sign-in the removal is made from; the current session's requirement is
- * evaluated again on the proofs it still holds, and a shortfall goes to the
- * bound `SessionTransition`, unless the revoker judged the session again
- * itself; with that security work done `FactorRemoved` is queued, then the
- * recovery code set's removal is reported after it. So every package row has
- * changed before a session seam runs, in the lock order every change shares,
- * and the default revoker's kept proofs are recorded again before any listener
- * runs.
+ * evaluated again on the proofs it still holds, and the removal goes to the
+ * bound `SessionTransition` with any shortfall, unless the revoker judged the
+ * session again itself; with that security work done `FactorRemoved` is queued,
+ * then the recovery code set's removal is reported after it. So every package
+ * row has changed before a session seam runs, in the lock order every change
+ * shares, and the default revoker's kept proofs are recorded again before any
+ * listener runs.
  *
  * A failure rolls the caller's whole change back. The proofs already forgotten
  * on the current session stay forgotten, which leaves it to verify again; they
@@ -87,7 +89,7 @@ final readonly class FactorRemoval
      * Remove the factor, as stored under the identity's lock, from the
      * identity, acting on the application from the sign-in, and say how it
      * ended: with the requirement the session no longer meets, if any, and what
-     * the bound revoker returned for the caller.
+     * the bound revoker, or else the bound transition, returned for the caller.
      *
      * @formatter:off
      *
@@ -125,9 +127,9 @@ final readonly class FactorRemoval
         $revocation   = $this->container->make(SessionRevoker::class)->factorRemoved($identity, $id, $session);
         $reevaluation = $this->container->make(SessionReevaluation::class);
 
-        $outstanding = $revocation->judgedCurrent
-            ? $reevaluation->outstanding($identity, $application, $kept)
-            : $reevaluation->reevaluate($identity, $application, $kept);
+        $judgement = $revocation->judgedCurrent
+            ? new SessionJudgement($reevaluation->outstanding($identity, $application, $kept), $revocation->completion())
+            : $reevaluation->judge($identity, $application, $session, FactorChangeMade::REMOVED, $summary, $kept);
 
         $this->events->dispatch(new FactorRemoved($context, $summary));
 
@@ -135,7 +137,7 @@ final readonly class FactorRemoval
             $this->recoveryCodes->reportSetRemoved($identity);
         }
 
-        return FactorRemovalResult::made($summary, $outstanding, $revocation->completion);
+        return FactorRemovalResult::made($summary, $judgement->outstanding, $judgement->completion());
     }
 
     /**

@@ -83,7 +83,7 @@ final class GenerationSessionRevokerTest extends TestCase
         $revocation = $this->removeFactor();
 
         self::assertFalse($revocation->judgedCurrent);
-        self::assertNull($revocation->completion);
+        self::assertNull($revocation->completion());
 
         self::assertSame([], $this->otherDevice->proofs($this->user, SignInProofs::APPLICATION));
         self::assertSame(['password', 'totp'], $this->methods());

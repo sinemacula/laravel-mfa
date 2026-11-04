@@ -17,6 +17,7 @@ use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 
 /**
  * One faulty implementation of each of several seams, for proving the contract
@@ -131,15 +132,13 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     /**
      * Fail with an error rather than a refusal.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $outstanding
-     * @return void
+     * @param  \SineMacula\Laravel\Mfa\Requirements\SessionChange  $change
+     * @return ?object
      *
      * @throws \LogicException
      */
     #[\Override]
-    public function returnToPending(MultiFactorAuthenticatable $identity, string $application, Requirement $outstanding): void
+    public function factorChanged(SessionChange $change): ?object
     {
         throw new \LogicException('A faulty transition fails without refusing.');
     }
