@@ -13,6 +13,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
+use SineMacula\Laravel\Mfa\Contracts\FactorChangeGate;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy;
@@ -21,6 +22,7 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
+use SineMacula\Laravel\Mfa\Enums\FactorChange;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
@@ -52,6 +54,7 @@ use Tests\Fixtures\Lifecycle\RecordingSessionRevoker;
 use Tests\Fixtures\Lifecycle\ScriptedLastFactorPolicy;
 use Tests\Fixtures\Requirements\FixedActiveTenant;
 use Tests\Fixtures\Requirements\FixedIdentityRequirement;
+use Tests\Fixtures\Requirements\ScriptedFactorChangeGate;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\RecordingSessionTransition;
 use Tests\TestCase;
@@ -614,8 +617,77 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $factor);
         $this->container()->instance(SessionRevoker::class, $revoker);
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        $result = Mfa::removeFactor($factor->id);
+
+        self::assertTrue($result->wasMade());
+        self::assertNull($result->completion);
         self::assertSame(['others'], $revoker->calls);
+        $session = $this->container()->make(ProofStore::class)->currentSession($user, self::APPLICATION);
+
+        self::assertSame([['factor' => $factor->id, 'session' => $session]], $revoker->removals);
+    }
+
+    /**
+     * The bound factor change gate is asked once, under the lock, with the
+     * factor and the sign-in, and its refusal is the removal's.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheBoundFactorChangeGateIsAskedUnderTheLockOnly(): void
+    {
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+        $gate   = new ScriptedFactorChangeGate;
+
+        $this->container()->instance(FactorChangeGate::class, $gate);
+
+        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertCount(1, $gate->requests);
+        self::assertGreaterThan(0, $gate->levels[0]);
+        self::assertSame(FactorChange::REMOVE_FACTOR, $gate->requests[0]->change);
+        self::assertSame($factor->id, $gate->requests[0]->factorId);
+
+        $other = $this->confirmedFactor($user);
+
+        $this->container()->instance(FactorChangeGate::class, new ScriptedFactorChangeGate(refusal: new OperationRefusedException(FailureReason::NOT_FRESH, 'The layer says no.')));
+
+        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor($other->id)->reason);
+        self::assertTrue($this->isStored($other));
+    }
+
+    /**
+     * A revoker that judges the current session itself is handed no second
+     * judgement: the shortfall is reported, not handed to the transition, and
+     * what the revoker returns reaches the caller.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testARevokerThatJudgesTheSessionItselfIsTheOnlyJudge(): void
+    {
+        $transition  = new RecordingSessionTransition;
+        $requirement = Requirement::none()->withPhishingResistance();
+        $completion  = new \stdClass;
+
+        $this->container()->instance(SessionTransition::class, $transition);
+        $this->container()->instance(SessionRevoker::class, new RecordingSessionRevoker(judges: true, completion: $completion));
+        $this->container()->instance(IdentityRequirement::class, new FixedIdentityRequirement($requirement));
+
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+        $other  = $this->confirmedFactor($user);
+
+        $this->stepUpWith($user, $other);
+
+        $result = Mfa::removeFactor($factor->id);
+
+        self::assertTrue($result->wasMade());
+        self::assertSame($completion, $result->completion);
+        self::assertSame($requirement->toArray(), $result->outstanding?->toArray());
+        self::assertSame([], $transition->returned);
     }
 
     /**
@@ -637,7 +709,7 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $factor);
 
         $revoker = self::createStub(SessionRevoker::class);
-        $revoker->method('revokeOthers')->willThrowException(new OperationRefusedException(FailureReason::NOT_FOUND, 'The sessions could not be ended.'));
+        $revoker->method('factorRemoved')->willThrowException(new OperationRefusedException(FailureReason::NOT_FOUND, 'The sessions could not be ended.'));
 
         $this->container()->instance(SessionRevoker::class, $revoker);
 

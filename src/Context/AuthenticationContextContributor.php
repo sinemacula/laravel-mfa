@@ -7,17 +7,23 @@ namespace SineMacula\Laravel\Mfa\Context;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
+use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Factors\ConfirmedFactors;
+use SineMacula\Laravel\Mfa\Proofs\CountingProofs;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
  * Fills the `mfa` namespace of the authentication context from the session's
  * recorded proofs, with the same eight keys every time, so a policy can read
- * them whoever the request serves.
+ * them whoever the request serves: `contribute()` for the session the request
+ * serves, and `contributeFor()` for a named sign-in whose proofs the caller
+ * supplies, as an authentication layer building the context for another
+ * session, or in a queued job, does.
  *
  * `accepted`, `multifactor`, `level` and `phishing_resistant` come from one
  * evaluation of an additional verification against the session's proofs.
@@ -98,8 +104,83 @@ final readonly class AuthenticationContextContributor
             return self::neutral();
         }
 
+        $proofs = $this->container->make(SessionFirstFactor::class)->proofs($caller->identity, $callers->application($caller));
+
+        return $this->contextOf($caller->identity, $proofs);
+    }
+
+    /**
+     * The keys of the `mfa` namespace for a named sign-in of the identity on
+     * the application, from its proofs as the caller read them: for a context
+     * built outside the request it describes, such as for another session or in
+     * a queued job. Only the proofs that count are read, by the rules the proof
+     * store applies (bound to the identity, the application and the sign-in,
+     * made in the identity's current verification generation, and not dated in
+     * the future), oldest first. The caller reads them from a trusted record of
+     * that sign-in, never from input, leaves out any made with a factor since
+     * removed, and gives a pending, revoked or ended session, or none, the
+     * neutral context without asking. A machine and an inactive identity have
+     * the neutral context.
+     *
+     * @formatter:off
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
+     * @return array{
+     *     accepted: bool,
+     *     multifactor: bool,
+     *     factor_types: list<string>,
+     *     level: string,
+     *     phishing_resistant: bool,
+     *     user_verification: bool,
+     *     last_verification_age_seconds: ?int,
+     *     has_confirmed_factor: bool,
+     * }
+     *
+     * @formatter:on
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function contributeFor(MultiFactorAuthenticatable $identity, string $application, string $session, Proof ...$proofs): array
+    {
+        if (!$this->container->make(SubjectTypeResolver::class)->isPerson($identity) || !$identity->isMfaActive()) {
+            return self::neutral();
+        }
+
+        return $this->contextOf($identity, CountingProofs::of($identity, $application, $session, $proofs));
+    }
+
+    /**
+     * The keys of the `mfa` namespace for the identity on the proofs of one of
+     * its sign-ins.
+     *
+     * @formatter:off
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
+     * @return array{
+     *     accepted: bool,
+     *     multifactor: bool,
+     *     factor_types: list<string>,
+     *     level: string,
+     *     phishing_resistant: bool,
+     *     user_verification: bool,
+     *     last_verification_age_seconds: ?int,
+     *     has_confirmed_factor: bool,
+     * }
+     *
+     * @formatter:on
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    private function contextOf(MultiFactorAuthenticatable $identity, array $proofs): array
+    {
         $check       = $this->container->make(RequirementCheck::class);
-        $proofs      = $this->container->make(SessionFirstFactor::class)->proofs($caller->identity, $callers->application($caller));
         $evaluation  = $check->check(Requirement::none()->withAdditionalVerification(), ...$proofs);
         $firstFactor = self::firstFactorOf($proofs);
         $evidence    = $firstFactor === null ? [] : self::evidence($check, $firstFactor, $proofs);
@@ -112,7 +193,7 @@ final readonly class AuthenticationContextContributor
             'phishing_resistant'            => $evaluation->phishingResistant,
             'user_verification'             => self::observedUserVerification($check, $firstFactor, $evidence),
             'last_verification_age_seconds' => self::ageOfNewest($evidence),
-            'has_confirmed_factor'          => ConfirmedFactors::isHeldBy($caller->identity, $this->container->make(Repository::class)),
+            'has_confirmed_factor'          => ConfirmedFactors::isHeldBy($identity, $this->container->make(Repository::class)),
         ];
     }
 
@@ -202,7 +283,8 @@ final readonly class AuthenticationContextContributor
 
     /**
      * How many whole seconds ago the newest of the evidence was made, or `null`
-     * without any.
+     * without any. The evidence is oldest first, as every read of a sign-in's
+     * proofs returns them.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $evidence
      * @return ?int

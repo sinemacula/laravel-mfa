@@ -82,8 +82,8 @@ and a pending credential that does not validate still throws through your resolv
 
 | The session is                                  | It needs                                                                                                                                                 |
 |-------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Active, and the identity has a confirmed factor | A step-up fresh for `mfa.add_factor` (see [Requirements](requirements.md))                                                                               |
-| Active, and the identity has none               | The first factor proved again in the last five minutes, through `Contracts\Reauthenticator`, whose default refuses                                       |
+| Active, and the identity has a confirmed factor | The bound `Contracts\FactorChangeGate` allowing `mfa.add_factor`: by default, a step-up fresh for it (see [Requirements](requirements.md))               |
+| Active, and the identity has none               | The gate allowing `mfa.add_first_additional_factor`: by default, the first factor proved again within five minutes through `Contracts\Reauthenticator`   |
 | Pending                                         | The bootstrap path: the credential allows the action, `bootstrap.enabled` and `bootstrap.types` allow the type, and the identity has no confirmed factor |
 
 Then the application's limits apply (see [Applications](configuration.md#applications)). They count only factors

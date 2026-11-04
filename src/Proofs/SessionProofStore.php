@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Proofs;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Session\Session;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -137,31 +136,15 @@ final readonly class SessionProofStore implements ProofStore
     #[\Override]
     public function proofs(MultiFactorAuthenticatable $identity, string $application): array
     {
-        $owner  = ProofOwner::of($identity);
-        $record = $this->read($owner, $application);
+        $record = $this->read(ProofOwner::of($identity), $application);
 
         if ($record === null) {
             return [];
         }
 
-        $generation = VerificationGeneration::current($identity);
-        $now        = CarbonImmutable::now();
-        $proofs     = [];
+        $restored = array_filter(array_map(self::restore(...), $record['proofs']));
 
-        foreach ($record['proofs'] as $stored) {
-
-            $proof = self::restore($stored);
-
-            if ($proof === null || !self::counts($proof, $owner, $application, $record['session'], $generation, $now)) {
-                continue;
-            }
-
-            $proofs[] = $proof;
-        }
-
-        usort($proofs, static fn (Proof $a, Proof $b): int => $a->provedAt <=> $b->provedAt);
-
-        return $proofs;
+        return CountingProofs::of($identity, $application, $record['session'], $restored);
     }
 
     /**
@@ -293,26 +276,6 @@ final readonly class SessionProofStore implements ProofStore
         }
 
         return array_values($proofs);
-    }
-
-    /**
-     * Whether a stored proof still counts: bound to the owner, the application
-     * and the current sign-in, made in the identity's current verification
-     * generation, and not dated in the future.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
-     * @param  string  $application
-     * @param  string  $session
-     * @param  int  $generation
-     * @param  \Carbon\CarbonImmutable  $now
-     * @return bool
-     */
-    private static function counts(Proof $proof, ProofOwner $owner, string $application, string $session, int $generation, CarbonImmutable $now): bool
-    {
-        return $owner->ownsSignIn($proof->binding, $application, $session)
-            && $proof->generation === $generation
-            && $proof->provedAt->lessThanOrEqualTo($now);
     }
 
     /**

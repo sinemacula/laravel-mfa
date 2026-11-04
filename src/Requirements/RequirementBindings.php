@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Requirements;
 use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
+use SineMacula\Laravel\Mfa\Contracts\FactorChangeGate;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
@@ -21,11 +22,12 @@ use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
  * (`IdentityContractRequirement`), no active tenant (`NoActiveTenant`) and no
  * tenant requirement (`NoTenantRequirement`), the check of a session's proofs
  * through the combination policy (`ProofRequirementCheck`), the freshness of a
- * named operation from the proof store (`ConfiguredFreshnessGate`), and the
- * first factor the application declares
- * (`Applications\DeclaredFirstFactorResolver`), which the freshness gate reads.
- * An adapter, or the application, rebinds any of the contracts in its own
- * service provider.
+ * named operation from the proof store (`ConfiguredFreshnessGate`), the
+ * authorisation of a factor change on that freshness and the bound
+ * reauthenticator (`ConfiguredFactorChangeGate`), and the first factor the
+ * application declares (`Applications\DeclaredFirstFactorResolver`), which the
+ * freshness gate reads. An adapter, or the application, rebinds any of the
+ * contracts in its own service provider.
  *
  * Every default keeps no state between calls and resolves what it reads on each
  * one, and is built when it is asked for, on the application serving at the
@@ -58,6 +60,7 @@ final class RequirementBindings
         $app->bind(ActiveTenantResolver::class, NoActiveTenant::class);
         $app->bind(RequirementCheck::class, ProofRequirementCheck::class);
         $app->bind(FreshnessGate::class, ConfiguredFreshnessGate::class);
+        $app->bind(FactorChangeGate::class, ConfiguredFactorChangeGate::class);
         $app->bind(FirstFactorResolver::class, DeclaredFirstFactorResolver::class);
     }
 }

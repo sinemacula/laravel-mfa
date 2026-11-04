@@ -148,7 +148,7 @@ final class LockOrderTest extends TestCase
         $this->recorder->start();
 
         self::assertTrue($act());
-        self::assertSame(['revokeOthers'], $this->recorder->seams());
+        self::assertSame(['factorRemoved'], $this->recorder->seams());
 
         $seen = [];
 

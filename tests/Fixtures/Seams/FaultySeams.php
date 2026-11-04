@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
+use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
@@ -104,12 +105,15 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
      * Revoke nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @return void
+     * @param  string  $factorId
+     * @param  string  $session
+     * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      */
     #[\Override]
-    public function revokeOthers(MultiFactorAuthenticatable $identity): void
+    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $session): RemovalRevocation
     {
         // A faulty revoker revokes nothing.
+        return RemovalRevocation::othersEnded();
     }
 
     /**

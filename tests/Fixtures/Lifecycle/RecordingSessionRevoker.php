@@ -6,10 +6,12 @@ namespace Tests\Fixtures\Lifecycle;
 
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
+use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 
 /**
  * A session revoker that advances nothing and records what it was asked to do,
- * as an authentication layer's would, and throws when told to.
+ * as an authentication layer's would, and throws when told to; told to judge
+ * the current session itself, it says so, returning the completion given.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,29 +23,46 @@ final class RecordingSessionRevoker implements SessionRevoker
     /** @var list<string> The calls made, oldest first. */
     public array $calls = [];
 
+    /** @var list<array{factor: string, session: string}> The removals it was told of, oldest first. */
+    public array $removals = [];
+
     /**
      * Constructor.
      *
      * @param  bool  $fails
+     * @param  bool  $judges
+     * @param  ?object  $completion
      */
     public function __construct(
 
         /** Whether a revocation throws. */
         private readonly bool $fails = false,
+
+        /** Whether it judges the current session again itself. */
+        private readonly bool $judges = false,
+
+        /** What it returns for the caller when it judges the session. */
+        private readonly ?object $completion = null,
     ) {}
 
     /**
-     * Record the revocation of the other sessions.
+     * Record the revocation of the other sessions for the factor's removal.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @return void
+     * @param  string  $factorId
+     * @param  string  $session
+     * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      *
      * @throws \RuntimeException
      */
     #[\Override]
-    public function revokeOthers(MultiFactorAuthenticatable $identity): void
+    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $session): RemovalRevocation
     {
         $this->revoked('others');
+
+        $this->removals[] = ['factor' => $factorId, 'session' => $session];
+
+        return $this->judges ? RemovalRevocation::judged($this->completion) : RemovalRevocation::othersEnded();
     }
 
     /**

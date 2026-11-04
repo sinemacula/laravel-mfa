@@ -5,12 +5,14 @@ declare(strict_types = 1);
 namespace Tests\Feature\Context;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Auth\Authenticatable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -496,6 +498,118 @@ final class AuthenticationContextContributorTest extends TestCase
     public function testTheFacadeReadsTheContext(): void
     {
         self::assertSame(self::NEUTRAL, Mfa::authenticationContext());
+    }
+
+    /**
+     * A named sign-in's context is built from the proofs given, without the
+     * request serving anyone.
+     *
+     * @return void
+     */
+    public function testANamedSignInFromTheProofsGiven(): void
+    {
+        $user = TestUser::query()->create(['email' => 'named@example.test']);
+
+        $this->totpFactor($user);
+
+        $signIn = SignInProofs::of($user)->inSession('named-sign-in');
+
+        self::assertSame([
+            'accepted'                      => true,
+            'multifactor'                   => true,
+            'factor_types'                  => ['totp'],
+            'level'                         => 'aal2',
+            'phishing_resistant'            => false,
+            'user_verification'             => false,
+            'last_verification_age_seconds' => 90,
+            'has_confirmed_factor'          => true,
+        ], $this->contributor()->contributeFor($user, self::APPLICATION, 'named-sign-in', $signIn->totp(90), $signIn->password(3600)));
+    }
+
+    /**
+     * A named sign-in reads only the proofs that count for it: none of another
+     * sign-in, another application or an older verification generation, and
+     * none dated in the future.
+     *
+     * @return void
+     */
+    public function testANamedSignInReadsOnlyTheProofsThatCount(): void
+    {
+        $user = TestUser::query()->create(['email' => 'counting@example.test']);
+
+        $this->totpFactor($user);
+
+        VerificationGeneration::advance($user);
+
+        $current = SignInProofs::of($user)->inSession('named-sign-in')->underGeneration(1);
+        $older   = SignInProofs::of($user)->inSession('named-sign-in')->underGeneration(0);
+        $other   = SignInProofs::of($user)->inSession('other-sign-in')->underGeneration(1);
+
+        $context = $this->contributor()->contributeFor(
+            $user,
+            self::APPLICATION,
+            'named-sign-in',
+            $current->password(3600),
+            $older->totp(10),
+            $other->totp(20),
+            $current->totp(-60),
+            $current->totp(300),
+        );
+
+        self::assertTrue($context['accepted']);
+        self::assertSame(300, $context['last_verification_age_seconds']);
+        $elsewhere = $this->contributor()->contributeFor($user, 'other-application', 'named-sign-in', $current->password(3600), $current->totp(300));
+
+        self::assertFalse($elsewhere['accepted']);
+        self::assertSame([], $elsewhere['factor_types']);
+    }
+
+    /**
+     * A named sign-in of a machine, or of an inactive identity, has the neutral
+     * context, whatever proofs that count for it are given.
+     *
+     * @return void
+     */
+    public function testANamedSignInOfAMachineOrAnInactiveIdentityIsNeutral(): void
+    {
+        $user = TestUser::query()->create(['email' => 'served@example.test']);
+
+        $this->totpFactor($user);
+
+        $signIn = SignInProofs::of($user)->inSession('named-sign-in');
+        $proofs = [$signIn->password(3600), $signIn->totp(90)];
+
+        self::assertTrue($this->contributor()->contributeFor($user, self::APPLICATION, 'named-sign-in', ...$proofs)['accepted']);
+
+        $inactive = new NonEloquentIdentity('person-1', mfaEnabled: true, active: false);
+
+        self::assertSame(self::NEUTRAL, $this->contributor()->contributeFor($inactive, self::APPLICATION, 'named-sign-in'));
+
+        $this->container()->instance(SubjectTypeResolver::class, new class implements SubjectTypeResolver {
+            /**
+             * Nobody is a person.
+             *
+             * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
+             * @return bool
+             */
+            #[\Override]
+            public function isPerson(Authenticatable $identity): bool
+            {
+                return false;
+            }
+        });
+
+        self::assertSame(self::NEUTRAL, $this->contributor()->contributeFor($user, self::APPLICATION, 'named-sign-in', ...$proofs));
+    }
+
+    /**
+     * The contributor under test.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor
+     */
+    private function contributor(): AuthenticationContextContributor
+    {
+        return $this->container()->make(AuthenticationContextContributor::class);
     }
 
     /**

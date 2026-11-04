@@ -8,12 +8,14 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
+use SineMacula\Laravel\Mfa\Contracts\FactorChangeGate;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
+use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredRequirementPolicy;
 use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
@@ -63,6 +65,7 @@ final class RequirementBindingsTest extends TestCase
         yield 'the tenant requirement' => [TenantRequirement::class, NoTenantRequirement::class];
         yield 'the requirement check' => [RequirementCheck::class, ProofRequirementCheck::class];
         yield 'the freshness gate' => [FreshnessGate::class, ConfiguredFreshnessGate::class];
+        yield 'the factor change gate' => [FactorChangeGate::class, ConfiguredFactorChangeGate::class];
         yield 'the first factor resolver' => [FirstFactorResolver::class, DeclaredFirstFactorResolver::class];
     }
 

@@ -5,21 +5,26 @@ declare(strict_types = 1);
 namespace Tests\Unit\Enrollment;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Contracts\FactorChangeGate;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentAuthority;
 use SineMacula\Laravel\Mfa\Enrollment\GrantAuthority;
 use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
+use SineMacula\Laravel\Mfa\Enums\FactorChange;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
+use Tests\Fixtures\Requirements\ScriptedFactorChangeGate;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
@@ -62,11 +67,17 @@ final class EnrollmentAuthorityTest extends TestCase
 
         self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user), 'passkey'));
 
-        $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store, EnrollmentAuthority::REAUTHENTICATION_MAX_AGE + 1));
+        $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store, ConfiguredFactorChangeGate::REAUTHENTICATION_MAX_AGE + 1));
 
         self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user), 'passkey'));
 
-        $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store, EnrollmentAuthority::REAUTHENTICATION_MAX_AGE));
+        // A reauthentication exactly five minutes old would grant nothing that
+        // lasts, so it is refused with the grant's end.
+        $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store, ConfiguredFactorChangeGate::REAUTHENTICATION_MAX_AGE));
+
+        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user), 'passkey'));
+
+        $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store, ConfiguredFactorChangeGate::REAUTHENTICATION_MAX_AGE - 1));
 
         self::assertNull($this->refusal(new Caller($user), 'passkey'));
 
@@ -162,22 +173,84 @@ final class EnrollmentAuthorityTest extends TestCase
 
         self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->refusal(new Caller($user), 'sms'));
 
-        $first = $this->authority()->authorize(new Caller($user), self::APPLICATION, 'totp', Factor::query()->get());
+        $first = $this->authorized(new Caller($user), 'totp');
 
         self::assertSame(EnrollmentAuthorization::REAUTHENTICATION, $first->kind);
         self::assertTrue(CarbonImmutable::now()->addSeconds(240)->equalTo($first->deadline));
 
         $pending = $this->pending($user);
-        $boot    = $this->authority()->authorize($pending, self::APPLICATION, 'totp', Factor::query()->get());
+        $boot    = $this->authorized($pending, 'totp');
 
         self::assertSame(EnrollmentAuthorization::BOOTSTRAP, $boot->kind);
         self::assertSame($pending->pending?->expiresAt, $boot->deadline);
 
         $this->stepUpWith($user, $this->confirmedFactor($user));
 
-        self::assertSame(EnrollmentAuthorization::STEP_UP, $this->authority()->authorize(new Caller($user), self::APPLICATION, 'passkey', Factor::query()->get())->kind);
+        self::assertSame(EnrollmentAuthorization::STEP_UP, $this->authorized(new Caller($user), 'passkey')->kind);
 
         CarbonImmutable::setTestNow();
+    }
+
+    /**
+     * An active session's enrolment is authorised by the bound factor change
+     * gate: a first additional factor while the identity has no confirmed
+     * factor, a further one beside one, from the session's sign-in, the grant
+     * lasting as long as the gate's authorisation; a bootstrap enrolment never
+     * asks it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnActiveSessionsEnrolmentIsTheBoundGatesToAuthorize(): void
+    {
+        $this->enablePasskeys(['bootstrap' => ['enabled' => true, 'types' => ['totp']]]);
+
+        $until = CarbonImmutable::now()->addMinutes(3);
+        $gate  = new ScriptedFactorChangeGate($until);
+        $user  = $this->signedInPerson();
+
+        $this->container()->instance(FactorChangeGate::class, $gate);
+
+        $first = $this->authorized(new Caller($user), 'totp');
+
+        self::assertSame(EnrollmentAuthorization::REAUTHENTICATION, $first->kind);
+        self::assertSame($until, $first->deadline);
+
+        $this->authorized($this->pending($user), 'totp');
+        $this->confirmedFactor($user);
+
+        self::assertSame(EnrollmentAuthorization::STEP_UP, $this->authorized(new Caller($user), 'passkey')->kind);
+        self::assertSame([FactorChange::ADD_FIRST_ADDITIONAL_FACTOR, FactorChange::ADD_FACTOR], array_map(static fn ($request): FactorChange => $request->change, $gate->requests));
+        self::assertSame([self::SESSION, self::SESSION], array_map(static fn ($request): string => $request->session, $gate->requests));
+
+        $refusal = new OperationRefusedException(FailureReason::LAST_FACTOR, 'The layer says no.');
+
+        $this->container()->instance(FactorChangeGate::class, new ScriptedFactorChangeGate(refusal: $refusal));
+
+        self::assertSame(FailureReason::LAST_FACTOR, $this->refusal(new Caller($user), 'passkey'));
+    }
+
+    /**
+     * An active session with no sign-in to authorise a change from is refused
+     * without the gate being asked.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnActiveSessionWithNoSignInIsNotFresh(): void
+    {
+        $this->enablePasskeys();
+
+        $gate = new ScriptedFactorChangeGate(CarbonImmutable::now()->addMinutes(3));
+        $user = $this->signedInPerson();
+
+        $this->container()->instance(FactorChangeGate::class, $gate);
+        $this->container()->make(ProofStore::class)->forget($user, self::APPLICATION);
+
+        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user), 'totp'));
+        self::assertSame([], $gate->requests);
     }
 
     /**
@@ -286,6 +359,21 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
+     * Authorise the caller a factor of the type inside a transaction, as the
+     * identity's factor state lock holds one.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
+     * @param  string  $type
+     * @return \SineMacula\Laravel\Mfa\Enrollment\GrantAuthority
+     *
+     * @throws \Throwable
+     */
+    private function authorized(Caller $caller, string $type): GrantAuthority
+    {
+        return DB::transaction(fn (): GrantAuthority => $this->container()->make(EnrollmentAuthority::class)->authorize($caller, self::APPLICATION, $type, Factor::query()->get()));
+    }
+
+    /**
      * The reason the caller is refused a factor of the type, or `null` when it
      * is not.
      *
@@ -293,12 +381,12 @@ final class EnrollmentAuthorityTest extends TestCase
      * @param  string  $type
      * @return ?\SineMacula\Laravel\Mfa\Enums\FailureReason
      *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
      */
     private function refusal(Caller $caller, string $type): ?FailureReason
     {
         try {
-            $this->container()->make(EnrollmentAuthority::class)->authorize($caller, self::APPLICATION, $type, Factor::query()->get());
+            $this->authorized($caller, $type);
         } catch (OperationRefusedException $exception) {
             return $exception->reason;
         }

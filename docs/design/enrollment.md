@@ -12,9 +12,11 @@ for the session. The API is in [Enrolment](../guides/enrollment.md).
   is the one exception: its registration confirms it, through `Passkeys\PasskeyChangeGate`.
 - What authorises a start is decided under the identity's factor state lock by
   `Enrollment\EnrollmentAuthority::authorize()`, which returns `Enrollment\GrantAuthority`: the kind
-  (`Enums\EnrollmentAuthorization`) and the instant it ends. A step-up ends when
-  `FreshnessGate::freshUntil(mfa.add_factor)` says, a reauthentication five minutes after it was proved, and the
-  bootstrap path when `PendingContext::$expiresAt` says.
+  (`Enums\EnrollmentAuthorization`) and the instant it ends. On an active session the bound `FactorChangeGate` decides
+  it, asked for `mfa.add_factor` or, with no confirmed factor, `mfa.add_first_additional_factor`, and the grant ends
+  when the gate says; the package refuses a grant it gives no end in the future. The default ends a step-up when
+  `FreshnessGate::freshUntil(mfa.add_factor)` says, and a reauthentication five minutes after it was proved. The
+  bootstrap path, which never asks the gate, ends when `PendingContext::$expiresAt` says.
 - `expires_at` is the earlier of `now + mfa.enrollment.ttl_minutes` and that instant, floored to the second as it is
   stored, and a deadline past after flooring is `not_fresh`. It is written once, by the start, and never again. A grant
   is live only while `expires_at` is ahead and the verification generation it recorded is the identity's current one.

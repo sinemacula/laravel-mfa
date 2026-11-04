@@ -6,36 +6,40 @@ namespace SineMacula\Laravel\Mfa\RecoveryCodes;
 
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Database\Eloquent\Collection;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
+use SineMacula\Laravel\Mfa\Enums\FactorChange;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
-use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Requirements\FactorChanges;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
-use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 
 /**
  * Issues a new recovery code set to the person the request serves, only on a
- * session fresh enough for `mfa.generate_recovery_codes` that also reaches the
- * level the application sets for issuing them.
+ * session the bound `Contracts\FactorChangeGate` authorises for
+ * `mfa.generate_recovery_codes` (by default, one fresh enough for it) that also
+ * reaches the level the application sets for issuing them.
  *
  * A pending session is served nothing here, and neither is a request that
  * serves nobody: both are `not_found`. The session is captured when the call
  * begins, and checked before the codes are drawn and again under the identity's
  * lock, so what was proved and the sign-in it was proved on still hold when the
- * old set is replaced; a refusal leaves the old set intact. A session that has
- * changed, one that is not fresh and one below the level are all refused as
- * `not_fresh`, since the remedy is the same stronger step-up.
+ * old set is replaced; a refusal leaves the old set intact. The gate is asked
+ * under the lock only. A session that has changed, one the gate refuses and one
+ * below the level are all refused as `not_fresh`, since the remedy is the same
+ * stronger step-up.
  *
- * Only the package's own refusals become a refused result. A seam's exception
- * propagates, and the event is reported outside the conversion, so a listener's
- * failure is never read as a refusal of a set that committed.
+ * Only the package's own refusals become a refused result, the gate's among
+ * them, since refusing by throwing is how it answers. Any other exception of a
+ * seam propagates, and the event is reported outside the conversion, so a
+ * listener's failure is never read as a refusal of a set that committed.
  *
  * With an identity's first additional factor a set is issued as part of the
  * change that confirms it, not through that gate: the factor's own confirmation
@@ -90,8 +94,10 @@ final readonly class RecoveryCodeIssuance
             return RecoveryCodeGeneration::refused($caller === null ? FailureReason::NOT_FOUND : FailureReason::NOT_FRESH);
         }
 
+        $gate = fn (?Collection $factors) => $this->assertMayIssue($binding, $factors);
+
         try {
-            ['codes' => $codes, 'generation' => $generation] = $this->codes->replaceSet($caller->identity, $binding->application, fn () => $this->assertMayIssue($binding));
+            ['codes' => $codes, 'generation' => $generation] = $this->codes->replaceSet($caller->identity, $binding->application, $gate);
         } catch (OperationRefusedException $exception) {
             return self::refusedBy($exception);
         }
@@ -146,25 +152,33 @@ final readonly class RecoveryCodeIssuance
     }
 
     /**
-     * Refuse issuing on a session that is no longer the one captured, is not
-     * fresh enough for the operation, or does not reach the level.
+     * Refuse issuing on a session that is no longer the one captured, that the
+     * bound factor change gate does not authorise under the lock, or that does
+     * not reach the level. Before the lock, with no factors, the gate is not
+     * asked.
+     *
+     * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  ?\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
      * @return void
+     *
+     * @formatter:on
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
+     * @throws \LogicException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    private function assertMayIssue(ProofBinding $binding): void
+    private function assertMayIssue(ProofBinding $binding, ?Collection $factors): void
     {
         $caller = $this->callers->still(null, $binding);
 
         OperationRefusedException::byPackageUnless($caller !== null, FailureReason::NOT_FRESH, 'The session is no longer the one the recovery codes were asked for on.');
 
-        $fresh = $this->container->make(RequirementService::class)->isFresh(Operation::GENERATE_RECOVERY_CODES->value);
-
-        OperationRefusedException::byPackageUnless($fresh, FailureReason::NOT_FRESH, 'The session is not fresh enough to issue recovery codes.');
+        if ($factors !== null) {
+            $this->container->make(FactorChanges::class)->allow($caller->identity, $binding->application, $binding->sessionId, FactorChange::GENERATE_RECOVERY_CODES, $factors);
+        }
 
         $proofs   = $this->firstFactors->proofs($caller->identity, $binding->application);
         $level    = $this->container->make(RequirementCheck::class)->check(Requirement::none(), ...$proofs)->level;

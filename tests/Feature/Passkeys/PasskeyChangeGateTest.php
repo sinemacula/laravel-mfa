@@ -20,6 +20,7 @@ use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
+use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentAuthority;
@@ -51,6 +52,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
@@ -61,6 +63,7 @@ use Tests\Fixtures\Factors\UnwrittenFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Lifecycle\FixedFreshnessGate;
+use Tests\Fixtures\Lifecycle\RecordingSessionRevoker;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\Fixtures\Passkeys\StandInRegistrar;
 use Tests\Fixtures\Requirements\FixedIdentityRequirement;
@@ -274,7 +277,7 @@ final class PasskeyChangeGateTest extends TestCase
     public function testAStaleReauthenticationIsRefused(): void
     {
         $this->enablePasskeys();
-        $this->reauthenticate(EnrollmentAuthority::REAUTHENTICATION_MAX_AGE + 1);
+        $this->reauthenticate(ConfiguredFactorChangeGate::REAUTHENTICATION_MAX_AGE + 1);
 
         $user = $this->signedInPerson();
 
@@ -577,6 +580,36 @@ final class PasskeyChangeGateTest extends TestCase
         self::assertFalse(Factor::query()->whereKey($passkey->id)->exists());
         self::assertCount(1, $transition->returned);
         self::assertSame(self::APPLICATION, $transition->returned[0][0]);
+    }
+
+    /**
+     * A revoker that judges the session itself is the only judge of a passkey
+     * removal too, and what it returns is what `removing()` returns.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testARevokerThatJudgesTheSessionReturnsItsResultFromRemoving(): void
+    {
+        $this->enablePasskeys();
+
+        $transition = new RecordingSessionTransition;
+        $completion = new \stdClass;
+
+        $this->container()->instance(SessionTransition::class, $transition);
+        $this->container()->instance(SessionRevoker::class, new RecordingSessionRevoker(judges: true, completion: $completion));
+        $this->container()->instance(IdentityRequirement::class, new FixedIdentityRequirement(Requirement::none()->withPhishingResistance()));
+
+        $user = $this->signedInPerson();
+        $totp = $this->confirmedFactor($user);
+
+        $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+        $this->stepUpWith($user, $totp);
+
+        self::assertSame($completion, DB::transaction(fn (): ?object => $this->gate()->removing($user, self::APPLICATION, self::CREDENTIAL)));
+        self::assertSame([], $transition->returned);
+        self::assertNull(DB::transaction(fn (): ?object => $this->gate()->removing($user, self::APPLICATION, self::CREDENTIAL)));
     }
 
     /**

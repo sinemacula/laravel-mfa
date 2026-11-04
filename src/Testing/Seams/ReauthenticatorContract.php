@@ -8,9 +8,9 @@ use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
-use SineMacula\Laravel\Mfa\Enrollment\EnrollmentAuthority;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
+use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 
 /**
  * What every `Reauthenticator` must guarantee, as an assertion: it answers
@@ -58,7 +58,7 @@ final class ReauthenticatorContract
         Assert::assertSame($application, $proof->binding->application, 'The reauthentication must be bound to the application asked about.');
         Assert::assertTrue($proof->provedAt->lessThanOrEqualTo($now), 'The reauthentication must not be dated in the future.');
         Assert::assertTrue(
-            $proof->provedAt->greaterThanOrEqualTo($now->subSeconds(EnrollmentAuthority::REAUTHENTICATION_MAX_AGE)),
+            $proof->provedAt->greaterThanOrEqualTo($now->subSeconds(ConfiguredFactorChangeGate::REAUTHENTICATION_MAX_AGE)),
             'The reauthentication must have just been made.',
         );
     }

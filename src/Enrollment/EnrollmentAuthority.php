@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Enrollment;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
@@ -14,38 +13,31 @@ use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
+use SineMacula\Laravel\Mfa\Enums\FactorChange;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
-use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
-use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Proofs\Proof;
-use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
-use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
-use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Requirements\FactorChanges;
 
 /**
  * Whether a caller may add a factor of a type now, asked under the identity's
  * factor state lock with its factors as stored there, and how long that answer
  * lasts.
  *
- * On an active session the application must enable the type. An identity with a
- * confirmed factor then needs a fresh step-up for `mfa.add_factor` (see
- * `Contracts\FreshnessGate`), which lasts until that step-up stops being fresh;
- * one with none, enrolling its first additional factor, needs its first factor
- * proved again through the bound `Reauthenticator`, which the default refuses:
- * a first factor reauthentication of the identity on the application, bound to
- * its current sign-in, made under its current verification generation within
- * the last five minutes, which lasts until those five minutes end. A pending
- * session is exempt only on the bootstrap path, which lasts as long as it does:
- * its credential allows the action, the application enables bootstrap for the
- * type, and the identity has no confirmed factor. Then the application's limits
- * apply to the factors enrolled through it: confirmed ones of the type, and
- * confirmed ones in all.
+ * On an active session the application must enable the type, and the bound
+ * `Contracts\FactorChangeGate` must authorise the change from the session's
+ * sign-in: an identity with a confirmed factor adding a further one
+ * (`mfa.add_factor`), by default on a fresh step-up, and one with none
+ * enrolling its first additional factor (`mfa.add_first_additional_factor`), by
+ * default on its first factor proved again through the bound `Reauthenticator`.
+ * The grant lasts as long as the authorisation. A pending session is exempt
+ * only on the bootstrap path, which lasts as long as it does: its credential
+ * allows the action, the application enables bootstrap for the type, and the
+ * identity has no confirmed factor. Then the application's limits apply to the
+ * factors enrolled through it: confirmed ones of the type, and confirmed ones
+ * in all.
  *
  * Confirming an enrolment asks `reconfirm()` under the lock instead: the limits
  * again, and what the grant's authority rested on. Freshness is not judged
@@ -61,9 +53,6 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
  */
 final readonly class EnrollmentAuthority
 {
-    /** @var int How old, in seconds, a reauthentication may be and still authorise a first additional factor. */
-    public const int REAUTHENTICATION_MAX_AGE = 300;
-
     /**
      * Constructor.
      *
@@ -114,7 +103,7 @@ final readonly class EnrollmentAuthority
 
         $authority = $caller->pending !== null
             ? self::authorizeBootstrap($caller->pending, $settings, $type, $none, $action)
-            : $this->authorizeActive($caller, $settings, $application, $type, $none);
+            : $this->authorizeActive($caller, $settings, $application, $type, $factors, $none);
 
         $this->assertLimits($application, $type, $factors);
 
@@ -262,98 +251,39 @@ final readonly class EnrollmentAuthority
 
     /**
      * Refuse an active session a type the application does not enable, then
-     * authorise it by its reauthentication or its step-up.
+     * authorise it through the bound factor change gate: as the identity's
+     * first additional factor, resting on its first factor proved again, or as
+     * a further one, resting on a step-up. The grant lasts as long as the
+     * gate's authorisation.
+     *
+     * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $settings
      * @param  string  $application
      * @param  string  $type
+     * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
      * @param  bool  $none
      * @return \SineMacula\Laravel\Mfa\Enrollment\GrantAuthority
      *
+     * @formatter:on
+     *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
+     * @throws \LogicException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    private function authorizeActive(Caller $caller, ApplicationSettings $settings, string $application, string $type, bool $none): GrantAuthority
+    private function authorizeActive(Caller $caller, ApplicationSettings $settings, string $application, string $type, Collection $factors, bool $none): GrantAuthority
     {
         OperationRefusedException::unless($settings->enables($type), FailureReason::TYPE_NOT_ENABLED, sprintf('The application does not enable the type [%s].', $type));
 
-        return $none ? $this->authorizeReauthentication($caller, $application) : $this->authorizeStepUp();
-    }
+        $session = $this->callers->binding($caller, Purpose::STEP_UP)?->sessionId;
 
-    /**
-     * Refuse an active session with a confirmed factor unless it is fresh for
-     * adding one; the grant lasts until it stops being fresh.
-     *
-     * @return \SineMacula\Laravel\Mfa\Enrollment\GrantAuthority
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     */
-    private function authorizeStepUp(): GrantAuthority
-    {
-        $until = $this->container->make(RequirementService::class)->freshUntil(Operation::ADD_FACTOR->value);
+        OperationRefusedException::unless($session !== null, FailureReason::NOT_FRESH, 'Adding a factor needs a sign-in to authorise it from.');
 
-        OperationRefusedException::unless($until !== null, FailureReason::NOT_FRESH, 'Adding a factor needs a fresh step-up.');
+        $change = $none ? FactorChange::ADD_FIRST_ADDITIONAL_FACTOR : FactorChange::ADD_FACTOR;
+        $until  = $this->container->make(FactorChanges::class)->grant($caller->identity, $application, $session, $change, $factors);
 
-        return new GrantAuthority(EnrollmentAuthorization::STEP_UP, $until);
-    }
-
-    /**
-     * Refuse an active session enrolling its first additional factor unless the
-     * bound reauthenticator proves its first factor again, now; the grant lasts
-     * until that proof is too old to authorise one.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
-     * @param  string  $application
-     * @return \SineMacula\Laravel\Mfa\Enrollment\GrantAuthority
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     */
-    private function authorizeReauthentication(Caller $caller, string $application): GrantAuthority
-    {
-        $session = $this->callers->binding($caller, Purpose::REAUTHENTICATE)?->sessionId;
-        $proof   = $session === null ? null : $this->container->make(Reauthenticator::class)->reauthenticate($caller->identity, $application);
-
-        OperationRefusedException::unless(
-            $session !== null && $proof !== null && self::isFreshReauthentication($proof, $caller->identity, $application, $session),
-            FailureReason::NOT_FRESH,
-            'Adding a first additional factor needs the first factor proved again.',
-        );
-
-        return new GrantAuthority(EnrollmentAuthorization::REAUTHENTICATION, $proof->provedAt->addSeconds(self::REAUTHENTICATION_MAX_AGE));
-    }
-
-    /**
-     * Whether the proof is a reauthentication with the identity's first factor
-     * on its current sign-in, under its current verification generation, made
-     * within the last five minutes and not after now.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  string  $session
-     * @return bool
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
-     */
-    private static function isFreshReauthentication(Proof $proof, MultiFactorAuthenticatable $identity, string $application, string $session): bool
-    {
-        if ($proof->kind !== ProofKind::FIRST_FACTOR_REAUTHENTICATION || !ProofOwner::of($identity)->ownsSignIn($proof->binding, $application, $session)) {
-            return false;
-        }
-
-        if ($proof->generation !== VerificationGeneration::current($identity)) {
-            return false;
-        }
-
-        $now = CarbonImmutable::now();
-
-        return $proof->provedAt->lessThanOrEqualTo($now)
-            && $proof->provedAt->greaterThanOrEqualTo($now->subSeconds(self::REAUTHENTICATION_MAX_AGE));
+        return new GrantAuthority($none ? EnrollmentAuthorization::REAUTHENTICATION : EnrollmentAuthorization::STEP_UP, $until);
     }
 }

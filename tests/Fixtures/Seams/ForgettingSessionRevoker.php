@@ -7,6 +7,7 @@ namespace Tests\Fixtures\Seams;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
+use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 
 /**
  * A faulty revoker: it forgets the other session's sign-in at once, outside the
@@ -43,18 +44,18 @@ final readonly class ForgettingSessionRevoker implements SessionRevoker
      * Forget the other session's sign-in at once, or throw the failure.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @return void
+     * @param  string  $factorId
+     * @param  string  $session
+     * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      *
      * @throws \LogicException
      */
     #[\Override]
-    public function revokeOthers(MultiFactorAuthenticatable $identity): void
+    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $session): RemovalRevocation
     {
-        if ($this->failure !== null) {
-            throw $this->failure;
-        }
+        $this->revokeAll($identity);
 
-        $this->otherSession->forget($identity, $this->application);
+        return RemovalRevocation::othersEnded();
     }
 
     /**
@@ -68,6 +69,10 @@ final readonly class ForgettingSessionRevoker implements SessionRevoker
     #[\Override]
     public function revokeAll(MultiFactorAuthenticatable $identity): void
     {
-        $this->revokeOthers($identity);
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+
+        $this->otherSession->forget($identity, $this->application);
     }
 }

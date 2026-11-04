@@ -40,6 +40,9 @@ final class SessionRevokerContractTest extends TestCase
 {
     use SessionRevokerTests;
 
+    /** @var string The id of the factor the kit's removals name. */
+    private const string REMOVED_FACTOR = 'removed-factor';
+
     /** @var \SineMacula\Laravel\Mfa\Proofs\SessionProofStore The store of the identity's other device. */
     private SessionProofStore $otherDevice;
 
@@ -65,9 +68,11 @@ final class SessionRevokerContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        SessionRevokerContract::assertRevokingOthersStopsAnotherSessionCounting(
+        SessionRevokerContract::assertRemovingAFactorStopsAnotherSessionCounting(
             new FaultySeams,
             $this->revokedIdentity(),
+            self::REMOVED_FACTOR,
+            SignInProofs::SESSION,
             $this->verifyAnotherSession(...),
             $this->doesAnotherSessionCount(...),
         );
@@ -108,7 +113,74 @@ final class SessionRevokerContractTest extends TestCase
             $this->revokedIdentity(),
             $this->verifyAnotherSession(...),
             $this->doesAnotherSessionCount(...),
+            self::REMOVED_FACTOR,
+            SignInProofs::SESSION,
         );
+    }
+
+    /**
+     * The kit rejects a revoker that spares the current session when told a
+     * factor was removed from another sign-in.
+     *
+     * @return void
+     */
+    public function testRejectsARevokerThatSparesTheCurrentSessionForAnotherSignIn(): void
+    {
+        $identity = $this->revokedIdentity();
+
+        $this->currentSessionOf($identity);
+
+        $this->expectException(AssertionFailedError::class);
+
+        SessionRevokerContract::assertRemovingAFactorFromAnotherSignInSparesNothing(
+            new FaultySeams,
+            $identity,
+            self::REMOVED_FACTOR,
+            'another-sign-in',
+            $this->doesCurrentSessionCount(...),
+        );
+    }
+
+    /**
+     * The kit rejects a contract whose current session never counted, rather
+     * than passing a removal from another sign-in.
+     *
+     * @return void
+     */
+    public function testRejectsACurrentSessionThatNeverCounted(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        SessionRevokerContract::assertRemovingAFactorFromAnotherSignInSparesNothing(
+            $this->sessionRevoker(),
+            $this->revokedIdentity(),
+            self::REMOVED_FACTOR,
+            'another-sign-in',
+            $this->doesCurrentSessionCount(...),
+        );
+    }
+
+    /**
+     * The kit passes a revoker that refuses a sign-in that is not the
+     * identity's current one by throwing.
+     *
+     * @return void
+     */
+    public function testPassesARevokerThatRefusesAnotherSignInByThrowing(): void
+    {
+        $identity = $this->revokedIdentity();
+
+        $this->currentSessionOf($identity);
+
+        SessionRevokerContract::assertRemovingAFactorFromAnotherSignInSparesNothing(
+            new ForgettingSessionRevoker($this->otherDevice, SignInProofs::APPLICATION, new \LogicException('Not the identity\'s session.')),
+            $identity,
+            self::REMOVED_FACTOR,
+            'another-sign-in',
+            $this->doesCurrentSessionCount(...),
+        );
+
+        self::assertTrue($this->doesCurrentSessionCount($identity));
     }
 
     /**
@@ -131,6 +203,8 @@ final class SessionRevokerContractTest extends TestCase
                 $this->revokedIdentity(),
                 $this->verifyAnotherSession(...),
                 $this->doesAnotherSessionCount(...),
+                self::REMOVED_FACTOR,
+                SignInProofs::SESSION,
             );
             self::fail('The revoker\'s failure was expected to propagate.');
         } catch (\LogicException $exception) {
@@ -150,9 +224,11 @@ final class SessionRevokerContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        SessionRevokerContract::assertRevokingOthersStopsAnotherSessionCounting(
+        SessionRevokerContract::assertRemovingAFactorStopsAnotherSessionCounting(
             $this->sessionRevoker(),
             $this->revokedIdentity(),
+            self::REMOVED_FACTOR,
+            SignInProofs::SESSION,
             static function (MultiFactorAuthenticatable $identity): void {
                 // Verifies nothing.
             },
@@ -186,6 +262,48 @@ final class SessionRevokerContractTest extends TestCase
         $this->container()->make(ProofStore::class)->begin($user, SignInProofs::APPLICATION, SignInProofs::SESSION);
 
         return $user;
+    }
+
+    /**
+     * The factor the kit's removals name.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @return string
+     */
+    #[\Override]
+    protected function removedFactorId(MultiFactorAuthenticatable $identity): string
+    {
+        return self::REMOVED_FACTOR;
+    }
+
+    /**
+     * Verify the identity on its current sign-in, and name it.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @return string
+     */
+    #[\Override]
+    protected function currentSessionOf(MultiFactorAuthenticatable $identity): string
+    {
+        $proofs = SignInProofs::of($identity)->underGeneration(VerificationGeneration::current($identity));
+        $store  = $this->container()->make(ProofStore::class);
+
+        $store->record($proofs->password());
+        $store->record($proofs->totp());
+
+        return SignInProofs::SESSION;
+    }
+
+    /**
+     * Whether the current sign-in's proofs still count.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @return bool
+     */
+    #[\Override]
+    protected function doesCurrentSessionCount(MultiFactorAuthenticatable $identity): bool
+    {
+        return $this->container()->make(ProofStore::class)->proofs($identity, SignInProofs::APPLICATION) !== [];
     }
 
     /**

@@ -51,14 +51,32 @@ final readonly class SessionReevaluation
      */
     public function reevaluate(MultiFactorAuthenticatable $identity, string $application, array $proofs): ?Requirement
     {
-        $requirement = $this->container->make(RequirementService::class)->requirementFor($identity, $application);
+        $requirement = $this->outstanding($identity, $application, $proofs);
 
-        if ($this->container->make(RequirementCheck::class)->check($requirement, ...$proofs)->meetsRequirement()) {
-            return null;
+        if ($requirement !== null) {
+            $this->container->make(SessionTransition::class)->returnToPending($identity, $application, $requirement);
         }
 
-        $this->container->make(SessionTransition::class)->returnToPending($identity, $application, $requirement);
-
         return $requirement;
+    }
+
+    /**
+     * The requirement the session does not meet on the proofs given, whole and
+     * not what is left of it, or `null` when it meets it, changing nothing.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
+     * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function outstanding(MultiFactorAuthenticatable $identity, string $application, array $proofs): ?Requirement
+    {
+        $requirement = $this->container->make(RequirementService::class)->requirementFor($identity, $application);
+
+        return $this->container->make(RequirementCheck::class)->check($requirement, ...$proofs)->meetsRequirement() ? null : $requirement;
     }
 }
