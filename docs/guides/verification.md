@@ -112,13 +112,14 @@ A factor that delivers no codes answers `not_found`. A delivered factor must nam
 
 `Verification\VerificationResult` is told apart by `isVerified()` and `isFailed()`.
 
-| On success     | Holds                                                                                                  |
-|----------------|--------------------------------------------------------------------------------------------------------|
-| `proof`        | The `Proofs\Proof` made: kind, method, channel, factor, what it observed, time, binding and generation |
-| `evaluation`   | The session's proofs with this one against the whole requirement: accepted, multifactor, level, met    |
-| `amr`          | The `amr` values of this proof alone, never `mfa`, which only the evaluation can report                |
-| `type`         | The type proved: the factor's, or `recovery_code`                                                      |
-| `completion()` | Whatever the completion seam returned, such as an authentication layer's tokens                        |
+| On success             | Holds                                                                                                   |
+|------------------------|---------------------------------------------------------------------------------------------------------|
+| `proof`                | The `Proofs\Proof` made: kind, method, channel, factor, what it observed, time, binding and generation  |
+| `evaluation`           | The session's proofs with this one against the whole requirement: accepted, multifactor, level, met     |
+| `amr`                  | The `amr` values of this proof alone, never `mfa`, which only the evaluation can report                 |
+| `refreshesMultifactor` | Whether this proof supplies or completes the multifactor evidence of the session's first factor with it |
+| `type`                 | The type proved: the factor's, or `recovery_code`                                                       |
+| `completion()`         | Whatever the completion seam returned, such as an authentication layer's tokens                         |
 
 | On failure    | Holds                                                                                                  |
 |---------------|--------------------------------------------------------------------------------------------------------|
@@ -129,6 +130,13 @@ A factor that delivers no codes answers `not_found`. A delivered factor must nam
 A successful verification whose `evaluation` does not yet meet the requirement is still a success: the proof is kept,
 and the caller asks for the next factor. A requirement of an operation is not part of `verify()`: ask
 `Mfa::isFresh($operation)` afterwards (see [Requirements and step-up](requirements.md)).
+
+`refreshesMultifactor` is for a layer that keeps an evaluation on each proof and times multifactor freshness by it. It
+judges the session's first factor with this proof alone, so another proof the session holds cannot make it true. It is
+true only when the multifactor evidence is this proof's own: it completes the combination, as a TOTP code after a
+password does, or is multifactor by itself. It is false after a first factor that is multifactor on its own, such as a
+passkey with user verification, followed by a weaker proof such as an email code, so a fresh email code never
+refreshes an old passkey's multifactor evidence. `evaluation` stays the answer for the session as a whole.
 
 A result and a `Submission` never leave through a dump or JSON with anything secret in them. The code, the assertion's
 response and the completion are read through `code()`, `response()` and `completion()`, and a channel's destination

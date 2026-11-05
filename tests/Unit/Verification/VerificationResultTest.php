@@ -151,7 +151,7 @@ final class VerificationResultTest extends TestCase
     {
         $evaluation = new Evaluation(true, true, AssuranceLevel::AAL2, false, false, ['otp', 'mfa'], [], []);
         $proof      = self::proof();
-        $result     = VerificationResult::verified($proof, $evaluation, ['otp'], 'totp');
+        $result     = VerificationResult::verified($proof, $evaluation, ['otp'], 'totp', true);
         $completion = new \stdClass;
         $completed  = $result->withCompletion($completion);
 
@@ -161,12 +161,14 @@ final class VerificationResultTest extends TestCase
         self::assertSame($evaluation, $completed->evaluation);
         self::assertSame(['otp'], $completed->amr);
         self::assertSame('totp', $completed->type);
+        self::assertTrue($completed->refreshesMultifactor);
 
         $failed = VerificationResult::failed(FailureReason::LOCKED, 'Locked.', CarbonImmutable::parse('2026-11-01T10:15:00+00:00'))->withCompletion(null);
 
         self::assertSame(FailureReason::LOCKED, $failed->reason);
         self::assertSame('Locked.', $failed->detail);
         self::assertNotNull($failed->lockedUntil);
+        self::assertFalse($failed->refreshesMultifactor);
     }
 
     /**
@@ -236,6 +238,7 @@ final class VerificationResultTest extends TestCase
         self::assertSame($proof->provedAt->toIso8601String(), $encoded['proved_at']);
         self::assertSame($proof->binding->toArray(), $encoded['binding']);
         self::assertSame('aal2', $encoded['evaluation']['level'] ?? null);
+        self::assertFalse($encoded['refreshes_multifactor']);
         self::assertArrayNotHasKey('detail', $encoded);
         self::assertArrayNotHasKey('completion', $encoded);
         self::assertStringNotContainsString('person@example.test', (string) json_encode($result));

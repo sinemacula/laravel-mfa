@@ -206,6 +206,21 @@ final readonly class SignInProofs
     }
 
     /**
+     * A passkey factor's proof, an additional factor of its own credential,
+     * multifactor on its own when user verification was observed.
+     *
+     * @param  bool  $userVerification
+     * @param  int  $secondsAgo
+     * @return \SineMacula\Laravel\Mfa\Proofs\Proof
+     */
+    public function passkeyFactor(bool $userVerification, int $secondsAgo = 0): Proof
+    {
+        $channel = new Channel(ChannelKind::PASSKEY, 'credential-2');
+
+        return $this->proof(ProofKind::ADDITIONAL_FACTOR, 'passkey', $channel, 'factor-passkey', self::assertion($userVerification), $secondsAgo);
+    }
+
+    /**
      * An email code factor's proof, accepted after a password without being
      * multifactor.
      *

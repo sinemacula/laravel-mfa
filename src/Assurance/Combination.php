@@ -192,6 +192,20 @@ final readonly class Combination
     }
 
     /**
+     * When the evidence for the given answer was made, or `null` when the
+     * combination does not give it: the first factor's time when the first
+     * factor gives it on its own and the further proof does not, and otherwise
+     * the time of the proof that completes the combination.
+     *
+     * @param  \Closure(self): bool  $answer
+     * @return ?\Carbon\CarbonImmutable
+     */
+    public function evidencedAt(\Closure $answer): ?CarbonImmutable
+    {
+        return $answer($this) ? $this->evidenceFor($answer) : null;
+    }
+
+    /**
      * When the evidence for the given answer was made: the first factor's time
      * when it gives the answer on its own and the further proof does not, and
      * otherwise the time of the proof that completes the combination.

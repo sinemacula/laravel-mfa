@@ -110,6 +110,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
             met: $met,
             unmet: $unmet,
             metUntil: $unmet === [] ? self::metUntil($requirement, $combinations) : null,
+            multifactorAt: self::multifactorAt($combinations),
         );
     }
 
@@ -395,6 +396,31 @@ final class DefaultCombinationPolicy implements CombinationPolicy
         }
 
         return false;
+    }
+
+    /**
+     * When the freshest evidence that the combinations are multifactor was
+     * made: the latest of each multifactor combination's evidence, or `null`
+     * when none is multifactor.
+     *
+     * @param  list<\SineMacula\Laravel\Mfa\Assurance\Combination>  $combinations
+     * @return ?\Carbon\CarbonImmutable
+     */
+    private static function multifactorAt(array $combinations): ?CarbonImmutable
+    {
+        $latest = null;
+
+        foreach ($combinations as $combination) {
+            $made = $combination->evidencedAt(static fn (Combination $candidate): bool => $candidate->isMultifactor());
+
+            if ($made === null || ($latest !== null && $made->lessThanOrEqualTo($latest))) {
+                continue;
+            }
+
+            $latest = $made;
+        }
+
+        return $latest;
     }
 
     /**

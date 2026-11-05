@@ -24,7 +24,9 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
  * What every new proof goes through, under the identity's lock, wherever it was
  * made: refused unless it is itself accepted after the session's first factor,
  * whatever an older proof shows; the whole requirement evaluated again with it;
- * and the result handed to `PendingCompletion` or `StepUp`.
+ * whether it supplies or completes the multifactor evidence of that first
+ * factor with it, when the evidence is its own and not the first factor's
+ * alone; and the result handed to `PendingCompletion` or `StepUp`.
  *
  * Stateless: the seams are resolved on every call.
  *
@@ -69,9 +71,10 @@ final readonly class ProofAcceptance
             ? $this->container->make(SessionFirstFactor::class)->proofs($caller->identity, $binding->application)
             : [$pending->firstFactor, ...self::counting($pending, $proof->generation)];
         $firstFactor = self::firstFactorOf($proofs);
+        $pair        = $firstFactor === null ? null : $requirements->check(Requirement::none(), $firstFactor, $proof);
 
         OperationRefusedException::unless(
-            $firstFactor !== null && $requirements->check(Requirement::none(), $firstFactor, $proof)->accepted,
+            $pair !== null && $pair->accepted,
             FailureReason::NOT_ACCEPTED,
             'The proof is not accepted after the session\'s first factor.',
         );
@@ -81,7 +84,12 @@ final readonly class ProofAcceptance
 
         $amr = array_values(array_unique(array_diff([...Authenticator::of($proof)->amr, ...$driverAmr], ['mfa'])));
 
-        return VerificationResult::verified($proof, $evaluation, $amr, $type);
+        // Judged on the first factor with this proof alone, so another proof
+        // the session holds cannot make it look fresh, nor the first factor
+        // alone
+        $refreshes = $pair->multifactorAt?->equalTo($proof->provedAt) ?? false;
+
+        return VerificationResult::verified($proof, $evaluation, $amr, $type, $refreshes);
     }
 
     /**

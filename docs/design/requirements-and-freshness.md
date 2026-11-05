@@ -127,6 +127,11 @@ nothing is stored in their place.
   from it lives no longer than the proof that authorised it (see [Enrolment](enrollment.md)). `Evaluation::$metUntil` is
   how the default gate reads it: for each part with a maximum age, the latest evidence time among the combinations
   providing it plus that age, and the earliest across the parts.
+- `Evaluation::$multifactorAt` says when the freshest multifactor evidence was made, by the same rule: a further
+  proof's time when it supplies or completes it, the first factor's when the first factor gives it alone. A policy that
+  does not say leaves it `null`. `Verification\ProofAcceptance` evaluates the session's first factor with the new proof
+  alone and sets `VerificationResult::$refreshesMultifactor` when that time is the proof's own, so a layer that records
+  multifactor on each proof's row, timed by the proof, never lets a weaker proof refresh an older stronger one.
 - The default gate answers for the person the request serves and nobody else: a pending session, a guest, a machine and
   an inactive identity are not fresh for any operation, and no helper's `isFresh()` or `freshUntil()` reads the guard's
   user in their place.
