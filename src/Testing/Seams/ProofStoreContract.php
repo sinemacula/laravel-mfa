@@ -29,9 +29,12 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
  * sessions is tested on one the test has arranged, and the default store on
  * `SESSION`. A sign-in may already hold proofs when it is begun, such as the
  * first factor an authentication layer records on signing in, so each count is
- * taken against those. A proof of any other sign-in is refused by throwing a
- * `ProofRefusedException`, as `ProofStore::record()` declares; a store that
- * cannot find that sign-in at all refuses it the same way.
+ * taken against those. The other checks put their proofs in through a closure
+ * and end the sign-in through another, so a store whose proofs and sign-ins an
+ * authentication layer keeps is tested on what that layer wrote; the refusal
+ * always goes through `record()`. A proof of any other sign-in is refused by
+ * throwing a `ProofRefusedException`, as `ProofStore::record()` declares; a
+ * store that cannot find that sign-in at all refuses it the same way.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -43,7 +46,7 @@ final class ProofStoreContract
     /** @var string The sign-in a store that keeps its own begins. */
     public const string SESSION = 'contract-sign-in';
 
-    /** @var string The factor the additional factor proof names. */
+    /** @var string The factor the additional factor proof names by default. */
     public const string FACTOR = 'contract-factor';
 
     /**
@@ -80,26 +83,41 @@ final class ProofStoreContract
 
     /**
      * A proof of the current sign-in is kept, and goes when the sign-in is
-     * forgotten.
+     * ended.
+     *
+     * The proof is put in by `$arrange`, and the sign-in ended by `$end`: by
+     * default the store's own `record()` and `forget()`, and for a store whose
+     * proofs and sign-ins another layer keeps, that layer's.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $session
+     * @param  ?\Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void  $arrange
+     * @param  ?\Closure(): void  $end
      * @return void
      */
-    public static function assertForgettingASignInForgetsItsProofs(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): void
-    {
+    public static function assertForgettingASignInForgetsItsProofs(
+        ProofStore $store,
+        MultiFactorAuthenticatable $identity,
+        string $application,
+        string $session,
+        ?\Closure $arrange = null,
+        ?\Closure $end = null,
+    ): void {
+        $arrange ??= $store->record(...);
+        $end     ??= static fn () => $store->forget($identity, $application);
+
         $store->begin($identity, $application, $session);
 
         $held = count($store->proofs($identity, $application));
 
-        $store->record(self::firstFactor($identity, $application, $session));
+        $arrange(self::firstFactor($identity, $application, $session));
 
         Assert::assertSame($session, $store->currentSession($identity, $application), 'The sign-in begun must be the current one.');
         Assert::assertCount($held + 1, $store->proofs($identity, $application), 'A proof of the current sign-in must be kept.');
 
-        $store->forget($identity, $application);
+        $end();
 
         Assert::assertNull($store->currentSession($identity, $application), 'A forgotten sign-in must not be current.');
         Assert::assertSame([], $store->proofs($identity, $application), 'A forgotten sign-in must keep no proof.');
@@ -118,12 +136,24 @@ final class ProofStoreContract
      * @param  string  $application
      * @param  string  $session
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): void  $void
+     * @param  ?\Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void  $arrange
      * @return void
      */
-    public static function assertVoidedProofsStopCounting(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session, \Closure $void): void
-    {
+    public static function assertVoidedProofsStopCounting(
+        ProofStore $store,
+        MultiFactorAuthenticatable $identity,
+        string $application,
+        string $session,
+        \Closure $void,
+        ?\Closure $arrange = null,
+    ): void {
+        $arrange ??= $store->record(...);
+
         $store->begin($identity, $application, $session);
-        $store->record(self::firstFactor($identity, $application, $session));
+
+        $arrange(self::firstFactor($identity, $application, $session));
+
+        Assert::assertNotSame([], $store->proofs($identity, $application), 'A proof of the current sign-in must count before the proofs are voided.');
 
         $void($identity);
 
@@ -148,22 +178,40 @@ final class ProofStoreContract
      * Forgetting a factor stops the proofs made with it counting, and leaves
      * the others.
      *
+     * The further proof names `$factor`: by default `FACTOR`, and for a store
+     * that counts a proof only while the identity holds its factor, one the
+     * test enrolled.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $session
+     * @param  string  $factor
+     * @param  ?\Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void  $arrange
      * @return void
      */
-    public static function assertForgettingAFactorStopsItsProofsCounting(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): void
-    {
+    public static function assertForgettingAFactorStopsItsProofsCounting(
+        ProofStore $store,
+        MultiFactorAuthenticatable $identity,
+        string $application,
+        string $session,
+        string $factor = self::FACTOR,
+        ?\Closure $arrange = null,
+    ): void {
+        $arrange ??= $store->record(...);
+
         $store->begin($identity, $application, $session);
 
         $held = self::kinds($store->proofs($identity, $application));
 
-        $store->record(self::firstFactor($identity, $application, $session));
-        $store->record(self::additionalFactor($identity, $application, $session));
+        $arrange(self::firstFactor($identity, $application, $session));
+        $arrange(self::additionalFactor($identity, $application, $session, $factor));
 
-        $store->forgetFactor($identity, self::FACTOR);
+        $arranged = self::kinds($store->proofs($identity, $application));
+
+        Assert::assertSame([...$held, ProofKind::FIRST_FACTOR, ProofKind::ADDITIONAL_FACTOR], $arranged, 'Both proofs must count before the factor is forgotten.');
+
+        $store->forgetFactor($identity, $factor);
 
         $kinds = self::kinds($store->proofs($identity, $application));
 
@@ -195,17 +243,18 @@ final class ProofStoreContract
     }
 
     /**
-     * An authenticator app proof of the identity's contract factor, bound to
-     * the sign-in.
+     * An authenticator app proof of the identity's factor, bound to the
+     * sign-in.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $session
+     * @param  string  $factor
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
-    private static function additionalFactor(MultiFactorAuthenticatable $identity, string $application, string $session): Proof
+    private static function additionalFactor(MultiFactorAuthenticatable $identity, string $application, string $session, string $factor): Proof
     {
-        return self::proof($identity, ProofKind::ADDITIONAL_FACTOR, 'totp', new Channel(ChannelKind::AUTHENTICATOR_APP, self::FACTOR), self::FACTOR, $application, $session);
+        return self::proof($identity, ProofKind::ADDITIONAL_FACTOR, 'totp', new Channel(ChannelKind::AUTHENTICATOR_APP, $factor), $factor, $application, $session);
     }
 
     /**

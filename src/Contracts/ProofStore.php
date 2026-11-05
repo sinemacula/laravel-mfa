@@ -105,6 +105,13 @@ interface ProofStore
      * of it, as on sign-out, so another identity on a reused session inherits
      * nothing, leaving its sign-ins on other applications alone.
      *
+     * A store backed by another layer's sign-ins may do nothing here only when
+     * that layer has already ended, or unbound, the sign-in before this is
+     * called, on every path that calls it (the sign-out listener and
+     * `Proofs\GuardHooks::signedOut()` alike): `currentSession()` then answers
+     * `null` and `proofs()` nothing for it, and the identity's sign-ins on
+     * other applications are left alone.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void
