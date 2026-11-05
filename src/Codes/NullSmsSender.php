@@ -22,14 +22,13 @@ final readonly class NullSmsSender implements SmsSender
     /**
      * Refuse to send, naming the contract to bind.
      *
-     * @param  string  $phoneNumber
-     * @param  string  $message
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException
      */
     #[\Override]
-    public function send(#[\SensitiveParameter] string $phoneNumber, #[\SensitiveParameter] string $message): void
+    public function send(#[\SensitiveParameter] CodeMessage $message): void
     {
         throw SenderNotConfiguredException::for(SmsSender::class);
     }

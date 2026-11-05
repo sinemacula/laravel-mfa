@@ -4,11 +4,10 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Drivers;
 
-use Carbon\CarbonImmutable;
+use SineMacula\Laravel\Mfa\Codes\CodeMessage;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
-use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
@@ -19,8 +18,8 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
  * The bound `ChallengeGateway` draws, stores and checks their codes, bound to
  * the factor, the identity, the application, the session and the purpose (see
  * `Codes\CodeService`), so a concrete driver only describes its channel and its
- * transport: how a code reaches the factor's destination. A factor with no
- * destination is refused before anything is sent.
+ * transport: how a code reaches the factor's destination. The code service
+ * refuses a factor with no destination before any message is built.
  *
  * The driver holds no code to compare, so `verify()` and `confirm()` refuse
  * with a `LogicException` rather than accept a code checked by nothing. Such a
@@ -90,37 +89,27 @@ abstract class AbstractCodeDriver implements CodeDeliveryDriver
     }
 
     /**
-     * Deliver the code to the factor's destination through the driver's
+     * Deliver the message's code to its destination through the driver's
      * transport.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
-     * @param  string  $code
-     * @param  \Carbon\CarbonImmutable  $expiresAt
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException
      */
     #[\Override]
-    public function deliver(Factor $factor, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void
+    public function deliver(Factor $factor, #[\SensitiveParameter] CodeMessage $message): void
     {
-        $destination = $factor->getDestination();
-
-        if ($destination === null || $destination === '') {
-            throw new MissingDestinationException(sprintf('The %s factor has no destination, so its code cannot be delivered.', $factor->getType()));
-        }
-
-        $this->send($destination, $code, $expiresAt);
+        $this->send($message);
     }
 
     /**
-     * Send the code to the destination through the driver's transport.
+     * Send the message's code to its destination through the driver's
+     * transport.
      *
-     * @param  string  $destination
-     * @param  string  $code
-     * @param  \Carbon\CarbonImmutable  $expiresAt
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      */
-    abstract protected function send(#[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code, CarbonImmutable $expiresAt): void;
+    abstract protected function send(#[\SensitiveParameter] CodeMessage $message): void;
 
     /**
      * The refusal of a factor-only call for a code that needs its binding.

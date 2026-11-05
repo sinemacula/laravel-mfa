@@ -69,7 +69,8 @@ codes and full destinations out of the application's logs and error reports:
   and the channel's own `processors`, so it sees everything they add, and before any handler writes the record. It
   redacts:
   - a `RevealedSecret` or a `\SensitiveParameterValue`, anywhere in the context or the extra data;
-  - a code message, `Codes\MfaCodeMessage` or a queued job sending one, which becomes `[redacted]`;
+  - a code message, a `Codes\CodeMessage` handed to a sender, a `Codes\MfaCodeMessage` or a queued job sending one,
+    which becomes `[redacted]`;
   - the value of any key naming a secret, a code or a destination: `secret`, `totp_secret`, `code`, `codes`, `otp`,
     `one_time_code`, `recovery_code`, `recovery_codes`, `destination`, `address`, `email`, `phone`, `phone_number`,
     `to`, `recipient`, `provisioning_uri`, `otpauth_uri`, `grant` and `enrollment_grant`, compared without case,

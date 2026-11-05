@@ -40,12 +40,13 @@ it.
   processor, pushed after the tap, all run before it, so it sees everything they add. A stack built from tapped
   channels holds one. Processors of a handler run after it.
 - `RedactSecrets` redacts the message, the context and the extra data of a record through `Secrets\Redactor`: a
-  `RevealedSecret`, `\SensitiveParameterValue` or code message (`Codes\MfaCodeMessage`, or a `SendQueuedMailable`
-  sending one) anywhere; the whole value of a string key that names a secret, a code or a destination (`secret`,
-  `totp_secret`, `code`, `codes`, `otp`, `one_time_code`, `recovery_code`, `recovery_codes`, `destination`, `address`,
-  `email`, `phone`, `phone_number`, `to`, `recipient`, `provisioning_uri`, `otpauth_uri`, `grant`, `enrollment_grant`,
-  compared without case, underscores, hyphens or spaces); every `otpauth://` or `otpauth-migration://` URI in a string.
-  Integer keys are never read as names. Everything else is kept, masked destinations included.
+  `RevealedSecret`, `\SensitiveParameterValue` or code message (a `Codes\CodeMessage` handed to a sender, a
+  `Codes\MfaCodeMessage`, or a `SendQueuedMailable` sending one) anywhere; the whole value of a string key that names a
+  secret, a code or a destination (`secret`, `totp_secret`, `code`, `codes`, `otp`, `one_time_code`, `recovery_code`,
+  `recovery_codes`, `destination`, `address`, `email`, `phone`, `phone_number`, `to`, `recipient`, `provisioning_uri`,
+  `otpauth_uri`, `grant`, `enrollment_grant`, compared without case, underscores, hyphens or spaces); every `otpauth://`
+  or `otpauth-migration://` URI in a string. Integer keys are never read as names. Everything else is kept, masked
+  destinations included.
 - `RedactSecrets` first normalises the context and the extra data once (`Redactor::normalize()`): every object other
   than a secret value, a code message, an exception, a date or an enum becomes its logged form keyed by its class,
   within the same bounds as the redaction. A value under a key above is left as it is, with no method of an object in
@@ -83,19 +84,23 @@ it.
   is kept.
 - Other arguments of other frames are kept, redacted as `Redactor` redacts a context but with other objects kept as
   they are. Frames without arguments are kept as they are. Scrubbing is idempotent.
-- `Codes\CodeService` wraps the driver's `deliver()` call alone in a catch: a throwable is scrubbed with the code and
-  the factor's destination given as known values, so they leave every message and frame of its chain whether or not
-  PHP recorded arguments, and `Exceptions\CodeDeliveryFailedException` is thrown, naming the factor's type and masked
-  destination, carrying its `FactorSummary`, with the scrubbed throwable as its previous one. Rethrowing inside the
-  factor state transaction still rolls it back, so the code is not kept.
+- `Codes\CodeService` wraps building the `CodeMessage` and the driver's `deliver()` call, and nothing else, in a catch:
+  a throwable is scrubbed with the code and the factor's destination given as known values, so they leave every message
+  and frame of its chain whether or not PHP recorded arguments, and `Exceptions\CodeDeliveryFailedException` is thrown,
+  naming the factor's type and masked destination, carrying its `FactorSummary`, with the scrubbed throwable as its
+  previous one. Rethrowing inside the factor state transaction still rolls it back, so the code is not kept.
 - `MfaCodeMessage::send()` catches a throwable from Laravel's `Mailable::send()`, scrubs it with its own code and
   recipients' addresses as known values, and rethrows it. A queue worker runs that method for a queued message, so
   the failure is scrubbed before the worker dispatches `JobExceptionOccurred` or reports it. The values are read from
   the message for that call only: nothing is static, so nothing collected for one job or one delivery reaches another.
 - Both delivery scrubs run whatever `mfa.secrets.redact` says.
-- The sender contracts, every shipped sender (`MailEmailSender`, the null and fake senders) and the code drivers'
-  `send()` and `deliver()` mark each parameter carrying a code, a message holding one or a destination
-  `#[\SensitiveParameter]`, and so does `CodeService`'s delivery helper for the issued code.
+- The sender contracts, every shipped sender (`MailEmailSender`, the null and fake senders), `SmsCodeText::of()` and
+  the code drivers' `send()` and `deliver()` mark each parameter carrying a code, a message holding one or a
+  destination `#[\SensitiveParameter]`, and so do `CodeService`'s delivery helper for the issued code and the
+  recipient, and `CodeMessage`'s constructor for the destination and the recipient.
+- A `CodeMessage` holds its code as a `RevealedSecret` and its destination and recipient as
+  `\SensitiveParameterValue`s, so no dump of it shows them. Its factor summary masks the destination, but the label is
+  the person's own text and is shown as it is.
 - While `mfa.secrets.redact` is on, Laravel's exception handler scrubs every exception it reports through a `report`
   callback the package registers on it, whether the handler was built before the package booted or is built after; an
   exception in a log record's context is scrubbed by the processor as well.

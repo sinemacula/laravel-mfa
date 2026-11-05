@@ -59,7 +59,8 @@ the provider or another capability.
   summaries, never models: exceptions name only enums, the support helpers, `Factors\FactorSummary`, `Codes\SendResult`
   and `Requirements\Requirement`, and events only the context, contracts, storage, enums, support helpers and
   `Factors\FactorSummary`. The assurance vocabulary names none of the capabilities that use it, and storage, the
-  support helpers and secrets name no capability but `Proofs\ProofOwner` and `Codes\MfaCodeMessage`. Contracts name no
+  support helpers and secrets name no capability but `Proofs\ProofOwner` and the code messages, `Codes\CodeMessage`
+  and `Codes\MfaCodeMessage`. Contracts name no
   model, capability service, seam default or composition root. Only the manager names a flow service (enrolment,
   factors, lifecycle, verification); only the provider names the HTTP layer, a `*Bindings` class, or, with the
   configuration bindings, the console; only the provider, the facade and the driver bindings name the manager; nothing

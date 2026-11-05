@@ -64,10 +64,14 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   the code up under its own digest, finds nothing and answers `not_found`. Under the default store a request with no
   started session has no sign-in: it has no binding, and nothing is sent or checked. A regenerated Laravel session keeps
   its sign-in, and with it its codes.
-- Delivery goes through contracts the application binds: `Contracts\SmsSender` (a phone number and the message, the
-  translated line with `:code` replaced) and `Contracts\EmailSender` (an address and the configured
-  `MfaCodeMessage` class, with the whole minutes the code has left and the locale it is sent in; see
-  [Consumer Messages](consumer-messages.md)). The package ships no provider: the defaults,
+- Delivery goes through contracts the application binds, `Contracts\SmsSender` and `Contracts\EmailSender`, each
+  handed a `Codes\CodeMessage`: the application and the purpose from the binding, the factor's type, destination and
+  summary as locked, the code as a `RevealedSecret`, its expiry, and the identity it is for. The code service builds it
+  inside the delivery's catch, so a factor with no destination, or any failure building it, is scrubbed and rolled back
+  as a failed delivery. The destination and the recipient are held as `\SensitiveParameterValue`s, so no dump shows
+  them. A sender words the message itself; `Codes\SmsCodeText::of()` gives the package's SMS line, and
+  `Codes\MailEmailSender` sends the configured `MfaCodeMessage` class with the whole minutes the code has left and the
+  locale it is sent in (see [Consumer Messages](consumer-messages.md)). The package ships no provider: the defaults,
   `Codes\NullSmsSender` and `Codes\NullEmailSender`, throw `SenderNotConfiguredException`, and the configuration check
   refuses an application that enables `sms` or `email` while its sender is the default, or while no `app.key` is set.
   `Codes\MailEmailSender` sends through Laravel's mailer for an application that binds it.
@@ -95,13 +99,14 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 
 - A resend within the cooldown, a send for an exhausted challenge, or one past a cap: `SendResult::refused()` with
   `sending_capped` and the wait; nothing is delivered and `CodeSent` is not dispatched.
-- A factor with no destination: `MissingDestinationException`, before the transport; the code is not kept.
+- A factor with no destination: `MissingDestinationException`, before the message is built; the code is not kept.
 - No sender bound: `SenderNotConfiguredException` from the default sender; the code is not kept. The configuration check
   normally refuses this before any send.
-- Any throwable from the driver's `deliver()`, the two above included, is caught around that call alone, scrubbed of the
-  code and the factor's destination (see [Secrets in Responses and Logs](secrets-in-responses-and-logs.md)), and
-  rethrown as `CodeDeliveryFailedException`, which names the factor's type and masked destination and keeps the
-  scrubbed throwable as its previous one. The transaction rolls back, so the code is not kept.
+- Any throwable from building the message or from the driver's `deliver()`, the two above included, is caught around
+  those alone, scrubbed of the code and the factor's destination (see [Secrets in Responses and
+  Logs](secrets-in-responses-and-logs.md)), and rethrown as `CodeDeliveryFailedException`, which names the factor's type
+  and masked destination and keeps the scrubbed throwable as its previous one. The transaction rolls back, so the code
+  is not kept.
 - A factor that is not a stored Eloquent factor: `UnsupportedFactorException`. A binding that names another identity
   than the factor's owner: `InvalidArgumentException`. Neither reads anything.
 - A code sent inside a transaction that rolls back is gone with it, and `CodeSent` is never dispatched.
@@ -115,8 +120,9 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   `src/Enums/CodeCheck.php`, `src/Codes/SendResult.php`, `src/Codes/IssuedCode.php`, `src/Codes/CodeSettings.php`.
 - `src/Contracts/CodeDeliveryDriver.php`, `src/Drivers/AbstractCodeDriver.php`, `src/Drivers/EmailDriver.php`,
   `src/Drivers/SmsDriver.php`.
-- `src/Contracts/SmsSender.php`, `src/Contracts/EmailSender.php`, `src/Codes/NullSmsSender.php`,
-  `src/Codes/NullEmailSender.php`, `src/Codes/MailEmailSender.php`, `src/Codes/MfaCodeMessage.php`.
+- `src/Codes/CodeMessage.php`, `src/Codes/SmsCodeText.php`, `src/Contracts/SmsSender.php`,
+  `src/Contracts/EmailSender.php`, `src/Codes/NullSmsSender.php`, `src/Codes/NullEmailSender.php`,
+  `src/Codes/MailEmailSender.php`, `src/Codes/MfaCodeMessage.php`.
 - `src/Testing/FakeSmsSender.php`, `src/Testing/FakeEmailSender.php`, `src/Testing/FakeSenderBinding.php`.
 - `src/Verification/VerificationService.php`: the binding of a request and the routing of delivered codes.
 - `src/Attempts/AttemptService.php`: the attempt a check runs inside, and the lockouts that refuse it.

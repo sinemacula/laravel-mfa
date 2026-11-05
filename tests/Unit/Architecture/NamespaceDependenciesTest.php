@@ -103,7 +103,7 @@ final class NamespaceDependenciesTest extends TestCase
             ],
             'allows' => [],
         ],
-        'storage, the support helpers and secrets name no capability but the proof owner and the code message' => [
+        'storage, the support helpers and secrets name no capability but the proof owner and the code messages' => [
             'from'    => ['Database', 'Support', 'Secrets'],
             'except'  => [],
             'forbids' => [
@@ -111,7 +111,7 @@ final class NamespaceDependenciesTest extends TestCase
                 'Factors', 'Http', 'Lifecycle', 'Passkeys', 'Proofs', 'RecoveryCodes', 'Requirements', 'Verification',
                 'Console', 'Testing', 'Facades', 'Seams', 'MfaManager', 'MfaServiceProvider',
             ],
-            'allows' => ['Proofs\ProofOwner', 'Codes\MfaCodeMessage'],
+            'allows' => ['Proofs\ProofOwner', 'Codes\MfaCodeMessage', 'Codes\CodeMessage'],
         ],
         'contracts name no model, capability service, seam default or composition root' => [
             'from'    => ['Contracts'],

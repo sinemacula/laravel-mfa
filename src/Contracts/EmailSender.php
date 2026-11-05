@@ -4,15 +4,22 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Contracts;
 
-use Illuminate\Contracts\Mail\Mailable;
+use SineMacula\Laravel\Mfa\Codes\CodeMessage;
 
 /**
  * Email sender contract.
  *
- * Delivers a message carrying a code to an email address through the
- * application's own mail set-up: the package ships no provider. An exception it
- * throws is the delivery's failure. The message carries the code: one that is
- * queued keeps it encrypted, and it is never logged.
+ * Delivers a code to the email address the message names, through the
+ * application's own mail set-up. It is given the neutral details of the code
+ * (see `Codes\CodeMessage`) and lays out the message itself; the package's
+ * `Codes\MailEmailSender` sends its own `MfaCodeMessage` through Laravel's
+ * mailer.
+ *
+ * It is called while the code is drawn, inside the identity's transaction. An
+ * exception it throws is the delivery's failure, and the code is then not kept.
+ * The code is in clear once revealed: do not log it, and an implementation that
+ * queues the message must encrypt the whole queued payload, address included. A
+ * queued job that fails later cannot take back a code already reported sent.
  *
  * @api
  *
@@ -22,11 +29,10 @@ use Illuminate\Contracts\Mail\Mailable;
 interface EmailSender
 {
     /**
-     * Send the message to the address.
+     * Send the message's code to its address.
      *
-     * @param  string  $address
-     * @param  \Illuminate\Contracts\Mail\Mailable  $message
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      */
-    public function send(#[\SensitiveParameter] string $address, #[\SensitiveParameter] Mailable $message): void;
+    public function send(#[\SensitiveParameter] CodeMessage $message): void;
 }

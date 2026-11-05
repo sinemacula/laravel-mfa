@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Secrets\SensitiveValues;
+use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Secrets\ForgedTrace;
 
 /**
@@ -146,6 +147,24 @@ final class SensitiveValuesTest extends TestCase
         self::assertTrue(SensitiveValues::isCodeMessage($message));
         self::assertFalse(SensitiveValues::isCodeMessage(new SendQueuedMailable(new Mailable)));
         self::assertFalse(SensitiveValues::isCodeMessage('4821'));
+    }
+
+    /**
+     * A code message handed to a sender, nested in an array too, gives its code
+     * and its destination as known values.
+     *
+     * @return void
+     */
+    public function testCollectsTheCodeAndDestinationOfASendersMessage(): void
+    {
+        $message = CodeMessages::to('ada@example.test', '4821');
+
+        $values = SensitiveValues::inArguments([[$message]], false);
+
+        self::assertTrue($values->matches('Your code is 4821'));
+        self::assertTrue($values->matches('<ada@example.test>'));
+        self::assertSame(['4821', 'ada@example.test'], SensitiveValues::ofCodeMessage($message));
+        self::assertTrue(SensitiveValues::isCodeMessage($message));
     }
 
     /**

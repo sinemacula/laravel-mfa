@@ -4,24 +4,17 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
-use Carbon\CarbonImmutable;
-use Illuminate\Container\Container;
-use Illuminate\Translation\ArrayLoader;
-use Illuminate\Translation\Translator;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
-use Tests\Fixtures\Codes\CustomMfaCodeMessage;
+use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Factors\InMemoryFactor;
-use Tests\Fixtures\Testing\ExplicitLocaleCodeMessage;
 
 /**
- * Unit tests for `EmailDriver`: its channel, and the message it delivers each
- * code in through the bound `EmailSender`.
+ * Unit tests for `EmailDriver`: its channel, and the code message it hands the
+ * bound `EmailSender`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,19 +26,6 @@ final class EmailDriverTest extends TestCase
 {
     /** @var string The address the factor delivers to. */
     private const string ADDRESS = 'ada@example.test';
-
-    /**
-     * Put the clock back.
-     *
-     * @return void
-     */
-    #[\Override]
-    protected function tearDown(): void
-    {
-        CarbonImmutable::setTestNow();
-
-        parent::tearDown();
-    }
 
     /**
      * An email factor travels by email and adds `otp`.
@@ -77,128 +57,18 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * The code goes to the factor's address in the shipped message, and no
-     * other.
+     * The message goes to the email sender as it was built.
      *
      * @return void
      */
-    public function testTheCodeIsDeliveredToTheAddressInTheShippedMessage(): void
+    public function testTheMessageIsHandedToTheSender(): void
     {
-        $sender = new FakeEmailSender;
+        $sender  = new FakeEmailSender;
+        $message = CodeMessages::to(self::ADDRESS);
 
-        (new EmailDriver($sender))->deliver(self::factor(), '123456', CarbonImmutable::now()->addMinutes(10));
+        (new EmailDriver($sender))->deliver(self::factor(), $message);
 
-        $sent = $sender->sent();
-
-        self::assertCount(1, $sent);
-        self::assertSame(self::ADDRESS, $sent[0]['to']);
-        self::assertInstanceOf(MfaCodeMessage::class, $sent[0]['message']);
-        self::assertSame('123456', $sent[0]['message']->code);
-    }
-
-    /**
-     * A configured message class is the one delivered.
-     *
-     * @return void
-     */
-    public function testAConfiguredMessageClassIsDelivered(): void
-    {
-        $sender = new FakeEmailSender;
-        $driver = new EmailDriver($sender, CustomMfaCodeMessage::class);
-
-        $driver->deliver(self::factor(), '654321', CarbonImmutable::now()->addMinutes(10));
-
-        self::assertInstanceOf(CustomMfaCodeMessage::class, $sender->sent()[0]['message']);
-        self::assertSame('654321', $sender->lastCodeTo(self::ADDRESS));
-    }
-
-    /**
-     * Rows of `[seconds the code has left, minutes the message states]`.
-     *
-     * @return iterable<string, array{int, int}>
-     */
-    public static function lifetimes(): iterable
-    {
-        yield 'whole minutes' => [600, 10];
-        yield 'part of a minute rounds up' => [570, 10];
-        yield 'just over a minute' => [61, 2];
-        yield 'under a minute is one' => [30, 1];
-        yield 'already past is one' => [-5, 1];
-    }
-
-    /**
-     * The message states the whole minutes, at least one, the code has left.
-     *
-     * @param  int  $seconds
-     * @param  int  $minutes
-     * @return void
-     */
-    #[DataProvider('lifetimes')]
-    public function testTheMessageStatesTheMinutesTheCodeHasLeft(int $seconds, int $minutes): void
-    {
-        $now = CarbonImmutable::parse('2026-11-01 12:00:00');
-
-        CarbonImmutable::setTestNow($now);
-
-        $sender = new FakeEmailSender;
-
-        (new EmailDriver($sender))->deliver(self::factor(), '123456', $now->addSeconds($seconds));
-
-        $message = $sender->sent()[0]['message'];
-
-        self::assertInstanceOf(MfaCodeMessage::class, $message);
-        self::assertSame($minutes, $message->expiresInMinutes);
-    }
-
-    /**
-     * The message carries the current locale, so a queue worker renders it as
-     * it was sent.
-     *
-     * @return void
-     */
-    public function testTheCurrentLocaleIsCaptured(): void
-    {
-        self::assertSame('fr', $this->messageSentInFrench(MfaCodeMessage::class)->locale);
-    }
-
-    /**
-     * A message that chose its own locale keeps it.
-     *
-     * @return void
-     */
-    public function testAMessagesOwnLocaleIsKept(): void
-    {
-        self::assertSame('de', $this->messageSentInFrench(ExplicitLocaleCodeMessage::class)->locale);
-    }
-
-    /**
-     * The message of the class given, sent while the current locale is French.
-     *
-     * @param  class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>  $mailable
-     * @return \SineMacula\Laravel\Mfa\Codes\MfaCodeMessage
-     */
-    private function messageSentInFrench(string $mailable): MfaCodeMessage
-    {
-        $container  = new Container;
-        $translator = new Translator(new ArrayLoader, 'fr');
-        $previous   = Container::getInstance();
-        $sender     = new FakeEmailSender;
-
-        $container->instance('translator', $translator);
-
-        Container::setInstance($container);
-
-        try {
-            (new EmailDriver($sender, $mailable))->deliver(self::factor(), '123456', CarbonImmutable::now()->addMinutes(5));
-        } finally {
-            Container::setInstance($previous);
-        }
-
-        $message = $sender->sent()[0]['message'];
-
-        self::assertInstanceOf(MfaCodeMessage::class, $message);
-
-        return $message;
+        self::assertSame([$message], $sender->sent());
     }
 
     /**

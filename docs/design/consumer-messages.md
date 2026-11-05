@@ -34,8 +34,10 @@ translation cannot be used, and what is deliberately left out.
   translation in a non-English fallback locale is honoured before the shipped English.
 - The refusal is translated in `InsufficientAuthenticationException`'s constructor, so every raiser gets it, in the
   locale when it is raised. Neither the middleware passing a message in nor a render callback is needed.
-- The SMS renders when it is sent, in the current locale.
-- `EmailDriver::send()` builds the message, then captures the current locale on one that chose none. `Mailable::send()`
+- A sender is given the code's neutral details (`Codes\CodeMessage`), not wording. The package's wording is applied
+  only where a sender keeps it: `Codes\SmsCodeText::of()` words the SMS when it is called, in the current locale.
+- `Codes\MailEmailSender::send()` builds the configured message, then captures the current locale on one that chose
+  none. `Mailable::send()`
   and `render()` enter that locale before building the envelope and the content, and `SerializesModels` carries it
   through the queue, encryption included, so a queued subclass renders in the person's locale on the worker, and the
   worker's is put back.
@@ -55,7 +57,8 @@ translation cannot be used, and what is deliberately left out.
 - Laravel's stock HTML `401` page shows its own `__('Unauthorized')` and not the exception's message. Only the JSON
   answer carries the translated refusal.
 - A locale middleware must run before `mfa`, or the refusal is raised in the default locale.
-- `HasLocalePreference` is not read, because the driver is given a factor and the sender an address. A custom
+- `HasLocalePreference` is not read by the package's own wording, which uses the current locale. A sender is given the
+  identity through `CodeMessage::recipient()`, so one of its own may choose a locale from it, and a custom
   `EmailSender` using `Mail::to($user)` still gets Laravel's preference, which `PendingMail` applies over the captured
   locale.
 - Internal or operator text is out of scope: `OperationRefusedException` detail, `VerificationResult::$detail`,
@@ -69,7 +72,7 @@ translation cannot be used, and what is deliberately left out.
 - `src/MfaServiceProvider.php`: `boot()`, `offerPublishing()`, tag `mfa-lang`.
 - `src/Exceptions/InsufficientAuthenticationException.php`: the constructor and `wwwAuthenticate()`.
 - `src/Codes/MfaCodeMessage.php`: `envelope()`, `renderHtml()`.
-- `src/Drivers/SmsDriver.php`, `src/Drivers/EmailDriver.php`: `send()`.
+- `src/Codes/SmsCodeText.php`: `of()`; `src/Codes/MailEmailSender.php`: `send()`.
 
 ## Authoritative Tests
 

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Secrets;
 
 use Illuminate\Mail\SendQueuedMailable;
+use SineMacula\Laravel\Mfa\Codes\CodeMessage;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 
 /**
@@ -15,13 +16,13 @@ use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
  *
  * They come in two kinds. A value known to be sensitive, because it was given
  * explicitly (the code and the destination of a delivery) or read from a code
- * message (its code and its recipients' addresses), is redacted from any string
- * that contains it, whatever its length. A value collected from a trace's
- * arguments or a log's values (a string a frame of the package received, a
- * value marked as sensitive, a value under a key naming a secret, a code or a
- * destination) may be as short and as common as a factor type, so a string is
- * redacted for it only when it is the value, or when the value is six
- * characters or more and the string contains it.
+ * message (its code, and its destination or its recipients' addresses), is
+ * redacted from any string that contains it, whatever its length. A value
+ * collected from a trace's arguments or a log's values (a string a frame of the
+ * package received, a value marked as sensitive, a value under a key naming a
+ * secret, a code or a destination) may be as short and as common as a factor
+ * type, so a string is redacted for it only when it is the value, or when the
+ * value is six characters or more and the string contains it.
  *
  * Nothing is kept beyond the value: each scrub and each record collects its
  * own, so what one delivery or one queued job collected never reaches another.
@@ -108,8 +109,9 @@ final readonly class SensitiveValues
     }
 
     /**
-     * Whether the value is a code message, or a queued job sending one, which
-     * carries the code in clear.
+     * Whether the value is a code message (a `CodeMessage` handed to a sender,
+     * an `MfaCodeMessage`, or a queued job sending one), which carries the
+     * code.
      *
      * @param  mixed  $value
      * @return bool
@@ -120,14 +122,18 @@ final readonly class SensitiveValues
     }
 
     /**
-     * The code a code message carries, and the address of each of its
-     * recipients.
+     * The code a code message carries, and its destination or the address of
+     * each of its recipients.
      *
-     * @param  \SineMacula\Laravel\Mfa\Codes\MfaCodeMessage  $message
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage|\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage  $message
      * @return list<string>
      */
-    public static function ofCodeMessage(#[\SensitiveParameter] MfaCodeMessage $message): array
+    public static function ofCodeMessage(#[\SensitiveParameter] CodeMessage|MfaCodeMessage $message): array
     {
+        if ($message instanceof CodeMessage) {
+            return [$message->code->reveal(), $message->destination()];
+        }
+
         $recipients = [...$message->to, ...$message->cc, ...$message->bcc];
         $addresses  = array_map(static fn (mixed $recipient): mixed => is_array($recipient) ? ($recipient['address'] ?? null) : null, $recipients);
 
@@ -257,12 +263,12 @@ final readonly class SensitiveValues
      * The code message the value is, or the queued job sends.
      *
      * @param  mixed  $value
-     * @return ?\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage
+     * @return \SineMacula\Laravel\Mfa\Codes\CodeMessage|\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage|null
      */
-    private static function codeMessageOf(mixed $value): ?MfaCodeMessage
+    private static function codeMessageOf(mixed $value): CodeMessage|MfaCodeMessage|null
     {
         return match (true) {
-            $value instanceof MfaCodeMessage                                                   => $value,
+            $value instanceof CodeMessage, $value instanceof MfaCodeMessage                    => $value,
             $value instanceof SendQueuedMailable && $value->mailable instanceof MfaCodeMessage => $value->mailable,
             default                                                                            => null,
         };

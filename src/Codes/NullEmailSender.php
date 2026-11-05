@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Codes;
 
-use Illuminate\Contracts\Mail\Mailable;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException;
 
@@ -25,14 +24,13 @@ final readonly class NullEmailSender implements EmailSender
     /**
      * Refuse to send, naming the contract to bind.
      *
-     * @param  string  $address
-     * @param  \Illuminate\Contracts\Mail\Mailable  $message
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException
      */
     #[\Override]
-    public function send(#[\SensitiveParameter] string $address, #[\SensitiveParameter] Mailable $message): void
+    public function send(#[\SensitiveParameter] CodeMessage $message): void
     {
         throw SenderNotConfiguredException::for(EmailSender::class);
     }

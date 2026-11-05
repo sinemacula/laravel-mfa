@@ -4,15 +4,23 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Contracts;
 
+use SineMacula\Laravel\Mfa\Codes\CodeMessage;
+
 /**
  * SMS sender contract.
  *
- * Delivers a message carrying a code to an E.164 phone number through the
- * application's own SMS gateway: the package ships no provider. An exception it
- * throws is the delivery's failure; a return means the gateway accepted the
- * message. The message carries the code in clear: do not log it, and an
- * implementation that queues it must encrypt the queued payload (for example,
- * with a job that implements `ShouldBeEncrypted`).
+ * Delivers a code to the E.164 phone number the message names, through the
+ * application's own SMS gateway: the package ships no provider. It is given the
+ * neutral details of the code (see `Codes\CodeMessage`) and writes the text
+ * itself; `Codes\SmsCodeText::of()` gives the package's own wording.
+ *
+ * It is called while the code is drawn, inside the identity's transaction. An
+ * exception it throws is the delivery's failure, and the code is then not
+ * kept; a return means the gateway accepted the message. The code is in clear
+ * once revealed: do not log it, and an implementation that queues the message
+ * must encrypt the whole queued payload, destination included (for example,
+ * with a job that implements `ShouldBeEncrypted`). A queued job that fails
+ * later cannot take back a code already reported sent.
  *
  * @api
  *
@@ -22,11 +30,10 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 interface SmsSender
 {
     /**
-     * Send the message to the phone number.
+     * Send the message's code to its phone number.
      *
-     * @param  string  $phoneNumber
-     * @param  string  $message
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      */
-    public function send(#[\SensitiveParameter] string $phoneNumber, #[\SensitiveParameter] string $message): void;
+    public function send(#[\SensitiveParameter] CodeMessage $message): void;
 }

@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Codes;
 
+use SineMacula\Laravel\Mfa\Codes\CodeMessage;
+use SineMacula\Laravel\Mfa\Codes\SmsCodeText;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 
 /**
@@ -23,16 +25,15 @@ final class LeakingSmsSender implements SmsSender
     /**
      * Refuse to send, quoting the phone number and the message.
      *
-     * @param  string  $phoneNumber
-     * @param  string  $message
+     * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      *
      * @throws \RuntimeException
      */
     #[\Override]
-    public function send(#[\SensitiveParameter] string $phoneNumber, #[\SensitiveParameter] string $message): void
+    public function send(#[\SensitiveParameter] CodeMessage $message): void
     {
-        $this->post($phoneNumber, $message);
+        $this->post($message->destination(), SmsCodeText::of($message));
     }
 
     /**

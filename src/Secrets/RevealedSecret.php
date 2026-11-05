@@ -10,7 +10,8 @@ use SineMacula\Laravel\Mfa\Exceptions\SecretNotRevealedException;
  * A secret the package returns once, for the response that shows it: a TOTP
  * secret or provisioning URI when an enrolment starts, or a recovery code when
  * a set is generated. The package keeps no plaintext of it afterwards, so it
- * cannot be shown again.
+ * cannot be shown again. A delivered code reaches its sender as one too, in a
+ * `Codes\CodeMessage`, revealed only into the message to its recipient.
  *
  * The plaintext is held as a `\SensitiveParameterValue` and leaves the value
  * only through `reveal()`. Casting it to a string, encoding it as JSON,

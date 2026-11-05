@@ -4,12 +4,12 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
-use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
+use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Factors\InMemoryFactor;
 
 /**
@@ -60,17 +60,18 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * The code goes to the factor's phone number in the shipped message.
+     * The message goes to the SMS sender as it was built.
      *
      * @return void
      */
-    public function testTheCodeIsDeliveredToThePhoneNumberInTheShippedMessage(): void
+    public function testTheMessageIsHandedToTheSender(): void
     {
-        $sender = new FakeSmsSender;
+        $sender  = new FakeSmsSender;
+        $message = CodeMessages::to(self::PHONE, type: 'sms');
 
-        (new SmsDriver($sender))->deliver(self::factor(), '123456', CarbonImmutable::now()->addMinutes(10));
+        (new SmsDriver($sender))->deliver(self::factor(), $message);
 
-        self::assertSame([['to' => self::PHONE, 'message' => 'Your verification code is: 123456']], $sender->sent());
+        self::assertSame([$message], $sender->sent());
     }
 
     /**

@@ -101,7 +101,7 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
 
             $admission = $this->counters->isUsable($identity, $factor, $binding);
 
-            return $admission->isAdmitted() ? $this->codes->send($factor, $binding, $driver) : SendResult::refusedBy($admission);
+            return $admission->isAdmitted() ? $this->codes->send($identity, $factor, $binding, $driver) : SendResult::refusedBy($admission);
         });
     }
 

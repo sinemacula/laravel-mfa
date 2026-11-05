@@ -19,6 +19,11 @@ stable names.
 
 `mfa::messages.email_expiry` is a plural line, chosen by the locale's own rules.
 
+The SMS and email lines are the package's own wording of a code, used where your sender keeps it: the email lines by
+`Codes\MfaCodeMessage`, which `Codes\MailEmailSender` sends, and the SMS line by `Codes\SmsCodeText::of()`. A sender
+is given the code's neutral details (see [Factor drivers](extending.md#factor-drivers)), so one that writes its own
+wording uses none of them.
+
 ## Translating them
 
 Write a file per locale at `lang/vendor/mfa/{locale}/messages.php` in your application. It only needs the keys you want
@@ -71,7 +76,7 @@ callback, so a translation layer that logs what it is asked does not see one.
 | Message     | Its locale                                                                             |
 |-------------|----------------------------------------------------------------------------------------|
 | The refusal | The current locale when the exception is raised                                        |
-| The SMS     | The current locale when it is sent                                                     |
+| The SMS     | The current locale when `SmsCodeText::of()` words it                                   |
 | The email   | The message's own locale if it chose one, otherwise the current locale when it is sent |
 
 A locale middleware must run before `mfa`, or the refusal is raised in the default locale. Place it ahead of `mfa` in
@@ -81,9 +86,9 @@ the route's middleware, and in the priority list too if you have one (see
 The email keeps the locale it was sent in, so a queued one renders in that locale on a worker, whose own locale is put
 back afterwards. A `Codes\MfaCodeMessage` subclass that sets a locale in its constructor keeps it.
 
-The package does not read `HasLocalePreference`: a driver is given a factor and a sender an address, so which locale to
-use is your application's to set before the call. A custom `Contracts\EmailSender` calling `Mail::to($user)` still gets
-Laravel's preference for that user.
+The package does not read `HasLocalePreference`: it words a message in the current locale, so which locale to use is
+your application's to set before the call, or your sender's to choose from the message's `recipient()`. A custom
+`Contracts\EmailSender` calling `Mail::to($user)` still gets Laravel's preference for that user.
 
 ## What is not translated
 

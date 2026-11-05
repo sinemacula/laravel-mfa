@@ -16,13 +16,16 @@ use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
+use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Codes\LeakingSmsSender;
 use Tests\Fixtures\Codes\RecordingCodeDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
+use Tests\Fixtures\Factors\LeakingLabelFactor;
 use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\Fixtures\Factors\UncastOwnerKeyFactor;
 use Tests\Fixtures\Identities\TestUser;
@@ -67,7 +70,7 @@ final class CodeServiceTest extends TestCase
         [$user, $factor] = $this->factor();
 
         $driver = new RecordingCodeDriver;
-        $result = $this->service()->send($factor, self::binding($user), $driver);
+        $result = $this->service()->send($user, $factor, self::binding($user), $driver);
 
         self::assertTrue($result->wasSent());
         self::assertNotNull($result->challengeId);
@@ -92,7 +95,7 @@ final class CodeServiceTest extends TestCase
 
         DB::beginTransaction();
 
-        $this->service()->send($factor, self::binding($user), new RecordingCodeDriver);
+        $this->service()->send($user, $factor, self::binding($user), new RecordingCodeDriver);
 
         DB::rollBack();
 
@@ -113,9 +116,9 @@ final class CodeServiceTest extends TestCase
 
         $driver = new RecordingCodeDriver;
 
-        $this->service()->send($factor, self::binding($user), $driver);
+        $this->service()->send($user, $factor, self::binding($user), $driver);
 
-        $result = $this->service()->send($factor, self::binding($user), $driver);
+        $result = $this->service()->send($user, $factor, self::binding($user), $driver);
 
         self::assertFalse($result->wasSent());
         self::assertSame(FailureReason::SENDING_CAPPED, $result->reason);
@@ -141,7 +144,7 @@ final class CodeServiceTest extends TestCase
         $driver->fail = true;
 
         try {
-            $this->service()->send($factor, self::binding($user), $driver);
+            $this->service()->send($user, $factor, self::binding($user), $driver);
             self::fail('Expected the delivery to fail.');
         } catch (CodeDeliveryFailedException $exception) {
             self::assertSame('The code could not be delivered to the email factor at a**@example.test.', $exception->getMessage());
@@ -153,7 +156,7 @@ final class CodeServiceTest extends TestCase
 
         $driver->fail = false;
 
-        self::assertTrue($this->service()->send($factor, self::binding($user), $driver)->wasSent());
+        self::assertTrue($this->service()->send($user, $factor, self::binding($user), $driver)->wasSent());
     }
 
     /**
@@ -186,7 +189,7 @@ final class CodeServiceTest extends TestCase
         [$user, $factor] = $this->factor('sms', self::PHONE);
 
         $driver    = new SmsDriver(new LeakingSmsSender);
-        $exception = RecordedTrace::thrownBy(fn () => $this->service()->send($factor, self::binding($user), $driver), $arguments);
+        $exception = RecordedTrace::thrownBy(fn () => $this->service()->send($user, $factor, self::binding($user), $driver), $arguments);
 
         self::assertInstanceOf(CodeDeliveryFailedException::class, $exception);
         self::assertSame('The code could not be delivered to the sms factor at *********0123.', $exception->getMessage());
@@ -238,13 +241,13 @@ final class CodeServiceTest extends TestCase
             $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00:50'));
         });
 
-        $result = $this->service()->send($factor, self::binding($user), new RecordingCodeDriver);
+        $result = $this->service()->send($user, $factor, self::binding($user), new RecordingCodeDriver);
 
         self::assertSame(CarbonImmutable::parse('2026-11-01 12:10:50')->getTimestamp(), $result->expiresAt?->getTimestamp());
 
         $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00:59'));
 
-        self::assertSame(51, $this->service()->send($factor, self::binding($user), new RecordingCodeDriver)->retryAfter);
+        self::assertSame(51, $this->service()->send($user, $factor, self::binding($user), new RecordingCodeDriver)->retryAfter);
     }
 
     /**
@@ -262,7 +265,7 @@ final class CodeServiceTest extends TestCase
         Factor::query()->whereKey($factor->getKey())->delete();
 
         $driver = new RecordingCodeDriver;
-        $result = $this->service()->send($factor, self::binding($user), $driver);
+        $result = $this->service()->send($user, $factor, self::binding($user), $driver);
 
         self::assertSame(FailureReason::NOT_FOUND, $result->reason);
         self::assertNull($result->retryAfter);
@@ -402,7 +405,7 @@ final class CodeServiceTest extends TestCase
         foreach ($bindings as $binding) {
 
             try {
-                $this->service()->send($factor, $binding, $driver);
+                $this->service()->send($user, $factor, $binding, $driver);
                 self::fail('Expected the binding to be refused.');
             } catch (\InvalidArgumentException $exception) {
                 self::assertSame('A delivered code\'s binding must name the identity that owns the factor.', $exception->getMessage());
@@ -410,6 +413,124 @@ final class CodeServiceTest extends TestCase
         }
 
         self::assertSame([], $driver->delivered);
+    }
+
+    /**
+     * A code is sent only to the identity its binding names, and nothing is
+     * sent otherwise.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACodeForAnotherIdentityThanTheBindingsIsRefused(): void
+    {
+        [$user, $factor] = $this->factor();
+
+        $other  = TestUser::query()->create(['email' => 'bob@example.test', 'mfa_enabled' => true]);
+        $driver = new RecordingCodeDriver;
+
+        try {
+            $this->service()->send($other, $factor, self::binding($user), $driver);
+            self::fail('Expected the identity to be refused.');
+        } catch (\InvalidArgumentException $exception) {
+            self::assertSame('A code is sent to the identity its binding names.', $exception->getMessage());
+        }
+
+        self::assertSame([], $driver->delivered);
+    }
+
+    /**
+     * The driver is handed the message the code service built: the binding's
+     * application and purpose, the factor as locked, the code and its expiry,
+     * and the identity the code is for.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheDriverIsHandedTheCodesMessage(): void
+    {
+        [$user, $factor] = $this->factor();
+
+        $driver = new RecordingCodeDriver;
+        $result = $this->service()->send($user, $factor, self::binding($user), $driver);
+        $sent   = $driver->delivered[0]['message'];
+
+        self::assertSame('web', $sent->application);
+        self::assertSame(Purpose::SIGN_IN, $sent->purpose);
+        self::assertSame('email', $sent->type);
+        self::assertSame(self::ADDRESS, $sent->destination());
+        self::assertSame($driver->lastCode(), $sent->code->reveal());
+        self::assertEquals($result->expiresAt, $sent->expiresAt);
+        self::assertSame($user, $sent->recipient());
+        self::assertSame(FactorSummary::fromFactor($factor)->id, $sent->factor->id);
+    }
+
+    /**
+     * A factor with no destination is refused, naming its type, before the
+     * driver is reached, as a failed delivery: nothing is kept.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFactorWithoutADestinationIsRefused(): void
+    {
+        [$user, $factor] = $this->factor();
+
+        $factor->forceFill(['destination' => null])->save();
+
+        $driver = new RecordingCodeDriver;
+
+        try {
+            $this->service()->send($user, $factor, self::binding($user), $driver);
+            self::fail('Expected the delivery to be refused.');
+        } catch (CodeDeliveryFailedException $exception) {
+            self::assertInstanceOf(MissingDestinationException::class, $exception->getPrevious());
+            self::assertSame('The email factor has no destination, so its code cannot be delivered.', $exception->getPrevious()->getMessage());
+        }
+
+        self::assertSame([], $driver->delivered);
+        self::assertSame(0, Code::query()->count());
+    }
+
+    /**
+     * A factor that fails while its message is built, quoting its destination
+     * in the message and a frame's arguments, surfaces scrubbed of it, whether
+     * or not PHP recorded the arguments, without reading the factor again;
+     * nothing is delivered and nothing is kept.
+     *
+     * @param  bool  $arguments
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('traceArguments')]
+    public function testAFailureBuildingTheMessageIsScrubbedAndKeepsNothing(bool $arguments): void
+    {
+        config()->set('mfa.factor.model', LeakingLabelFactor::class);
+
+        [$user] = $this->factor();
+
+        $factor = LeakingLabelFactor::query()->firstOrFail();
+        $driver = new RecordingCodeDriver;
+
+        $exception = RecordedTrace::thrownBy(fn () => $this->service()->send($user, $factor, self::binding($user), $driver), $arguments);
+
+        self::assertInstanceOf(\RuntimeException::class, $exception);
+        self::assertSame('No label could be read for [redacted].', $exception->getMessage());
+
+        foreach ([self::CODE, self::ADDRESS] as $plaintext) {
+            self::assertStringNotContainsString($plaintext, $exception->getTraceAsString());
+
+            foreach (RecordedTrace::strings($exception) as $string) {
+                self::assertStringNotContainsString($plaintext, $string);
+            }
+        }
+
+        self::assertSame([], $driver->delivered);
+        self::assertSame(0, Code::query()->count());
     }
 
     /**

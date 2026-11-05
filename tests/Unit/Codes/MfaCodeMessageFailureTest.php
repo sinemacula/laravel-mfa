@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use SineMacula\Laravel\Mfa\Secrets\ExceptionScrubber;
+use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Codes\FailingTransport;
 use Tests\Fixtures\Codes\PayloadRecordingQueue;
 use Tests\Fixtures\Secrets\RecordedTrace;
@@ -101,7 +102,7 @@ final class MfaCodeMessageFailureTest extends TestCase
 
         $sender = $this->container()->make(MailEmailSender::class);
 
-        $exception = RecordedTrace::thrownBy(static fn () => $sender->send(self::ADDRESS, new MfaCodeMessage(self::CODE, 10)), $arguments);
+        $exception = RecordedTrace::thrownBy(static fn () => $sender->send(CodeMessages::to(self::ADDRESS, self::CODE)), $arguments);
 
         self::assertSame('The relay refused the message to [redacted].', $exception->getMessage());
         $this->assertScrubbed($exception, self::CODE, self::ADDRESS);

@@ -78,9 +78,11 @@ use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 $this->app->bind(EmailSender::class, MailEmailSender::class);
 ```
 
-An SMS sender wraps your provider:
+An SMS sender wraps your provider, and writes the text itself, here in the package's own words:
 
 ```php
+use SineMacula\Laravel\Mfa\Codes\CodeMessage;
+use SineMacula\Laravel\Mfa\Codes\SmsCodeText;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use Twilio\Rest\Client;
 
@@ -91,11 +93,11 @@ final readonly class TwilioSmsSender implements SmsSender
         private string $fromNumber,
     ) {}
 
-    public function send(#[\SensitiveParameter] string $phoneNumber, #[\SensitiveParameter] string $message): void
+    public function send(#[\SensitiveParameter] CodeMessage $message): void
     {
-        $this->twilio->messages->create($phoneNumber, [
+        $this->twilio->messages->create($message->destination(), [
             'from' => $this->fromNumber,
-            'body' => $message,
+            'body' => SmsCodeText::of($message),
         ]);
     }
 }
@@ -110,9 +112,11 @@ $this->app->bind(SmsSender::class, static fn ($app): TwilioSmsSender => new Twil
 ));
 ```
 
-The contracts expose only the destination and the message: the package owns drawing, hashing, binding and checking the
-code, the resend cooldown, the delivery caps and the lockouts, so a sender stays thin. A sender that queues the message
-must encrypt the queued payload, and none may log it (see [Factor drivers](extending.md#factor-drivers)). Sending for a
+A sender is given a `Codes\CodeMessage`: the code, its destination, its purpose, the application, its expiry and the
+identity it is for, so it can word and lay out each message as the application wants. The package owns drawing,
+hashing, binding and checking the code, the resend cooldown, the delivery caps and the lockouts, so a sender stays thin.
+A sender that queues the message must encrypt the whole queued payload, and none may log the code (see
+[Factor drivers](extending.md#factor-drivers)). Sending for a
 factor answers a `Codes\SendResult`: sent, with the challenge's id and expiry, or refused with a failure reason, such as
 `sending_capped`, and the seconds to wait when there are any (see [Sending a code](verification.md#sending-a-code)). In
 tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` keep the messages

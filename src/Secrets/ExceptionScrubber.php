@@ -23,11 +23,12 @@ namespace SineMacula\Laravel\Mfa\Secrets;
  * value under a key naming a secret, a code or a destination is collected
  * before anything is scrubbed, and redacted wherever it appears in another
  * frame: a string equal to one, and a string containing one of six characters
- * or more. A code message (an `MfaCodeMessage`, or a queued job sending one)
- * becomes `[redacted]` in every frame, and its code and its recipients'
- * addresses are redacted from any string containing them, whatever their
- * length. Other arguments are kept, with the secrets in them redacted as
- * `Redactor` redacts a log context, and other objects are kept as they are.
+ * or more. A code message (a `CodeMessage`, an `MfaCodeMessage`, or a queued
+ * job sending one) becomes `[redacted]` in every frame, and its code and its
+ * destination or its recipients' addresses are redacted from any string
+ * containing them, whatever their length. Other arguments are kept, with the
+ * secrets in them redacted as `Redactor` redacts a log context, and other
+ * objects are kept as they are.
  *
  * The values collected are redacted from the message of every exception in the
  * chain too, each occurrence replaced by `[redacted]`, and so is every

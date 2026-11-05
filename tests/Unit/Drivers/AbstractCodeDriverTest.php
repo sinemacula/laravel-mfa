@@ -4,15 +4,14 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
-use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Drivers\AbstractCodeDriver;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
-use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Codes\RecordingCodeDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
 
@@ -85,51 +84,20 @@ final class AbstractCodeDriverTest extends TestCase
     }
 
     /**
-     * The code reaches the transport with the factor's destination and its
-     * expiry.
+     * The message reaches the transport as it was built.
      *
      * @return void
      */
-    public function testDeliveryHandsTheCodeToTheTransport(): void
+    public function testDeliveryHandsTheMessageToTheTransport(): void
     {
-        $driver    = new RecordingCodeDriver;
-        $expiresAt = CarbonImmutable::now()->addMinutes(10);
+        $driver  = new RecordingCodeDriver;
+        $message = CodeMessages::to('ada@example.test');
 
-        $driver->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), '123456', $expiresAt);
+        $driver->deliver(new InMemoryFactor(type: 'email', destination: 'ada@example.test'), $message);
 
-        self::assertSame([['destination' => 'ada@example.test', 'code' => '123456', 'expires_at' => $expiresAt]], $driver->delivered);
-    }
-
-    /**
-     * Rows of a destination a code cannot be delivered to.
-     *
-     * @return iterable<string, array{?string}>
-     */
-    public static function missingDestinations(): iterable
-    {
-        yield 'none' => [null];
-        yield 'empty' => [''];
-    }
-
-    /**
-     * A factor with no destination is refused, naming its type, before the
-     * transport is reached.
-     *
-     * @param  ?string  $destination
-     * @return void
-     */
-    #[DataProvider('missingDestinations')]
-    public function testAFactorWithoutADestinationIsRefused(?string $destination): void
-    {
-        $driver = new RecordingCodeDriver;
-
-        try {
-            $driver->deliver(new InMemoryFactor(type: 'sms', destination: $destination), '123456', CarbonImmutable::now());
-            self::fail('Expected the delivery to be refused.');
-        } catch (MissingDestinationException $exception) {
-            self::assertSame('The sms factor has no destination, so its code cannot be delivered.', $exception->getMessage());
-        }
-
-        self::assertSame([], $driver->delivered);
+        self::assertCount(1, $driver->delivered);
+        self::assertSame($message, $driver->delivered[0]['message']);
+        self::assertSame('ada@example.test', $driver->delivered[0]['destination']);
+        self::assertSame('123456', $driver->delivered[0]['code']);
     }
 }
