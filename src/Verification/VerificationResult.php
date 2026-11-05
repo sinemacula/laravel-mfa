@@ -47,6 +47,7 @@ final readonly class VerificationResult implements \JsonSerializable
      * @param  ?\Carbon\CarbonImmutable  $lockedUntil
      * @param  list<string>  $amr
      * @param  ?string  $type
+     * @param  bool  $refreshesMultifactor
      * @param  ?object  $completion
      */
     private function __construct(
@@ -71,6 +72,9 @@ final readonly class VerificationResult implements \JsonSerializable
 
         /** The type proved, when it succeeded: the factor's, or `recovery_code`. */
         public ?string $type = null,
+
+        /** Whether this proof supplies or completes the multifactor evidence of the session's first factor with it. */
+        public bool $refreshesMultifactor = false,
 
         // What the completion seam returned, opaque to this package.
         #[\SensitiveParameter]
@@ -122,11 +126,12 @@ final readonly class VerificationResult implements \JsonSerializable
      * @param  \SineMacula\Laravel\Mfa\Assurance\Evaluation  $evaluation
      * @param  list<string>  $amr
      * @param  string  $type
+     * @param  bool  $refreshesMultifactor
      * @return self
      */
-    public static function verified(Proof $proof, Evaluation $evaluation, array $amr, string $type): self
+    public static function verified(Proof $proof, Evaluation $evaluation, array $amr, string $type, bool $refreshesMultifactor = false): self
     {
-        return new self(proof: $proof, evaluation: $evaluation, amr: $amr, type: $type);
+        return new self(proof: $proof, evaluation: $evaluation, amr: $amr, type: $type, refreshesMultifactor: $refreshesMultifactor);
     }
 
     /**
@@ -161,7 +166,7 @@ final readonly class VerificationResult implements \JsonSerializable
      */
     public function withCompletion(#[\SensitiveParameter] ?object $completion): self
     {
-        return new self($this->proof, $this->evaluation, $this->reason, $this->detail, $this->lockedUntil, $this->amr, $this->type, $completion);
+        return new self($this->proof, $this->evaluation, $this->reason, $this->detail, $this->lockedUntil, $this->amr, $this->type, $this->refreshesMultifactor, $completion);
     }
 
     /**
@@ -206,17 +211,18 @@ final readonly class VerificationResult implements \JsonSerializable
     public function jsonSerialize(): array
     {
         return [
-            'verified'     => $this->isVerified(),
-            'reason'       => $this->reason?->value,
-            'locked_until' => $this->lockedUntil?->toIso8601String(),
-            'type'         => $this->type,
-            'amr'          => $this->amr,
-            'kind'         => $this->proof?->kind->value,
-            'reference'    => $this->proof?->reference,
-            'challenge_id' => $this->proof?->challengeId,
-            'proved_at'    => $this->proof?->provedAt->toIso8601String(),
-            'binding'      => $this->proof?->binding->toArray(),
-            'evaluation'   => $this->evaluation?->toArray(),
+            'verified'              => $this->isVerified(),
+            'reason'                => $this->reason?->value,
+            'locked_until'          => $this->lockedUntil?->toIso8601String(),
+            'type'                  => $this->type,
+            'amr'                   => $this->amr,
+            'kind'                  => $this->proof?->kind->value,
+            'reference'             => $this->proof?->reference,
+            'challenge_id'          => $this->proof?->challengeId,
+            'proved_at'             => $this->proof?->provedAt->toIso8601String(),
+            'binding'               => $this->proof?->binding->toArray(),
+            'evaluation'            => $this->evaluation?->toArray(),
+            'refreshes_multifactor' => $this->refreshesMultifactor,
         ];
     }
 }

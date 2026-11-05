@@ -29,7 +29,12 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
  * When every part is met, `metUntil` says when the evidence stops meeting them:
  * the instant the first part bounded by a maximum age falls out of it. It is
  * what an enrolment grant's lifetime is taken from, and an answer about now, so
- * neither `toArray()` nor JSON shows it.
+ * neither `toArray()` nor JSON shows it. When the combination is multifactor,
+ * `multifactorAt` says when the freshest evidence of that was made: a further
+ * proof's own time only when it supplies or completes the multifactor evidence,
+ * never when the first factor alone gives it. A policy that does not say leaves
+ * it `null`, and nothing then takes a proof to have refreshed it. Neither
+ * `toArray()` nor JSON shows it either.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, mixed>
  *
@@ -56,6 +61,7 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
      * @param  list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>  $met
      * @param  list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>  $unmet
      * @param  ?\Carbon\CarbonImmutable  $metUntil
+     * @param  ?\Carbon\CarbonImmutable  $multifactorAt
      *
      * @throws \InvalidArgumentException
      */
@@ -87,12 +93,19 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
 
         /** When the evidence stops meeting the whole requirement, if a maximum age bounds it. */
         public ?CarbonImmutable $metUntil = null,
+
+        /** When the freshest evidence that the proofs are multifactor was made, when they are and it is known. */
+        public ?CarbonImmutable $multifactorAt = null,
     ) {
         self::assertAmr($amr);
         self::assertParts($met, $unmet);
 
         if ($metUntil !== null && $unmet !== []) {
             throw new \InvalidArgumentException('An evaluation with an unmet part cannot say when it stops meeting the requirement.');
+        }
+
+        if ($multifactorAt !== null && !$multifactor) {
+            throw new \InvalidArgumentException('An evaluation that is not multifactor cannot say when its multifactor evidence was made.');
         }
 
         $this->assertMet();
