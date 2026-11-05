@@ -75,6 +75,29 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
+     * A void is not checked on an arranged proof that never counted, even when
+     * the sign-in already held a proof of its own.
+     *
+     * @return void
+     */
+    public function testTheKitRefusesAVoidWhenTheArrangedProofNeverCounted(): void
+    {
+        $identity = $this->proofStoreIdentity();
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A proof of the current sign-in must count before the proofs are voided.');
+
+        ProofStoreContract::assertVoidedProofsStopCounting(
+            $this->store,
+            $identity,
+            'web',
+            $this->store->arrange($identity, 'web'),
+            $this->store->void(...),
+            static function (): void {},
+        );
+    }
+
+    /**
      * The store under test.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
