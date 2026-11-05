@@ -119,10 +119,10 @@ final class DeliveredCodeContentionTest extends TestCase
             $this->assertCompetingSendIsLockedOut();
         };
 
-        self::assertTrue($this->service()->send(self::factor(), self::binding('session-a'), $driver)->wasSent());
+        self::assertTrue($this->service()->send(self::identity(), self::factor(), self::binding('session-a'), $driver)->wasSent());
         self::assertCount(1, $driver->delivered);
 
-        $competing = $this->asObserver(fn () => $this->service()->send(self::factor(), self::binding('session-b'), new RecordingCodeDriver));
+        $competing = $this->asObserver(fn () => $this->service()->send(self::identity(), self::factor(), self::binding('session-b'), new RecordingCodeDriver));
 
         self::assertSame(FailureReason::SENDING_CAPPED, $competing->reason);
         self::assertSame(3600, $competing->retryAfter);
@@ -139,7 +139,7 @@ final class DeliveredCodeContentionTest extends TestCase
      */
     public function testOfTwoInterleavedChecksOnlyOneIsAccepted(): void
     {
-        $challenge = (string) $this->service()->send(self::factor(), self::binding('session-a'), new RecordingCodeDriver)->challengeId;
+        $challenge = (string) $this->service()->send(self::identity(), self::factor(), self::binding('session-a'), new RecordingCodeDriver)->challengeId;
         $competing = null;
         $done      = false;
 
@@ -224,7 +224,7 @@ final class DeliveredCodeContentionTest extends TestCase
     private function assertCompetingSendIsLockedOut(): void
     {
         try {
-            $this->asObserver(fn () => $this->service()->send(self::factor(), self::binding('session-b'), new RecordingCodeDriver));
+            $this->asObserver(fn () => $this->service()->send(self::identity(), self::factor(), self::binding('session-b'), new RecordingCodeDriver));
 
             self::fail('A competing send must not take the lock while another send holds it.');
         } catch (\Throwable $exception) {
@@ -252,6 +252,16 @@ final class DeliveredCodeContentionTest extends TestCase
     private function service(): CodeService
     {
         return $this->container()->make(CodeService::class);
+    }
+
+    /**
+     * The identity the factor belongs to and the codes are sent to.
+     *
+     * @return \Tests\Fixtures\Identities\NonEloquentIdentity
+     */
+    private static function identity(): NonEloquentIdentity
+    {
+        return new NonEloquentIdentity(self::IDENTITY_KEY);
     }
 
     /**
