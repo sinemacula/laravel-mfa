@@ -18,6 +18,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Seams\Enums\ProofStoreFlaw;
 use Tests\Fixtures\Seams\FlawedProofStore;
 use Tests\Fixtures\Seams\KeepingProofStore;
+use Tests\Fixtures\Seams\LayerWrittenProofStore;
+use Tests\Fixtures\Seams\SignInRowsProofStore;
 use Tests\TestCase;
 
 /**
@@ -126,6 +128,72 @@ final class ProofStoreContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
 
         ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting(new KeepingProofStore, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
+    }
+
+    /**
+     * Each check runs on what the closures it is given write and end, not on
+     * the store's own `record()` and `forget()`.
+     *
+     * @return void
+     */
+    public function testTheChecksUseTheClosuresTheyAreGiven(): void
+    {
+        $identity = $this->proofStoreIdentity();
+        $store    = new LayerWrittenProofStore;
+
+        ProofStoreContract::assertForgettingASignInForgetsItsProofs($store, $identity, 'web', $store->signIn(), $store->write(...), $store->signOut(...));
+        ProofStoreContract::assertVoidedProofsStopCounting($store, $identity, 'web', $store->signIn(), $store->signOut(...), $store->write(...));
+        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting($store, $identity, 'web', $store->signIn(), $store->enrol(), $store->write(...));
+
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * A void is not checked on an arranged proof that never counted, even when
+     * the sign-in already held a proof of its own.
+     *
+     * @return void
+     */
+    public function testRejectsAVoidWhoseArrangedProofNeverCounted(): void
+    {
+        $identity = $this->proofStoreIdentity();
+        $store    = new SignInRowsProofStore;
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A proof of the current sign-in must count before the proofs are voided.');
+
+        ProofStoreContract::assertVoidedProofsStopCounting($store, $identity, 'web', $store->arrange($identity, 'web'), $store->void(...), static function (): void {});
+    }
+
+    /**
+     * A factor is not forgotten on arranged proofs that never counted.
+     *
+     * @return void
+     */
+    public function testRejectsAFactorCheckWhoseArrangedProofsNeverCounted(): void
+    {
+        $identity = $this->proofStoreIdentity();
+        $store    = new LayerWrittenProofStore;
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('Both proofs must count before the factor is forgotten.');
+
+        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting($store, $identity, 'web', $store->signIn());
+    }
+
+    /**
+     * The factor check counts against the proofs the sign-in held when begun.
+     *
+     * @return void
+     */
+    public function testTheFactorCheckCountsAgainstWhatTheSignInHeld(): void
+    {
+        $identity = $this->proofStoreIdentity();
+        $store    = new SignInRowsProofStore;
+
+        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting($store, $identity, 'web', $store->arrange($identity, 'web'));
+
+        $this->addToAssertionCount(1);
     }
 
     /**
