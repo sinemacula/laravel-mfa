@@ -151,9 +151,11 @@ final class ProofStoreContract
 
         $store->begin($identity, $application, $session);
 
+        $held = count($store->proofs($identity, $application));
+
         $arrange(self::firstFactor($identity, $application, $session));
 
-        Assert::assertNotSame([], $store->proofs($identity, $application), 'A proof of the current sign-in must count before the proofs are voided.');
+        Assert::assertCount($held + 1, $store->proofs($identity, $application), 'A proof of the current sign-in must count before the proofs are voided.');
 
         $void($identity);
 
