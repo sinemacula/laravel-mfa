@@ -21,8 +21,9 @@ models and the `Codes\MfaCodeMessage` mailable. Extension is through **compositi
 | Custom factor model        | Extend `Models\Factor` or implement `Contracts\EloquentFactor`; set `mfa.factor.model` |
 | Custom recovery code model | Extend `Models\RecoveryCode` or implement `Contracts\RecoveryCode`; set the model      |
 
-Every class name above is relative to `SineMacula\Laravel\Mfa`. Bind your own implementations from a service provider: a
-binding made after the package's provider has registered replaces the package's default, and `Mfa::extend()` replaces a
+Every class name above is relative to `SineMacula\Laravel\Mfa`. Bind your own implementations from a service provider. The
+package binds each default only when nothing is bound yet, so a binding made before its provider registers is kept, as
+one made after replaces the default, whichever order Composer registers the providers in. `Mfa::extend()` replaces a
 shipped driver of the same name. So does a driver registered on the manager from a container extender or a resolving
 callback on `mfa`, since the shipped drivers are registered before either runs. The manager builds a driver on every
 call rather than caching it, so the most recent registration is the one used, but call `extend()` from a service
@@ -427,6 +428,13 @@ passes when other sessions stop counting whether or not it ends them. The factor
 change and asks for the request from a session arranged fresh, or stale, for it; a removal stepped up only with the
 factor it removes; and a change beyond the requirement the request carries. The session transition's kit hands its hook
 each kind of change and asks for it made on a session arranged fresh for it, then judges it with a shortfall and
-without. Each check is a static assertion on a `*Contract` class beside its trait, so a test can also call one directly.
-The kits need PHPUnit and a database migrated with the package's tables, as any test of an adapter does.
+without. The proof store's kit begins a fixed sign-in id and voids proofs by advancing the verification generation,
+which suits a store keeping its own sign-ins. A store over an authentication layer's sessions overrides
+`proofStoreSignIn()` to sign the identity in through that layer and return the session's id, asked once a check, and
+`voidProofStoreProofs()` to void them as that layer does on a reset. The sign-in may already hold the first factor the
+layer recorded on signing in: each check counts against what it held when begun. Either way, a proof of a sign-in that
+is not current, or that the store cannot find, is refused by throwing `Exceptions\ProofRefusedException`, as
+`ProofStore::record()` declares. Each check is a static assertion on a `*Contract` class beside its trait, so a test
+can also call one directly. The kits need PHPUnit and a database migrated with the package's tables, as any test of an
+adapter does.
 

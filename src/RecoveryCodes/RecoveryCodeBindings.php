@@ -29,6 +29,6 @@ final class RecoveryCodeBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(RecoveryCodeService::class);
+        $app->bindIf(RecoveryCodeService::class);
     }
 }

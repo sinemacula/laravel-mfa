@@ -47,7 +47,7 @@ final class DriverBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(DriverResolver::class);
+        $app->bindIf(DriverResolver::class);
     }
 
     /**

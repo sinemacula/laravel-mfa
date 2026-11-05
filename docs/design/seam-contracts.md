@@ -43,10 +43,11 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
   storage connection.
 - Results cross the seams as structured values, never reduced to `amr`.
 - Every seam has a default that works without an authentication layer and fails closed, bound by the `*Bindings` class
-  of the capability whose state it reads (or `Seams\SeamBindings` for one that reads nothing of the package), so a
-  binding made after the package's provider replaces it. `SelfServiceRecovery` is bound to
-  `Lifecycle\NoSelfServiceRecovery`, which offers none; nothing in the package resolves it, and an application's own
-  flow does. `ApplicationResolver` has no binding: without one, the application is the guard's name.
+  of the capability whose state it reads (or `Seams\SeamBindings` for one that reads nothing of the package) only when
+  nothing is bound yet, so a binding made before the package's provider is kept and one made after replaces it.
+  `SelfServiceRecovery` is bound to `Lifecycle\NoSelfServiceRecovery`, which offers none; nothing in the package
+  resolves it, and an application's own flow does. `ApplicationResolver` has no binding: without one, the application
+  is the guard's name.
 - `PendingCompletion` and `StepUp` are both bound to `Proofs\ProofStoreCompletion`, which records the proof in the bound
   proof store once the transaction commits, refusing a binding that is not the store's current sign-in, and for a
   pending session the pending context's as well, as `not_accepted` (see [Proof Store](proof-store.md)).
@@ -183,7 +184,8 @@ exception that rolls the caller's change back with it.
 ## Success Path
 
 - An adapter, or the application, implements a contract and binds it in the container from a service provider; the
-  flow that calls the contract resolves it when it runs, so a binding made after the package's provider applies.
+  flow that calls the contract resolves it when it runs, so a binding made before or after the package's provider
+  applies.
 - `Context\CallerContextResolver` decides who every helper that returns summaries, sends a code or reveals a secret
   serves: a pending session only for the `PendingAction` the helper needs, as its own identity, and otherwise the
   guard's signed-in person; only a person either way. Starting, resending and cancelling an enrolment need

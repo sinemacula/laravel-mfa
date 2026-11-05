@@ -53,14 +53,14 @@ final class RequirementBindings
      */
     public static function register(Application $app): void
     {
-        $app->bind(RequirementService::class);
-        $app->bind(RequirementPolicy::class, ConfiguredRequirementPolicy::class);
-        $app->bind(IdentityRequirement::class, IdentityContractRequirement::class);
-        $app->bind(TenantRequirement::class, NoTenantRequirement::class);
-        $app->bind(ActiveTenantResolver::class, NoActiveTenant::class);
-        $app->bind(RequirementCheck::class, ProofRequirementCheck::class);
-        $app->bind(FreshnessGate::class, ConfiguredFreshnessGate::class);
-        $app->bind(FactorChangeGate::class, ConfiguredFactorChangeGate::class);
-        $app->bind(FirstFactorResolver::class, DeclaredFirstFactorResolver::class);
+        $app->bindIf(RequirementService::class);
+        $app->bindIf(RequirementPolicy::class, ConfiguredRequirementPolicy::class);
+        $app->bindIf(IdentityRequirement::class, IdentityContractRequirement::class);
+        $app->bindIf(TenantRequirement::class, NoTenantRequirement::class);
+        $app->bindIf(ActiveTenantResolver::class, NoActiveTenant::class);
+        $app->bindIf(RequirementCheck::class, ProofRequirementCheck::class);
+        $app->bindIf(FreshnessGate::class, ConfiguredFreshnessGate::class);
+        $app->bindIf(FactorChangeGate::class, ConfiguredFactorChangeGate::class);
+        $app->bindIf(FirstFactorResolver::class, DeclaredFirstFactorResolver::class);
     }
 }

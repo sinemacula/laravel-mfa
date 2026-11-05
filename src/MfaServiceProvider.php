@@ -49,7 +49,9 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
  * Consumers with their own requirement policy, stateless proof store, or SMS
  * and email senders rebind the matching contracts in their own service
  * provider; `laravel-iam` ships an opinionated set of bindings for paired-mode
- * use.
+ * use. Every default, and `mfa` itself, is bound only when nothing is bound
+ * yet, so a binding made before this provider registers is kept, and one made
+ * after replaces the default.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -104,7 +106,7 @@ final class MfaServiceProvider extends ServiceProvider
 
     /**
      * Register the MFA manager singleton with the shipped drivers, checking the
-     * configuration before building it.
+     * configuration before building it, unless `mfa` is already bound.
      *
      * The shipped drivers are registered inside the factory, through the same
      * `extend()` API a consumer uses, so they exist before the container runs
@@ -116,7 +118,7 @@ final class MfaServiceProvider extends ServiceProvider
      */
     protected function registerManager(): void
     {
-        $this->app->singleton('mfa', static function (Application $app): MfaManager {
+        $this->app->singletonIf('mfa', static function (Application $app): MfaManager {
 
             ConfigurationBindings::validate($app);
 
