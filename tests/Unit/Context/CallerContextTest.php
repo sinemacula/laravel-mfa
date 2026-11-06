@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
+use Tests\Fixtures\Context\GuardPortalResolver;
 use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\PlainUser;
@@ -181,6 +182,24 @@ final class CallerContextTest extends TestCase
         $this->container()->instance(ApplicationResolver::class, $resolver);
 
         self::assertSame('mobile', CallerContext::fromRequest($request)->application);
+    }
+
+    /**
+     * A bound guard application resolver names the application through the
+     * guard the caller is built through, or the default one.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAGuardApplicationResolverNamesTheApplicationThroughTheGuard(): void
+    {
+        config()->set('auth.guards.admin', ['driver' => 'session', 'provider' => 'users']);
+
+        $this->container()->instance(ApplicationResolver::class, new GuardPortalResolver);
+
+        self::assertSame('admin-portal', CallerContext::fromRequest(self::request(), 'admin')->application);
+        self::assertSame('web-portal', CallerContext::fromRequest(self::request())->application);
     }
 
     /**

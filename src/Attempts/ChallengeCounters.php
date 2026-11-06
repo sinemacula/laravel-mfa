@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
@@ -163,9 +164,10 @@ final readonly class ChallengeCounters
      * Count the outcome of a challenge the caller has just checked and
      * consumed, inside the same transaction: a success resets the factor's and
      * the identity's failures in a row, a failure counts against both and may
-     * lock or disable. An outcome is refused, and counted nowhere, while a
-     * lockout applies, and answered as not found for a factor no longer among
-     * the identity's.
+     * lock or disable, and a failure that does names the lockout it caused (see
+     * `AttemptOutcome::$caused`). An outcome is refused, and counted nowhere,
+     * while a lockout applies, and answered as not found for a factor no longer
+     * among the identity's.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -209,11 +211,12 @@ final readonly class ChallengeCounters
     private function identityRefusal(MultiFactorAuthenticatable $identity, ProofBinding $binding): ?ChallengeAdmission
     {
         $people = $this->container->make(SubjectTypeResolver::class);
+        $active = $this->container->make(ActiveStateResolver::class);
 
         return match (true) {
             !ProofOwner::of($identity)->owns($binding) => ChallengeAdmission::refuse(FailureReason::NOT_FOUND, 'The challenge\'s binding names another identity.'),
             !$people->isPerson($identity)              => ChallengeAdmission::refuse(FailureReason::MACHINE_IDENTITY, 'The identity is not a person.'),
-            !$identity->isMfaActive()                  => ChallengeAdmission::refuse(FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.'),
+            !$active->isActive($identity)              => ChallengeAdmission::refuse(FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.'),
             default                                    => null,
         };
     }

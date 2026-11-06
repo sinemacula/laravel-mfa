@@ -69,8 +69,8 @@ response if the commit fails.
   requirement for the operation (`freshnessRequirement()`, whose name is non-nullable, hence the guard), the session's
   offers and whether a factor is confirmed. One query, on the failure path only.
 - An invalid pending credential makes the resolver throw. That propagates: it is not disguised as a refusal.
-- An inactive identity is short-circuited by `isMfaActive()` and no gate judges it, though `freshnessRequirement()` is
-  read for the exception.
+- An inactive identity, as the bound `ActiveStateResolver` says, is short-circuited and no gate judges it, though
+  `freshnessRequirement()` is read for the exception.
 - With no matched route nothing is exempt, so `mfa` is route middleware only.
 - A forgotten `auth` leaves a route closed: a guest is refused. This also means a route machines use does not carry
   `mfa`.

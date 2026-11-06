@@ -33,7 +33,8 @@ is built the way it is, and which test helpers deliberately stay private to the 
    arranged by its own helper keeps its context. Then `shouldUse()`. On a model, `wasRecentlyCreated` becomes `false`,
    as `be()` does.
 3. The application is the argument, else `Proofs\SignInApplication::of($container, $guardName)`: the bound
-   `ApplicationResolver`'s answer for the container's request, else the guard's name.
+   `ApplicationResolver`'s answer for the container's request, through the guard when it is a
+   `GuardApplicationResolver`, else the guard's name.
 4. `ProofStore::begin()` with a lower-case ULID, then `currentSession()`.
 5. A password first factor is recorded at `$at`, unless the store already holds one, which is kept.
 6. The further proof is recorded at `$at`, an additional factor for sign-in, under the identity's current verification

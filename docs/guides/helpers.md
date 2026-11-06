@@ -19,12 +19,12 @@ $caller = CallerContext::fromRequest($request, 'admin'); // through the guard na
 `fromRequest()` asks the bound `Contracts\PendingSessionResolver` first, and a pending session it finds is the caller. A
 pending credential that does not validate throws, so the request is refused rather than served as the guard's user.
 Otherwise the caller is the guard's user, when it is an identity this package serves, and nobody when it is not. The
-application is what a bound `Contracts\ApplicationResolver` names for the request, or else the guard's name. The client
-is the request's IP address and user agent, which reach the events and the per-address throttle, and the facts a
-same-site check reads: its `Origin`, its scheme and host, and the names (never the values) of the headers that carry a
-value, lower-cased with underscores read as hyphens, which `carriesHeader()` answers about. Only the address and the
-user agent reach events; the rest is for a seam, such as an authentication layer's `PendingCompletion`, that judges a
-cookie-borne session.
+application is what a bound `Contracts\ApplicationResolver` names for the request, through the guard when it is a
+`Contracts\GuardApplicationResolver`, or else the guard's name. The client is the request's IP address and user agent,
+which reach the events and the per-address throttle, and the facts a same-site check reads: its `Origin`, its scheme and
+host, and the names (never the values) of the headers that carry a value, lower-cased with underscores read as hyphens,
+which `carriesHeader()` answers about. Only the address and the user agent reach events; the rest is for a seam, such as
+an authentication layer's `PendingCompletion`, that judges a cookie-borne session.
 
 Away from a request, in a queued job, a console command or a transport of your own, build one from plain values:
 

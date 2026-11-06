@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -82,7 +83,7 @@ final readonly class FactorOffers
     {
         $caller = $this->callers->resolve($context, PendingAction::LIST_FACTORS);
 
-        if ($caller === null || !$caller->identity->isMfaActive()) {
+        if ($caller === null || !$this->container->make(ActiveStateResolver::class)->isActive($caller->identity)) {
             return [];
         }
 

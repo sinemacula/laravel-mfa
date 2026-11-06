@@ -43,6 +43,9 @@ final class Redactor
     /** @var string The marker that replaces what the walk does not reach. */
     public const string TRUNCATED = '[truncated]';
 
+    /** @var string The marker that replaces the form of an object that refuses to give one. */
+    public const string UNSERIALIZABLE = '[unserializable]';
+
     /** @var int The deepest level the walk reaches; deeper arrays and objects are truncated. */
     public const int MAX_DEPTH = 10;
 
@@ -263,7 +266,9 @@ final class Redactor
 
     /**
      * The value with every object in it normalised, bounded as the redaction
-     * is.
+     * is. An exception or an enum that gives its own JSON form is normalised as
+     * any other object is, since Monolog logs that form rather than the
+     * exception or the case.
      *
      * @param  mixed  $value
      * @param  int  $depth
@@ -272,7 +277,8 @@ final class Redactor
     private static function normalizeValue(mixed $value, int $depth): mixed
     {
         return match (true) {
-            is_array($value) => $depth > self::MAX_DEPTH ? self::TRUNCATED : self::normalizeArray($value, $depth),
+            is_array($value)              => $depth > self::MAX_DEPTH ? self::TRUNCATED : self::normalizeArray($value, $depth),
+            self::givesItsOwnForm($value) => self::normalizeObject($value, $depth),
             !is_object($value),
             $value instanceof RevealedSecret,
             $value instanceof \SensitiveParameterValue,
@@ -285,9 +291,24 @@ final class Redactor
     }
 
     /**
+     * Whether the value is an exception or an enum that gives its own JSON
+     * form, which Monolog logs in its place.
+     *
+     * @param  mixed  $value
+     * @return bool
+     */
+    private static function givesItsOwnForm(mixed $value): bool
+    {
+        return $value instanceof \JsonSerializable && ($value instanceof \Throwable || $value instanceof \UnitEnum);
+    }
+
+    /**
      * A logged object as what Monolog would log for it, keyed by its class: its
      * array form, its JSON form, its string form or its public properties,
-     * themselves normalised.
+     * themselves normalised. An object that throws rather than give its form,
+     * as a value that refuses to be logged does on purpose, is logged as its
+     * class alone, so the log line is written and nothing it holds is read
+     * another way.
      *
      * @param  object  $value
      * @param  int  $depth
@@ -299,12 +320,18 @@ final class Redactor
             return self::TRUNCATED;
         }
 
-        $form = match (true) {
-            $value instanceof Arrayable         => $value->toArray(),
-            $value instanceof \JsonSerializable => $value->jsonSerialize(),
-            $value instanceof \Stringable       => (string) $value,
-            default                             => get_object_vars($value),
-        };
+        // Any of the forms may throw, an error included, and static analysis
+        // traces none of them through the object, so the catch is marked.
+        try {
+            $form = match (true) {
+                $value instanceof Arrayable         => $value->toArray(),
+                $value instanceof \JsonSerializable => $value->jsonSerialize(),
+                $value instanceof \Stringable       => (string) $value,
+                default                             => get_object_vars($value),
+            };
+        } catch (\Throwable) { // @phpstan-ignore catch.neverThrown
+            return [get_debug_type($value) => self::UNSERIALIZABLE];
+        }
 
         return [get_debug_type($value) => self::normalizeValue($form, $depth + 1)];
     }

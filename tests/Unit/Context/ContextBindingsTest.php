@@ -7,8 +7,10 @@ namespace Tests\Unit\Context;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Context\ContextBindings;
+use SineMacula\Laravel\Mfa\Context\IdentityContractActiveState;
 use SineMacula\Laravel\Mfa\Context\IdentityContractSubjectType;
 use SineMacula\Laravel\Mfa\Context\NoPendingSessionResolver;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use Tests\TestCase;
@@ -35,6 +37,7 @@ final class ContextBindingsTest extends TestCase
     {
         yield 'the pending session resolver' => [PendingSessionResolver::class, NoPendingSessionResolver::class];
         yield 'the subject type resolver' => [SubjectTypeResolver::class, IdentityContractSubjectType::class];
+        yield 'the active state resolver' => [ActiveStateResolver::class, IdentityContractActiveState::class];
     }
 
     /**

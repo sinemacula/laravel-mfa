@@ -7,6 +7,7 @@ namespace Tests\Feature\Verification;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
@@ -16,6 +17,7 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Verification\FactorOffers;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
@@ -220,6 +222,36 @@ final class FactorOffersTest extends TestCase
         $store->begin($inactive, self::APPLICATION, self::SESSION);
 
         self::assertSame([], $this->mfa()->offeredFactors(Callers::current()));
+    }
+
+    /**
+     * The bound active state resolver, not the identity, decides who is
+     * inactive: an identity it finds inactive is offered nothing, and one it
+     * finds active is offered its factors, whatever each says of itself.
+     *
+     * @return void
+     */
+    public function testAnIdentityTheBoundResolverFindsInactiveIsOfferedNothing(): void
+    {
+        $this->totpFactor($this->person());
+
+        $this->container()->instance(ActiveStateResolver::class, new InvertedActiveState);
+
+        $store    = $this->container()->make(ProofStore::class);
+        $active   = new NonEloquentIdentity;
+        $inactive = new NonEloquentIdentity(active: false);
+
+        $this->actingAs($active);
+
+        $store->begin($active, self::APPLICATION, self::SESSION);
+
+        self::assertSame([], $this->mfa()->offeredFactors(Callers::current()));
+
+        $this->actingAs($inactive);
+
+        $store->begin($inactive, self::APPLICATION, self::SESSION);
+
+        self::assertCount(1, $this->mfa()->offeredFactors(Callers::current()));
     }
 
     /**
