@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Secrets;
 
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\SendQueuedMailable;
 use Illuminate\Support\Collection;
@@ -17,6 +18,7 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Secrets\SensitiveValues;
 use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Secrets\ForgedTrace;
+use Tests\Fixtures\Secrets\RefusesToBeLogged;
 
 /**
  * Tests for `Redactor`: secrets, codes and full destinations are redacted by
@@ -241,6 +243,65 @@ final class RedactorTest extends TestCase
 
         self::assertSame([get_debug_type($json) => ['code' => '[redacted]', 'label' => 'Phone']], self::redact(['value' => $json])['value']);
         self::assertSame([get_debug_type($string) => 'Scan [redacted]'], self::redact(['value' => $string])['value']);
+    }
+
+    /**
+     * An object that throws rather than give its array, JSON or string form, an
+     * error included, is logged as its class alone, and what it holds is not read another way;
+     * the values beside it are still normalised.
+     *
+     * @return void
+     */
+    public function testLogsAnObjectThatRefusesItsFormAsItsClassAlone(): void
+    {
+        $arrayable = new class implements Arrayable {
+            /**
+             * Refuse the array form.
+             *
+             * @return array<string, string>
+             *
+             * @throws \LogicException
+             */
+            #[\Override]
+            public function toArray(): array
+            {
+                throw new \LogicException('Refused.');
+            }
+        };
+
+        $string = new class implements \Stringable {
+            /**
+             * Fail to give the string form, with an error rather than an
+             * exception.
+             *
+             * @return string
+             *
+             * @throws \TypeError
+             */
+            #[\Override]
+            public function __toString(): string
+            {
+                throw new \TypeError('Refused.');
+            }
+        };
+
+        $normalized = Redactor::normalize([
+            'arrayable' => $arrayable,
+            'json'      => new RefusesToBeLogged,
+            'string'    => $string,
+            'beside'    => (object) ['label' => 'Phone'],
+        ]);
+
+        self::assertSame(
+            [
+                'arrayable' => [get_debug_type($arrayable) => '[unserializable]'],
+                'json'      => [RefusesToBeLogged::class => '[unserializable]'],
+                'string'    => [get_debug_type($string) => '[unserializable]'],
+                'beside'    => [\stdClass::class => ['label' => 'Phone']],
+            ],
+            $normalized,
+        );
+        self::assertStringNotContainsString(RefusesToBeLogged::VALUE, (string) json_encode($normalized));
     }
 
     /**
