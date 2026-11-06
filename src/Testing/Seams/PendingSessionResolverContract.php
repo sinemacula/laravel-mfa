@@ -35,7 +35,7 @@ final class PendingSessionResolverContract
      */
     public static function assertNoCredentialMeansNoPendingSession(PendingSessionResolver $resolver, Request $request): void
     {
-        Assert::assertNull($resolver->resolve($request), 'A request carrying no pending credential must have no pending session.');
+        Assert::assertNull($resolver->fromRequest($request), 'A request carrying no pending credential must have no pending session.');
     }
 
     /**
@@ -50,11 +50,11 @@ final class PendingSessionResolverContract
     public static function assertAnInvalidCredentialIsRefused(PendingSessionResolver $resolver, ?Request $request): void
     {
         if ($request === null) {
-            Assert::assertNull($resolver->resolve(Request::create('/')), 'A resolver with no pending credentials must answer none.');
+            Assert::assertNull($resolver->fromRequest(Request::create('/')), 'A resolver with no pending credentials must answer none.');
 
             return;
         }
 
-        SeamAssert::refusesByThrowing(static fn () => $resolver->resolve($request), 'A pending credential that does not validate must be refused by throwing, not answered.');
+        SeamAssert::refusesByThrowing(static fn () => $resolver->fromRequest($request), 'A pending credential that does not validate must be refused by throwing, not answered.');
     }
 }

@@ -26,6 +26,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\FreshReauthenticator;
@@ -190,7 +191,7 @@ trait ArrangesEnrollment
      */
     protected function started(EnrollmentRequest $request): EnrollmentStart
     {
-        $start = $this->mfa()->startEnrollment($request);
+        $start = $this->mfa()->startEnrollment(Callers::current(), $request);
 
         Assert::assertTrue($start->hasStarted(), sprintf('The enrolment must start, not [%s].', $start->reason?->value));
 

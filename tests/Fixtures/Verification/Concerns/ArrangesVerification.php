@@ -38,6 +38,7 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Passkeys\FakePasskeyGateway;
@@ -251,7 +252,7 @@ trait ArrangesVerification
      */
     protected function sentCode(Factor $factor, ?Purpose $purpose = null): array
     {
-        $challenge = $this->mfa()->sendCode($factor->id, $purpose)->challengeId;
+        $challenge = $this->mfa()->sendCode(Callers::current(), $factor->id, $purpose)->challengeId;
         $code      = $this->mailbox->lastCodeTo((string) $factor->destination);
 
         Assert::assertNotNull($challenge, 'A code must be sent.');
@@ -269,7 +270,7 @@ trait ArrangesVerification
      */
     protected function recoveryCode(TestUser $user): string
     {
-        $codes = $this->container()->make(RecoveryCodeService::class)->generate($user, null, self::APPLICATION);
+        $codes = $this->container()->make(RecoveryCodeService::class)->generate($user, self::APPLICATION);
 
         Assert::assertInstanceOf(RevealedSecret::class, $codes[0]);
 

@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Codes\CodeMessages;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 
@@ -168,7 +169,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Driver [not-a-driver] must implement');
 
-        $manager->verify(Submission::factor($factor->id, '000000'));
+        $manager->verify(Callers::current(), Submission::factor($factor->id, '000000'));
     }
 
     /**

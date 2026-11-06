@@ -7,6 +7,7 @@ namespace Tests\Unit\Testing\Seams;
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
@@ -18,6 +19,7 @@ use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\StepUpTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\PendingCompletionContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\StepUpContract;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\CheckingCompletion;
@@ -65,7 +67,7 @@ final class CompletionContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        StepUpContract::assertRefusesAFailedResult(new CheckingCompletion('sign-in-1', false));
+        StepUpContract::assertRefusesAFailedResult(new CheckingCompletion('sign-in-1', false), Callers::current());
     }
 
     /**
@@ -79,7 +81,7 @@ final class CompletionContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        StepUpContract::assertRefusesAResultOfAnotherBinding(new RefusingCompletion(new \RuntimeException('Not a reason.')), $this->resultOfAnotherBinding());
+        StepUpContract::assertRefusesAResultOfAnotherBinding(new RefusingCompletion(new \RuntimeException('Not a reason.')), Callers::current(), $this->resultOfAnotherBinding());
     }
 
     /**
@@ -151,5 +153,18 @@ final class CompletionContractTest extends TestCase
     protected function stepUpResultOfAnotherBinding(): VerificationResult
     {
         return $this->resultOfAnotherBinding();
+    }
+
+    /**
+     * The caller of the request.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\CallerContext
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[\Override]
+    protected function stepUpCaller(): CallerContext
+    {
+        return Callers::current();
     }
 }

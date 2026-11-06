@@ -45,6 +45,7 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Verification\Dumps;
 use Tests\TestCase;
@@ -173,7 +174,7 @@ final class TotpEnrollmentStarterTest extends TestCase
         $this->reauthenticatedPerson();
 
         try {
-            $this->mfa()->startEnrollment(EnrollmentRequest::totp('not:allowed'));
+            $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp('not:allowed'));
 
             self::fail('An account name holding a colon was expected to be refused.');
         } catch (\InvalidArgumentException $exception) {
@@ -252,8 +253,8 @@ final class TotpEnrollmentStarterTest extends TestCase
 
         self::assertNotSame($first->secret?->reveal(), $second->secret?->reveal());
         self::assertSame(1, Factor::query()->count());
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment($this->grantOf($first), $oldCode)->reason);
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->confirmEnrollment($this->grantOf($second), $oldCode)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($first), $oldCode)->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($second), $oldCode)->reason);
     }
 
     /**
@@ -269,7 +270,7 @@ final class TotpEnrollmentStarterTest extends TestCase
         $start = $this->startedTotp();
         $code  = $this->appCode($start);
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertSame(FactorStatus::CONFIRMED, $confirmation->factor?->status);
@@ -279,7 +280,7 @@ final class TotpEnrollmentStarterTest extends TestCase
         self::assertTrue($factor->isConfirmed());
         self::assertNotNull($factor->getConfirmedAt());
         self::assertNotNull($factor->getLastAcceptedStep());
-        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Submission::factor($factor->id, $code))->reason);
+        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, $code))->reason);
     }
 
     /**
@@ -294,8 +295,8 @@ final class TotpEnrollmentStarterTest extends TestCase
 
         $start = $this->startedTotp();
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start, 1))->reason);
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->isConfirmed());
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start, 1))->reason);
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->isConfirmed());
     }
 
     /**
@@ -310,12 +311,12 @@ final class TotpEnrollmentStarterTest extends TestCase
         $start  = $this->startedTotp();
         $factor = $this->pendingFactorOf($start);
 
-        self::assertSame([], $this->mfa()->offeredFactors());
-        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->verify(Submission::factor($factor->id, $this->appCode($start)))->reason);
+        self::assertSame([], $this->mfa()->offeredFactors(Callers::current()));
+        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, $this->appCode($start)))->reason);
 
-        $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
-        self::assertCount(1, $this->mfa()->offeredFactors());
+        self::assertCount(1, $this->mfa()->offeredFactors(Callers::current()));
     }
 
     /**

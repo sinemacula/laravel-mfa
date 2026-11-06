@@ -22,6 +22,7 @@ use SineMacula\Laravel\Mfa\Models\Enrollment;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Drivers\RecordingFactorDriver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -101,8 +102,8 @@ final class EnrollmentContentionTest extends TestCase
 
         Mfa::extend('other', fn (): RecordingFactorDriver => new RecordingFactorDriver);
 
-        $totp  = Mfa::startEnrollment(EnrollmentRequest::totp('person@example.test'));
-        $other = Mfa::startEnrollment(EnrollmentRequest::of('other'));
+        $totp  = Mfa::startEnrollment(Callers::current(), EnrollmentRequest::totp('person@example.test'));
+        $other = Mfa::startEnrollment(Callers::current(), EnrollmentRequest::of('other'));
         $code  = AuthenticatorApp::code(Factor::query()->whereKey($totp->factor?->id)->sole());
 
         self::assertTrue($totp->hasStarted());
@@ -122,13 +123,13 @@ final class EnrollmentContentionTest extends TestCase
             $this->assertCompetingConfirmationIsLockedOut($grant);
         });
 
-        $first = Mfa::confirmEnrollment((string) $totp->grant?->reveal(), $code);
+        $first = Mfa::confirmEnrollment(Callers::current(), (string) $totp->grant?->reveal(), $code);
 
         self::assertTrue($tried);
         self::assertTrue($first->isConfirmed());
         self::assertCount(10, $first->recoveryCodes);
 
-        $second = Mfa::confirmEnrollment($grant, 'correct');
+        $second = Mfa::confirmEnrollment(Callers::current(), $grant, 'correct');
 
         self::assertSame(FailureReason::NOT_FRESH, $second->reason);
         self::assertSame(1, Factor::query()->where('status', 'confirmed')->count());
@@ -189,7 +190,7 @@ final class EnrollmentContentionTest extends TestCase
         Config::set('mfa.storage.connection', 'observer');
 
         try {
-            Mfa::confirmEnrollment($grant, 'correct');
+            Mfa::confirmEnrollment(Callers::current(), $grant, 'correct');
 
             self::fail('A confirmation competing for the lock was expected to be locked out.');
         } catch (QueryException $exception) {

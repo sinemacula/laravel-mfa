@@ -29,6 +29,7 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\ProofStoreCompletion;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Hardening\Concerns\FlowCatalog;
 use Tests\Fixtures\Hardening\LockOrderRecorder;
 use Tests\Fixtures\Hardening\SpyCompletion;
@@ -181,7 +182,7 @@ final class LockOrderTest extends TestCase
 
         foreach ([FactorRemoved::class, RecoveryCodesRemoved::class] as $event) {
             Event::listen($event, function (object $removed) use (&$seen): void {
-                $seen[class_basename($removed)] = array_map(static fn (Proof $proof): string => $proof->method, Mfa::proofs());
+                $seen[class_basename($removed)] = array_map(static fn (Proof $proof): string => $proof->method, Mfa::proofs(Callers::current()));
             });
         }
 

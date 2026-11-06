@@ -156,12 +156,13 @@ description in `wwwAuthenticate()` is always the shipped English, since RFC 6750
 
 ## The authentication context
 
-`Mfa::authenticationContext()`, or `Context\AuthenticationContextContributor::contribute()`, gives these keys for the
-`mfa` namespace of the authentication context, always all of them. `contributeFor($identity, $application, $session,
-...$proofs)` gives the same keys for a named sign-in, from proofs the caller read from a trusted record of it: for an
-authentication layer building the context of another session, or in a queued job. It reads only the proofs that count
-for that sign-in, as the proof store does, and the caller leaves out any made with a factor since removed and gives a
-pending, revoked or ended session the neutral context itself:
+`Mfa::authenticationContext($caller)` gives these keys for the caller's sign-in, for the `mfa` namespace of the
+authentication context, always all of them, and the neutral context to a pending session or nobody.
+`Context\AuthenticationContextContributor::neutral()` gives that neutral context. `contributeFor($identity,
+$application, $session, ...$proofs)` gives the same keys for a named sign-in, from proofs the caller read from a trusted
+record of it: for an authentication layer building the context of another session, or in a queued job. It reads only the
+proofs that count for that sign-in, as the proof store does, and the caller leaves out any made with a factor since
+removed and gives a pending, revoked or ended session the neutral context itself:
 
 | Key                             | Type           | Means                                                                        |
 |---------------------------------|----------------|------------------------------------------------------------------------------|

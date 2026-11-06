@@ -131,12 +131,13 @@ Verify on routes of your own, through the `Mfa` facade:
 ```php
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 
 Route::middleware(['web', 'auth', 'mfa.exempt'])->post('/mfa/verify', function (Request $request) {
-    $result = Mfa::verify(Submission::factor(
+    $result = Mfa::verify(CallerContext::fromRequest($request), Submission::factor(
         $request->string('factor')->toString(),
         $request->string('code')->toString(),
     ), Purpose::SIGN_IN);
@@ -147,8 +148,11 @@ Route::middleware(['web', 'auth', 'mfa.exempt'])->post('/mfa/verify', function (
 });
 ```
 
-This form is for TOTP. Email and SMS factors use `Mfa::sendCode()` and then `Submission::challenge()`, and a step-up
-leaves the purpose out (see [Verification](docs/guides/verification.md#sending-a-code)).
+Every helper that acts for a person takes the caller first, read from the request once with
+`CallerContext::fromRequest()` or built from plain values away from one (see
+[The caller](docs/guides/helpers.md#the-caller)). This form is for TOTP. Email and SMS factors use `Mfa::sendCode()` and
+then `Submission::challenge()`, and a step-up leaves the purpose out (see
+[Verification](docs/guides/verification.md#sending-a-code)).
 
 Gate the rest with the middleware, asking for more where a route needs it:
 

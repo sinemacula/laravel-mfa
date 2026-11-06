@@ -63,7 +63,7 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   first factor. No ceremony starts with an empty or wider allowlist. `Mfa::requestAssertion()` starts one, and answers
   with a `Passkeys\AssertionRequest`: the options, or the package's reason for refusing, nobody served being
   `not_found`. A gateway's own exception propagates, and `PasskeyAssertions::options()` itself stays throwing. Verifying
-  is `Mfa::verify(Submission::assertion(...))`, an attempt through `Attempts\AttemptService`, so a reason the gateway
+  is `Mfa::verify($caller, Submission::assertion(...))`, an attempt through `Attempts\AttemptService`, so a reason the gateway
   returns counts against the factor and the identity, and an assertion verified for another credential fails as
   `invalid_code`. A gateway that cannot verify at all refuses with an `OperationRefusedException`, which counts nothing.
   A pending session needs `mfa.verify`.
@@ -85,7 +85,7 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   `FactorConfirmed` and, with codes, `RecoveryCodesGenerated` are dispatched on the commit.
 - To remove a passkey, it calls `removing()` in the transaction that deletes the credential; the factor goes with it.
 - To verify a passkey factor, `Mfa::requestAssertion()` asks `PasskeyAssertions` for the options of a ceremony, and
-  `Mfa::verify(Submission::assertion(...))` hands the client's response back under the identity's lock and makes a proof
+  `Mfa::verify($caller, Submission::assertion(...))` hands the client's response back under the identity's lock and makes a proof
   of what the returned assertion observed, with the challenge it answered when the gateway reports one.
 
 ## Failure / Edge Cases

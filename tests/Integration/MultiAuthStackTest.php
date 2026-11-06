@@ -13,6 +13,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Guards\GenericUserGuard;
 use Tests\Fixtures\Guards\StaticUserGuard;
 use Tests\Fixtures\Identities\TestUser;
@@ -55,8 +56,8 @@ final class MultiAuthStackTest extends TestCase
 
         $this->actingAs($user);
 
-        self::assertFalse(Mfa::requirement()->isEmpty());
-        self::assertCount(1, Mfa::factors());
+        self::assertFalse(Mfa::requirement(Callers::current())->isEmpty());
+        self::assertCount(1, Mfa::factors(Callers::current()));
     }
 
     /**
@@ -82,8 +83,8 @@ final class MultiAuthStackTest extends TestCase
         config()->set('auth.defaults.guard', 'token');
         $this->container()->forgetInstance('mfa');
 
-        self::assertFalse(Mfa::requirement()->isEmpty());
-        self::assertCount(1, Mfa::factors());
+        self::assertFalse(Mfa::requirement(Callers::current())->isEmpty());
+        self::assertCount(1, Mfa::factors(Callers::current()));
     }
 
     /**
@@ -111,8 +112,8 @@ final class MultiAuthStackTest extends TestCase
 
         // GenericUser does not implement MultiFactorAuthenticatable, so the
         // manager must short-circuit cleanly rather than throw.
-        self::assertTrue(Mfa::requirement()->isEmpty());
-        self::assertSame([], Mfa::factors());
+        self::assertTrue(Mfa::requirement(Callers::current())->isEmpty());
+        self::assertSame([], Mfa::factors(Callers::current()));
     }
 
     /**
@@ -149,9 +150,9 @@ final class MultiAuthStackTest extends TestCase
         // guard return our MFA-capable identity.
         Sanctum::actingAs($user, ['*']);
 
-        self::assertFalse(Mfa::requirement()->isEmpty());
+        self::assertFalse(Mfa::requirement(Callers::current())->isEmpty());
 
-        $factors = Mfa::factors();
+        $factors = Mfa::factors(Callers::current());
         self::assertCount(1, $factors);
         self::assertSame('totp', $factors[0]->type);
     }

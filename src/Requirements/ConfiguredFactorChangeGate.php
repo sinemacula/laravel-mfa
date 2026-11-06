@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\FactorChangeGate;
@@ -127,7 +128,7 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
      */
     private function freshUntil(FactorChangeRequest $request, string $detail): CarbonImmutable
     {
-        $until = $this->requirements()->freshUntil($request->change->value, $request->requirement);
+        $until = $this->requirements()->freshUntil(self::caller($request), $request->change->value, $request->requirement);
 
         OperationRefusedException::byPackageUnless($until !== null, FailureReason::NOT_FRESH, $detail);
 
@@ -147,7 +148,9 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
      */
     private function fresh(FactorChangeRequest $request, string $detail): null
     {
-        OperationRefusedException::byPackageUnless($this->requirements()->isFresh($request->change->value, $request->requirement), FailureReason::NOT_FRESH, $detail);
+        $fresh = $this->requirements()->isFresh(self::caller($request), $request->change->value, $request->requirement);
+
+        OperationRefusedException::byPackageUnless($fresh, FailureReason::NOT_FRESH, $detail);
 
         return null;
     }
@@ -175,7 +178,7 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
             return null;
         }
 
-        $requirement = $this->requirements()->freshnessRequirement($request->change->value, $request->requirement);
+        $requirement = $this->requirements()->freshnessRequirement(self::caller($request), $request->change->value, $request->requirement);
 
         OperationRefusedException::byPackageUnless($requirement !== null, FailureReason::NOT_FRESH, 'Removing a factor has no freshness to judge it by.');
 
@@ -232,5 +235,19 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
 
         return $proof->provedAt->lessThanOrEqualTo($now)
             && $proof->provedAt->greaterThanOrEqualTo($now->subSeconds(self::REAUTHENTICATION_MAX_AGE));
+    }
+
+    /**
+     * The caller the change is for: the request's identity, on an active
+     * session of its application, since the gate is asked only for those.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
+     * @return \SineMacula\Laravel\Mfa\Context\CallerContext
+     *
+     * @throws \InvalidArgumentException
+     */
+    private static function caller(FactorChangeRequest $request): CallerContext
+    {
+        return CallerContext::forIdentity($request->identity, $request->application);
     }
 }

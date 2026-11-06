@@ -39,6 +39,7 @@ trait SessionRevokerTests
             $this->sessionRevoker(),
             $identity,
             $this->removedFactorId($identity),
+            $this->revokedApplication(),
             $this->currentSessionOf($identity),
             $this->verifyAnotherSession(...),
             $this->doesAnotherSessionCount(...),
@@ -60,6 +61,7 @@ trait SessionRevokerTests
             $this->sessionRevoker(),
             $identity,
             $this->removedFactorId($identity),
+            $this->revokedApplication(),
             'another-sign-in',
             $this->doesCurrentSessionCount(...),
         );
@@ -97,9 +99,17 @@ trait SessionRevokerTests
             $this->verifyAnotherSession(...),
             $this->doesAnotherSessionCount(...),
             $this->removedFactorId($identity),
+            $this->revokedApplication(),
             $this->currentSessionOf($identity),
         );
     }
+
+    /**
+     * The application the identity's sessions are on.
+     *
+     * @return string
+     */
+    abstract protected function revokedApplication(): string;
 
     /**
      * The revoker under test.

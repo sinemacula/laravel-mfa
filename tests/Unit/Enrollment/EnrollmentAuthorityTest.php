@@ -61,25 +61,25 @@ final class EnrollmentAuthorityTest extends TestCase
         $user  = $this->signedInPerson();
         $store = $this->container()->make(ProofStore::class);
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user), 'passkey'));
+        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user, null, 'web'), 'passkey'));
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store, 0, 'another-sign-in'));
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user), 'passkey'));
+        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user, null, 'web'), 'passkey'));
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store, ConfiguredFactorChangeGate::REAUTHENTICATION_MAX_AGE + 1));
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user), 'passkey'));
+        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user, null, 'web'), 'passkey'));
 
         // A reauthentication exactly five minutes old would grant nothing that
         // lasts, so it is refused with the grant's end.
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store, ConfiguredFactorChangeGate::REAUTHENTICATION_MAX_AGE));
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user), 'passkey'));
+        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user, null, 'web'), 'passkey'));
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store, ConfiguredFactorChangeGate::REAUTHENTICATION_MAX_AGE - 1));
 
-        self::assertNull($this->refusal(new Caller($user), 'passkey'));
+        self::assertNull($this->refusal(new Caller($user, null, 'web'), 'passkey'));
 
         CarbonImmutable::setTestNow();
     }
@@ -101,7 +101,7 @@ final class EnrollmentAuthorityTest extends TestCase
         $this->container()->instance(Reauthenticator::class, $reauthenticator);
         $this->container()->make(ProofStore::class)->forget($user, self::APPLICATION);
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user), 'passkey'));
+        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user, null, 'web'), 'passkey'));
         self::assertSame(0, $reauthenticator->asked);
     }
 
@@ -171,9 +171,9 @@ final class EnrollmentAuthorityTest extends TestCase
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($this->container()->make(ProofStore::class), 60));
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->refusal(new Caller($user), 'sms'));
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->refusal(new Caller($user, null, 'web'), 'sms'));
 
-        $first = $this->authorized(new Caller($user), 'totp');
+        $first = $this->authorized(new Caller($user, null, 'web'), 'totp');
 
         self::assertSame(EnrollmentAuthorization::REAUTHENTICATION, $first->kind);
         self::assertTrue(CarbonImmutable::now()->addSeconds(240)->equalTo($first->deadline));
@@ -186,7 +186,7 @@ final class EnrollmentAuthorityTest extends TestCase
 
         $this->stepUpWith($user, $this->confirmedFactor($user));
 
-        self::assertSame(EnrollmentAuthorization::STEP_UP, $this->authorized(new Caller($user), 'passkey')->kind);
+        self::assertSame(EnrollmentAuthorization::STEP_UP, $this->authorized(new Caller($user, null, 'web'), 'passkey')->kind);
 
         CarbonImmutable::setTestNow();
     }
@@ -212,7 +212,7 @@ final class EnrollmentAuthorityTest extends TestCase
 
         $this->container()->instance(FactorChangeGate::class, $gate);
 
-        $first = $this->authorized(new Caller($user), 'totp');
+        $first = $this->authorized(new Caller($user, null, 'web'), 'totp');
 
         self::assertSame(EnrollmentAuthorization::REAUTHENTICATION, $first->kind);
         self::assertSame($until, $first->deadline);
@@ -220,7 +220,7 @@ final class EnrollmentAuthorityTest extends TestCase
         $this->authorized($this->pending($user), 'totp');
         $this->confirmedFactor($user);
 
-        self::assertSame(EnrollmentAuthorization::STEP_UP, $this->authorized(new Caller($user), 'passkey')->kind);
+        self::assertSame(EnrollmentAuthorization::STEP_UP, $this->authorized(new Caller($user, null, 'web'), 'passkey')->kind);
         self::assertSame([FactorChange::ADD_FIRST_ADDITIONAL_FACTOR, FactorChange::ADD_FACTOR], array_map(static fn ($request): FactorChange => $request->change, $gate->requests));
         self::assertSame([self::SESSION, self::SESSION], array_map(static fn ($request): string => $request->session, $gate->requests));
 
@@ -228,7 +228,7 @@ final class EnrollmentAuthorityTest extends TestCase
 
         $this->container()->instance(FactorChangeGate::class, new ScriptedFactorChangeGate(refusal: $refusal));
 
-        self::assertSame(FailureReason::LAST_FACTOR, $this->refusal(new Caller($user), 'passkey'));
+        self::assertSame(FailureReason::LAST_FACTOR, $this->refusal(new Caller($user, null, 'web'), 'passkey'));
     }
 
     /**
@@ -249,7 +249,7 @@ final class EnrollmentAuthorityTest extends TestCase
         $this->container()->instance(FactorChangeGate::class, $gate);
         $this->container()->make(ProofStore::class)->forget($user, self::APPLICATION);
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user), 'totp'));
+        self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user, null, 'web'), 'totp'));
         self::assertSame([], $gate->requests);
     }
 
@@ -299,16 +299,16 @@ final class EnrollmentAuthorityTest extends TestCase
 
         $this->stepUpWith($user, $totp);
 
-        self::assertSame(FailureReason::LIMIT_REACHED, $this->refusal(new Caller($user), 'totp'));
-        self::assertNull($this->refusal(new Caller($user), 'passkey'));
+        self::assertSame(FailureReason::LIMIT_REACHED, $this->refusal(new Caller($user, null, 'web'), 'totp'));
+        self::assertNull($this->refusal(new Caller($user, null, 'web'), 'passkey'));
 
         $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
 
-        self::assertSame(FailureReason::LIMIT_REACHED, $this->refusal(new Caller($user), 'sms'));
+        self::assertSame(FailureReason::LIMIT_REACHED, $this->refusal(new Caller($user, null, 'web'), 'sms'));
 
         Factor::query()->update(['application' => 'admin']);
 
-        self::assertNull($this->refusal(new Caller($user), 'totp'));
+        self::assertNull($this->refusal(new Caller($user, null, 'web'), 'totp'));
     }
 
     /**
@@ -355,7 +355,9 @@ final class EnrollmentAuthorityTest extends TestCase
     {
         $first = SignInProofs::of($user)->inSession('pending-1')->password();
 
-        return new Caller($user, new PendingContext($user, self::APPLICATION, 'pending-1', $first, Requirement::none(), $actions, CarbonImmutable::now()->addMinutes(10)));
+        $pending = new PendingContext($user, self::APPLICATION, 'pending-1', $first, Requirement::none(), $actions, CarbonImmutable::now()->addMinutes(10));
+
+        return new Caller($user, $pending, self::APPLICATION);
     }
 
     /**

@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\DefaultEventContextResolver;
 use SineMacula\Laravel\Mfa\Context\IdentityContractSubjectType;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
@@ -45,6 +46,7 @@ use SineMacula\Laravel\Mfa\Testing\Seams\RequirementSeamContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\SeamAssert;
 use SineMacula\Laravel\Mfa\Testing\Seams\SessionTransitionContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\SubjectTypeResolverContract;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -96,7 +98,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        FreshnessGateContract::assertANameThatIsNoOperationIsNeverFresh(new FaultySeams);
+        FreshnessGateContract::assertANameThatIsNoOperationIsNeverFresh(new FaultySeams, Callers::current());
     }
 
     /**
@@ -116,12 +118,13 @@ final class SeamsWithoutStateContractTest extends TestCase
                 /**
                  * Fresh.
                  *
+                 * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
                  * @param  string  $operation
                  * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
                  * @return bool
                  */
                 #[\Override]
-                public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool
+                public function isFresh(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): bool
                 {
                     return true;
                 }
@@ -129,12 +132,13 @@ final class SeamsWithoutStateContractTest extends TestCase
                 /**
                  * No deadline.
                  *
+                 * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
                  * @param  string  $operation
                  * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
                  * @return ?\Carbon\CarbonImmutable
                  */
                 #[\Override]
-                public function freshUntil(string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
+                public function freshUntil(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
                 {
                     return null;
                 }
@@ -142,12 +146,13 @@ final class SeamsWithoutStateContractTest extends TestCase
                 /**
                  * Nothing for no caller, and less than a caller asks.
                  *
+                 * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
                  * @param  string  $operation
                  * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
                  * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
                  */
                 #[\Override]
-                public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement
+                public function requirement(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?Requirement
                 {
                     return $callerRequirement === null ? null : Requirement::none();
                 }
@@ -167,7 +172,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        FreshnessGateContract::assertTheRequirementAsksWhatTheCallerAsks($gate);
+        FreshnessGateContract::assertTheRequirementAsksWhatTheCallerAsks($gate, Callers::current());
     }
 
     /**
@@ -179,7 +184,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     public function testRejectsAGateWithADeadlineThatIsNoDeadline(): void
     {
         try {
-            FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new FaultySeams, Operation::ADD_FACTOR->value);
+            FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new FaultySeams, Callers::current(), Operation::ADD_FACTOR->value);
 
             self::fail('A deadline already past was expected to be rejected.');
         } catch (AssertionFailedError $failure) {
@@ -188,7 +193,7 @@ final class SeamsWithoutStateContractTest extends TestCase
 
         $this->expectException(AssertionFailedError::class);
 
-        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new FreshOnceGate, Operation::ADD_FACTOR->value);
+        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new FreshOnceGate, Callers::current(), Operation::ADD_FACTOR->value);
     }
 
     /**
@@ -200,7 +205,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        FreshnessGateContract::assertAnUnboundedRequirementIsRefused(new FaultySeams);
+        FreshnessGateContract::assertAnUnboundedRequirementIsRefused(new FaultySeams, Callers::current());
     }
 
     /**
@@ -331,7 +336,7 @@ final class SeamsWithoutStateContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
         $this->expectExceptionMessage('An operation with no requirement must never be fresh.');
 
-        FreshnessGateContract::assertAnOperationWithNoRequirementIsNeverFresh(new ScriptedFreshnessGate(true, null));
+        FreshnessGateContract::assertAnOperationWithNoRequirementIsNeverFresh(new ScriptedFreshnessGate(true, null), Callers::current());
     }
 
     /**
@@ -350,7 +355,7 @@ final class SeamsWithoutStateContractTest extends TestCase
 
         foreach ($gates as $name => $gate) {
             self::assertNotNull(
-                self::rejection(static fn () => FreshnessGateContract::assertAnOperationThatIsNotFreshHasNoDeadline($gate)),
+                self::rejection(static fn () => FreshnessGateContract::assertAnOperationThatIsNotFreshHasNoDeadline($gate, Callers::current())),
                 sprintf('A gate %s was expected to be rejected.', $name),
             );
         }
@@ -367,7 +372,7 @@ final class SeamsWithoutStateContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
         $this->expectExceptionMessage('A session fresh for the operation must say until when.');
 
-        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new ScriptedFreshnessGate(true, null), Operation::ADD_FACTOR->value);
+        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new ScriptedFreshnessGate(true, null), Callers::current(), Operation::ADD_FACTOR->value);
     }
 
     /**
@@ -656,6 +661,19 @@ final class SeamsWithoutStateContractTest extends TestCase
     protected function tenantApplication(): string
     {
         return 'web';
+    }
+
+    /**
+     * The caller of the request, as the gate last signed it in.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\CallerContext
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[\Override]
+    protected function freshnessCaller(): CallerContext
+    {
+        return Callers::current();
     }
 
     /**

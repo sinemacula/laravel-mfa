@@ -10,7 +10,12 @@ use Illuminate\Contracts\Container\Container as ContainerContract;
 use Illuminate\Support\Manager;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
+use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
+use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
@@ -166,15 +171,16 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * identity's own requirement and its re-enrolment obligation: empty when it
      * needs nothing further, and without an MFA-capable identity.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function requirement(): Requirement
+    public function requirement(CallerContext $caller): Requirement
     {
-        return $this->service(RequirementService::class)->requirement();
+        return $this->service(RequirementService::class)->requirement($caller);
     }
 
     /**
@@ -183,6 +189,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * given applies, either alone when the other is absent, and an operation
      * with neither is never fresh.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @return bool
@@ -190,9 +197,9 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    public function isFresh(string $operation, ?Requirement $requirement = null): bool
+    public function isFresh(CallerContext $caller, string $operation, ?Requirement $requirement = null): bool
     {
-        return $this->service(RequirementService::class)->isFresh($operation, $requirement);
+        return $this->service(RequirementService::class)->isFresh($caller, $operation, $requirement);
     }
 
     /**
@@ -200,13 +207,14 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * that still count, oldest first: none without an MFA-capable person or a
      * sign-in, and none on a pending session.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function proofs(): array
+    public function proofs(CallerContext $caller): array
     {
-        return $this->service(ProofService::class)->proofs();
+        return $this->service(ProofService::class)->proofs($caller);
     }
 
     /**
@@ -216,13 +224,14 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * serves nobody. Every factor is listed, pending ones and those enrolled
      * through another application included.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function factors(): array
+    public function factors(CallerContext $caller): array
     {
-        return $this->service(FactorService::class)->factors();
+        return $this->service(FactorService::class)->factors($caller);
     }
 
     /**
@@ -230,14 +239,15 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * summary; `null` when it serves nobody or the id is not one of its
      * factors, whoever else's it may be.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
      * @return ?\SineMacula\Laravel\Mfa\Factors\FactorSummary
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function factor(mixed $factorId): ?FactorSummary
+    public function factor(CallerContext $caller, mixed $factorId): ?FactorSummary
     {
-        return $this->service(FactorService::class)->factor($factorId);
+        return $this->service(FactorService::class)->factor($caller, $factorId);
     }
 
     /**
@@ -245,14 +255,15 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * confirmed, of an enabled type and accepted after its first factor, the
      * preferred one first; none when it serves nobody.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    public function offeredFactors(): array
+    public function offeredFactors(CallerContext $caller): array
     {
-        return $this->service(FactorOffers::class)->offered();
+        return $this->service(FactorOffers::class)->offered($caller);
     }
 
     /**
@@ -260,6 +271,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * the purpose: for a pending session, its sign-in; for an active one, a
      * step-up unless `sign_in` is asked for. Verify under the same purpose.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Codes\SendResult
@@ -267,9 +279,9 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function sendCode(mixed $factorId, ?Purpose $purpose = null): SendResult
+    public function sendCode(CallerContext $caller, mixed $factorId, ?Purpose $purpose = null): SendResult
     {
-        return $this->service(ChallengeRequests::class)->sendCode($factorId, $purpose);
+        return $this->service(ChallengeRequests::class)->sendCode($caller, $factorId, $purpose);
     }
 
     /**
@@ -277,6 +289,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * for the client, or the reason there are none, `not_found` when the
      * request serves nobody for verifying.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Passkeys\AssertionRequest
@@ -284,9 +297,9 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function requestAssertion(mixed $factorId, ?Purpose $purpose = null): AssertionRequest
+    public function requestAssertion(CallerContext $caller, mixed $factorId, ?Purpose $purpose = null): AssertionRequest
     {
-        return $this->service(ChallengeRequests::class)->requestAssertion($factorId, $purpose);
+        return $this->service(ChallengeRequests::class)->requestAssertion($caller, $factorId, $purpose);
     }
 
     /**
@@ -294,6 +307,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * or a passkey's assertion, for the purpose given: for a pending session,
      * its sign-in; for an active one, a step-up unless `sign_in` is asked for.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
@@ -301,9 +315,9 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function verify(#[\SensitiveParameter] Submission $submission, ?Purpose $purpose = null): VerificationResult
+    public function verify(CallerContext $caller, #[\SensitiveParameter] Submission $submission, ?Purpose $purpose = null): VerificationResult
     {
-        return $this->service(VerificationService::class)->verify($submission, $purpose);
+        return $this->service(VerificationService::class)->verify($caller, $submission, $purpose);
     }
 
     /**
@@ -311,15 +325,16 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * grant that may confirm it, and by type a secret and its provisioning URI,
      * or a first code to the destination; or the reason it may not start.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function startEnrollment(#[\SensitiveParameter] EnrollmentRequest $request): EnrollmentStart
+    public function startEnrollment(CallerContext $caller, #[\SensitiveParameter] EnrollmentRequest $request): EnrollmentStart
     {
-        return $this->service(EnrollmentService::class)->start($request);
+        return $this->service(EnrollmentService::class)->start($caller, $request);
     }
 
     /**
@@ -327,6 +342,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * session that started it: the factor, with any recovery codes that come
      * with it; or the reason it was not confirmed.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
      * @param  string  $code
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation
@@ -334,29 +350,31 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function confirmEnrollment(#[\SensitiveParameter] RevealedSecret|string $grant, #[\SensitiveParameter] string $code): EnrollmentConfirmation
+    public function confirmEnrollment(CallerContext $caller, #[\SensitiveParameter] RevealedSecret|string $grant, #[\SensitiveParameter] string $code): EnrollmentConfirmation
     {
-        return $this->service(EnrollmentService::class)->confirm($grant, $code);
+        return $this->service(EnrollmentService::class)->confirm($caller, $grant, $code);
     }
 
     /**
      * Send the code of the enrolment the grant holds again, renewing nothing.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
      * @return \SineMacula\Laravel\Mfa\Codes\SendResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function resendEnrollmentCode(#[\SensitiveParameter] RevealedSecret|string $grant): SendResult
+    public function resendEnrollmentCode(CallerContext $caller, #[\SensitiveParameter] RevealedSecret|string $grant): SendResult
     {
-        return $this->service(EnrollmentService::class)->resend($grant);
+        return $this->service(EnrollmentService::class)->resend($caller, $grant);
     }
 
     /**
      * Cancel the enrolment the grant holds; `false` for a grant that is not the
      * caller's.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
      * @return bool
      *
@@ -365,15 +383,16 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      *
      * @imperative
      */
-    public function cancelEnrollment(#[\SensitiveParameter] RevealedSecret|string $grant): bool
+    public function cancelEnrollment(CallerContext $caller, #[\SensitiveParameter] RevealedSecret|string $grant): bool
     {
-        return $this->service(EnrollmentService::class)->cancel($grant);
+        return $this->service(EnrollmentService::class)->cancel($caller, $grant);
     }
 
     /**
      * Give the signed-in person's factor, enrolled through the current
      * application, a new label, with no step-up; a blank label is none.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
      * @param  ?string  $label
      * @return \SineMacula\Laravel\Mfa\Factors\FactorChange
@@ -382,39 +401,41 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @throws \InvalidArgumentException
      * @throws \Throwable
      */
-    public function renameFactor(mixed $factorId, ?string $label): FactorChange
+    public function renameFactor(CallerContext $caller, mixed $factorId, ?string $label): FactorChange
     {
-        return $this->service(FactorService::class)->rename($factorId, $label);
+        return $this->service(FactorService::class)->rename($caller, $factorId, $label);
     }
 
     /**
      * Make the signed-in person's confirmed factor their preferred one, which
      * is offered first, with no step-up.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
      * @return \SineMacula\Laravel\Mfa\Factors\FactorChange
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function setPreferredFactor(mixed $factorId): FactorChange
+    public function setPreferredFactor(CallerContext $caller, mixed $factorId): FactorChange
     {
-        return $this->service(FactorService::class)->setPreferred($factorId);
+        return $this->service(FactorService::class)->setPreferred($caller, $factorId);
     }
 
     /**
      * Remove the signed-in person's factor enrolled through the current
      * application, with a fresh step-up, or say why not.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
      * @return \SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function removeFactor(mixed $factorId): FactorRemovalResult
+    public function removeFactor(CallerContext $caller, mixed $factorId): FactorRemovalResult
     {
-        return $this->service(LifecycleService::class)->removeFactor($factorId);
+        return $this->service(LifecycleService::class)->removeFactor($caller, $factorId);
     }
 
     /**
@@ -427,14 +448,15 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  string  $reason
      * @param  bool  $requireReenrollment
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    public function resetIdentity(MultiFactorAuthenticatable $identity, Actor $actor, string $reason, bool $requireReenrollment = true): void
+    public function resetIdentity(MultiFactorAuthenticatable $identity, Actor $actor, string $reason, bool $requireReenrollment = true, ?ClientContext $client = null): void
     {
-        $this->service(IdentityReset::class)->reset($identity, $actor, $reason, $requireReenrollment);
+        $this->service(IdentityReset::class)->reset($identity, $actor, $reason, $requireReenrollment, $client);
     }
 
     /**
@@ -445,6 +467,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  mixed  $factorId
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -452,9 +475,9 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      *
      * @imperative
      */
-    public function unlockFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor): bool
+    public function unlockFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor, ?ClientContext $client = null): bool
     {
-        return $this->service(LifecycleService::class)->unlockFactor($identity, $factorId, $actor);
+        return $this->service(LifecycleService::class)->unlockFactor($identity, $factorId, $actor, $client);
     }
 
     /**
@@ -463,6 +486,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -470,9 +494,9 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      *
      * @imperative
      */
-    public function unlockIdentity(MultiFactorAuthenticatable $identity, Actor $actor): bool
+    public function unlockIdentity(MultiFactorAuthenticatable $identity, Actor $actor, ?ClientContext $client = null): bool
     {
-        return $this->service(LifecycleService::class)->unlockIdentity($identity, $actor);
+        return $this->service(LifecycleService::class)->unlockIdentity($identity, $actor, $client);
     }
 
     /**
@@ -518,14 +542,15 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * for issuing them, and `not_found` without an MFA-capable person signed
      * in, or on a pending session.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \Throwable
      */
-    public function generateRecoveryCodes(): RecoveryCodeGeneration
+    public function generateRecoveryCodes(CallerContext $caller): RecoveryCodeGeneration
     {
-        return $this->service(RecoveryCodeIssuance::class)->generate();
+        return $this->service(RecoveryCodeIssuance::class)->generate($caller);
     }
 
     /**
@@ -534,23 +559,28 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * credential allows listing them, otherwise the signed-in person's; `null`
      * when it serves nobody.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function recoveryCodeStatus(): ?RecoveryCodeStatus
+    public function recoveryCodeStatus(CallerContext $caller): ?RecoveryCodeStatus
     {
-        return $this->service(RecoveryCodeService::class)->statusOfCaller();
+        return $this->service(RecoveryCodeService::class)->statusOfCaller($caller);
     }
 
     /**
-     * The keys of the authentication context's `mfa` namespace for the session
-     * the request serves.
+     * The keys of the authentication context's `mfa` namespace for the caller's
+     * own sign-in: its proofs as the proof store holds them, with its first
+     * factor, given to `AuthenticationContextContributor::contributeFor()`. A
+     * pending session, nobody and an identity that is not a person have the
+     * neutral context.
      *
      * @formatter:off
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return array{
      *     accepted: bool,
      *     multifactor: bool,
@@ -568,9 +598,18 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function authenticationContext(): array
+    public function authenticationContext(CallerContext $caller): array
     {
-        return $this->service(AuthenticationContextContributor::class)->contribute();
+        $served = $this->service(CallerContextResolver::class)->resolve($caller, null);
+
+        if ($served === null) {
+            return AuthenticationContextContributor::neutral();
+        }
+
+        $session = $this->service(ProofStore::class)->currentSession($served->identity, $served->application);
+        $proofs  = $session === null ? [] : $this->service(SessionFirstFactor::class)->proofs($served->identity, $served->application);
+
+        return $this->service(AuthenticationContextContributor::class)->contributeFor($served->identity, $served->application, $session ?? '', ...$proofs);
     }
 
     /**

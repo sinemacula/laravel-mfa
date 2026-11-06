@@ -6,14 +6,16 @@ What a sign-in must prove, and how fresh a session must be before a sensitive op
 
 ## What a sign-in must prove
 
-`Mfa::requirement()` returns the requirement the current identity's sign-in on the current application must meet. It
+`Mfa::requirement()` returns the requirement the caller's sign-in on the caller's application must meet. It
 is empty when nothing further is needed, and without an MFA-capable identity. The `mfa` middleware enforces it on the
 routes that carry it (see [Route middleware](middleware.md)).
 
 ```php
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 
-$requirement = Mfa::requirement();
+$caller      = CallerContext::fromRequest($request); // see Helpers: The caller
+$requirement = Mfa::requirement($caller);
 
 $requirement->isEmpty();   // true when the sign-in needs nothing further
 $requirement->parts();     // [RequirementPart::ADDITIONAL_VERIFICATION, ...]
@@ -66,12 +68,12 @@ $outstanding = app(RequirementPolicy::class)->requirementFor($user, 'web', $firs
 ## Step-up
 
 A sensitive operation is named, and each name has a requirement and a maximum age for the proof that meets it, set per
-application. `Mfa::isFresh()` answers whether the current session is fresh enough for it:
+application. `Mfa::isFresh()` answers whether the caller's session is fresh enough for it:
 
 ```php
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 
-if (!Mfa::isFresh('billing.change_plan')) {
+if (!Mfa::isFresh($caller, 'billing.change_plan')) {
     // ask the person to verify a factor again
 }
 ```
@@ -99,7 +101,7 @@ other is absent:
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
-Mfa::isFresh('mfa.remove_factor', Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2, maxAge: 300));
+Mfa::isFresh($caller, 'mfa.remove_factor', Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2, maxAge: 300));
 ```
 
 Every part of a caller's requirement needs a maximum age of 1 to 86400 seconds: one without, or one longer, is refused
@@ -137,7 +139,7 @@ one first factor began and hands them to the combination policy (see
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 
-$evaluation = app(RequirementCheck::class)->check($tenantRequirement, ...Mfa::proofs());
+$evaluation = app(RequirementCheck::class)->check($tenantRequirement, ...Mfa::proofs($caller));
 
 $evaluation->meetsRequirement();
 $evaluation->unmet;   // the parts still to prove

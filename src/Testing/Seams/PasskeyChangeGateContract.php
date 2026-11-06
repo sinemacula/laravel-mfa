@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Testing\Seams;
 use Illuminate\Container\Container;
 use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
@@ -106,8 +107,8 @@ final class PasskeyChangeGateContract
         );
 
         $calls = [
-            static fn () => $gate->registering($identity, $application, $registration),
-            static fn () => $gate->removing($identity, $application, self::CREDENTIAL),
+            static fn () => $gate->registering(CallerContext::forIdentity($identity, $application), $registration),
+            static fn () => $gate->removing(CallerContext::forIdentity($identity, $application), self::CREDENTIAL),
         ];
 
         foreach ($calls as $call) {

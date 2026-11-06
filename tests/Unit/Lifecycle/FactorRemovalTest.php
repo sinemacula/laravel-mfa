@@ -20,6 +20,7 @@ use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\Fixtures\Lifecycle\RecordingSessionRevoker;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -137,7 +138,7 @@ final class FactorRemovalTest extends TestCase
         $this->stepUpWith($user, $factor);
         $this->recoveryCodesOf($user);
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
         self::assertSame(0, RecoveryCode::query()->count());
         self::assertSame(['FactorRemoved', 'RecoveryCodesRemoved'], $this->reportedNames());
     }
@@ -164,7 +165,7 @@ final class FactorRemovalTest extends TestCase
         $stored = RecoveryCode::query()->count();
 
         self::assertGreaterThan(0, $stored);
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
         self::assertSame($stored, RecoveryCode::query()->count());
         self::assertSame(['FactorRemoved'], $this->reportedNames());
     }
@@ -185,7 +186,7 @@ final class FactorRemovalTest extends TestCase
 
         $this->stepUpWith($user, $factor);
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
         self::assertSame(['FactorRemoved'], $this->reportedNames());
     }
 

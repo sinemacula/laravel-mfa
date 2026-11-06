@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -24,6 +25,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\PendingCompletionTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\StepUpTests;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
@@ -105,12 +107,12 @@ final class ProofStoreCompletionTest extends TestCase
         $seam  = $this->stepUp();
         $proof = $this->proof(Purpose::STEP_UP);
 
-        self::assertNull($seam->stepUp($this->resultOf($proof)));
+        self::assertNull($seam->stepUp(Callers::current(), $this->resultOf($proof)));
         self::assertSame([$proof->toArray()], $this->storedArrays());
 
         $signIn = $this->proof(Purpose::SIGN_IN);
 
-        self::assertNull($seam->stepUp($this->resultOf($signIn)));
+        self::assertNull($seam->stepUp(Callers::current(), $this->resultOf($signIn)));
         self::assertSame([$proof->toArray(), $signIn->toArray()], $this->storedArrays());
     }
 
@@ -142,7 +144,7 @@ final class ProofStoreCompletionTest extends TestCase
         $proof = $this->proof(Purpose::STEP_UP);
 
         DB::beginTransaction();
-        $seam->stepUp($this->resultOf($proof));
+        $seam->stepUp(Callers::current(), $this->resultOf($proof));
 
         $during = $this->store()->proofs($this->user, 'web');
 
@@ -151,7 +153,7 @@ final class ProofStoreCompletionTest extends TestCase
         $rolledBack = $this->store()->proofs($this->user, 'web');
 
         DB::beginTransaction();
-        $seam->stepUp($this->resultOf($proof));
+        $seam->stepUp(Callers::current(), $this->resultOf($proof));
         DB::commit();
 
         self::assertSame([], $during);
@@ -167,8 +169,8 @@ final class ProofStoreCompletionTest extends TestCase
      */
     public function testAStepUpIsRefusedWhatAnActiveSessionCannotTake(): void
     {
-        $this->assertNotAccepted(fn () => $this->stepUp()->stepUp($this->resultOf($this->proof(Purpose::ENROLLMENT))));
-        $this->assertNotAccepted(fn () => $this->stepUp()->stepUp($this->resultOf($this->proof(Purpose::REAUTHENTICATE))));
+        $this->assertNotAccepted(fn () => $this->stepUp()->stepUp(Callers::current(), $this->resultOf($this->proof(Purpose::ENROLLMENT))));
+        $this->assertNotAccepted(fn () => $this->stepUp()->stepUp(Callers::current(), $this->resultOf($this->proof(Purpose::REAUTHENTICATE))));
 
         $this->assertNotAccepted(function (): void {
             $other = new TestUser;
@@ -178,16 +180,16 @@ final class ProofStoreCompletionTest extends TestCase
             $binding = new ProofBinding($other->getMorphClass(), '8', 'web', self::SESSION, Purpose::STEP_UP);
             $parts   = self::parts(SignInProofs::of($other)->inSession(self::SESSION)->totp());
 
-            $this->stepUp()->stepUp($this->resultOf(new Proof(...[...$parts, 'binding' => $binding])));
+            $this->stepUp()->stepUp(Callers::current(), $this->resultOf(new Proof(...[...$parts, 'binding' => $binding])));
         });
 
         $this->store()->forget($this->user, 'web');
 
-        $this->assertNotAccepted(fn () => $this->stepUp()->stepUp($this->resultOf($this->proof(Purpose::STEP_UP))));
+        $this->assertNotAccepted(fn () => $this->stepUp()->stepUp(Callers::current(), $this->resultOf($this->proof(Purpose::STEP_UP))));
 
         $this->app?->make('auth')->forgetGuards();
 
-        $this->assertNotAccepted(fn () => $this->stepUp()->stepUp($this->resultOf($this->proof(Purpose::STEP_UP))));
+        $this->assertNotAccepted(fn () => $this->stepUp()->stepUp(Callers::current(), $this->resultOf($this->proof(Purpose::STEP_UP))));
     }
 
     /**
@@ -272,6 +274,19 @@ final class ProofStoreCompletionTest extends TestCase
     protected function stepUpResultOfAnotherBinding(): VerificationResult
     {
         return $this->resultOf($this->proof(Purpose::STEP_UP, 'another-session'));
+    }
+
+    /**
+     * The signed-in person, on an active session.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\CallerContext
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[\Override]
+    protected function stepUpCaller(): CallerContext
+    {
+        return Callers::current();
     }
 
     /**

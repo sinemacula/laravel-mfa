@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Verification\FactorOffers;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
@@ -86,7 +87,7 @@ final class FactorOffersTest extends TestCase
 
         $preferred->forceFill(['created_at' => CarbonImmutable::now()->addHours(2)])->save();
 
-        $ids = array_map(static fn (FactorSummary $factor): string => $factor->id, $this->mfa()->offeredFactors());
+        $ids = array_map(static fn (FactorSummary $factor): string => $factor->id, $this->mfa()->offeredFactors(Callers::current()));
 
         self::assertSame([$preferred->id, $oldest->id, ...$tied, $newest->id], $ids);
     }
@@ -110,7 +111,7 @@ final class FactorOffersTest extends TestCase
 
         $locked = $this->totpFactor($user, ['locked_until' => CarbonImmutable::now()->addHour()]);
 
-        $offered = $this->mfa()->offeredFactors();
+        $offered = $this->mfa()->offeredFactors(Callers::current());
 
         self::assertCount(1, $offered);
         self::assertSame($locked->id, $offered[0]->id);
@@ -128,22 +129,22 @@ final class FactorOffersTest extends TestCase
         $user    = $this->signedInPerson();
         $factor  = $this->passkeyFactor($user);
 
-        self::assertCount(1, $this->mfa()->offeredFactors());
+        self::assertCount(1, $this->mfa()->offeredFactors(Callers::current()));
 
         $gateway->available = false;
 
-        self::assertSame([], $this->mfa()->offeredFactors());
+        self::assertSame([], $this->mfa()->offeredFactors(Callers::current()));
 
         $gateway->available  = true;
         $gateway->registered = [];
 
-        self::assertSame([], $this->mfa()->offeredFactors());
+        self::assertSame([], $this->mfa()->offeredFactors(Callers::current()));
 
         $gateway->registered = [self::CREDENTIAL];
 
         PasskeyAssociation::query()->where('factor_id', $factor->id)->delete();
 
-        self::assertSame([], $this->mfa()->offeredFactors());
+        self::assertSame([], $this->mfa()->offeredFactors(Callers::current()));
     }
 
     /**
@@ -162,11 +163,11 @@ final class FactorOffersTest extends TestCase
 
         $this->pendingSession($user, actions: [PendingAction::VERIFY]);
 
-        $refused = $this->mfa()->offeredFactors();
+        $refused = $this->mfa()->offeredFactors(Callers::current());
 
         $this->pendingSession($user);
 
-        $offered = $this->mfa()->offeredFactors();
+        $offered = $this->mfa()->offeredFactors(Callers::current());
 
         self::assertSame([], $refused);
 
@@ -181,7 +182,7 @@ final class FactorOffersTest extends TestCase
      */
     public function testNothingIsOfferedWithoutAFirstFactor(): void
     {
-        self::assertSame([], $this->mfa()->offeredFactors());
+        self::assertSame([], $this->mfa()->offeredFactors(Callers::current()));
 
         $this->container()->instance(FirstFactorResolver::class, new FixedFirstFactorResolver(null));
 
@@ -191,7 +192,7 @@ final class FactorOffersTest extends TestCase
 
         $this->totpFactor($user);
 
-        self::assertSame([], $this->mfa()->offeredFactors());
+        self::assertSame([], $this->mfa()->offeredFactors(Callers::current()));
     }
 
     /**
@@ -212,13 +213,13 @@ final class FactorOffersTest extends TestCase
 
         $store->begin($active, self::APPLICATION, self::SESSION);
 
-        self::assertCount(1, $this->mfa()->offeredFactors());
+        self::assertCount(1, $this->mfa()->offeredFactors(Callers::current()));
 
         $this->actingAs($inactive);
 
         $store->begin($inactive, self::APPLICATION, self::SESSION);
 
-        self::assertSame([], $this->mfa()->offeredFactors());
+        self::assertSame([], $this->mfa()->offeredFactors(Callers::current()));
     }
 
     /**
@@ -234,11 +235,11 @@ final class FactorOffersTest extends TestCase
         $this->totpFactor($user);
         $this->pendingSession($user);
 
-        self::assertCount(1, $this->mfa()->offeredFactors());
+        self::assertCount(1, $this->mfa()->offeredFactors(Callers::current()));
 
         VerificationGeneration::advance($user);
 
-        self::assertSame([], $this->mfa()->offeredFactors());
+        self::assertSame([], $this->mfa()->offeredFactors(Callers::current()));
     }
 
     /**
@@ -253,7 +254,7 @@ final class FactorOffersTest extends TestCase
         $this->emailFactor($user);
         $this->totpFactor($user);
 
-        $encoded = (string) json_encode($this->mfa()->offeredFactors());
+        $encoded = (string) json_encode($this->mfa()->offeredFactors(Callers::current()));
 
         self::assertStringNotContainsString(self::ADDRESS, $encoded);
         self::assertStringContainsString('example.test', $encoded);

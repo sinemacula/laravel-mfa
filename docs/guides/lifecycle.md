@@ -8,10 +8,13 @@ factors need CSRF protection (see [CSRF protection](middleware.md#csrf-protectio
 ## Listing and getting factors
 
 ```php
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 
-Mfa::factors();          // list<FactorSummary>, the preferred first, then by id
-Mfa::factor($factorId);  // ?FactorSummary
+$caller = CallerContext::fromRequest($request); // see Helpers: The caller
+
+Mfa::factors($caller);           // list<FactorSummary>, the preferred first, then by id
+Mfa::factor($caller, $factorId); // ?FactorSummary
 ```
 
 Both serve an active session, and a pending one whose credential allows `mfa.list_factors`. A request that serves nobody
@@ -28,7 +31,7 @@ answers it). Whether a person is set up is whether any of their factors is confi
 ## Removing a factor
 
 ```php
-$result = Mfa::removeFactor($factorId);
+$result = Mfa::removeFactor($caller, $factorId);
 
 if (!$result->wasMade()) {
     return response()->json(['reason' => $result->reason->value], 422);
@@ -131,8 +134,8 @@ generation advances, whatever the bound revoker does; and every session is revok
 last, as the lock order puts the session row after the rest. Delivered code rows stay, since the send caps read them;
 with the factor gone they verify nothing.
 
-Resetting the identity the request serves invalidates its own proofs too: none are kept for it. Without an
-authentication layer the Laravel login itself goes on, and its next protected request finds no proof.
+Resetting your own identity, from a request signed in as it, invalidates that request's proofs too: none are kept.
+Without an authentication layer the Laravel login itself goes on, and its next protected request finds no proof.
 
 Once it commits the events follow, in this order: `LockoutLifted` for each live lockout, naming the actor; in id order,
 `FactorRemoved` naming the actor for a confirmed factor and `EnrollmentAbandoned` for a pending one;

@@ -13,7 +13,6 @@ use SineMacula\Laravel\Mfa\Assurance\Evaluation;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Context\Caller;
-use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\Factor as ContractFactor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
@@ -64,6 +63,7 @@ use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
@@ -146,21 +146,21 @@ final class GatesEnrollmentStarterTest extends TestCase
     {
         $request = EnrollmentRequest::totp(self::ACCOUNT);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->startEnrollment($request)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->startEnrollment(Callers::current(), $request)->reason);
 
         $this->actingAs(new NonEloquentIdentity(person: false));
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->startEnrollment($request)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->startEnrollment(Callers::current(), $request)->reason);
 
         $user = $this->person();
 
         $this->actingAs($user);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->startEnrollment($request)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->startEnrollment(Callers::current(), $request)->reason);
 
         $this->pendingSession($user, null, [PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT, PendingAction::SEND_CODE]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->startEnrollment($request)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->startEnrollment(Callers::current(), $request)->reason);
         self::assertSame(0, Factor::query()->count());
     }
 
@@ -177,7 +177,7 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         $this->container()->make(ProofStore::class)->begin($identity, self::APPLICATION, self::SESSION);
 
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
     }
 
     /**
@@ -193,10 +193,10 @@ final class GatesEnrollmentStarterTest extends TestCase
         $this->enableApplication(['types' => ['email', 'passkey', 'noop']]);
         $this->steppedUpPerson();
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->startEnrollment(EnrollmentRequest::of('no_such_type'))->reason);
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(EnrollmentRequest::of('passkey'))->reason);
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(EnrollmentRequest::of('noop'))->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::of('no_such_type'))->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::of('passkey'))->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::of('noop'))->reason);
         self::assertSame(1, Factor::query()->count());
     }
 
@@ -233,7 +233,7 @@ final class GatesEnrollmentStarterTest extends TestCase
         $this->enableApplication(['types' => ['totp', 'email', 'sms']]);
         $this->steppedUpPerson();
 
-        self::assertSame(FailureReason::INVALID_DESTINATION, $this->mfa()->startEnrollment(EnrollmentRequest::delivered($type, $destination))->reason);
+        self::assertSame(FailureReason::INVALID_DESTINATION, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered($type, $destination))->reason);
         self::assertSame(1, Factor::query()->count());
     }
 
@@ -246,7 +246,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     {
         $this->steppedUpPerson();
 
-        self::assertSame(FailureReason::INVALID_DESTINATION, $this->mfa()->startEnrollment(EnrollmentRequest::of('email'))->reason);
+        self::assertSame(FailureReason::INVALID_DESTINATION, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::of('email'))->reason);
     }
 
     /**
@@ -262,7 +262,7 @@ final class GatesEnrollmentStarterTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Enrolling the type [totp] needs the account name its authenticator app shows.');
 
-        $this->mfa()->startEnrollment(EnrollmentRequest::of('totp'));
+        $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::of('totp'));
     }
 
     /**
@@ -281,11 +281,11 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         self::assertSame(0, $this->addressHits('127.0.0.1'));
 
-        $this->mfa()->confirmEnrollment($this->grantOf($first), $this->wrongCode($first));
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($first), $this->wrongCode($first));
 
         self::assertSame(1, $this->addressHits('127.0.0.1'));
 
-        $start = $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
+        $start = $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT));
 
         self::assertSame(FailureReason::LOCKED, $start->reason);
         self::assertNotNull($start->lockedUntil);
@@ -305,7 +305,7 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         IdentityState::query()->updateOrCreate(['authenticatable_type' => $owner->type, 'authenticatable_id' => $owner->key], ['locked_until' => $until]);
 
-        $start = $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
+        $start = $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT));
 
         self::assertSame(FailureReason::LOCKED, $start->reason);
         self::assertSame($until->getTimestamp(), $start->lockedUntil?->getTimestamp());
@@ -324,7 +324,7 @@ final class GatesEnrollmentStarterTest extends TestCase
         $this->totpFactor($user, ['application' => self::APPLICATION]);
         $this->recordFirstFactor($user);
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
     }
 
     /**
@@ -339,11 +339,11 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         $this->recordFirstFactor($user);
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
 
         $this->container()->instance(Reauthenticator::class, new FixedReauthenticator(SignInProofs::of($user)->inSession('other')->reauthentication()));
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
 
         $this->container()->instance(Reauthenticator::class, new FixedReauthenticator(SignInProofs::of($user)->inSession(self::SESSION)->reauthentication(10)));
 
@@ -370,7 +370,7 @@ final class GatesEnrollmentStarterTest extends TestCase
         Factor::query()->whereKey($stored->id)->toBase()->update(['status' => 'CONFIRMED']);
 
         try {
-            $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
+            $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT));
 
             self::fail('An unknown status must not read as pending.');
         } catch (InvalidModelException $exception) {
@@ -406,11 +406,11 @@ final class GatesEnrollmentStarterTest extends TestCase
         $this->beginSignIn($user, self::PENDING);
         $this->pendingSession($user, null, self::BOOTSTRAP_ACTIONS);
 
-        self::assertSame(FailureReason::MFA_ENROLLMENT_REQUIRED, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::MFA_ENROLLMENT_REQUIRED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
 
         $this->enableApplication(['bootstrap' => ['enabled' => true, 'types' => ['email']]]);
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
 
         $start = $this->startedEmail();
 
@@ -418,12 +418,12 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         $this->totpFactor($user);
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS))->reason);
+        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS))->reason);
 
         // Having a factor to verify, it is told to, whatever bootstrap allows.
         $this->enableApplication();
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
     }
 
     /**
@@ -436,14 +436,14 @@ final class GatesEnrollmentStarterTest extends TestCase
     {
         $user = $this->bootstrapPerson(actions: [PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT]);
 
-        $pending = $this->container()->make(CallerContextResolver::class)->pending();
+        $pending = Callers::current()->pending;
 
         self::assertNotNull($pending);
 
         $authority = $this->container()->make(EnrollmentAuthority::class);
 
         try {
-            $authority->authorize(new Caller($user, $pending), self::APPLICATION, 'totp', Factor::query()->get(), PendingAction::START_BOOTSTRAP_ENROLLMENT);
+            $authority->authorize(new Caller($user, $pending, $pending->application), self::APPLICATION, 'totp', Factor::query()->get(), PendingAction::START_BOOTSTRAP_ENROLLMENT);
 
             self::fail('A credential lacking the action was expected to be refused.');
         } catch (OperationRefusedException $exception) {
@@ -464,15 +464,15 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         $this->pendingSession($user, null, self::BOOTSTRAP_ACTIONS, firstFactor: $this->emailFirstFactor($user, self::PENDING));
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS))->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS))->reason);
         self::assertSame(0, Factor::query()->count());
 
-        self::assertTrue($this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', 'other@example.test'))->hasStarted());
-        self::assertTrue($this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->hasStarted());
+        self::assertTrue($this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', 'other@example.test'))->hasStarted());
+        self::assertTrue($this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->hasStarted());
 
         $this->pendingSession($user, null, self::BOOTSTRAP_ACTIONS, firstFactor: SignInProofs::of($user)->inSession(self::PENDING)->underGeneration(5)->password());
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
     }
 
     /**
@@ -495,15 +495,15 @@ final class GatesEnrollmentStarterTest extends TestCase
         $this->container()->instance(FirstFactorResolver::class, new FixedFirstFactorResolver(null));
         $this->enableApplication(['first_factor' => null]);
 
-        self::assertTrue($this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS))->hasStarted());
+        self::assertTrue($this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS))->hasStarted());
 
         Enrollment::query()->delete();
         Factor::query()->delete();
 
         $store->record($this->emailFirstFactor($user, self::SESSION));
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS))->reason);
-        self::assertTrue($this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', 'other@example.test'))->hasStarted());
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS))->reason);
+        self::assertTrue($this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', 'other@example.test'))->hasStarted());
 
         Enrollment::query()->delete();
         Factor::query()->delete();
@@ -512,7 +512,7 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         $this->recordStepUp($user, $factor);
 
-        self::assertTrue($this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS))->hasStarted());
+        self::assertTrue($this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS))->hasStarted());
     }
 
     /**
@@ -527,16 +527,16 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         $user = $this->steppedUpPerson();
 
-        self::assertSame(FailureReason::LIMIT_REACHED, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
-        self::assertTrue($this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS))->hasStarted());
+        self::assertSame(FailureReason::LIMIT_REACHED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertTrue($this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS))->hasStarted());
 
         $this->emailFactor($user, 'second@example.test', ['application' => self::APPLICATION]);
 
-        self::assertSame(FailureReason::LIMIT_REACHED, $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS))->reason);
+        self::assertSame(FailureReason::LIMIT_REACHED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS))->reason);
 
         Factor::query()->where('status', 'confirmed')->update(['application' => 'admin']);
 
-        self::assertTrue($this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->hasStarted());
+        self::assertTrue($this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->hasStarted());
     }
 
     /**
@@ -551,12 +551,12 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         $first = $this->startedEmail();
 
-        self::assertSame(FailureReason::LIMIT_REACHED, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::LIMIT_REACHED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
         self::assertTrue($this->rowOf($first)->exists);
 
         Enrollment::query()->update(['application' => 'admin']);
 
-        self::assertTrue($this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->hasStarted());
+        self::assertTrue($this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->hasStarted());
         self::assertSame(2, Enrollment::query()->count());
     }
 
@@ -572,7 +572,7 @@ final class GatesEnrollmentStarterTest extends TestCase
         $this->container()->instance(ProofStore::class, new InterruptingProofStore($this->container()->make(ProofStore::class)));
         $this->forgetReports();
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
         self::assertSame(0, Enrollment::query()->count());
         self::assertSame([], $this->reported);
     }
@@ -590,7 +590,7 @@ final class GatesEnrollmentStarterTest extends TestCase
 
         $this->expectException(WriteCanceledException::class);
 
-        $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
+        $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT));
     }
 
     /**
@@ -608,7 +608,7 @@ final class GatesEnrollmentStarterTest extends TestCase
         $this->expectException(WriteCanceledException::class);
         $this->expectExceptionMessage('its enrolment did not start');
 
-        $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT));
+        $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT));
     }
 
     /**
@@ -620,7 +620,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     {
         $this->steppedUpPerson();
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->startEnrollment(EnrollmentRequest::of('passkey'))->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::of('passkey'))->reason);
     }
 
     /**
@@ -680,7 +680,7 @@ final class GatesEnrollmentStarterTest extends TestCase
         self::assertSame('own-secret', $start->secret?->reveal());
         self::assertNull($start->provisioningUri);
         self::assertSame('own-secret', $this->pendingFactorOf($start)->getSecret());
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), 'correct')->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), 'correct')->isConfirmed());
     }
 
     /**
@@ -733,12 +733,12 @@ final class GatesEnrollmentStarterTest extends TestCase
         $start = $this->startedTotp();
         $new   = $this->pendingFactorOf($start);
 
-        self::assertTrue($this->mfa()->verify(Submission::factor($old->id, AuthenticatorApp::code($old, -1)))->isVerified());
-        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->verify(Submission::factor($new->id, $this->appCode($start, -1)))->reason);
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($old->id, AuthenticatorApp::code($old, -1)))->isVerified());
+        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->verify(Callers::current(), Submission::factor($new->id, $this->appCode($start, -1)))->reason);
 
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->isConfirmed());
 
-        self::assertTrue($this->mfa()->verify(Submission::factor($old->id, AuthenticatorApp::code($old)))->isVerified());
-        self::assertTrue($this->mfa()->verify(Submission::factor($new->id, $this->appCode($start, 1)))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($old->id, AuthenticatorApp::code($old)))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($new->id, $this->appCode($start, 1)))->isVerified());
     }
 }

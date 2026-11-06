@@ -7,14 +7,14 @@ below is relative to `SineMacula\Laravel\Mfa`.
 
 ## Reading the proofs
 
-`Mfa::proofs()` returns the proofs of the current identity's sign-in on the current application that still count,
-oldest first:
+`Mfa::proofs()` returns the proofs of the caller's sign-in on the caller's application that still count, oldest first:
 
 ```php
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 
-foreach (Mfa::proofs() as $proof) {
+foreach (Mfa::proofs(CallerContext::fromRequest($request)) as $proof) {
     $proof->kind;        // ProofKind::ADDITIONAL_FACTOR, ProofKind::RECOVERY_CODE, ...
     $proof->method;      // 'totp', 'email', 'sms', 'recovery_code', ...
     $proof->reference;   // the factor it was made with
@@ -22,8 +22,9 @@ foreach (Mfa::proofs() as $proof) {
 }
 ```
 
-The current application is the one a bound `Contracts\ApplicationResolver` names for the request, or the default
-guard's name without one. The list is empty without an MFA-capable identity or a sign-in.
+The caller's application is the one `CallerContext::fromRequest()` takes from a bound `Contracts\ApplicationResolver`,
+or the guard's name without one (see [The caller](helpers.md#the-caller)). The list is empty without an MFA-capable
+identity or a sign-in, and on a pending session.
 
 A recorded proof stops counting, and is left out, when:
 

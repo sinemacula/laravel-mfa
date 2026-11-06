@@ -51,6 +51,7 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Seams\AcceptingChallengeGateway;
@@ -132,7 +133,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         $this->forgetReports();
 
-        $result = $this->mfa()->resendEnrollmentCode($this->grantOf($start));
+        $result = $this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start));
 
         self::assertTrue($result->wasSent());
         self::assertSame(['CodeSent'], $this->reportedNames());
@@ -163,11 +164,11 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         Carbon::setTestNow(CarbonImmutable::now()->addMinutes(11));
 
-        $result = $this->mfa()->resendEnrollmentCode($this->grantOf($start));
+        $result = $this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start));
 
         self::assertNotSame($first, $result->challengeId);
         self::assertSame($result->challengeId, $this->rowOf($start)->challenge_id);
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), (string) $this->mailbox->lastCodeTo(self::ADDRESS))->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), (string) $this->mailbox->lastCodeTo(self::ADDRESS))->isConfirmed());
     }
 
     /**
@@ -185,7 +186,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         $this->forgetReports();
 
-        $result = $this->mfa()->resendEnrollmentCode(new RevealedSecret($this->grantOf($start)));
+        $result = $this->mfa()->resendEnrollmentCode(Callers::current(), new RevealedSecret($this->grantOf($start)));
 
         self::assertSame(FailureReason::SENDING_CAPPED, $result->reason);
         self::assertNotNull($result->retryAfter);
@@ -204,13 +205,13 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
         $start = $this->startedEmail();
         $grant = $this->grantOf($start);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode('unknown')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode(Callers::current(), 'unknown')->reason);
 
         $this->lock($user);
 
         Carbon::setTestNow(CarbonImmutable::now()->addSeconds(61));
 
-        $locked = $this->mfa()->resendEnrollmentCode($grant);
+        $locked = $this->mfa()->resendEnrollmentCode(Callers::current(), $grant);
 
         self::assertSame(FailureReason::LOCKED, $locked->reason);
         self::assertSame(239, $locked->retryAfter);
@@ -219,13 +220,13 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         $this->enableApplication(['types' => ['totp']]);
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->resendEnrollmentCode($grant)->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->resendEnrollmentCode(Callers::current(), $grant)->reason);
 
         $this->enableApplication();
 
         Carbon::setTestNow(CarbonImmutable::now()->addHour());
 
-        self::assertSame(FailureReason::EXPIRED, $this->mfa()->resendEnrollmentCode($grant)->reason);
+        self::assertSame(FailureReason::EXPIRED, $this->mfa()->resendEnrollmentCode(Callers::current(), $grant)->reason);
         self::assertTrue($this->rowOf($start)->exists);
     }
 
@@ -244,7 +245,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         $this->container()->instance(ChallengeGateway::class, new AcceptingChallengeGateway);
 
-        self::assertSame(FailureReason::EXPIRED, $this->mfa()->resendEnrollmentCode($this->grantOf($start))->reason);
+        self::assertSame(FailureReason::EXPIRED, $this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start))->reason);
     }
 
     /**
@@ -256,7 +257,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     {
         $this->reauthenticatedPerson();
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode($this->grantOf($this->startedTotp()))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($this->startedTotp()))->reason);
         self::assertSame([], $this->mailbox->sent());
     }
 
@@ -268,11 +269,11 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
      */
     public function testAResendNeedsItsCaller(): void
     {
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode('any')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode(Callers::current(), 'any')->reason);
 
         $this->actingAs($this->person('other@example.test'));
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode('any')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode(Callers::current(), 'any')->reason);
 
         $user  = $this->bootstrapPerson();
         $start = $this->startedEmail();
@@ -281,18 +282,18 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         $this->pendingSession($user, null, [PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT, PendingAction::SEND_CODE]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode($this->grantOf($start))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start))->reason);
 
         $this->pendingSession($user, null, self::BOOTSTRAP_ACTIONS);
 
-        self::assertTrue($this->mfa()->resendEnrollmentCode($this->grantOf($start))->wasSent());
+        self::assertTrue($this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start))->wasSent());
 
         Carbon::setTestNow(CarbonImmutable::now()->addSeconds(61));
 
         $this->container()->instance(ProofStore::class, new InterruptingProofStore($this->container()->make(ProofStore::class), 0));
         $this->pendingSession($user, null, self::BOOTSTRAP_ACTIONS, session: 'pending-b');
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode($this->grantOf($start))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start))->reason);
     }
 
     /**
@@ -312,7 +313,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         $this->container()->instance(ProofStore::class, new InterruptingProofStore($this->container()->make(ProofStore::class)));
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode($this->grantOf($start))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start))->reason);
         self::assertSame([], $this->mailbox->sent());
     }
 
@@ -329,9 +330,9 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         $start = $this->startedEmail();
 
-        $this->mfa()->confirmEnrollment($this->grantOf($start), 'wrong');
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), 'wrong');
 
-        $result = $this->mfa()->resendEnrollmentCode($this->grantOf($start));
+        $result = $this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start));
 
         self::assertSame(FailureReason::LOCKED, $result->reason);
         self::assertNotNull($result->retryAfter);
@@ -350,14 +351,14 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         $this->forgetReports();
 
-        self::assertTrue($this->mfa()->cancelEnrollment($start->grant ?? ''));
+        self::assertTrue($this->mfa()->cancelEnrollment(Callers::current(), $start->grant ?? ''));
         self::assertSame(['EnrollmentAbandoned'], $this->reportedNames());
         self::assertInstanceOf(EnrollmentAbandoned::class, $this->reported[0]);
         self::assertSame($start->factor?->id, $this->reported[0]->factor->id);
         self::assertSame(self::APPLICATION, $this->reported[0]->context()['application']);
         self::assertSame(0, Factor::query()->count());
         self::assertSame(0, Enrollment::query()->count());
-        self::assertFalse($this->mfa()->cancelEnrollment($start->grant ?? ''));
+        self::assertFalse($this->mfa()->cancelEnrollment(Callers::current(), $start->grant ?? ''));
     }
 
     /**
@@ -368,7 +369,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
      */
     public function testCancelingWorksDuringALockoutAndOnlyWithItsGrant(): void
     {
-        self::assertFalse($this->mfa()->cancelEnrollment('any'));
+        self::assertFalse($this->mfa()->cancelEnrollment(Callers::current(), 'any'));
 
         $user  = $this->reauthenticatedPerson();
         $start = $this->startedTotp();
@@ -377,10 +378,10 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         $this->forgetReports();
 
-        self::assertFalse($this->mfa()->cancelEnrollment('unknown'));
+        self::assertFalse($this->mfa()->cancelEnrollment(Callers::current(), 'unknown'));
         self::assertSame([], $this->reported);
         self::assertSame(1, Factor::query()->count());
-        self::assertTrue($this->mfa()->cancelEnrollment($this->grantOf($start)));
+        self::assertTrue($this->mfa()->cancelEnrollment(Callers::current(), $this->grantOf($start)));
     }
 
     /**
@@ -395,11 +396,35 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
 
         $this->pendingSession($user, null, [PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT]);
 
-        self::assertFalse($this->mfa()->cancelEnrollment($this->grantOf($start)));
+        self::assertFalse($this->mfa()->cancelEnrollment(Callers::current(), $this->grantOf($start)));
 
         $this->pendingSession($user, null, self::BOOTSTRAP_ACTIONS);
 
-        self::assertTrue($this->mfa()->cancelEnrollment($this->grantOf($start)));
+        self::assertTrue($this->mfa()->cancelEnrollment(Callers::current(), $this->grantOf($start)));
+    }
+
+    /**
+     * A caller whose pending credential is revoked once it was read cancels
+     * nothing: the credential is read again under the identity's lock.
+     *
+     * @return void
+     */
+    public function testACallerRevokedOnceReadCancelsNothing(): void
+    {
+        $user  = $this->bootstrapPerson();
+        $start = $this->startedTotp();
+
+        $this->pendingSession($user, null, self::BOOTSTRAP_ACTIONS);
+
+        $caller = Callers::current();
+
+        $this->noPendingSession();
+
+        self::assertFalse($this->mfa()->cancelEnrollment($caller, $this->grantOf($start)));
+
+        $this->pendingSession($user, null, self::BOOTSTRAP_ACTIONS);
+
+        self::assertTrue($this->mfa()->cancelEnrollment(Callers::current(), $this->grantOf($start)));
     }
 
     /**
@@ -411,7 +436,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     {
         $this->actingAs($this->person());
 
-        self::assertFalse($this->mfa()->cancelEnrollment('any'));
+        self::assertFalse($this->mfa()->cancelEnrollment(Callers::current(), 'any'));
     }
 
     /**

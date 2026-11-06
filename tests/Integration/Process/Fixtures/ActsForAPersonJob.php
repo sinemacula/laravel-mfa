@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
@@ -96,8 +97,8 @@ final class ActsForAPersonJob implements ShouldQueue
         $observations->seen[] = [
             'job'      => $this->name,
             'identity' => Auth::guard('web')->id(),
-            'factors'  => array_map(static fn (FactorSummary $factor): string => $factor->id, Mfa::factors()),
-            'proofs'   => count(Mfa::proofs()),
+            'factors'  => array_map(static fn (FactorSummary $factor): string => $factor->id, Mfa::factors(Callers::current())),
+            'proofs'   => count(Mfa::proofs(Callers::current())),
             'changed'  => $before !== $this->stored(),
         ];
     }
@@ -133,18 +134,18 @@ final class ActsForAPersonJob implements ShouldQueue
     private function act(): void
     {
         if ($this->renames !== null) {
-            Mfa::renameFactor($this->renames, 'Renamed by ' . $this->name);
+            Mfa::renameFactor(Callers::current(), $this->renames, 'Renamed by ' . $this->name);
         }
 
         if ($this->sendsTo !== null) {
-            Mfa::sendCode($this->sendsTo);
+            Mfa::sendCode(Callers::current(), $this->sendsTo);
         }
 
         if ($this->verifies === null) {
             return;
         }
 
-        Mfa::verify(Submission::factor($this->verifies, (string) $this->code));
+        Mfa::verify(Callers::current(), Submission::factor($this->verifies, (string) $this->code));
     }
 
     /**

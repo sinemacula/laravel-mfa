@@ -43,6 +43,7 @@ use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Enrollment\FixedDeadlineGate;
 use Tests\Fixtures\Enrollment\UndatedCombinationPolicy;
@@ -158,9 +159,9 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
 
         $this->recordStepUp($user, $factor);
 
-        self::assertTrue($this->mfa()->isFresh('mfa.add_factor'));
+        self::assertTrue($this->mfa()->isFresh(Callers::current(), 'mfa.add_factor'));
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertSame(FailureReason::EXPIRED, $confirmation->reason);
         self::assertSame(0, Factor::query()->where('status', 'pending')->count());
@@ -180,7 +181,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
 
         Carbon::setTestNow(CarbonImmutable::now()->addSeconds(99));
 
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->isConfirmed());
     }
 
     /**
@@ -198,11 +199,11 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
         $start   = $this->startedEmail();
         $expires = $this->rowOf($start)->expires_at->getTimestamp();
 
-        $this->mfa()->confirmEnrollment($this->grantOf($start), 'wrong');
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), 'wrong');
 
         Carbon::setTestNow(CarbonImmutable::now()->addSeconds(61));
 
-        self::assertTrue($this->mfa()->resendEnrollmentCode($this->grantOf($start))->wasSent());
+        self::assertTrue($this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start))->wasSent());
 
         $this->recordStepUp($user, $factor);
 
@@ -252,8 +253,8 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
 
         $this->steppedUpPerson();
 
-        self::assertTrue($this->mfa()->isFresh('mfa.add_factor'));
-        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertTrue($this->mfa()->isFresh(Callers::current(), 'mfa.add_factor'));
+        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
     }
 
     /**
@@ -270,7 +271,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
 
         $this->container()->instance(FreshnessGate::class, new FixedDeadlineGate(CarbonImmutable::now()->addMilliseconds(200)));
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->reason);
+        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->reason);
         self::assertSame(1, Factor::query()->count());
 
         $this->container()->instance(FreshnessGate::class, new FixedDeadlineGate(CarbonImmutable::now()->addMilliseconds(700)));
@@ -291,7 +292,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
 
         $requirements = $this->container()->make(RequirementService::class);
 
-        self::assertNull($requirements->freshUntil('Not An Operation'));
-        self::assertNotNull($requirements->freshUntil('mfa.add_factor'));
+        self::assertNull($requirements->freshUntil(Callers::current(), 'Not An Operation'));
+        self::assertNotNull($requirements->freshUntil(Callers::current(), 'mfa.add_factor'));
     }
 }

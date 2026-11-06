@@ -37,15 +37,18 @@ the provider or another capability.
 - Services resolve the seams a consumer rebinds (`FreshnessGate`, `ProofStore`, the event dispatcher and the
   configuration) from the container when they need them, never at construction, so a rebinding (`Event::fake()`, a
   store bound mid-test, a policy bound by a sibling package) reaches a service that is already resolved.
-- The services act for the current identity: `Support\CurrentIdentity::resolve()`, which is `Auth::user()` on the
-  default guard when it implements `MultiFactorAuthenticatable`. Without one, every service answers as it always has: no
-  setup, no factors, no proofs, and nothing written or dispatched.
+- Every self-service action has one method, taking the caller first as a `Context\CallerContext` of plain values, and no
+  service reads a request, a guard or `Auth`. `CallerContext::fromRequest()` is the one place a caller is read from a
+  request; the others are the route gate, factor route binding and the sign-in listeners, through
+  `Proofs\SignInApplication`. A caller that is nobody gets what it always has: no setup, no factors, no proofs, and
+  nothing written or dispatched. The caller is trusted input, and `Context\CallerContextResolver` decides whether it is
+  served: a person, and a pending session only for the actions it allows.
 - A factor runs through the driver of its type, resolved by `Drivers\DriverResolver` from the `mfa` manager the
   container holds. Recovery codes are not a factor and have no driver. A factor
-  is only looked up within the identity the request serves (`Factors\OperationGuard`).
+  is only looked up within the caller's identity (`Factors\OperationGuard`).
 - No service keeps request state: the reads (`factors()`, `factor()`, `proofs()`) go to the identity, the
   database or the bound proof store on every call, and no service is kept between resolutions, so none carries one
-  request's identity or factors into the next (see [Long-Running Processes](long-running-processes.md)).
+  caller's identity or factors into the next (see [Long-Running Processes](long-running-processes.md)).
 - Each capability registers its container wiring in its own `*Bindings` class, which the provider calls: the
   capability's service and the defaults for the seams it owns, each with `bind()`. The capabilities that ship drivers
   also build them, and the provider's `mfa` factory registers them against the manager through the same `extend()` API a
@@ -84,7 +87,7 @@ the provider or another capability.
   drivers, each built from the settings of its capability's block (`mfa.totp`, `mfa.codes`), before the container
   applies any extender or resolving callback.
   The factory first checks the whole configuration (see the application configuration note).
-- A call such as `Mfa::verify(Submission::factor($id, $code))` reaches `MfaManager::verify()`, which hands it to
+- A call such as `Mfa::verify($caller, Submission::factor($id, $code))` reaches `MfaManager::verify()`, which hands it to
   `Verification\VerificationService::verify()`. The service resolves who the request serves, guards the factor, checks
   and counts the code under the identity's lock, hands the result to the completion seam and queues the events (see
   [Verification Lifecycle and Events](verification-lifecycle-and-events.md)).
@@ -109,7 +112,8 @@ the provider or another capability.
   `EnrollmentConfirmer.php` behind it),
   `src/Lifecycle/LifecycleService.php`, `src/RecoveryCodes/RecoveryCodeService.php`: the capability services.
 - `src/Drivers/DriverResolver.php`,
-  `src/Support/CurrentIdentity.php`, `src/Config/IntegerSetting.php`: what the services share.
+  `src/Context/CallerContext.php`, `src/Context/ClientContext.php`, `src/Support/IdentityType.php`,
+  `src/Config/IntegerSetting.php`: what the services share.
 
 ## Authoritative Tests
 

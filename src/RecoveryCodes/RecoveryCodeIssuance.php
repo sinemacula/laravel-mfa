@@ -8,7 +8,11 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
+use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
+use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
@@ -81,20 +85,21 @@ final readonly class RecoveryCodeIssuance
      * Generate a new set for the person the request serves, and answer with its
      * codes, once, as secrets for the response, or the reason it was refused.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration
      *
      * @throws \Throwable
      */
-    public function generate(): RecoveryCodeGeneration
+    public function generate(CallerContext $context): RecoveryCodeGeneration
     {
-        $caller  = $this->callers->resolve(null);
+        $caller  = $this->callers->resolve($context, null);
         $binding = $caller === null ? null : $this->callers->binding($caller, Purpose::STEP_UP);
 
         if ($caller === null || $binding === null) {
             return RecoveryCodeGeneration::refused($caller === null ? FailureReason::NOT_FOUND : FailureReason::NOT_FRESH);
         }
 
-        $gate = fn (?Collection $factors) => $this->assertMayIssue($binding, $factors);
+        $gate = fn (?Collection $factors) => $this->assertMayIssue($caller, $binding, $factors);
 
         try {
             ['codes' => $codes, 'generation' => $generation] = $this->codes->replaceSet($caller->identity, $binding->application, $gate);
@@ -102,7 +107,7 @@ final readonly class RecoveryCodeIssuance
             return self::refusedBy($exception);
         }
 
-        $this->codes->reportGenerated($caller->identity, $binding->application, count($codes), $generation);
+        $this->codes->reportGenerated($caller->identity, $binding->application, count($codes), $generation, null, $caller->client);
 
         return RecoveryCodeGeneration::generated($codes);
     }
@@ -112,20 +117,23 @@ final readonly class RecoveryCodeIssuance
      * change that confirms it, and return its codes, once, as secrets for the
      * response: none when the application does not accept recovery codes, the
      * session's first factor is not known, or that first factor followed by the
-     * confirmation's own proof does not reach the application's level.
+     * confirmation's own proof does not reach the application's level. The
+     * set's event carries the client the change was made from.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    public function withFirstFactor(MultiFactorAuthenticatable $identity, string $application, Proof $proof): array
+    public function withFirstFactor(MultiFactorAuthenticatable $identity, string $application, Proof $proof, ?PendingContext $pending, ?ClientContext $client = null): array
     {
         $settings    = new ApplicationSettings($this->container->make(Repository::class), $application);
-        $firstFactor = $this->firstFactors->forBinding($identity, $proof->binding);
+        $firstFactor = $this->firstFactors->forBinding($identity, $proof->binding, $pending);
 
         if (!$settings->acceptsRecoveryCodes() || $firstFactor === null) {
             return [];
@@ -134,7 +142,7 @@ final readonly class RecoveryCodeIssuance
         $requirement = Requirement::none()->withMinimumLevel($settings->recoveryCodeLevel());
 
         return $this->container->make(RequirementCheck::class)->check($requirement, $firstFactor, $proof)->meetsRequirement()
-            ? $this->codes->generate($identity, null, $application)
+            ? $this->codes->generate($identity, $application, client: $client)
             : [];
     }
 
@@ -159,6 +167,7 @@ final readonly class RecoveryCodeIssuance
      *
      * @formatter:off
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  ?\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
      * @return void
@@ -170,9 +179,9 @@ final readonly class RecoveryCodeIssuance
      * @throws \LogicException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    private function assertMayIssue(ProofBinding $binding, ?Collection $factors): void
+    private function assertMayIssue(Caller $served, ProofBinding $binding, ?Collection $factors): void
     {
-        $caller = $this->callers->still(null, $binding);
+        $caller = $this->callers->still($served, null, $binding);
 
         OperationRefusedException::byPackageUnless($caller !== null, FailureReason::NOT_FRESH, 'The session is no longer the one the recovery codes were asked for on.');
 

@@ -25,6 +25,7 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\PlainUser;
@@ -471,7 +472,6 @@ final class AuthenticationContextContributorTest extends TestCase
      */
     public function testConsecutiveRequestsThroughOneInstanceShareNothing(): void
     {
-        $instance = $this->container()->make(AuthenticationContextContributor::class);
         $proved   = $this->signedInPerson();
         $unproved = $this->person('other@example.test');
 
@@ -479,15 +479,15 @@ final class AuthenticationContextContributorTest extends TestCase
 
         $this->container()->make(ProofStore::class)->begin($unproved, self::APPLICATION, 'sign-in-b');
 
-        self::assertTrue($instance->contribute()['accepted']);
+        self::assertTrue(Mfa::authenticationContext(Callers::current())['accepted']);
 
         $this->actingAs($unproved);
 
-        self::assertFalse($instance->contribute()['accepted']);
+        self::assertFalse(Mfa::authenticationContext(Callers::current())['accepted']);
 
         $this->actingAs($proved);
 
-        self::assertTrue($instance->contribute()['accepted']);
+        self::assertTrue(Mfa::authenticationContext(Callers::current())['accepted']);
     }
 
     /**
@@ -497,7 +497,7 @@ final class AuthenticationContextContributorTest extends TestCase
      */
     public function testTheFacadeReadsTheContext(): void
     {
-        self::assertSame(self::NEUTRAL, Mfa::authenticationContext());
+        self::assertSame(self::NEUTRAL, Mfa::authenticationContext(Callers::current()));
     }
 
     /**
@@ -613,13 +613,13 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * The context the contributor gives now.
+     * The context the caller of the request is given now.
      *
      * @return array<string, mixed>
      */
     private function context(): array
     {
-        return $this->container()->make(AuthenticationContextContributor::class)->contribute();
+        return Mfa::authenticationContext(Callers::current());
     }
 
     /**

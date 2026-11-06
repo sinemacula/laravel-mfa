@@ -82,7 +82,7 @@ final class FactorStateTransaction
      */
     public static function forIdentity(Authenticatable $identity, EloquentFactor&Model $factorModel, \Closure $callback): mixed
     {
-        return self::run(CurrentIdentity::typeOf($identity), self::keyOf($identity->getAuthIdentifier()), $factorModel, $callback);
+        return self::run(IdentityType::of($identity), self::keyOf($identity->getAuthIdentifier()), $factorModel, $callback);
     }
 
     /**
@@ -169,7 +169,7 @@ final class FactorStateTransaction
             return $none;
         }
 
-        return self::owned(WriteConnection::query($factorModel->newQuery()), CurrentIdentity::typeOf($identity), (string) $key, $factorModel);
+        return self::owned(WriteConnection::query($factorModel->newQuery()), IdentityType::of($identity), (string) $key, $factorModel);
     }
 
     /**

@@ -35,6 +35,7 @@ use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\SubmissionRoutes;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Seams\RefusingCompletion;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
@@ -110,7 +111,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
 
         [$challenge, $code] = $this->sentCode($factor);
 
-        $this->mfa()->verify(Submission::challenge($factor->id, $challenge, $code));
+        $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code));
 
         [$sent, $passed] = $this->reported;
 
@@ -141,10 +142,10 @@ final class EventSequenceVerificationServiceTest extends TestCase
         $seen   = null;
 
         Event::listen(VerificationPassed::class, static function () use (&$seen): void {
-            $seen = count(Mfa::proofs());
+            $seen = count(Mfa::proofs(Callers::current()));
         });
 
-        $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
         self::assertSame(1, $seen);
         self::assertCount(1, $this->reported);
@@ -169,7 +170,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
 
         $code = $this->recoveryCode($user);
 
-        $this->mfa()->verify(Submission::recoveryCode($code));
+        $this->mfa()->verify(Callers::current(), Submission::recoveryCode($code));
 
         self::assertCount(3, $this->reported);
         [$passed, $used, $low] = $this->reported;
@@ -201,7 +202,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
 
         $code = $this->recoveryCode($user);
 
-        $this->mfa()->verify(Submission::recoveryCode($code));
+        $this->mfa()->verify(Callers::current(), Submission::recoveryCode($code));
 
         self::assertCount(2, $this->reported);
     }
@@ -221,12 +222,12 @@ final class EventSequenceVerificationServiceTest extends TestCase
 
         $this->container()->instance(StepUp::class, new RefusingCompletion(new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'Refused.')));
 
-        $this->mfa()->verify(Submission::recoveryCode($code));
+        $this->mfa()->verify(Callers::current(), Submission::recoveryCode($code));
 
         self::assertCount(1, $this->reported);
         self::assertInstanceOf(VerificationFailed::class, $this->reported[0]);
         self::assertSame('recovery_code', $this->reported[0]->type);
-        self::assertSame(10, $this->mfa()->recoveryCodeStatus()?->remaining);
+        self::assertSame(10, $this->mfa()->recoveryCodeStatus(Callers::current())?->remaining);
     }
 
     /**
@@ -244,7 +245,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
 
         $this->forgetReports();
 
-        $this->mfa()->verify(Submission::challenge($factor->id, $challenge, 'wrong'));
+        $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, 'wrong'));
 
         $event = $this->failureReported();
 
@@ -274,7 +275,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
         });
 
         try {
-            $this->mfa()->sendCode($factor->id);
+            $this->mfa()->sendCode(Callers::current(), $factor->id);
 
             self::fail('The listener\'s refusal must propagate.');
         } catch (OperationRefusedException $exception) {
@@ -297,7 +298,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
         $user = $this->signedInPerson();
         $key  = $this->passkeyFactor($user);
 
-        $result = $this->mfa()->verify(Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
+        $result = $this->mfa()->verify(Callers::current(), Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
 
         self::assertSame('passkey-challenge', $result->proof?->challengeId);
         self::assertInstanceOf(VerificationPassed::class, $this->reported[0]);

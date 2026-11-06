@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Contracts;
 
 use Carbon\CarbonImmutable;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
@@ -54,26 +55,28 @@ interface FreshnessGate
     /**
      * Whether the current session is fresh for the operation.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return bool
      *
      * @throws \InvalidArgumentException
      */
-    public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool;
+    public function isFresh(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): bool;
 
     /**
      * The requirement the gate holds the current session to for the operation:
      * the stricter of its own setting and the caller's, either alone when the
      * other is absent, and `null` with neither.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      *
      * @throws \InvalidArgumentException
      */
-    public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement;
+    public function requirement(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?Requirement;
 
     /**
      * The instant the current session stops being fresh for the operation on
@@ -81,11 +84,12 @@ interface FreshnessGate
      * cannot say. An answer that is not `null` implies `isFresh()` is `true`,
      * and is never in the past.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return ?\Carbon\CarbonImmutable
      *
      * @throws \InvalidArgumentException
      */
-    public function freshUntil(string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable;
+    public function freshUntil(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable;
 }

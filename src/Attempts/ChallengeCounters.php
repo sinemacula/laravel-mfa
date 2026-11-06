@@ -9,7 +9,8 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
-use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
+use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
@@ -103,7 +104,7 @@ final readonly class ChallengeCounters
      * the identity's factor state lock, which is held until the caller's
      * transaction ends.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
@@ -111,9 +112,12 @@ final readonly class ChallengeCounters
      * @throws \LogicException
      * @throws \Throwable
      */
-    public function isUsable(MultiFactorAuthenticatable $identity, Factor $factor, ProofBinding $binding): ChallengeAdmission
+    public function isUsable(CallerContext $caller, Factor $factor, ProofBinding $binding): ChallengeAdmission
     {
         OpenTransaction::assertOpen(self::NO_TRANSACTION);
+
+        $identity = self::identityOf($caller);
+        $pending  = $caller->pending;
 
         $refusal = $this->identityRefusal($identity, $binding);
 
@@ -121,13 +125,15 @@ final readonly class ChallengeCounters
             return $refusal;
         }
 
-        return FactorStateTransaction::forIdentity($identity, $this->factorModel($factor), function (Collection $factors) use ($identity, $factor, $binding): ChallengeAdmission {
+        $model = $this->factorModel($factor);
+
+        return FactorStateTransaction::forIdentity($identity, $model, function (Collection $factors) use ($identity, $pending, $factor, $binding): ChallengeAdmission {
 
             $stored = LockedFactors::find($factor, $factors);
 
             return $stored === null
                 ? ChallengeAdmission::refuse(FailureReason::NOT_FOUND, 'The factor is not among the identity\'s factors.')
-                : $this->factorAdmission($identity, $stored, $binding);
+                : $this->factorAdmission($identity, $pending, $stored, $binding);
         });
     }
 
@@ -135,7 +141,7 @@ final readonly class ChallengeCounters
      * Whether the factor as stored may be challenged now under the binding, for
      * a caller already holding the identity's factor state lock.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
@@ -146,9 +152,11 @@ final readonly class ChallengeCounters
      *
      * @internal
      */
-    public function underLock(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): ChallengeAdmission
+    public function underLock(CallerContext $caller, EloquentFactor&Model $factor, ProofBinding $binding): ChallengeAdmission
     {
-        return $this->identityRefusal($identity, $binding) ?? $this->factorAdmission($identity, $factor, $binding);
+        $identity = self::identityOf($caller);
+
+        return $this->identityRefusal($identity, $binding) ?? $this->factorAdmission($identity, $caller->pending, $factor, $binding);
     }
 
     /**
@@ -159,7 +167,7 @@ final readonly class ChallengeCounters
      * lockout applies, and answered as not found for a factor no longer among
      * the identity's.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  bool  $passed
@@ -169,9 +177,11 @@ final readonly class ChallengeCounters
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    public function report(MultiFactorAuthenticatable $identity, Factor $factor, ProofBinding $binding, bool $passed): AttemptOutcome
+    public function report(CallerContext $caller, Factor $factor, ProofBinding $binding, bool $passed): AttemptOutcome
     {
         OpenTransaction::assertOpen(self::NO_TRANSACTION);
+
+        $identity = self::identityOf($caller);
 
         OperationRefusedException::unless(ProofOwner::of($identity)->owns($binding), FailureReason::NOT_FOUND, 'The challenge\'s binding names another identity.');
 
@@ -180,7 +190,7 @@ final readonly class ChallengeCounters
         }
 
         return $this->attempts->attempt(
-            new Attempt($identity, $factor, $binding->purpose, $binding->application),
+            new Attempt($identity, $factor, $binding->purpose, $binding->application, $caller->client),
             static fn (): bool => $passed,
         );
     }
@@ -213,6 +223,7 @@ final readonly class ChallengeCounters
      * failure ceiling holds.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
@@ -221,10 +232,10 @@ final readonly class ChallengeCounters
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private function factorAdmission(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): ChallengeAdmission
+    private function factorAdmission(MultiFactorAuthenticatable $identity, ?PendingContext $pending, EloquentFactor&Model $factor, ProofBinding $binding): ChallengeAdmission
     {
         $enrolling = $binding->purpose === Purpose::ENROLLMENT;
-        $refusal   = $enrolling ? $this->enrollingRefusal($identity, $factor, $binding) : $this->factorRefusal($identity, $factor, $binding);
+        $refusal   = $enrolling ? $this->enrollingRefusal($identity, $pending, $factor, $binding) : $this->factorRefusal($identity, $pending, $factor, $binding);
 
         if ($refusal !== null) {
             return $refusal;
@@ -241,6 +252,7 @@ final readonly class ChallengeCounters
      * binding and served to who is asking.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return ?\SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
@@ -249,17 +261,16 @@ final readonly class ChallengeCounters
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private function enrollingRefusal(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): ?ChallengeAdmission
+    private function enrollingRefusal(MultiFactorAuthenticatable $identity, ?PendingContext $pending, EloquentFactor&Model $factor, ProofBinding $binding): ?ChallengeAdmission
     {
         if (!(new ApplicationSettings($this->config, $binding->application))->enables($factor->getType())) {
             return ChallengeAdmission::refuse(FailureReason::TYPE_NOT_ENABLED, sprintf('The application does not enable the factor\'s type [%s].', $factor->getType()));
         }
 
         $enrollments = $this->container->make(PendingEnrollments::class);
-        $pending     = $this->container->make(CallerContextResolver::class)->pending() !== null;
         $enrollment  = $factor->isConfirmed() ? null : $enrollments->forFactor((string) LockedFactors::idOf($factor));
 
-        if ($enrollment === null || !$enrollments->isBound($enrollment, $binding, $pending)) {
+        if ($enrollment === null || !$enrollments->isBound($enrollment, $binding, $pending !== null)) {
             return ChallengeAdmission::refuse(FailureReason::NOT_FOUND, 'The factor holds no enrolment bound to the challenge.');
         }
 
@@ -272,6 +283,7 @@ final readonly class ChallengeCounters
      * factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return ?\SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
@@ -280,7 +292,7 @@ final readonly class ChallengeCounters
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private function factorRefusal(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): ?ChallengeAdmission
+    private function factorRefusal(MultiFactorAuthenticatable $identity, ?PendingContext $pending, EloquentFactor&Model $factor, ProofBinding $binding): ?ChallengeAdmission
     {
         if (!$factor->isConfirmed()) {
             return ChallengeAdmission::refuse(FailureReason::NOT_CONFIRMED, 'The factor is pending.');
@@ -290,7 +302,7 @@ final readonly class ChallengeCounters
             return ChallengeAdmission::refuse(FailureReason::TYPE_NOT_ENABLED, sprintf('The application does not enable the factor\'s type [%s].', $factor->getType()));
         }
 
-        return $this->isAccepted($identity, $factor, $binding)
+        return $this->isAccepted($identity, $pending, $factor, $binding)
             ? null
             : ChallengeAdmission::refuse(FailureReason::NOT_ACCEPTED, 'The combination policy does not accept the factor after the session\'s first factor.');
     }
@@ -301,6 +313,7 @@ final readonly class ChallengeCounters
      * factor is not known.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return bool
@@ -309,9 +322,9 @@ final readonly class ChallengeCounters
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private function isAccepted(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): bool
+    private function isAccepted(MultiFactorAuthenticatable $identity, ?PendingContext $pending, EloquentFactor&Model $factor, ProofBinding $binding): bool
     {
-        $firstFactor = $this->firstFactors->forBinding($identity, $binding);
+        $firstFactor = $this->firstFactors->forBinding($identity, $binding, $pending);
         $driver      = $this->container->make(DriverResolver::class)->fromContainer($this->container, $factor->getType());
         $channel     = FactorChannel::of($factor, $driver->channelKind());
 
@@ -336,5 +349,19 @@ final readonly class ChallengeCounters
         $model = ConfiguredModels::factor($this->config);
 
         return new $model;
+    }
+
+    /**
+     * The identity the caller is, refusing a caller that is nobody: counters
+     * belong to an identity.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     *
+     * @throws \InvalidArgumentException
+     */
+    private static function identityOf(CallerContext $caller): MultiFactorAuthenticatable
+    {
+        return $caller->identity ?? throw new \InvalidArgumentException('Challenge counters are kept for an identity, and the caller is nobody.');
     }
 }

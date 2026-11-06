@@ -23,20 +23,21 @@ An application's own `singleton()` over one of the package's contracts is the ap
 
 ## Queue workers
 
-A worker runs many jobs in one application, and does not forget guards between them. The package reads the identity from
-`Auth::user()` and owns no guard, so it resets none. A job acting for a person sets its identity itself:
+A worker runs many jobs in one application, and does not forget guards between them. The helpers read no guard and the
+package owns none, so it resets none. A job acting for a person names them in the caller it builds:
 
 ```php
+use SineMacula\Laravel\Mfa\Context\CallerContext;
+use SineMacula\Laravel\Mfa\Facades\Mfa;
+
 public function handle(): void
 {
-    Auth::setUser($this->person);
-
-    Mfa::factors();
+    Mfa::factors(CallerContext::forIdentity($this->person, 'web'));
 }
 ```
 
-An application on plain Laravel guards clears them before each job, ahead of any identity the job sets, so a job that
-sets none does not act as the last job's person. It clears the session too: the default proof store keeps its records
+An application on plain Laravel guards still clears them before each job, so its own code in a job never acts as the
+last job's person. It clears the session too: the default proof store keeps its records
 in the session, and a worker's session lives in memory for as long as the worker does, so without this a job would read
 the proofs an earlier job made for the same person. Leave `sync` jobs out: they run inside the request that dispatched
 them, and clearing its guards and its session would sign that request out.

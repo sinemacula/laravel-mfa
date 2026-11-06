@@ -26,9 +26,10 @@ what is not.
 - The package declares no static property and no static local variable. `Database\WriteConnection::during()` restores
   the connection's read mode when its callback returns or throws, and `Database\StorageTransaction` forgets the work a
   failed commit left waiting.
-- The package owns no guard and resets none. `Support\CurrentIdentity` reads `Auth::user()`, and Laravel's queue worker
-  does not forget guards between jobs, so a job acting for a person sets its own identity, and an application on plain
-  Laravel guards clears them with `Queue::before()` (see [Operations](../guides/operations.md#queue-workers)). A
+- The package owns no guard and resets none, and no action reads one: each takes a `Context\CallerContext`, which
+  `CallerContext::fromRequest()` reads at the request's edge, so a job acting for a person names it with
+  `CallerContext::forIdentity()`. Laravel's queue worker does not forget guards between jobs, so an application on plain
+  Laravel guards still clears them with `Queue::before()` (see [Operations](../guides/operations.md#queue-workers)). A
   listener of the package's own calling `Auth::forgetGuards()` was rejected: it would reach into guards the package does
   not own.
 - The default proof store keeps its records in the Laravel session, and Laravel's worker does not reset the session

@@ -12,9 +12,9 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
-use SineMacula\Laravel\Mfa\Attempts\RequestIp;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
@@ -96,42 +96,45 @@ final readonly class EnrollmentService
     /**
      * Start an enrolment for the person the request serves.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
      *
      * @throws \Throwable
      */
-    public function start(#[\SensitiveParameter] EnrollmentRequest $request): EnrollmentStart
+    public function start(CallerContext $context, #[\SensitiveParameter] EnrollmentRequest $request): EnrollmentStart
     {
-        return $this->starter->start($request);
+        return $this->starter->start($context, $request);
     }
 
     /**
      * Confirm the enrolment the grant holds with the code.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
      * @param  string  $code
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation
      *
      * @throws \Throwable
      */
-    public function confirm(#[\SensitiveParameter] RevealedSecret|string $grant, #[\SensitiveParameter] string $code): EnrollmentConfirmation
+    public function confirm(CallerContext $context, #[\SensitiveParameter] RevealedSecret|string $grant, #[\SensitiveParameter] string $code): EnrollmentConfirmation
     {
-        return $this->confirmer->confirm($grant, $code);
+        return $this->confirmer->confirm($context, $grant, $code);
     }
 
     /**
      * Send the enrolment's code again, through the delivered-code cooldown and
      * caps. Nothing is renewed: not the grant's expiry and not its attempts.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
      * @return \SineMacula\Laravel\Mfa\Codes\SendResult
      *
      * @throws \Throwable
      */
-    public function resend(#[\SensitiveParameter] RevealedSecret|string $grant): SendResult
+    public function resend(CallerContext $context, #[\SensitiveParameter] RevealedSecret|string $grant): SendResult
     {
-        $caller  = $this->callers->resolve(PendingAction::START_BOOTSTRAP_ENROLLMENT);
+        $caller  = $this->callers->resolve($context, PendingAction::START_BOOTSTRAP_ENROLLMENT);
         $binding = $caller === null ? null : $this->callers->binding($caller, Purpose::ENROLLMENT);
 
         if ($caller === null || $binding === null) {
@@ -141,13 +144,13 @@ final readonly class EnrollmentService
         $result  = SendResult::refused(FailureReason::NOT_FOUND);
         $hash    = EnrollmentGrant::hash($grant);
         $outcome = $this->attempts->throttled(
-            RequestIp::resolve($this->container),
+            $caller->client->ip,
             function () use ($caller, $binding, $hash, &$result): AttemptOutcome {
 
                 $result = FactorStateTransaction::forIdentity(
                     $caller->identity,
                     new (ConfiguredModels::factor($this->config)),
-                    fn (Collection $factors): SendResult => $this->resendUnderLock($binding, $hash, $factors),
+                    fn (Collection $factors): SendResult => $this->resendUnderLock($caller, $binding, $hash, $factors),
                 );
 
                 return AttemptOutcome::uncounted();
@@ -159,9 +162,11 @@ final readonly class EnrollmentService
 
     /**
      * Cancel the enrolment the grant holds, deleting its pending factor:
-     * `false` for a grant that is not the caller's. It needs no step-up, and
-     * works during a lockout, since it only gives something up.
+     * `false` for a grant that is not the caller's, or for a caller that is no
+     * longer the one served once the identity is locked. It needs no step-up,
+     * and works during a lockout, since it only gives something up.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
      * @return bool
      *
@@ -169,9 +174,9 @@ final readonly class EnrollmentService
      *
      * @imperative
      */
-    public function cancel(#[\SensitiveParameter] RevealedSecret|string $grant): bool
+    public function cancel(CallerContext $context, #[\SensitiveParameter] RevealedSecret|string $grant): bool
     {
-        $caller  = $this->callers->resolve(PendingAction::START_BOOTSTRAP_ENROLLMENT);
+        $caller  = $this->callers->resolve($context, PendingAction::START_BOOTSTRAP_ENROLLMENT);
         $binding = $caller === null ? null : $this->callers->binding($caller, Purpose::ENROLLMENT);
 
         if ($caller === null || $binding === null) {
@@ -185,9 +190,10 @@ final readonly class EnrollmentService
             new (ConfiguredModels::factor($this->config)),
             function (Collection $factors) use ($caller, $binding, $hash): bool {
 
-                $granted = $this->enrollments->granted($hash, $binding, $caller, $factors);
+                $still   = $this->callers->still($caller, PendingAction::START_BOOTSTRAP_ENROLLMENT, $binding);
+                $granted = $still === null ? null : $this->enrollments->granted($hash, $binding, $still, $factors);
 
-                if ($granted === null) {
+                if ($still === null || $granted === null) {
                     return false;
                 }
 
@@ -195,7 +201,9 @@ final readonly class EnrollmentService
 
                 $this->enrollments->discard($enrollment, $factor);
 
-                $this->events->dispatch(new EnrollmentAbandoned($this->events->context($caller->identity, $binding->application), FactorSummary::fromFactor($factor)));
+                $context = $this->events->context($still->identity, $binding->application, $still->client);
+
+                $this->events->dispatch(new EnrollmentAbandoned($context, FactorSummary::fromFactor($factor)));
 
                 return true;
             },
@@ -208,6 +216,7 @@ final readonly class EnrollmentService
      *
      * @formatter:off
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $hash
      * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
@@ -217,9 +226,9 @@ final readonly class EnrollmentService
      *
      * @throws \Throwable
      */
-    private function resendUnderLock(ProofBinding $binding, string $hash, Collection $factors): SendResult
+    private function resendUnderLock(Caller $served, ProofBinding $binding, string $hash, Collection $factors): SendResult
     {
-        $caller  = $this->callers->still(PendingAction::START_BOOTSTRAP_ENROLLMENT, $binding);
+        $caller  = $this->callers->still($served, PendingAction::START_BOOTSTRAP_ENROLLMENT, $binding);
         $granted = $caller === null ? null : $this->enrollments->granted($hash, $binding, $caller, $factors);
 
         return $caller === null || $granted === null
@@ -246,19 +255,19 @@ final readonly class EnrollmentService
             return SendResult::refused(FailureReason::NOT_FOUND);
         }
 
-        $admission = $this->container->make(ChallengeCounters::class)->underLock($caller->identity, $factor, $binding);
+        $admission = $this->container->make(ChallengeCounters::class)->underLock($caller->context(), $factor, $binding);
 
         if (!$admission->isAdmitted()) {
             return SendResult::refusedBy($admission);
         }
 
-        $result      = $this->container->make(ChallengeGateway::class)->send($factor, $binding);
+        $result      = $this->container->make(ChallengeGateway::class)->send($caller->context(), $factor, $binding);
         $challengeId = $result->challengeId;
 
         if ($challengeId !== null) {
             $this->enrollments->recordChallenge($enrollment, $challengeId);
 
-            $context = $this->events->context($caller->identity, $binding->application);
+            $context = $this->events->context($caller->identity, $binding->application, $caller->client);
 
             $this->events->dispatch(new CodeSent($context, FactorSummary::fromFactor($factor), Purpose::ENROLLMENT, $challengeId));
         }

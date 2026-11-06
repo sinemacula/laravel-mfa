@@ -175,7 +175,7 @@ registers it with the container, and the classes only it uses:
 | `Proofs`        | The sign-in's proofs, `SessionProofStore`, `ProofStoreCompletion`, `GuardHooks`, `Proof`                          |
 | `Verification`  | `verify()`, `sendCode()`, `offeredFactors()`, `Submission` and `VerificationResult`                               |
 | `Assurance`     | `Channel`, `ObservedProperties`, `Evaluation` and the default `DefaultCombinationPolicy`                          |
-| `Context`       | `PendingContext`, who a request serves, the defaults, and `AuthenticationContextContributor`                      |
+| `Context`       | `CallerContext`, `ClientContext`, `PendingContext`, the defaults, and `AuthenticationContextContributor`          |
 | `Passkeys`      | The change gate, `PasskeyRegistration`, `CredentialId`, assertions and the unavailable gateway                    |
 | `Seams`         | Defaults that read nothing of the package: `RefusingReauthenticator`                                              |
 | `Enrollment`    | `startEnrollment()`, `confirmEnrollment()`, what they answer and `EnrollmentSettings`                             |
@@ -223,7 +223,7 @@ service provider:
 | `FactorChangeGate`       | `Requirements\ConfiguredFactorChangeGate`  | A change rests on a fresh step-up, a first factor on a reauthentication     |
 | `PendingSessionResolver` | `Context\NoPendingSessionResolver`         | No request carries a pending session                                        |
 | `SubjectTypeResolver`    | `Context\IdentityContractSubjectType`      | A person is an identity whose `canHoldFactors()` is true                    |
-| `EventContextResolver`   | `Context\DefaultEventContextResolver`      | The identity, the application and the request                               |
+| `EventContextResolver`   | `Context\DefaultEventContextResolver`      | The identity, the application and the caller's client                       |
 | `FirstFactorResolver`    | `Applications\DeclaredFirstFactorResolver` | The application's `first_factor`, dated at the Unix epoch                   |
 | `Reauthenticator`        | `Seams\RefusingReauthenticator`            | Nothing proves the first factor again                                       |
 | `SessionRevoker`         | `Proofs\GenerationSessionRevoker`          | The verification generation advances; other sessions verify again           |
@@ -246,14 +246,19 @@ The refusing reauthenticator means an identity cannot add its first additional f
 something proves its first factor again: bind a `Contracts\Reauthenticator` that asks the person for their password, for
 example, and returns a `first_factor_reauthentication` proof bound to their current sign-in.
 
-Every helper that returns summaries, sends a code or reveals a secret asks the bound `PendingSessionResolver` first. On
-a pending session it serves only the action it needs (`mfa.list_factors` for `factors()`, `factor()`, `offeredFactors()`
-and `recoveryCodeStatus()`, `mfa.send_code` for `sendCode()`, `mfa.verify` for `verify()` and `requestAssertion()`), as
-the pending session's own identity; anything else gets nothing, never the guard's user in its place. Starting, resending
-and cancelling an enrolment need `mfa.start_bootstrap_enrollment`, and confirming one
-`mfa.confirm_bootstrap_enrollment`. Generating recovery codes, renaming, preferring or removing a factor and `proofs()`
-serve active sessions only. A code is sent or checked only for a binding that is exactly the caller's own, on its
-application and its session. A resolver reports a pending credential that does not validate by throwing.
+Every helper that acts for a person takes a `Context\CallerContext` first (see [The caller](helpers.md#the-caller)), and
+no helper or seam is handed a request: `CallerContext::fromRequest()` asks the bound `PendingSessionResolver`'s
+`fromRequest()`, and the actions ask its `revalidate()` under the identity's lock, with the pending session the caller
+was served. A resolver that must read the credential again keeps it on the `PendingContext` it returns, as
+`credential()`, which no dump or log of the context shows. On a pending session a helper serves only the action it needs
+(`mfa.list_factors` for `factors()`, `factor()`, `offeredFactors()` and `recoveryCodeStatus()`, `mfa.send_code` for
+`sendCode()`, `mfa.verify` for `verify()` and `requestAssertion()`), as the pending session's own identity; anything
+else gets nothing, never the guard's user in its place. Starting, resending and cancelling an enrolment need
+`mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`. Generating recovery codes,
+renaming, preferring or removing a factor and `proofs()` serve active sessions only. A code is sent or checked only for
+a binding that is exactly the caller's own, on its application and its session. A resolver reports a pending credential
+that does not validate by throwing from `fromRequest()`, and a session that no longer stands by answering `null` from
+`revalidate()`.
 
 ## Seams with an authentication layer
 
@@ -268,14 +273,14 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Contracts\TenantRequirement`                                                         | `Contracts\TenantAuthenticationPolicy::requirementFor()`; `Auth::sessions()->tenantPolicyChanged()` for a change outside a request                                                                                                   |
 | `Contracts\RequirementCheck`                                                          | `Contracts\RequirementCheck::evaluate()`, which the adapter answers with this check                                                                                                                                                  |
 | `Contracts\ActiveTenantResolver`                                                      | `Auth::tenant()`                                                                                                                                                                                                                     |
-| `Contracts\PendingSessionResolver`                                                    | `Auth::sessions()->pending()`, answering a `Sessions\PendingSession`                                                                                                                                                                 |
+| `Contracts\PendingSessionResolver`                                                    | `Auth::sessions()->pending()`, answering a `Sessions\PendingSession`, from `fromRequest()` and again from `revalidate()` with the credential kept                                                                                    |
 | `Enums\PendingAction`                                                                 | `Sessions\Enums\PendingAction`, with the same values                                                                                                                                                                                 |
 | `Contracts\PendingCompletion`                                                         | `Auth::sessions()->satisfy()`, recording the proof's own `multifactor` from the result's `refreshesMultifactor`                                                                                                                      |
 | `Contracts\StepUp`                                                                    | `Auth::sessions()->stepUp()`, recording the proof's own `multifactor` from the result's `refreshesMultifactor`                                                                                                                       |
 | `Contracts\FreshnessGate`                                                             | `Contracts\FreshnessPolicy::freshProof()` and `freshUntil()`                                                                                                                                                                         |
 | `Contracts\FactorChangeGate`                                                          | `Auth::sessions()->factorChange()`, inside this package's transaction, after its locks                                                                                                                                               |
 | `Contracts\Reauthenticator`                                                           | `Auth::sessions()->reauthenticate()`                                                                                                                                                                                                 |
-| `Contracts\SessionRevoker`                                                            | `Auth::sessions()->factorRemoved()` with the factor and the session, answered as judged, and `factorReset()` for a reset                                                                                                             |
+| `Contracts\SessionRevoker`                                                            | `Auth::sessions()->factorRemoved()` with the factor, the application and the session, answered as judged, and `factorReset()` for a reset                                                                                            |
 | `Contracts\SubjectTypeResolver`                                                       | `Contracts\MachineIdentity`                                                                                                                                                                                                          |
 | `Contracts\ApplicationResolver`                                                       | The session's `getGuard()`, from `Auth::session()`                                                                                                                                                                                   |
 | `Contracts\EventContextResolver`                                                      | `Auth::identity()`, `Auth::principal()`, `Auth::tenant()` and `Auth::session()`                                                                                                                                                      |
@@ -333,8 +338,8 @@ the storage connection that consumes the challenge, and answers with an `Attempt
 reaches the caller:
 
 ```php
-DB::transaction(function () use ($counters, $identity, $factor, $binding, $code): ChallengeOutcome {
-    $admission = $counters->isUsable($identity, $factor, $binding);
+DB::transaction(function () use ($counters, $caller, $factor, $binding, $code): ChallengeOutcome {
+    $admission = $counters->isUsable($caller, $factor, $binding);
 
     if (!$admission->isAdmitted()) {
         return ChallengeOutcome::refused($admission->reason, $admission->detail, $admission->lockedUntil);
@@ -342,13 +347,16 @@ DB::transaction(function () use ($counters, $identity, $factor, $binding, $code)
 
     $passed = $this->consume($binding, $code); // the owner's own challenge, locked and consumed here
 
-    return $counters->report($identity, $factor, $binding, $passed)->passed
+    return $counters->report($caller, $factor, $binding, $passed)->passed
         ? ChallengeOutcome::passed()
         : ChallengeOutcome::failed(FailureReason::INVALID_CODE, 'The code did not match.');
 });
 ```
 
-Both calls refuse with a `LogicException` outside a transaction. `isUsable()` takes the identity's factor state lock,
+`$caller` is the `Context\CallerContext` the gateway's `send()` or `verify()` was handed, or one the owner builds for
+the identity with `CallerContext::forIdentity()`. A pending one carries the session's first factor, which the factor
+must be accepted after. Both calls refuse with a `LogicException` outside a transaction, and with an
+`InvalidArgumentException` for a caller that is nobody. `isUsable()` takes the identity's factor state lock,
 which is held until the owner commits, so parallel guesses are counted one after the other; ask it before sending a code
 too, and never report a delivery. The lock order is the identity's state, then its factors, then the owner's challenge.
 
@@ -367,17 +375,19 @@ Every path that registers or removes a passkey calls `Passkeys\PasskeyChangeGate
 the storage connection:
 
 ```php
-DB::transaction(function () use ($gate, $identity, $application, $credential, $properties, $binding): void {
+DB::transaction(function () use ($gate, $caller, $credential, $properties, $binding): void {
     $this->storeCredential($credential); // the authentication layer's own write
 
-    $result = $gate->registering($identity, $application, new PasskeyRegistration($credential, $properties, $binding));
+    $result = $gate->registering($caller, new PasskeyRegistration($credential, $properties, $binding));
 
     // Reveal $result?->recoveryCodes only once this transaction has committed.
 });
 ```
 
-`registering()` associates the passkey as a confirmed factor when the application enables `passkey`, after the same
-checks an enrolment needs: the bound `Contracts\FactorChangeGate` allowing a further factor or the first one (by
+`$caller` is the `Context\CallerContext` of the person registering, read once at the layer's edge with
+`CallerContext::fromRequest()` or built with `forIdentity()` or `forPending()`; `removing($caller, $credentialId)` takes
+the same. `registering()` associates the passkey as a confirmed factor when the application enables `passkey`, after the
+same checks an enrolment needs: the bound `Contracts\FactorChangeGate` allowing a further factor or the first one (by
 default, a fresh step-up, or the first factor proved again), or the bootstrap path on a pending session that allows
 `mfa.confirm_bootstrap_enrollment`; then the application's limits. It returns `null` when the application does not
 enable the type, and recovery codes with the identity's first additional factor. On a pending session its proof then
@@ -422,6 +432,12 @@ final class SessionProofStoreAdapterTest extends TestCase
     }
 }
 ```
+
+A kit for a seam that is handed the caller asks for one through a hook, built as the seam would be handed it, with
+`Context\CallerContext::forIdentity()` for an active session: `freshnessCaller()`, whose session the fresh gate must
+find fresh for the fresh operation; `challengeCaller()`, the caller the challenged binding is for; and `stepUpCaller()`,
+on an active session whose own result would be accepted. The session revoker's kit asks for the application the
+identity's sessions are on, with `revokedApplication()`.
 
 The kits check safety guarantees, not capabilities a default lacks: a refusing reauthenticator passes, and a revoker
 passes when other sessions stop counting whether or not it ends them. The factor change gate's kit hands its hooks each

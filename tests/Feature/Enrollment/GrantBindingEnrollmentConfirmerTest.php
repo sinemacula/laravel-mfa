@@ -48,6 +48,7 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
@@ -144,7 +145,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
         Enrollment::query()->update($change);
         $this->forgetReports();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
         self::assertSame(FailureReason::NOT_FOUND, $confirmation->reason);
         self::assertNull($this->failureReported()->factor);
@@ -166,7 +167,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
 
         Enrollment::query()->update(['authenticatable_type' => strtoupper(ProofOwner::of($user)->type)]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->reason);
     }
 
     /**
@@ -182,10 +183,10 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
         $start = $this->startedTotp();
         $code  = $this->appCode($start);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment('unknown', $code)->reason);
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $code)->isConfirmed());
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), 'unknown', $code)->reason);
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->isConfirmed());
 
-        $second = $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $second = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertSame(FailureReason::NOT_FOUND, $second->reason);
         self::assertSame([], $second->recoveryCodes);
@@ -206,7 +207,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
 
         Factor::query()->delete();
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
     }
 
     /**
@@ -222,7 +223,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
         $start = $this->startedTotp();
 
         self::assertInstanceOf(RevealedSecret::class, $start->grant);
-        self::assertTrue($this->mfa()->confirmEnrollment($start->grant, $this->appCode($start))->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $start->grant, $this->appCode($start))->isConfirmed());
     }
 
     /**
@@ -240,13 +241,13 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
         $this->actingAs($user);
 
         self::assertSame(EnrollmentAuthorization::BOOTSTRAP, $this->rowOf($start)->authority);
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->reason);
 
         Enrollment::query()->update(['authority' => EnrollmentAuthorization::STEP_UP]);
 
         $this->pendingSession($user, null, self::BOOTSTRAP_ACTIONS);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->reason);
     }
 
     /**
@@ -262,7 +263,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
 
         VerificationGeneration::advance($user);
 
-        self::assertSame(FailureReason::EXPIRED, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::EXPIRED, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
         self::assertSame(0, Enrollment::query()->count());
         self::assertSame(0, Factor::query()->count());
     }
@@ -284,7 +285,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
 
         $this->container()->instance(ProofStore::class, new InterruptingProofStore($this->container()->make(ProofStore::class)));
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
         self::assertSame([], $this->reported);
         self::assertSame(0, $this->rowOf($start)->attempts);
         self::assertSame(0, $this->addressHits('127.0.0.1'));
@@ -299,17 +300,17 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
      */
     public function testARequestServingNobodyIsNotFound(): void
     {
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment('any', '000000')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), 'any', '000000')->reason);
 
         $user = $this->person();
 
         $this->actingAs($user);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment('any', '000000')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), 'any', '000000')->reason);
 
         $this->pendingSession($user, null, [PendingAction::START_BOOTSTRAP_ENROLLMENT]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment('any', '000000')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), 'any', '000000')->reason);
         self::assertSame([], $this->reported);
     }
 
@@ -325,7 +326,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
 
         $this->expectException(InvalidPendingCredentialException::class);
 
-        $this->mfa()->confirmEnrollment('any', '000000');
+        $this->mfa()->confirmEnrollment(Callers::current(), 'any', '000000');
     }
 
     /**

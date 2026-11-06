@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Attempts;
 
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -30,6 +31,7 @@ final readonly class Attempt
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  ?string  $application
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      */
     public function __construct(
 
@@ -44,5 +46,8 @@ final readonly class Attempt
 
         /** The application the attempt was made through, named in the events' context. */
         public ?string $application = null,
+
+        /** The client the attempt was made through, when it is known. */
+        public ?ClientContext $client = null,
     ) {}
 }

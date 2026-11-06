@@ -46,6 +46,7 @@ use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -150,7 +151,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
             'status'               => 'confirmed',
         ]);
 
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
         self::assertSame($start->factor?->id, $this->failureReported()->factor?->id);
         self::assertSame('totp', $this->failureReported()->type);
         self::assertSame(Purpose::ENROLLMENT, $this->failureReported()->purpose);
@@ -176,7 +177,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
 
         $this->forgetReports();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertSame(FailureReason::LOCKED, $confirmation->reason);
         self::assertSame($until->getTimestamp(), $confirmation->lockedUntil?->getTimestamp());
@@ -199,7 +200,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
 
         $this->enableApplication(['types' => ['email']]);
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
         self::assertFalse($this->pendingFactorOf($start)->isConfirmed());
     }
 
@@ -219,11 +220,11 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
         $other = $this->emailFactor($user, 'second@example.test', ['application' => self::APPLICATION]);
 
         self::assertNotNull($code);
-        self::assertSame(FailureReason::LIMIT_REACHED, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::LIMIT_REACHED, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
 
         $other->update(['application' => 'admin']);
 
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $code)->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->isConfirmed());
     }
 
     /**
@@ -241,11 +242,11 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
 
         $this->enableApplication(['bootstrap' => ['enabled' => false]]);
 
-        self::assertSame(FailureReason::MFA_ENROLLMENT_REQUIRED, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::MFA_ENROLLMENT_REQUIRED, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
 
         $this->enableApplication(['bootstrap' => ['enabled' => true, 'types' => ['email']]]);
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
         self::assertFalse($this->pendingFactorOf($start)->isConfirmed());
     }
 
@@ -264,7 +265,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
 
         $this->totpFactor($user, ['application' => 'admin']);
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
 
         Factor::query()->where('status', 'confirmed')->delete();
 
@@ -276,11 +277,11 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
 
         $this->totpFactor($other, ['application' => 'admin']);
 
-        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::NOT_FRESH, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
 
         $this->rowOf($start)->update(['authority' => 'step_up']);
 
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $code)->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->isConfirmed());
     }
 
     /**
@@ -297,8 +298,8 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
 
         $this->container()->make(ProofStore::class)->forgetFactor($user, Factor::query()->where('status', 'confirmed')->sole()->id);
 
-        self::assertFalse($this->mfa()->isFresh('mfa.add_factor'));
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->isConfirmed());
+        self::assertFalse($this->mfa()->isFresh(Callers::current(), 'mfa.add_factor'));
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->isConfirmed());
     }
 
     /**
@@ -323,7 +324,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
 
         $this->forgetReports();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $confirmation->reason);
         self::assertFalse($this->pendingFactorOf($start)->isConfirmed());
@@ -332,7 +333,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
         self::assertSame(FactorStatus::PENDING, $this->failureReported()->factor?->status);
         self::assertSame('email', $this->failureReported()->type);
         self::assertSame($this->rowOf($start)->challenge_id, $this->failureReported()->challengeId);
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
     }
 
     /**
@@ -352,7 +353,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
         $store->begin($user, self::APPLICATION, self::SESSION);
         $store->record($this->emailFirstFactor($user, self::SESSION));
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertFalse($confirmation->abandoned);

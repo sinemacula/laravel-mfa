@@ -47,7 +47,9 @@ final class BeginSignInOnLogin
         }
 
         try {
-            Container::getInstance()->make(ProofService::class)->beginSignIn($event->user, $event->guard);
+            $container = Container::getInstance();
+
+            $container->make(ProofService::class)->beginSignIn($event->user, SignInApplication::of($container, $event->guard));
         } catch (UnsupportedIdentifierException) {
             return;
         }

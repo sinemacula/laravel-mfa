@@ -52,7 +52,7 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
   proof store once the transaction commits, refusing a binding that is not the store's current sign-in, and for a
   pending session the pending context's as well, as `not_accepted` (see [Proof Store](proof-store.md)).
 - `EventContextResolver` is bound to `Context\DefaultEventContextResolver`, which gives the identity, the application
-  and the request (see [Event Catalogue](event-catalog.md)).
+  and the caller's client (see [Event Catalogue](event-catalog.md)).
 - `ProofStore` is bound to `Proofs\SessionProofStore`, which keeps each sign-in's proofs in the Laravel session (see
   [Proof Store and Sign-Ins](proof-store.md)).
 - `CombinationPolicy` is bound to `Assurance\DefaultCombinationPolicy` (see
@@ -186,9 +186,17 @@ exception that rolls the caller's change back with it.
 - An adapter, or the application, implements a contract and binds it in the container from a service provider; the
   flow that calls the contract resolves it when it runs, so a binding made before or after the package's provider
   applies.
-- `Context\CallerContextResolver` decides who every helper that returns summaries, sends a code or reveals a secret
-  serves: a pending session only for the `PendingAction` the helper needs, as its own identity, and otherwise the
-  guard's signed-in person; only a person either way. Starting, resending and cancelling an enrolment need
+- Every self-service helper takes a `Context\CallerContext` first, and no seam is handed a request:
+  `CallerContext::fromRequest()` is the one place a caller is read from one, through
+  `PendingSessionResolver::fromRequest()` and then the guard. The caller is trusted input, never authentication.
+  `Context\CallerContextResolver` decides whether it is served: a pending session only for the `PendingAction` the
+  helper needs, as its own identity, and otherwise the identity it names; only a person either way. Under the
+  identity's lock, `CallerContextResolver::still()` asks `PendingSessionResolver::revalidate()` for a pending session,
+  or the proof store for an active one's sign-in, and compares the binding; a pending session that no longer stands is
+  refused. A resolver that must read the credential again keeps it on the `PendingContext`, as `credential()`, which is
+  held as a `\SensitiveParameterValue` so no dump shows it. The seams handed the caller are `ChallengeGateway`,
+  `StepUp` and `FreshnessGate`; `ChallengeCounters` and `PasskeyChangeGate` take one as well, and `SessionRevoker` is
+  handed the application. Starting, resending and cancelling an enrolment need
   `mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`. A helper that names no action
   (generating recovery codes, renaming, preferring or removing a factor and `proofs()`) serves active sessions only;
   `recoveryCodeStatus()` needs `mfa.list_factors`, as `factors()` and `factor()` do. A bound factor route parameter

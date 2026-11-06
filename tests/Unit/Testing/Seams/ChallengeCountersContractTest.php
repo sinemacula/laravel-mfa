@@ -29,6 +29,7 @@ use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ChallengeCountersTests;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -452,7 +453,7 @@ final class ChallengeCountersContractTest extends TestCase
         $this->container()->make(ProofStore::class)->begin($identity, self::CHALLENGE_APPLICATION, self::CHALLENGE_SESSION);
 
         self::assertTrue(
-            DB::connection(StorageConnection::name())->transaction(fn (): bool => $this->counters()->isUsable($identity, $factor, $binding)->isAdmitted()),
+            DB::connection(StorageConnection::name())->transaction(fn (): bool => $this->counters()->isUsable(Callers::of($identity, 'web'), $factor, $binding)->isAdmitted()),
             'The identity\'s own factor and sign-in were expected to be admissible.',
         );
 
@@ -487,8 +488,10 @@ final class ChallengeCountersContractTest extends TestCase
         self::rejects(fn () => ChallengeCountersContract::assertAConsumedChallengeIsNeverASuccessAgain($this->factor, function (): \Closure {
             $this->consumeChallenge();
 
-            return function (): void {
-                DB::connection(StorageConnection::name())->transaction(fn () => $this->counters()->report($this->user, $this->factor, $this->emailBinding($this->user), true));
+            $caller = Callers::of($this->user, 'web');
+
+            return function () use ($caller): void {
+                DB::connection(StorageConnection::name())->transaction(fn () => $this->counters()->report($caller, $this->factor, $this->emailBinding($this->user), true));
             };
         }, $this->failChallenge(...)));
     }
@@ -569,11 +572,11 @@ final class ChallengeCountersContractTest extends TestCase
         $gateway = $this->container()->make(ChallengeGateway::class);
         $binding = $this->emailBinding($this->user);
 
-        $this->challenge ??= (string) $gateway->send($this->factor, $binding)->challengeId;
+        $this->challenge ??= (string) $gateway->send(Callers::current(), $this->factor, $binding)->challengeId;
 
         $code = self::lastEmailedCode($this->mailbox);
 
-        $gateway->verify($this->factor, $binding, $this->challenge, $code === '000000' ? '111111' : '000000');
+        $gateway->verify(Callers::current(), $this->factor, $binding, $this->challenge, $code === '000000' ? '111111' : '000000');
     }
 
     /**
@@ -589,15 +592,15 @@ final class ChallengeCountersContractTest extends TestCase
     {
         $gateway   = $this->container()->make(ChallengeGateway::class);
         $binding   = $this->emailBinding($this->user);
-        $challenge = (string) $gateway->send($this->factor, $binding)->challengeId;
+        $challenge = (string) $gateway->send(Callers::current(), $this->factor, $binding)->challengeId;
         $code      = self::lastEmailedCode($this->mailbox);
 
-        self::assertTrue($gateway->verify($this->factor, $binding, $challenge, $code)->hasPassed());
+        self::assertTrue($gateway->verify(Callers::current(), $this->factor, $binding, $challenge, $code)->hasPassed());
 
         $factor = $this->factor;
 
         return static function () use ($gateway, $factor, $binding, $challenge, $code): void {
-            $gateway->verify($factor, $binding, $challenge, $code);
+            $gateway->verify(Callers::current(), $factor, $binding, $challenge, $code);
         };
     }
 

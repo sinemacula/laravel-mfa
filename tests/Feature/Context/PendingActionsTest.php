@@ -23,7 +23,9 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
+use Tests\Fixtures\Context\RecordingPendingSessionResolver;
 use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -110,15 +112,15 @@ final class PendingActionsTest extends TestCase
     {
         $this->pendingSession([PendingAction::START_BOOTSTRAP_ENROLLMENT]);
 
-        self::assertSame([], $this->manager()->factors());
-        self::assertNull($this->manager()->factor($this->factor->id));
-        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->sendCode($this->factor->id)->reason);
-        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Submission::challenge($this->factor->id, 'any', '123456'))->reason);
-        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
-        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->generateRecoveryCodes()->reason);
-        self::assertNull($this->manager()->recoveryCodeStatus());
-        self::assertSame([], $this->manager()->proofs());
-        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->removeFactor($this->guardedFactor->id)->reason);
+        self::assertSame([], $this->manager()->factors(Callers::current()));
+        self::assertNull($this->manager()->factor(Callers::current(), $this->factor->id));
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->sendCode(Callers::current(), $this->factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Callers::current(), Submission::challenge($this->factor->id, 'any', '123456'))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Callers::current(), Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->generateRecoveryCodes(Callers::current())->reason);
+        self::assertNull($this->manager()->recoveryCodeStatus(Callers::current()));
+        self::assertSame([], $this->manager()->proofs(Callers::current()));
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->removeFactor(Callers::current(), $this->guardedFactor->id)->reason);
         self::assertTrue(Factor::query()->whereKey($this->guardedFactor->id)->exists());
         self::assertSame([], $this->mailbox->sent());
         self::assertSame(0, RecoveryCode::query()->count());
@@ -134,9 +136,9 @@ final class PendingActionsTest extends TestCase
      */
     public function testWithoutAPendingSessionTheGuardsUserIsServed(): void
     {
-        self::assertNotNull($this->manager()->recoveryCodeStatus());
-        self::assertCount(1, $this->manager()->proofs());
-        self::assertSame([$this->guardedFactor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors()));
+        self::assertNotNull($this->manager()->recoveryCodeStatus(Callers::current()));
+        self::assertCount(1, $this->manager()->proofs(Callers::current()));
+        self::assertSame([$this->guardedFactor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors(Callers::current())));
     }
 
     /**
@@ -151,10 +153,10 @@ final class PendingActionsTest extends TestCase
     {
         $this->pendingSession([PendingAction::LIST_FACTORS]);
 
-        self::assertSame([$this->factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors()));
-        self::assertSame($this->factor->id, $this->manager()->factor($this->factor->id)?->id);
-        self::assertNull($this->manager()->factor($this->guardedFactor->id));
-        self::assertNotNull($this->manager()->recoveryCodeStatus());
+        self::assertSame([$this->factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors(Callers::current())));
+        self::assertSame($this->factor->id, $this->manager()->factor(Callers::current(), $this->factor->id)?->id);
+        self::assertNull($this->manager()->factor(Callers::current(), $this->guardedFactor->id));
+        self::assertNotNull($this->manager()->recoveryCodeStatus(Callers::current()));
     }
 
     /**
@@ -171,14 +173,14 @@ final class PendingActionsTest extends TestCase
 
         $this->container()->make(ProofStore::class)->begin($this->pending, 'web', 'pending-1');
 
-        $sent = $this->manager()->sendCode($this->factor->id);
+        $sent = $this->manager()->sendCode(Callers::current(), $this->factor->id);
         $code = $this->mailbox->lastCodeTo('pending@example.test');
 
         self::assertTrue($sent->wasSent());
         self::assertNotNull($sent->challengeId);
         self::assertNotNull($code);
         self::assertNull($this->mailbox->lastCodeTo('guarded@example.test'));
-        self::assertTrue($this->manager()->verify(Submission::challenge($this->factor->id, $sent->challengeId, $code))->isVerified());
+        self::assertTrue($this->manager()->verify(Callers::current(), Submission::challenge($this->factor->id, $sent->challengeId, $code))->isVerified());
     }
 
     /**
@@ -193,12 +195,14 @@ final class PendingActionsTest extends TestCase
     {
         $this->pendingSession([PendingAction::SEND_CODE]);
 
-        $sent = $this->manager()->sendCode($this->factor->id);
+        $sent = $this->manager()->sendCode(Callers::current(), $this->factor->id);
 
         self::assertTrue($sent->wasSent());
         $code = (string) $this->mailbox->lastCodeTo('pending@example.test');
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Submission::challenge($this->factor->id, (string) $sent->challengeId, $code))->reason);
+        $submission = Submission::challenge($this->factor->id, (string) $sent->challengeId, $code);
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify(Callers::current(), $submission)->reason);
     }
 
     /**
@@ -215,7 +219,55 @@ final class PendingActionsTest extends TestCase
 
         $this->expectException(InvalidPendingCredentialException::class);
 
-        $this->manager()->factors();
+        $this->manager()->factors(Callers::current());
+    }
+
+    /**
+     * A caller whose pending credential is revoked once it was read is refused
+     * under the identity's lock: the code it was sent is not spent, and answers
+     * once the credential stands again.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACallerRevokedOnceReadIsRefusedUnderTheLock(): void
+    {
+        $this->pendingSession([PendingAction::SEND_CODE, PendingAction::VERIFY]);
+        $this->container()->make(ProofStore::class)->begin($this->pending, 'web', 'pending-1');
+
+        $sent       = $this->manager()->sendCode(Callers::current(), $this->factor->id);
+        $submission = Submission::challenge($this->factor->id, (string) $sent->challengeId, (string) $this->mailbox->lastCodeTo('pending@example.test'));
+        $caller     = Callers::current();
+
+        $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver);
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->manager()->verify($caller, $submission)->reason);
+
+        $this->pendingSession([PendingAction::SEND_CODE, PendingAction::VERIFY]);
+
+        self::assertTrue($this->manager()->verify(Callers::current(), $submission)->isVerified());
+    }
+
+    /**
+     * The credential the caller presented is what the resolver is asked to read
+     * again under the lock.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testThePresentedCredentialIsReadAgainUnderTheLock(): void
+    {
+        $first    = SignInProofs::of($this->pending)->inSession('pending-1')->password();
+        $expiry   = CarbonImmutable::now()->addMinutes(10);
+        $pending  = new PendingContext($this->pending, 'web', 'pending-1', $first, Requirement::none(), [PendingAction::SEND_CODE], $expiry, credential: 'presented-credential');
+        $resolver = new RecordingPendingSessionResolver($pending);
+
+        $this->container()->instance(PendingSessionResolver::class, $resolver);
+
+        self::assertTrue($this->manager()->sendCode(Callers::current(), $this->factor->id)->wasSent());
+        self::assertSame(['presented-credential'], $resolver->revalidated);
     }
 
     /**

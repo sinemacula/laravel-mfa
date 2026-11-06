@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Applications\ApplicationBlock;
 use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 use SineMacula\Laravel\Mfa\Events\EventContext;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -130,16 +131,14 @@ final class DocumentationTest extends TestCase
 
     /**
      * Every key the package contributes to the authentication context is named
-     * in the documentation. The keys are read from the contributor itself, with
-     * nobody signed in: its neutral answer has the keys of a full one.
+     * in the documentation. The keys are read from the contributor's neutral
+     * answer, which has the keys of a full one.
      *
      * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function testEveryAuthenticationContextKeyIsDocumented(): void
     {
-        $keys = array_keys($this->container()->make(AuthenticationContextContributor::class)->contribute());
+        $keys = array_keys(AuthenticationContextContributor::neutral());
 
         self::assertNotSame([], $keys);
 
@@ -254,6 +253,34 @@ final class DocumentationTest extends TestCase
         ));
 
         self::assertSame([], $unknown, 'The documentation calls Mfa methods that do not exist.');
+    }
+
+    /**
+     * Every `Mfa::name(` the documentation shows with arguments, for a method
+     * that takes the caller first, passes the caller first.
+     *
+     * @return void
+     */
+    public function testEveryCallerFirstCallTheDocumentationShowsPassesTheCaller(): void
+    {
+        $methods = [];
+
+        foreach ((new \ReflectionClass(MfaManager::class))->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+
+            $type = ($method->getParameters()[0] ?? null)?->getType();
+
+            if (!$type instanceof \ReflectionNamedType || $type->getName() !== CallerContext::class) {
+                continue;
+            }
+
+            $methods[] = $method->getName();
+        }
+
+        self::assertNotSame([], $methods);
+
+        preg_match_all('/\bMfa::(' . implode('|', $methods) . ')\((?!\s*\))(?!\s*\$caller\b)(?!\s*CallerContext::)([^,)]*)/', self::documentation(), $matches);
+
+        self::assertSame([], $matches[0], 'The documentation shows a call without the caller first.');
     }
 
     /**

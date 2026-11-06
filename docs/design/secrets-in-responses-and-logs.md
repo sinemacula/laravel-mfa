@@ -139,7 +139,7 @@ it.
 - A log call anywhere in the application writes `['code' => $code]`, or Laravel's shared context holds a code, or a
   channel's own processor adds one; the channel's `RedactSecrets` processor runs after every other processor of the
   logger and before any handler, and the record written holds `[redacted]`.
-- An exception thrown below a call such as `Mfa::verify(Submission::factor($id, $code))` is reported. The package's
+- An exception thrown below a call such as `Mfa::verify($caller, Submission::factor($id, $code))` is reported. The package's
   `report` callback scrubs it before the handler logs it: the frames inside the package lose every argument, and the
   facade's frame and every frame below the package lose the code, so the trace's string form shows `'[redacted]'` where
   it would show the start of the code. The context the exception's `context()` gives is redacted by the processor.

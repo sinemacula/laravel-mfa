@@ -46,7 +46,9 @@ final class ForgetSignInOnLogout
         }
 
         try {
-            Container::getInstance()->make(ProofService::class)->endSignIn($event->user, $event->guard);
+            $container = Container::getInstance();
+
+            $container->make(ProofService::class)->endSignIn($event->user, SignInApplication::of($container, $event->guard));
         } catch (UnsupportedIdentifierException) {
             return;
         }

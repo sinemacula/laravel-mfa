@@ -63,6 +63,7 @@ use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -152,7 +153,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
         $start = $this->startedTotp();
         $code  = $this->appCode($start);
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertCount(1, $seam->accepted);
@@ -185,7 +186,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $start = $this->startedTotp();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertSame([RequirementPart::PHISHING_RESISTANCE], $confirmation->verification?->evaluation?->unmet);
@@ -202,7 +203,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
         $user  = $this->bootstrapPerson();
         $start = $this->startedTotp();
 
-        $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
         $proofs = $this->furtherProofs($user);
 
@@ -228,7 +229,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
         $this->container()->instance(PendingCompletion::class, new RefusingCompletion(new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'The session refused it.')));
         $this->forgetReports();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $confirmation->reason);
         self::assertSame([], $confirmation->recoveryCodes);
@@ -263,7 +264,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
         $this->container()->instance(PendingCompletion::class, new RefusingCompletion(new ProofRefusedException('The store is gone.')));
 
         try {
-            $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+            $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
             self::fail('The failure was expected to propagate.');
         } catch (ProofRefusedException) {
@@ -285,7 +286,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $this->pendingSession($user, null, self::BOOTSTRAP_ACTIONS, firstFactor: $this->emailFirstFactor($user, self::PENDING));
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
         self::assertFalse($this->pendingFactorOf($start)->isConfirmed());
     }
 
@@ -309,7 +310,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $start = $this->startedTotp();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertNull($confirmation->verification);
@@ -346,7 +347,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $start = $this->startedTotp();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $confirmation->reason);
         self::assertNull($confirmation->completion());
@@ -373,7 +374,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $start = $this->startedTotp();
 
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->isConfirmed());
         self::assertCount(1, $transition->shortfalls());
         self::assertSame(self::APPLICATION, $transition->changes[0]->application);
         self::assertTrue($transition->changes[0]->outstanding?->asks(RequirementPart::ADDITIONAL_VERIFICATION));
@@ -390,7 +391,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
         $user  = $this->reauthenticatedPerson();
         $start = $this->startedTotp();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
         self::assertCount(10, $confirmation->recoveryCodes);
         self::assertInstanceOf(RevealedSecret::class, $confirmation->recoveryCodes[0]);
@@ -405,7 +406,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
         $this->recordStepUp($user, Factor::query()->sole());
 
         $second = $this->startedEmail();
-        $later  = $this->mfa()->confirmEnrollment($this->grantOf($second), (string) $this->mailbox->lastCodeTo(self::ADDRESS));
+        $later  = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($second), (string) $this->mailbox->lastCodeTo(self::ADDRESS));
 
         self::assertTrue($later->isConfirmed());
         self::assertSame([], $later->recoveryCodes);
@@ -425,7 +426,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $start = $this->startedTotp();
 
-        self::assertSame([], $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->recoveryCodes);
+        self::assertSame([], $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->recoveryCodes);
 
         Factor::query()->delete();
 
@@ -434,7 +435,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $second = $this->startedEmail();
 
-        self::assertSame([], $this->mfa()->confirmEnrollment($this->grantOf($second), (string) $this->mailbox->lastCodeTo(self::ADDRESS))->recoveryCodes);
+        self::assertSame([], $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($second), (string) $this->mailbox->lastCodeTo(self::ADDRESS))->recoveryCodes);
         self::assertSame(0, RecoveryCode::query()->count());
 
         Factor::query()->delete();
@@ -443,7 +444,9 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $third = $this->startedEmail('other@example.test');
 
-        self::assertCount(10, $this->mfa()->confirmEnrollment($this->grantOf($third), (string) $this->mailbox->lastCodeTo('other@example.test'))->recoveryCodes);
+        $code = (string) $this->mailbox->lastCodeTo('other@example.test');
+
+        self::assertCount(10, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($third), $code)->recoveryCodes);
     }
 
     /**
@@ -464,7 +467,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $start = $this->startedTotp();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertSame([], $confirmation->recoveryCodes);
@@ -486,7 +489,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $start = $this->startedTotp();
 
-        $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
         self::assertFalse(ReenrollmentObligation::isRequired($user));
 
@@ -496,7 +499,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $second = $this->startedTotp();
 
-        $this->mfa()->confirmEnrollment($this->grantOf($second), $this->appCode($second));
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($second), $this->appCode($second));
 
         self::assertFalse(ReenrollmentObligation::isRequired($pending));
     }

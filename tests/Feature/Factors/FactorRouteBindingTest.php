@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorRouteBinding;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
 use Tests\Fixtures\Identities\ScopedFactorOwner;
@@ -64,7 +65,7 @@ final class FactorRouteBindingTest extends TestCase
             Route::get('labeled/{factor:label}', static fn (Factor $factor): string => $factor->id);
 
             Route::post('factors/{factor}/verify', static function (Factor $factor): string {
-                $result = Mfa::verify(Submission::factor($factor->getFactorIdentifier(), '000000'));
+                $result = Mfa::verify(Callers::current(), Submission::factor($factor->getFactorIdentifier(), '000000'));
 
                 return $result->reason->value ?? 'verified';
             });
@@ -247,10 +248,10 @@ final class FactorRouteBindingTest extends TestCase
     {
         $factor = $this->totpFactor($this->signedInPerson());
 
-        self::assertNull(Mfa::factor($factor));
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor($factor)->reason);
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::sendCode($factor)->reason);
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::factor($factor, AuthenticatorApp::code($factor)))->reason);
-        self::assertSame($factor->id, Mfa::factor($factor->getFactorIdentifier())?->id);
+        self::assertNull(Mfa::factor(Callers::current(), $factor));
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor(Callers::current(), $factor)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::sendCode(Callers::current(), $factor)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Callers::current(), Submission::factor($factor, AuthenticatorApp::code($factor)))->reason);
+        self::assertSame($factor->id, Mfa::factor(Callers::current(), $factor->getFactorIdentifier())?->id);
     }
 }

@@ -16,9 +16,10 @@ leaves the package, and the order of the events listeners and audit sinks attach
   `not_found`. This does not rely on forgetting codes at sign-in or sign-out, which a custom guard bypasses.
 - With no binding, or no caller, nothing is sent, counted or reported.
 - Under the identity's lock the caller and the binding are resolved again and compared by array form
-  (`CallerContextResolver::still()`). A difference is `Exceptions\SignInChangedException`, thrown inside the
-  transaction, answered `not_found` with no event and no count. A credential a bound `PendingSessionResolver` cannot
-  validate there throws, uncaught.
+  (`CallerContextResolver::still()`), from the caller first served and never from a request: a pending session through
+  `PendingSessionResolver::revalidate()`, an active one through the proof store's current sign-in. A difference, or a
+  pending session that no longer stands, is `Exceptions\SignInChangedException`, thrown inside the transaction,
+  answered `not_found` with no event and no count. What a resolver throws there propagates, uncaught.
 - `Verification\PurposeRule` decides the purpose before anything is checked: a pending session is always `sign_in`; an
   active one is `step_up` or, when asked for, `sign_in`. `enrollment` and `reauthenticate` are refused. Routing to the
   seam is by pending or active, never by purpose.
@@ -43,21 +44,21 @@ leaves the package, and the order of the events listeners and audit sinks attach
 ## Success Path
 
 ```text
-Mfa::verify(Submission, ?Purpose)
-  1  caller = CallerContextResolver::resolve(VERIFY)             null -> failed not_found, no event, no count
+Mfa::verify(CallerContext, Submission, ?Purpose)
+  1  caller = CallerContextResolver::resolve(context, VERIFY)    null -> failed not_found, no event, no count
   2  purpose = PurposeRule::resolve()                            refused -> failed not_accepted, one event, no count
   3  binding = CallerContextResolver::binding(caller, purpose)   null -> failed not_found, no event, no count
   4  factor = OperationGuard::factor(identity, id, application)  refusal -> failed, one event, no count
   5  AttemptService::throttled(ip, function () {
   6    FactorStateTransaction::forIdentity(identity, model, function () {   <- the identity lock
-  7      CallerContextResolver::still(VERIFY, binding)           differs -> uncounted refusal, no event
+  7      CallerContextResolver::still(caller, VERIFY, binding)   differs -> uncounted refusal, no event
   8      admission under the lock                                refusal -> one event, no count
   9      route: check the code and count it, exactly once        failed -> return, so the count commits
  10      generation = VerificationGeneration::current(identity); proof = new Proof(..., binding, generation)
  11      check(none, firstFactor, proof)->accepted false         -> throw, rolled back, not_accepted
  12      evaluation = check(whole requirement, all proofs including this one)
  13      result = VerificationResult::verified(proof, evaluation, amr, type)
- 14      completion = PendingCompletion::complete(pending, result) or StepUp::stepUp(result)   <- last write
+ 14      completion = PendingCompletion::complete(pending, result) or StepUp::stepUp(context, result)   <- last write
  15      queue VerificationPassed, then RecoveryCodeUsed and RecoveryCodesLow
  16    })
  17  })

@@ -46,6 +46,7 @@ use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -110,7 +111,7 @@ final class RemovingFactorTest extends TestCase
         $user   = TestUser::query()->create(['email' => 'person@example.test']);
         $factor = $this->confirmedFactor($user);
 
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
         self::assertTrue($this->isStored($factor));
     }
 
@@ -141,7 +142,7 @@ final class RemovingFactorTest extends TestCase
             ),
         ));
 
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
         self::assertTrue($this->isStored($factor));
     }
 
@@ -156,7 +157,7 @@ final class RemovingFactorTest extends TestCase
     {
         $this->actingAs(new NonEloquentIdentity('plain-1', active: false));
 
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, Mfa::removeFactor('missing')->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, Mfa::removeFactor(Callers::current(), 'missing')->reason);
     }
 
     /**
@@ -177,7 +178,7 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $factor);
 
         foreach (['missing', $theirs->id, ['id' => $theirs->id], strtoupper($factor->id)] as $id) {
-            self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor($id)->reason);
+            self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor(Callers::current(), $id)->reason);
         }
 
         self::assertTrue($this->isStored($theirs));
@@ -200,7 +201,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $this->confirmedFactor($user));
 
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor($other->id)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor(Callers::current(), $other->id)->reason);
         self::assertTrue($this->isStored($other));
     }
 
@@ -217,7 +218,7 @@ final class RemovingFactorTest extends TestCase
 
         [$pending] = $this->pendingEnrollmentOf($user);
 
-        self::assertSame(FailureReason::NOT_CONFIRMED, Mfa::removeFactor($pending->id)->reason);
+        self::assertSame(FailureReason::NOT_CONFIRMED, Mfa::removeFactor(Callers::current(), $pending->id)->reason);
         self::assertTrue($this->isStored($pending));
     }
 
@@ -235,7 +236,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $factor, 86400);
 
-        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
         self::assertTrue($this->isStored($factor));
     }
 
@@ -258,12 +259,12 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $factor);
 
-        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
         self::assertTrue($this->isStored($factor));
 
         $this->stepUpWith($user, $other);
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
     }
 
     /**
@@ -286,7 +287,7 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $factor);
 
         try {
-            Mfa::removeFactor($factor->id);
+            Mfa::removeFactor(Callers::current(), $factor->id);
 
             self::fail('An unknown status must not read as pending.');
         } catch (InvalidModelException $exception) {
@@ -313,7 +314,7 @@ final class RemovingFactorTest extends TestCase
         $this->pendingEnrollmentOf($user);
         $this->stepUpWith($user, $factor);
 
-        $result = Mfa::removeFactor($factor->id);
+        $result = Mfa::removeFactor(Callers::current(), $factor->id);
 
         self::assertTrue($result->wasMade());
         self::assertNull($result->reason);
@@ -342,11 +343,11 @@ final class RemovingFactorTest extends TestCase
 
         $this->container()->instance(FreshnessGate::class, new FixedFreshnessGate(Requirement::none()->withAdditionalVerification(60)));
 
-        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
 
         $this->container()->instance(FreshnessGate::class, new FixedFreshnessGate(Requirement::none()->withAdditionalVerification(300)));
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
     }
 
     /**
@@ -365,11 +366,11 @@ final class RemovingFactorTest extends TestCase
 
         $this->container()->instance(FreshnessGate::class, new FixedFreshnessGate(null));
 
-        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
 
         $other->delete();
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
     }
 
     /**
@@ -398,7 +399,7 @@ final class RemovingFactorTest extends TestCase
             generation: 0,
         ));
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
     }
 
     /**
@@ -419,7 +420,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->container()->instance(FreshnessGate::class, new FixedFreshnessGate(Requirement::none()->withAdditionalVerification(60)));
 
-        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
         self::assertTrue($this->isStored($factor));
     }
 
@@ -440,7 +441,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $factor);
 
-        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
         self::assertTrue($this->isStored($factor));
     }
 
@@ -461,7 +462,7 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $factor);
         $this->container()->instance(LastFactorPolicy::class, $policy);
 
-        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
         self::assertSame(2, $policy->asked);
         self::assertTrue($this->isStored($factor));
         self::assertSame([], $this->reportedNames());
@@ -483,7 +484,7 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $factor);
         $this->container()->instance(LastFactorPolicy::class, $policy);
 
-        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
         self::assertSame(1, $policy->asked);
     }
 
@@ -516,7 +517,7 @@ final class RemovingFactorTest extends TestCase
             },
         ));
 
-        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor($second->id)->reason);
+        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor(Callers::current(), $second->id)->reason);
         self::assertTrue($this->isStored($second));
     }
 
@@ -541,7 +542,7 @@ final class RemovingFactorTest extends TestCase
             },
         ));
 
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
         self::assertSame([], $this->reportedNames());
     }
 
@@ -565,7 +566,7 @@ final class RemovingFactorTest extends TestCase
             fn () => $this->container()->make(ProofStore::class)->begin($user, self::APPLICATION, 'another-sign-in'),
         ));
 
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor($factor->id)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
         self::assertTrue($this->isStored($factor));
     }
 
@@ -596,7 +597,7 @@ final class RemovingFactorTest extends TestCase
             $seen = self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION));
         });
 
-        self::assertTrue(Mfa::removeFactor($gone->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $gone->id)->wasMade());
         self::assertSame([], $other->proofs($user, self::APPLICATION));
         self::assertSame([$kept->id], $seen);
         self::assertSame([$kept->id], self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION)));
@@ -618,7 +619,7 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $factor);
         $this->container()->instance(SessionRevoker::class, $revoker);
 
-        $result = Mfa::removeFactor($factor->id);
+        $result = Mfa::removeFactor(Callers::current(), $factor->id);
 
         self::assertTrue($result->wasMade());
         self::assertNull($result->completion());
@@ -644,7 +645,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->container()->instance(FactorChangeGate::class, $gate);
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
         self::assertCount(1, $gate->requests);
         self::assertGreaterThan(0, $gate->levels[0]);
         self::assertSame(FactorChange::REMOVE_FACTOR, $gate->requests[0]->change);
@@ -654,7 +655,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->container()->instance(FactorChangeGate::class, new ScriptedFactorChangeGate(refusal: new OperationRefusedException(FailureReason::NOT_FRESH, 'The layer says no.')));
 
-        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor($other->id)->reason);
+        self::assertSame(FailureReason::NOT_FRESH, Mfa::removeFactor(Callers::current(), $other->id)->reason);
         self::assertTrue($this->isStored($other));
     }
 
@@ -683,7 +684,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $other);
 
-        $result = Mfa::removeFactor($factor->id);
+        $result = Mfa::removeFactor(Callers::current(), $factor->id);
 
         self::assertTrue($result->wasMade());
         self::assertSame($completion, $result->completion());
@@ -715,7 +716,7 @@ final class RemovingFactorTest extends TestCase
         $this->container()->instance(SessionRevoker::class, $revoker);
 
         try {
-            Mfa::removeFactor($factor->id);
+            Mfa::removeFactor(Callers::current(), $factor->id);
             self::fail('A failed revocation was expected to propagate.');
         } catch (OperationRefusedException $exception) {
             self::assertSame('The sessions could not be ended.', $exception->getMessage());
@@ -750,7 +751,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $other);
 
-        $result = Mfa::removeFactor($factor->id);
+        $result = Mfa::removeFactor(Callers::current(), $factor->id);
 
         self::assertTrue($result->wasMade());
         self::assertSame($requirement->toArray(), $result->outstanding?->toArray());
@@ -786,7 +787,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $other);
 
-        $result = Mfa::removeFactor($factor->id);
+        $result = Mfa::removeFactor(Callers::current(), $factor->id);
 
         self::assertTrue($result->wasMade());
         self::assertNull($result->outstanding);
@@ -819,12 +820,12 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $other);
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
         self::assertCount(0, $transition->shortfalls());
 
         $this->container()->instance(ActiveTenantResolver::class, new FixedActiveTenant('tenant-1'));
 
-        self::assertSame(['phishing_resistance' => ['max_age' => null]], Mfa::removeFactor($third->id)->outstanding?->toArray());
+        self::assertSame(['phishing_resistance' => ['max_age' => null]], Mfa::removeFactor(Callers::current(), $third->id)->outstanding?->toArray());
         self::assertCount(1, $transition->shortfalls());
     }
 
@@ -852,7 +853,7 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $factor);
 
         try {
-            Mfa::removeFactor($factor->id);
+            Mfa::removeFactor(Callers::current(), $factor->id);
             self::fail('The transition\'s refusal was expected to propagate.');
         } catch (OperationRefusedException $exception) {
             self::assertSame('Cannot gate the session.', $exception->getMessage());
@@ -879,7 +880,7 @@ final class RemovingFactorTest extends TestCase
         $this->recoveryCodesOf($user);
         $this->stepUpWith($user, $other);
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
         self::assertSame(10, RecoveryCode::query()->count());
         self::assertSame(['FactorRemoved'], $this->reportedNames());
     }
@@ -902,7 +903,7 @@ final class RemovingFactorTest extends TestCase
         $this->recoveryCodesOf($user);
         $this->stepUpWith($user, $factor);
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
         self::assertSame(0, RecoveryCode::query()->count());
         self::assertSame(['FactorRemoved', 'RecoveryCodesRemoved'], $this->reportedNames());
         self::assertInstanceOf(FactorRemoved::class, $this->reported[0]);
@@ -925,7 +926,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $factor);
 
-        self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
         self::assertSame(['FactorRemoved'], $this->reportedNames());
     }
 
@@ -948,8 +949,8 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $proved);
 
-        self::assertTrue(Mfa::removeFactor($disabled->id)->wasMade());
-        self::assertTrue(Mfa::removeFactor($retired->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $disabled->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $retired->id)->wasMade());
     }
 
     /**
@@ -970,7 +971,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->stepUpWith($user, $other);
 
-        self::assertTrue(Mfa::removeFactor($preferred->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $preferred->id)->wasMade());
         self::assertFalse(Factor::query()->whereKey($other->id)->sole()->isPreferred());
         self::assertSame(['FactorRemoved'], $this->reportedNames());
     }
@@ -996,7 +997,7 @@ final class RemovingFactorTest extends TestCase
         });
 
         try {
-            Mfa::removeFactor($factor->id);
+            Mfa::removeFactor(Callers::current(), $factor->id);
             self::fail('The listener\'s refusal was expected to propagate.');
         } catch (OperationRefusedException $exception) {
             self::assertSame('From a listener.', $exception->getMessage());
@@ -1023,7 +1024,7 @@ final class RemovingFactorTest extends TestCase
         try {
             DB::transaction(static function () use ($factor): void {
 
-                self::assertTrue(Mfa::removeFactor($factor->id)->wasMade());
+                self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
 
                 throw new \RuntimeException('The caller changed its mind.');
             });
@@ -1053,7 +1054,7 @@ final class RemovingFactorTest extends TestCase
         Factor::deleting(static fn (): bool => false);
 
         try {
-            Mfa::removeFactor($factor->id);
+            Mfa::removeFactor(Callers::current(), $factor->id);
             self::fail('A cancelled deletion was expected to throw.');
         } catch (WriteCanceledException $exception) {
             self::assertStringContainsString('cancelled the factor\'s deletion', $exception->getMessage());

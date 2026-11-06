@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
@@ -65,7 +66,7 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     {
         $user = $this->loginUser();
 
-        $codes = $this->codes()->generate($user);
+        $codes = $this->codes()->generate($user, 'web');
 
         self::assertCount(10, $codes);
         self::assertSame('secondary', (new RecoveryCode)->getConnectionName());
@@ -86,13 +87,13 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
      */
     public function testRedemptionRunsOnTheStorageConnection(): void
     {
-        $code = $this->codes()->generate($this->loginUser())[0]->reveal();
+        $code = $this->codes()->generate($this->loginUser(), 'web')[0]->reveal();
 
-        self::assertTrue(Mfa::verify(Submission::recoveryCode($code))->isVerified());
-        self::assertTrue(Mfa::verify(Submission::recoveryCode($code))->isFailed());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::recoveryCode($code))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::recoveryCode($code))->isFailed());
         self::assertSame(1, DB::connection('secondary')->table('mfa_recovery_codes')->whereNotNull('used_at')->count());
         self::assertSame(0, DB::connection('secondary')->transactionLevel());
-        self::assertSame(9, Mfa::recoveryCodeStatus()?->remaining);
+        self::assertSame(9, Mfa::recoveryCodeStatus(Callers::current())?->remaining);
     }
 
     /**
@@ -107,7 +108,7 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     public function testAFailedReplacementRollsBackOnTheStorageConnection(): void
     {
         $user  = $this->loginUser();
-        $prior = $this->codes()->generate($user);
+        $prior = $this->codes()->generate($user, 'web');
         $seen  = 0;
 
         RecoveryCode::creating(static function () use (&$seen): void {
@@ -117,7 +118,7 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
         });
 
         try {
-            $this->codes()->generate($user);
+            $this->codes()->generate($user, 'web');
             self::fail('Expected the replacement to fail partway through.');
         } catch (MidRotationFailureException $exception) {
             self::assertSame('mid-replacement failure', $exception->getMessage());
@@ -125,8 +126,8 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
 
         self::assertSame(0, DB::connection('secondary')->transactionLevel());
         self::assertSame(10, RecoveryCode::query()->where('authenticatable_id', (string) $user->id)->whereNull('replaced_at')->count());
-        self::assertSame(1, Mfa::recoveryCodeStatus()?->generation);
-        self::assertTrue(Mfa::verify(Submission::recoveryCode($prior[9]->reveal()))->isVerified());
+        self::assertSame(1, Mfa::recoveryCodeStatus(Callers::current())?->generation);
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::recoveryCode($prior[9]->reveal()))->isVerified());
     }
 
     /**

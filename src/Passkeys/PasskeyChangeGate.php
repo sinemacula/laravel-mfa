@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
@@ -44,8 +45,8 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
+use SineMacula\Laravel\Mfa\Support\IdentityType;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 
 /**
@@ -130,8 +131,7 @@ final readonly class PasskeyChangeGate
      * identity is not a person, so the registration goes on as a sign-in
      * passkey only.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration  $registration
      * @param  ?string  $label
      * @return ?\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociationResult
@@ -140,20 +140,25 @@ final readonly class PasskeyChangeGate
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    public function registering(MultiFactorAuthenticatable $identity, string $application, PasskeyRegistration $registration, ?string $label = null): ?PasskeyAssociationResult
+    public function registering(CallerContext $caller, PasskeyRegistration $registration, ?string $label = null): ?PasskeyAssociationResult
     {
         OpenTransaction::assertOpen(self::NO_TRANSACTION);
 
-        if (!$this->settings($application)->enables(PasskeyAssertions::TYPE) || !$this->container->make(SubjectTypeResolver::class)->isPerson($identity)) {
+        $identity    = $caller->identity;
+        $application = $caller->application;
+
+        if ($identity === null || !$this->settings($application)->enables(PasskeyAssertions::TYPE) || !$this->container->make(SubjectTypeResolver::class)->isPerson($identity)) {
             return null;
         }
 
-        $this->assertRegistration($this->caller($identity, $application, PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT), $registration);
+        $served = $this->caller($caller, PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT);
+
+        $this->assertRegistration($served, $registration);
 
         return FactorStateTransaction::forIdentity(
             $identity,
             $this->factorModel(),
-            fn (Collection $factors): PasskeyAssociationResult => $this->associate($application, $registration, $label, $factors),
+            fn (Collection $factors): PasskeyAssociationResult => $this->associate($served, $application, $registration, $label, $factors),
         );
     }
 
@@ -164,8 +169,7 @@ final readonly class PasskeyChangeGate
      * an authentication layer's result carrying the pending session's new
      * credential, or `null` with nothing to return.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $credentialId
      * @return ?object
      *
@@ -174,7 +178,7 @@ final readonly class PasskeyChangeGate
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    public function removing(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId): ?object
+    public function removing(CallerContext $caller, #[\SensitiveParameter] string $credentialId): ?object
     {
         OpenTransaction::assertOpen(self::NO_TRANSACTION);
 
@@ -186,7 +190,10 @@ final readonly class PasskeyChangeGate
             return null;
         }
 
-        $binding = $this->callers->binding($this->caller($identity, $application, null), Purpose::STEP_UP);
+        $served      = $this->caller($caller, null);
+        $identity    = $served->identity;
+        $application = $served->application;
+        $binding     = $this->callers->binding($served, Purpose::STEP_UP);
 
         // No sign-in means nothing a step-up could have been made on, or to
         // compare under the lock, whatever a bound gate would answer.
@@ -197,7 +204,7 @@ final readonly class PasskeyChangeGate
         return FactorStateTransaction::forIdentity(
             $identity,
             $this->factorModel(),
-            fn (Collection $factors): ?object => $this->remove($binding, $application, $credentialId, $factors),
+            fn (Collection $factors): ?object => $this->remove($served, $binding, $application, $credentialId, $factors),
         );
     }
 
@@ -211,6 +218,7 @@ final readonly class PasskeyChangeGate
      *
      * @formatter:off
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration  $registration
      * @param  ?string  $label
@@ -223,12 +231,12 @@ final readonly class PasskeyChangeGate
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      */
-    private function associate(string $application, PasskeyRegistration $registration, ?string $label, Collection $factors): PasskeyAssociationResult
+    private function associate(Caller $served, string $application, PasskeyRegistration $registration, ?string $label, Collection $factors): PasskeyAssociationResult
     {
-        $caller = $this->callers->still(PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT, $registration->binding);
+        $caller = $this->callers->still($served, PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT, $registration->binding);
 
         if ($caller === null) {
-            throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The sign-in the registration was made on is no longer the request\'s.');
+            throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The sign-in the registration was made on is no longer the caller\'s.');
         }
 
         $identity = $caller->identity;
@@ -249,7 +257,7 @@ final readonly class PasskeyChangeGate
         $factor  = $this->store($identity, $application, $registration->credentialId, $label);
         $id      = self::storedId($factor);
         $summary = FactorSummary::fromFactor($factor);
-        $context = $this->events->context($identity, $application);
+        $context = $this->events->context($identity, $application, $caller->client);
         $proof   = self::proofOf($identity, $registration, $id);
 
         $this->associations->associate(ProofOwner::of($identity), $id, $registration->credentialId);
@@ -265,7 +273,7 @@ final readonly class PasskeyChangeGate
 
         $acceptance = $this->container->make(ProofAcceptance::class);
         $result     = $caller->pending === null ? null : $acceptance->evaluate($caller, $proof, [], PasskeyAssertions::TYPE);
-        $codes      = $first ? $this->container->make(RecoveryCodeIssuance::class)->withFirstFactor($identity, $application, $proof) : [];
+        $codes      = $first ? $this->container->make(RecoveryCodeIssuance::class)->withFirstFactor($identity, $application, $proof, $caller->pending, $caller->client) : [];
 
         if ($result !== null) {
             return new PasskeyAssociationResult($summary, $codes, $result->withCompletion($acceptance->handOver($caller, $result)));
@@ -286,6 +294,7 @@ final readonly class PasskeyChangeGate
      *
      * @formatter:off
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $application
      * @param  string  $credentialId
@@ -297,9 +306,9 @@ final readonly class PasskeyChangeGate
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    private function remove(ProofBinding $binding, string $application, #[\SensitiveParameter] string $credentialId, Collection $factors): ?object
+    private function remove(Caller $served, ProofBinding $binding, string $application, #[\SensitiveParameter] string $credentialId, Collection $factors): ?object
     {
-        $caller = $this->callers->still(null, $binding);
+        $caller = $this->callers->still($served, null, $binding);
 
         if ($caller === null) {
             throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The sign-in changed before the identity\'s lock was held.');
@@ -332,7 +341,7 @@ final readonly class PasskeyChangeGate
 
         $this->container->make(RemovalGuard::class)->assertRemovable($identity, $application, $factor, $factors, $binding->sessionId);
 
-        return $this->container->make(FactorRemoval::class)->remove($identity, $application, $factor, $factors, $binding->sessionId)->completion();
+        return $this->container->make(FactorRemoval::class)->remove($identity, $application, $factor, $factors, $binding->sessionId, $caller->client)->completion();
     }
 
     /**
@@ -352,7 +361,7 @@ final readonly class PasskeyChangeGate
         $factor   = $this->factorModel();
         $relation = $factor->authenticatable();
 
-        $factor->setAttribute($relation->getMorphType(), CurrentIdentity::typeOf($identity));
+        $factor->setAttribute($relation->getMorphType(), IdentityType::of($identity));
         $factor->setAttribute($relation->getForeignKeyName(), ProofOwner::of($identity)->key);
         $factor->setAttribute($factor->getTypeName(), PasskeyAssertions::TYPE);
         $factor->setAttribute($factor->getLabelName(), $label);
@@ -390,24 +399,21 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * The request's validated caller, refused unless it is the identity and the
-     * application given.
+     * The caller served for the change, refused when it is nobody the change
+     * serves.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  ?\SineMacula\Laravel\Mfa\Enums\PendingAction  $action
      * @return \SineMacula\Laravel\Mfa\Context\Caller
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private function caller(MultiFactorAuthenticatable $identity, string $application, ?PendingAction $action): Caller
+    private function caller(CallerContext $context, ?PendingAction $action): Caller
     {
-        $caller   = $this->callers->resolve($action);
-        $isCaller = $caller !== null && ProofOwner::of($caller->identity)->slot() === ProofOwner::of($identity)->slot() && $this->callers->application($caller) === $application;
+        $caller = $this->callers->resolve($context, $action);
 
-        OperationRefusedException::unless($isCaller, FailureReason::NOT_FOUND, 'The identity and application are not the request\'s validated caller.');
+        OperationRefusedException::unless($caller !== null, FailureReason::NOT_FOUND, 'The caller is not served for this change.');
 
         return $caller;
     }

@@ -45,13 +45,14 @@ final readonly class ForgettingSessionRevoker implements SessionRevoker
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
+     * @param  string  $application
      * @param  string  $session
      * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      *
      * @throws \LogicException
      */
     #[\Override]
-    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $session): RemovalRevocation
+    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $application, string $session): RemovalRevocation
     {
         $this->revokeAll($identity);
 

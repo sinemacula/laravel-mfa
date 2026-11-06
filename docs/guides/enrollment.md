@@ -11,11 +11,13 @@ refused as `not_accepted`.
 ## The flow
 
 ```php
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
 
-$start = Mfa::startEnrollment(EnrollmentRequest::totp($user->email, label: 'My phone'));
+$caller = CallerContext::fromRequest($request); // see Helpers: The caller
+$start  = Mfa::startEnrollment($caller, EnrollmentRequest::totp($user->email, label: 'My phone'));
 
 if (! $start->hasStarted()) {
     return response()->json(['reason' => $start->reason->value], 422);
@@ -37,7 +39,11 @@ person who loses them starts again. Cookie-authenticated routes need CSRF protec
 render, and shows a code:
 
 ```php
-$confirmation = Mfa::confirmEnrollment($request->string('grant')->toString(), $request->string('code')->toString());
+$confirmation = Mfa::confirmEnrollment(
+    $caller,
+    $request->string('grant')->toString(),
+    $request->string('code')->toString(),
+);
 
 if (! $confirmation->isConfirmed()) {
     return response()->json(['reason' => $confirmation->reason->value], 422);
@@ -52,10 +58,10 @@ return SecretResponse::json([
 A delivered type names the destination to prove instead, and its first code goes out as the enrolment starts:
 
 ```php
-Mfa::startEnrollment(EnrollmentRequest::delivered('email', $request->string('email')->toString()));
-Mfa::startEnrollment(EnrollmentRequest::delivered('sms', '+44 7700 900123', label: 'Work phone'));
-Mfa::startEnrollment(EnrollmentRequest::provisioned('your_app_type', $request->user()->email));
-Mfa::startEnrollment(EnrollmentRequest::of('your_own_type'));
+Mfa::startEnrollment($caller, EnrollmentRequest::delivered('email', $request->string('email')->toString()));
+Mfa::startEnrollment($caller, EnrollmentRequest::delivered('sms', '+44 7700 900123', label: 'Work phone'));
+Mfa::startEnrollment($caller, EnrollmentRequest::provisioned('your_app_type', $request->user()->email));
+Mfa::startEnrollment($caller, EnrollmentRequest::of('your_own_type'));
 ```
 
 `provisioned()` is for your own type whose driver implements `Contracts\ProvisioningDriver`: it starts as TOTP does,
@@ -65,14 +71,14 @@ under the account name and optional issuer the app shows.
 application's name. Neither the issuer nor the account name may hold a colon, and a label is trimmed, a blank one being
 none and one over 255 characters refused, so validate what a person types first.
 
-| Call                                    | Answers                                                             |
-|-----------------------------------------|---------------------------------------------------------------------|
-| `Mfa::startEnrollment($request)`        | `Enrollment\EnrollmentStart`, with `hasStarted()`                   |
-| `Mfa::confirmEnrollment($grant, $code)` | `Enrollment\EnrollmentConfirmation`, with `isConfirmed()`           |
-| `Mfa::resendEnrollmentCode($grant)`     | `Codes\SendResult`, renewing nothing                                |
-| `Mfa::cancelEnrollment($grant)`         | `true` when it was cancelled, `false` for a grant that is not yours |
-| `Mfa::renameFactor($factorId, $label)`  | `Factors\FactorChange`, with `wasMade()`                            |
-| `Mfa::setPreferredFactor($factorId)`    | `Factors\FactorChange`, with `wasMade()`                            |
+| Call                                             | Answers                                                             |
+|--------------------------------------------------|---------------------------------------------------------------------|
+| `Mfa::startEnrollment($caller, $request)`        | `Enrollment\EnrollmentStart`, with `hasStarted()`                   |
+| `Mfa::confirmEnrollment($caller, $grant, $code)` | `Enrollment\EnrollmentConfirmation`, with `isConfirmed()`           |
+| `Mfa::resendEnrollmentCode($caller, $grant)`     | `Codes\SendResult`, renewing nothing                                |
+| `Mfa::cancelEnrollment($caller, $grant)`         | `true` when it was cancelled, `false` for a grant that is not yours |
+| `Mfa::renameFactor($caller, $factorId, $label)`  | `Factors\FactorChange`, with `wasMade()`                            |
+| `Mfa::setPreferredFactor($caller, $factorId)`    | `Factors\FactorChange`, with `wasMade()`                            |
 
 A grant is taken as a `RevealedSecret` or as the string revealed from it. A refusal is a result carrying a reason a
 caller may be told, since `not_fresh` is an ordinary path; only misuse, a storage failure or a delivery failure throws,

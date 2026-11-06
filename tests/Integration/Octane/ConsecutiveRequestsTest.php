@@ -50,6 +50,7 @@ use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Exceptions\CommitFailedException;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FixedIdentityRequirement;
@@ -380,7 +381,7 @@ final class ConsecutiveRequestsTest extends TestCase
 
                 $submission = Submission::challenge($request->string('factor')->toString(), $request->string('challenge')->toString(), $request->string('code')->toString());
 
-                return new JsonResponse(['verified' => Mfa::verify($submission)->isVerified()]);
+                return new JsonResponse(['verified' => Mfa::verify(Callers::current(), $submission)->isVerified()]);
             });
 
             $router->post('remove', self::removed(...));
@@ -465,7 +466,7 @@ final class ConsecutiveRequestsTest extends TestCase
      */
     private static function factorIds(): JsonResponse
     {
-        return new JsonResponse(['ids' => array_map(static fn (FactorSummary $factor): string => $factor->id, Mfa::factors())]);
+        return new JsonResponse(['ids' => array_map(static fn (FactorSummary $factor): string => $factor->id, Mfa::factors(Callers::current()))]);
     }
 
     /**
@@ -475,7 +476,7 @@ final class ConsecutiveRequestsTest extends TestCase
      */
     private static function proofMethods(): JsonResponse
     {
-        return new JsonResponse(['methods' => array_map(static fn (Proof $proof): string => $proof->method, Mfa::proofs())]);
+        return new JsonResponse(['methods' => array_map(static fn (Proof $proof): string => $proof->method, Mfa::proofs(Callers::current()))]);
     }
 
     /**
@@ -486,7 +487,7 @@ final class ConsecutiveRequestsTest extends TestCase
      */
     private static function sent(Request $request): JsonResponse
     {
-        return new JsonResponse(['challenge' => Mfa::sendCode($request->string('factor')->toString())->challengeId]);
+        return new JsonResponse(['challenge' => Mfa::sendCode(Callers::current(), $request->string('factor')->toString())->challengeId]);
     }
 
     /**
@@ -497,7 +498,7 @@ final class ConsecutiveRequestsTest extends TestCase
      */
     private static function removed(Request $request): JsonResponse
     {
-        return new JsonResponse(['made' => Mfa::removeFactor($request->string('factor')->toString())->wasMade()]);
+        return new JsonResponse(['made' => Mfa::removeFactor(Callers::current(), $request->string('factor')->toString())->wasMade()]);
     }
 
     /**
@@ -574,7 +575,7 @@ final class ConsecutiveRequestsTest extends TestCase
     {
         $submission = Submission::factor($request->string('factor')->toString(), $request->string('code')->toString());
 
-        return new JsonResponse(['verified' => Mfa::verify($submission)->isVerified()]);
+        return new JsonResponse(['verified' => Mfa::verify(Callers::current(), $submission)->isVerified()]);
     }
 
     /**
@@ -618,7 +619,7 @@ final class ConsecutiveRequestsTest extends TestCase
 
         self::assertInstanceOf(TotpDriver::class, $driver);
 
-        return new JsonResponse(['digits' => $driver->parameters()->digits, 'requirement' => array_keys(Mfa::requirement()->toArray())]);
+        return new JsonResponse(['digits' => $driver->parameters()->digits, 'requirement' => array_keys(Mfa::requirement(Callers::current())->toArray())]);
     }
 
     /**

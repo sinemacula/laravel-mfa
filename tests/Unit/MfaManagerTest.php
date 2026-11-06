@@ -8,7 +8,8 @@ use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
-use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
@@ -42,6 +43,7 @@ use SineMacula\Laravel\Mfa\Verification\FactorOffers;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -84,8 +86,8 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * The delegation matrix: manager method, service, service method,
-     * arguments and the service's result.
+     * The delegation matrix: manager method, service, service method, arguments
+     * and the service's result.
      *
      * @return iterable<string, array{0: string, 1: class-string, 2: string, 3: list<mixed>, 4: mixed}>
      */
@@ -95,52 +97,54 @@ final class MfaManagerTest extends TestCase
         $refused     = SendResult::refused(FailureReason::SENDING_CAPPED, 30);
         $requirement = Requirement::none()->withAdditionalVerification(300);
         $summary     = FactorSummary::fromFactor($factor);
+        $caller      = CallerContext::forIdentity(new NonEloquentIdentity('caller-1'), 'web');
 
-        yield 'requirement' => ['requirement', RequirementService::class, 'requirement', [], $requirement];
-        yield 'requirement empty' => ['requirement', RequirementService::class, 'requirement', [], Requirement::none()];
-        yield 'isFresh true' => ['isFresh', RequirementService::class, 'isFresh', ['mfa.add_factor', $requirement], true];
-        yield 'isFresh false' => ['isFresh', RequirementService::class, 'isFresh', ['billing.change_plan', null], false];
-        yield 'authentication context' => ['authenticationContext', AuthenticationContextContributor::class, 'contribute', [], ['accepted' => false]];
-        yield 'factors' => ['factors', FactorService::class, 'factors', [], [$summary]];
-        yield 'factor' => ['factor', FactorService::class, 'factor', ['factor-1'], $summary];
-        yield 'factor missing' => ['factor', FactorService::class, 'factor', ['factor-1'], null];
+        yield 'requirement' => ['requirement', RequirementService::class, 'requirement', [$caller], $requirement];
+        yield 'requirement empty' => ['requirement', RequirementService::class, 'requirement', [$caller], Requirement::none()];
+        yield 'isFresh true' => ['isFresh', RequirementService::class, 'isFresh', [$caller, 'mfa.add_factor', $requirement], true];
+        yield 'isFresh false' => ['isFresh', RequirementService::class, 'isFresh', [$caller, 'billing.change_plan', null], false];
+        yield 'factors' => ['factors', FactorService::class, 'factors', [$caller], [$summary]];
+        yield 'factor' => ['factor', FactorService::class, 'factor', [$caller, 'factor-1'], $summary];
+        yield 'factor missing' => ['factor', FactorService::class, 'factor', [$caller, 'factor-1'], null];
         yield 'factorModel' => ['factorModel', FactorService::class, 'factorModel', [], Factor::class];
-        yield 'proofs' => ['proofs', ProofService::class, 'proofs', [], []];
-        yield 'offeredFactors' => ['offeredFactors', FactorOffers::class, 'offered', [], [$summary]];
-        yield 'sendCode' => ['sendCode', ChallengeRequests::class, 'sendCode', [$factor->getFactorIdentifier(), Purpose::STEP_UP], $refused];
+        yield 'proofs' => ['proofs', ProofService::class, 'proofs', [$caller], []];
+        yield 'offeredFactors' => ['offeredFactors', FactorOffers::class, 'offered', [$caller], [$summary]];
+        yield 'sendCode' => ['sendCode', ChallengeRequests::class, 'sendCode', [$caller, $factor->getFactorIdentifier(), Purpose::STEP_UP], $refused];
 
         $started = AssertionRequest::started(['challenge' => 'options']);
 
-        yield 'requestAssertion' => ['requestAssertion', ChallengeRequests::class, 'requestAssertion', ['factor-1', Purpose::SIGN_IN], $started];
+        yield 'requestAssertion' => ['requestAssertion', ChallengeRequests::class, 'requestAssertion', [$caller, 'factor-1', Purpose::SIGN_IN], $started];
 
         $failed = VerificationResult::failed(FailureReason::INVALID_CODE, 'The code did not match.');
 
-        yield 'verify' => ['verify', VerificationService::class, 'verify', [Submission::factor('factor-1', '123456'), Purpose::STEP_UP], $failed];
+        yield 'verify' => ['verify', VerificationService::class, 'verify', [$caller, Submission::factor('factor-1', '123456'), Purpose::STEP_UP], $failed];
 
         $generated = RecoveryCodeGeneration::generated([new RevealedSecret('ABCDEFGHJKLM')]);
 
-        yield 'generateRecoveryCodes' => ['generateRecoveryCodes', RecoveryCodeIssuance::class, 'generate', [], $generated];
-        yield 'recoveryCodeStatus' => ['recoveryCodeStatus', RecoveryCodeService::class, 'statusOfCaller', [], new RecoveryCodeStatus(4, 2, CarbonImmutable::now())];
-        yield 'recoveryCodeStatus of nobody' => ['recoveryCodeStatus', RecoveryCodeService::class, 'statusOfCaller', [], null];
+        yield 'generateRecoveryCodes' => ['generateRecoveryCodes', RecoveryCodeIssuance::class, 'generate', [$caller], $generated];
+        yield 'recoveryCodeStatus' => ['recoveryCodeStatus', RecoveryCodeService::class, 'statusOfCaller', [$caller], new RecoveryCodeStatus(4, 2, CarbonImmutable::now())];
+        yield 'recoveryCodeStatus of nobody' => ['recoveryCodeStatus', RecoveryCodeService::class, 'statusOfCaller', [$caller], null];
 
         $grant = new RevealedSecret('grant');
 
         $request = EnrollmentRequest::totp('person@example.test');
 
-        yield 'startEnrollment' => ['startEnrollment', EnrollmentService::class, 'start', [$request], EnrollmentStart::refused(FailureReason::NOT_FOUND)];
-        yield 'confirmEnrollment' => ['confirmEnrollment', EnrollmentService::class, 'confirm', [$grant, '123456'], EnrollmentConfirmation::failed(FailureReason::NOT_FOUND)];
-        yield 'resendEnrollmentCode' => ['resendEnrollmentCode', EnrollmentService::class, 'resend', [$grant], $refused];
-        yield 'cancelEnrollment' => ['cancelEnrollment', EnrollmentService::class, 'cancel', [$grant], false];
-        yield 'renameFactor' => ['renameFactor', FactorService::class, 'rename', ['factor-1', 'Work phone'], FactorChange::refused(FailureReason::NOT_FOUND)];
-        yield 'setPreferredFactor' => ['setPreferredFactor', FactorService::class, 'setPreferred', ['factor-1'], FactorChange::refused(FailureReason::NOT_FOUND)];
+        yield 'startEnrollment' => ['startEnrollment', EnrollmentService::class, 'start', [$caller, $request], EnrollmentStart::refused(FailureReason::NOT_FOUND)];
+        $unconfirmed = EnrollmentConfirmation::failed(FailureReason::NOT_FOUND);
+
+        yield 'confirmEnrollment' => ['confirmEnrollment', EnrollmentService::class, 'confirm', [$caller, $grant, '123456'], $unconfirmed];
+        yield 'resendEnrollmentCode' => ['resendEnrollmentCode', EnrollmentService::class, 'resend', [$caller, $grant], $refused];
+        yield 'cancelEnrollment' => ['cancelEnrollment', EnrollmentService::class, 'cancel', [$caller, $grant], false];
+        yield 'renameFactor' => ['renameFactor', FactorService::class, 'rename', [$caller, 'factor-1', 'Work phone'], FactorChange::refused(FailureReason::NOT_FOUND)];
+        yield 'setPreferredFactor' => ['setPreferredFactor', FactorService::class, 'setPreferred', [$caller, 'factor-1'], FactorChange::refused(FailureReason::NOT_FOUND)];
 
         $identity = new NonEloquentIdentity('plain-1');
         $actor    = new Actor('admin', '9');
 
-        yield 'removeFactor' => ['removeFactor', LifecycleService::class, 'removeFactor', ['factor-1'], FactorRemovalResult::refused(FailureReason::NOT_FOUND)];
-        yield 'unlockFactor' => ['unlockFactor', LifecycleService::class, 'unlockFactor', [$identity, 'factor-1', $actor], true];
-        yield 'unlockIdentity' => ['unlockIdentity', LifecycleService::class, 'unlockIdentity', [$identity, $actor], false];
-        yield 'resetIdentity' => ['resetIdentity', IdentityReset::class, 'reset', [$identity, $actor, 'Lost phone.', false], null];
+        yield 'removeFactor' => ['removeFactor', LifecycleService::class, 'removeFactor', [$caller, 'factor-1'], FactorRemovalResult::refused(FailureReason::NOT_FOUND)];
+        yield 'unlockFactor' => ['unlockFactor', LifecycleService::class, 'unlockFactor', [$identity, 'factor-1', $actor, new ClientContext('192.0.2.7')], true];
+        yield 'unlockIdentity' => ['unlockIdentity', LifecycleService::class, 'unlockIdentity', [$identity, $actor, null], false];
+        yield 'resetIdentity' => ['resetIdentity', IdentityReset::class, 'reset', [$identity, $actor, 'Lost phone.', false, null], null];
         yield 'forgetIdentity' => ['forgetIdentity', ForgetIdentity::class, 'forget', [$identity], null];
     }
 
@@ -158,13 +162,8 @@ final class MfaManagerTest extends TestCase
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     #[DataProvider('delegations')]
-    public function testMethodDelegatesToItsCapabilityService(
-        string $method,
-        string $service,
-        string $serviceMethod,
-        array $arguments,
-        mixed $result,
-    ): void {
+    public function testMethodDelegatesToItsCapabilityService(string $method, string $service, string $serviceMethod, array $arguments, mixed $result): void
+    {
         // Resolved before the double is bound: resolving the manager checks the
         // configuration, which reads the factor model through the service.
         $manager = $this->manager();
@@ -197,7 +196,7 @@ final class MfaManagerTest extends TestCase
         $manager  = $this->manager();
         $reset    = \Mockery::mock($this->container()->make(IdentityReset::class));
 
-        $reset->shouldReceive('reset')->once()->with($identity, $actor, 'Lost phone.', true);
+        $reset->shouldReceive('reset')->once()->with($identity, $actor, 'Lost phone.', true, null);
 
         $this->container()->instance(IdentityReset::class, $reset);
 
@@ -214,29 +213,30 @@ final class MfaManagerTest extends TestCase
      */
     public function testOptionalArgumentsDefaultToNoPurpose(): void
     {
+        $caller     = Callers::current();
         $submission = Submission::factor('factor-1', '123456');
         $result     = VerificationResult::failed(FailureReason::INVALID_CODE, 'The code did not match.');
         $refused    = SendResult::refused(FailureReason::NOT_FOUND);
         $assertion  = AssertionRequest::refused(FailureReason::NOT_FOUND);
 
         $verification = \Mockery::mock($this->container()->make(VerificationService::class));
-        $verification->shouldReceive('verify')->once()->with($submission, null)->andReturn($result);
+        $verification->shouldReceive('verify')->once()->with($caller, $submission, null)->andReturn($result);
 
         $requests = \Mockery::mock($this->container()->make(ChallengeRequests::class));
-        $requests->shouldReceive('sendCode')->once()->with('factor-1', null)->andReturn($refused);
-        $requests->shouldReceive('requestAssertion')->once()->with('factor-1', null)->andReturn($assertion);
+        $requests->shouldReceive('sendCode')->once()->with($caller, 'factor-1', null)->andReturn($refused);
+        $requests->shouldReceive('requestAssertion')->once()->with($caller, 'factor-1', null)->andReturn($assertion);
 
         $requirements = \Mockery::mock($this->container()->make(RequirementService::class));
-        $requirements->shouldReceive('isFresh')->once()->with('mfa.add_factor', null)->andReturnFalse();
+        $requirements->shouldReceive('isFresh')->once()->with($caller, 'mfa.add_factor', null)->andReturnFalse();
 
         $this->container()->instance(VerificationService::class, $verification);
         $this->container()->instance(ChallengeRequests::class, $requests);
         $this->container()->instance(RequirementService::class, $requirements);
 
-        self::assertSame($result, $this->manager()->verify($submission));
-        self::assertSame($refused, $this->manager()->sendCode('factor-1'));
-        self::assertSame($assertion, $this->manager()->requestAssertion('factor-1'));
-        self::assertFalse($this->manager()->isFresh('mfa.add_factor'));
+        self::assertSame($result, $this->manager()->verify($caller, $submission));
+        self::assertSame($refused, $this->manager()->sendCode($caller, 'factor-1'));
+        self::assertSame($assertion, $this->manager()->requestAssertion($caller, 'factor-1'));
+        self::assertFalse($this->manager()->isFresh($caller, 'mfa.add_factor'));
     }
 
     /**
@@ -246,11 +246,11 @@ final class MfaManagerTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testRecoveryCodeStatusIsTheCurrentIdentitys(): void
+    public function testRecoveryCodeStatusIsTheCallers(): void
     {
         $this->actingAs(TestUser::query()->create(['email' => 'codes@example.com']));
 
-        $status = $this->manager()->recoveryCodeStatus();
+        $status = $this->manager()->recoveryCodeStatus(Callers::current());
 
         self::assertNotNull($status);
         self::assertFalse($status->exists());
@@ -267,12 +267,12 @@ final class MfaManagerTest extends TestCase
      */
     public function testRecoveryCodeMethodsServeNobodyWithoutAnIdentity(): void
     {
-        $generation = $this->manager()->generateRecoveryCodes();
+        $generation = $this->manager()->generateRecoveryCodes(Callers::current());
 
         self::assertFalse($generation->wasGenerated());
         self::assertSame(FailureReason::NOT_FOUND, $generation->reason);
         self::assertSame(0, RecoveryCode::query()->count());
-        self::assertNull($this->manager()->recoveryCodeStatus());
+        self::assertNull($this->manager()->recoveryCodeStatus(Callers::current()));
     }
 
     /**

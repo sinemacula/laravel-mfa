@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Seams;
 
 use Carbon\CarbonImmutable;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
@@ -38,12 +39,13 @@ final readonly class ScriptedFreshnessGate implements FreshnessGate
     /**
      * Fresh as told.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return bool
      */
     #[\Override]
-    public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool
+    public function isFresh(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): bool
     {
         return $this->fresh;
     }
@@ -51,12 +53,13 @@ final readonly class ScriptedFreshnessGate implements FreshnessGate
     /**
      * The deadline as told.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return ?\Carbon\CarbonImmutable
      */
     #[\Override]
-    public function freshUntil(string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
+    public function freshUntil(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
     {
         return $this->until;
     }
@@ -64,12 +67,13 @@ final readonly class ScriptedFreshnessGate implements FreshnessGate
     /**
      * No requirement of its own.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      */
     #[\Override]
-    public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement
+    public function requirement(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?Requirement
     {
         return $callerRequirement;
     }

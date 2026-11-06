@@ -31,6 +31,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
 use Tests\Fixtures\Assurance\RefusingCombinationPolicy;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -95,7 +96,7 @@ final class PasskeyAssertionsTest extends TestCase
      */
     public function testRequestsExactlyTheFactorsCredential(): void
     {
-        $request = $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP);
+        $request = $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP);
 
         self::assertTrue($request->hasStarted());
         self::assertNull($request->reason);
@@ -116,17 +117,17 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $this->gateway->registered = [self::OTHER_CREDENTIAL];
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
 
         $this->gateway->registered = [self::CREDENTIAL];
 
         PasskeyAssociation::query()->update(['credential_id' => self::OTHER_CREDENTIAL]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
 
         PasskeyAssociation::query()->delete();
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
         self::assertSame([], $this->gateway->requested);
     }
 
@@ -142,7 +143,7 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $totp = $this->confirmedFactor($this->user, 'totp', self::OTHER_CREDENTIAL);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion($totp->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion(Callers::current(), $totp->id, Purpose::STEP_UP)->reason);
         self::assertSame([], $this->gateway->requested);
     }
 
@@ -161,7 +162,7 @@ final class PasskeyAssertionsTest extends TestCase
 
         $this->gateway->registered = [$padded];
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion($passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion(Callers::current(), $passkey->id, Purpose::STEP_UP)->reason);
         self::assertSame([], $this->gateway->requested);
     }
 
@@ -177,11 +178,11 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $this->enablePasskeys(['first_factor' => ['method' => 'passkey', 'channel' => 'passkey']], [self::CREDENTIAL]);
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
 
         $this->signInWithPasskey(self::CREDENTIAL);
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
     }
 
     /**
@@ -196,17 +197,17 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $this->passkey->update(['disabled_at' => CarbonImmutable::now()]);
 
-        self::assertSame(FailureReason::LOCKED, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::LOCKED, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
 
         $this->passkey->update(['disabled_at' => null, 'status' => 'pending']);
 
-        self::assertSame(FailureReason::NOT_CONFIRMED, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_CONFIRMED, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
 
         $this->passkey->update(['status' => 'confirmed']);
 
         config()->set('mfa.applications.web.types', ['totp']);
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
     }
 
     /**
@@ -246,7 +247,7 @@ final class PasskeyAssertionsTest extends TestCase
         $properties               = new ObservedProperties(userPresence: true, userVerification: true);
         $this->gateway->assertion = new PasskeyAssertion(self::CREDENTIAL, $properties, 'challenge-1');
 
-        $assertion = $this->assertions()->check($this->user, $this->passkey, $this->bindingOf($this->user, Purpose::STEP_UP), ['id' => self::CREDENTIAL]);
+        $assertion = $this->assertions()->check($this->user, $this->passkey, $this->bindingOf($this->user, Purpose::STEP_UP), ['id' => self::CREDENTIAL], null);
 
         self::assertInstanceOf(PasskeyAssertion::class, $assertion);
         self::assertSame($properties, $assertion->properties);
@@ -268,11 +269,11 @@ final class PasskeyAssertionsTest extends TestCase
 
         $this->gateway->assertion = new PasskeyAssertion(self::OTHER_CREDENTIAL, new ObservedProperties(userPresence: true));
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::OTHER_CREDENTIAL]));
+        self::assertSame(FailureReason::INVALID_CODE, $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::OTHER_CREDENTIAL], null));
 
         $this->gateway->assertion = FailureReason::EXPIRED;
 
-        self::assertSame(FailureReason::EXPIRED, $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::CREDENTIAL]));
+        self::assertSame(FailureReason::EXPIRED, $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::CREDENTIAL], null));
     }
 
     /**
@@ -287,7 +288,7 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $this->pending([PendingAction::LIST_FACTORS]);
 
-        $refused = $this->requests()->requestAssertion($this->passkey->id, Purpose::SIGN_IN);
+        $refused = $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::SIGN_IN);
 
         self::assertFalse($refused->hasStarted());
         self::assertSame(FailureReason::NOT_FOUND, $refused->reason);
@@ -295,7 +296,7 @@ final class PasskeyAssertionsTest extends TestCase
 
         $this->pending([PendingAction::VERIFY]);
 
-        self::assertSame('pending-1', $this->requests()->requestAssertion($this->passkey->id, Purpose::SIGN_IN)->options['session']);
+        self::assertSame('pending-1', $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::SIGN_IN)->options['session']);
     }
 
     /**
@@ -307,7 +308,7 @@ final class PasskeyAssertionsTest extends TestCase
      */
     public function testRefusesAPurposeNotOfACeremony(): void
     {
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->requests()->requestAssertion($this->passkey->id, Purpose::ENROLLMENT)->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::ENROLLMENT)->reason);
         self::assertSame([], $this->gateway->requested);
     }
 
@@ -322,7 +323,7 @@ final class PasskeyAssertionsTest extends TestCase
     {
         $this->container()->make(ProofStore::class)->forget($this->user, self::APPLICATION);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
     }
 
     /**
@@ -338,7 +339,7 @@ final class PasskeyAssertionsTest extends TestCase
 
         Auth::logout();
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
         self::assertSame([], $this->gateway->requested);
     }
 
@@ -352,7 +353,7 @@ final class PasskeyAssertionsTest extends TestCase
      */
     public function testTheGuardsReasonsAreAnswers(): void
     {
-        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion('01JUNKNOWNFACTOR0000000000', Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion(Callers::current(), '01JUNKNOWNFACTOR0000000000', Purpose::STEP_UP)->reason);
 
         $identity = new NonEloquentIdentity('inactive', active: false);
         $first    = SignInProofs::of($identity)->inSession('pending-1')->password();
@@ -361,7 +362,7 @@ final class PasskeyAssertionsTest extends TestCase
             new PendingContext($identity, self::APPLICATION, 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY], CarbonImmutable::now()->addMinutes(10)),
         ));
 
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->requests()->requestAssertion($this->passkey->id, Purpose::SIGN_IN)->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::SIGN_IN)->reason);
     }
 
     /**
@@ -393,7 +394,7 @@ final class PasskeyAssertionsTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('The gateway is down.');
 
-        $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP);
+        $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP);
     }
 
     /**
@@ -427,7 +428,7 @@ final class PasskeyAssertionsTest extends TestCase
 
         $this->container()->instance(SubjectTypeResolver::class, $resolver);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP)->reason);
 
         $this->assertPropagates();
 
@@ -447,7 +448,7 @@ final class PasskeyAssertionsTest extends TestCase
     private function assertOptionsRefused(FailureReason $reason, ProofBinding $binding): void
     {
         try {
-            $this->assertions()->options($this->user, $this->passkey, $binding);
+            $this->assertions()->options($this->user, $this->passkey, $binding, null);
 
             self::fail('The options must be refused.');
         } catch (OperationRefusedException $exception) {
@@ -467,7 +468,7 @@ final class PasskeyAssertionsTest extends TestCase
     private function assertPropagates(?\Throwable $expected = null): void
     {
         try {
-            $this->requests()->requestAssertion($this->passkey->id, Purpose::STEP_UP);
+            $this->requests()->requestAssertion(Callers::current(), $this->passkey->id, Purpose::STEP_UP);
 
             self::fail('A seam\'s refusal must propagate.');
         } catch (OperationRefusedException $exception) {

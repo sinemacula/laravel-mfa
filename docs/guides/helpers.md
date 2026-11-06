@@ -4,63 +4,100 @@ Every flow is one call on the `Mfa` facade, and routes and controllers stay your
 yours too (see [CSRF protection](middleware.md#csrf-protection)). Every class name below is relative to
 `SineMacula\Laravel\Mfa`.
 
+## The caller
+
+Every helper that acts for the person in front of you takes a `Context\CallerContext` first, and no helper reads the
+request. Build one at the edge, once per request:
+
+```php
+use SineMacula\Laravel\Mfa\Context\CallerContext;
+
+$caller = CallerContext::fromRequest($request);          // through the default guard
+$caller = CallerContext::fromRequest($request, 'admin'); // through the guard named
+```
+
+`fromRequest()` asks the bound `Contracts\PendingSessionResolver` first, and a pending session it finds is the caller. A
+pending credential that does not validate throws, so the request is refused rather than served as the guard's user.
+Otherwise the caller is the guard's user, when it is an identity this package serves, and nobody when it is not. The
+application is what a bound `Contracts\ApplicationResolver` names for the request, or else the guard's name. The client
+is the request's IP address and user agent, which reach the events and the per-address throttle.
+
+Away from a request, in a queued job, a console command or a transport of your own, build one from plain values:
+
+```php
+use SineMacula\Laravel\Mfa\Context\CallerContext;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
+
+CallerContext::forIdentity($user, 'web', new ClientContext($ip, $userAgent));
+CallerContext::forPending($pending, $client); // a pending session your resolver read
+CallerContext::nobody('web');
+```
+
+A `CallerContext` is trusted input from your own code: building one authenticates nobody, so build one only for an
+identity your application has already authenticated. Each helper still decides whether it serves the caller. It serves
+only a person, and a pending session only the actions its credential allows. Under the identity's lock it checks again
+that the pending credential still validates, through the resolver's `revalidate()`, or that the proof store's current
+sign-in is still the one the action began on. The sign-in is never carried on the caller: it is read from the proof
+store, for the identity and the application. The client is optional: when it is left out, the address is unknown and
+the per-address throttle is not applied.
+
 ## Every helper
 
-The caller is a pending session's identity when its credential allows the action named, otherwise the person the guard
-signed in: without the action the helper serves nobody, and the guard's user is never served in its place. "Active only"
-serves a pending session nothing, and "not read" takes no account of one.
+A caller holding a pending session is served as that session's identity when its credential allows the action named,
+and otherwise nothing. Any other caller is served as the identity it names, when that is a person. "Active only" serves
+a pending session nothing, and "not read" takes no account of one.
 
 ### Requirements
 
-| Helper                              | Returns            | Serves               | On a pending session |
-|-------------------------------------|--------------------|----------------------|----------------------|
-| `requirement()`                     | `Requirement`      | The signed-in person | Not read             |
-| `isFresh($operation, $requirement)` | `bool`             | The signed-in person | Never fresh          |
-| `proofs()`                          | `list<Proof>`      | The signed-in person | Active only          |
-| `authenticationContext()`           | The context's keys | The signed-in person | The neutral context  |
+| Helper                                       | Returns            | Serves               | On a pending session |
+|----------------------------------------------|--------------------|----------------------|----------------------|
+| `requirement($caller)`                       | `Requirement`      | The signed-in person | Not read             |
+| `isFresh($caller, $operation, $requirement)` | `bool`             | The signed-in person | Never fresh          |
+| `proofs($caller)`                            | `list<Proof>`      | The signed-in person | Active only          |
+| `authenticationContext($caller)`             | The context's keys | The signed-in person | The neutral context  |
 
 ### Factors
 
-| Helper                            | Returns               | Serves               | On a pending session |
-|-----------------------------------|-----------------------|----------------------|----------------------|
-| `factors()`                       | `list<FactorSummary>` | The caller           | `mfa.list_factors`   |
-| `factor($factorId)`               | `?FactorSummary`      | The caller           | `mfa.list_factors`   |
-| `offeredFactors()`                | `list<FactorSummary>` | The caller           | `mfa.list_factors`   |
-| `renameFactor($factorId, $label)` | `FactorChange`        | The signed-in person | Active only          |
-| `setPreferredFactor($factorId)`   | `FactorChange`        | The signed-in person | Active only          |
+| Helper                                     | Returns               | Serves               | On a pending session |
+|--------------------------------------------|-----------------------|----------------------|----------------------|
+| `factors($caller)`                         | `list<FactorSummary>` | The caller           | `mfa.list_factors`   |
+| `factor($caller, $factorId)`               | `?FactorSummary`      | The caller           | `mfa.list_factors`   |
+| `offeredFactors($caller)`                  | `list<FactorSummary>` | The caller           | `mfa.list_factors`   |
+| `renameFactor($caller, $factorId, $label)` | `FactorChange`        | The signed-in person | Active only          |
+| `setPreferredFactor($caller, $factorId)`   | `FactorChange`        | The signed-in person | Active only          |
 
 ### Verification
 
-| Helper                                  | Returns              | Serves     | On a pending session |
-|-----------------------------------------|----------------------|------------|----------------------|
-| `sendCode($factorId, $purpose)`         | `SendResult`         | The caller | `mfa.send_code`      |
-| `requestAssertion($factorId, $purpose)` | `AssertionRequest`   | The caller | `mfa.verify`         |
-| `verify($submission, $purpose)`         | `VerificationResult` | The caller | `mfa.verify`         |
+| Helper                                           | Returns              | Serves     | On a pending session |
+|--------------------------------------------------|----------------------|------------|----------------------|
+| `sendCode($caller, $factorId, $purpose)`         | `SendResult`         | The caller | `mfa.send_code`      |
+| `requestAssertion($caller, $factorId, $purpose)` | `AssertionRequest`   | The caller | `mfa.verify`         |
+| `verify($caller, $submission, $purpose)`         | `VerificationResult` | The caller | `mfa.verify`         |
 
-A recovery code goes through `Mfa::verify(Submission::recoveryCode($code))`, on the one verification path and purpose
+A recovery code goes through `Mfa::verify($caller, Submission::recoveryCode($code))`, on the one verification path and purpose
 rule: there is no separate helper to redeem one.
 
 ### Enrolment
 
-| Helper                             | Returns                  | Serves     | On a pending session               |
-|------------------------------------|--------------------------|------------|------------------------------------|
-| `startEnrollment($request)`        | `EnrollmentStart`        | The caller | `mfa.start_bootstrap_enrollment`   |
-| `confirmEnrollment($grant, $code)` | `EnrollmentConfirmation` | The caller | `mfa.confirm_bootstrap_enrollment` |
-| `resendEnrollmentCode($grant)`     | `SendResult`             | The caller | `mfa.start_bootstrap_enrollment`   |
-| `cancelEnrollment($grant)`         | `bool`                   | The caller | `mfa.start_bootstrap_enrollment`   |
+| Helper                                      | Returns                  | Serves     | On a pending session               |
+|---------------------------------------------|--------------------------|------------|------------------------------------|
+| `startEnrollment($caller, $request)`        | `EnrollmentStart`        | The caller | `mfa.start_bootstrap_enrollment`   |
+| `confirmEnrollment($caller, $grant, $code)` | `EnrollmentConfirmation` | The caller | `mfa.confirm_bootstrap_enrollment` |
+| `resendEnrollmentCode($caller, $grant)`     | `SendResult`             | The caller | `mfa.start_bootstrap_enrollment`   |
+| `cancelEnrollment($caller, $grant)`         | `bool`                   | The caller | `mfa.start_bootstrap_enrollment`   |
 
 ### Recovery codes
 
-| Helper                    | Returns                  | Serves               | On a pending session |
-|---------------------------|--------------------------|----------------------|----------------------|
-| `generateRecoveryCodes()` | `RecoveryCodeGeneration` | The signed-in person | Active only          |
-| `recoveryCodeStatus()`    | `?RecoveryCodeStatus`    | The caller           | `mfa.list_factors`   |
+| Helper                           | Returns                  | Serves               | On a pending session |
+|----------------------------------|--------------------------|----------------------|----------------------|
+| `generateRecoveryCodes($caller)` | `RecoveryCodeGeneration` | The signed-in person | Active only          |
+| `recoveryCodeStatus($caller)`    | `?RecoveryCodeStatus`    | The caller           | `mfa.list_factors`   |
 
 ### Lifecycle
 
 | Helper                                                            | Returns               | Serves               |
 |-------------------------------------------------------------------|-----------------------|----------------------|
-| `removeFactor($factorId)`                                         | `FactorRemovalResult` | The signed-in person |
+| `removeFactor($caller, $factorId)`                                | `FactorRemovalResult` | The signed-in person |
 | `resetIdentity($identity, $actor, $reason, $requireReenrollment)` | `void`                | The identity given   |
 | `unlockFactor($identity, $factorId, $actor)`                      | `bool`                | The identity given   |
 | `unlockIdentity($identity, $actor)`                               | `bool`                | The identity given   |
@@ -68,7 +105,8 @@ rule: there is no separate helper to redeem one.
 | `prune()`                                                         | `PruneResult`         | No identity          |
 
 `removeFactor()` serves active sessions only. The others are told the identity by their caller, so who may call them is
-your authorisation.
+your authorisation. `resetIdentity()`, `unlockFactor()` and `unlockIdentity()` also take an optional
+`Context\ClientContext` last, the operator's own client, which their events carry.
 
 ### Registry
 
@@ -89,19 +127,20 @@ events, so `Mfa::driver($name)` is the deliberate way to reach one.
 A helper a person can be refused by answers with a value holding the reason, so a stale session is never a 500:
 
 ```php
-$generation = Mfa::generateRecoveryCodes();
+$caller     = CallerContext::fromRequest($request);
+$generation = Mfa::generateRecoveryCodes($caller);
 
 if (! $generation->wasGenerated()) {
     return response()->json(['reason' => $generation->reason->value], 403);
 }
 
-$request = Mfa::requestAssertion($factorId);
+$assertion = Mfa::requestAssertion($caller, $factorId);
 
-if (! $request->hasStarted()) {
-    return response()->json(['reason' => $request->reason->value], 422);
+if (! $assertion->hasStarted()) {
+    return response()->json(['reason' => $assertion->reason->value], 422);
 }
 
-return response()->json($request->options);
+return response()->json($assertion->options);
 ```
 
 Nobody served is `not_found`, as on `sendCode()` and `removeFactor()`. `cancelEnrollment()`, `unlockFactor()` and
@@ -120,11 +159,13 @@ resolver's, a gateway's and a database's.
 The shipped `Models\Factor` binds through the caller:
 
 ```php
+use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
-Route::delete('/factors/{factor}', function (Factor $factor) {
-    $removal = Mfa::removeFactor($factor->getFactorIdentifier());
+Route::delete('/factors/{factor}', function (Request $request, Factor $factor) {
+    $removal = Mfa::removeFactor(CallerContext::fromRequest($request), $factor->getFactorIdentifier());
 
     return $removal->wasMade()
         ? response()->noContent()
@@ -132,8 +173,8 @@ Route::delete('/factors/{factor}', function (Factor $factor) {
 })->middleware('auth');
 ```
 
-A bound factor is found only within the caller's identity, from whichever credential the route uses, and anything else
-is the same `404` as a factor that does not exist. An application's own factor model opts in beside
+A bound factor is found only within the identity of the request's caller, as `CallerContext::fromRequest()` reads it,
+and anything else is the same `404` as a factor that does not exist. An application's own factor model opts in beside
 `Concerns\ActsAsFactor`:
 
 ```php

@@ -17,6 +17,7 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Seams\CountingChallengeGateway;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
@@ -83,22 +84,22 @@ final class ChallengeRequestsUnderLockTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->emailFactor($user, attributes: ['locked_until' => CarbonImmutable::now()->addMinutes(15)]);
 
-        $result = $this->mfa()->sendCode($factor->id);
+        $result = $this->mfa()->sendCode(Callers::current(), $factor->id);
 
         self::assertSame(FailureReason::LOCKED, $result->reason);
         self::assertSame(0, $this->gateway->sends);
     }
 
     /**
-     * The caller is read again once the identity's lock is held, and an
-     * identity found inactive then is refused, though it was active when its
-     * factor was first looked up: the gateway is never asked to send.
+     * The caller is the identity the action was given: a guard signing in
+     * someone else while the lock is awaited changes nothing about who the code
+     * is sent to, since no request or guard is read under the lock.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAnIdentityFoundInactiveOnceTheLockIsHeldIsSentNothing(): void
+    public function testTheGuardChangingUnderTheLockChangesNoCaller(): void
     {
         $active   = new NonEloquentIdentity('plain-1');
         $inactive = new NonEloquentIdentity('plain-1', active: false);
@@ -129,10 +130,10 @@ final class ChallengeRequestsUnderLockTest extends TestCase
             $this->actingAs($inactive);
         });
 
-        $result = $this->mfa()->sendCode($factor->id);
+        $result = $this->mfa()->sendCode(Callers::current(), $factor->id);
 
         self::assertTrue($locked, 'The identity\'s lock was expected to be taken.');
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, $result->reason);
-        self::assertSame(0, $this->gateway->sends);
+        self::assertTrue($result->wasSent());
+        self::assertSame(1, $this->gateway->sends);
     }
 }

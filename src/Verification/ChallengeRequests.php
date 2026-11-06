@@ -12,9 +12,9 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
-use SineMacula\Laravel\Mfa\Attempts\RequestIp;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
@@ -89,15 +89,16 @@ final readonly class ChallengeRequests
      * when the request serves nobody or the identity has no sign-in, and when
      * the factor is missing, another's, or delivers no codes.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Codes\SendResult
      *
      * @throws \Throwable
      */
-    public function sendCode(mixed $factorId, ?Purpose $purpose = null): SendResult
+    public function sendCode(CallerContext $context, mixed $factorId, ?Purpose $purpose = null): SendResult
     {
-        $caller = $this->callers->resolve(PendingAction::SEND_CODE);
+        $caller = $this->callers->resolve($context, PendingAction::SEND_CODE);
 
         if ($caller === null) {
             return SendResult::refused(FailureReason::NOT_FOUND);
@@ -134,6 +135,7 @@ final readonly class ChallengeRequests
      * verifying. Only the package's own refusals are answered as a reason: a
      * seam's exception propagates.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Passkeys\AssertionRequest
@@ -141,9 +143,9 @@ final readonly class ChallengeRequests
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \Throwable
      */
-    public function requestAssertion(mixed $factorId, ?Purpose $purpose = null): AssertionRequest
+    public function requestAssertion(CallerContext $context, mixed $factorId, ?Purpose $purpose = null): AssertionRequest
     {
-        $caller = $this->callers->resolve(PendingAction::VERIFY);
+        $caller = $this->callers->resolve($context, PendingAction::VERIFY);
 
         if ($caller === null) {
             return AssertionRequest::refused(FailureReason::NOT_FOUND);
@@ -181,7 +183,7 @@ final readonly class ChallengeRequests
 
         $factor = $this->guard->factor($caller->identity, $factorId, $binding->application);
 
-        return $this->container->make(PasskeyAssertions::class)->options($caller->identity, $factor, $binding);
+        return $this->container->make(PasskeyAssertions::class)->options($caller->identity, $factor, $binding, $caller->pending);
     }
 
     /**
@@ -206,14 +208,14 @@ final readonly class ChallengeRequests
         $result = SendResult::refused(FailureReason::NOT_FOUND);
 
         $outcome = $this->attempts->throttled(
-            RequestIp::resolve($this->container),
+            $caller->client->ip,
             function () use ($caller, $binding, $factor, &$result): AttemptOutcome {
 
                 $result = FactorStateTransaction::forIdentity(
                     $caller->identity,
                     $factor,
                     fn (Collection $factors): SendResult => RefusedUnderLockException::carrying(
-                        fn (): SendResult => $this->sendUnderLock($binding, LockedFactors::find($factor, $factors)),
+                        fn (): SendResult => $this->sendUnderLock($caller, $binding, LockedFactors::find($factor, $factors)),
                     ),
                 );
 
@@ -228,31 +230,32 @@ final readonly class ChallengeRequests
      * Under the lock: refuse a sign-in that changed and a factor no longer
      * stored, admit the factor, send the code and queue `CodeSent`.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
      * @return \SineMacula\Laravel\Mfa\Codes\SendResult
      *
      * @throws \Throwable
      */
-    private function sendUnderLock(ProofBinding $binding, (EloquentFactor&Model)|null $factor): SendResult
+    private function sendUnderLock(Caller $served, ProofBinding $binding, (EloquentFactor&Model)|null $factor): SendResult
     {
-        $caller = $this->callers->still(PendingAction::SEND_CODE, $binding);
+        $caller = $this->callers->still($served, PendingAction::SEND_CODE, $binding);
 
         if ($caller === null || $factor === null) {
             return SendResult::refused(FailureReason::NOT_FOUND);
         }
 
-        $admission = $this->container->make(ChallengeCounters::class)->underLock($caller->identity, $factor, $binding);
+        $admission = $this->container->make(ChallengeCounters::class)->underLock($caller->context(), $factor, $binding);
 
         if (!$admission->isAdmitted()) {
             return SendResult::refusedBy($admission);
         }
 
-        $result      = $this->container->make(ChallengeGateway::class)->send($factor, $binding);
+        $result      = $this->container->make(ChallengeGateway::class)->send($caller->context(), $factor, $binding);
         $challengeId = $result->challengeId;
 
         if ($challengeId !== null) {
-            $context = $this->events->context($caller->identity, $binding->application);
+            $context = $this->events->context($caller->identity, $binding->application, $caller->client);
 
             $this->events->dispatch(new CodeSent($context, FactorSummary::fromFactor($factor), $binding->purpose, $challengeId));
         }

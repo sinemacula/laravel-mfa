@@ -12,7 +12,7 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
+use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
  * A pending session, a sign-in still owing a requirement, as resolved from a
@@ -27,11 +27,19 @@ use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
  * and the actions are pending actions, each named once. A helper serves a
  * pending session only an action it `allows()`.
  *
+ * It carries the pending credential the caller presented, when the resolver
+ * that read it keeps it, so a layer revalidating the session or completing it
+ * has it as a value: held as a `\SensitiveParameterValue`, read through
+ * `credential()`, and shown by no dump.
+ *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final readonly class PendingContext
 {
+    /** @var \SensitiveParameterValue The pending credential the caller presented, hidden from dumps. */
+    private \SensitiveParameterValue $credential;
+
     /**
      * Constructor.
      *
@@ -43,6 +51,7 @@ final readonly class PendingContext
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
      * @param  \Carbon\CarbonImmutable  $expiresAt
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
+     * @param  ?string  $credential
      *
      * @throws \InvalidArgumentException
      */
@@ -71,7 +80,13 @@ final readonly class PendingContext
 
         /** The further proofs the session already holds, oldest first. */
         public array $proofs = [],
+
+        // The pending credential the caller presented, when it is kept.
+        #[\SensitiveParameter]
+        ?string $credential = null,
     ) {
+        $this->credential = new \SensitiveParameterValue($credential);
+
         if (trim($application) === '') {
             throw new \InvalidArgumentException('The application of a pending session must not be blank.');
         }
@@ -83,6 +98,18 @@ final readonly class PendingContext
         $this->assertFirstFactor();
         $this->assertProofs();
         self::assertActions($actions);
+    }
+
+    /**
+     * The pending credential the caller presented, or `null` when the resolver
+     * kept none.
+     *
+     * @return ?string
+     */
+    public function credential(): ?string
+    {
+        /** @var ?string */
+        return $this->credential->getValue();
     }
 
     /**
@@ -152,7 +179,7 @@ final readonly class PendingContext
             return false;
         }
 
-        return (new ProofOwner(CurrentIdentity::typeOf($this->identity), (string) $key))->ownsSignIn($binding, $this->application, $this->sessionId);
+        return (new ProofOwner(IdentityType::of($this->identity), (string) $key))->ownsSignIn($binding, $this->application, $this->sessionId);
     }
 
     /**

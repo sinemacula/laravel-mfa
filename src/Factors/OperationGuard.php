@@ -15,8 +15,8 @@ use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
+use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
  * The one guard every operation on an identity's factors starts with, so each
@@ -134,7 +134,7 @@ final readonly class OperationGuard
 
         [$typeColumn, $keyColumn] = FactorOwnerColumns::of($blank);
 
-        $type = CurrentIdentity::typeOf($identity);
+        $type = IdentityType::of($identity);
 
         /** @var (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null $factor */
         $factor = WriteConnection::query($blank->newQuery())

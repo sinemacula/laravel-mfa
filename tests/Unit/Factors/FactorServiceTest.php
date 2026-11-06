@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Factors\CustomFactor;
 use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\Fixtures\Identities\PlainUser;
@@ -40,8 +41,8 @@ final class FactorServiceTest extends TestCase
      */
     public function testAGuestHasNoFactors(): void
     {
-        self::assertSame([], $this->service()->factors());
-        self::assertNull($this->service()->factor('anything'));
+        self::assertSame([], $this->service()->factors(Callers::current()));
+        self::assertNull($this->service()->factor(Callers::current(), 'anything'));
     }
 
     /**
@@ -63,7 +64,7 @@ final class FactorServiceTest extends TestCase
 
         $summaries = [];
 
-        foreach ($this->service()->factors() as $summary) {
+        foreach ($this->service()->factors(Callers::current()) as $summary) {
             $summaries[$summary->id] = $summary;
         }
 
@@ -96,7 +97,7 @@ final class FactorServiceTest extends TestCase
             DB::table('mfa_factors')->where('id', $factor->id)->update(['id' => $id, 'preferred' => $id === $b]);
         }
 
-        self::assertSame([$b, $a, $c], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->service()->factors()));
+        self::assertSame([$b, $a, $c], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->service()->factors(Callers::current())));
     }
 
     /**
@@ -115,11 +116,11 @@ final class FactorServiceTest extends TestCase
         $another = TestUser::query()->create(['email' => 'another@example.test']);
         $theirs  = $this->addFactor($another);
 
-        self::assertSame($factor->id, $this->service()->factor($factor->id)?->id);
-        self::assertNull($this->service()->factor($theirs->id));
-        self::assertNull($this->service()->factor('missing'));
-        self::assertNull($this->service()->factor(strtoupper($factor->id)));
-        self::assertNull($this->service()->factor(['id' => $factor->id]));
+        self::assertSame($factor->id, $this->service()->factor(Callers::current(), $factor->id)?->id);
+        self::assertNull($this->service()->factor(Callers::current(), $theirs->id));
+        self::assertNull($this->service()->factor(Callers::current(), 'missing'));
+        self::assertNull($this->service()->factor(Callers::current(), strtoupper($factor->id)));
+        self::assertNull($this->service()->factor(Callers::current(), ['id' => $factor->id]));
     }
 
     /**
@@ -134,11 +135,11 @@ final class FactorServiceTest extends TestCase
     {
         $user = $this->signIn();
 
-        self::assertCount(0, $this->service()->factors());
+        self::assertCount(0, $this->service()->factors(Callers::current()));
 
         $this->addFactor($user);
 
-        self::assertCount(1, $this->service()->factors());
+        self::assertCount(1, $this->service()->factors(Callers::current()));
     }
 
     /**

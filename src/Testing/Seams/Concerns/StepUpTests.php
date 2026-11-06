@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Testing\Seams\StepUpContract;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
@@ -32,7 +33,7 @@ trait StepUpTests
      */
     public function testStepUpRefusesAResultOfAnotherBinding(): void
     {
-        StepUpContract::assertRefusesAResultOfAnotherBinding($this->stepUp(), $this->stepUpResultOfAnotherBinding());
+        StepUpContract::assertRefusesAResultOfAnotherBinding($this->stepUp(), $this->stepUpCaller(), $this->stepUpResultOfAnotherBinding());
     }
 
     /**
@@ -42,8 +43,16 @@ trait StepUpTests
      */
     public function testStepUpRefusesAFailedResult(): void
     {
-        StepUpContract::assertRefusesAFailedResult($this->stepUp());
+        StepUpContract::assertRefusesAFailedResult($this->stepUp(), $this->stepUpCaller());
     }
+
+    /**
+     * The caller the step-up is handed: one on an active session, whose own
+     * result would be accepted.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\CallerContext
+     */
+    abstract protected function stepUpCaller(): CallerContext;
 
     /**
      * The step-up under test.

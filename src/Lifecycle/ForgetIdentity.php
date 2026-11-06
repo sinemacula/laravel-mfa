@@ -15,8 +15,8 @@ use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Enrollment;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
+use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
  * Deletes everything the package holds for a deleted identity: its factors,
@@ -63,7 +63,7 @@ final readonly class ForgetIdentity
         $factorModel       = ConfiguredModels::factor($this->config);
         $recoveryCodeModel = ConfiguredModels::recoveryCode($this->config);
 
-        $type = CurrentIdentity::typeOf($identity);
+        $type = IdentityType::of($identity);
 
         /** @var int|string $key Refused by the transaction when it is anything else. */
         $key = $identity->getAuthIdentifier();

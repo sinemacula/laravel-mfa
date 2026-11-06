@@ -39,6 +39,7 @@ use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Enrollment\HardwareAppDriver;
 use Tests\TestCase;
@@ -122,9 +123,9 @@ final class ProvisionedTypeEnrollmentStarterTest extends TestCase
         self::assertSame(HardwareAppDriver::SECRET, $start->secret?->reveal());
         self::assertSame('hardware://Example/' . self::ACCOUNT . '?secret=' . HardwareAppDriver::SECRET, $start->provisioningUri?->reveal());
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->confirmEnrollment($this->grantOf($start), 'wrong')->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), 'wrong')->reason);
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), HardwareAppDriver::CODE);
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), HardwareAppDriver::CODE);
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertSame(FactorStatus::CONFIRMED, $confirmation->factor?->status);
@@ -157,6 +158,6 @@ final class ProvisionedTypeEnrollmentStarterTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
 
-        $this->mfa()->startEnrollment(EnrollmentRequest::of(HardwareAppDriver::TYPE));
+        $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::of(HardwareAppDriver::TYPE));
     }
 }

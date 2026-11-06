@@ -22,6 +22,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Lifecycle\RecordingSessionRevoker;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
@@ -119,14 +120,14 @@ final class LifecycleRaceTest extends TestCase
             $stopped = false;
 
             try {
-                $this->asObserver(static fn (): FactorRemovalResult => Mfa::removeFactor($first->id));
+                $this->asObserver(static fn (): FactorRemovalResult => Mfa::removeFactor(Callers::current(), $first->id));
             } catch (QueryException $exception) {
                 $stopped = $exception;
             }
         });
 
         try {
-            $passed = Mfa::removeFactor($second->id);
+            $passed = Mfa::removeFactor(Callers::current(), $second->id);
         } finally {
             Factor::flushEventListeners();
         }
@@ -134,7 +135,7 @@ final class LifecycleRaceTest extends TestCase
         self::assertTrue($passed->wasMade());
         self::assertInstanceOf(QueryException::class, $stopped);
 
-        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor($first->id)->reason);
+        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor(Callers::current(), $first->id)->reason);
         self::assertSame([$first->id], Factor::query()->pluck('id')->all());
     }
 
@@ -164,8 +165,8 @@ final class LifecycleRaceTest extends TestCase
         $this->stepUpWith($user, $this->confirmedFactor($user, 'sms'));
 
         $outcome = $this->holdingTheLock(
-            static fn () => self::assertTrue(Mfa::removeFactor($second->id)->wasMade()),
-            static fn (): ?FailureReason => Mfa::removeFactor($first->id)->reason,
+            static fn () => self::assertTrue(Mfa::removeFactor(Callers::current(), $second->id)->wasMade()),
+            static fn (): ?FailureReason => Mfa::removeFactor(Callers::current(), $first->id)->reason,
         );
 
         self::assertSame(FailureReason::LAST_FACTOR->value, $outcome);
@@ -196,7 +197,7 @@ final class LifecycleRaceTest extends TestCase
 
         $outcome = $this->holdingTheLock(
             static fn () => Mfa::resetIdentity($user, new Actor('admin', '9'), 'Lost phone.'),
-            static fn (): ?FailureReason => Mfa::verify(Submission::factor($factor->id, $code))->reason,
+            static fn (): ?FailureReason => Mfa::verify(Callers::current(), Submission::factor($factor->id, $code))->reason,
         );
 
         self::assertSame(FailureReason::NOT_FOUND->value, $outcome);
@@ -232,7 +233,7 @@ final class LifecycleRaceTest extends TestCase
             $stopped = false;
 
             try {
-                $this->asObserver(static fn (): VerificationResult => Mfa::verify(Submission::factor($factor->id, $code)));
+                $this->asObserver(static fn (): VerificationResult => Mfa::verify(Callers::current(), Submission::factor($factor->id, $code)));
             } catch (QueryException $exception) {
                 $stopped = $exception;
             }
@@ -246,7 +247,7 @@ final class LifecycleRaceTest extends TestCase
 
         self::assertInstanceOf(QueryException::class, $stopped);
 
-        $after = Mfa::verify(Submission::factor($factor->id, $code));
+        $after = Mfa::verify(Callers::current(), Submission::factor($factor->id, $code));
 
         self::assertSame(FailureReason::NOT_FOUND, $after->reason);
         self::assertSame([], $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION));
@@ -269,7 +270,7 @@ final class LifecycleRaceTest extends TestCase
 
         $factor->update(AuthenticatorApp::FACTOR);
 
-        self::assertTrue(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
         self::assertNotSame([], $this->additionalProofs($user));
 
         Mfa::resetIdentity($user, new Actor('admin', '9'), 'Lost phone.');

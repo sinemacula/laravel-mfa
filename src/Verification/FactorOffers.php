@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
@@ -71,14 +72,15 @@ final readonly class FactorOffers
     /**
      * The factors offered to the session the request serves.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    public function offered(): array
+    public function offered(CallerContext $context): array
     {
-        $caller = $this->callers->resolve(PendingAction::LIST_FACTORS);
+        $caller = $this->callers->resolve($context, PendingAction::LIST_FACTORS);
 
         if ($caller === null || !$caller->identity->isMfaActive()) {
             return [];

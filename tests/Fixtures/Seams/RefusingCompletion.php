@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Seams;
 
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
@@ -49,13 +50,14 @@ final readonly class RefusingCompletion implements PendingCompletion, StepUp
     /**
      * Refuse the result.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object
      *
      * @throws \Throwable
      */
     #[\Override]
-    public function stepUp(VerificationResult $result): ?object
+    public function stepUp(CallerContext $caller, VerificationResult $result): ?object
     {
         throw $this->refusal;
     }

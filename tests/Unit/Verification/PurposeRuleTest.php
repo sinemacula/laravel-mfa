@@ -72,6 +72,6 @@ final class PurposeRuleTest extends TestCase
             )
             : null;
 
-        self::assertSame($expected, PurposeRule::resolve(new Caller($identity, $context), $requested));
+        self::assertSame($expected, PurposeRule::resolve(new Caller($identity, $context, $context->application ?? 'web'), $requested));
     }
 }

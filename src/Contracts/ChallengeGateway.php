@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
@@ -41,11 +42,12 @@ interface ChallengeGateway
      * and when the code stops working, or why none was sent and, when waiting
      * will help, how long to wait.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return \SineMacula\Laravel\Mfa\Codes\SendResult
      */
-    public function send(Factor $factor, ProofBinding $binding): SendResult;
+    public function send(CallerContext $caller, Factor $factor, ProofBinding $binding): SendResult;
 
     /**
      * Whether the code answers the challenge, consuming it when it does. A code
@@ -55,11 +57,12 @@ interface ChallengeGateway
      * the code that used it and `expired` for any other. Every outcome of a
      * code that was checked has been reported; one refused before that has not.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $challengeId
      * @param  string  $code
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome
      */
-    public function verify(Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): ChallengeOutcome;
+    public function verify(CallerContext $caller, Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): ChallengeOutcome;
 }

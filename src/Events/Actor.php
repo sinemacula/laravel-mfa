@@ -5,7 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Events;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
+use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
  * Who took an action on someone else's factors, such as a reset or a lifted
@@ -43,7 +43,7 @@ final readonly class Actor implements \JsonSerializable
      */
     public static function of(Authenticatable $identity): self
     {
-        return new self(CurrentIdentity::typeOf($identity), EventContext::scalarKey($identity->getAuthIdentifier()) ?? '');
+        return new self(IdentityType::of($identity), EventContext::scalarKey($identity->getAuthIdentifier()) ?? '');
     }
 
     /**

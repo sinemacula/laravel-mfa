@@ -23,6 +23,7 @@ use SineMacula\Laravel\Mfa\Models\Enrollment;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Drivers\RecordingFactorDriver;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -85,8 +86,8 @@ final class EnrollmentRaceTest extends TestCase
     {
         $this->signIn();
 
-        $totp  = Mfa::startEnrollment(EnrollmentRequest::totp('person@example.test'));
-        $email = Mfa::startEnrollment(EnrollmentRequest::of('other'));
+        $totp  = Mfa::startEnrollment(Callers::current(), EnrollmentRequest::totp('person@example.test'));
+        $email = Mfa::startEnrollment(Callers::current(), EnrollmentRequest::of('other'));
 
         self::assertTrue($totp->hasStarted());
         self::assertTrue($email->hasStarted());
@@ -105,19 +106,19 @@ final class EnrollmentRaceTest extends TestCase
             $stopped = false;
 
             try {
-                $this->asObserver(static fn (): EnrollmentConfirmation => Mfa::confirmEnrollment($other, 'correct'));
+                $this->asObserver(static fn (): EnrollmentConfirmation => Mfa::confirmEnrollment(Callers::current(), $other, 'correct'));
             } catch (QueryException $exception) {
                 $stopped = $exception;
             }
         });
 
-        $first = Mfa::confirmEnrollment($grant, $code);
+        $first = Mfa::confirmEnrollment(Callers::current(), $grant, $code);
 
         self::assertTrue($first->isConfirmed());
         self::assertCount(10, $first->recoveryCodes);
         self::assertInstanceOf(QueryException::class, $stopped);
 
-        $second = Mfa::confirmEnrollment($other, 'correct');
+        $second = Mfa::confirmEnrollment(Callers::current(), $other, 'correct');
 
         self::assertSame(FailureReason::NOT_FRESH, $second->reason);
         self::assertSame([], $second->recoveryCodes);
@@ -149,15 +150,15 @@ final class EnrollmentRaceTest extends TestCase
             $stopped = false;
 
             try {
-                $this->asObserver(static fn (): EnrollmentStart => Mfa::startEnrollment(EnrollmentRequest::totp('person@example.test')));
+                $this->asObserver(static fn (): EnrollmentStart => Mfa::startEnrollment(Callers::current(), EnrollmentRequest::totp('person@example.test')));
             } catch (QueryException $exception) {
                 $stopped = $exception;
             }
         });
 
-        self::assertTrue(Mfa::startEnrollment(EnrollmentRequest::totp('person@example.test'))->hasStarted());
+        self::assertTrue(Mfa::startEnrollment(Callers::current(), EnrollmentRequest::totp('person@example.test'))->hasStarted());
         self::assertInstanceOf(QueryException::class, $stopped);
-        self::assertTrue(Mfa::startEnrollment(EnrollmentRequest::totp('person@example.test'))->hasStarted());
+        self::assertTrue(Mfa::startEnrollment(Callers::current(), EnrollmentRequest::totp('person@example.test'))->hasStarted());
         self::assertSame(1, Factor::query()->count());
         self::assertSame(1, Enrollment::query()->count());
     }

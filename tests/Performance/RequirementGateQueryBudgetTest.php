@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 
@@ -91,7 +92,7 @@ final class RequirementGateQueryBudgetTest extends PerformanceContractTestCase
     {
         $factor = $this->totpFactor($user);
 
-        self::assertTrue($this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
     }
 
     /**

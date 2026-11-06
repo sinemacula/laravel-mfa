@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -90,7 +91,7 @@ final class ParallelChallengeCountersTest extends TestCase
 
         DB::transaction(function () use ($user, $factor, $binding): void {
 
-            self::assertTrue($this->counters()->isUsable($user, $factor, $binding)->isAdmitted());
+            self::assertTrue($this->counters()->isUsable(Callers::of($user, 'web'), $factor, $binding)->isAdmitted());
 
             try {
                 $this->parallel = $this->asObserver($user, $factor);
@@ -98,7 +99,7 @@ final class ParallelChallengeCountersTest extends TestCase
                 $this->stopped = $exception instanceof DeadlockException ? $exception->getPrevious() : $exception;
             }
 
-            self::assertTrue($this->counters()->report($user, $factor, $binding, false)->isFailed());
+            self::assertTrue($this->counters()->report(Callers::of($user, 'web'), $factor, $binding, false)->isFailed());
         });
 
         self::assertNull($this->parallel);
@@ -146,7 +147,9 @@ final class ParallelChallengeCountersTest extends TestCase
         try {
             $stored = Factor::query()->findOrFail($factor->id);
 
-            return DB::connection('observer')->transaction(fn (): ChallengeAdmission => $this->counters()->isUsable($user, $stored, $this->emailBinding($user)));
+            $caller = Callers::of($user, 'web');
+
+            return DB::connection('observer')->transaction(fn (): ChallengeAdmission => $this->counters()->isUsable($caller, $stored, $this->emailBinding($user)));
         } finally {
             config()->set('mfa.storage.connection', null);
         }

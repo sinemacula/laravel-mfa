@@ -5,12 +5,10 @@ declare(strict_types = 1);
 namespace Tests\Unit\Proofs;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\CoversClass;
-use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
-use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 use Tests\Unit\Concerns\BuildsProofs;
@@ -58,7 +56,7 @@ final class ProofServiceTest extends TestCase
 
         $this->container()->instance(ProofStore::class, $store);
 
-        self::assertSame([], $this->service()->proofs());
+        self::assertSame([], $this->service()->proofs(Callers::current()));
 
         $store->shouldNotHaveReceived('proofs');
     }
@@ -71,7 +69,7 @@ final class ProofServiceTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testReadsTheCurrentIdentitysProofsOnTheCurrentApplication(): void
+    public function testReadsTheCallersProofsOnItsApplication(): void
     {
         $user  = $this->user();
         $proof = self::proof();
@@ -83,74 +81,18 @@ final class ProofServiceTest extends TestCase
 
         $this->container()->instance(ProofStore::class, $store);
 
-        self::assertSame([$proof], $this->service()->proofs());
+        self::assertSame([$proof], $this->service()->proofs(Callers::current()));
     }
 
     /**
-     * Without an application resolver, the application is the default guard's
-     * name.
+     * Beginning a sign-in begins it on the application under a fresh id, and
+     * ending it forgets only that application's.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testTheApplicationIsTheDefaultGuardsName(): void
-    {
-        self::assertSame('web', $this->service()->application());
-
-        config()->set('auth.defaults.guard', 'admin');
-
-        self::assertSame('admin', $this->service()->application());
-    }
-
-    /**
-     * A bound application resolver names the application for the request.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testABoundResolverNamesTheApplication(): void
-    {
-        $request = $this->container()->make(Request::class);
-
-        $resolver = \Mockery::mock(ApplicationResolver::class);
-        $resolver->shouldReceive('resolve')->once()->with($request)->andReturn('mobile');
-
-        $this->container()->instance(ApplicationResolver::class, $resolver);
-
-        self::assertSame('mobile', $this->service()->application());
-    }
-
-    /**
-     * A guard names its own application without a resolver, and the bound
-     * resolver's application with one.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testAGuardsApplicationIsItsNameUnlessAResolverNamesOne(): void
-    {
-        self::assertSame('admin', $this->service()->applicationFor('admin'));
-
-        $resolver = \Mockery::mock(ApplicationResolver::class);
-        $resolver->shouldReceive('resolve')->once()->andReturn('mobile');
-
-        $this->container()->instance(ApplicationResolver::class, $resolver);
-
-        self::assertSame('mobile', $this->service()->applicationFor('admin'));
-    }
-
-    /**
-     * Beginning a sign-in for a guard begins it on the guard's application
-     * under a fresh id, and ending it forgets only that application's.
-     *
-     * @return void
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function testBeginsAndEndsASignInOnTheGuardsApplication(): void
+    public function testBeginsAndEndsASignInOnTheApplication(): void
     {
         $user  = $this->user();
         $store = $this->container()->make(ProofStore::class);

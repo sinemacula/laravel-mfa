@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
@@ -79,14 +81,15 @@ final readonly class LifecycleService
      * Remove the signed-in person's factor enrolled through the current
      * application, or say why not.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
      * @return \SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult
      *
      * @throws \Throwable
      */
-    public function removeFactor(mixed $factorId): FactorRemovalResult
+    public function removeFactor(CallerContext $context, mixed $factorId): FactorRemovalResult
     {
-        $caller = $this->callers->resolve(null);
+        $caller = $this->callers->resolve($context, null);
 
         return $caller === null ? FactorRemovalResult::refused(FailureReason::NOT_FOUND) : $this->removeFor($caller, $factorId);
     }
@@ -99,19 +102,20 @@ final readonly class LifecycleService
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  mixed  $factorId
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return bool
      *
      * @throws \Throwable
      *
      * @imperative
      */
-    public function unlockFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor): bool
+    public function unlockFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor, ?ClientContext $client = null): bool
     {
-        return FactorStateTransaction::forIdentity($identity, $this->factorModel(), function (Collection $factors) use ($identity, $factorId, $actor): bool {
+        return FactorStateTransaction::forIdentity($identity, $this->factorModel(), function (Collection $factors) use ($identity, $factorId, $actor, $client): bool {
 
             $factor = LockedFactors::withId($factorId, $factors);
 
-            return $factor !== null && $this->attempts->liftLockout($identity, $factor, $actor);
+            return $factor !== null && $this->attempts->liftLockout($identity, $factor, $actor, null, $client);
         });
     }
 
@@ -122,15 +126,16 @@ final readonly class LifecycleService
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return bool
      *
      * @throws \Throwable
      *
      * @imperative
      */
-    public function unlockIdentity(MultiFactorAuthenticatable $identity, Actor $actor): bool
+    public function unlockIdentity(MultiFactorAuthenticatable $identity, Actor $actor, ?ClientContext $client = null): bool
     {
-        return $this->attempts->liftLockout($identity, null, $actor);
+        return $this->attempts->liftLockout($identity, null, $actor, null, $client);
     }
 
     /**
@@ -161,7 +166,7 @@ final readonly class LifecycleService
             return FactorStateTransaction::forIdentity(
                 $identity,
                 $model,
-                fn (Collection $factors): FactorRemovalResult => $this->removeUnderLock($binding, $application, $factorId, $factors),
+                fn (Collection $factors): FactorRemovalResult => $this->removeUnderLock($caller, $binding, $application, $factorId, $factors),
             );
         } catch (RefusedUnderLockException $exception) {
             return FactorRemovalResult::refused($exception->refusal->reason);
@@ -200,6 +205,7 @@ final readonly class LifecycleService
      *
      * @formatter:off
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $application
      * @param  mixed  $factorId
@@ -211,11 +217,11 @@ final readonly class LifecycleService
      * @throws \SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException
      * @throws \Throwable
      */
-    private function removeUnderLock(ProofBinding $binding, string $application, mixed $factorId, Collection $factors): FactorRemovalResult
+    private function removeUnderLock(Caller $served, ProofBinding $binding, string $application, mixed $factorId, Collection $factors): FactorRemovalResult
     {
-        [$identity, $factor] = RefusedUnderLockException::carrying(function () use ($binding, $application, $factorId, $factors): array {
+        [$identity, $factor] = RefusedUnderLockException::carrying(function () use ($served, $binding, $application, $factorId, $factors): array {
 
-            $caller = $this->callers->still(null, $binding);
+            $caller = $this->callers->still($served, null, $binding);
 
             if ($caller === null) {
                 throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The sign-in changed before the identity\'s lock was held.');
@@ -224,7 +230,7 @@ final readonly class LifecycleService
             return [$caller->identity, $this->guard->assertRemovable($caller->identity, $application, LockedFactors::withId($factorId, $factors), $factors, $binding->sessionId)];
         });
 
-        return $this->removal->remove($identity, $application, $factor, $factors, $binding->sessionId);
+        return $this->removal->remove($identity, $application, $factor, $factors, $binding->sessionId, $served->client);
     }
 
     /**

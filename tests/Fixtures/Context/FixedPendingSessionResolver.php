@@ -45,12 +45,25 @@ final readonly class FixedPendingSessionResolver implements PendingSessionResolv
      * @throws \Tests\Fixtures\Exceptions\InvalidPendingCredentialException
      */
     #[\Override]
-    public function resolve(Request $request): ?PendingContext
+    public function fromRequest(Request $request): ?PendingContext
     {
         if ($this->invalid) {
             throw new InvalidPendingCredentialException('The pending credential does not validate.');
         }
 
         return $this->pending;
+    }
+
+    /**
+     * The fixed pending session again, when it is still the one given and the
+     * credential still validates; otherwise none.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
+     */
+    #[\Override]
+    public function revalidate(PendingContext $pending): ?PendingContext
+    {
+        return !$this->invalid && $this->pending?->sessionId === $pending->sessionId ? $this->pending : null;
     }
 }

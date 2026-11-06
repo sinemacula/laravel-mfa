@@ -41,6 +41,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Factors\EnumStatusFactor;
 use Tests\Fixtures\Factors\FailingReadFactor;
 use Tests\Fixtures\Factors\RemappedLockoutFactor;
@@ -223,12 +224,12 @@ final class ResettingIdentityTest extends TestCase
 
         $this->stepUpWith($user, $factor);
 
-        self::assertNotSame([], Mfa::proofs());
+        self::assertNotSame([], Mfa::proofs(Callers::current()));
 
         Mfa::resetIdentity($user, self::actor(), self::REASON);
 
-        self::assertSame([], Mfa::proofs());
-        self::assertFalse(Mfa::requirement()->isEmpty());
+        self::assertSame([], Mfa::proofs(Callers::current()));
+        self::assertFalse(Mfa::requirement(Callers::current())->isEmpty());
     }
 
     /**
@@ -601,7 +602,7 @@ final class ResettingIdentityTest extends TestCase
             Mfa::resetIdentity($user, self::actor(), self::REASON);
         });
 
-        $result = Mfa::verify(Submission::factor($factor->id, $code));
+        $result = Mfa::verify(Callers::current(), Submission::factor($factor->id, $code));
 
         Factor::flushEventListeners();
 
@@ -625,12 +626,12 @@ final class ResettingIdentityTest extends TestCase
 
         $this->recordFirstFactor($user);
 
-        self::assertTrue(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
-        self::assertNotSame([], Mfa::proofs());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
+        self::assertNotSame([], Mfa::proofs(Callers::current()));
 
         Mfa::resetIdentity($user, self::actor(), self::REASON);
 
-        self::assertSame([], Mfa::proofs());
+        self::assertSame([], Mfa::proofs(Callers::current()));
     }
 
     /**
@@ -648,15 +649,15 @@ final class ResettingIdentityTest extends TestCase
 
         $this->recordFirstFactor($user);
 
-        $codes = $this->container()->make(RecoveryCodeService::class)->generate($user);
+        $codes = $this->container()->make(RecoveryCodeService::class)->generate($user, 'web');
 
-        self::assertTrue(Mfa::verify(Submission::recoveryCode($codes[0]->reveal()))->isVerified());
-        self::assertNotSame([], Mfa::proofs());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::recoveryCode($codes[0]->reveal()))->isVerified());
+        self::assertNotSame([], Mfa::proofs(Callers::current()));
 
         Mfa::resetIdentity($user, self::actor(), self::REASON);
 
-        self::assertSame([], Mfa::proofs());
-        self::assertFalse(Mfa::verify(Submission::recoveryCode($codes[1]->reveal()))->isVerified());
+        self::assertSame([], Mfa::proofs(Callers::current()));
+        self::assertFalse(Mfa::verify(Callers::current(), Submission::recoveryCode($codes[1]->reveal()))->isVerified());
         self::assertFalse($this->isStored($factor));
     }
 
@@ -677,7 +678,7 @@ final class ResettingIdentityTest extends TestCase
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store));
 
-        $start = Mfa::startEnrollment(EnrollmentRequest::totp('person@example.test'));
+        $start = Mfa::startEnrollment(Callers::current(), EnrollmentRequest::totp('person@example.test'));
 
         self::assertTrue($start->hasStarted());
 
@@ -685,7 +686,7 @@ final class ResettingIdentityTest extends TestCase
 
         Mfa::resetIdentity($user, self::actor(), self::REASON);
 
-        self::assertFalse(Mfa::confirmEnrollment((string) $start->grant?->reveal(), $code)->isConfirmed());
+        self::assertFalse(Mfa::confirmEnrollment(Callers::current(), (string) $start->grant?->reveal(), $code)->isConfirmed());
         self::assertSame(0, Factor::query()->count());
         self::assertTrue(ReenrollmentObligation::isRequired($user));
     }
@@ -711,7 +712,7 @@ final class ResettingIdentityTest extends TestCase
         $fresh = TestUser::query()->findOrFail($user->id);
 
         self::assertTrue(ReenrollmentObligation::isRequired($fresh));
-        self::assertFalse(Mfa::requirement()->isEmpty());
+        self::assertFalse(Mfa::requirement(Callers::current())->isEmpty());
 
         $store = $this->container()->make(ProofStore::class);
 
@@ -722,14 +723,14 @@ final class ResettingIdentityTest extends TestCase
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store));
 
-        $start = Mfa::startEnrollment(EnrollmentRequest::totp('person@example.test'));
+        $start = Mfa::startEnrollment(Callers::current(), EnrollmentRequest::totp('person@example.test'));
 
         self::assertTrue($start->hasStarted());
         self::assertTrue(ReenrollmentObligation::isRequired($fresh));
 
         $code = AuthenticatorApp::code(Factor::query()->whereKey($start->factor?->id)->sole());
 
-        self::assertTrue(Mfa::confirmEnrollment((string) $start->grant?->reveal(), $code)->isConfirmed());
+        self::assertTrue(Mfa::confirmEnrollment(Callers::current(), (string) $start->grant?->reveal(), $code)->isConfirmed());
         self::assertFalse(ReenrollmentObligation::isRequired($fresh));
     }
 
