@@ -18,13 +18,25 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 final readonly class NoPendingSessionResolver implements PendingSessionResolver
 {
     /**
-     * No pending session, whatever the request carries.
+     * No pending session: no request carries one.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return null
      */
     #[\Override]
-    public function resolve(Request $request): null
+    public function fromRequest(Request $request): null
+    {
+        return null;
+    }
+
+    /**
+     * No pending session stands: none was ever served.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @return null
+     */
+    #[\Override]
+    public function revalidate(PendingContext $pending): null
     {
         return null;
     }

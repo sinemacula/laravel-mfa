@@ -13,9 +13,9 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
-use SineMacula\Laravel\Mfa\Attempts\RequestIp;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
@@ -50,8 +50,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
+use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
  * Starts an enrolment: a pending factor, a grant that may confirm it, and by
@@ -126,14 +126,15 @@ final readonly class EnrollmentStarter
     /**
      * Start an enrolment for the person the request serves.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
      *
      * @throws \Throwable
      */
-    public function start(#[\SensitiveParameter] EnrollmentRequest $request): EnrollmentStart
+    public function start(CallerContext $context, #[\SensitiveParameter] EnrollmentRequest $request): EnrollmentStart
     {
-        $caller  = $this->callers->resolve(PendingAction::START_BOOTSTRAP_ENROLLMENT);
+        $caller  = $this->callers->resolve($context, PendingAction::START_BOOTSTRAP_ENROLLMENT);
         $binding = $caller === null ? null : $this->callers->binding($caller, Purpose::ENROLLMENT);
 
         if ($caller === null || $binding === null) {
@@ -180,15 +181,15 @@ final readonly class EnrollmentStarter
 
         try {
             $outcome = $this->attempts->throttled(
-                RequestIp::resolve($this->container),
+                $caller->client->ip,
                 function () use ($binding, $caller, $request, $driver, $destination, &$started): AttemptOutcome {
 
                     $started = FactorStateTransaction::forIdentity(
                         $caller->identity,
                         $this->factorModel(),
-                        function (Collection $factors) use ($binding, $request, $driver, $destination): EnrollmentStart {
+                        function (Collection $factors) use ($caller, $binding, $request, $driver, $destination): EnrollmentStart {
 
-                            $current = $this->callers->still(PendingAction::START_BOOTSTRAP_ENROLLMENT, $binding)
+                            $current = $this->callers->still($caller, PendingAction::START_BOOTSTRAP_ENROLLMENT, $binding)
                                 ?? throw new SignInChangedException('The sign-in changed before the identity\'s lock was held.');
 
                             return $this->underLock($current, $binding, $request, $driver, $destination, $factors);
@@ -289,7 +290,7 @@ final readonly class EnrollmentStarter
 
         $this->assertCombination($caller, $binding, $driver, $destination, $factors);
 
-        $context = $this->events->context($identity, $application);
+        $context = $this->events->context($identity, $application, $caller->client);
 
         $this->discard($identity, $binding, $request->type, $factors, $context);
         $this->assertPendingLimit($binding);
@@ -309,7 +310,7 @@ final readonly class EnrollmentStarter
         $this->events->dispatch(new EnrollmentStarted($context, $summary));
 
         if ($driver instanceof CodeDeliveryDriver) {
-            $this->sendFirstCode($factor, $binding, $row, $summary, $context);
+            $this->sendFirstCode($caller, $factor, $binding, $row, $summary, $context);
         }
 
         return EnrollmentStart::started($summary, $grant, $expiresAt, $secret, $this->provisioningUri($driver, $factor, $request, $secret));
@@ -440,7 +441,7 @@ final readonly class EnrollmentStarter
             return;
         }
 
-        $firstFactor = $this->container->make(SessionFirstFactor::class)->forBinding($caller->identity, $binding);
+        $firstFactor = $this->container->make(SessionFirstFactor::class)->forBinding($caller->identity, $binding, $caller->pending);
 
         if ($active && $firstFactor === null) {
             return;
@@ -560,7 +561,7 @@ final readonly class EnrollmentStarter
         $factor   = $this->factorModel();
         $relation = $factor->authenticatable();
 
-        $factor->setAttribute($relation->getMorphType(), CurrentIdentity::typeOf($caller->identity));
+        $factor->setAttribute($relation->getMorphType(), IdentityType::of($caller->identity));
         $factor->setAttribute($relation->getForeignKeyName(), $binding->identityKey);
         $factor->setAttribute($factor->getTypeName(), $request->type);
         $factor->setAttribute($factor->getLabelName(), $request->label);
@@ -574,6 +575,7 @@ final readonly class EnrollmentStarter
      * Send the pending factor's first code, recording its challenge once it has
      * gone; one that does not go rolls the whole start back.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $row
@@ -585,9 +587,9 @@ final readonly class EnrollmentStarter
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException
      */
-    private function sendFirstCode(EloquentFactor&Model $factor, ProofBinding $binding, Enrollment $row, FactorSummary $summary, array $context): void
+    private function sendFirstCode(Caller $caller, EloquentFactor&Model $factor, ProofBinding $binding, Enrollment $row, FactorSummary $summary, array $context): void
     {
-        $challengeId = self::challengeOf($this->container->make(ChallengeGateway::class)->send($factor, $binding));
+        $challengeId = self::challengeOf($this->container->make(ChallengeGateway::class)->send($caller->context(), $factor, $binding));
 
         $this->enrollments->recordChallenge($row, $challengeId);
 

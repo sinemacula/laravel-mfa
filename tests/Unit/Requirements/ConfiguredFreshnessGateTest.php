@@ -21,6 +21,7 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\OperationRequirements;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -93,9 +94,9 @@ final class ConfiguredFreshnessGateTest extends TestCase
     {
         $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password(), $signIn->totp()]);
 
-        self::assertTrue($this->gate()->isFresh('mfa.add_factor'));
-        self::assertFalse($this->gate()->isFresh('billing.change_plan'));
-        self::assertFalse($this->gate()->isFresh('billing.change_plan', Requirement::none()));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'billing.change_plan'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'billing.change_plan', Requirement::none()));
     }
 
     /**
@@ -110,7 +111,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
     {
         $user = $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password(), $signIn->totp()]);
 
-        self::assertTrue($this->gate()->isFresh('mfa.add_factor'));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
 
         $proofs = SignInProofs::of($user)->inSession('pending-1');
 
@@ -124,8 +125,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
             CarbonImmutable::now()->addMinutes(10),
         )));
 
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
-        self::assertNull($this->gate()->freshUntil('mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
+        self::assertNull($this->gate()->freshUntil(Callers::current(), 'mfa.add_factor'));
     }
 
     /**
@@ -162,8 +163,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
         $store->record($signIn->password());
         $store->record($signIn->totp());
 
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
-        self::assertNull($this->gate()->freshUntil('mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
+        self::assertNull($this->gate()->freshUntil(Callers::current(), 'mfa.add_factor'));
     }
 
     /**
@@ -180,10 +181,10 @@ final class ConfiguredFreshnessGateTest extends TestCase
 
         $caller = Requirement::none()->withAdditionalVerification(900);
 
-        self::assertTrue($this->gate()->isFresh('billing.change_plan', $caller));
-        self::assertFalse($this->gate()->isFresh('Billing.Change_Plan', $caller));
-        self::assertFalse($this->gate()->isFresh("billing.change_plan\n", $caller));
-        self::assertFalse($this->gate()->isFresh('Billing.Change_Plan', Requirement::none()->withMultifactor()));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'billing.change_plan', $caller));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'Billing.Change_Plan', $caller));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), "billing.change_plan\n", $caller));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'Billing.Change_Plan', Requirement::none()->withMultifactor()));
     }
 
     /**
@@ -198,15 +199,15 @@ final class ConfiguredFreshnessGateTest extends TestCase
     {
         $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password(self::TWO_HOURS), $signIn->totp()]);
 
-        self::assertTrue($this->gate()->isFresh('mfa.generate_recovery_codes'));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.generate_recovery_codes'));
 
         self::travelSeconds(900);
 
-        self::assertTrue($this->gate()->isFresh('mfa.generate_recovery_codes'));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.generate_recovery_codes'));
 
         self::travelSeconds(1);
 
-        self::assertFalse($this->gate()->isFresh('mfa.generate_recovery_codes'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.generate_recovery_codes'));
     }
 
     /**
@@ -226,11 +227,11 @@ final class ConfiguredFreshnessGateTest extends TestCase
         $looser   = Requirement::none()->withAdditionalVerification(600);
         $stricter = Requirement::none()->withAdditionalVerification(60);
 
-        self::assertFalse($this->gate()->isFresh('mfa.remove_factor', $looser));
-        self::assertTrue($this->gate()->isFresh('mfa.add_factor', $looser));
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor', $stricter));
-        self::assertTrue($this->gate()->isFresh('reports.export', $looser));
-        self::assertFalse($this->gate()->isFresh('reports.export', $stricter));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.remove_factor', $looser));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor', $looser));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor', $stricter));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'reports.export', $looser));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'reports.export', $stricter));
     }
 
     /**
@@ -245,8 +246,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
     {
         $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password(self::TWO_HOURS), $signIn->email()]);
 
-        self::assertTrue($this->gate()->isFresh('mfa.add_factor'));
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor', Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2, 900)));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor', Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2, 900)));
     }
 
     /**
@@ -270,8 +271,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
             $signIn->reauthentication(),
         ]);
 
-        self::assertFalse($this->gate()->isFresh('billing.change_plan'));
-        self::assertTrue($this->gate()->isFresh('reports.export', Requirement::none()->withMinimumLevel(AssuranceLevel::AAL1, 900)));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'billing.change_plan'));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'reports.export', Requirement::none()->withMinimumLevel(AssuranceLevel::AAL1, 900)));
     }
 
     /**
@@ -287,11 +288,11 @@ final class ConfiguredFreshnessGateTest extends TestCase
     {
         $user = $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password()]);
 
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
 
         $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password(self::TWO_HOURS), $signIn->totp(self::TWO_HOURS), $signIn->reauthentication()], $user);
 
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
     }
 
     /**
@@ -314,13 +315,13 @@ final class ConfiguredFreshnessGateTest extends TestCase
         $session->regenerate();
         $session->migrate(true);
 
-        self::assertTrue($this->gate()->isFresh('mfa.add_factor'));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
 
         self::travelSeconds(301);
 
         $session->regenerate();
 
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
     }
 
     /**
@@ -333,17 +334,17 @@ final class ConfiguredFreshnessGateTest extends TestCase
      */
     public function testASessionWithNoRecordIsNotFresh(): void
     {
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
 
         $user = TestUser::query()->create(['email' => 'none@example.test']);
 
         $this->actingAs($user);
 
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
 
         $this->signIn(static fn (SignInProofs $signIn): array => [], $user);
 
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
     }
 
     /**
@@ -358,7 +359,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        $this->gate()->isFresh('mfa.add_factor', Requirement::none()->withAdditionalVerification());
+        $this->gate()->isFresh(Callers::current(), 'mfa.add_factor', Requirement::none()->withAdditionalVerification());
     }
 
     /**
@@ -374,16 +375,16 @@ final class ConfiguredFreshnessGateTest extends TestCase
         $user     = $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->totp()]);
         $resolver = new FixedFirstFactorResolver(SignInProofs::of($user)->password(self::TWO_HOURS));
 
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
 
         $this->container()->instance(FirstFactorResolver::class, $resolver);
 
-        self::assertTrue($this->gate()->isFresh('mfa.add_factor'));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
         self::assertSame(1, $resolver->asked);
 
         $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password(self::TWO_HOURS), $signIn->totp()], $user);
 
-        self::assertTrue($this->gate()->isFresh('mfa.add_factor'));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
         self::assertSame(1, $resolver->asked);
     }
 
@@ -402,7 +403,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
 
         $this->container()->instance(FirstFactorResolver::class, new FixedFirstFactorResolver(SignInProofs::of($user)->password(self::TWO_HOURS)));
 
-        self::assertTrue($this->gate()->isFresh('mfa.add_factor'));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
     }
 
     /**
@@ -442,7 +443,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
         $this->container()->instance(CombinationPolicy::class, $policy);
         $this->container()->instance(FirstFactorResolver::class, new FixedFirstFactorResolver($firstFactor(SignInProofs::of($user))));
 
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
         self::assertSame([[]], $policy->handed);
     }
 
@@ -462,7 +463,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
         $this->actingAs($user);
         $this->container()->instance(FirstFactorResolver::class, $resolver);
 
-        self::assertFalse($this->gate()->isFresh('mfa.add_factor', Requirement::none()->withMinimumLevel(AssuranceLevel::AAL1, self::TWO_HOURS)));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor', Requirement::none()->withMinimumLevel(AssuranceLevel::AAL1, self::TWO_HOURS)));
         self::assertSame(0, $resolver->asked);
     }
 

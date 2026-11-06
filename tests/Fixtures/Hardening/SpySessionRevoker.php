@@ -44,11 +44,12 @@ final readonly class SpySessionRevoker implements SessionRevoker
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
+     * @param  string  $application
      * @param  string  $session
      * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      */
     #[\Override]
-    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $session): RemovalRevocation
+    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $application, string $session): RemovalRevocation
     {
         if ($this->onFactorRemoved !== null) {
             ($this->onFactorRemoved)();
@@ -60,7 +61,7 @@ final readonly class SpySessionRevoker implements SessionRevoker
             return RemovalRevocation::othersEnded();
         }
 
-        $revocation = $this->wrapped->factorRemoved($identity, $factorId, $session);
+        $revocation = $this->wrapped->factorRemoved($identity, $factorId, $application, $session);
 
         $this->recorder->seam('factorRemoved');
 

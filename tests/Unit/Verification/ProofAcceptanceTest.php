@@ -179,6 +179,6 @@ final class ProofAcceptanceTest extends TestCase
             proofs     : array_values($held),
         );
 
-        return $this->container()->make(ProofAcceptance::class)->evaluate(new Caller($this->user, $pending), $proof, [], 'test');
+        return $this->container()->make(ProofAcceptance::class)->evaluate(new Caller($this->user, $pending, $pending->application), $proof, [], 'test');
     }
 }

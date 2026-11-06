@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
@@ -15,8 +16,6 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Enums\RequirementMode;
-use SineMacula\Laravel\Mfa\Proofs\ProofService;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 
 /**
  * Composes what an identity's sign-in must prove, and asks whether the current
@@ -64,21 +63,22 @@ final readonly class RequirementService
      * The requirement the current identity's sign-in on the current application
      * must meet: none without an MFA-capable identity.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function requirement(): Requirement
+    public function requirement(CallerContext $caller): Requirement
     {
-        $identity = CurrentIdentity::resolve();
+        $identity = $caller->identity;
 
-        if ($identity === null) {
+        if ($identity === null || $caller->pending !== null) {
             return Requirement::none();
         }
 
-        return $this->requirementFor($identity, $this->container->make(ProofService::class)->application());
+        return $this->requirementFor($identity, $caller->application);
     }
 
     /**
@@ -120,6 +120,7 @@ final readonly class RequirementService
      * caller's requirement that asks for nothing adds nothing, and one with a
      * part that carries no maximum age, or one longer than a day, is refused.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @return bool
@@ -127,13 +128,13 @@ final readonly class RequirementService
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    public function isFresh(string $operation, ?Requirement $requirement = null): bool
+    public function isFresh(CallerContext $caller, string $operation, ?Requirement $requirement = null): bool
     {
         if (!Operation::isName($operation)) {
             return false;
         }
 
-        return $this->container->make(FreshnessGate::class)->isFresh($operation, $this->effective($operation, $requirement));
+        return $this->container->make(FreshnessGate::class)->isFresh($caller, $operation, $this->effective($caller, $operation, $requirement));
     }
 
     /**
@@ -141,6 +142,7 @@ final readonly class RequirementService
      * proofs it holds now, asked of the bound `FreshnessGate` as `isFresh()`
      * asks it; `null` when it is not fresh or the gate cannot say.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @return ?\Carbon\CarbonImmutable
@@ -148,13 +150,13 @@ final readonly class RequirementService
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    public function freshUntil(string $operation, ?Requirement $requirement = null): ?CarbonImmutable
+    public function freshUntil(CallerContext $caller, string $operation, ?Requirement $requirement = null): ?CarbonImmutable
     {
         if (!Operation::isName($operation)) {
             return null;
         }
 
-        return $this->container->make(FreshnessGate::class)->freshUntil($operation, $this->effective($operation, $requirement));
+        return $this->container->make(FreshnessGate::class)->freshUntil($caller, $operation, $this->effective($caller, $operation, $requirement));
     }
 
     /**
@@ -163,6 +165,7 @@ final readonly class RequirementService
      * requirement passed to it; `null` when it has none, or for a name that is
      * not an operation's.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
@@ -170,19 +173,20 @@ final readonly class RequirementService
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    public function freshnessRequirement(string $operation, ?Requirement $requirement = null): ?Requirement
+    public function freshnessRequirement(CallerContext $caller, string $operation, ?Requirement $requirement = null): ?Requirement
     {
         if (!Operation::isName($operation)) {
             return null;
         }
 
-        return $this->container->make(FreshnessGate::class)->requirement($operation, $this->effective($operation, $requirement));
+        return $this->container->make(FreshnessGate::class)->requirement($caller, $operation, $this->effective($caller, $operation, $requirement));
     }
 
     /**
      * The strictest of this package's setting for the operation on the current
      * application and the caller's requirement.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
@@ -190,11 +194,9 @@ final readonly class RequirementService
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    private function effective(string $operation, ?Requirement $requirement): ?Requirement
+    private function effective(CallerContext $caller, string $operation, ?Requirement $requirement): ?Requirement
     {
-        $application = $this->container->make(ProofService::class)->application();
-
-        return (new OperationRequirements($this->config()))->effective($application, $operation, $requirement);
+        return (new OperationRequirements($this->config()))->effective($caller->application, $operation, $requirement);
     }
 
     /**

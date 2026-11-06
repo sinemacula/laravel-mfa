@@ -239,7 +239,7 @@ final class GenerationSessionRevokerTest extends TestCase
      */
     public function testTheRemovedFactorsProofsAreNotKept(): void
     {
-        $this->revoker()->factorRemoved($this->user, 'factor-totp', SignInProofs::SESSION);
+        $this->revoker()->factorRemoved($this->user, 'factor-totp', 'web', SignInProofs::SESSION);
 
         self::assertSame(['password'], $this->methods());
     }
@@ -254,7 +254,7 @@ final class GenerationSessionRevokerTest extends TestCase
      */
     public function testARemovalFromAnotherSignInKeepsNothing(): void
     {
-        $this->revoker()->factorRemoved($this->user, 'removed-factor', 'other-sign-in');
+        $this->revoker()->factorRemoved($this->user, 'removed-factor', 'web', 'other-sign-in');
 
         self::assertSame([], $this->methods());
         self::assertSame(1, VerificationGeneration::current($this->user));
@@ -270,7 +270,7 @@ final class GenerationSessionRevokerTest extends TestCase
      */
     private function removeFactor(): RemovalRevocation
     {
-        return $this->revoker()->factorRemoved($this->user, 'removed-factor', SignInProofs::SESSION);
+        return $this->revoker()->factorRemoved($this->user, 'removed-factor', 'web', SignInProofs::SESSION);
     }
 
     /**

@@ -41,6 +41,7 @@ final class SessionRevokerContract
      * @param  \SineMacula\Laravel\Mfa\Contracts\SessionRevoker  $revoker
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
+     * @param  string  $application
      * @param  string  $session
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): void  $verifyOther
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): bool  $otherCounts
@@ -50,13 +51,14 @@ final class SessionRevokerContract
         SessionRevoker $revoker,
         MultiFactorAuthenticatable $identity,
         string $factorId,
+        string $application,
         string $session,
         \Closure $verifyOther,
         \Closure $otherCounts,
     ): void {
         self::verify($identity, $verifyOther, $otherCounts);
 
-        $revoker->factorRemoved($identity, $factorId, $session);
+        $revoker->factorRemoved($identity, $factorId, $application, $session);
 
         Assert::assertFalse($otherCounts($identity), 'Removing a factor must stop another session counting.');
     }
@@ -69,6 +71,7 @@ final class SessionRevokerContract
      * @param  \SineMacula\Laravel\Mfa\Contracts\SessionRevoker  $revoker
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
+     * @param  string  $application
      * @param  string  $otherSession
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): bool  $currentCounts
      * @return void
@@ -77,13 +80,14 @@ final class SessionRevokerContract
         SessionRevoker $revoker,
         MultiFactorAuthenticatable $identity,
         string $factorId,
+        string $application,
         string $otherSession,
         \Closure $currentCounts,
     ): void {
         Assert::assertTrue($currentCounts($identity), 'The identity\'s current session must count before a factor is removed.');
 
         try {
-            $revoker->factorRemoved($identity, $factorId, $otherSession);
+            $revoker->factorRemoved($identity, $factorId, $application, $otherSession);
         } catch (\Throwable) {
             return;
         }
@@ -122,6 +126,7 @@ final class SessionRevokerContract
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): void  $verifyOther
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): bool  $otherCounts
      * @param  string  $factorId
+     * @param  string  $application
      * @param  string  $session
      * @return void
      *
@@ -133,6 +138,7 @@ final class SessionRevokerContract
         \Closure $verifyOther,
         \Closure $otherCounts,
         string $factorId,
+        string $application,
         string $session,
     ): void {
         self::verify($identity, $verifyOther, $otherCounts);
@@ -142,7 +148,7 @@ final class SessionRevokerContract
         $connection->beginTransaction();
 
         try {
-            $revoker->factorRemoved($identity, $factorId, $session);
+            $revoker->factorRemoved($identity, $factorId, $application, $session);
         } finally {
             $connection->rollBack();
         }

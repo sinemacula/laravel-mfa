@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
@@ -39,6 +40,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Hardening\ServerErrorAnswered;
 use Tests\Fixtures\Identities\TestUser;
@@ -430,7 +432,7 @@ trait FlowCatalog
     {
         $this->holdingTotp();
 
-        return static fn (): bool => count(Mfa::factors()) === 1;
+        return static fn (): bool => count(Mfa::factors(Callers::current())) === 1;
     }
 
     /**
@@ -442,7 +444,7 @@ trait FlowCatalog
     {
         [, $factor] = $this->holdingTotp();
 
-        return static fn (): bool => Mfa::factor($factor->id) !== null;
+        return static fn (): bool => Mfa::factor(Callers::current(), $factor->id) !== null;
     }
 
     /**
@@ -454,7 +456,7 @@ trait FlowCatalog
     {
         $this->holdingTotp();
 
-        return static fn (): bool => Mfa::factor('missing') === null;
+        return static fn (): bool => Mfa::factor(Callers::current(), 'missing') === null;
     }
 
     /**
@@ -466,7 +468,7 @@ trait FlowCatalog
     {
         $this->holdingTotp();
 
-        return static fn (): bool => count(Mfa::offeredFactors()) === 1;
+        return static fn (): bool => count(Mfa::offeredFactors(Callers::current())) === 1;
     }
 
     /**
@@ -506,7 +508,7 @@ trait FlowCatalog
 
         $submission = Submission::factor($factor->id, $this->secret(AuthenticatorApp::code($factor)));
 
-        return static fn (): bool => Mfa::verify($submission)->isVerified();
+        return static fn (): bool => Mfa::verify(Callers::current(), $submission)->isVerified();
     }
 
     /**
@@ -520,7 +522,7 @@ trait FlowCatalog
 
         $submission = Submission::factor($factor->id, $this->secret(AuthenticatorApp::code($factor, 5)));
 
-        return static fn (): bool => !Mfa::verify($submission)->isVerified();
+        return static fn (): bool => !Mfa::verify(Callers::current(), $submission)->isVerified();
     }
 
     /**
@@ -536,7 +538,7 @@ trait FlowCatalog
 
         $submission = Submission::challenge($factor->id, $challenge, $this->secret($code));
 
-        return static fn (): bool => Mfa::verify($submission)->isVerified();
+        return static fn (): bool => Mfa::verify(Callers::current(), $submission)->isVerified();
     }
 
     /**
@@ -552,7 +554,7 @@ trait FlowCatalog
 
         $submission = Submission::challenge($factor->id, $challenge, $this->secret($code === '000000' ? '111111' : '000000'));
 
-        return static fn (): bool => !Mfa::verify($submission)->isVerified();
+        return static fn (): bool => !Mfa::verify(Callers::current(), $submission)->isVerified();
     }
 
     /**
@@ -566,7 +568,7 @@ trait FlowCatalog
 
         $submission = Submission::recoveryCode($this->secret($this->recoveryCode($user)));
 
-        return static fn (): bool => Mfa::verify($submission)->isVerified();
+        return static fn (): bool => Mfa::verify(Callers::current(), $submission)->isVerified();
     }
 
     /**
@@ -582,7 +584,7 @@ trait FlowCatalog
 
         $submission = Submission::recoveryCode($this->secret('AAAAAAAAAAAA'));
 
-        return static fn (): bool => !Mfa::verify($submission)->isVerified();
+        return static fn (): bool => !Mfa::verify(Callers::current(), $submission)->isVerified();
     }
 
     /**
@@ -599,7 +601,7 @@ trait FlowCatalog
 
         $submission = Submission::assertion($this->passkeyFactor($user)->id, ['id' => self::CREDENTIAL]);
 
-        return static fn (): bool => Mfa::verify($submission)->isVerified();
+        return static fn (): bool => Mfa::verify(Callers::current(), $submission)->isVerified();
     }
 
     /**
@@ -616,7 +618,7 @@ trait FlowCatalog
 
         $submission = Submission::assertion($this->passkeyFactor($user)->id, ['id' => self::CREDENTIAL]);
 
-        return static fn (): bool => !Mfa::verify($submission)->isVerified();
+        return static fn (): bool => !Mfa::verify(Callers::current(), $submission)->isVerified();
     }
 
     /**
@@ -635,7 +637,7 @@ trait FlowCatalog
         $factor     = $this->totpFactor($user);
         $submission = Submission::factor($factor->id, $this->secret(AuthenticatorApp::code($factor)));
 
-        return static fn (): bool => Mfa::verify($submission)->isVerified();
+        return static fn (): bool => Mfa::verify(Callers::current(), $submission)->isVerified();
     }
 
     /**
@@ -647,7 +649,7 @@ trait FlowCatalog
     {
         [, $factor] = $this->holdingEmail();
 
-        return static fn (): bool => Mfa::sendCode($factor->id)->wasSent();
+        return static fn (): bool => Mfa::sendCode(Callers::current(), $factor->id)->wasSent();
     }
 
     /**
@@ -659,7 +661,7 @@ trait FlowCatalog
     {
         $this->holdingEmail();
 
-        return static fn (): bool => !Mfa::sendCode('missing')->wasSent();
+        return static fn (): bool => !Mfa::sendCode(Callers::current(), 'missing')->wasSent();
     }
 
     /**
@@ -676,7 +678,7 @@ trait FlowCatalog
 
         $factor = $this->passkeyFactor($user);
 
-        return static fn (): bool => Mfa::requestAssertion($factor->id)->hasStarted();
+        return static fn (): bool => Mfa::requestAssertion(Callers::current(), $factor->id)->hasStarted();
     }
 
     /**
@@ -691,7 +693,7 @@ trait FlowCatalog
         $this->recordFirstFactor($user);
         $this->enablePasskeys();
 
-        return static fn (): bool => !Mfa::requestAssertion('missing')->hasStarted();
+        return static fn (): bool => !Mfa::requestAssertion(Callers::current(), 'missing')->hasStarted();
     }
 
     /**
@@ -703,7 +705,7 @@ trait FlowCatalog
     {
         $this->reauthenticatedPerson();
 
-        return fn (): bool => Mfa::startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->hasStarted();
+        return fn (): bool => Mfa::startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->hasStarted();
     }
 
     /**
@@ -715,7 +717,7 @@ trait FlowCatalog
     {
         $this->signedInPerson();
 
-        return fn (): bool => !Mfa::startEnrollment(EnrollmentRequest::totp(self::ACCOUNT))->hasStarted();
+        return fn (): bool => !Mfa::startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT))->hasStarted();
     }
 
     /**
@@ -731,7 +733,7 @@ trait FlowCatalog
         $grant = $this->secret($this->grantOf($start));
         $code  = $this->secret($this->appCode($start));
 
-        return fn (): bool => $this->mfa()->confirmEnrollment($grant, $code)->isConfirmed();
+        return fn (): bool => $this->mfa()->confirmEnrollment(Callers::current(), $grant, $code)->isConfirmed();
     }
 
     /**
@@ -747,7 +749,7 @@ trait FlowCatalog
         $grant = $this->secret($this->grantOf($start));
         $code  = $this->secret($this->wrongCode($start));
 
-        return fn (): bool => !$this->mfa()->confirmEnrollment($grant, $code)->isConfirmed();
+        return fn (): bool => !$this->mfa()->confirmEnrollment(Callers::current(), $grant, $code)->isConfirmed();
     }
 
     /**
@@ -764,7 +766,7 @@ trait FlowCatalog
         $grant = $this->secret($this->grantOf($start));
         $code  = $this->secret($this->appCode($start));
 
-        return fn (): bool => $this->mfa()->confirmEnrollment($grant, $code)->isConfirmed();
+        return fn (): bool => $this->mfa()->confirmEnrollment(Callers::current(), $grant, $code)->isConfirmed();
     }
 
     /**
@@ -780,7 +782,7 @@ trait FlowCatalog
 
         Carbon::setTestNow(CarbonImmutable::now()->addSeconds(61));
 
-        return fn (): bool => $this->mfa()->resendEnrollmentCode($grant)->wasSent();
+        return fn (): bool => $this->mfa()->resendEnrollmentCode(Callers::current(), $grant)->wasSent();
     }
 
     /**
@@ -794,7 +796,7 @@ trait FlowCatalog
 
         $grant = $this->secret($this->grantOf($this->startedEmail()));
 
-        return fn (): bool => !$this->mfa()->resendEnrollmentCode($grant)->wasSent();
+        return fn (): bool => !$this->mfa()->resendEnrollmentCode(Callers::current(), $grant)->wasSent();
     }
 
     /**
@@ -808,7 +810,7 @@ trait FlowCatalog
 
         $grant = $this->secret($this->grantOf($this->startedTotp()));
 
-        return fn (): bool => $this->mfa()->cancelEnrollment($grant);
+        return fn (): bool => $this->mfa()->cancelEnrollment(Callers::current(), $grant);
     }
 
     /**
@@ -820,7 +822,7 @@ trait FlowCatalog
     {
         $this->reauthenticatedPerson();
 
-        return fn (): bool => !$this->mfa()->cancelEnrollment('no-such-grant');
+        return fn (): bool => !$this->mfa()->cancelEnrollment(Callers::current(), 'no-such-grant');
     }
 
     /**
@@ -834,7 +836,7 @@ trait FlowCatalog
 
         $email = $this->emailFactor($user, attributes: ['application' => self::APPLICATION]);
 
-        return static fn (): bool => Mfa::removeFactor($email->id)->wasMade();
+        return static fn (): bool => Mfa::removeFactor(Callers::current(), $email->id)->wasMade();
     }
 
     /**
@@ -848,7 +850,7 @@ trait FlowCatalog
 
         $this->secret($this->recoveryCode($user));
 
-        return static fn (): bool => Mfa::removeFactor($factor->id)->wasMade();
+        return static fn (): bool => Mfa::removeFactor(Callers::current(), $factor->id)->wasMade();
     }
 
     /**
@@ -866,13 +868,13 @@ trait FlowCatalog
         $user  = TestUser::query()->sole();
         $email = $this->emailFactor($user, attributes: ['application' => self::APPLICATION]);
 
-        Mfa::verify(Submission::factor($totp->id, AuthenticatorApp::code($totp)));
+        Mfa::verify(Callers::current(), Submission::factor($totp->id, AuthenticatorApp::code($totp)));
 
         [$challenge, $code] = $this->sentCode($email);
 
-        Mfa::verify(Submission::challenge($email->id, $challenge, $code));
+        Mfa::verify(Callers::current(), Submission::challenge($email->id, $challenge, $code));
 
-        return static fn (): bool => Mfa::removeFactor($totp->id)->outstanding !== null;
+        return static fn (): bool => Mfa::removeFactor(Callers::current(), $totp->id)->outstanding !== null;
     }
 
     /**
@@ -884,7 +886,7 @@ trait FlowCatalog
     {
         [, $factor] = $this->holdingTotp();
 
-        return static fn (): bool => !Mfa::removeFactor($factor->id)->wasMade();
+        return static fn (): bool => !Mfa::removeFactor(Callers::current(), $factor->id)->wasMade();
     }
 
     /**
@@ -896,7 +898,7 @@ trait FlowCatalog
     {
         [, $factor] = $this->holdingTotp();
 
-        return static fn (): bool => Mfa::renameFactor($factor->id, 'Phone')->wasMade();
+        return static fn (): bool => Mfa::renameFactor(Callers::current(), $factor->id, 'Phone')->wasMade();
     }
 
     /**
@@ -908,7 +910,7 @@ trait FlowCatalog
     {
         $this->holdingTotp();
 
-        return static fn (): bool => !Mfa::renameFactor('missing', 'Phone')->wasMade();
+        return static fn (): bool => !Mfa::renameFactor(Callers::current(), 'missing', 'Phone')->wasMade();
     }
 
     /**
@@ -920,7 +922,7 @@ trait FlowCatalog
     {
         [, $factor] = $this->holdingTotp();
 
-        return static fn (): bool => Mfa::setPreferredFactor($factor->id)->wasMade();
+        return static fn (): bool => Mfa::setPreferredFactor(Callers::current(), $factor->id)->wasMade();
     }
 
     /**
@@ -932,7 +934,7 @@ trait FlowCatalog
     {
         $this->holdingTotp();
 
-        return static fn (): bool => !Mfa::setPreferredFactor('missing')->wasMade();
+        return static fn (): bool => !Mfa::setPreferredFactor(Callers::current(), 'missing')->wasMade();
     }
 
     /**
@@ -1039,7 +1041,7 @@ trait FlowCatalog
     {
         $this->steppedUp();
 
-        return static fn (): bool => Mfa::generateRecoveryCodes()->wasGenerated();
+        return static fn (): bool => Mfa::generateRecoveryCodes(Callers::current())->wasGenerated();
     }
 
     /**
@@ -1051,7 +1053,7 @@ trait FlowCatalog
     {
         $this->holdingTotp();
 
-        return static fn (): bool => !Mfa::generateRecoveryCodes()->wasGenerated();
+        return static fn (): bool => !Mfa::generateRecoveryCodes(Callers::current())->wasGenerated();
     }
 
     /**
@@ -1065,7 +1067,7 @@ trait FlowCatalog
 
         $this->recoveryCode($user);
 
-        return static fn (): bool => Mfa::recoveryCodeStatus() !== null;
+        return static fn (): bool => Mfa::recoveryCodeStatus(Callers::current()) !== null;
     }
 
     /**
@@ -1077,7 +1079,7 @@ trait FlowCatalog
     {
         $this->steppedUp();
 
-        return static fn (): bool => Mfa::authenticationContext()['accepted'];
+        return static fn (): bool => Mfa::authenticationContext(Callers::current())['accepted'];
     }
 
     /**
@@ -1089,7 +1091,7 @@ trait FlowCatalog
     {
         $this->steppedUp();
 
-        return static fn (): bool => Mfa::isFresh('mfa.add_factor');
+        return static fn (): bool => Mfa::isFresh(Callers::current(), 'mfa.add_factor');
     }
 
     /**
@@ -1104,7 +1106,7 @@ trait FlowCatalog
         $this->reauthenticatedPerson();
         $this->startedTotp();
 
-        Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, 5)));
+        Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor, 5)));
 
         Carbon::setTestNow(CarbonImmutable::now()->addDays(60));
 
@@ -1125,7 +1127,7 @@ trait FlowCatalog
     {
         $this->steppedUp();
 
-        return static fn (): bool => count(Mfa::proofs()) > 0;
+        return static fn (): bool => count(Mfa::proofs(Callers::current())) > 0;
     }
 
     /**
@@ -1139,7 +1141,7 @@ trait FlowCatalog
 
         $this->enableApplication(['requirement' => 'always']);
 
-        return static fn (): bool => !Mfa::requirement()->isEmpty();
+        return static fn (): bool => !Mfa::requirement(Callers::current())->isEmpty();
     }
 
     /**
@@ -1156,7 +1158,7 @@ trait FlowCatalog
         $registration = new PasskeyRegistration(self::CREDENTIAL, new ObservedProperties(userPresence: true), $this->flowBinding($user, Purpose::ENROLLMENT));
         $gate         = $this->container()->make(PasskeyChangeGate::class);
 
-        return fn (): bool => $this->inCallersTransaction(static fn (): bool => $gate->registering($user, self::APPLICATION, $registration) !== null);
+        return fn (): bool => $this->inCallersTransaction(static fn (): bool => $gate->registering(Callers::of($user, self::APPLICATION), $registration) !== null);
     }
 
     /**
@@ -1176,7 +1178,7 @@ trait FlowCatalog
 
         return fn (): bool => $this->refusedWith(
             FailureReason::CREDENTIAL_ASSOCIATED,
-            fn (): mixed => $this->inCallersTransaction(static fn (): mixed => $gate->registering($user, self::APPLICATION, $registration)),
+            fn (): mixed => $this->inCallersTransaction(static fn (): mixed => $gate->registering(Callers::of($user, self::APPLICATION), $registration)),
         );
     }
 
@@ -1199,7 +1201,7 @@ trait FlowCatalog
 
         return fn (): bool => $this->inCallersTransaction(static function () use ($gate, $user): bool {
 
-            $gate->removing($user, self::APPLICATION, self::CREDENTIAL);
+            $gate->removing(Callers::of($user, self::APPLICATION), self::CREDENTIAL);
 
             return WriteConnection::query(Factor::query())->where('type', 'passkey')->count() === 0;
         });
@@ -1220,7 +1222,7 @@ trait FlowCatalog
         $gate = $this->container()->make(PasskeyChangeGate::class);
 
         return fn (): bool => $this->refusedWith(FailureReason::NOT_FOUND, fn (): mixed => $this->inCallersTransaction(static function () use ($gate, $user): void {
-            $gate->removing($user, self::APPLICATION, self::FOREIGN_CREDENTIAL);
+            $gate->removing(Callers::of($user, self::APPLICATION), self::FOREIGN_CREDENTIAL);
         }));
     }
 
@@ -1254,7 +1256,9 @@ trait FlowCatalog
         $counters = $this->container()->make(ChallengeCounters::class);
         $binding  = $this->flowBinding($user);
 
-        return fn (): bool => $this->inCallersTransaction(static fn (): bool => $counters->isUsable($user, $factor, $binding)->isAdmitted());
+        $caller = CallerContext::forIdentity($user, $binding->application);
+
+        return fn (): bool => $this->inCallersTransaction(static fn (): bool => $counters->isUsable($caller, $factor, $binding)->isAdmitted());
     }
 
     /**
@@ -1269,7 +1273,9 @@ trait FlowCatalog
         $counters = $this->container()->make(ChallengeCounters::class);
         $binding  = $this->flowBinding($user);
 
-        return fn (): bool => $this->inCallersTransaction(static fn (): bool => $counters->report($user, $factor, $binding, true)->passed);
+        $caller = CallerContext::forIdentity($user, $binding->application);
+
+        return fn (): bool => $this->inCallersTransaction(static fn (): bool => $counters->report($caller, $factor, $binding, true)->passed);
     }
 
     /**
@@ -1284,7 +1290,9 @@ trait FlowCatalog
         $counters = $this->container()->make(ChallengeCounters::class);
         $binding  = $this->flowBinding($user);
 
-        return fn (): bool => $this->inCallersTransaction(static fn (): bool => $counters->report($user, $factor, $binding, false)->isFailed());
+        $caller = CallerContext::forIdentity($user, $binding->application);
+
+        return fn (): bool => $this->inCallersTransaction(static fn (): bool => $counters->report($caller, $factor, $binding, false)->isFailed());
     }
 
     /**
@@ -1299,7 +1307,7 @@ trait FlowCatalog
         $gateway = $this->container()->make(ChallengeGateway::class);
         $binding = $this->flowBinding($user);
 
-        return static fn (): bool => $gateway->send($factor, $binding)->wasSent();
+        return static fn (): bool => $gateway->send(Callers::current(), $factor, $binding)->wasSent();
     }
 
     /**
@@ -1318,7 +1326,7 @@ trait FlowCatalog
 
         $this->secret($code);
 
-        return static fn (): bool => $gateway->verify($factor, $binding, $challenge, $code)->hasPassed();
+        return static fn (): bool => $gateway->verify(Callers::current(), $factor, $binding, $challenge, $code)->hasPassed();
     }
 
     /**
@@ -1336,7 +1344,7 @@ trait FlowCatalog
         $binding = $this->flowBinding($user);
         $wrong   = $this->secret($code === '000000' ? '111111' : '000000');
 
-        return static fn (): bool => !$gateway->verify($factor, $binding, $challenge, $wrong)->hasPassed();
+        return static fn (): bool => !$gateway->verify(Callers::current(), $factor, $binding, $challenge, $wrong)->hasPassed();
     }
 
     /**

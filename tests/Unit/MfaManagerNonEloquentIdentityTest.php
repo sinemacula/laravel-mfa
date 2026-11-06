@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Illuminate\Contracts\Config\Repository;
-use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
@@ -15,12 +14,13 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 
 /**
  * Coverage for the FQCN-fallback paths behind the manager.
  *
- * `Support\CurrentIdentity::typeOf()`, which the proof store and recovery code
+ * `Support\IdentityType::of()`, which the proof store and recovery code
  * generation all use, branches on whether the identity is a `Model` — Eloquent
  * identities use `getMorphClass()`, non-Eloquent identities fall back to a
  * strict FQCN comparison. The shipped test identities (`TestUser`,
@@ -61,7 +61,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     {
         $identity = new NonEloquentIdentity('plain-1', mfaEnabled: false);
 
-        Auth::shouldReceive('user')->andReturn($identity);
+        $this->actingAs($identity);
 
         $factor = Factor::query()->create([
             'authenticatable_type' => NonEloquentIdentity::class,
@@ -75,7 +75,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
             'type'                 => 'totp',
         ]);
 
-        self::assertSame([$factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors()));
+        self::assertSame([$factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->factors(Callers::current())));
     }
 
     /**
@@ -90,12 +90,11 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     {
         $identity = new NonEloquentIdentity(['nested' => 'array'], mfaEnabled: false);
 
-        Auth::shouldReceive('user')->andReturn($identity);
-        Auth::shouldReceive('getDefaultDriver')->andReturn('web');
+        $this->actingAs($identity);
 
         $this->expectException(UnsupportedIdentifierException::class);
 
-        $this->manager()->verify(Submission::factor('any', '000000'));
+        $this->manager()->verify(Callers::current(), Submission::factor('any', '000000'));
     }
 
     /**
@@ -127,7 +126,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 
         $this->actingAs($identity);
 
-        self::assertCount(2, $this->container()->make(RecoveryCodeService::class)->generate($identity));
+        self::assertCount(2, $this->container()->make(RecoveryCodeService::class)->generate($identity, 'web'));
 
         // Stored rows must carry the identity's FQCN as the owner type, proving
         // the `: $identity::class` fallback fired.

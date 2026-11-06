@@ -44,12 +44,13 @@ interface SessionRevoker
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
+     * @param  string  $application
      * @param  string  $session
      * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      *
      * @throws \RuntimeException
      */
-    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $session): RemovalRevocation;
+    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $application, string $session): RemovalRevocation;
 
     /**
      * End every session of the identity, the current one included.

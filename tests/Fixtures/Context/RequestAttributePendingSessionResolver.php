@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Context;
 
+use Illuminate\Container\Container;
 use Illuminate\Http\Request;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
@@ -29,10 +30,26 @@ final readonly class RequestAttributePendingSessionResolver implements PendingSe
      * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
      */
     #[\Override]
-    public function resolve(Request $request): ?PendingContext
+    public function fromRequest(Request $request): ?PendingContext
     {
         $pending = $request->attributes->get(self::ATTRIBUTE);
 
         return $pending instanceof PendingContext ? $pending : null;
+    }
+
+    /**
+     * The pending session the request being served carries now, when it is
+     * still the one given: a test changes the attribute to stand for a session
+     * revoked or changed meanwhile.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
+     */
+    #[\Override]
+    public function revalidate(PendingContext $pending): ?PendingContext
+    {
+        $now = Container::getInstance()->make('request')->attributes->get(self::ATTRIBUTE);
+
+        return $now instanceof PendingContext && $now->sessionId === $pending->sessionId ? $now : null;
     }
 }

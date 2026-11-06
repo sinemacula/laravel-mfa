@@ -27,6 +27,7 @@ use Symfony\Component\Mime\Email;
 use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Codes\PayloadRecordingQueue;
 use Tests\Fixtures\Codes\WordingSmsSender;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Testing\ChooseLocale;
 use Tests\Fixtures\Testing\ExplicitLocaleCodeMessage;
 use Tests\Fixtures\Testing\RecordingTranslator;
@@ -194,8 +195,8 @@ final class CodeMessageWordingTest extends TestCase
 
         $user = $this->signedInPerson();
 
-        Mfa::sendCode($this->emailFactor($user)->id);
-        Mfa::sendCode($this->factorOf($user, ['type' => 'sms', 'destination' => self::PHONE])->id);
+        Mfa::sendCode(Callers::current(), $this->emailFactor($user)->id);
+        Mfa::sendCode(Callers::current(), $this->factorOf($user, ['type' => 'sms', 'destination' => self::PHONE])->id);
 
         self::assertMatchesRegularExpression('/^Your verification code is: \d{6}$/D', (string) $this->texts->lastTextTo(self::PHONE));
 
@@ -233,8 +234,8 @@ final class CodeMessageWordingTest extends TestCase
         app('translator')->addLines(['messages.sms_code' => $line, 'messages.email_code' => $line], 'fr', 'mfa');
         app()->setLocale('fr');
 
-        Mfa::sendCode($this->emailFactor($user)->id);
-        Mfa::sendCode($this->factorOf($user, ['type' => 'sms', 'destination' => self::PHONE])->id);
+        Mfa::sendCode(Callers::current(), $this->emailFactor($user)->id);
+        Mfa::sendCode(Callers::current(), $this->factorOf($user, ['type' => 'sms', 'destination' => self::PHONE])->id);
 
         self::assertMatchesRegularExpression('/^Your verification code is: \d{6}$/D', (string) $this->texts->lastTextTo(self::PHONE));
 
@@ -253,7 +254,9 @@ final class CodeMessageWordingTest extends TestCase
         app('translator')->addLines(['messages.sms_code' => ':code est votre code. Encore : :code'], 'fr', 'mfa');
         app()->setLocale('fr');
 
-        Mfa::sendCode($this->factorOf($this->signedInPerson(), ['type' => 'sms', 'destination' => self::PHONE])->id);
+        $factor = $this->factorOf($this->signedInPerson(), ['type' => 'sms', 'destination' => self::PHONE]);
+
+        Mfa::sendCode(Callers::current(), $factor->id);
 
         self::assertMatchesRegularExpression('/^(\d{6}) est votre code\. Encore : \1$/D', (string) $this->texts->lastTextTo(self::PHONE));
     }
@@ -273,8 +276,8 @@ final class CodeMessageWordingTest extends TestCase
 
         $user = $this->signedInPerson();
 
-        Mfa::sendCode($this->emailFactor($user)->id);
-        Mfa::sendCode($this->factorOf($user, ['type' => 'sms', 'destination' => self::PHONE])->id);
+        Mfa::sendCode(Callers::current(), $this->emailFactor($user)->id);
+        Mfa::sendCode(Callers::current(), $this->factorOf($user, ['type' => 'sms', 'destination' => self::PHONE])->id);
 
         $message = $this->lastMessage();
         $body    = (string) $message->content()->htmlString;
@@ -349,7 +352,9 @@ final class CodeMessageWordingTest extends TestCase
         app('translator')->addLines(['messages.email_code' => 'Ihr Code: :code'], 'de', 'mfa');
         app()->setLocale('fr');
 
-        Mfa::sendCode($this->emailFactor($this->signedInPerson())->id);
+        $factor = $this->emailFactor($this->signedInPerson());
+
+        Mfa::sendCode(Callers::current(), $factor->id);
 
         $message = $this->lastMessage();
 
@@ -365,7 +370,9 @@ final class CodeMessageWordingTest extends TestCase
      */
     public function testTheDefaultLocaleIsCaptured(): void
     {
-        Mfa::sendCode($this->emailFactor($this->signedInPerson())->id);
+        $factor = $this->emailFactor($this->signedInPerson());
+
+        Mfa::sendCode(Callers::current(), $factor->id);
 
         self::assertSame('en', $this->lastMessage()->locale);
     }
@@ -407,7 +414,9 @@ final class CodeMessageWordingTest extends TestCase
     {
         app()->setLocale('fr');
 
-        Mfa::sendCode($this->emailFactor($this->signedInPerson())->id);
+        $factor = $this->emailFactor($this->signedInPerson());
+
+        Mfa::sendCode(Callers::current(), $factor->id);
 
         $message = $this->lastMessage();
 
@@ -456,7 +465,7 @@ final class CodeMessageWordingTest extends TestCase
     #[\Override]
     protected function defineRoutes(mixed $router): void
     {
-        $router->post('code/{factor}', static fn (string $factor): array => ['sent' => Mfa::sendCode($factor)->wasSent()])
+        $router->post('code/{factor}', static fn (string $factor): array => ['sent' => Mfa::sendCode(Callers::current(), $factor)->wasSent()])
             ->middleware(ChooseLocale::class . ':fr');
     }
 

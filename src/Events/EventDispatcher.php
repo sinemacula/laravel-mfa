@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Events;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -46,23 +47,22 @@ final readonly class EventDispatcher
     ) {}
 
     /**
-     * The context of an event about the identity, from the bound resolver and
-     * the request being served, cut down to `EventContext::KEYS`. The
-     * application an operation ran through, when given, names the application.
+     * The context of an event about the identity, from the bound resolver for
+     * the client the action was served to, cut down to `EventContext::KEYS`, on
+     * the application the operation ran through. No request is read.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?string  $application
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return array<string, int|string|null>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function context(?MultiFactorAuthenticatable $identity, ?string $application = null): array
+    public function context(?MultiFactorAuthenticatable $identity, ?string $application = null, ?ClientContext $client = null): array
     {
-        $request = $this->container->bound('request') ? $this->container->make('request') : null;
+        $context = EventContext::allowlist($this->container->make(EventContextResolver::class)->resolve($identity, $client));
 
-        $context = EventContext::allowlist($this->container->make(EventContextResolver::class)->resolve($identity, $request));
-
-        $context['application'] = $application ?? $context['application'];
+        $context['application'] = $application;
 
         return $context;
     }

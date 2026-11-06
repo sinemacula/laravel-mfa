@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
@@ -115,11 +116,12 @@ final readonly class IdentityReset
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  string  $reason
      * @param  bool  $requireReenrollment
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return void
      *
      * @throws \InvalidArgumentException
      */
-    public function reset(MultiFactorAuthenticatable $identity, Actor $actor, string $reason, bool $requireReenrollment): void
+    public function reset(MultiFactorAuthenticatable $identity, Actor $actor, string $reason, bool $requireReenrollment, ?ClientContext $client = null): void
     {
         if (trim($reason) === '') {
             throw new \InvalidArgumentException('A reset needs a reason.');
@@ -133,17 +135,17 @@ final readonly class IdentityReset
 
         $model = ConfiguredModels::factor($this->config);
 
-        FactorStateTransaction::forIdentity($identity, new $model, function (Collection $stored) use ($identity, $actor, $reason, $requireReenrollment): void {
+        FactorStateTransaction::forIdentity($identity, new $model, function (Collection $stored) use ($identity, $actor, $reason, $requireReenrollment, $client): void {
 
             $factors    = $stored->sortBy(static fn (EloquentFactor&Model $factor): ?string => LockedFactors::idOf($factor))->values();
             $readable   = $factors->filter(static fn (EloquentFactor&Model $factor): bool => self::isReadable($factor))->values();
             $unreadable = $factors->count() - $readable->count();
-            $context    = $this->events->context($identity);
+            $context    = $this->events->context($identity, null, $client);
 
-            $this->liftLockouts($identity, $readable, $actor);
+            $this->liftLockouts($identity, $readable, $actor, $client);
             $this->removeFactors($identity, $factors, $readable, $actor, $context);
 
-            $this->recoveryCodes->removeSet($identity, $actor);
+            $this->recoveryCodes->removeSet($identity, $actor, $client);
 
             ReenrollmentObligation::record($identity, $requireReenrollment);
             VerificationGeneration::advance($identity);
@@ -192,19 +194,20 @@ final readonly class IdentityReset
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return void
      *
      * @formatter:on
      *
      * @throws \Throwable
      */
-    private function liftLockouts(MultiFactorAuthenticatable $identity, Collection $factors, Actor $actor): void
+    private function liftLockouts(MultiFactorAuthenticatable $identity, Collection $factors, Actor $actor, ?ClientContext $client): void
     {
         foreach ($factors as $factor) {
-            $this->attempts->liftLockout($identity, $factor, $actor);
+            $this->attempts->liftLockout($identity, $factor, $actor, null, $client);
         }
 
-        $this->attempts->liftLockout($identity, null, $actor);
+        $this->attempts->liftLockout($identity, null, $actor, null, $client);
         $this->attempts->resetIdentityFailures($identity);
     }
 

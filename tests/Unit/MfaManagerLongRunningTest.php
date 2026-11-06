@@ -27,6 +27,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use Tests\Fixtures\Codes\CodeMessages;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\RequestAttributePendingSessionResolver;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
@@ -106,11 +107,11 @@ final class MfaManagerLongRunningTest extends TestCase
 
         $sandbox->instance('request', $request);
 
-        self::assertSame([$factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $manager->factors()));
+        self::assertSame([$factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $manager->factors(Callers::current())));
 
         $this->makeCurrent($this->container());
 
-        self::assertSame([], $manager->factors());
+        self::assertSame([], $manager->factors(Callers::current()));
     }
 
     /**
@@ -218,7 +219,7 @@ final class MfaManagerLongRunningTest extends TestCase
 
         $manager->driver('totp');
         $manager->driver('email');
-        $manager->factors();
+        $manager->factors(Callers::current());
 
         self::assertSame([], $manager->getDrivers());
         self::assertSame($booted, $manager->getContainer());

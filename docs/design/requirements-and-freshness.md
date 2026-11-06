@@ -63,11 +63,11 @@ nothing is stored in their place.
   bound to the current sign-in, made under the identity's current verification generation and not after now. The
   default resolver reads the application's `first_factor` declaration and dates it at the Unix epoch, so it establishes
   the channel a further factor must be independent of but never meets a part with a maximum age on its own.
-- `Mfa::isFresh($operation, $requirement)` asks the bound gate with the strictest of this package's setting for the
-  operation and the requirement given as the caller's requirement, after answering `false` for a name that does not
-  match the pattern and refusing an unbounded one. A gate an adapter binds over an authentication layer's freshness
-  check therefore always receives this package's setting and must apply the stricter of it and its own; the default
-  gate sees the same setting twice, which changes nothing.
+- `Mfa::isFresh($caller, $operation, $requirement)` asks the bound gate, for the caller, with the strictest of this
+  package's setting for the operation and the requirement given as the caller's requirement, after answering `false` for
+  a name that does not match the pattern and refusing an unbounded one. A gate an adapter binds over an authentication
+  layer's freshness check therefore always receives this package's setting and must apply the stricter of it and its
+  own; the default gate sees the same setting twice, which changes nothing.
 - Refreshing never renews freshness: only a proof's `provedAt` counts. Regenerating or migrating the Laravel session
   keeps the records and their times, a first-factor reauthentication renews only what it provides on its own, and
   nothing but a successful proof records a proof.
@@ -87,7 +87,7 @@ nothing is stored in their place.
    in the pending session's `requires` when the answer is not empty.
 3. Where a tenant becomes active, the adapter names it through `ActiveTenantResolver`; the tenant's requirement is then
    part of what the session is held to, and of what a factor change evaluates it against again.
-4. Before a sensitive operation, the application asks `Mfa::isFresh('billing.change_plan')`; the gate reads the
+4. Before a sensitive operation, the application asks `Mfa::isFresh($caller, 'billing.change_plan')`; the gate reads the
    sign-in's proofs and the check judges them against the operation's requirement. The package's own changes to a
    person's factors ask the bound `FactorChangeGate` instead, whose default asks the freshness gate in the same way, so
    an adapter binding that seam to its layer's own factor-change gate replaces both judgements with one.
@@ -132,9 +132,8 @@ nothing is stored in their place.
   does not say leaves it `null`. `Verification\ProofAcceptance` evaluates the session's first factor with the new proof
   alone and sets `VerificationResult::$refreshesMultifactor` when that time is the proof's own, so a layer that records
   multifactor on each proof's row, timed by the proof, never lets a weaker proof refresh an older stronger one.
-- The default gate answers for the person the request serves and nobody else: a pending session, a guest, a machine and
-  an inactive identity are not fresh for any operation, and no helper's `isFresh()` or `freshUntil()` reads the guard's
-  user in their place.
+- The default gate answers for the caller it is handed and nobody else: a pending session, nobody, a machine and an
+  inactive identity are not fresh for any operation, and no gate reads the guard's user in their place.
 - The `mfa` middleware judges this requirement, with any level or operation its route asks (see
   [Route Gate](route-gate.md)).
 

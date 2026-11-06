@@ -21,7 +21,7 @@ use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
+use SineMacula\Laravel\Mfa\Support\IdentityType;
 use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\FactorHoldingRecord;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -151,7 +151,7 @@ final class ForgetIdentityTest extends TestCase
 
         foreach ([$forgotten, $kept] as $identity) {
             (new RemappedOwnerFactor)->forceFill([
-                'owner_type' => CurrentIdentity::typeOf($identity),
+                'owner_type' => IdentityType::of($identity),
                 'owner_id'   => ProofOwner::of($identity)->key,
                 'type'       => 'totp',
             ])->save();
@@ -270,7 +270,7 @@ final class ForgetIdentityTest extends TestCase
         /** @var int|string $key */
         $key = $identity->getAuthIdentifier();
 
-        return ['authenticatable_type' => CurrentIdentity::typeOf($identity), 'authenticatable_id' => (string) $key];
+        return ['authenticatable_type' => IdentityType::of($identity), 'authenticatable_id' => (string) $key];
     }
 
     /**

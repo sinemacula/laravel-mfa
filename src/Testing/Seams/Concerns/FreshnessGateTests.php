@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Testing\Seams\FreshnessGateContract;
 
@@ -31,7 +32,7 @@ trait FreshnessGateTests
      */
     public function testFreshnessGateNeverFindsANameThatIsNoOperationFresh(): void
     {
-        FreshnessGateContract::assertANameThatIsNoOperationIsNeverFresh($this->freshnessGate());
+        FreshnessGateContract::assertANameThatIsNoOperationIsNeverFresh($this->freshnessGate(), $this->freshnessCaller());
     }
 
     /**
@@ -41,7 +42,7 @@ trait FreshnessGateTests
      */
     public function testFreshnessGateNeverFindsAnOperationWithNoRequirementFresh(): void
     {
-        FreshnessGateContract::assertAnOperationWithNoRequirementIsNeverFresh($this->freshnessGate());
+        FreshnessGateContract::assertAnOperationWithNoRequirementIsNeverFresh($this->freshnessGate(), $this->freshnessCaller());
     }
 
     /**
@@ -51,7 +52,7 @@ trait FreshnessGateTests
      */
     public function testFreshnessGateRefusesAnUnboundedRequirement(): void
     {
-        FreshnessGateContract::assertAnUnboundedRequirementIsRefused($this->freshnessGate());
+        FreshnessGateContract::assertAnUnboundedRequirementIsRefused($this->freshnessGate(), $this->freshnessCaller());
     }
 
     /**
@@ -61,7 +62,7 @@ trait FreshnessGateTests
      */
     public function testFreshnessGateGivesAnOperationThatIsNotFreshNoDeadline(): void
     {
-        FreshnessGateContract::assertAnOperationThatIsNotFreshHasNoDeadline($this->freshnessGate());
+        FreshnessGateContract::assertAnOperationThatIsNotFreshHasNoDeadline($this->freshnessGate(), $this->freshnessCaller());
     }
 
     /**
@@ -71,7 +72,7 @@ trait FreshnessGateTests
      */
     public function testFreshnessGateGivesAFreshOperationADeadlineAhead(): void
     {
-        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh($this->freshGate(), $this->freshOperation());
+        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh($this->freshGate(), $this->freshnessCaller(), $this->freshOperation());
     }
 
     /**
@@ -82,8 +83,16 @@ trait FreshnessGateTests
      */
     public function testFreshnessGateHoldsASessionToWhatTheCallerAsks(): void
     {
-        FreshnessGateContract::assertTheRequirementAsksWhatTheCallerAsks($this->freshnessGate());
+        FreshnessGateContract::assertTheRequirementAsksWhatTheCallerAsks($this->freshnessGate(), $this->freshnessCaller());
     }
+
+    /**
+     * The caller whose freshness the gates judge: the fresh gate must find it
+     * fresh for the fresh operation.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\CallerContext
+     */
+    abstract protected function freshnessCaller(): CallerContext;
 
     /**
      * The gate under test, asked on behalf of a signed-in identity.

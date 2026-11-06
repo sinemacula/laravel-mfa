@@ -27,6 +27,7 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Secrets\SecretBindings;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Secrets\AddsCodeToExtra;
 use Tests\Fixtures\Secrets\CodeForwardingDriver;
@@ -333,7 +334,7 @@ final class LogRedactionTest extends TestCase
             'status'               => 'confirmed',
         ]);
 
-        return RecordedTrace::thrownBy(static fn (): VerificationResult => Mfa::verify(Submission::factor($factor->getKey(), self::CODE)));
+        return RecordedTrace::thrownBy(static fn (): VerificationResult => Mfa::verify(Callers::current(), Submission::factor($factor->getKey(), self::CODE)));
     }
 
     /**

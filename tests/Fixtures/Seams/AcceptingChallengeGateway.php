@@ -7,6 +7,7 @@ namespace Tests\Fixtures\Seams;
 use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -24,12 +25,13 @@ final readonly class AcceptingChallengeGateway implements ChallengeGateway
     /**
      * A challenge id, with nothing sent.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return \SineMacula\Laravel\Mfa\Codes\SendResult
      */
     #[\Override]
-    public function send(Factor $factor, ProofBinding $binding): SendResult
+    public function send(CallerContext $caller, Factor $factor, ProofBinding $binding): SendResult
     {
         return SendResult::sent('accepting-challenge', CarbonImmutable::now()->addMinutes(5));
     }
@@ -37,6 +39,7 @@ final readonly class AcceptingChallengeGateway implements ChallengeGateway
     /**
      * Accept the code, whatever it is.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $challengeId
@@ -44,7 +47,7 @@ final readonly class AcceptingChallengeGateway implements ChallengeGateway
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome
      */
     #[\Override]
-    public function verify(Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): ChallengeOutcome
+    public function verify(CallerContext $caller, Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): ChallengeOutcome
     {
         return ChallengeOutcome::passed();
     }

@@ -7,34 +7,38 @@ name below is relative to `SineMacula\Laravel\Mfa`.
 ## The flow
 
 ```php
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 
-$offered = Mfa::offeredFactors();                  // list<FactorSummary>, the preferred first
+$caller  = CallerContext::fromRequest($request);
+$offered = Mfa::offeredFactors($caller); // list<FactorSummary>, the preferred first
 
-$sent   = Mfa::sendCode($factorId);                // a SendResult, for an email or SMS factor
-$result = Mfa::verify(Submission::challenge($factorId, $sent->challengeId, $code));
+$sent   = Mfa::sendCode($caller, $factorId); // a SendResult, for an email or SMS factor
+$result = Mfa::verify($caller, Submission::challenge($factorId, $sent->challengeId, $code));
 
-$result = Mfa::verify(Submission::factor($factorId, $code));        // TOTP, or a driver of your own
-$result = Mfa::verify(Submission::recoveryCode($code));             // a recovery code
-$request = Mfa::requestAssertion($factorId);       // an AssertionRequest: the options, or the reason
-$result  = Mfa::verify(Submission::assertion($factorId, $response)); // a passkey's response to those options
+$result    = Mfa::verify($caller, Submission::factor($factorId, $code));        // TOTP, or a driver of your own
+$result    = Mfa::verify($caller, Submission::recoveryCode($code));             // a recovery code
+$assertion = Mfa::requestAssertion($caller, $factorId);                         // the options, or the reason
+$result    = Mfa::verify($caller, Submission::assertion($factorId, $response)); // a passkey's response to them
 
 if ($result->isFailed()) {
     return response()->json(['reason' => $result->reason->value], 422);
 }
 ```
 
-Only stored factors verify, named by their id, looked up within the identity the request serves: a factor that does not
+Only stored factors verify, named by their id, looked up within the caller's identity: a factor that does not
 exist and one that belongs to someone else get the same answer and the same report. The driver is the one registered for
 the factor's type.
 
 ## Who is served
 
-A request is served as its pending session's identity when the bound `Contracts\PendingSessionResolver` finds one and
-its credential allows the action (`mfa.list_factors`, `mfa.send_code`, `mfa.verify`); otherwise as the identity the
-guard signed in, when it is a person. A pending session that does not allow the action is served nothing, and the
-guard's user is never served in its place. A pending session's first factor must be of the identity's current
+Every call takes the caller first, a `Context\CallerContext` read from the request with `CallerContext::fromRequest()`
+or built from plain values (see [The caller](helpers.md#the-caller)). A caller holding a pending session, which
+`fromRequest()` takes from the bound `Contracts\PendingSessionResolver`, is served as that session's identity when its
+credential allows the action (`mfa.list_factors`, `mfa.send_code`, `mfa.verify`); any other caller as its identity, when
+it is a person. A pending session that does not allow the action is served nothing, and the guard's user is never
+served in its place. A pending session's first factor must be of the identity's current
 verification generation and not dated in the future: one that is not is refused as `not_accepted` before anything is
 checked or spent.
 
@@ -48,7 +52,8 @@ it.
 
 With no sign-in there is nothing to bind to, so nothing is sent and nothing is verified. Under the identity's lock the
 caller and the binding are resolved again and compared; a difference is refused as `not_found`, counting and reporting
-nothing. A bound `PendingSessionResolver` revalidates its credential there, and one that does not validate throws.
+nothing. A pending session is read again there through the bound `PendingSessionResolver`'s `revalidate()`, and one
+that no longer stands is refused as `not_found` too.
 
 ### Before the sign-in exists
 
@@ -82,8 +87,8 @@ completes with no authentication layer. `enrollment` and `reauthenticate` are re
 anything is checked or spent. Codes are bound to their purpose, so `sendCode()` and `verify()` must name the same one.
 
 ```php
-Mfa::sendCode($factorId, Purpose::SIGN_IN);
-Mfa::verify(Submission::challenge($factorId, $challengeId, $code), Purpose::SIGN_IN);
+Mfa::sendCode($caller, $factorId, Purpose::SIGN_IN);
+Mfa::verify($caller, Submission::challenge($factorId, $challengeId, $code), Purpose::SIGN_IN);
 ```
 
 ## Offered factors
@@ -99,9 +104,9 @@ Recovery codes are not offered. Offers are advisory: sending and verifying repea
 
 ## Sending a code
 
-`Mfa::sendCode($factorId, $purpose)` asks the bound `Contracts\ChallengeGateway` to send a code for a delivered factor,
-and answers with a `Codes\SendResult`: the challenge's id and when the code stops working, or the reason nothing was
-sent, such as `sending_capped`, and, when waiting will help, `retryAfter` in seconds. A send is not an attempt: it
+`Mfa::sendCode($caller, $factorId, $purpose)` asks the bound `Contracts\ChallengeGateway` to send a code for a delivered
+factor, and answers with a `Codes\SendResult`: the challenge's id and when the code stops working, or the reason nothing
+was sent, such as `sending_capped`, and, when waiting will help, `retryAfter` in seconds. A send is not an attempt: it
 resets no count, lifts no lockout and reports only `CodeSent`. A failing delivery throws
 `Exceptions\CodeDeliveryFailedException`.
 
@@ -129,7 +134,7 @@ A factor that delivers no codes answers `not_found`. A delivered factor must nam
 
 A successful verification whose `evaluation` does not yet meet the requirement is still a success: the proof is kept,
 and the caller asks for the next factor. A requirement of an operation is not part of `verify()`: ask
-`Mfa::isFresh($operation)` afterwards (see [Requirements and step-up](requirements.md)).
+`Mfa::isFresh($caller, $operation)` afterwards (see [Requirements and step-up](requirements.md)).
 
 `refreshesMultifactor` is for a layer that keeps an evaluation on each proof and times multifactor freshness by it. It
 judges the session's first factor with this proof alone, so another proof the session holds cannot make it true. It is

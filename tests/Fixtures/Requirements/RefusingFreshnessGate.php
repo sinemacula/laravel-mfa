@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Requirements;
 
 use Carbon\CarbonImmutable;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
@@ -40,6 +41,7 @@ final class RefusingFreshnessGate implements FreshnessGate
     /**
      * Fresh, unless this read is refused.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return bool
@@ -47,7 +49,7 @@ final class RefusingFreshnessGate implements FreshnessGate
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
     #[\Override]
-    public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool
+    public function isFresh(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): bool
     {
         if (++$this->reads === $this->refuseOnRead) {
             throw new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'The freshness gate refused.');
@@ -59,12 +61,13 @@ final class RefusingFreshnessGate implements FreshnessGate
     /**
      * An hour on.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return \Carbon\CarbonImmutable
      */
     #[\Override]
-    public function freshUntil(string $operation, ?Requirement $callerRequirement = null): CarbonImmutable
+    public function freshUntil(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): CarbonImmutable
     {
         return CarbonImmutable::now()->addHour();
     }
@@ -72,12 +75,13 @@ final class RefusingFreshnessGate implements FreshnessGate
     /**
      * The caller's requirement, unchanged.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      */
     #[\Override]
-    public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement
+    public function requirement(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?Requirement
     {
         return $callerRequirement;
     }

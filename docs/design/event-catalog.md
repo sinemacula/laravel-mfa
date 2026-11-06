@@ -33,9 +33,10 @@ event carries is built, and why every event is dispatched only after the change 
   `Contracts\EventContextResolver` and cut down to those keys and to integers and strings by
   `Events\EventDispatcher::context()`, so a resolver cannot put a model in a payload; the application an operation ran
   through names the application.
-- The default resolver, `Context\DefaultEventContextResolver`, gives the identity, the application a bound
-  `ApplicationResolver` names for the request, and the request's IP address and user agent. It never gives the Laravel
-  session's id, a bearer secret.
+- The default resolver, `Context\DefaultEventContextResolver`, gives the identity and the IP address and user agent of
+  the caller's `Context\ClientContext`, which `CallerContext::fromRequest()` read from the request; it reads no request
+  itself. The application is always the one the operation ran through. It never gives the Laravel session's id, a
+  bearer secret. An operator's action (a reset or an unlock) carries the client it is given, or none.
 - `Events\EventDispatcher::dispatch()` is the one way the package dispatches an event: at once when the storage
   connection has no open transaction, when that transaction commits otherwise, and never when it rolls back. A
   transaction on another connection neither delays nor drops it. The transactions manager is read when the event is

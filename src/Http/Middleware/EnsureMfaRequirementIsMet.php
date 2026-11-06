@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -105,14 +106,15 @@ final readonly class EnsureMfaRequirementIsMet
             return $next($request);
         }
 
+        $context = CallerContext::fromRequest($request, null, $this->container);
         $callers = $this->container->make(CallerContextResolver::class);
-        $pending = $callers->pending();
+        $pending = $context->pending;
 
         if ($pending !== null) {
-            throw $this->refusal(Requirement::strictest($pending->requirement, $level), $operation, $this->hasConfirmedFactor($pending->identity));
+            throw $this->refusal($context, Requirement::strictest($pending->requirement, $level), $operation, $this->hasConfirmedFactor($pending->identity));
         }
 
-        $caller = $callers->resolve(null) ?? throw $this->refusal($level, $operation, false);
+        $caller = $callers->resolve($context, null) ?? throw $this->refusal($context, $level, $operation, false);
 
         return $this->gate($request, $next, $caller, $callers->application($caller), $level, $operation);
     }
@@ -142,9 +144,9 @@ final readonly class EnsureMfaRequirementIsMet
             return $next($request);
         }
 
-        $freshness = $operation === null ? null : $requirements->freshnessRequirement($operation);
+        $freshness = $operation === null ? null : $requirements->freshnessRequirement($caller->context(), $operation);
 
-        throw $this->refusal(Requirement::strictest($requirement, $freshness ?? Requirement::none()), $operation, $this->hasConfirmedFactor($caller->identity));
+        throw $this->refusal($caller->context(), Requirement::strictest($requirement, $freshness ?? Requirement::none()), $operation, $this->hasConfirmedFactor($caller->identity));
     }
 
     /**
@@ -171,7 +173,7 @@ final readonly class EnsureMfaRequirementIsMet
         $proofs = $this->container->make(SessionFirstFactor::class)->proofs($caller->identity, $application);
 
         return $this->container->make(RequirementCheck::class)->check($requirement, ...$proofs)->meetsRequirement()
-            && ($operation === null || $requirements->isFresh($operation));
+            && ($operation === null || $requirements->isFresh($caller->context(), $operation));
     }
 
     /**
@@ -196,6 +198,7 @@ final readonly class EnsureMfaRequirementIsMet
     /**
      * The refusal of the request.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  ?string  $operation
      * @param  bool  $hasConfirmedFactor
@@ -204,9 +207,9 @@ final readonly class EnsureMfaRequirementIsMet
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    private function refusal(Requirement $requirement, ?string $operation, bool $hasConfirmedFactor): InsufficientAuthenticationException
+    private function refusal(CallerContext $context, Requirement $requirement, ?string $operation, bool $hasConfirmedFactor): InsufficientAuthenticationException
     {
-        return new InsufficientAuthenticationException($requirement, $this->container->make(FactorOffers::class)->offered(), $operation, $hasConfirmedFactor);
+        return new InsufficientAuthenticationException($requirement, $this->container->make(FactorOffers::class)->offered($context), $operation, $hasConfirmedFactor);
     }
 
     /**

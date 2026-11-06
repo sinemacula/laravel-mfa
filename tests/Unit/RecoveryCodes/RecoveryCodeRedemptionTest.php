@@ -35,6 +35,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\Redemption;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\RecoveryCodes\CountingHasher;
@@ -71,7 +72,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testACodeRedeemsOnce(): void
     {
         $holder = $this->signInHolder();
-        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
 
         $first = $this->recoveryCodes()->redeem($holder, $codes[4], self::bound($holder, Purpose::STEP_UP));
 
@@ -80,7 +81,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
         self::assertSame(9, $first->remaining);
         self::assertNull($first->reason);
         self::assertCount(1, $this->storedCodes($holder)->filter(static fn (RecoveryCode $row): bool => $row->getUsedAt() !== null));
-        self::assertSame([], $this->container()->make(ProofService::class)->proofs());
+        self::assertSame([], $this->container()->make(ProofService::class)->proofs(Callers::current()));
 
         $second = $this->recoveryCodes()->redeem($holder, $codes[4], self::bound($holder, Purpose::STEP_UP));
 
@@ -116,7 +117,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testNormalizesCaseSpacesAndHyphens(\Closure $typed): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
 
         self::assertTrue($this->recoveryCodes()->redeem($holder, $typed($code), self::bound($holder, Purpose::SIGN_IN))->passed);
     }
@@ -133,7 +134,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testTheWorkIsTheSameWhicheverCodeMatches(): void
     {
         $holder = $this->signInHolder();
-        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
         $hasher = $this->countChecks();
 
         foreach ($codes as $index => $code) {
@@ -171,7 +172,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     {
         $holder = $this->signInHolder();
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         $hasher     = $this->countChecks();
         $redemption = $this->recoveryCodes()->redeem($holder, str_repeat('ABCD-', 60), self::bound($holder, Purpose::SIGN_IN));
@@ -218,8 +219,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     {
         $holder = $this->signInHolder();
 
-        $this->recoveryCodes()->generate($holder);
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
+        $this->recoveryCodes()->generate($holder, 'web');
 
         RecoveryCode::query()->create([
             'authenticatable_type' => $holder->getMorphClass(),
@@ -245,7 +246,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testAFailureCountsAndASuccessResetsTheRun(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
 
         $this->recoveryCodes()->redeem($holder, 'WRONGWRONG22', self::bound($holder, Purpose::SIGN_IN));
         $this->recoveryCodes()->redeem($holder, 'WRONGWRONG23', self::bound($holder, Purpose::SIGN_IN));
@@ -272,7 +273,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
         $this->container()->instance('request', Request::create('/mfa/recover', 'POST', server: ['REMOTE_ADDR' => '192.0.2.7']));
 
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
 
         self::assertSame(FailureReason::INVALID_CODE, $this->verify('WRONGWRONG22')->reason);
 
@@ -295,7 +296,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00:00'));
 
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
         $until  = CarbonImmutable::parse('2026-11-01 12:15:00');
 
         IdentityState::query()->where('authenticatable_id', (string) $holder->id)->update(['locked_until' => $until]);
@@ -327,7 +328,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
         config()->set('mfa.attempts.failure_ceiling', 1);
 
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
 
         $this->recoveryCodes()->redeem($holder, 'WRONGWRONG22', self::bound($holder, Purpose::SIGN_IN));
 
@@ -349,7 +350,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testAnEnrollmentIsRefused(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
         $hasher = $this->countChecks();
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $this->verify($code, Purpose::ENROLLMENT)->reason);
@@ -368,7 +369,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testAnApplicationThatDoesNotAcceptRecoveryCodesRefusesThem(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
 
         config()->set('mfa.applications.web.recovery_codes.enabled', false);
 
@@ -385,7 +386,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testAnIdentityWithoutAConfirmedFactorIsRefused(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
 
         Factor::query()->update(['status' => 'pending']);
 
@@ -424,7 +425,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testAStatusThatIsNotExactlyConfirmedIsNoConfirmedFactor(string $status, string $collation): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
 
         $sqlite = DB::connection()->getDriverName() === 'sqlite';
 
@@ -454,7 +455,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testAnIdentityWithoutASignInIsRefused(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
 
         $this->container()->make(ProofStore::class)->forget($holder, 'web');
 
@@ -474,8 +475,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
         $machine  = new NonEloquentIdentity('machine', mfaEnabled: true, person: false);
         $inactive = new NonEloquentIdentity('inactive', mfaEnabled: true, active: false);
 
-        self::assertSame(FailureReason::MACHINE_IDENTITY, $this->recoveryCodes()->admission($machine, self::bound($machine, Purpose::SIGN_IN))->reason);
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->recoveryCodes()->admission($inactive, self::bound($inactive, Purpose::SIGN_IN))->reason);
+        self::assertSame(FailureReason::MACHINE_IDENTITY, $this->recoveryCodes()->admission($machine, self::bound($machine, Purpose::SIGN_IN), null)->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->recoveryCodes()->admission($inactive, self::bound($inactive, Purpose::SIGN_IN), null)->reason);
     }
 
     /**
@@ -494,7 +495,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
         config()->set('mfa.recovery_codes.low_count', 3);
 
         $holder = $this->signInHolder();
-        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
         $seen   = $this->recordRedemptionEvents();
 
         foreach ($codes as $code) {
@@ -523,7 +524,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
         config()->set('mfa.recovery_codes.low_count', 0);
 
         $holder = $this->signInHolder();
-        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
         $seen   = $this->recordRedemptionEvents();
 
         foreach ($codes as $code) {
@@ -544,7 +545,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testTheEventsCarryNoCode(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
 
         Event::fake([VerificationPassed::class, VerificationFailed::class, RecoveryCodeUsed::class, RecoveryCodesLow::class]);
 
@@ -579,7 +580,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testNothingIsReportedWhenTheSurroundingTransactionRollsBack(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
         $seen   = $this->recordRedemptionEvents();
 
         try {
@@ -594,7 +595,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
         }
 
         self::assertSame([], $seen->getArrayCopy());
-        self::assertSame([], $this->container()->make(ProofService::class)->proofs());
+        self::assertSame([], $this->container()->make(ProofService::class)->proofs(Callers::current()));
         self::assertTrue($this->storedCodes($holder)->every(static fn (RecoveryCode $row): bool => $row->isUsable()));
     }
 
@@ -610,7 +611,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testOfTwoRedemptionsOfOneCodeOnlyOnePasses(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
         $hasher = $this->countChecks();
         $winner = null;
 
@@ -638,12 +639,12 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testARedemptionRacingAReplacementFindsTheOldSetReplaced(): void
     {
         $holder  = $this->signInHolder();
-        $old     = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $old     = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
         $hasher  = $this->countChecks();
         $current = null;
 
         $hasher->before(function () use ($holder, &$current): void {
-            $current = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+            $current = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
         });
 
         self::assertFalse($this->recoveryCodes()->redeem($holder, $old, self::bound($holder, Purpose::SIGN_IN))->passed);
@@ -663,7 +664,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testARedemptionRacingTheLastFactorsRemovalFails(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
         $hasher = $this->countChecks();
 
         $this->onceTheLockIsTaken(static function (): void {
@@ -688,7 +689,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testARedemptionRacingTheEndOfTheSignInFails(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
         $hasher = $this->countChecks();
         $seen   = $this->recordRedemptionEvents();
 
@@ -716,7 +717,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     public function testARedemptionWhoseSignInEndsDuringTheCheckRecordsNothing(): void
     {
         $holder = $this->signInHolder();
-        $code   = self::plaintexts($this->recoveryCodes()->generate($holder))[0];
+        $code   = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'))[0];
         $hasher = $this->countChecks();
         $seen   = $this->recordRedemptionEvents();
 
@@ -776,7 +777,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
      */
     private function verify(#[\SensitiveParameter] string $code, ?Purpose $purpose = null): VerificationResult
     {
-        return $this->container()->make(VerificationService::class)->verify(Submission::recoveryCode($code), $purpose);
+        return $this->container()->make(VerificationService::class)->verify(Callers::current(), Submission::recoveryCode($code), $purpose);
     }
 
     /**

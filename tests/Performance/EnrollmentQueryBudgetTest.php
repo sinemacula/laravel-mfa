@@ -22,6 +22,7 @@ use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 
 /**
@@ -79,7 +80,7 @@ final class EnrollmentQueryBudgetTest extends PerformanceContractTestCase
         //
         // Writes (6): the address's slot (2) and the slot given back (1); the
         // lock (1); the pending factor and the enrolment (2).
-        $start = $this->assertQueryBudget(8, 6, fn (): EnrollmentStart => $this->mfa()->startEnrollment(EnrollmentRequest::totp(self::ACCOUNT)));
+        $start = $this->assertQueryBudget(8, 6, fn (): EnrollmentStart => $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT)));
 
         self::assertTrue($start->hasStarted());
     }
@@ -101,7 +102,8 @@ final class EnrollmentQueryBudgetTest extends PerformanceContractTestCase
         //
         // Writes (10): those of a TOTP start (6); the locks of the admission
         // and the send (2); the code, and the challenge on the enrolment (2).
-        $start = $this->assertQueryBudget(17, 10, fn (): EnrollmentStart => $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS)));
+        $caller = Callers::current();
+        $start  = $this->assertQueryBudget(17, 10, fn (): EnrollmentStart => $this->mfa()->startEnrollment($caller, EnrollmentRequest::delivered('email', self::ADDRESS)));
 
         self::assertTrue($start->hasStarted());
     }
@@ -152,7 +154,7 @@ final class EnrollmentQueryBudgetTest extends PerformanceContractTestCase
         // confirmed and the enrolment deleted (3); the obligation ended (1);
         // the set's lock, the old set replaced and the new one's generation
         // (3); and the slot given back (1).
-        $confirmation = $this->assertQueryBudget(12, $writes, fn (): EnrollmentConfirmation => $this->mfa()->confirmEnrollment($grant, $code));
+        $confirmation = $this->assertQueryBudget(12, $writes, fn (): EnrollmentConfirmation => $this->mfa()->confirmEnrollment(Callers::current(), $grant, $code));
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertCount($count, $confirmation->recoveryCodes);
@@ -179,7 +181,7 @@ final class EnrollmentQueryBudgetTest extends PerformanceContractTestCase
         // (1); the step's compare-and-set, the factor confirmed and the
         // enrolment deleted (3); the obligation ended (1); and the slot given
         // back (1).
-        $confirmation = $this->assertQueryBudget(7, 7, fn (): EnrollmentConfirmation => $this->mfa()->confirmEnrollment($grant, $code));
+        $confirmation = $this->assertQueryBudget(7, 7, fn (): EnrollmentConfirmation => $this->mfa()->confirmEnrollment(Callers::current(), $grant, $code));
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertSame([], $confirmation->recoveryCodes);
@@ -203,7 +205,7 @@ final class EnrollmentQueryBudgetTest extends PerformanceContractTestCase
         //
         // Writes (3): the address's slot, by the update alone (1); the lock
         // (1); the attempt counted on the enrolment (1).
-        $confirmation = $this->assertQueryBudget(4, 3, fn (): EnrollmentConfirmation => $this->mfa()->confirmEnrollment($grant, $code));
+        $confirmation = $this->assertQueryBudget(4, 3, fn (): EnrollmentConfirmation => $this->mfa()->confirmEnrollment(Callers::current(), $grant, $code));
 
         self::assertSame(FailureReason::INVALID_CODE, $confirmation->reason);
     }

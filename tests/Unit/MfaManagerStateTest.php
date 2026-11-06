@@ -4,12 +4,12 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
-use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
 use Tests\Fixtures\Identities\PlainUser;
 use Tests\Fixtures\Identities\TestUser;
@@ -57,7 +57,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      */
     public function testRequirementIsEmptyWhenNoIdentityResolved(): void
     {
-        self::assertTrue($this->manager()->requirement()->isEmpty());
+        self::assertTrue($this->manager()->requirement(Callers::current())->isEmpty());
     }
 
     /**
@@ -74,7 +74,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->actingAs($plain);
 
-        self::assertTrue($this->manager()->requirement()->isEmpty());
+        self::assertTrue($this->manager()->requirement(Callers::current())->isEmpty());
     }
 
     /**
@@ -94,7 +94,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        self::assertSame([RequirementPart::ADDITIONAL_VERIFICATION], $this->manager()->requirement()->parts());
+        self::assertSame([RequirementPart::ADDITIONAL_VERIFICATION], $this->manager()->requirement(Callers::current())->parts());
     }
 
     /**
@@ -119,7 +119,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        self::assertSame([RequirementPart::ADDITIONAL_VERIFICATION], $this->manager()->requirement()->parts());
+        self::assertSame([RequirementPart::ADDITIONAL_VERIFICATION], $this->manager()->requirement(Callers::current())->parts());
     }
 
     /**
@@ -139,7 +139,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        self::assertTrue($this->manager()->requirement()->isEmpty());
+        self::assertTrue($this->manager()->requirement(Callers::current())->isEmpty());
     }
 
     /**
@@ -162,7 +162,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->expectException(UnsupportedIdentifierException::class);
 
-        $this->manager()->requirement();
+        $this->manager()->requirement(Callers::current());
     }
 
     /**
@@ -175,8 +175,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
      */
     public function testListsNothingWhenNoIdentity(): void
     {
-        self::assertSame([], $this->manager()->factors());
-        self::assertNull($this->manager()->factor('anything'));
+        self::assertSame([], $this->manager()->factors(Callers::current()));
+        self::assertNull($this->manager()->factor(Callers::current(), 'anything'));
     }
 
     /**
@@ -195,7 +195,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
 
         $this->actingAs($user);
 
-        self::assertSame([], $this->manager()->factors());
+        self::assertSame([], $this->manager()->factors(Callers::current()));
     }
 
     /**
@@ -213,15 +213,15 @@ final class MfaManagerStateTest extends MfaManagerTestCase
         $this->actingAs($user);
 
         $manager = $this->manager();
-        $factors = $manager->factors();
+        $factors = $manager->factors(Callers::current());
 
         self::assertCount(1, $factors);
-        self::assertSame($factors[0]->id, $manager->factor($factors[0]->id)?->id);
+        self::assertSame($factors[0]->id, $manager->factor(Callers::current(), $factors[0]->id)?->id);
 
         Factor::query()->where('authenticatable_id', $user->getKey())->delete();
 
-        self::assertSame([], $manager->factors());
-        self::assertNull($manager->factor($factors[0]->id));
+        self::assertSame([], $manager->factors(Callers::current()));
+        self::assertNull($manager->factor(Callers::current(), $factors[0]->id));
     }
 
     /**
@@ -236,8 +236,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     {
         $identity = new NonScalarIdentifierUser;
 
-        Auth::shouldReceive('user')->andReturn($identity);
+        $this->actingAs($identity);
 
-        self::assertSame([], $this->manager()->factors());
+        self::assertSame([], $this->manager()->factors(Callers::current()));
     }
 }

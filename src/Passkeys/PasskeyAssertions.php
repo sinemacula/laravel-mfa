@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
@@ -75,14 +76,15 @@ final readonly class PasskeyAssertions
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return array<string, mixed>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    public function options(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): array
+    public function options(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding, ?PendingContext $pending): array
     {
-        return $this->gateway()->requestAssertion($identity, $binding, [$this->credential($identity, $factor, $binding)]);
+        return $this->gateway()->requestAssertion($identity, $binding, [$this->credential($identity, $factor, $binding, $pending)]);
     }
 
     /**
@@ -94,6 +96,7 @@ final readonly class PasskeyAssertions
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  array<string, mixed>  $response
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -104,8 +107,9 @@ final readonly class PasskeyAssertions
         EloquentFactor&Model $factor,
         ProofBinding $binding,
         #[\SensitiveParameter] array $response,
+        ?PendingContext $pending,
     ): FailureReason|PasskeyAssertion {
-        $credential = $this->credential($identity, $factor, $binding);
+        $credential = $this->credential($identity, $factor, $binding, $pending);
         $assertion  = $this->gateway()->verifyAssertion($identity, $binding, [$credential], $response);
 
         if ($assertion instanceof FailureReason) {
@@ -143,12 +147,13 @@ final readonly class PasskeyAssertions
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return string
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    private function credential(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): string
+    private function credential(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding, ?PendingContext $pending): string
     {
         $credential = $factor->getCredentialReference();
 
@@ -166,7 +171,7 @@ final readonly class PasskeyAssertions
             'The passkey gateway no longer lists the factor\'s credential.',
         );
 
-        $firstFactor = $this->firstFactors->forBinding($identity, $binding);
+        $firstFactor = $this->firstFactors->forBinding($identity, $binding, $pending);
         $accepted    = $firstFactor !== null && $this->container->make(CombinationPolicy::class)->accepts($firstFactor, new Channel(ChannelKind::PASSKEY, $credential));
 
         OperationRefusedException::byPackageUnless($accepted, FailureReason::NOT_ACCEPTED, 'The combination policy does not accept the passkey after the session\'s first factor.');

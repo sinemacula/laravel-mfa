@@ -10,6 +10,7 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociationResult;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration;
+use Tests\Fixtures\Context\Callers;
 
 /**
  * Stands in for an authentication layer's passkey registration and removal: it
@@ -61,7 +62,7 @@ final readonly class StandInRegistrar
                 'credential_id' => $registration->credentialId,
             ]);
 
-            $result = $this->gate->registering($identity, $application, $registration);
+            $result = $this->gate->registering(Callers::of($identity, $application), $registration);
 
             if ($after !== null) {
                 $after();
@@ -89,7 +90,7 @@ final readonly class StandInRegistrar
 
             DB::connection(StorageConnection::name())->table(self::TABLE)->where('credential_id', $credentialId)->delete();
 
-            $this->gate->removing($identity, $application, $credentialId);
+            $this->gate->removing(Callers::of($identity, $application), $credentialId);
 
             if ($after === null) {
                 return;

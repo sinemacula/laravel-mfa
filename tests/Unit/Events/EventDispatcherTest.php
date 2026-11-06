@@ -8,10 +8,10 @@ use Illuminate\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -145,8 +145,8 @@ final class EventDispatcherTest extends TestCase
 
     /**
      * The context is the resolver's, cut down to the allowlist: a model or an
-     * array it returns by mistake is dropped, and a key it does not know is
-     * `null`.
+     * array it returns by mistake is dropped, a key it does not know is `null`,
+     * and the application is the operation's, never the resolver's.
      *
      * @return void
      */
@@ -167,16 +167,16 @@ final class EventDispatcherTest extends TestCase
             'principal_type' => null,
             'principal_id'   => null,
             'tenant_id'      => null,
-            'application'    => 'web',
+            'application'    => 'admin',
             'session_id'     => null,
             'ip'             => null,
             'user_agent'     => null,
-        ], $this->dispatcher()->context(new NonEloquentIdentity));
+        ], $this->dispatcher()->context(new NonEloquentIdentity, 'admin'));
     }
 
     /**
      * The application an operation ran through names the application, over the
-     * resolver's.
+     * resolver's, and none named is none.
      *
      * @return void
      */
@@ -185,17 +185,19 @@ final class EventDispatcherTest extends TestCase
         $this->bindResolver(['application' => 'web']);
 
         self::assertSame('admin', $this->dispatcher()->context(null, 'admin')['application']);
-        self::assertSame('web', $this->dispatcher()->context(null)['application']);
+        self::assertNull($this->dispatcher()->context(null)['application']);
     }
 
     /**
-     * The resolver is handed the identity and the request being served.
+     * The resolver is handed the identity and the client the action was served
+     * to.
      *
      * @return void
      */
-    public function testTheResolverIsHandedTheIdentityAndTheRequest(): void
+    public function testTheResolverIsHandedTheIdentityAndTheClient(): void
     {
         $identity = new NonEloquentIdentity;
+        $client   = new ClientContext('192.0.2.1', 'agent');
         /** @var \ArrayObject<int, mixed> $seen */
         $seen = new \ArrayObject;
 
@@ -215,35 +217,34 @@ final class EventDispatcherTest extends TestCase
              * Record what the resolver was handed.
              *
              * @param  ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-             * @param  ?\Illuminate\Http\Request  $request
+             * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
              * @return array<string, int|string|null>
              */
             #[\Override]
-            public function resolve(?MultiFactorAuthenticatable $identity, ?Request $request): array
+            public function resolve(?MultiFactorAuthenticatable $identity, ?ClientContext $client): array
             {
                 $this->seen->append($identity);
-                $this->seen->append($request);
+                $this->seen->append($client);
 
                 return [];
             }
         });
 
-        $this->dispatcher()->context($identity);
+        $this->dispatcher()->context($identity, 'web', $client);
 
         self::assertSame($identity, $seen[0]);
-        self::assertSame($this->container()->make('request'), $seen[1]);
+        self::assertSame($client, $seen[1]);
     }
 
     /**
-     * Without a request bound, the resolver is handed none.
+     * Without a client, the context knows no address.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testWithoutARequestTheResolverIsHandedNone(): void
+    public function testWithoutAClientNoAddressIsKnown(): void
     {
-        $this->container()->forgetInstance('request');
-        $this->container()->offsetUnset('request');
-
         $context = $this->dispatcher()->context(new NonEloquentIdentity);
 
         self::assertSame('plain-1', $context['identity_id']);
@@ -274,11 +275,11 @@ final class EventDispatcherTest extends TestCase
              * Answer the values, whatever they are.
              *
              * @param  ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-             * @param  ?\Illuminate\Http\Request  $request
+             * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
              * @return array<string, int|string|null>
              */
             #[\Override]
-            public function resolve(?MultiFactorAuthenticatable $identity, ?Request $request): array
+            public function resolve(?MultiFactorAuthenticatable $identity, ?ClientContext $client): array
             {
                 /** @var array<string, int|string|null> */
                 return $this->values;

@@ -7,12 +7,13 @@ namespace SineMacula\Laravel\Mfa\Codes;
 use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
+use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -80,6 +81,7 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
      * Send a code for the factor, bound as the binding says: the challenge's id
      * and when the code stops working, or why none was sent.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return \SineMacula\Laravel\Mfa\Codes\SendResult
@@ -87,21 +89,21 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
      * @throws \Throwable
      */
     #[\Override]
-    public function send(Factor $factor, ProofBinding $binding): SendResult
+    public function send(CallerContext $caller, Factor $factor, ProofBinding $binding): SendResult
     {
-        $identity = $this->identity(self::actionOf($binding, PendingAction::SEND_CODE, PendingAction::START_BOOTSTRAP_ENROLLMENT), $binding);
+        $served = $this->served($caller, self::actionOf($binding, PendingAction::SEND_CODE, PendingAction::START_BOOTSTRAP_ENROLLMENT), $binding);
 
-        if ($identity === null) {
+        if ($served === null) {
             return SendResult::refused(FailureReason::NOT_FOUND);
         }
 
         $driver = $this->driver($factor);
 
-        return StorageTransaction::run(function () use ($identity, $factor, $binding, $driver): SendResult {
+        return StorageTransaction::run(function () use ($served, $factor, $binding, $driver): SendResult {
 
-            $admission = $this->counters->isUsable($identity, $factor, $binding);
+            $admission = $this->counters->isUsable($served->context(), $factor, $binding);
 
-            return $admission->isAdmitted() ? $this->codes->send($identity, $factor, $binding, $driver) : SendResult::refusedBy($admission);
+            return $admission->isAdmitted() ? $this->codes->send($served->identity, $factor, $binding, $driver) : SendResult::refusedBy($admission);
         });
     }
 
@@ -110,6 +112,7 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
      * the outcome counted against the factor and the identity. A challenge that
      * may not go ahead is refused without checking the code, counting nothing.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $challengeId
@@ -119,17 +122,17 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
      * @throws \Throwable
      */
     #[\Override]
-    public function verify(Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): ChallengeOutcome
+    public function verify(CallerContext $caller, Factor $factor, ProofBinding $binding, string $challengeId, #[\SensitiveParameter] string $code): ChallengeOutcome
     {
-        $identity = $this->identity(self::actionOf($binding, PendingAction::VERIFY, PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT), $binding);
+        $served = $this->served($caller, self::actionOf($binding, PendingAction::VERIFY, PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT), $binding);
 
-        if ($identity === null) {
-            return ChallengeOutcome::refused(FailureReason::NOT_FOUND, 'The binding does not name the identity the request serves.');
+        if ($served === null) {
+            return ChallengeOutcome::refused(FailureReason::NOT_FOUND, 'The binding does not name the identity the caller is.');
         }
 
-        return StorageTransaction::run(function () use ($identity, $factor, $binding, $challengeId, $code): ChallengeOutcome {
+        return StorageTransaction::run(function () use ($served, $factor, $binding, $challengeId, $code): ChallengeOutcome {
 
-            $admission = $this->counters->isUsable($identity, $factor, $binding);
+            $admission = $this->counters->isUsable($served->context(), $factor, $binding);
 
             if (!$admission->isAdmitted()) {
                 return ChallengeOutcome::refused($admission->reason ?? FailureReason::LOCKED, $admission->detail, $admission->lockedUntil);
@@ -137,7 +140,7 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
 
             $check   = $this->codes->check($factor, $binding, $code, $challengeId);
             $failure = $check->failure();
-            $outcome = $this->counters->report($identity, $factor, $binding, $failure === null);
+            $outcome = $this->counters->report($served->context(), $factor, $binding, $failure === null);
 
             return $failure === null && $outcome->passed
                 ? ChallengeOutcome::passed()
@@ -146,26 +149,27 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     }
 
     /**
-     * The identity the request serves for the action, when the binding is the
-     * caller's own: the same identity, application, session and purpose.
+     * The caller served for the action, when the binding is the caller's own:
+     * the same identity, application, session and purpose.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Enums\PendingAction  $action
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @return ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     * @return ?\SineMacula\Laravel\Mfa\Context\Caller
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private function identity(PendingAction $action, ProofBinding $binding): ?MultiFactorAuthenticatable
+    private function served(CallerContext $context, PendingAction $action, ProofBinding $binding): ?Caller
     {
-        $caller = $this->callers->resolve($action);
+        $caller = $this->callers->resolve($context, $action);
 
         if ($caller === null) {
             return null;
         }
 
-        return $this->callers->binding($caller, $binding->purpose)?->toArray() === $binding->toArray() ? $caller->identity : null;
+        return $this->callers->binding($caller, $binding->purpose)?->toArray() === $binding->toArray() ? $caller : null;
     }
 
     /**

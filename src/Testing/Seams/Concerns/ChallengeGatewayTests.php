@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -33,7 +34,13 @@ trait ChallengeGatewayTests
      */
     public function testChallengeGatewayRefusesAWrongCode(): void
     {
-        ChallengeGatewayContract::assertAWrongCodeIsRefused($this->challengeGateway(), $this->challengedFactor(), $this->challengeBinding(), $this->deliveredCode(...));
+        ChallengeGatewayContract::assertAWrongCodeIsRefused(
+            $this->challengeGateway(),
+            $this->challengeCaller(),
+            $this->challengedFactor(),
+            $this->challengeBinding(),
+            $this->deliveredCode(...),
+        );
     }
 
     /**
@@ -43,7 +50,13 @@ trait ChallengeGatewayTests
      */
     public function testChallengeGatewayAnswersOnlyTheCodesOwnBinding(): void
     {
-        ChallengeGatewayContract::assertACodeAnswersOnlyItsOwnBinding($this->challengeGateway(), $this->challengedFactor(), $this->challengeBinding(), $this->deliveredCode(...));
+        ChallengeGatewayContract::assertACodeAnswersOnlyItsOwnBinding(
+            $this->challengeGateway(),
+            $this->challengeCaller(),
+            $this->challengedFactor(),
+            $this->challengeBinding(),
+            $this->deliveredCode(...),
+        );
     }
 
     /**
@@ -53,7 +66,13 @@ trait ChallengeGatewayTests
      */
     public function testChallengeGatewayConsumesACodeOnce(): void
     {
-        ChallengeGatewayContract::assertACodeIsConsumedOnce($this->challengeGateway(), $this->challengedFactor(), $this->challengeBinding(), $this->deliveredCode(...));
+        ChallengeGatewayContract::assertACodeIsConsumedOnce(
+            $this->challengeGateway(),
+            $this->challengeCaller(),
+            $this->challengedFactor(),
+            $this->challengeBinding(),
+            $this->deliveredCode(...),
+        );
     }
 
     /**
@@ -63,8 +82,15 @@ trait ChallengeGatewayTests
      */
     public function testChallengeGatewayDoesNotFindAnUnknownChallenge(): void
     {
-        ChallengeGatewayContract::assertAnUnknownChallengeIsNotFound($this->challengeGateway(), $this->challengedFactor(), $this->challengeBinding());
+        ChallengeGatewayContract::assertAnUnknownChallengeIsNotFound($this->challengeGateway(), $this->challengeCaller(), $this->challengedFactor(), $this->challengeBinding());
     }
+
+    /**
+     * The caller the binding is for, as the gateway is handed it.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\CallerContext
+     */
+    abstract protected function challengeCaller(): CallerContext;
 
     /**
      * The gateway under test.

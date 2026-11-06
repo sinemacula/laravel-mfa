@@ -42,6 +42,7 @@ use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\TestCase;
 
@@ -115,7 +116,7 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
         $user  = $this->reauthenticatedPerson();
         $start = $this->startedTotp();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $this->wrongCode($start));
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->wrongCode($start));
 
         self::assertSame(FailureReason::INVALID_CODE, $confirmation->reason);
         self::assertFalse($confirmation->abandoned);
@@ -139,7 +140,7 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
 
         $this->pendingFactorOf($start)->storeAcceptedStep((int) (now()->getTimestamp() / 30));
 
-        self::assertSame(FailureReason::REPLAYED, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::REPLAYED, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
         self::assertSame(1, $this->rowOf($start)->attempts);
         self::assertSame(1, $this->addressHits('127.0.0.1'));
     }
@@ -160,16 +161,16 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
         $wrong = $this->wrongCode($start);
         $grant = $this->grantOf($start);
 
-        self::assertFalse($this->mfa()->confirmEnrollment($grant, $wrong)->abandoned);
+        self::assertFalse($this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong)->abandoned);
         self::assertSame(1, Factor::query()->count());
 
-        $last = $this->mfa()->confirmEnrollment($grant, $wrong);
+        $last = $this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong);
 
         self::assertTrue($last->abandoned);
         self::assertSame(FailureReason::INVALID_CODE, $last->reason);
         self::assertSame(0, Factor::query()->count());
         self::assertSame(0, Enrollment::query()->count());
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment($grant, $wrong)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong)->reason);
         self::assertCount(1, array_filter($this->reported, static fn (object $event): bool => $event instanceof EnrollmentAbandoned));
     }
 
@@ -187,15 +188,15 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
         $grant = $this->grantOf($start);
 
         for ($attempt = 1; $attempt < 5; $attempt++) {
-            self::assertFalse($this->mfa()->confirmEnrollment($grant, $wrong)->abandoned);
+            self::assertFalse($this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong)->abandoned);
         }
 
         self::assertSame(4, $this->rowOf($start)->attempts);
 
-        $this->mfa()->resendEnrollmentCode($grant);
+        $this->mfa()->resendEnrollmentCode(Callers::current(), $grant);
 
         self::assertSame(4, $this->rowOf($start)->attempts);
-        self::assertTrue($this->mfa()->confirmEnrollment($grant, $wrong)->abandoned);
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong)->abandoned);
     }
 
     /**
@@ -218,7 +219,7 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
         Factor::deleting(static fn (): bool => false);
 
         try {
-            $this->mfa()->confirmEnrollment($this->grantOf($start), $wrong);
+            $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $wrong);
 
             self::fail('A cancelled deletion was expected to propagate.');
         } catch (WriteCanceledException) {
@@ -241,10 +242,10 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
 
         $start = $this->startedTotp();
 
-        $this->mfa()->confirmEnrollment($this->grantOf($start), $this->wrongCode($start));
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->wrongCode($start));
         $this->forgetReports();
 
-        $confirmation = $this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start));
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
         self::assertSame(FailureReason::LOCKED, $confirmation->reason);
         self::assertNotNull($confirmation->lockedUntil);

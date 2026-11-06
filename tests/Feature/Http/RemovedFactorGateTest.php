@@ -17,6 +17,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Requirements\FixedIdentityRequirement;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
@@ -79,7 +80,7 @@ final class RemovedFactorGateTest extends TestCase
 
         self::assertInstanceOf(MiddlewareSessionTransition::class, $transition);
 
-        $result = Mfa::removeFactor($totp->id);
+        $result = Mfa::removeFactor(Callers::current(), $totp->id);
 
         self::assertTrue($result->wasMade());
         self::assertSame(self::AAL2, $result->outstanding?->toArray());
@@ -115,9 +116,9 @@ final class RemovedFactorGateTest extends TestCase
         $totp  = $this->totpFactor($user, ['application' => self::APPLICATION]);
         $email = $this->emailFactor($user, attributes: ['application' => self::APPLICATION]);
 
-        self::assertTrue(Mfa::verify(Submission::factor($totp->id, AuthenticatorApp::code($totp)))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($totp->id, AuthenticatorApp::code($totp)))->isVerified());
 
-        $result = Mfa::removeFactor($email->id);
+        $result = Mfa::removeFactor(Callers::current(), $email->id);
 
         self::assertTrue($result->wasMade());
         self::assertNull($result->outstanding);
@@ -154,11 +155,11 @@ final class RemovedFactorGateTest extends TestCase
         $totp  = $this->totpFactor($user, ['application' => self::APPLICATION]);
         $email = $this->emailFactor($user, attributes: ['application' => self::APPLICATION]);
 
-        self::assertTrue(Mfa::verify(Submission::factor($totp->id, AuthenticatorApp::code($totp)))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($totp->id, AuthenticatorApp::code($totp)))->isVerified());
 
         [$challenge, $code] = $this->sentCode($email);
 
-        self::assertTrue(Mfa::verify(Submission::challenge($email->id, $challenge, $code))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::challenge($email->id, $challenge, $code))->isVerified());
 
         return [$user, $totp];
     }

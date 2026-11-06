@@ -4,13 +4,16 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Factors;
 
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
+use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
  * Holds what a factor model's route binding finds to the caller, for
@@ -23,7 +26,9 @@ use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
  * is `null`. A database failure and a pending credential the resolver refuses
  * propagate: neither is a missing factor.
  *
- * Stateless: the caller is resolved on every call.
+ * It is an edge, run while Laravel binds the route's parameters: the caller is
+ * built from the request being served (`Context\CallerContext::fromRequest()`)
+ * on every call, and nothing is served outside a request.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,11 +40,15 @@ final readonly class FactorRouteBinding
     /**
      * Constructor.
      *
+     * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      */
     public function __construct(
 
-        /** The resolver of who the request serves. */
+        /** The container the request being served is read from. */
+        private Container $container,
+
+        /** The resolver of who the caller is served as. */
         private CallerContextResolver $callers,
     ) {}
 
@@ -56,7 +65,8 @@ final readonly class FactorRouteBinding
      */
     public function resolve(EloquentFactor&Model $model, \Closure $lookup): ?Model
     {
-        $identity = $this->callers->forFactorBinding()?->identity;
+        $request  = $this->container->bound('request') ? $this->container->make('request') : null;
+        $identity = $request instanceof Request ? $this->callers->forFactorBinding(CallerContext::fromRequest($request, null, $this->container))?->identity : null;
         $key      = $identity?->getAuthIdentifier();
 
         if ($identity === null || (!is_string($key) && !is_int($key))) {
@@ -65,7 +75,7 @@ final readonly class FactorRouteBinding
 
         $found = self::find($model, $lookup);
 
-        return $found instanceof $model && FactorOwnerColumns::owns($found, CurrentIdentity::typeOf($identity), (string) $key) ? $found : null;
+        return $found instanceof $model && FactorOwnerColumns::owns($found, IdentityType::of($identity), (string) $key) ? $found : null;
     }
 
     /**

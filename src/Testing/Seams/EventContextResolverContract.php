@@ -4,7 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams;
 
-use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
@@ -36,7 +36,7 @@ final class EventContextResolverContract
     {
         $message = 'An event context must hold integers, strings and nulls only.';
 
-        SeamAssert::scalars($resolver->resolve($identity, Request::create('/', 'POST', server: ['REMOTE_ADDR' => '192.0.2.1'])), $message);
+        SeamAssert::scalars($resolver->resolve($identity, new ClientContext('192.0.2.1', 'contract-agent')), $message);
         SeamAssert::scalars($resolver->resolve(null, null), $message);
     }
 }

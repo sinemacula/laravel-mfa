@@ -262,7 +262,7 @@ final class RecoveryCodeRaceTest extends TestCase
      */
     private function generate(FactorHolder $holder): array
     {
-        return $this->service()->generate($holder);
+        return $this->service()->generate($holder, 'web');
     }
 
     /**

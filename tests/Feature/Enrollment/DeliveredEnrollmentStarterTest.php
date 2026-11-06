@@ -55,6 +55,7 @@ use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -172,10 +173,10 @@ final class DeliveredEnrollmentStarterTest extends TestCase
 
         Carbon::setTestNow(CarbonImmutable::now()->addSeconds(61));
 
-        self::assertTrue($this->mfa()->resendEnrollmentCode($this->grantOf($start))->wasSent());
+        self::assertTrue($this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start))->wasSent());
         self::assertCount(2, $this->mailbox->sentTo(self::ADDRESS));
         self::assertSame([], $this->mailbox->sentTo('changed@example.test'));
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), (string) $this->mailbox->lastCodeTo(self::ADDRESS))->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), (string) $this->mailbox->lastCodeTo(self::ADDRESS))->isConfirmed());
     }
 
     /**
@@ -207,7 +208,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
         $this->forgetReports();
 
         try {
-            $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS));
+            $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS));
 
             self::fail('A delivery that throws was expected to propagate.');
         } catch (CodeDeliveryFailedException) {
@@ -233,7 +234,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
         $this->startedEmail();
         $this->forgetReports();
 
-        $second = $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS));
+        $second = $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS));
 
         self::assertSame(FailureReason::SENDING_CAPPED, $second->reason);
         self::assertSame(3600, $second->retryAfter);
@@ -260,7 +261,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
         $this->startedEmail();
 
         $second = $this->startedEmail();
-        $third  = $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS));
+        $third  = $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS));
 
         self::assertSame(FailureReason::SENDING_CAPPED, $third->reason);
         self::assertSame(3600, $third->retryAfter);
@@ -280,13 +281,13 @@ final class DeliveredEnrollmentStarterTest extends TestCase
         $this->reauthenticatedPerson();
 
         $first   = $this->startedEmail();
-        $restart = $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS));
+        $restart = $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS));
 
         self::assertSame(FailureReason::SENDING_CAPPED, $restart->reason);
         self::assertSame(60, $restart->retryAfter);
         self::assertTrue($this->rowOf($first)->exists);
-        self::assertTrue($this->mfa()->cancelEnrollment($this->grantOf($first)));
-        self::assertSame(60, $this->mfa()->startEnrollment(EnrollmentRequest::delivered('email', self::ADDRESS))->retryAfter);
+        self::assertTrue($this->mfa()->cancelEnrollment(Callers::current(), $this->grantOf($first)));
+        self::assertSame(60, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS))->retryAfter);
         self::assertTrue($this->startedEmail('other@example.test')->hasStarted());
 
         Carbon::setTestNow(CarbonImmutable::now()->addSeconds(60));
@@ -311,8 +312,8 @@ final class DeliveredEnrollmentStarterTest extends TestCase
 
         $submission = Submission::challenge((string) $start->factor?->id, (string) $row->challenge_id, $code);
 
-        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->verify($submission)->reason);
-        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->sendCode($start->factor?->id)->reason);
+        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->verify(Callers::current(), $submission)->reason);
+        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->sendCode(Callers::current(), $start->factor?->id)->reason);
 
         $confirmed = $this->emailFactor($user, 'second@example.test');
 
@@ -320,7 +321,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
 
         $row->update(['factor_id' => $confirmed->id, 'challenge_id' => $challenge]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment($this->grantOf($start), $signInCode)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $signInCode)->reason);
     }
 
     /**
@@ -338,14 +339,14 @@ final class DeliveredEnrollmentStarterTest extends TestCase
 
         $this->rowOf($start)->update(['challenge_id' => null]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
         self::assertSame(0, $this->rowOf($start)->attempts);
 
         $this->rowOf($start)->update(['challenge_id' => Code::query()->value('id')]);
 
         Code::query()->update(['expires_at' => CarbonImmutable::now()->subSecond()]);
 
-        self::assertSame(FailureReason::EXPIRED, $this->mfa()->confirmEnrollment($this->grantOf($start), $code)->reason);
+        self::assertSame(FailureReason::EXPIRED, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code)->reason);
         self::assertSame(0, $this->rowOf($start)->attempts);
         self::assertSame(0, $this->addressHits('127.0.0.1'));
     }
@@ -364,7 +365,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
 
         $this->forgetReports();
 
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), (string) $this->mailbox->lastCodeTo(self::ADDRESS))->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), (string) $this->mailbox->lastCodeTo(self::ADDRESS))->isConfirmed());
 
         self::assertInstanceOf(VerificationPassed::class, $this->reported[0]);
         self::assertSame($challenge, $this->reported[0]->challengeId);
@@ -388,7 +389,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
         $binding   = $this->enrollmentBinding($user);
         $counters  = $this->container()->make(ChallengeCounters::class);
         $admit     = static fn (Factor $factor, ProofBinding $on): ?FailureReason => DB::transaction(
-            static fn (): ?FailureReason => $counters->isUsable($user, $factor, $on)->reason,
+            static fn (): ?FailureReason => $counters->isUsable(Callers::of($user, 'web'), $factor, $on)->reason,
         );
         $elsewhere = new ProofBinding($binding->identityType, $binding->identityKey, $binding->application, 'another-sign-in', Purpose::ENROLLMENT);
         $stepUp    = new ProofBinding($binding->identityType, $binding->identityKey, $binding->application, $binding->sessionId, Purpose::STEP_UP);
@@ -426,8 +427,8 @@ final class DeliveredEnrollmentStarterTest extends TestCase
 
         $factor->update(['consecutive_failures' => 2]);
 
-        $failed = DB::transaction(static fn () => $counters->report($user, $factor, $binding, false));
-        $passed = DB::transaction(static fn () => $counters->report($user, $factor, $binding, true));
+        $failed = DB::transaction(static fn () => $counters->report(Callers::of($user, 'web'), $factor, $binding, false));
+        $passed = DB::transaction(static fn () => $counters->report(Callers::of($user, 'web'), $factor, $binding, true));
 
         self::assertFalse($failed->passed);
         self::assertTrue($failed->isFailed());
@@ -454,13 +455,13 @@ final class DeliveredEnrollmentStarterTest extends TestCase
 
         $this->pendingSession($user, null, [PendingAction::SEND_CODE, PendingAction::VERIFY]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $gateway->send($factor, $binding)->reason);
-        self::assertSame(FailureReason::NOT_FOUND, $gateway->verify($factor, $binding, (string) $row->challenge_id, $code)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $gateway->send(Callers::current(), $factor, $binding)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $gateway->verify(Callers::current(), $factor, $binding, (string) $row->challenge_id, $code)->reason);
 
         $this->pendingSession($user, null, [PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $gateway->send($factor, $binding)->reason);
-        self::assertNull($gateway->verify($factor, $binding, (string) $row->challenge_id, $code)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $gateway->send(Callers::current(), $factor, $binding)->reason);
+        self::assertNull($gateway->verify(Callers::current(), $factor, $binding, (string) $row->challenge_id, $code)->reason);
     }
 
     /**

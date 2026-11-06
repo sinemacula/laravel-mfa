@@ -49,6 +49,7 @@ use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\SubmissionRoutes;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Drivers\RecordingFactorDriver;
 use Tests\Fixtures\Requirements\FixedIdentityRequirement;
 use Tests\Fixtures\Requirements\RecordingCombinationPolicy;
@@ -126,9 +127,9 @@ final class CompletionVerificationServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->totpFactor($user);
 
-        $before = Mfa::proofs();
-        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
-        $after  = Mfa::proofs();
+        $before = Mfa::proofs(Callers::current());
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $after  = Mfa::proofs(Callers::current());
 
         self::assertSame([], $before);
         self::assertTrue($result->isVerified());
@@ -173,7 +174,7 @@ final class CompletionVerificationServiceTest extends TestCase
 
         $this->container()->instance(StepUp::class, new RefusingCompletion(new OperationRefusedException(FailureReason::NOT_FRESH, 'The adapter refused.')));
 
-        $result = $this->mfa()->verify($submission);
+        $result = $this->mfa()->verify(Callers::current(), $submission);
 
         self::assertSame(FailureReason::NOT_FRESH, $result->reason);
         self::assertSame('The adapter refused.', $result->detail);
@@ -203,12 +204,12 @@ final class CompletionVerificationServiceTest extends TestCase
 
         $this->container()->instance(StepUp::class, new RefusingCompletion(new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'Refused.')));
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->verify(Submission::challenge($factor->id, $challenge, $code))->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->reason);
 
         $this->container()->forgetInstance(StepUp::class);
         $this->container()->singleton(StepUp::class, ProofStoreCompletion::class);
 
-        self::assertTrue($this->mfa()->verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->isVerified());
     }
 
     /**
@@ -226,7 +227,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $this->container()->instance(StepUp::class, new RefusingCompletion(new \LogicException('The adapter is broken.')));
 
         try {
-            $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+            $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
             self::fail('The exception must propagate.');
         } catch (\LogicException $exception) {
@@ -253,7 +254,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $this->container()->instance(ProofStore::class, new InterruptingProofStore($this->container()->make(ProofStore::class), 100, null, true));
 
         try {
-            $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+            $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
             self::fail('The store\'s refusal must propagate.');
         } catch (ProofRefusedException) {
@@ -279,7 +280,7 @@ final class CompletionVerificationServiceTest extends TestCase
 
         $this->container()->instance(PendingCompletion::class, $seam);
 
-        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
         self::assertTrue($result->isVerified());
         self::assertSame($completion, $result->completion());
@@ -303,11 +304,11 @@ final class CompletionVerificationServiceTest extends TestCase
         $totp = $this->totpFactor($user);
         $key  = $this->passkeyFactor($user);
 
-        $first = $this->mfa()->verify(Submission::factor($totp->id, AuthenticatorApp::code($totp)));
+        $first = $this->mfa()->verify(Callers::current(), Submission::factor($totp->id, AuthenticatorApp::code($totp)));
 
         self::assertSame([RequirementPart::PHISHING_RESISTANCE], $first->evaluation?->unmet);
 
-        $second = $this->mfa()->verify(Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
+        $second = $this->mfa()->verify(Callers::current(), Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
 
         self::assertTrue($second->evaluation?->meetsRequirement());
         self::assertCount(2, $this->furtherProofs($user));
@@ -330,7 +331,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $this->pendingSession($user, Requirement::none()->withAdditionalVerification()->withPhishingResistance(600), proofs: [$earlier]);
         $this->beginSignIn($user, self::PENDING);
 
-        $result = $this->mfa()->verify(Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
+        $result = $this->mfa()->verify(Callers::current(), Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
 
         self::assertTrue($result->evaluation?->meetsRequirement());
     }
@@ -359,7 +360,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $this->pendingSession($user, Requirement::none(), proofs: [$old, $kept, $future], firstFactor: $proofs->password(60));
         $this->beginSignIn($user, self::PENDING);
 
-        $result = $this->mfa()->verify(Submission::factor($totp->id, AuthenticatorApp::code($totp)));
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($totp->id, AuthenticatorApp::code($totp)));
 
         self::assertTrue($result->isVerified());
         self::assertSame([$kept, $result->proof], array_slice($policy->handed[1], 1));
@@ -391,7 +392,7 @@ final class CompletionVerificationServiceTest extends TestCase
 
         VerificationGeneration::advance($user);
 
-        $result = $this->mfa()->verify($submission);
+        $result = $this->mfa()->verify(Callers::current(), $submission);
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
         self::assertSame(FailureReason::NOT_ACCEPTED, $this->failureReported()->reason);
@@ -415,7 +416,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $this->pendingSession($user, firstFactor: $proofs->password(-300));
         $this->beginSignIn($user, self::PENDING);
 
-        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
         self::assertNull(Factor::query()->whereKey($factor->id)->sole()->getLastAcceptedStep());
@@ -446,7 +447,7 @@ final class CompletionVerificationServiceTest extends TestCase
         });
 
         try {
-            $this->mfa()->verify($submission);
+            $this->mfa()->verify(Callers::current(), $submission);
 
             self::fail('The listener\'s refusal must propagate.');
         } catch (OperationRefusedException $exception) {
@@ -474,7 +475,7 @@ final class CompletionVerificationServiceTest extends TestCase
 
         $this->container()->instance(StepUp::class, new RefusingCompletion(new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'Refused.')));
 
-        $result = $this->mfa()->verify(Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
+        $result = $this->mfa()->verify(Callers::current(), Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
         self::assertSame('passkey-challenge', $this->failureReported()->challengeId);
@@ -494,7 +495,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $user = $this->signedInPerson();
         $key  = $this->passkeyFactor($user);
 
-        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Submission::assertion($key->id, ['id' => self::CREDENTIAL]))->reason);
+        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Callers::current(), Submission::assertion($key->id, ['id' => self::CREDENTIAL]))->reason);
         self::assertNull($this->failureReported()->challengeId);
     }
 
@@ -510,11 +511,11 @@ final class CompletionVerificationServiceTest extends TestCase
         $older  = $this->totpFactor($user);
         $factor = $this->totpFactor($user);
 
-        self::assertTrue($this->mfa()->verify(Submission::factor($older->id, AuthenticatorApp::code($older)))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($older->id, AuthenticatorApp::code($older)))->isVerified());
 
         $this->container()->instance(CombinationPolicy::class, new UnacceptingCombinationPolicy($factor->id));
 
-        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
         self::assertNull(Factor::query()->whereKey($factor->id)->sole()->getLastAcceptedStep());
@@ -535,7 +536,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->factorOf($user, ['type' => 'custom']);
 
-        $result = $this->mfa()->verify(Submission::factor($factor->id, 'correct'));
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, 'correct'));
 
         self::assertSame(['otp', 'custom'], $result->amr);
         self::assertSame('custom', $result->type);
@@ -556,7 +557,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->factorOf($user, ['type' => 'custom']);
 
-        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Submission::factor($factor->id, 'replayed'))->reason);
+        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, 'replayed'))->reason);
         self::assertSame(1, $this->factorRun($factor));
     }
 
@@ -574,7 +575,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $key  = $this->passkeyFactor($user);
         $totp = $this->totpFactor($user);
 
-        $passkey = $this->mfa()->verify(Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
+        $passkey = $this->mfa()->verify(Callers::current(), Submission::assertion($key->id, ['id' => self::CREDENTIAL]));
         $proof   = $passkey->proof;
 
         self::assertNotNull($proof);
@@ -585,7 +586,7 @@ final class CompletionVerificationServiceTest extends TestCase
         self::assertContains('pop', $passkey->amr);
         self::assertContains('user', $passkey->amr);
 
-        $code  = $this->mfa()->verify(Submission::factor($totp->id, AuthenticatorApp::code($totp)));
+        $code  = $this->mfa()->verify(Callers::current(), Submission::factor($totp->id, AuthenticatorApp::code($totp)));
         $proof = $code->proof;
 
         self::assertNotNull($proof);
@@ -610,7 +611,7 @@ final class CompletionVerificationServiceTest extends TestCase
         $factor = $this->totpFactor($user);
         $code   = $this->recoveryCode($user);
 
-        $result = $this->mfa()->verify(Submission::recoveryCode($code), Purpose::SIGN_IN);
+        $result = $this->mfa()->verify(Callers::current(), Submission::recoveryCode($code), Purpose::SIGN_IN);
         $proof  = $result->proof;
 
         self::assertNotNull($proof);
@@ -624,7 +625,7 @@ final class CompletionVerificationServiceTest extends TestCase
 
         $factorCode = AuthenticatorApp::code($factor);
 
-        self::assertTrue($this->mfa()->verify(Submission::factor($factor->id, $factorCode))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($factor->id, $factorCode))->isVerified());
         self::assertNotNull(Factor::query()->whereKey($factor->id)->sole()->getLastUsedAt());
     }
 
@@ -642,7 +643,7 @@ final class CompletionVerificationServiceTest extends TestCase
 
         $this->container()->instance(StepUp::class, $seam);
 
-        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
         self::assertCount(1, $seam->accepted);
         self::assertSame([], $this->furtherProofs($user));

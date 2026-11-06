@@ -23,6 +23,7 @@ use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
@@ -86,7 +87,7 @@ final class OtpLifecycleTest extends TestCase
     {
         $factor = $this->emailFactor($this->signedInPerson());
 
-        $result = Mfa::sendCode($factor->id);
+        $result = Mfa::sendCode(Callers::current(), $factor->id);
         $code   = $this->mailbox->lastCodeTo(self::ADDRESS);
 
         self::assertTrue($result->wasSent());
@@ -94,8 +95,8 @@ final class OtpLifecycleTest extends TestCase
         self::assertNotNull($result->challengeId);
         self::assertSame(Purpose::STEP_UP, $this->mailbox->sentTo(self::ADDRESS)[0]->purpose);
 
-        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $result->challengeId, $code))->isVerified());
-        self::assertSame(FailureReason::REPLAYED, Mfa::verify(Submission::challenge($factor->id, $result->challengeId, $code))->reason);
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::challenge($factor->id, $result->challengeId, $code))->isVerified());
+        self::assertSame(FailureReason::REPLAYED, Mfa::verify(Callers::current(), Submission::challenge($factor->id, $result->challengeId, $code))->reason);
     }
 
     /**
@@ -111,9 +112,9 @@ final class OtpLifecycleTest extends TestCase
 
         [$challenge, $code] = $this->sentCode($factor);
 
-        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->isVerified());
 
-        $proofs = Mfa::proofs();
+        $proofs = Mfa::proofs(Callers::current());
 
         self::assertCount(1, $proofs);
         self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proofs[0]->kind);
@@ -136,13 +137,13 @@ final class OtpLifecycleTest extends TestCase
         $sender = FakeSmsSender::fake($this->container());
         $factor = $this->factorOf($this->signedInPerson(), ['type' => 'sms', 'destination' => self::PHONE]);
 
-        $challenge = Mfa::sendCode($factor->id)->challengeId;
+        $challenge = Mfa::sendCode(Callers::current(), $factor->id)->challengeId;
         $code      = $sender->lastCodeTo(self::PHONE);
 
         self::assertNotNull($challenge);
         self::assertNotNull($code);
         self::assertMatchesRegularExpression('/^\d{6}$/D', $code);
-        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->isVerified());
     }
 
     /**
@@ -178,11 +179,11 @@ final class OtpLifecycleTest extends TestCase
 
         $this->beginSignIn($user, 'sign-in-b');
 
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::challenge($factor->id, $challenge, $code))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->reason);
 
         [$next, $nextCode] = $this->sentCode($factor);
 
-        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $next, $nextCode))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::challenge($factor->id, $next, $nextCode))->isVerified());
     }
 
     /**
@@ -199,8 +200,8 @@ final class OtpLifecycleTest extends TestCase
 
         [$challenge, $code] = $this->sentCode($factor);
 
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::challenge($other->id, $challenge, $code))->reason);
-        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Callers::current(), Submission::challenge($other->id, $challenge, $code))->reason);
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->isVerified());
     }
 
     /**
@@ -215,7 +216,7 @@ final class OtpLifecycleTest extends TestCase
 
         [$challenge, $first] = $this->sentCode($factor);
 
-        $refused = Mfa::sendCode($factor->id);
+        $refused = Mfa::sendCode(Callers::current(), $factor->id);
 
         self::assertSame(FailureReason::SENDING_CAPPED, $refused->reason);
         self::assertSame(60, $refused->retryAfter);
@@ -227,8 +228,8 @@ final class OtpLifecycleTest extends TestCase
 
         self::assertSame($challenge, $resent);
         self::assertNotSame($first, $second);
-        self::assertSame(FailureReason::INVALID_CODE, Mfa::verify(Submission::challenge($factor->id, $resent, $first))->reason);
-        self::assertTrue(Mfa::verify(Submission::challenge($factor->id, $resent, $second))->isVerified());
+        self::assertSame(FailureReason::INVALID_CODE, Mfa::verify(Callers::current(), Submission::challenge($factor->id, $resent, $first))->reason);
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::challenge($factor->id, $resent, $second))->isVerified());
     }
 
     /**
@@ -248,14 +249,14 @@ final class OtpLifecycleTest extends TestCase
         [$challenge] = $this->sentCode($factor);
 
         foreach (range(1, 3) as $attempt) {
-            self::assertSame(FailureReason::INVALID_CODE, Mfa::verify(Submission::challenge($factor->id, $challenge, 'wrong' . $attempt))->reason);
+            self::assertSame(FailureReason::INVALID_CODE, Mfa::verify(Callers::current(), Submission::challenge($factor->id, $challenge, 'wrong' . $attempt))->reason);
         }
 
         $attempts = $this->container()->make(AttemptService::class);
         $before   = $attempts->lockout($user, $factor);
 
         self::assertNotNull($before);
-        self::assertSame(FailureReason::LOCKED, Mfa::sendCode($factor->id)->reason);
+        self::assertSame(FailureReason::LOCKED, Mfa::sendCode(Callers::current(), $factor->id)->reason);
 
         $after = $attempts->lockout($user, $factor);
 
@@ -281,12 +282,12 @@ final class OtpLifecycleTest extends TestCase
         foreach (['a', 'b'] as $id) {
             $this->beginSignIn($user, 'sign-in-' . $id);
 
-            self::assertTrue(Mfa::sendCode($factor->id)->wasSent());
+            self::assertTrue(Mfa::sendCode(Callers::current(), $factor->id)->wasSent());
         }
 
         $this->beginSignIn($user, 'sign-in-c');
 
-        self::assertSame(FailureReason::SENDING_CAPPED, Mfa::sendCode($factor->id)->reason);
+        self::assertSame(FailureReason::SENDING_CAPPED, Mfa::sendCode(Callers::current(), $factor->id)->reason);
         self::assertCount(2, $this->mailbox->sent());
     }
 
@@ -308,7 +309,7 @@ final class OtpLifecycleTest extends TestCase
         config()->set('mfa.applications.web.types', ['sms']);
 
         try {
-            Mfa::sendCode($factor->id);
+            Mfa::sendCode(Callers::current(), $factor->id);
 
             self::fail('Expected the send to be refused.');
         } catch (CodeDeliveryFailedException $exception) {

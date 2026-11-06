@@ -72,6 +72,7 @@ final class SessionRevokerContractTest extends TestCase
             new FaultySeams,
             $this->revokedIdentity(),
             self::REMOVED_FACTOR,
+            SignInProofs::APPLICATION,
             SignInProofs::SESSION,
             $this->verifyAnotherSession(...),
             $this->doesAnotherSessionCount(...),
@@ -114,6 +115,7 @@ final class SessionRevokerContractTest extends TestCase
             $this->verifyAnotherSession(...),
             $this->doesAnotherSessionCount(...),
             self::REMOVED_FACTOR,
+            SignInProofs::APPLICATION,
             SignInProofs::SESSION,
         );
     }
@@ -136,6 +138,7 @@ final class SessionRevokerContractTest extends TestCase
             new FaultySeams,
             $identity,
             self::REMOVED_FACTOR,
+            SignInProofs::APPLICATION,
             'another-sign-in',
             $this->doesCurrentSessionCount(...),
         );
@@ -155,6 +158,7 @@ final class SessionRevokerContractTest extends TestCase
             $this->sessionRevoker(),
             $this->revokedIdentity(),
             self::REMOVED_FACTOR,
+            SignInProofs::APPLICATION,
             'another-sign-in',
             $this->doesCurrentSessionCount(...),
         );
@@ -176,6 +180,7 @@ final class SessionRevokerContractTest extends TestCase
             new ForgettingSessionRevoker($this->otherDevice, SignInProofs::APPLICATION, new \LogicException('Not the identity\'s session.')),
             $identity,
             self::REMOVED_FACTOR,
+            SignInProofs::APPLICATION,
             'another-sign-in',
             $this->doesCurrentSessionCount(...),
         );
@@ -204,6 +209,7 @@ final class SessionRevokerContractTest extends TestCase
                 $this->verifyAnotherSession(...),
                 $this->doesAnotherSessionCount(...),
                 self::REMOVED_FACTOR,
+                SignInProofs::APPLICATION,
                 SignInProofs::SESSION,
             );
             self::fail('The revoker\'s failure was expected to propagate.');
@@ -228,6 +234,7 @@ final class SessionRevokerContractTest extends TestCase
             $this->sessionRevoker(),
             $this->revokedIdentity(),
             self::REMOVED_FACTOR,
+            SignInProofs::APPLICATION,
             SignInProofs::SESSION,
             static function (MultiFactorAuthenticatable $identity): void {
                 // Verifies nothing.
@@ -332,5 +339,16 @@ final class SessionRevokerContractTest extends TestCase
     protected function doesAnotherSessionCount(MultiFactorAuthenticatable $identity): bool
     {
         return $this->otherDevice->proofs($identity, SignInProofs::APPLICATION) !== [];
+    }
+
+    /**
+     * The application the identity's sessions are on.
+     *
+     * @return string
+     */
+    #[\Override]
+    protected function revokedApplication(): string
+    {
+        return 'web';
     }
 }

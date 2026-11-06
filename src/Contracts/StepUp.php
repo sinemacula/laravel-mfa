@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Contracts;
 
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
@@ -33,10 +34,11 @@ interface StepUp
      * never by returning, so the code's use and the count roll back with it.
      * Any other throwable propagates to the caller.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    public function stepUp(VerificationResult $result): ?object;
+    public function stepUp(CallerContext $caller, VerificationResult $result): ?object;
 }

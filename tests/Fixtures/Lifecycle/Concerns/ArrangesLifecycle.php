@@ -88,7 +88,7 @@ trait ArrangesLifecycle
      */
     protected function recoveryCodesOf(TestUser $user): void
     {
-        $this->container()->make(RecoveryCodeService::class)->generate($user);
+        $this->container()->make(RecoveryCodeService::class)->generate($user, 'web');
 
         $this->reported = [];
     }

@@ -47,6 +47,7 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -186,7 +187,7 @@ final class OwnerCollationEnrollmentStarterTest extends TestCase
 
         $start = $this->startedTotp();
 
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->isConfirmed());
     }
 
     /**
@@ -201,9 +202,9 @@ final class OwnerCollationEnrollmentStarterTest extends TestCase
         $theirs = $this->totpFactor($user, ['application' => self::APPLICATION, 'authenticatable_type' => self::otherType($user), 'preferred' => true, 'label' => 'Theirs']);
         $mine   = $this->totpFactor($user, ['application' => self::APPLICATION]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor($theirs->id, 'Mine now')->reason);
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor($theirs->id)->reason);
-        self::assertTrue($this->mfa()->setPreferredFactor($mine->id)->factor?->preferred);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor(Callers::current(), $theirs->id, 'Mine now')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor(Callers::current(), $theirs->id)->reason);
+        self::assertTrue($this->mfa()->setPreferredFactor(Callers::current(), $mine->id)->factor?->preferred);
 
         $stored = Factor::query()->whereKey($theirs->id)->sole();
 

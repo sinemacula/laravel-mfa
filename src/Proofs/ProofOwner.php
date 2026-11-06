@@ -6,7 +6,7 @@ namespace SineMacula\Laravel\Mfa\Proofs;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
+use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
  * The identity a proof belongs to, as a proof's binding names it: its type (the
@@ -53,7 +53,7 @@ final readonly class ProofOwner
             throw new UnsupportedIdentifierException(sprintf('An identity\'s key must be a non-empty string or an integer to hold proofs; got [%s].', get_debug_type($key)));
         }
 
-        return new self(CurrentIdentity::typeOf($identity), (string) $key);
+        return new self(IdentityType::of($identity), (string) $key);
     }
 
     /**

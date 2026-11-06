@@ -61,8 +61,8 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
   identity's other sessions through the session revocation seam. The shipped `Proofs\GenerationSessionRevoker` does
   that by advancing the verification generation, so those sessions stop counting its proofs; a revoker bound in its
   place ends them its own way (see [Factor Lifecycle](factor-lifecycle.md)).
-- `Mfa::proofs()` is the public read: the proofs of the current identity's sign-in on the current application that
-  still count, or none without an MFA-capable identity or a sign-in.
+- `Mfa::proofs()` is the public read: the proofs of the caller's sign-in on the caller's application that still count,
+  or none for nobody, a pending session or an identity without a sign-in.
 - A sign-in's proofs last as long as the sign-in, subject to invalidation and the verification generation. A time bound
   comes from a requirement's maximum age, set by an identity, a tenant or a named operation, never from a global window.
 - Verification is per device by default: a session's proofs are its own, in the authentication layer's session record
@@ -116,8 +116,8 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
 - `src/Contracts/ProofStore.php`; `src/Exceptions/ProofRefusedException.php`.
 - `src/Proofs/SessionProofStore.php`, `src/Proofs/ProofOwner.php`, `src/Proofs/VerificationGeneration.php`.
 - `src/Proofs/GuardHooks.php`, `src/Proofs/BeginSignInOnLogin.php`, `src/Proofs/ForgetSignInOnLogout.php`.
-- `src/Proofs/ProofService.php` (`proofs()`, `beginSignIn()`, `endSignIn()`, `forgetFactor()`, `application()`,
-  `applicationFor()`), `src/Proofs/ProofStoreCompletion.php`, `src/Proofs/ProofBindings.php`.
+- `src/Proofs/ProofService.php` (`proofs()`, `beginSignIn()`, `endSignIn()`, `forgetFactor()`),
+  `src/Proofs/SignInApplication.php`, `src/Proofs/ProofStoreCompletion.php`, `src/Proofs/ProofBindings.php`.
 - `src/Verification/VerificationService.php` (`verify()`); `src/Lifecycle/FactorRemoval.php` (`erase()`).
 
 ## Authoritative Tests

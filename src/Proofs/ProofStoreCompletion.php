@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Proofs;
 
 use Illuminate\Contracts\Container\Container;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -90,6 +91,7 @@ final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
      * Record a successful verification on the active session of the person the
      * request serves.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return null
      *
@@ -98,15 +100,19 @@ final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
     #[\Override]
-    public function stepUp(VerificationResult $result): null
+    public function stepUp(CallerContext $caller, VerificationResult $result): null
     {
         $proof    = self::proofOf($result);
-        $identity = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
+        $identity = $this->container->make(CallerContextResolver::class)->resolve($caller, null)?->identity;
+        $session  = $identity === null ? null : $this->container->make(ProofStore::class)->currentSession($identity, $caller->application);
 
         OperationRefusedException::unless(
-            $identity !== null && in_array($proof->binding->purpose, [Purpose::STEP_UP, Purpose::SIGN_IN], true),
+            $identity       !== null
+                && $session !== null
+                && in_array($proof->binding->purpose, [Purpose::STEP_UP, Purpose::SIGN_IN], true)
+                && ProofOwner::of($identity)->ownsSignIn($proof->binding, $caller->application, $session),
             FailureReason::NOT_ACCEPTED,
-            'The proof is not one an active session can take.',
+            'The proof is not one the caller\'s active session can take.',
         );
 
         $this->record($identity, $proof);

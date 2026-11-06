@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
@@ -23,6 +24,7 @@ use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
 use Tests\Fixtures\Identities\PlainUser;
@@ -258,19 +260,19 @@ final class RequirementServiceTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testTheCurrentRequirementIsTheCurrentIdentitys(): void
+    public function testTheRequirementIsTheCallers(): void
     {
         config()->set('mfa.applications.' . self::APPLICATION, ['requirement' => 'always']);
 
-        self::assertTrue($this->service()->requirement()->isEmpty());
+        self::assertTrue($this->service()->requirement(Callers::current())->isEmpty());
 
         $this->actingAs(new PlainUser);
 
-        self::assertTrue($this->service()->requirement()->isEmpty());
+        self::assertTrue($this->service()->requirement(Callers::current())->isEmpty());
 
         $this->actingAs(TestUser::query()->create(['email' => 'current@example.test', 'mfa_enabled' => false]));
 
-        self::assertSame(['additional_verification' => ['max_age' => null]], $this->service()->requirement()->toArray());
+        self::assertSame(['additional_verification' => ['max_age' => null]], $this->service()->requirement(Callers::current())->toArray());
     }
 
     /**
@@ -317,7 +319,7 @@ final class RequirementServiceTest extends TestCase
 
         $this->expectException(UnsupportedIdentifierException::class);
 
-        $this->service()->requirement();
+        $this->service()->requirement(Callers::current());
     }
 
     /**
@@ -338,11 +340,11 @@ final class RequirementServiceTest extends TestCase
 
         $this->container()->instance(FreshnessGate::class, self::gateRecording($asked, true));
 
-        self::assertTrue($this->service()->isFresh('mfa.remove_factor'));
-        self::assertTrue($this->service()->isFresh('mfa.remove_factor', $extra));
-        self::assertTrue($this->service()->isFresh('billing.change_plan', $extra));
-        self::assertTrue($this->service()->isFresh('billing.change_plan', Requirement::none()));
-        self::assertTrue($this->service()->isFresh('billing.change_plan'));
+        self::assertTrue($this->service()->isFresh(Callers::current(), 'mfa.remove_factor'));
+        self::assertTrue($this->service()->isFresh(Callers::current(), 'mfa.remove_factor', $extra));
+        self::assertTrue($this->service()->isFresh(Callers::current(), 'billing.change_plan', $extra));
+        self::assertTrue($this->service()->isFresh(Callers::current(), 'billing.change_plan', Requirement::none()));
+        self::assertTrue($this->service()->isFresh(Callers::current(), 'billing.change_plan'));
 
         self::assertSame([
             ['mfa.remove_factor', ['additional_verification' => ['max_age' => 300]]],
@@ -368,9 +370,9 @@ final class RequirementServiceTest extends TestCase
 
         $this->container()->instance(FreshnessGate::class, self::gateRecording($asked, true));
 
-        self::assertFalse($this->service()->isFresh('Mfa.Add_Factor', Requirement::none()->withAdditionalVerification(60)));
-        self::assertFalse($this->service()->isFresh("mfa.add_factor\n"));
-        self::assertFalse($this->service()->isFresh('Not An Operation', Requirement::none()->withMultifactor()));
+        self::assertFalse($this->service()->isFresh(Callers::current(), 'Mfa.Add_Factor', Requirement::none()->withAdditionalVerification(60)));
+        self::assertFalse($this->service()->isFresh(Callers::current(), "mfa.add_factor\n"));
+        self::assertFalse($this->service()->isFresh(Callers::current(), 'Not An Operation', Requirement::none()->withMultifactor()));
         self::assertSame([], $asked);
     }
 
@@ -389,7 +391,7 @@ final class RequirementServiceTest extends TestCase
         $this->container()->instance(FreshnessGate::class, self::gateRecording($asked, true));
 
         try {
-            $this->service()->isFresh('mfa.add_factor', Requirement::none()->withAdditionalVerification());
+            $this->service()->isFresh(Callers::current(), 'mfa.add_factor', Requirement::none()->withAdditionalVerification());
             self::fail('Expected the caller\'s requirement to be refused.');
         } catch (\InvalidArgumentException $exception) {
             $expected = 'A caller\'s requirement must give every part a max_age from 1 to 86400 seconds, which its [additional_verification] part does not.';
@@ -598,12 +600,13 @@ final class RequirementServiceTest extends TestCase
             /**
              * Record the question and answer it.
              *
+             * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
              * @param  string  $operation
              * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
              * @return bool
              */
             #[\Override]
-            public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool
+            public function isFresh(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): bool
             {
                 ($this->record)($operation, $callerRequirement);
 
@@ -613,12 +616,13 @@ final class RequirementServiceTest extends TestCase
             /**
              * The caller's requirement, unchanged.
              *
+             * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
              * @param  string  $operation
              * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
              * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
              */
             #[\Override]
-            public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement
+            public function requirement(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?Requirement
             {
                 ($this->record)($operation, $callerRequirement);
 
@@ -629,12 +633,13 @@ final class RequirementServiceTest extends TestCase
              * Record the question and answer it with the end of the next
              * minute.
              *
+             * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
              * @param  string  $operation
              * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
              * @return ?\Carbon\CarbonImmutable
              */
             #[\Override]
-            public function freshUntil(string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
+            public function freshUntil(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
             {
                 ($this->record)($operation, $callerRequirement);
 

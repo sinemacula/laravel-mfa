@@ -83,17 +83,18 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 
 ## Success Path
 
-- `Mfa::sendCode($factorId)`: the caller and its binding are captured (the identity, the application, the sign-in, the
-  purpose), the factor state transaction opens and they are checked again, the factor is admitted, and the bound
-  `ChallengeGateway` sends: by default `Codes\PackageChallengeGateway`, through `CodeService::send()`: the identity's
-  and the factor's sends counted, a challenge started or resent, the code delivered through the bound `EmailSender`.
-  `CodeSent` is queued for the commit, and the answer is a `Codes\SendResult` with the challenge's id and expiry.
-- `Mfa::verify(Submission::challenge($factorId, $challengeId, $code))` under the same purpose, in the same sign-in: the
-  gateway asks `ChallengeCounters::isUsable()`, `CodeService::check()` makes the read, the counting `UPDATE`, the
-  comparison and the using `UPDATE`, and `ChallengeCounters::report()` counts the outcome against the factor and the
-  identity in the same transaction, so a lockout refuses it before the challenge is read, spending none of its attempts,
-  and the code's use and the count commit as one. A refusal by the completion seam rolls both back (see [Verification
-  Lifecycle and Events](verification-lifecycle-and-events.md)).
+- `Mfa::sendCode($caller, $factorId)`: the caller and its binding are captured (the identity, the application, the
+  sign-in, the purpose), the factor state transaction opens and they are checked again, the factor is admitted, and the
+  bound `ChallengeGateway` sends: by default `Codes\PackageChallengeGateway`, through `CodeService::send()`: the
+  identity's and the factor's sends counted, a challenge started or resent, the code delivered through the bound
+  `EmailSender`. `CodeSent` is queued for the commit, and the answer is a `Codes\SendResult` with the challenge's id and
+  expiry.
+- `Mfa::verify($caller, Submission::challenge($factorId, $challengeId, $code))` under the same purpose, in the same
+  sign-in: the gateway asks `ChallengeCounters::isUsable()`, `CodeService::check()` makes the read, the counting
+  `UPDATE`, the comparison and the using `UPDATE`, and `ChallengeCounters::report()` counts the outcome against the
+  factor and the identity in the same transaction, so a lockout refuses it before the challenge is read, spending none
+  of its attempts, and the code's use and the count commit as one. A refusal by the completion seam rolls both back (see
+  [Verification Lifecycle and Events](verification-lifecycle-and-events.md)).
 
 ## Failure / Edge Cases
 

@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Fixtures\Verification\Dumps;
 use Tests\Unit\Concerns\BuildsProofs;
 
 /**
@@ -158,6 +159,24 @@ final class PendingContextTest extends TestCase
         $this->expectExceptionMessage($message);
 
         self::context($overrides);
+    }
+
+    /**
+     * The credential the caller presented is kept, read back through
+     * `credential()`, and shown by no dump; without one it is `null`.
+     *
+     * @return void
+     */
+    public function testKeepsThePresentedCredentialOutOfEveryDump(): void
+    {
+        $pending = self::context(['credential' => 'pending-credential-7731']);
+
+        self::assertSame('pending-credential-7731', $pending->credential());
+        self::assertNull(self::context()->credential());
+
+        foreach (Dumps::of($pending) as $way => $dump) {
+            self::assertStringNotContainsString('pending-credential-7731', $dump, $way);
+        }
     }
 
     /**

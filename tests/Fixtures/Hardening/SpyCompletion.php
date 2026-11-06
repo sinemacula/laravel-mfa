@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Hardening;
 
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
@@ -56,16 +57,17 @@ final readonly class SpyCompletion implements PendingCompletion, StepUp
     /**
      * Note the call and step up.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object
      *
      * @throws \Throwable
      */
     #[\Override]
-    public function stepUp(VerificationResult $result): ?object
+    public function stepUp(CallerContext $caller, VerificationResult $result): ?object
     {
         $this->recorder->seam('stepUp');
 
-        return $this->default->stepUp($result);
+        return $this->default->stepUp($caller, $result);
     }
 }

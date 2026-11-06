@@ -7,6 +7,8 @@ namespace Tests\Feature\Verification;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Hashing\Hasher;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
@@ -37,7 +39,7 @@ use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\SubmissionRoutes;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
-use Tests\Fixtures\Http\InterruptingRequest;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\RecoveryCodes\CountingHasher;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
@@ -104,7 +106,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
      */
     public function testAGuestIsNotFound(): void
     {
-        $result = $this->mfa()->verify(Submission::recoveryCode('ABCDEFGHJKLM'));
+        $result = $this->mfa()->verify(Callers::current(), Submission::recoveryCode('ABCDEFGHJKLM'));
 
         self::assertSame(FailureReason::NOT_FOUND, $result->reason);
         self::assertSame([], $this->reported);
@@ -122,12 +124,12 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $foreign = $this->totpFactor($other);
         $user    = $this->signedInPerson();
 
-        $missing = $this->mfa()->verify(Submission::factor('01HZZZZZZZZZZZZZZZZZZZZZZZ', '000000'));
+        $missing = $this->mfa()->verify(Callers::current(), Submission::factor('01HZZZZZZZZZZZZZZZZZZZZZZZ', '000000'));
         $event   = $this->failureReported();
 
         $this->forgetReports();
 
-        $found = $this->mfa()->verify(Submission::factor($foreign->id, '000000'));
+        $found = $this->mfa()->verify(Callers::current(), Submission::factor($foreign->id, '000000'));
 
         self::assertSame(FailureReason::NOT_FOUND, $missing->reason);
         self::assertEquals($missing, $found);
@@ -148,7 +150,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     {
         $this->signedInPerson();
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify(Submission::factor(['1'], '000000'))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify(Callers::current(), Submission::factor(['1'], '000000'))->reason);
     }
 
     /**
@@ -162,15 +164,11 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->totpFactor($user);
 
-        $request = InterruptingRequest::create('/', 'POST');
-
-        $request->interruption = static function () use ($factor): void {
+        self::whenTheLockIsTaken(static function () use ($factor): void {
             Factor::query()->whereKey($factor->id)->delete();
-        };
+        });
 
-        $this->container()->instance('request', $request);
-
-        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
         $event  = $this->failureReported();
 
         self::assertSame(FailureReason::NOT_FOUND, $result->reason);
@@ -192,12 +190,12 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         $this->container()->make(ProofStore::class)->begin($identity, self::APPLICATION, self::SESSION);
 
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->verify(Submission::factor('any', '000000'))->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->verify(Callers::current(), Submission::factor('any', '000000'))->reason);
         self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->failureReported()->reason);
 
         $this->forgetReports();
 
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->verify(Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->verify(Callers::current(), Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
         self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->failureReported()->reason);
     }
 
@@ -211,7 +209,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->totpFactor($user, ['status' => 'pending', 'confirmed_at' => null]);
 
-        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
+        self::assertSame(FailureReason::NOT_CONFIRMED, $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
         self::assertSame(FailureReason::NOT_CONFIRMED, $this->failureReported()->reason);
         self::assertSame(0, $this->factorRun($factor));
     }
@@ -235,10 +233,10 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         $this->forgetReports();
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify(Submission::factor($totp->id, AuthenticatorApp::code($totp)))->reason);
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify(Submission::challenge($email->id, $challenge, $emailed))->reason);
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify(Submission::recoveryCode($code))->reason);
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->sendCode($email->id)->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify(Callers::current(), Submission::factor($totp->id, AuthenticatorApp::code($totp)))->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify(Callers::current(), Submission::challenge($email->id, $challenge, $emailed))->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify(Callers::current(), Submission::recoveryCode($code))->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->sendCode(Callers::current(), $email->id)->reason);
 
         self::assertCount(3, $this->reported);
         self::assertSame(0, $this->factorRun($totp));
@@ -257,15 +255,11 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->totpFactor($user);
 
-        $request = InterruptingRequest::create('/', 'POST');
-
-        $request->interruption = function (): void {
+        self::whenTheLockIsTaken(function (): void {
             $this->enableApplication(['types' => ['email']]);
-        };
+        });
 
-        $this->container()->instance('request', $request);
-
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
         self::assertSame(0, $this->factorRun($factor));
         self::assertSame('totp', $this->failureReported()->type);
     }
@@ -283,8 +277,8 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->emailFactor($user);
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->sendCode($factor->id)->reason);
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->verify(Submission::challenge($factor->id, 'any', '000000'))->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->sendCode(Callers::current(), $factor->id)->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, 'any', '000000'))->reason);
         self::assertSame(FailureReason::NOT_ACCEPTED, $this->failureReported()->reason);
         self::assertSame(0, $this->factorRun($factor));
     }
@@ -305,7 +299,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $factor = $this->totpFactor($user);
         $code   = $this->recoveryCode($user);
 
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
 
         $this->forgetReports();
 
@@ -313,13 +307,13 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         $this->container()->instance(Hasher::class, $hasher);
 
-        $result = $this->mfa()->verify(Submission::recoveryCode($code));
+        $result = $this->mfa()->verify(Callers::current(), Submission::recoveryCode($code));
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
         self::assertSame(0, $hasher->checks());
         self::assertSame(FailureReason::NOT_ACCEPTED, $this->failureReported()->reason);
         self::assertSame(0, $this->identityRun($user));
-        self::assertSame(10, $this->mfa()->recoveryCodeStatus()?->remaining);
+        self::assertSame(10, $this->mfa()->recoveryCodeStatus(Callers::current())?->remaining);
     }
 
     /**
@@ -355,11 +349,11 @@ final class FailureReasonsVerificationServiceTest extends TestCase
             $this->pendingSession($user);
         }
 
-        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)), $purpose);
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)), $purpose);
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
         self::assertSame($purpose, $this->failureReported()->purpose);
-        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->sendCode($factor->id, $purpose)->reason);
+        self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->sendCode(Callers::current(), $factor->id, $purpose)->reason);
         self::assertNull(Factor::query()->whereKey($factor->id)->sole()->getLastAcceptedStep());
     }
 
@@ -375,10 +369,10 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $this->totpFactor($user);
 
         $code   = $this->recoveryCode($user);
-        $result = $this->mfa()->verify(Submission::recoveryCode($code), Purpose::ENROLLMENT);
+        $result = $this->mfa()->verify(Callers::current(), Submission::recoveryCode($code), Purpose::ENROLLMENT);
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
-        self::assertSame(10, $this->mfa()->recoveryCodeStatus()?->remaining);
+        self::assertSame(10, $this->mfa()->recoveryCodeStatus(Callers::current())?->remaining);
     }
 
     /**
@@ -392,7 +386,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $until  = CarbonImmutable::now()->addHour();
         $factor = $this->totpFactor($user, ['consecutive_failures' => 5, 'locked_until' => $until]);
 
-        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
         self::assertSame(FailureReason::LOCKED, $result->reason);
         self::assertSame($until->getTimestamp(), $result->lockedUntil?->getTimestamp());
@@ -412,7 +406,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->totpFactor($user, ['disabled_at' => CarbonImmutable::now()]);
 
-        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
         self::assertSame(FailureReason::LOCKED, $result->reason);
         self::assertNull($result->lockedUntil);
@@ -433,15 +427,15 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         IdentityState::query()->where('authenticatable_id', (string) $user->id)->update(['consecutive_failures' => 100]);
 
-        $result = $this->mfa()->verify(Submission::recoveryCode($code));
+        $result = $this->mfa()->verify(Callers::current(), Submission::recoveryCode($code));
 
         self::assertSame(FailureReason::LOCKED, $result->reason);
         self::assertNull($result->lockedUntil);
         self::assertSame(FailureReason::LOCKED, $this->failureReported()->reason);
         self::assertSame('recovery_code', $this->failureReported()->type);
-        self::assertSame(10, $this->mfa()->recoveryCodeStatus()?->remaining);
+        self::assertSame(10, $this->mfa()->recoveryCodeStatus(Callers::current())?->remaining);
 
-        self::assertTrue($this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
         self::assertSame(0, $this->identityRun($user));
     }
 
@@ -463,7 +457,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         self::assertSame(
             'The identity has reached the failure ceiling across its factors and recovery codes.',
-            $this->mfa()->verify(Submission::recoveryCode($code))->detail,
+            $this->mfa()->verify(Callers::current(), Submission::recoveryCode($code))->detail,
         );
 
         IdentityState::query()->where('authenticatable_id', (string) $user->id)->update([
@@ -473,7 +467,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         self::assertSame(
             'The identity is locked after too many failed attempts across its factors.',
-            $this->mfa()->verify(Submission::recoveryCode($code))->detail,
+            $this->mfa()->verify(Callers::current(), Submission::recoveryCode($code))->detail,
         );
     }
 
@@ -492,18 +486,18 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->totpFactor($user);
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Submission::factor($factor->id, '000000'))->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, '000000'))->reason);
 
         $this->forgetReports();
 
-        $result = $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
         $event  = $this->failureReported();
 
         self::assertSame(FailureReason::LOCKED, $result->reason);
         self::assertSame(CarbonImmutable::now()->addSeconds(900)->getTimestamp(), $result->lockedUntil?->getTimestamp());
         self::assertSame($factor->id, $event->factor?->id);
         self::assertSame(1, $this->factorRun($factor));
-        self::assertSame(FailureReason::LOCKED, $this->mfa()->sendCode($this->emailFactor($user)->id)->reason);
+        self::assertSame(FailureReason::LOCKED, $this->mfa()->sendCode(Callers::current(), $this->emailFactor($user)->id)->reason);
         self::assertSame(1, $this->addressHits('203.0.113.9'));
     }
 
@@ -517,7 +511,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     {
         $user = $this->signedInPerson();
 
-        self::assertSame(FailureReason::NO_FACTOR, $this->mfa()->verify(Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
+        self::assertSame(FailureReason::NO_FACTOR, $this->mfa()->verify(Callers::current(), Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
         self::assertSame(FailureReason::NO_FACTOR, $this->failureReported()->reason);
         self::assertSame(0, $this->identityRun($user));
     }
@@ -540,16 +534,16 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         $this->forgetReports();
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Submission::factor($totp->id, 'x'))->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::factor($totp->id, 'x'))->reason);
         self::assertSame(1, $this->factorRun($totp));
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Submission::challenge($email->id, $challenge, 'x'))->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::challenge($email->id, $challenge, 'x'))->reason);
         self::assertSame(1, $this->factorRun($email));
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Submission::assertion($key->id, ['id' => self::CREDENTIAL]))->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::assertion($key->id, ['id' => self::CREDENTIAL]))->reason);
         self::assertSame(1, $this->factorRun($key));
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::recoveryCode('ABCDEFGHJKLM'))->reason);
 
         self::assertSame(4, $this->identityRun($user));
         self::assertCount(4, $this->reported);
@@ -567,16 +561,16 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         [$challenge, $code] = $this->sentCode($factor);
 
-        self::assertTrue($this->mfa()->verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->isVerified());
 
-        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Submission::challenge($factor->id, $challenge, 'other'))->reason);
+        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, 'other'))->reason);
         self::assertSame(1, $this->factorRun($factor));
 
         [$next] = $this->sentCode($factor);
 
         Carbon::setTestNow(CarbonImmutable::now()->addHour());
 
-        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Submission::challenge($factor->id, $next, 'other'))->reason);
+        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $next, 'other'))->reason);
         self::assertSame(2, $this->factorRun($factor));
     }
 
@@ -594,8 +588,8 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         [$challenge, $code] = $this->sentCode($factor);
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Submission::challenge($factor->id, $challenge, 'wrong'))->reason);
-        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Submission::challenge($factor->id, $challenge, $code))->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, 'wrong'))->reason);
+        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->reason);
         self::assertSame(2, $this->factorRun($factor));
     }
 
@@ -616,21 +610,21 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         [$challenge, $code] = $this->sentCode($email);
 
-        self::assertTrue($this->mfa()->verify(Submission::challenge($email->id, $challenge, $code))->isVerified());
-        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Submission::challenge($email->id, $challenge, $code))->reason);
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::challenge($email->id, $challenge, $code))->isVerified());
+        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Callers::current(), Submission::challenge($email->id, $challenge, $code))->reason);
         self::assertSame(1, $this->factorRun($email));
 
         $step = AuthenticatorApp::code($totp);
 
-        self::assertTrue($this->mfa()->verify(Submission::factor($totp->id, $step))->isVerified());
-        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Submission::factor($totp->id, $step))->reason);
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($totp->id, $step))->isVerified());
+        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Callers::current(), Submission::factor($totp->id, $step))->reason);
         self::assertSame(1, $this->factorRun($totp));
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Submission::factor($totp->id, 'wrong'))->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::factor($totp->id, 'wrong'))->reason);
 
         $this->container()->instance(PasskeyGateway::class, $this->enablePasskeys(FailureReason::REPLAYED));
 
-        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Submission::assertion($key->id, ['id' => self::CREDENTIAL]))->reason);
+        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Callers::current(), Submission::assertion($key->id, ['id' => self::CREDENTIAL]))->reason);
         self::assertSame(1, $this->factorRun($key));
     }
 
@@ -645,8 +639,8 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->totpFactor($user);
 
-        self::assertTrue($this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
-        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, -1)))->reason);
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
+        self::assertSame(FailureReason::REPLAYED, $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor, -1)))->reason);
     }
 
     /**
@@ -665,7 +659,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         $this->forgetReports();
 
-        $result = $this->mfa()->verify(Submission::challenge($factor->id, $challenge, $code));
+        $result = $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code));
         $event  = $this->failureReported();
 
         self::assertSame(FailureReason::NOT_FOUND, $result->reason);
@@ -699,7 +693,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         ];
 
         foreach ($submissions as $submission) {
-            self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify($submission)->reason);
+            self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify(Callers::current(), $submission)->reason);
         }
 
         self::assertCount(6, $this->reported);
@@ -725,13 +719,13 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         $gateway->registered = [];
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify(Submission::assertion($factor->id, ['id' => self::CREDENTIAL]))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify(Callers::current(), Submission::assertion($factor->id, ['id' => self::CREDENTIAL]))->reason);
         self::assertSame(0, $this->factorRun($factor));
 
         $gateway->registered = [self::CREDENTIAL];
         $gateway->assertion  = new PasskeyAssertion('b3RoZXI', ObservedProperties::none());
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Submission::assertion($factor->id, ['id' => self::CREDENTIAL]))->reason);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::assertion($factor->id, ['id' => self::CREDENTIAL]))->reason);
         self::assertSame(1, $this->factorRun($factor));
         self::assertSame([], $this->furtherProofs($user));
     }
@@ -757,7 +751,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
             $gateway->refusal = $exception;
         }
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify(Submission::assertion($factor->id, ['id' => self::CREDENTIAL]))->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify(Callers::current(), Submission::assertion($factor->id, ['id' => self::CREDENTIAL]))->reason);
         self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->failureReported()->reason);
         self::assertSame(0, $this->factorRun($factor));
         self::assertSame(0, $this->identityRun($user));
@@ -781,7 +775,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         $this->container()->instance(ChallengeGateway::class, $refusing);
 
-        $result = $this->mfa()->verify(Submission::challenge($factor->id, 'any', '000000'));
+        $result = $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, 'any', '000000'));
 
         self::assertSame(FailureReason::LOCKED, $result->reason);
         self::assertSame('The challenge is locked.', $result->detail);
@@ -792,7 +786,30 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         $this->container()->instance(ChallengeGateway::class, $failing);
 
-        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Submission::challenge($factor->id, 'any', '000000'))->reason);
+        self::assertSame(FailureReason::EXPIRED, $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, 'any', '000000'))->reason);
         self::assertSame(1, $this->addressHits('203.0.113.9'));
+    }
+
+    /**
+     * Run the change once, when the identity's state row is first locked: the
+     * first statement under the lock, after every check made before it, as a
+     * concurrent change made while the lock was awaited would land.
+     *
+     * @param  \Closure(): void  $change
+     * @return void
+     */
+    private static function whenTheLockIsTaken(\Closure $change): void
+    {
+        $done = false;
+
+        DB::listen(static function (QueryExecuted $query) use (&$done, $change): void {
+            if ($done || !str_contains($query->sql, 'mfa_identity_states')) {
+                return;
+            }
+
+            $done = true;
+
+            $change();
+        });
     }
 }

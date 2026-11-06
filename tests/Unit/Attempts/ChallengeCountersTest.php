@@ -25,6 +25,7 @@ use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -85,8 +86,8 @@ final class ChallengeCountersTest extends TestCase
 
         foreach (
             [
-                fn () => $this->counters()->isUsable($this->user, $this->factor, $binding),
-                fn () => $this->counters()->report($this->user, $this->factor, $binding, false),
+                fn () => $this->counters()->isUsable(Callers::of($this->user, 'web'), $this->factor, $binding),
+                fn () => $this->counters()->report(Callers::of($this->user, 'web'), $this->factor, $binding, false),
             ] as $call
         ) {
             try {
@@ -122,7 +123,7 @@ final class ChallengeCountersTest extends TestCase
     public function testAFactorThatKeepsNoStateIsLookedUpAmongTheStoredOnes(): void
     {
         $factor    = new InMemoryFactor(type: 'email', destination: self::ADDRESS);
-        $admission = DB::transaction(fn (): ChallengeAdmission => $this->counters()->isUsable($this->user, $factor, $this->emailBinding($this->user)));
+        $admission = DB::transaction(fn (): ChallengeAdmission => $this->counters()->isUsable(Callers::of($this->user, 'web'), $factor, $this->emailBinding($this->user)));
 
         self::assertSame(FailureReason::NOT_FOUND, $admission->reason);
     }
@@ -206,7 +207,7 @@ final class ChallengeCountersTest extends TestCase
         $inactive = new NonEloquentIdentity('plain-1', active: false);
         $binding  = new ProofBinding(NonEloquentIdentity::class, 'plain-1', 'web', self::CHALLENGE_SESSION, Purpose::SIGN_IN);
 
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, DB::transaction(fn () => $this->counters()->isUsable($inactive, $this->factor, $binding))->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, DB::transaction(fn () => $this->counters()->isUsable(Callers::of($inactive, 'web'), $this->factor, $binding))->reason);
     }
 
     /**
@@ -253,13 +254,13 @@ final class ChallengeCountersTest extends TestCase
     {
         $binding = $this->emailBinding($this->user);
 
-        $failed = DB::transaction(fn () => $this->counters()->report($this->user, $this->factor, $binding, false));
+        $failed = DB::transaction(fn () => $this->counters()->report(Callers::of($this->user, 'web'), $this->factor, $binding, false));
 
         self::assertTrue($failed->isFailed());
         self::assertSame(1, $this->failures());
         self::assertSame(1, IdentityState::query()->sole()->consecutive_failures);
 
-        $passed = DB::transaction(fn () => $this->counters()->report($this->user, $this->factor, $binding, true));
+        $passed = DB::transaction(fn () => $this->counters()->report(Callers::of($this->user, 'web'), $this->factor, $binding, true));
 
         self::assertTrue($passed->passed);
         self::assertSame(0, $this->failures());
@@ -276,7 +277,7 @@ final class ChallengeCountersTest extends TestCase
     {
         DB::beginTransaction();
 
-        $this->counters()->report($this->user, $this->factor, $this->emailBinding($this->user), false);
+        $this->counters()->report(Callers::of($this->user, 'web'), $this->factor, $this->emailBinding($this->user), false);
 
         DB::rollBack();
 
@@ -300,9 +301,9 @@ final class ChallengeCountersTest extends TestCase
 
         $binding  = $this->emailBinding($this->user);
         $outcomes = DB::transaction(fn () => [
-            $this->counters()->report($this->user, $this->factor, $binding, false),
-            $this->counters()->report($this->user, $this->factor, $binding, false),
-            $this->counters()->report($this->user, $this->factor, $binding, false),
+            $this->counters()->report(Callers::of($this->user, 'web'), $this->factor, $binding, false),
+            $this->counters()->report(Callers::of($this->user, 'web'), $this->factor, $binding, false),
+            $this->counters()->report(Callers::of($this->user, 'web'), $this->factor, $binding, false),
         ]);
 
         self::assertTrue($outcomes[0]->isFailed());
@@ -327,7 +328,7 @@ final class ChallengeCountersTest extends TestCase
 
         $this->expectException(OperationRefusedException::class);
 
-        DB::transaction(fn () => $this->counters()->report($this->user, $this->factor, $other, false));
+        DB::transaction(fn () => $this->counters()->report(Callers::of($this->user, 'web'), $this->factor, $other, false));
     }
 
     /**
@@ -341,7 +342,9 @@ final class ChallengeCountersTest extends TestCase
      */
     private function admission(?Factor $factor = null, ?ProofBinding $binding = null): ChallengeAdmission
     {
-        return DB::transaction(fn (): ChallengeAdmission => $this->counters()->isUsable($this->user, $factor ?? $this->factor, $binding ?? $this->emailBinding($this->user)));
+        $caller = Callers::of($this->user, 'web');
+
+        return DB::transaction(fn (): ChallengeAdmission => $this->counters()->isUsable($caller, $factor ?? $this->factor, $binding ?? $this->emailBinding($this->user)));
     }
 
     /**

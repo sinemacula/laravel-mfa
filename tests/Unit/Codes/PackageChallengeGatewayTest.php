@@ -21,6 +21,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -75,11 +76,11 @@ final class PackageChallengeGatewayTest extends TestCase
     public function testSendsAndVerifiesTheCallersCode(): void
     {
         $binding = $this->emailBinding($this->user);
-        $sent    = $this->gateway()->send($this->factor, $binding);
+        $sent    = $this->gateway()->send(Callers::current(), $this->factor, $binding);
 
         self::assertTrue($sent->wasSent());
         self::assertNotNull($sent->challengeId);
-        self::assertTrue($this->gateway()->verify($this->factor, $binding, $sent->challengeId, self::lastEmailedCode($this->mailbox))->hasPassed());
+        self::assertTrue($this->gateway()->verify(Callers::current(), $this->factor, $binding, $sent->challengeId, self::lastEmailedCode($this->mailbox))->hasPassed());
     }
 
     /**
@@ -94,9 +95,9 @@ final class PackageChallengeGatewayTest extends TestCase
     {
         $binding = new ProofBinding(TestUser::class, 'someone-else', 'web', self::CHALLENGE_SESSION, Purpose::SIGN_IN);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->verify($this->factor, $binding, 'challenge-1', '123456')->reason);
-        self::assertFalse($this->gateway()->verify($this->factor, $binding, 'challenge-1', '123456')->counted);
-        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send($this->factor, $binding)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->verify(Callers::current(), $this->factor, $binding, 'challenge-1', '123456')->reason);
+        self::assertFalse($this->gateway()->verify(Callers::current(), $this->factor, $binding, 'challenge-1', '123456')->counted);
+        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send(Callers::current(), $this->factor, $binding)->reason);
     }
 
     /**
@@ -114,11 +115,11 @@ final class PackageChallengeGatewayTest extends TestCase
 
         $this->container()->make(ProofStore::class)->forget($this->user, self::CHALLENGE_APPLICATION);
 
-        $outcome = $this->gateway()->verify($this->factor, $binding, 'challenge-1', '123456');
+        $outcome = $this->gateway()->verify(Callers::current(), $this->factor, $binding, 'challenge-1', '123456');
 
         self::assertSame(FailureReason::NOT_FOUND, $outcome->reason);
         self::assertFalse($outcome->counted);
-        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send($this->factor, $binding)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send(Callers::current(), $this->factor, $binding)->reason);
         self::assertSame([], $this->mailbox->sent());
     }
 
@@ -146,8 +147,8 @@ final class PackageChallengeGatewayTest extends TestCase
             ),
         ));
 
-        self::assertFalse($this->gateway()->verify($this->factor, $this->emailBinding($this->user), 'challenge-1', '123456')->hasPassed());
-        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send($this->factor, $this->emailBinding($this->user))->reason);
+        self::assertFalse($this->gateway()->verify(Callers::current(), $this->factor, $this->emailBinding($this->user), 'challenge-1', '123456')->hasPassed());
+        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send(Callers::current(), $this->factor, $this->emailBinding($this->user))->reason);
         self::assertSame([], $this->mailbox->sent());
     }
 
@@ -173,8 +174,8 @@ final class PackageChallengeGatewayTest extends TestCase
         foreach ([['admin', 'admin-sign-in'], ['web', 'another-sign-in']] as [$application, $session]) {
             $binding = new ProofBinding($owner->type, $owner->key, $application, $session, Purpose::SIGN_IN);
 
-            self::assertFalse($this->gateway()->verify($this->factor, $binding, 'challenge-1', '123456')->hasPassed());
-            self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send($this->factor, $binding)->reason);
+            self::assertFalse($this->gateway()->verify(Callers::current(), $this->factor, $binding, 'challenge-1', '123456')->hasPassed());
+            self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send(Callers::current(), $this->factor, $binding)->reason);
         }
 
         self::assertSame([], $this->mailbox->sent());
@@ -211,16 +212,16 @@ final class PackageChallengeGatewayTest extends TestCase
 
         $active = $this->emailBinding($this->user);
 
-        self::assertFalse($this->gateway()->verify($this->factor, $active, 'challenge-1', '123456')->hasPassed());
-        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send($this->factor, $active)->reason);
+        self::assertFalse($this->gateway()->verify(Callers::current(), $this->factor, $active, 'challenge-1', '123456')->hasPassed());
+        self::assertSame(FailureReason::NOT_FOUND, $this->gateway()->send(Callers::current(), $this->factor, $active)->reason);
         self::assertSame([], $this->mailbox->sent());
 
         $owner     = ProofOwner::of($this->user);
         $pending   = new ProofBinding($owner->type, $owner->key, 'admin', 'pending-1', Purpose::SIGN_IN);
-        $challenge = $this->gateway()->send($this->factor, $pending)->challengeId;
+        $challenge = $this->gateway()->send(Callers::current(), $this->factor, $pending)->challengeId;
 
         self::assertNotNull($challenge);
-        self::assertTrue($this->gateway()->verify($this->factor, $pending, $challenge, self::lastEmailedCode($this->mailbox))->hasPassed());
+        self::assertTrue($this->gateway()->verify(Callers::current(), $this->factor, $pending, $challenge, self::lastEmailedCode($this->mailbox))->hasPassed());
     }
 
     /**
@@ -233,23 +234,23 @@ final class PackageChallengeGatewayTest extends TestCase
     public function testALockedFactorIsNotChallenged(): void
     {
         $binding   = $this->emailBinding($this->user);
-        $challenge = $this->gateway()->send($this->factor, $binding)->challengeId;
+        $challenge = $this->gateway()->send(Callers::current(), $this->factor, $binding)->challengeId;
         $code      = self::lastEmailedCode($this->mailbox);
 
         self::assertNotNull($challenge);
 
         $this->factor->update(['disabled_at' => CarbonImmutable::now()]);
 
-        $refused = $this->gateway()->verify($this->factor, $binding, $challenge, $code);
+        $refused = $this->gateway()->verify(Callers::current(), $this->factor, $binding, $challenge, $code);
 
         self::assertSame(FailureReason::LOCKED, $refused->reason);
         self::assertFalse($refused->counted);
         self::assertNull($refused->lockedUntil);
-        self::assertSame(FailureReason::LOCKED, $this->gateway()->send($this->factor, $binding)->reason);
+        self::assertSame(FailureReason::LOCKED, $this->gateway()->send(Callers::current(), $this->factor, $binding)->reason);
 
         $this->factor->update(['disabled_at' => null]);
 
-        self::assertTrue($this->gateway()->verify($this->factor, $binding, $challenge, $code)->hasPassed());
+        self::assertTrue($this->gateway()->verify(Callers::current(), $this->factor, $binding, $challenge, $code)->hasPassed());
     }
 
     /**
@@ -265,15 +266,15 @@ final class PackageChallengeGatewayTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00:00'));
 
         $binding   = $this->emailBinding($this->user);
-        $challenge = $this->gateway()->send($this->factor, $binding)->challengeId;
+        $challenge = $this->gateway()->send(Callers::current(), $this->factor, $binding)->challengeId;
         $until     = CarbonImmutable::now()->addMinutes(5);
 
         self::assertNotNull($challenge);
 
         $this->factor->update(['locked_until' => $until]);
 
-        self::assertSame($until->getTimestamp(), $this->gateway()->verify($this->factor, $binding, $challenge, '000000')->lockedUntil?->getTimestamp());
-        self::assertSame(300, $this->gateway()->send($this->factor, $binding)->retryAfter);
+        self::assertSame($until->getTimestamp(), $this->gateway()->verify(Callers::current(), $this->factor, $binding, $challenge, '000000')->lockedUntil?->getTimestamp());
+        self::assertSame(300, $this->gateway()->send(Callers::current(), $this->factor, $binding)->retryAfter);
     }
 
     /**
@@ -287,17 +288,17 @@ final class PackageChallengeGatewayTest extends TestCase
     public function testAFailureIsCountedWithItsReason(): void
     {
         $binding   = $this->emailBinding($this->user);
-        $challenge = $this->gateway()->send($this->factor, $binding)->challengeId;
+        $challenge = $this->gateway()->send(Callers::current(), $this->factor, $binding)->challengeId;
 
         self::assertNotNull($challenge);
 
-        $wrong = $this->gateway()->verify($this->factor, $binding, $challenge, '000000');
+        $wrong = $this->gateway()->verify(Callers::current(), $this->factor, $binding, $challenge, '000000');
 
         self::assertSame(FailureReason::INVALID_CODE, $wrong->reason);
         self::assertSame('The code did not match.', $wrong->detail);
         self::assertTrue($wrong->counted);
 
-        $unknown = $this->gateway()->verify($this->factor, $binding, 'unknown', '000000');
+        $unknown = $this->gateway()->verify(Callers::current(), $this->factor, $binding, 'unknown', '000000');
 
         self::assertSame(FailureReason::NOT_FOUND, $unknown->reason);
         self::assertTrue($unknown->counted);
@@ -321,7 +322,7 @@ final class PackageChallengeGatewayTest extends TestCase
         $this->expectException(UnsupportedFactorException::class);
         $this->expectExceptionMessage('The factor\'s type [totp] does not deliver codes.');
 
-        $this->gateway()->send($totp, $this->emailBinding($this->user));
+        $this->gateway()->send(Callers::current(), $totp, $this->emailBinding($this->user));
     }
 
     /**

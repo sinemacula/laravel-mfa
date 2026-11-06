@@ -17,6 +17,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\OtherConnectionUser;
 use Tests\TestCase;
 
@@ -89,15 +90,15 @@ final class IdentityOffStorageConnectionTest extends TestCase
 
         $user->factors()->create(['type' => 'totp', 'status' => 'confirmed']);
 
-        $codes = $this->container()->make(RecoveryCodeService::class)->generate($user);
+        $codes = $this->container()->make(RecoveryCodeService::class)->generate($user, 'web');
 
         self::assertCount(10, $codes);
         self::assertSame(StorageConnection::resolvedName(), (new RecoveryCode)->getConnectionName());
         self::assertSame(10, RecoveryCode::query()->where('authenticatable_id', (string) $user->id)->count());
 
-        self::assertTrue(Mfa::verify(Submission::recoveryCode($codes[0]->reveal()))->isVerified());
-        self::assertTrue(Mfa::verify(Submission::recoveryCode($codes[0]->reveal()))->isFailed());
-        self::assertSame(9, Mfa::recoveryCodeStatus()?->remaining);
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::recoveryCode($codes[0]->reveal()))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::recoveryCode($codes[0]->reveal()))->isFailed());
+        self::assertSame(9, Mfa::recoveryCodeStatus(Callers::current())?->remaining);
     }
 
     /**

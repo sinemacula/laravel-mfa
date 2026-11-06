@@ -27,6 +27,7 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
@@ -128,7 +129,7 @@ final class WriteConnectionReadTest extends TestCase
 
         self::assertSame(0, $user->authFactors()->count());
 
-        self::assertSame([$factor->getKey()], array_map(static fn (FactorSummary $read): string => $read->id, Mfa::factors()));
+        self::assertSame([$factor->getKey()], array_map(static fn (FactorSummary $read): string => $read->id, Mfa::factors(Callers::current())));
     }
 
     /**
@@ -173,7 +174,7 @@ final class WriteConnectionReadTest extends TestCase
         ]);
 
         self::assertTrue($holder->isMfaEnabled());
-        self::assertCount(1, Mfa::factors());
+        self::assertCount(1, Mfa::factors(Callers::current()));
     }
 
     /**
@@ -201,7 +202,7 @@ final class WriteConnectionReadTest extends TestCase
         ]);
 
         self::assertFalse($holder->isMfaEnabled());
-        self::assertSame([], Mfa::factors());
+        self::assertSame([], Mfa::factors(Callers::current()));
     }
 
     /**
@@ -229,7 +230,7 @@ final class WriteConnectionReadTest extends TestCase
 
         self::assertSame(0, DB::connection('replica')->table('mfa_identity_states')->count());
         self::assertTrue(ReenrollmentObligation::isRequired($holder));
-        self::assertFalse(Mfa::requirement()->isEmpty());
+        self::assertFalse(Mfa::requirement(Callers::current())->isEmpty());
     }
 
     /**
@@ -247,10 +248,10 @@ final class WriteConnectionReadTest extends TestCase
         $this->recordFirstFactor($user);
         $this->replicaCatchesUp();
 
-        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, $code))->isVerified());
         self::assertNull(DB::connection('replica')->table('mfa_factors')->where('id', $factor->id)->value('last_accepted_step'));
 
-        self::assertSame(FailureReason::REPLAYED, Mfa::verify(Submission::factor($factor->id, $code))->reason);
+        self::assertSame(FailureReason::REPLAYED, Mfa::verify(Callers::current(), Submission::factor($factor->id, $code))->reason);
     }
 
     /**
@@ -270,7 +271,7 @@ final class WriteConnectionReadTest extends TestCase
 
         self::assertNull(DB::connection('replica')->table('mfa_factors')->where('id', $factor->id)->value('locked_until'));
 
-        self::assertSame(FailureReason::LOCKED, Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
+        self::assertSame(FailureReason::LOCKED, Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
     }
 
     /**
@@ -298,7 +299,7 @@ final class WriteConnectionReadTest extends TestCase
 
         self::assertSame(0, DB::connection('replica')->table('mfa_identity_states')->count());
 
-        self::assertSame(FailureReason::LOCKED, Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
+        self::assertSame(FailureReason::LOCKED, Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
     }
 
     /**
@@ -316,12 +317,12 @@ final class WriteConnectionReadTest extends TestCase
         $this->replicaCatchesUp();
 
         for ($attempt = 0; $attempt < 5; $attempt++) {
-            self::assertFalse(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, 5)))->isVerified());
+            self::assertFalse(Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor, 5)))->isVerified());
         }
 
         self::assertSame(0, DB::connection('replica')->table('mfa_attempts')->count());
 
-        self::assertSame(FailureReason::LOCKED, Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
+        self::assertSame(FailureReason::LOCKED, Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
     }
 
     /**
@@ -343,10 +344,10 @@ final class WriteConnectionReadTest extends TestCase
 
         $submission = Submission::challenge($factor->id, $challenge, $code);
 
-        self::assertTrue(Mfa::verify($submission)->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), $submission)->isVerified());
         self::assertNull(DB::connection('replica')->table('mfa_codes')->value('consumed_at'));
 
-        self::assertFalse(Mfa::verify($submission)->isVerified());
+        self::assertFalse(Mfa::verify(Callers::current(), $submission)->isVerified());
     }
 
     /**
@@ -366,10 +367,10 @@ final class WriteConnectionReadTest extends TestCase
 
         $this->replicaCatchesUp();
 
-        self::assertTrue(Mfa::verify(Submission::recoveryCode($code))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::recoveryCode($code))->isVerified());
         self::assertSame(0, DB::connection('replica')->table('mfa_recovery_codes')->whereNotNull('used_at')->count());
 
-        self::assertFalse(Mfa::verify(Submission::recoveryCode($code))->isVerified());
+        self::assertFalse(Mfa::verify(Callers::current(), Submission::recoveryCode($code))->isVerified());
     }
 
     /**
@@ -389,7 +390,7 @@ final class WriteConnectionReadTest extends TestCase
 
         self::assertSame(1, DB::connection('replica')->table('mfa_factors')->count());
 
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->reason);
     }
 
     /**
@@ -406,7 +407,7 @@ final class WriteConnectionReadTest extends TestCase
 
         $this->recordFirstFactor($user);
 
-        self::assertCount(1, Mfa::proofs());
+        self::assertCount(1, Mfa::proofs(Callers::current()));
 
         $this->replicaCatchesUp();
 
@@ -414,7 +415,7 @@ final class WriteConnectionReadTest extends TestCase
 
         self::assertSame(0, DB::connection('replica')->table('mfa_identity_states')->count());
         self::assertSame(1, VerificationGeneration::current($user));
-        self::assertSame([], Mfa::proofs());
+        self::assertSame([], Mfa::proofs(Callers::current()));
     }
 
     /**

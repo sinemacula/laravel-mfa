@@ -107,7 +107,7 @@ final readonly class ProofAcceptance
     public function handOver(Caller $caller, VerificationResult $result): ?object
     {
         return $caller->pending === null
-            ? $this->container->make(StepUp::class)->stepUp($result)
+            ? $this->container->make(StepUp::class)->stepUp($caller->context(), $result)
             : $this->container->make(PendingCompletion::class)->complete($caller->pending, $result);
     }
 

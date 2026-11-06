@@ -10,11 +10,11 @@ use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
+use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\SubmissionKind;
@@ -91,16 +91,16 @@ final readonly class SubmissionRoutes
     /**
      * Redeem the submitted recovery code.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return \SineMacula\Laravel\Mfa\Verification\CheckOutcome
      *
      * @throws \Throwable
      */
-    public function recoveryCode(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] Submission $submission, ProofBinding $binding): CheckOutcome
+    public function recoveryCode(Caller $caller, #[\SensitiveParameter] Submission $submission, ProofBinding $binding): CheckOutcome
     {
-        $redemption = $this->recoveryCodes->redeem($identity, $submission->code() ?? '', $binding);
+        $redemption = $this->recoveryCodes->redeem($caller->identity, $submission->code() ?? '', $binding, $caller->client);
         $reason     = $redemption->reason;
 
         return match (true) {
@@ -114,7 +114,7 @@ final readonly class SubmissionRoutes
      * Check the submission against the factor as stored under the lock, along
      * the route its kind takes.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
@@ -123,24 +123,19 @@ final readonly class SubmissionRoutes
      *
      * @throws \Throwable
      */
-    public function factor(
-        MultiFactorAuthenticatable $identity,
-        #[\SensitiveParameter] Submission $submission,
-        EloquentFactor&Model $factor,
-        FactorDriver $driver,
-        ProofBinding $binding,
-    ): CheckOutcome {
+    public function factor(Caller $caller, #[\SensitiveParameter] Submission $submission, EloquentFactor&Model $factor, FactorDriver $driver, ProofBinding $binding): CheckOutcome
+    {
         return match ($submission->kind) {
-            SubmissionKind::CHALLENGE => $this->challenge($submission, $factor, $binding),
-            SubmissionKind::ASSERTION => $this->assertion($identity, $submission, $factor, $binding),
-            default                   => $this->code($identity, $submission, $factor, $driver, $binding),
+            SubmissionKind::CHALLENGE => $this->challenge($caller, $submission, $factor, $binding),
+            SubmissionKind::ASSERTION => $this->assertion($caller, $submission, $factor, $binding),
+            default                   => $this->code($caller, $submission, $factor, $driver, $binding),
         };
     }
 
     /**
      * Check the code through the factor's driver, as an attempt.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
@@ -149,17 +144,12 @@ final readonly class SubmissionRoutes
      *
      * @throws \Throwable
      */
-    private function code(
-        MultiFactorAuthenticatable $identity,
-        #[\SensitiveParameter] Submission $submission,
-        EloquentFactor&Model $factor,
-        FactorDriver $driver,
-        ProofBinding $binding,
-    ): CheckOutcome {
+    private function code(Caller $caller, #[\SensitiveParameter] Submission $submission, EloquentFactor&Model $factor, FactorDriver $driver, ProofBinding $binding): CheckOutcome
+    {
         $check = CodeCheck::INVALID;
 
         $outcome = $this->attempts->attempt(
-            new Attempt($identity, $factor, $binding->purpose, $binding->application),
+            new Attempt($caller->identity, $factor, $binding->purpose, $binding->application, $caller->client),
             static function () use ($driver, $factor, $submission, $binding, &$check): bool {
 
                 $check = $driver->verify($factor, $submission->code() ?? '', $binding);
@@ -175,7 +165,7 @@ final readonly class SubmissionRoutes
     /**
      * Check the passkey's response through the gateway, as an attempt.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -183,19 +173,15 @@ final readonly class SubmissionRoutes
      *
      * @throws \Throwable
      */
-    private function assertion(
-        MultiFactorAuthenticatable $identity,
-        #[\SensitiveParameter] Submission $submission,
-        EloquentFactor&Model $factor,
-        ProofBinding $binding,
-    ): CheckOutcome {
+    private function assertion(Caller $caller, #[\SensitiveParameter] Submission $submission, EloquentFactor&Model $factor, ProofBinding $binding): CheckOutcome
+    {
         $assertion = FailureReason::INVALID_CODE;
 
         $outcome = $this->attempts->attempt(
-            new Attempt($identity, $factor, $binding->purpose, $binding->application),
-            function () use ($identity, $factor, $binding, $submission, &$assertion): bool {
+            new Attempt($caller->identity, $factor, $binding->purpose, $binding->application, $caller->client),
+            function () use ($caller, $factor, $binding, $submission, &$assertion): bool {
 
-                $assertion = $this->passkeys->check($identity, $factor, $binding, $submission->response());
+                $assertion = $this->passkeys->check($caller->identity, $factor, $binding, $submission->response(), $caller->pending);
 
                 return $assertion instanceof PasskeyAssertion;
             },
@@ -211,6 +197,7 @@ final readonly class SubmissionRoutes
      * Check the code through the bound gateway, which owns the challenge and
      * reports its outcome.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -218,10 +205,10 @@ final readonly class SubmissionRoutes
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function challenge(#[\SensitiveParameter] Submission $submission, EloquentFactor&Model $factor, ProofBinding $binding): CheckOutcome
+    private function challenge(Caller $caller, #[\SensitiveParameter] Submission $submission, EloquentFactor&Model $factor, ProofBinding $binding): CheckOutcome
     {
         $challengeId = $submission->challengeId ?? '';
-        $outcome     = $this->container->make(ChallengeGateway::class)->verify($factor, $binding, $challengeId, $submission->code() ?? '');
+        $outcome     = $this->container->make(ChallengeGateway::class)->verify($caller->context(), $factor, $binding, $challengeId, $submission->code() ?? '');
         $reason      = $outcome->reason;
 
         return match (true) {

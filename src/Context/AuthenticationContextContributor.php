@@ -20,10 +20,11 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 /**
  * Fills the `mfa` namespace of the authentication context from the session's
  * recorded proofs, with the same eight keys every time, so a policy can read
- * them whoever the request serves: `contribute()` for the session the request
- * serves, and `contributeFor()` for a named sign-in whose proofs the caller
- * supplies, as an authentication layer building the context for another
- * session, or in a queued job, does.
+ * them whoever is served: `contributeFor()` for a named sign-in whose proofs
+ * the caller supplies, the one way it is built. `Mfa::authenticationContext()`
+ * reads a caller's own sign-in and its proofs from the proof store and hands
+ * them to it, and an authentication layer building the context for another
+ * session, or in a queued job, supplies its own.
  *
  * `accepted`, `multifactor`, `level` and `phishing_resistant` come from one
  * evaluation of an additional verification against the session's proofs.
@@ -65,62 +66,24 @@ final readonly class AuthenticationContextContributor
      */
     public function __construct(
 
-        /** The container the caller, the proofs and the check are resolved from. */
+        /** The container the seams and the check are resolved from. */
         private Container $container,
     ) {}
 
     /**
-     * The keys of the `mfa` namespace for the session the request serves.
+     * The keys of the `mfa` namespace for a named sign-in of the identity on
+     * the application, from its proofs as the caller read them.
      * `has_confirmed_factor` is a fact: whether the identity has a factor whose
      * stored status is exactly `confirmed` (see `Factors\ConfirmedFactors`). A
      * status the package does not know is no confirmed factor, though
-     * `isMfaEnabled()` still holds the identity to MFA for it.
-     *
-     * @formatter:off
-     *
-     * @return array{
-     *     accepted: bool,
-     *     multifactor: bool,
-     *     factor_types: list<string>,
-     *     level: string,
-     *     phishing_resistant: bool,
-     *     user_verification: bool,
-     *     last_verification_age_seconds: ?int,
-     *     has_confirmed_factor: bool,
-     * }
-     *
-     * @formatter:on
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \InvalidArgumentException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
-     */
-    public function contribute(): array
-    {
-        $callers = $this->container->make(CallerContextResolver::class);
-        $caller  = $callers->resolve(null);
-
-        if ($caller === null || !$caller->identity->isMfaActive()) {
-            return self::neutral();
-        }
-
-        $proofs = $this->container->make(SessionFirstFactor::class)->proofs($caller->identity, $callers->application($caller));
-
-        return $this->contextOf($caller->identity, $proofs);
-    }
-
-    /**
-     * The keys of the `mfa` namespace for a named sign-in of the identity on
-     * the application, from its proofs as the caller read them: for a context
-     * built outside the request it describes, such as for another session or in
-     * a queued job. Only the proofs that count are read, by the rules the proof
-     * store applies (bound to the identity, the application and the sign-in,
-     * made in the identity's current verification generation, and not dated in
-     * the future), oldest first. The caller reads them from a trusted record of
-     * that sign-in, never from input, leaves out any made with a factor since
-     * removed, and gives a pending, revoked or ended session, or none, the
-     * neutral context without asking. A machine and an inactive identity have
-     * the neutral context.
+     * `isMfaEnabled()` still holds the identity to MFA for it. Only the proofs
+     * that count are read, by the rules the proof store applies (bound to the
+     * identity, the application and the sign-in, made in the identity's current
+     * verification generation, and not dated in the future), oldest first. The
+     * caller reads them from a trusted record of that sign-in, never from
+     * input, leaves out any made with a factor since removed, and gives a
+     * pending, revoked or ended session, or none, the neutral context without
+     * asking. A machine and an inactive identity have the neutral context.
      *
      * @formatter:off
      *
@@ -152,6 +115,38 @@ final readonly class AuthenticationContextContributor
         }
 
         return $this->contextOf($identity, CountingProofs::of($identity, $application, $session, $proofs));
+    }
+
+    /**
+     * The context of a caller the package does not serve.
+     *
+     * @formatter:off
+     *
+     * @return array{
+     *     accepted: bool,
+     *     multifactor: bool,
+     *     factor_types: list<string>,
+     *     level: string,
+     *     phishing_resistant: bool,
+     *     user_verification: bool,
+     *     last_verification_age_seconds: ?int,
+     *     has_confirmed_factor: bool,
+     * }
+     *
+     * @formatter:on
+     */
+    public static function neutral(): array
+    {
+        return [
+            'accepted'                      => false,
+            'multifactor'                   => false,
+            'factor_types'                  => [],
+            'level'                         => AssuranceLevel::UNCLASSIFIED->value,
+            'phishing_resistant'            => false,
+            'user_verification'             => false,
+            'last_verification_age_seconds' => null,
+            'has_confirmed_factor'          => false,
+        ];
     }
 
     /**
@@ -194,38 +189,6 @@ final readonly class AuthenticationContextContributor
             'user_verification'             => self::observedUserVerification($check, $firstFactor, $evidence),
             'last_verification_age_seconds' => self::ageOfNewest($evidence),
             'has_confirmed_factor'          => ConfirmedFactors::isHeldBy($identity, $this->container->make(Repository::class)),
-        ];
-    }
-
-    /**
-     * The context of a caller the package does not serve.
-     *
-     * @formatter:off
-     *
-     * @return array{
-     *     accepted: bool,
-     *     multifactor: bool,
-     *     factor_types: list<string>,
-     *     level: string,
-     *     phishing_resistant: bool,
-     *     user_verification: bool,
-     *     last_verification_age_seconds: ?int,
-     *     has_confirmed_factor: bool,
-     * }
-     *
-     * @formatter:on
-     */
-    private static function neutral(): array
-    {
-        return [
-            'accepted'                      => false,
-            'multifactor'                   => false,
-            'factor_types'                  => [],
-            'level'                         => AssuranceLevel::UNCLASSIFIED->value,
-            'phishing_resistant'            => false,
-            'user_verification'             => false,
-            'last_verification_age_seconds' => null,
-            'has_confirmed_factor'          => false,
         ];
     }
 

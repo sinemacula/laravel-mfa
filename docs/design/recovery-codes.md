@@ -60,7 +60,7 @@ moment when both work or neither exists, and what a redemption leaves behind.
   only `replaceSet()`, where a refusal `OperationRefusedException::byPackage()` marked becomes the answer and any other
   is thrown on, rolling back, and reports outside the wrapping: a listener's exception, marked or not, is never read as
   a refusal of a set that committed, and an application's outer transaction still defers the event to its own commit.
-- Redemption (`Mfa::verify(Submission::recoveryCode(...))`, then `RecoveryCodeService::admission()` and `redeem()`,
+- Redemption (`Mfa::verify($caller, Submission::recoveryCode(...))`, then `RecoveryCodeService::admission()` and `redeem()`,
   under the identity's lock the verification holds): an inactive identity, an application that does not accept recovery
   codes, no confirmed factor as stored and an unknown first factor are refused before any hash is checked. A confirmed
   factor is one whose status is exactly `confirmed`, compared in PHP among the identity's locked factors
@@ -131,7 +131,7 @@ moment when both work or neither exists, and what a redemption leaves behind.
   `src/RecoveryCodes/RecoveryCodeMatcher.php`, `src/RecoveryCodes/RecoveryCodeSettings.php`.
 - `src/RecoveryCodes/Redemption.php`, `src/RecoveryCodes/RecoveryCodeStatus.php`.
 - `src/Lifecycle/FactorRemoval.php`: `remove()`; `src/Lifecycle/IdentityReset.php`.
-- `src/Attempts/AttemptService.php`: `attempt()`; `src/Attempts/RequestIp.php`.
+- `src/Attempts/AttemptService.php`: `attempt()`; `src/Context/ClientContext.php`.
 - `src/Models/RecoveryCode.php`, `src/Concerns/ActsAsRecoveryCode.php`, `src/Contracts/RecoveryCode.php`.
 
 ## Authoritative Tests

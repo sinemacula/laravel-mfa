@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Identities\FactorHolder;
 use Tests\TestCase;
@@ -79,7 +80,7 @@ final class EnrolledFactorGateTest extends TestCase
         $start = $this->startedTotp();
 
         self::assertInstanceOf(MiddlewareSessionTransition::class, $this->container()->make(SessionTransition::class));
-        self::assertTrue($this->mfa()->confirmEnrollment($this->grantOf($start), $this->appCode($start))->isConfirmed());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->isConfirmed());
 
         $factor  = $this->pendingFactorOf($start);
         $refusal = $this->get(self::GATED)->exception;
@@ -92,7 +93,7 @@ final class EnrolledFactorGateTest extends TestCase
 
         Carbon::setTestNow(CarbonImmutable::now()->addSeconds(30));
 
-        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $this->appCode($start)))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, $this->appCode($start)))->isVerified());
 
         $this->get(self::GATED)->assertOk();
     }

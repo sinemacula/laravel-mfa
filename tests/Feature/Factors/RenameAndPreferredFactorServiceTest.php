@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorChange;
 use SineMacula\Laravel\Mfa\Factors\FactorLabel;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Factors\IntegerKeyedFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -58,7 +59,7 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->totpFactor($user, ['application' => self::APPLICATION, 'label' => 'Old']);
 
-        $change = $this->mfa()->renameFactor($factor->id, '  New  ');
+        $change = $this->mfa()->renameFactor(Callers::current(), $factor->id, '  New  ');
 
         self::assertTrue($change->wasMade());
         self::assertNull($change->reason);
@@ -79,12 +80,12 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
     {
         $factor = $this->totpFactor($this->signedInPerson(), ['application' => self::APPLICATION, 'label' => 'Old']);
 
-        self::assertNull($this->mfa()->renameFactor($factor->id, '   ')->factor?->label);
+        self::assertNull($this->mfa()->renameFactor(Callers::current(), $factor->id, '   ')->factor?->label);
         self::assertNull($factor->refresh()->getLabel());
 
         $this->expectException(\InvalidArgumentException::class);
 
-        $this->mfa()->renameFactor($factor->id, str_repeat('a', 256));
+        $this->mfa()->renameFactor(Callers::current(), $factor->id, str_repeat('a', 256));
     }
 
     /**
@@ -100,7 +101,7 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
         $theirs = $this->totpFactor($this->person('other@example.test'), ['application' => self::APPLICATION]);
 
         foreach ([$there->id, $theirs->id, 'unknown', ['not', 'an', 'id'], null] as $id) {
-            self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor($id, 'New')->reason);
+            self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor(Callers::current(), $id, 'New')->reason);
         }
 
         self::assertSame('There', $there->refresh()->getLabel());
@@ -132,11 +133,11 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
 
         self::assertIsInt($id);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor($id + 1, 'New')->reason);
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor($id + 1)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor(Callers::current(), $id + 1, 'New')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor(Callers::current(), $id + 1)->reason);
 
-        self::assertSame('New', $this->mfa()->renameFactor($id, 'New')->factor?->label);
-        self::assertTrue($this->mfa()->setPreferredFactor($id)->factor?->preferred);
+        self::assertSame('New', $this->mfa()->renameFactor(Callers::current(), $id, 'New')->factor?->label);
+        self::assertTrue($this->mfa()->setPreferredFactor(Callers::current(), $id)->factor?->preferred);
     }
 
     /**
@@ -151,7 +152,7 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
         $there = $this->totpFactor($user, ['application' => 'admin', 'preferred' => true]);
         $here  = $this->emailFactor($user, self::ADDRESS, ['application' => self::APPLICATION]);
 
-        $change = $this->mfa()->setPreferredFactor($here->id);
+        $change = $this->mfa()->setPreferredFactor(Callers::current(), $here->id);
 
         self::assertTrue($change->wasMade());
         self::assertTrue($change->factor?->preferred);
@@ -175,14 +176,14 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->totpFactor($user, ['application' => self::APPLICATION]);
 
-        $this->mfa()->setPreferredFactor($factor->id);
+        $this->mfa()->setPreferredFactor(Callers::current(), $factor->id);
 
         self::assertInstanceOf(PreferredFactorChanged::class, $this->reported[0]);
         self::assertNull($this->reported[0]->previous);
 
         $this->forgetReports();
 
-        $again = $this->mfa()->setPreferredFactor($factor->id);
+        $again = $this->mfa()->setPreferredFactor(Callers::current(), $factor->id);
 
         self::assertTrue($again->factor?->preferred);
         self::assertSame([], $this->reported);
@@ -199,9 +200,9 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
         $pending = $this->totpFactor($user, ['status' => 'pending']);
         $sms     = $this->factorOf($user, ['type' => 'sms', 'destination' => '+447700900123']);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor($pending->id)->reason);
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->setPreferredFactor($sms->id)->reason);
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor('unknown')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor(Callers::current(), $pending->id)->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->setPreferredFactor(Callers::current(), $sms->id)->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor(Callers::current(), 'unknown')->reason);
         self::assertSame(0, Factor::query()->where('preferred', true)->count());
         self::assertSame([], $this->reported);
     }
@@ -214,19 +215,19 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
      */
     public function testOnlyAnActiveSessionOfAnActivePersonIsServed(): void
     {
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor('any', 'New')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor(Callers::current(), 'any', 'New')->reason);
 
         $user = $this->person();
 
         $this->pendingSession($user, null, [PendingAction::LIST_FACTORS, PendingAction::VERIFY, PendingAction::START_BOOTSTRAP_ENROLLMENT]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor('any', 'New')->reason);
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor('any')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor(Callers::current(), 'any', 'New')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor(Callers::current(), 'any')->reason);
 
         $this->noPendingSession();
         $this->actingAs(new NonEloquentIdentity(active: false));
 
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->renameFactor('any', 'New')->reason);
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->setPreferredFactor('any')->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->renameFactor(Callers::current(), 'any', 'New')->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->setPreferredFactor(Callers::current(), 'any')->reason);
     }
 }

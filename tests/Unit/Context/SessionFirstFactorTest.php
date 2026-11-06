@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
@@ -143,11 +144,15 @@ final class SessionFirstFactorTest extends TestCase
 
         $this->store()->record($first);
 
-        $found = $this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP));
+        $found = $this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP), Callers::current()->pending);
 
         self::assertSame($first->toArray(), $found?->toArray());
-        self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', 'elsewhere', Purpose::STEP_UP)));
-        self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, 'someone-else', 'web', SignInProofs::SESSION, Purpose::STEP_UP)));
+        $binding = new ProofBinding($owner->type, $owner->key, 'web', 'elsewhere', Purpose::STEP_UP);
+
+        self::assertNull($this->firstFactors()->forBinding($user, $binding, $this->pendingOfTheRequest()));
+        $binding = new ProofBinding($owner->type, 'someone-else', 'web', SignInProofs::SESSION, Purpose::STEP_UP);
+
+        self::assertNull($this->firstFactors()->forBinding($user, $binding, $this->pendingOfTheRequest()));
     }
 
     /**
@@ -169,8 +174,12 @@ final class SessionFirstFactorTest extends TestCase
             new PendingContext($user, 'web', 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY], CarbonImmutable::now()->addHour()),
         ));
 
-        self::assertSame($first, $this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', 'pending-1', Purpose::SIGN_IN)));
-        self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'admin', 'pending-1', Purpose::SIGN_IN)));
+        $binding = new ProofBinding($owner->type, $owner->key, 'web', 'pending-1', Purpose::SIGN_IN);
+
+        self::assertSame($first, $this->firstFactors()->forBinding($user, $binding, $this->pendingOfTheRequest()));
+        $binding = new ProofBinding($owner->type, $owner->key, 'admin', 'pending-1', Purpose::SIGN_IN);
+
+        self::assertNull($this->firstFactors()->forBinding($user, $binding, $this->pendingOfTheRequest()));
     }
 
     /**
@@ -210,7 +219,9 @@ final class SessionFirstFactorTest extends TestCase
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver($current));
 
-        self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', 'pending-1', Purpose::SIGN_IN)));
+        $binding = new ProofBinding($owner->type, $owner->key, 'web', 'pending-1', Purpose::SIGN_IN);
+
+        self::assertNull($this->firstFactors()->forBinding($user, $binding, $this->pendingOfTheRequest()));
     }
 
     /**
@@ -234,7 +245,9 @@ final class SessionFirstFactorTest extends TestCase
             new PendingContext($user, 'admin', 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY], CarbonImmutable::now()->addHour()),
         ));
 
-        self::assertNull($this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP)));
+        $binding = new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP);
+
+        self::assertNull($this->firstFactors()->forBinding($user, $binding, $this->pendingOfTheRequest()));
     }
 
     /**
@@ -277,5 +290,17 @@ final class SessionFirstFactorTest extends TestCase
     private function firstFactors(): SessionFirstFactor
     {
         return $this->container()->make(SessionFirstFactor::class);
+    }
+
+    /**
+     * The pending session the request being served carries, if any.
+     *
+     * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function pendingOfTheRequest(): ?PendingContext
+    {
+        return Callers::current()->pending;
     }
 }

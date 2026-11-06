@@ -12,6 +12,8 @@ use SineMacula\Laravel\Mfa\Assurance\DefaultCombinationPolicy;
 use SineMacula\Laravel\Mfa\Assurance\Evaluation;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
@@ -46,6 +48,7 @@ use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\TestCase;
 
@@ -207,7 +210,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
         $wrong = $this->wrongCode($start);
 
         $this->forgetReports();
-        $this->mfa()->confirmEnrollment($this->grantOf($start), $wrong);
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $wrong);
 
         self::assertSame(['VerificationFailed'], $this->reportedNames());
         self::assertInstanceOf(VerificationFailed::class, $this->reported[0]);
@@ -216,7 +219,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
         self::assertSame($start->factor?->id, $this->reported[0]->factor?->id);
 
         $this->forgetReports();
-        $this->mfa()->confirmEnrollment($this->grantOf($start), $wrong);
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $wrong);
 
         self::assertSame(['VerificationFailed', 'EnrollmentAbandoned'], $this->reportedNames());
     }
@@ -237,7 +240,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
 
         Carbon::setTestNow(CarbonImmutable::now()->addHour());
 
-        $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertSame(['EnrollmentExpired', 'VerificationFailed'], $this->reportedNames());
         self::assertInstanceOf(EnrollmentExpired::class, $this->reported[0]);
@@ -259,7 +262,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
         $code  = $this->appCode($start);
 
         $this->forgetReports();
-        $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertSame(['VerificationPassed', 'FactorConfirmed', 'RecoveryCodesGenerated'], $this->reportedNames());
         self::assertInstanceOf(VerificationPassed::class, $this->reported[0]);
@@ -267,6 +270,31 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
         self::assertSame('totp', $this->reported[0]->type);
         self::assertNull($this->reported[0]->challengeId);
         self::assertSame(self::APPLICATION, $this->reported[1]->context()['application']);
+    }
+
+    /**
+     * Every event of a success, the codes generated with the first factor
+     * included, carries the caller's client.
+     *
+     * @return void
+     */
+    public function testEveryEventOfASuccessCarriesTheCallersClient(): void
+    {
+        $user = $this->reauthenticatedPerson();
+
+        $start  = $this->startedTotp();
+        $code   = $this->appCode($start);
+        $caller = CallerContext::forIdentity($user, self::APPLICATION, new ClientContext('203.0.113.7', 'Agent/2.0'));
+
+        $this->forgetReports();
+        $this->mfa()->confirmEnrollment($caller, $this->grantOf($start), $code);
+
+        self::assertSame(['VerificationPassed', 'FactorConfirmed', 'RecoveryCodesGenerated'], $this->reportedNames());
+
+        foreach ($this->reported as $event) {
+            self::assertSame('203.0.113.7', $event->context()['ip']);
+            self::assertSame('Agent/2.0', $event->context()['user_agent']);
+        }
     }
 
     /**
@@ -282,7 +310,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
         $code  = $this->appCode($start);
 
         $this->forgetReports();
-        $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertSame(['VerificationPassed', 'FactorConfirmed', 'BootstrapEnrollmentCompleted', 'RecoveryCodesGenerated'], $this->reportedNames());
     }
@@ -300,7 +328,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
         $code  = (string) $this->mailbox->lastCodeTo(self::ADDRESS);
 
         $this->forgetReports();
-        $this->mfa()->confirmEnrollment($this->grantOf($start), $code);
+        $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 
         self::assertSame(['VerificationPassed', 'FactorConfirmed'], $this->reportedNames());
         self::assertSame(0, Enrollment::query()->where('factor_id', $start->factor?->id)->count());

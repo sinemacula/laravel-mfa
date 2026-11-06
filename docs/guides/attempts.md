@@ -61,7 +61,7 @@ Three things never reset a count or lift a lockout:
 ## Who is charged
 
 An attempt is charged to the identity whose own pending or active session made it, and only one of that identity's
-factors can be attempted: `Mfa::verify()` looks the factor up within the identity the request serves, so another
+factors can be attempted: `Mfa::verify()` looks the factor up within the caller's identity, so another
 identity's is not found, before anything is counted. Nobody can
 lock an identity out with requests of their own. The IP address is charged whoever is signed in.
 

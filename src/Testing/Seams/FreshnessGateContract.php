@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Testing\Seams;
 
 use PHPUnit\Framework\Assert;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
@@ -35,11 +36,12 @@ final class FreshnessGateContract
      * A name that is not in the form an operation's takes is never fresh.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return void
      */
-    public static function assertANameThatIsNoOperationIsNeverFresh(FreshnessGate $gate): void
+    public static function assertANameThatIsNoOperationIsNeverFresh(FreshnessGate $gate, CallerContext $caller): void
     {
-        Assert::assertFalse($gate->isFresh('Not An Operation'), 'A name that is not an operation\'s must never be fresh.');
+        Assert::assertFalse($gate->isFresh($caller, 'Not An Operation'), 'A name that is not an operation\'s must never be fresh.');
     }
 
     /**
@@ -47,11 +49,12 @@ final class FreshnessGateContract
      * never fresh.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return void
      */
-    public static function assertAnOperationWithNoRequirementIsNeverFresh(FreshnessGate $gate): void
+    public static function assertAnOperationWithNoRequirementIsNeverFresh(FreshnessGate $gate, CallerContext $caller): void
     {
-        Assert::assertFalse($gate->isFresh(self::UNCONFIGURED), 'An operation with no requirement must never be fresh.');
+        Assert::assertFalse($gate->isFresh($caller, self::UNCONFIGURED), 'An operation with no requirement must never be fresh.');
     }
 
     /**
@@ -59,14 +62,15 @@ final class FreshnessGateContract
      * with an `InvalidArgumentException`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return void
      */
-    public static function assertAnUnboundedRequirementIsRefused(FreshnessGate $gate): void
+    public static function assertAnUnboundedRequirementIsRefused(FreshnessGate $gate, CallerContext $caller): void
     {
         $outcome = null;
 
         try {
-            $gate->isFresh(self::UNCONFIGURED, Requirement::none()->withAdditionalVerification());
+            $gate->isFresh($caller, self::UNCONFIGURED, Requirement::none()->withAdditionalVerification());
         } catch (\Throwable $exception) {
             $outcome = $exception;
         }
@@ -78,28 +82,30 @@ final class FreshnessGateContract
      * An operation that is not fresh has no time it is fresh until.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return void
      */
-    public static function assertAnOperationThatIsNotFreshHasNoDeadline(FreshnessGate $gate): void
+    public static function assertAnOperationThatIsNotFreshHasNoDeadline(FreshnessGate $gate, CallerContext $caller): void
     {
-        Assert::assertFalse($gate->isFresh(self::UNCONFIGURED));
-        Assert::assertNull($gate->freshUntil(self::UNCONFIGURED), 'An operation that is not fresh must have no deadline.');
+        Assert::assertFalse($gate->isFresh($caller, self::UNCONFIGURED));
+        Assert::assertNull($gate->freshUntil($caller, self::UNCONFIGURED), 'An operation that is not fresh must have no deadline.');
     }
 
     /**
      * A deadline is not in the past, and the session is fresh while it holds.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @return void
      */
-    public static function assertADeadlineIsAheadAndMeansFresh(FreshnessGate $gate, string $operation): void
+    public static function assertADeadlineIsAheadAndMeansFresh(FreshnessGate $gate, CallerContext $caller, string $operation): void
     {
-        $until = $gate->freshUntil($operation);
+        $until = $gate->freshUntil($caller, $operation);
 
         Assert::assertNotNull($until, 'A session fresh for the operation must say until when.');
         Assert::assertFalse($until->isPast(), 'A deadline must not be in the past.');
-        Assert::assertTrue($gate->isFresh($operation), 'A session with a deadline must be fresh.');
+        Assert::assertTrue($gate->isFresh($caller, $operation), 'A session with a deadline must be fresh.');
     }
 
     /**
@@ -109,14 +115,15 @@ final class FreshnessGateContract
      * gate does.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return void
      */
-    public static function assertTheRequirementAsksWhatTheCallerAsks(FreshnessGate $gate): void
+    public static function assertTheRequirementAsksWhatTheCallerAsks(FreshnessGate $gate, CallerContext $caller): void
     {
-        Assert::assertNull($gate->requirement(self::UNCONFIGURED), 'An operation with no requirement must have none to judge by.');
+        Assert::assertNull($gate->requirement($caller, self::UNCONFIGURED), 'An operation with no requirement must have none to judge by.');
 
         $asked  = Requirement::none()->withAdditionalVerification(300);
-        $answer = $gate->requirement(self::UNCONFIGURED, $asked);
+        $answer = $gate->requirement($caller, self::UNCONFIGURED, $asked);
 
         Assert::assertNotNull($answer, 'A caller\'s requirement must be answered with a requirement.');
         Assert::assertSame($answer->toArray(), Requirement::strictest($answer, $asked)->toArray(), 'The requirement must ask at least what the caller asks.');

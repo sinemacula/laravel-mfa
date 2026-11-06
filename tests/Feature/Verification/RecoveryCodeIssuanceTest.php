@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace Tests\Feature\Verification;
 
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -31,6 +30,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Assurance\RefusingCombinationPolicy;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FreshOnceGate;
@@ -95,7 +95,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     {
         $user = $this->steppedUpPerson();
 
-        $generation = $this->mfa()->generateRecoveryCodes();
+        $generation = $this->mfa()->generateRecoveryCodes(Callers::current());
 
         self::assertTrue($generation->wasGenerated());
         self::assertNull($generation->reason);
@@ -153,8 +153,8 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         [$challenge, $code] = $this->sentCode($factor);
 
-        self::assertTrue($this->mfa()->verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
-        self::assertCount(10, $this->mfa()->generateRecoveryCodes()->codes);
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->isVerified());
+        self::assertCount(10, $this->mfa()->generateRecoveryCodes(Callers::current())->codes);
     }
 
     /**
@@ -172,7 +172,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         [$challenge, $code] = $this->sentCode($factor);
 
-        self::assertTrue($this->mfa()->verify(Submission::challenge($factor->id, $challenge, $code))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->isVerified());
 
         $this->assertRefused();
     }
@@ -189,7 +189,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         $this->pendingSession($user, Requirement::none(), [PendingAction::LIST_FACTORS, PendingAction::SEND_CODE, PendingAction::VERIFY]);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->generateRecoveryCodes()->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->generateRecoveryCodes(Callers::current())->reason);
         self::assertSame(0, RecoveryCode::query()->count());
     }
 
@@ -201,7 +201,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
      */
     public function testNoSignInIsRefused(): void
     {
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->generateRecoveryCodes()->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->generateRecoveryCodes(Callers::current())->reason);
 
         $user = $this->person();
 
@@ -225,7 +225,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         $this->container()->instance(FreshnessGate::class, $gate);
 
-        self::assertTrue($this->mfa()->generateRecoveryCodes()->wasGenerated());
+        self::assertTrue($this->mfa()->generateRecoveryCodes(Callers::current())->wasGenerated());
         self::assertSame(1, $gate->reads);
     }
 
@@ -253,7 +253,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         $this->container()->forgetInstance(FactorChangeGate::class);
 
-        self::assertTrue($this->mfa()->verify(Submission::recoveryCode($old))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::recoveryCode($old))->isVerified());
     }
 
     /**
@@ -271,7 +271,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         $this->container()->instance(FactorChangeGate::class, $gate);
 
-        self::assertTrue($this->mfa()->generateRecoveryCodes()->wasGenerated());
+        self::assertTrue($this->mfa()->generateRecoveryCodes(Callers::current())->wasGenerated());
         self::assertSame($this->container()->make(ProofStore::class)->currentSession($user, self::APPLICATION), $gate->requests[0]->session);
         self::assertSame(self::APPLICATION, $gate->requests[0]->application);
         self::assertSame(120, $gate->requests[0]->requirement?->maxAge(RequirementPart::ADDITIONAL_VERIFICATION));
@@ -305,13 +305,13 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         config()->set('mfa.applications.' . self::APPLICATION . '.recovery_codes.enabled', false);
 
-        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->generateRecoveryCodes()->reason);
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->generateRecoveryCodes(Callers::current())->reason);
 
         config()->set('mfa.applications.' . self::APPLICATION . '.recovery_codes.enabled', true);
 
         Factor::query()->update(['status' => 'pending']);
 
-        self::assertSame(FailureReason::NO_FACTOR, $this->mfa()->generateRecoveryCodes()->reason);
+        self::assertSame(FailureReason::NO_FACTOR, $this->mfa()->generateRecoveryCodes(Callers::current())->reason);
         self::assertSame(0, RecoveryCode::query()->count());
         self::assertTrue($user->exists);
     }
@@ -325,12 +325,11 @@ final class RecoveryCodeIssuanceTest extends TestCase
     {
         $identity = new NonEloquentIdentity('inactive', mfaEnabled: true, active: false);
 
-        Auth::shouldReceive('user')->andReturn($identity);
-        Auth::shouldReceive('getDefaultDriver')->andReturn('web');
+        $this->actingAs($identity);
 
         $this->container()->make(ProofStore::class)->begin($identity, self::APPLICATION, self::SESSION);
 
-        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->generateRecoveryCodes()->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->generateRecoveryCodes(Callers::current())->reason);
         self::assertSame(0, RecoveryCode::query()->count());
     }
 
@@ -353,10 +352,10 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         $this->container()->instance(SubjectTypeResolver::class, $resolver);
 
-        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->generateRecoveryCodes()->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->generateRecoveryCodes(Callers::current())->reason);
 
         try {
-            $this->mfa()->generateRecoveryCodes();
+            $this->mfa()->generateRecoveryCodes(Callers::current());
 
             self::fail('The resolver\'s refusal must propagate.');
         } catch (OperationRefusedException $exception) {
@@ -383,7 +382,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         $this->container()->forgetInstance(FreshnessGate::class);
 
-        self::assertTrue($this->mfa()->verify(Submission::recoveryCode($old))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::recoveryCode($old))->isVerified());
     }
 
     /**
@@ -403,7 +402,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
 
         $this->container()->instance(CombinationPolicy::class, $policy);
 
-        self::assertTrue($this->mfa()->generateRecoveryCodes()->wasGenerated());
+        self::assertTrue($this->mfa()->generateRecoveryCodes(Callers::current())->wasGenerated());
 
         $calls = $policy->calls;
 
@@ -447,7 +446,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
         });
 
         try {
-            $this->mfa()->generateRecoveryCodes();
+            $this->mfa()->generateRecoveryCodes(Callers::current());
 
             self::fail('The listener\'s refusal must propagate.');
         } catch (OperationRefusedException $exception) {
@@ -471,7 +470,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
         $connection = DB::connection((new Factor)->getConnectionName());
 
         $generation = $connection->transaction(function (): RecoveryCodeGeneration {
-            $generation = $this->mfa()->generateRecoveryCodes();
+            $generation = $this->mfa()->generateRecoveryCodes(Callers::current());
 
             self::assertSame([], $this->reported);
 
@@ -499,7 +498,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->totpFactor($user);
 
-        self::assertTrue($this->mfa()->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
 
         return $user;
     }
@@ -512,7 +511,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     private function assertRefused(): void
     {
         $before     = RecoveryCode::query()->whereNull('replaced_at')->count();
-        $generation = $this->mfa()->generateRecoveryCodes();
+        $generation = $this->mfa()->generateRecoveryCodes(Callers::current());
 
         self::assertFalse($generation->wasGenerated());
         self::assertSame(FailureReason::NOT_FRESH, $generation->reason);
@@ -524,13 +523,15 @@ final class RecoveryCodeIssuanceTest extends TestCase
      * Generating throws a seam's refusal, unmarked, leaving what was there.
      *
      * @return void
+     *
+     * @throws \Throwable
      */
     private function assertPropagates(): void
     {
         $generation = RecoveryCode::query()->whereNull('replaced_at')->max('generation');
 
         try {
-            $this->mfa()->generateRecoveryCodes();
+            $this->mfa()->generateRecoveryCodes(Callers::current());
 
             self::fail('A seam\'s refusal must propagate.');
         } catch (OperationRefusedException $exception) {

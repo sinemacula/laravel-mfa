@@ -38,6 +38,7 @@ use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Exceptions\CommitFailedException;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
@@ -152,13 +153,13 @@ final class CommitFailureTest extends TestCase
         $factor     = $this->totpFactor($user);
         $submission = Submission::factor($factor->id, AuthenticatorApp::code($factor));
 
-        $this->assertTheCommitFailureReachesTheCaller(static fn (): VerificationResult => Mfa::verify($submission));
+        $this->assertTheCommitFailureReachesTheCaller(static fn (): VerificationResult => Mfa::verify(Callers::current(), $submission));
 
         self::assertNull(Factor::query()->whereKey($factor->id)->sole()->last_used_at);
         self::assertSame([], $this->furtherProofs($user));
         self::assertSame([], $this->passedReports());
 
-        $retried = Mfa::verify($submission);
+        $retried = Mfa::verify(Callers::current(), $submission);
 
         self::assertTrue($retried->isVerified(), 'The code must still be unspent.');
         self::assertInstanceOf(IssuedTokens::class, $retried->completion());
@@ -180,13 +181,13 @@ final class CommitFailureTest extends TestCase
         $factor     = $this->totpFactor($user);
         $submission = Submission::factor($factor->id, AuthenticatorApp::code($factor));
 
-        $this->assertTheCommitFailureReachesTheCaller(static fn (): VerificationResult => Mfa::verify($submission));
+        $this->assertTheCommitFailureReachesTheCaller(static fn (): VerificationResult => Mfa::verify(Callers::current(), $submission));
 
         self::assertNull(Factor::query()->whereKey($factor->id)->sole()->last_used_at);
         self::assertSame([], $this->furtherProofs($user));
         self::assertSame([], $this->passedReports());
 
-        $retried = Mfa::verify($submission);
+        $retried = Mfa::verify(Callers::current(), $submission);
 
         self::assertTrue($retried->isVerified(), 'The code must still be unspent.');
         self::assertCount(1, $this->furtherProofs($user), 'The failed commit\'s proof must not follow the retry\'s.');
@@ -209,14 +210,14 @@ final class CommitFailureTest extends TestCase
 
         $this->forgetReports();
 
-        $this->assertTheCommitFailureReachesTheCaller(fn (): EnrollmentConfirmation => $this->mfa()->confirmEnrollment($grant, $code));
+        $this->assertTheCommitFailureReachesTheCaller(fn (): EnrollmentConfirmation => $this->mfa()->confirmEnrollment(Callers::current(), $grant, $code));
 
         self::assertSame(FactorStatus::PENDING, $this->pendingFactorOf($start)->getStatus());
         self::assertSame(0, RecoveryCode::query()->count());
         self::assertSame([], $this->furtherProofs($user));
         self::assertSame([], $this->passedReports());
 
-        $retried = $this->mfa()->confirmEnrollment($grant, $code);
+        $retried = $this->mfa()->confirmEnrollment(Callers::current(), $grant, $code);
 
         self::assertTrue($retried->isConfirmed(), 'The grant and the code must still work.');
         self::assertInstanceOf(IssuedTokens::class, $retried->verification?->completion());
@@ -311,7 +312,7 @@ final class CommitFailureTest extends TestCase
 
         $this->recordStepUp($user, $totp);
 
-        self::assertTrue(Mfa::removeFactor($email->id)->wasMade());
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $email->id)->wasMade());
         self::assertSame(['FactorRemoved'], $this->reportedNames());
     }
 
@@ -340,7 +341,7 @@ final class CommitFailureTest extends TestCase
 
         try {
             DB::connection(StorageConnection::name())->transaction(static function () use ($gate, $user, $registration): void {
-                self::assertNotNull($gate->registering($user, self::APPLICATION, $registration));
+                self::assertNotNull($gate->registering(Callers::of($user, self::APPLICATION), $registration));
             });
 
             self::fail('The commit failure must reach the caller.');
@@ -373,7 +374,7 @@ final class CommitFailureTest extends TestCase
         $this->pendingSession($user, Requirement::none()->withAdditionalVerification());
 
         $factor = $this->totpFactor($user);
-        $result = Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $result = Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
         self::assertFalse($result->isVerified());
         self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
@@ -398,7 +399,7 @@ final class CommitFailureTest extends TestCase
         try {
             DB::connection(StorageConnection::name())->transaction(static function () use ($submission, &$seen): void {
 
-                $seen = Mfa::verify($submission)->completion();
+                $seen = Mfa::verify(Callers::current(), $submission)->completion();
 
                 throw new MidRotationFailureException('The application changed its mind.');
             });
@@ -422,7 +423,7 @@ final class CommitFailureTest extends TestCase
 
         DB::connection(StorageConnection::name())->transaction(function () use ($submission): void {
 
-            self::assertInstanceOf(IssuedTokens::class, Mfa::verify($submission)->completion());
+            self::assertInstanceOf(IssuedTokens::class, Mfa::verify(Callers::current(), $submission)->completion());
             self::assertFalse($this->cookies()->hasQueued(TokenIssuingCompletion::COOKIE));
         });
 
@@ -442,21 +443,21 @@ final class CommitFailureTest extends TestCase
     {
         $router->post(self::ROUTE, static function (Request $request): Response {
 
-            $tokens = Mfa::verify(Submission::factor($request->string('factor')->toString(), $request->string('code')->toString()))->completion();
+            $tokens = Mfa::verify(Callers::current(), Submission::factor($request->string('factor')->toString(), $request->string('code')->toString()))->completion();
 
             return new Response($tokens instanceof IssuedTokens ? $tokens->accessToken : 'no token');
         })->middleware(AddQueuedCookiesToResponse::class);
 
         $router->post(self::CONFIRM_ROUTE, static function (Request $request): Response {
 
-            $tokens = Mfa::confirmEnrollment($request->string('grant')->toString(), $request->string('code')->toString())->verification?->completion();
+            $tokens = Mfa::confirmEnrollment(Callers::current(), $request->string('grant')->toString(), $request->string('code')->toString())->verification?->completion();
 
             return new Response($tokens instanceof IssuedTokens ? $tokens->accessToken : 'no token');
         })->middleware(AddQueuedCookiesToResponse::class);
 
         $router->post(self::REMOVE_ROUTE, static function (Request $request): Response {
 
-            $made = Mfa::removeFactor($request->string('factor')->toString())->wasMade();
+            $made = Mfa::removeFactor(Callers::current(), $request->string('factor')->toString())->wasMade();
 
             return new Response($made ? 'removed' : 'refused');
         })->middleware(AddQueuedCookiesToResponse::class);

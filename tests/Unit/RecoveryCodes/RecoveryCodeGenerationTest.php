@@ -21,6 +21,7 @@ use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -57,7 +58,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     public function testReturnsTheSetOnceAsSecrets(): void
     {
         $holder = $this->signInHolder();
-        $codes  = $this->recoveryCodes()->generate($holder);
+        $codes  = $this->recoveryCodes()->generate($holder, 'web');
 
         self::assertCount(10, $codes);
 
@@ -88,7 +89,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     {
         config()->set('mfa.recovery_codes', ['count' => 3, 'length' => 16, 'alphabet' => 'abcdefghjk']);
 
-        $codes = self::plaintexts($this->recoveryCodes()->generate($this->signInHolder()));
+        $codes = self::plaintexts($this->recoveryCodes()->generate($this->signInHolder(), 'web'));
 
         self::assertCount(3, $codes);
 
@@ -111,7 +112,7 @@ final class RecoveryCodeGenerationTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-11-01 09:30:00'));
 
         $holder = $this->signInHolder();
-        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
         $stored = $this->storedCodes($holder);
 
         self::assertCount(10, $stored);
@@ -154,7 +155,7 @@ final class RecoveryCodeGenerationTest extends TestCase
 
         $holder = $this->signInHolder();
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         foreach ($this->storedCodes($holder) as $row) {
             self::assertSame('argon2id', password_get_info((string) $row->getCodeHash())['algoName']);
@@ -173,13 +174,13 @@ final class RecoveryCodeGenerationTest extends TestCase
     public function testANewSetReplacesTheOldOne(): void
     {
         $holder   = $this->signInHolder();
-        $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $previous = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
 
         self::assertTrue($this->recoveryCodes()->redeem($holder, $previous[0], self::redemptionBinding($holder, Purpose::STEP_UP))->passed);
 
         $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00:00'));
 
-        $current = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $current = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
 
         $stored = $this->storedCodes($holder);
 
@@ -207,9 +208,9 @@ final class RecoveryCodeGenerationTest extends TestCase
         $neighbor = FactorHolder::query()->create(['email' => 'neighbor@example.com']);
 
         $this->addFactor($neighbor);
-        $this->recoveryCodes()->generate($neighbor);
+        $this->recoveryCodes()->generate($neighbor, 'web');
 
-        $this->recoveryCodes()->generate($this->signInHolder());
+        $this->recoveryCodes()->generate($this->signInHolder(), 'web');
 
         self::assertCount(10, $this->storedCodes($neighbor)->filter(static fn (RecoveryCode $row): bool => $row->isUsable()));
     }
@@ -229,7 +230,7 @@ final class RecoveryCodeGenerationTest extends TestCase
 
         Event::fake([RecoveryCodesGenerated::class]);
 
-        $codes = self::plaintexts($this->recoveryCodes()->generate($holder, $actor));
+        $codes = self::plaintexts($this->recoveryCodes()->generate($holder, 'web', $actor));
 
         Event::assertDispatchedTimes(RecoveryCodesGenerated::class, 1);
         Event::assertDispatched(RecoveryCodesGenerated::class, static function (RecoveryCodesGenerated $event) use ($codes, $actor): bool {
@@ -258,7 +259,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     public function testAFailedReplacementKeepsThePreviousSet(): void
     {
         $holder   = $this->signInHolder();
-        $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $previous = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
         $inserted = 0;
 
         RecoveryCode::creating(static function () use (&$inserted): void {
@@ -270,7 +271,7 @@ final class RecoveryCodeGenerationTest extends TestCase
         Event::fake([RecoveryCodesGenerated::class]);
 
         try {
-            $this->recoveryCodes()->generate($holder);
+            $this->recoveryCodes()->generate($holder, 'web');
             self::fail('The replacement was expected to fail.');
         } catch (MidRotationFailureException $exception) {
             self::assertSame('Failed mid-replacement.', $exception->getMessage());
@@ -295,7 +296,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     public function testACanceledCodeSaveKeepsThePreviousSet(): void
     {
         $holder   = $this->signInHolder();
-        $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $previous = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
         $inserted = 0;
 
         RecoveryCode::creating(static function () use (&$inserted): bool {
@@ -316,7 +317,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     public function testACanceledStateSaveKeepsThePreviousSet(): void
     {
         $holder   = $this->signInHolder();
-        $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $previous = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
 
         IdentityState::saving(static fn (): bool => false);
 
@@ -337,7 +338,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     {
         $holder = $this->signInHolder();
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         $usable = [];
 
@@ -345,7 +346,7 @@ final class RecoveryCodeGenerationTest extends TestCase
             $usable[] = $this->storedCodes($holder)->filter(static fn (RecoveryCode $row): bool => $row->isUsable())->count();
         });
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         self::assertSame(range(0, 9), $usable);
     }
@@ -364,7 +365,7 @@ final class RecoveryCodeGenerationTest extends TestCase
 
         $holder = $this->signInHolder();
 
-        $this->assertRefused(FailureReason::TYPE_NOT_ENABLED, fn () => $this->recoveryCodes()->generate($holder));
+        $this->assertRefused(FailureReason::TYPE_NOT_ENABLED, fn () => $this->recoveryCodes()->generate($holder, 'web'));
 
         self::assertCount(0, $this->storedCodes($holder));
     }
@@ -382,8 +383,8 @@ final class RecoveryCodeGenerationTest extends TestCase
         $pending = $this->signInHolder('pending@example.com', 'pending');
         $none    = $this->signInHolder('none@example.com', null);
 
-        $this->assertRefused(FailureReason::NO_FACTOR, fn () => $this->recoveryCodes()->generate($pending));
-        $this->assertRefused(FailureReason::NO_FACTOR, fn () => $this->recoveryCodes()->generate($none));
+        $this->assertRefused(FailureReason::NO_FACTOR, fn () => $this->recoveryCodes()->generate($pending, 'web'));
+        $this->assertRefused(FailureReason::NO_FACTOR, fn () => $this->recoveryCodes()->generate($none, 'web'));
 
         self::assertCount(0, $this->storedCodes($pending));
     }
@@ -408,7 +409,7 @@ final class RecoveryCodeGenerationTest extends TestCase
             'status'               => 'pending',
         ]);
 
-        $this->assertRefused(FailureReason::NO_FACTOR, fn () => $this->recoveryCodes()->generate($identity));
+        $this->assertRefused(FailureReason::NO_FACTOR, fn () => $this->recoveryCodes()->generate($identity, 'web'));
 
         self::assertSame(0, RecoveryCode::query()->where('authenticatable_id', 'pending-only')->count());
     }
@@ -420,8 +421,11 @@ final class RecoveryCodeGenerationTest extends TestCase
      */
     public function testRefusedForAMachineOrInactiveIdentity(): void
     {
-        $this->assertRefused(FailureReason::MACHINE_IDENTITY, fn () => $this->recoveryCodes()->generate(new NonEloquentIdentity('machine', mfaEnabled: true, person: false)));
-        $this->assertRefused(FailureReason::IDENTITY_INACTIVE, fn () => $this->recoveryCodes()->generate(new NonEloquentIdentity('inactive', mfaEnabled: true, active: false)));
+        $machine  = new NonEloquentIdentity('machine', mfaEnabled: true, person: false);
+        $inactive = new NonEloquentIdentity('inactive', mfaEnabled: true, active: false);
+
+        $this->assertRefused(FailureReason::MACHINE_IDENTITY, fn () => $this->recoveryCodes()->generate($machine, 'web'));
+        $this->assertRefused(FailureReason::IDENTITY_INACTIVE, fn () => $this->recoveryCodes()->generate($inactive, 'web'));
     }
 
     /**
@@ -437,13 +441,13 @@ final class RecoveryCodeGenerationTest extends TestCase
         $holder = $this->signInHolder();
         $factor = $holder->authFactors()->firstOrFail();
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         $factor->delete();
 
         self::assertCount(10, $this->storedCodes($holder));
         self::assertFalse($holder->isMfaEnabled());
-        self::assertSame([], Mfa::factors());
+        self::assertSame([], Mfa::factors(Callers::current()));
     }
 
     /**
@@ -466,7 +470,7 @@ final class RecoveryCodeGenerationTest extends TestCase
         $thrown = null;
 
         try {
-            $this->recoveryCodes()->generate($holder);
+            $this->recoveryCodes()->generate($holder, 'web');
         } catch (WriteCanceledException $exception) {
             $thrown = $exception;
         }

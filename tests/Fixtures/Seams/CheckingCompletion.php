@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Seams;
 
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
@@ -63,13 +64,14 @@ final class CheckingCompletion implements PendingCompletion, StepUp
     /**
      * Accept a successful result bound to the active session.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
     #[\Override]
-    public function stepUp(VerificationResult $result): ?object
+    public function stepUp(CallerContext $caller, VerificationResult $result): ?object
     {
         return $this->accept($result, $this->session);
     }

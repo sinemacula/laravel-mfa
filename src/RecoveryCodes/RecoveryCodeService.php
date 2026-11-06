@@ -18,7 +18,10 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
+use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -42,7 +45,6 @@ use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
-use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
@@ -66,8 +68,8 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  * whichever code matches, if any. Every event is dispatched through
  * `Events\EventDispatcher`, once the change it reports has committed.
  *
- * The application of every operation is the current request's (see
- * `Proofs\ProofService::application()`), read once per call.
+ * The application of every operation is the one it is given, and no request is
+ * read.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -87,14 +89,13 @@ final readonly class RecoveryCodeService
      * @param  \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGenerator  $generator
      * @param  \SineMacula\Laravel\Mfa\Factors\OperationGuard  $guard
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptService  $attempts
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofService  $proofs
      * @param  \SineMacula\Laravel\Mfa\Events\EventDispatcher  $events
      * @param  \SineMacula\Laravel\Mfa\Context\SessionFirstFactor  $firstFactors
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      */
     public function __construct(
 
-        /** The container the hasher and the request are read from on every call. */
+        /** The container the hasher is read from on every call. */
         private Container $container,
 
         /** The configuration the settings and models are read from on every call. */
@@ -108,9 +109,6 @@ final readonly class RecoveryCodeService
 
         /** The attempt service a redemption is counted through. */
         private AttemptService $attempts,
-
-        /** The application of the request. */
-        private ProofService $proofs,
 
         /** The dispatcher of the recovery code events. */
         private EventDispatcher $events,
@@ -145,25 +143,24 @@ final readonly class RecoveryCodeService
      * set is replaced, and a refusal leaves the old set intact.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
-     * @param  ?string  $application
      * @param  (\Closure(?\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>): void)|null  $gate
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      */
-    public function generate(MultiFactorAuthenticatable $identity, ?Actor $actor = null, ?string $application = null, ?\Closure $gate = null): array
+    public function generate(MultiFactorAuthenticatable $identity, string $application, ?Actor $actor = null, ?\Closure $gate = null, ?ClientContext $client = null): array
     {
-        $application ??= $this->proofs->application();
-
         ['codes' => $codes, 'generation' => $generation] = $this->replaceSet($identity, $application, $gate);
 
         // Dispatched from out here, so inside a caller's transaction it keeps
         // its place among the caller's events rather than running ahead of them
         // with this nested transaction's.
-        $this->reportGenerated($identity, $application, count($codes), $generation, $actor);
+        $this->reportGenerated($identity, $application, count($codes), $generation, $actor, $client);
 
         return $codes;
     }
@@ -230,14 +227,21 @@ final readonly class RecoveryCodeService
      * @param  int  $count
      * @param  int  $generation
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    public function reportGenerated(MultiFactorAuthenticatable $identity, string $application, int $count, int $generation, ?Actor $actor = null): void
-    {
-        $this->events->dispatch(new RecoveryCodesGenerated($this->events->context($identity, $application), $count, $generation, $actor));
+    public function reportGenerated(
+        MultiFactorAuthenticatable $identity,
+        string $application,
+        int $count,
+        int $generation,
+        ?Actor $actor = null,
+        ?ClientContext $client = null,
+    ): void {
+        $this->events->dispatch(new RecoveryCodesGenerated($this->events->context($identity, $application, $client), $count, $generation, $actor));
     }
 
     /**
@@ -249,12 +253,13 @@ final readonly class RecoveryCodeService
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
-    public function admission(MultiFactorAuthenticatable $identity, ProofBinding $binding): ChallengeAdmission
+    public function admission(MultiFactorAuthenticatable $identity, ProofBinding $binding, ?PendingContext $pending): ChallengeAdmission
     {
         try {
             $this->guard->identity($identity);
@@ -264,12 +269,13 @@ final readonly class RecoveryCodeService
 
         $settings = new ApplicationSettings($this->config, $binding->application);
         $owner    = ProofOwner::of($identity);
+        $known    = $this->hasKnownFirstFactor($identity, $binding, $pending);
 
         return match (true) {
-            !$settings->acceptsRecoveryCodes()               => ChallengeAdmission::refuse(FailureReason::TYPE_NOT_ENABLED, 'The application does not accept recovery codes.'),
-            !$this->hasConfirmedFactor($owner)               => ChallengeAdmission::refuse(FailureReason::NO_FACTOR, 'The identity has no confirmed factor.'),
-            !$this->hasKnownFirstFactor($identity, $binding) => ChallengeAdmission::refuse(FailureReason::NOT_ACCEPTED, 'The session\'s first factor is not known.'),
-            default                                          => ChallengeAdmission::admit(),
+            !$settings->acceptsRecoveryCodes() => ChallengeAdmission::refuse(FailureReason::TYPE_NOT_ENABLED, 'The application does not accept recovery codes.'),
+            !$this->hasConfirmedFactor($owner) => ChallengeAdmission::refuse(FailureReason::NO_FACTOR, 'The identity has no confirmed factor.'),
+            !$known                            => ChallengeAdmission::refuse(FailureReason::NOT_ACCEPTED, 'The session\'s first factor is not known.'),
+            default                            => ChallengeAdmission::admit(),
         };
     }
 
@@ -290,17 +296,18 @@ final readonly class RecoveryCodeService
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\Redemption
      *
      * @throws \Throwable
      */
-    public function redeem(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] string $code, ProofBinding $binding): Redemption
+    public function redeem(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] string $code, ProofBinding $binding, ?ClientContext $client = null): Redemption
     {
         $normalized = RecoveryCodeNormalizer::normalize($code);
         $checked    = null;
 
         $outcome = $this->attempts->attempt(
-            new Attempt($identity, null, $binding->purpose, $binding->application),
+            new Attempt($identity, null, $binding->purpose, $binding->application, $client),
             function () use ($identity, $normalized, &$checked): bool {
 
                 $checked = $this->check($identity, $normalized);
@@ -324,14 +331,15 @@ final readonly class RecoveryCodeService
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  int  $remaining
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    public function reportRedeemed(MultiFactorAuthenticatable $identity, ProofBinding $binding, int $remaining): void
+    public function reportRedeemed(MultiFactorAuthenticatable $identity, ProofBinding $binding, int $remaining, ?ClientContext $client = null): void
     {
-        $context  = $this->events->context($identity, $binding->application);
+        $context  = $this->events->context($identity, $binding->application, $client);
         $lowCount = (new RecoveryCodeSettings($this->config))->lowCount();
 
         $this->events->dispatch(new RecoveryCodeUsed($context, $remaining, $binding->purpose));
@@ -396,15 +404,16 @@ final readonly class RecoveryCodeService
      * stands: a pending session's when its credential allows listing them,
      * otherwise the signed-in person's; `null` when it serves nobody.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
-    public function statusOfCaller(): ?RecoveryCodeStatus
+    public function statusOfCaller(CallerContext $context): ?RecoveryCodeStatus
     {
-        $caller = $this->callers->resolve(PendingAction::LIST_FACTORS);
+        $caller = $this->callers->resolve($context, PendingAction::LIST_FACTORS);
 
         return $caller === null ? null : $this->status($caller->identity);
     }
@@ -424,6 +433,7 @@ final readonly class RecoveryCodeService
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return bool
      *
      * @throws \LogicException
@@ -432,12 +442,12 @@ final readonly class RecoveryCodeService
      *
      * @imperative
      */
-    public function removeSet(MultiFactorAuthenticatable $identity, ?Actor $actor = null): bool
+    public function removeSet(MultiFactorAuthenticatable $identity, ?Actor $actor = null, ?ClientContext $client = null): bool
     {
         $existed = $this->deleteSet($identity);
 
         if ($existed) {
-            $this->reportSetRemoved($identity, $actor);
+            $this->reportSetRemoved($identity, $actor, null, $client);
         }
 
         return $existed;
@@ -482,13 +492,15 @@ final readonly class RecoveryCodeService
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?string  $application
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function reportSetRemoved(MultiFactorAuthenticatable $identity, ?Actor $actor = null): void
+    public function reportSetRemoved(MultiFactorAuthenticatable $identity, ?Actor $actor = null, ?string $application = null, ?ClientContext $client = null): void
     {
-        $this->events->dispatch(new RecoveryCodesRemoved($this->events->context($identity, $this->proofs->application()), $actor));
+        $this->events->dispatch(new RecoveryCodesRemoved($this->events->context($identity, $application, $client), $actor));
     }
 
     /**
@@ -713,14 +725,15 @@ final readonly class RecoveryCodeService
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private function hasKnownFirstFactor(MultiFactorAuthenticatable $identity, ProofBinding $binding): bool
+    private function hasKnownFirstFactor(MultiFactorAuthenticatable $identity, ProofBinding $binding, ?PendingContext $pending): bool
     {
-        return $this->firstFactors->forBinding($identity, $binding) !== null;
+        return $this->firstFactors->forBinding($identity, $binding, $pending) !== null;
     }
 
     /**

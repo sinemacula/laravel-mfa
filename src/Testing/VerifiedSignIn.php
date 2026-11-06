@@ -26,7 +26,7 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
-use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\Proofs\SignInApplication;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
@@ -101,7 +101,7 @@ final readonly class VerifiedSignIn
 
         $guardName = $this->actOnGuard($identity, $guard);
 
-        $application ??= $this->container->make(ProofService::class)->applicationFor($guardName);
+        $application ??= SignInApplication::of($this->container, $guardName);
 
         $store   = $this->container->make(ProofStore::class);
         $session = self::begin($store, $identity, $application);

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
@@ -58,14 +59,15 @@ final readonly class FactorService
      * they decide verification and lockout, matched to the owner exactly, and
      * on every call, so nothing is kept from one request to the next.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function factors(): array
+    public function factors(CallerContext $context): array
     {
         /** @var list<\SineMacula\Laravel\Mfa\Factors\FactorSummary> */
-        return $this->listed()
+        return $this->listed($context)
             ->sortBy(static fn (EloquentFactor&Model $factor): array => [!$factor->isPreferred(), LockedFactors::idOf($factor)])
             ->map(static fn (EloquentFactor&Model $factor): FactorSummary => FactorSummary::fromFactor($factor))
             ->values()
@@ -78,14 +80,15 @@ final readonly class FactorService
      * its factors, so another person's cannot be told from one that does not
      * exist.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
      * @return ?\SineMacula\Laravel\Mfa\Factors\FactorSummary
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function factor(mixed $factorId): ?FactorSummary
+    public function factor(CallerContext $context, mixed $factorId): ?FactorSummary
     {
-        $factor = LockedFactors::withId($factorId, $this->listed());
+        $factor = LockedFactors::withId($factorId, $this->listed($context));
 
         return $factor === null ? null : FactorSummary::fromFactor($factor);
     }
@@ -95,6 +98,7 @@ final readonly class FactorService
      * label is what that application shows, so another application's factor is
      * `not_found`, as one that is not the person's is.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
      * @param  ?string  $label
      * @return \SineMacula\Laravel\Mfa\Factors\FactorChange
@@ -102,10 +106,10 @@ final readonly class FactorService
      * @throws \InvalidArgumentException
      * @throws \Throwable
      */
-    public function rename(mixed $factorId, ?string $label): FactorChange
+    public function rename(CallerContext $context, mixed $factorId, ?string $label): FactorChange
     {
         $label  = FactorLabel::normalize($label);
-        $caller = $this->served();
+        $caller = $this->served($context);
 
         if ($caller instanceof FactorChange) {
             return $caller;
@@ -125,14 +129,15 @@ final readonly class FactorService
      * it gives it up, through whichever application it was enrolled. Choosing
      * the factor already preferred changes nothing and reports nothing.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
      * @return \SineMacula\Laravel\Mfa\Factors\FactorChange
      *
      * @throws \Throwable
      */
-    public function setPreferred(mixed $factorId): FactorChange
+    public function setPreferred(CallerContext $context, mixed $factorId): FactorChange
     {
-        $caller = $this->served();
+        $caller = $this->served($context);
 
         if ($caller instanceof FactorChange) {
             return $caller;
@@ -164,13 +169,14 @@ final readonly class FactorService
      * The person a change is made for: one who is not served is `not_found`,
      * and an inactive one is refused.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return \SineMacula\Laravel\Mfa\Context\Caller|\SineMacula\Laravel\Mfa\Factors\FactorChange
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function served(): Caller|FactorChange
+    private function served(CallerContext $context): Caller|FactorChange
     {
-        $caller = $this->container->make(CallerContextResolver::class)->resolve(null);
+        $caller = $this->container->make(CallerContextResolver::class)->resolve($context, null);
 
         return match (true) {
             $caller === null                  => FactorChange::refused(FailureReason::NOT_FOUND),
@@ -206,7 +212,7 @@ final readonly class FactorService
         $summary = FactorSummary::fromFactor($factor);
         $events  = $this->container->make(EventDispatcher::class);
 
-        $events->dispatch(new FactorRenamed($events->context($caller->identity, $application), $summary, $previous));
+        $events->dispatch(new FactorRenamed($events->context($caller->identity, $application, $caller->client), $summary, $previous));
 
         return FactorChange::made($summary);
     }
@@ -272,7 +278,7 @@ final readonly class FactorService
         $changed = FactorSummary::fromFactor($factor);
         $events  = $this->container->make(EventDispatcher::class);
 
-        $events->dispatch(new PreferredFactorChanged($events->context($caller->identity, $application), $changed, $summary));
+        $events->dispatch(new PreferredFactorChanged($events->context($caller->identity, $application, $caller->client), $changed, $summary));
 
         return FactorChange::made($changed);
     }
@@ -283,16 +289,17 @@ final readonly class FactorService
      *
      * @formatter:off
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
      * @formatter:on
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function listed(): Collection
+    private function listed(CallerContext $context): Collection
     {
         $model  = new ($this->factorModel());
-        $caller = $this->container->make(CallerContextResolver::class)->resolve(PendingAction::LIST_FACTORS);
+        $caller = $this->container->make(CallerContextResolver::class)->resolve($context, PendingAction::LIST_FACTORS);
 
         return $caller === null ? $model->newCollection() : FactorStateTransaction::snapshot($caller->identity, $model);
     }

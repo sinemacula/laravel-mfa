@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
@@ -75,7 +76,7 @@ final class ChallengeCountersContract
             Assert::assertFalse(self::admission($identity, $confirmed, $enrolling)->isAdmitted(), 'A confirmed factor must not be challenged for enrolling.');
             Assert::assertFalse(self::admission($identity, $pending, $enrolling)->isAdmitted(), 'A pending factor with no live enrolment must not be challenged.');
 
-            self::counters()->report($identity, $confirmed, $enrolling, false);
+            self::counters()->report(CallerContext::forIdentity($identity, $enrolling->application), $confirmed, $enrolling, false);
         });
 
         Assert::assertSame($before, self::failures($confirmed), 'An enrolment challenge\'s outcome must change no factor\'s count.');
@@ -294,7 +295,9 @@ final class ChallengeCountersContract
     {
         $counters = self::counters();
 
-        foreach ([static fn () => $counters->isUsable($identity, $factor, $binding), static fn () => $counters->report($identity, $factor, $binding, false)] as $call) {
+        $caller = CallerContext::forIdentity($identity, $binding->application);
+
+        foreach ([static fn () => $counters->isUsable($caller, $factor, $binding), static fn () => $counters->report($caller, $factor, $binding, false)] as $call) {
             $outcome = null;
 
             try {
@@ -322,7 +325,9 @@ final class ChallengeCountersContract
         $other = new ProofBinding($binding->identityType, $binding->identityKey . '-other', $binding->application, $binding->sessionId, Purpose::SIGN_IN);
 
         DB::connection(StorageConnection::name())->transaction(static function () use ($identity, $factor, $other): void {
-            Assert::assertSame(FailureReason::NOT_FOUND, self::counters()->isUsable($identity, $factor, $other)->reason, 'A binding of another identity must not be admitted.');
+            $admission = self::counters()->isUsable(CallerContext::forIdentity($identity, $other->application), $factor, $other);
+
+            Assert::assertSame(FailureReason::NOT_FOUND, $admission->reason, 'A binding of another identity must not be admitted.');
         });
     }
 
@@ -355,7 +360,9 @@ final class ChallengeCountersContract
      */
     private static function admission(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): ChallengeAdmission
     {
-        return DB::connection(StorageConnection::name())->transaction(static fn (): ChallengeAdmission => self::counters()->isUsable($identity, $factor, $binding));
+        $caller = CallerContext::forIdentity($identity, $binding->application);
+
+        return DB::connection(StorageConnection::name())->transaction(static fn (): ChallengeAdmission => self::counters()->isUsable($caller, $factor, $binding));
     }
 
     /**

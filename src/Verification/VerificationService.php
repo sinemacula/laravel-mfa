@@ -14,12 +14,11 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
-use SineMacula\Laravel\Mfa\Attempts\RequestIp;
 use SineMacula\Laravel\Mfa\Context\Caller;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -114,18 +113,19 @@ final readonly class VerificationService
      * completing its sign-in; for an active one, stepping up unless `sign_in`
      * is asked for. See `PurposeRule`.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
      * @throws \Throwable
      */
-    public function verify(#[\SensitiveParameter] Submission $submission, ?Purpose $purpose = null): VerificationResult
+    public function verify(CallerContext $context, #[\SensitiveParameter] Submission $submission, ?Purpose $purpose = null): VerificationResult
     {
-        $caller = $this->callers->resolve(PendingAction::VERIFY);
+        $caller = $this->callers->resolve($context, PendingAction::VERIFY);
 
         if ($caller === null) {
-            return VerificationResult::failed(FailureReason::NOT_FOUND, 'The request serves nobody for verifying.');
+            return VerificationResult::failed(FailureReason::NOT_FOUND, 'The caller is nobody this verifies for.');
         }
 
         $allowed = PurposeRule::resolve($caller, $purpose);
@@ -133,7 +133,7 @@ final readonly class VerificationService
         if ($allowed === null) {
             $application = $this->callers->application($caller);
 
-            return $this->refused($caller->identity, $application, $purpose ?? Purpose::SIGN_IN, FailureReason::NOT_ACCEPTED, 'A verification is not made for that purpose.');
+            return $this->refused($caller, $application, $purpose ?? Purpose::SIGN_IN, FailureReason::NOT_ACCEPTED, 'A verification is not made for that purpose.');
         }
 
         $binding = $this->callers->binding($caller, $allowed);
@@ -163,7 +163,7 @@ final readonly class VerificationService
         try {
             $factor = $this->guard->factor($caller->identity, $submission->factorId, $binding->application);
         } catch (OperationRefusedException $exception) {
-            return $this->refused($caller->identity, $binding->application, $binding->purpose, $exception->reason, $exception->getMessage());
+            return $this->refused($caller, $binding->application, $binding->purpose, $exception->reason, $exception->getMessage());
         }
 
         $driver = $this->container->make(DriverResolver::class)->fromContainer($this->container, $factor->getType());
@@ -171,7 +171,7 @@ final readonly class VerificationService
         if (!SubmissionRoutes::fits($submission, $driver, $factor->getType())) {
             $check = CheckOutcome::refused(FailureReason::NOT_FOUND, 'The factor does not take that kind of submission.');
 
-            return $this->report($caller->identity, $binding, FactorSummary::fromFactor($factor), $factor->getType(), $submission, $check);
+            return $this->report($caller, $binding, FactorSummary::fromFactor($factor), $factor->getType(), $submission, $check);
         }
 
         return $this->attempt($submission, $caller, $binding, $factor, $driver);
@@ -197,7 +197,7 @@ final readonly class VerificationService
         (EloquentFactor&Model)|null $factor,
         ?FactorDriver $driver,
     ): VerificationResult {
-        $settled = $this->settled($submission, $caller->identity, $binding, $factor, $driver);
+        $settled = $this->settled($submission, $caller, $binding, $factor, $driver);
 
         if ($settled instanceof VerificationResult) {
             return $settled;
@@ -207,7 +207,7 @@ final readonly class VerificationService
         $summary  = $vanished || $factor === null ? null : FactorSummary::fromFactor($factor);
         $type     = $factor              === null ? RecoveryCodeService::TYPE : $factor->getType();
 
-        return $this->report($caller->identity, $binding, $summary, $vanished ? null : $type, $submission, $settled);
+        return $this->report($caller, $binding, $summary, $vanished ? null : $type, $submission, $settled);
     }
 
     /**
@@ -218,7 +218,7 @@ final readonly class VerificationService
      * propagates.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
@@ -229,7 +229,7 @@ final readonly class VerificationService
     private function settled(
         #[\SensitiveParameter]
         Submission $submission,
-        MultiFactorAuthenticatable $identity,
+        Caller $caller,
         ProofBinding $binding,
         (EloquentFactor&Model)|null $factor,
         ?FactorDriver $driver,
@@ -238,16 +238,16 @@ final readonly class VerificationService
 
         try {
             $outcome = $this->attempts->throttled(
-                RequestIp::resolve($this->container),
-                function () use ($submission, $identity, $binding, $factor, $driver, &$settled): AttemptOutcome {
+                $caller->client->ip,
+                function () use ($submission, $caller, $binding, $factor, $driver, &$settled): AttemptOutcome {
 
-                    $settled = $this->transaction($submission, $identity, $binding, $factor, $driver);
+                    $settled = $this->transaction($submission, $caller, $binding, $factor, $driver);
 
                     return self::attemptOutcome($settled);
                 },
             );
         } catch (SignInChangedException) {
-            return VerificationResult::failed(FailureReason::NOT_FOUND, 'The sign-in the verification was made for is no longer the request\'s.');
+            return VerificationResult::failed(FailureReason::NOT_FOUND, 'The sign-in the verification was made for is no longer the caller\'s.');
         } catch (RefusedUnderLockException $exception) {
             return CheckOutcome::refused($exception->refusal->reason, $exception->refusal->getMessage(), challengeId: $exception->challengeId);
         }
@@ -262,7 +262,7 @@ final readonly class VerificationService
      * everything back and is carried out, marked as made before the commit.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
@@ -272,16 +272,16 @@ final readonly class VerificationService
      */
     private function transaction(
         #[\SensitiveParameter] Submission $submission,
-        MultiFactorAuthenticatable $identity,
+        Caller $served,
         ProofBinding $binding,
         (EloquentFactor&Model)|null $factor,
         ?FactorDriver $driver,
     ): CheckOutcome|VerificationResult {
         $model = $factor ?? new (ConfiguredModels::factor($this->container->make(Repository::class)));
 
-        $settle = function (Collection $factors) use ($submission, $binding, $factor, $driver): CheckOutcome|VerificationResult {
+        $settle = function (Collection $factors) use ($submission, $served, $binding, $factor, $driver): CheckOutcome|VerificationResult {
 
-            $caller = $this->callers->still(PendingAction::VERIFY, $binding)
+            $caller = $this->callers->still($served, PendingAction::VERIFY, $binding)
                 ?? throw new SignInChangedException('The sign-in changed before the identity\'s lock was held.');
 
             return RefusedUnderLockException::carrying(function () use ($submission, $caller, $binding, $factor, $driver, $factors): CheckOutcome|VerificationResult {
@@ -298,7 +298,7 @@ final readonly class VerificationService
             });
         };
 
-        return FactorStateTransaction::forIdentity($identity, $model, $settle);
+        return FactorStateTransaction::forIdentity($served->identity, $model, $settle);
     }
 
     /**
@@ -321,13 +321,13 @@ final readonly class VerificationService
         EloquentFactor&Model $factor,
         FactorDriver $driver,
     ): CheckOutcome|VerificationResult {
-        $admission = $this->container->make(ChallengeCounters::class)->underLock($caller->identity, $factor, $binding);
+        $admission = $this->container->make(ChallengeCounters::class)->underLock($caller->context(), $factor, $binding);
 
         if (!$admission->isAdmitted()) {
             return CheckOutcome::refusedBy($admission);
         }
 
-        $check = $this->routes->factor($caller->identity, $submission, $factor, $driver, $binding);
+        $check = $this->routes->factor($caller, $submission, $factor, $driver, $binding);
 
         if (!$check->hasPassed()) {
             return $check;
@@ -360,13 +360,13 @@ final readonly class VerificationService
      */
     private function settleRecoveryCode(#[\SensitiveParameter] Submission $submission, Caller $caller, ProofBinding $binding): CheckOutcome|VerificationResult
     {
-        $admission = $this->container->make(RecoveryCodeService::class)->admission($caller->identity, $binding);
+        $admission = $this->container->make(RecoveryCodeService::class)->admission($caller->identity, $binding, $caller->pending);
 
         if (!$admission->isAdmitted()) {
             return CheckOutcome::refusedBy($admission);
         }
 
-        $check = $this->routes->recoveryCode($caller->identity, $submission, $binding);
+        $check = $this->routes->recoveryCode($caller, $submission, $binding);
 
         if (!$check->hasPassed()) {
             return $check;
@@ -424,12 +424,12 @@ final readonly class VerificationService
         $binding    = $proof->binding;
         $result     = $acceptance->evaluate($caller, $proof, $driverAmr, $type);
         $completion = $acceptance->handOver($caller, $result);
-        $context    = $this->events->context($caller->identity, $binding->application);
+        $context    = $this->events->context($caller->identity, $binding->application, $caller->client);
 
         $this->events->dispatch(new VerificationPassed($context, $summary, $type, $binding->purpose, $proof->challengeId));
 
         if ($check->remaining !== null) {
-            $this->container->make(RecoveryCodeService::class)->reportRedeemed($caller->identity, $binding, $check->remaining);
+            $this->container->make(RecoveryCodeService::class)->reportRedeemed($caller->identity, $binding, $check->remaining, $caller->client);
         }
 
         return $result->withCompletion($completion);
@@ -438,7 +438,7 @@ final readonly class VerificationService
     /**
      * Report a refusal made before any factor or attempt.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
@@ -448,9 +448,9 @@ final readonly class VerificationService
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    private function refused(MultiFactorAuthenticatable $identity, string $application, Purpose $purpose, FailureReason $reason, string $detail): VerificationResult
+    private function refused(Caller $caller, string $application, Purpose $purpose, FailureReason $reason, string $detail): VerificationResult
     {
-        $this->events->dispatch(new VerificationFailed($this->events->context($identity, $application), null, null, $purpose, $reason));
+        $this->events->dispatch(new VerificationFailed($this->events->context($caller->identity, $application, $caller->client), null, null, $purpose, $reason));
 
         return VerificationResult::failed($reason, $detail);
     }
@@ -460,7 +460,7 @@ final readonly class VerificationService
      * reported before a seam refused, or the one the submission named, and only
      * with the factor it was named for.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $summary
      * @param  ?string  $type
@@ -472,7 +472,7 @@ final readonly class VerificationService
      * @throws \InvalidArgumentException
      */
     private function report(
-        MultiFactorAuthenticatable $identity,
+        Caller $caller,
         ProofBinding $binding,
         ?FactorSummary $summary,
         ?string $type,
@@ -482,7 +482,7 @@ final readonly class VerificationService
         $reason = $check->reason ?? FailureReason::INVALID_CODE;
 
         $this->events->dispatch(new VerificationFailed(
-            $this->events->context($identity, $binding->application),
+            $this->events->context($caller->identity, $binding->application, $caller->client),
             $summary,
             $type,
             $binding->purpose,

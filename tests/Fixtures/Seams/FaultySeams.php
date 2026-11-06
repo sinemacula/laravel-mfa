@@ -7,6 +7,7 @@ namespace Tests\Fixtures\Seams;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
@@ -51,12 +52,13 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     /**
      * Everything is fresh.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return bool
      */
     #[\Override]
-    public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool
+    public function isFresh(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): bool
     {
         return true;
     }
@@ -64,12 +66,13 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     /**
      * A deadline already past, however fresh it says the session is.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return \Carbon\CarbonImmutable
      */
     #[\Override]
-    public function freshUntil(string $operation, ?Requirement $callerRequirement = null): CarbonImmutable
+    public function freshUntil(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): CarbonImmutable
     {
         return CarbonImmutable::now()->subHour();
     }
@@ -78,12 +81,13 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
      * A requirement that asks for nothing, whatever the operation or the caller
      * asks.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
      */
     #[\Override]
-    public function requirement(string $operation, ?Requirement $callerRequirement = null): Requirement
+    public function requirement(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): Requirement
     {
         return Requirement::none();
     }
@@ -107,11 +111,12 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
+     * @param  string  $application
      * @param  string  $session
      * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      */
     #[\Override]
-    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $session): RemovalRevocation
+    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $application, string $session): RemovalRevocation
     {
         // A faulty revoker revokes nothing.
         return RemovalRevocation::othersEnded();

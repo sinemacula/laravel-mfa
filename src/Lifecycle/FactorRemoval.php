@@ -8,6 +8,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -98,6 +99,7 @@ final readonly class FactorRemoval
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
      * @param  string  $session
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return \SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult
      *
      * @formatter:on
@@ -107,13 +109,19 @@ final readonly class FactorRemoval
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      */
-    public function remove(MultiFactorAuthenticatable $identity, string $application, EloquentFactor&Model $factor, Collection $factors, string $session): FactorRemovalResult
-    {
+    public function remove(
+        MultiFactorAuthenticatable $identity,
+        string $application,
+        EloquentFactor&Model $factor,
+        Collection $factors,
+        string $session,
+        ?ClientContext $client = null,
+    ): FactorRemovalResult {
         OpenTransaction::assertOpen('A factor is removed only inside the identity\'s factor state transaction.');
 
         $id      = self::idOf($factor);
         $summary = FactorSummary::fromFactor($factor);
-        $context = $this->events->context($identity, $application);
+        $context = $this->events->context($identity, $application, $client);
 
         $this->erase($identity, $factor);
 
@@ -124,7 +132,7 @@ final readonly class FactorRemoval
         // which hides every proof it does not record again once committed.
         $kept = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
 
-        $revocation   = $this->container->make(SessionRevoker::class)->factorRemoved($identity, $id, $session);
+        $revocation   = $this->container->make(SessionRevoker::class)->factorRemoved($identity, $id, $application, $session);
         $reevaluation = $this->container->make(SessionReevaluation::class);
 
         $judgement = $revocation->judgedCurrent
@@ -134,7 +142,7 @@ final readonly class FactorRemoval
         $this->events->dispatch(new FactorRemoved($context, $summary));
 
         if ($setRemoved) {
-            $this->recoveryCodes->reportSetRemoved($identity);
+            $this->recoveryCodes->reportSetRemoved($identity, null, $application, $client);
         }
 
         return FactorRemovalResult::made($summary, $judgement->outstanding, $judgement->completion());

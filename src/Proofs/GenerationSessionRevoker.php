@@ -57,6 +57,7 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
+     * @param  string  $application
      * @param  string  $session
      * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      *
@@ -65,13 +66,12 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
      * @throws \Throwable
      */
     #[\Override]
-    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $session): RemovalRevocation
+    public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $application, string $session): RemovalRevocation
     {
-        $store       = $this->container->make(ProofStore::class);
-        $application = $this->container->make(ProofService::class)->application();
-        $current     = $store->currentSession($identity, $application) === $session;
-        $kept        = $current ? self::without($factorId, $store->proofs($identity, $application)) : [];
-        $generation  = VerificationGeneration::advance($identity);
+        $store      = $this->container->make(ProofStore::class);
+        $current    = $store->currentSession($identity, $application) === $session;
+        $kept       = $current ? self::without($factorId, $store->proofs($identity, $application)) : [];
+        $generation = VerificationGeneration::advance($identity);
 
         if ($kept !== []) {
             $this->recordAgainOnCommit($identity, $application, $session, $kept, $generation);

@@ -40,8 +40,8 @@ credential the route uses, through the model's own lookup. It also records what 
 - `GET /factors/{factor}` behind `auth`: the signed-in person's factor.
 - `POST /sign-in/factors/{factor}/verify` with a pending credential the bound `PendingSessionResolver` validates: the
   pending session's own factor, `Mfa::verify()` then asking for `mfa.verify` itself.
-- A helper takes the factor's id, not the model: `Mfa::removeFactor($factor->getFactorIdentifier())`. `getRouteKey()` is
-  not the same value under a custom key.
+- A helper takes the factor's id, not the model: `Mfa::removeFactor($caller, $factor->getFactorIdentifier())`.
+  `getRouteKey()` is not the same value under a custom key.
 
 ## Failure / Edge Cases
 
@@ -59,7 +59,7 @@ credential the route uses, through the model's own lookup. It also records what 
   own, and is the way to bind other people's factors; `unlockFactor()` and `resetIdentity()` take the identity and a raw
   id, so an administrator needs no bound model.
 - An eager load on another connection is not pinned to its writer, and is not a security input.
-- A model passed to a helper finds nothing, since a helper looks up an id: `Mfa::removeFactor($factor)` answers
+- A model passed to a helper finds nothing, since a helper looks up an id: `Mfa::removeFactor($caller, $factor)` answers
   `not_found`.
 
 ## Rejected

@@ -11,6 +11,7 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
@@ -119,12 +120,12 @@ final class AuthenticatorAppTest extends TestCase
         $factor = $this->totpFactor($user);
         $code   = AuthenticatorApp::code($factor);
 
-        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
-        self::assertFalse(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, $code))->isVerified());
+        self::assertFalse(Mfa::verify(Callers::current(), Submission::factor($factor->id, $code))->isVerified());
 
         Carbon::setTestNow(Carbon::now()->addSeconds(120));
 
-        self::assertTrue(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor->refresh())))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor->refresh())))->isVerified());
     }
 
     /**

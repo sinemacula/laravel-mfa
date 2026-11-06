@@ -4,8 +4,8 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Context;
 
-use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Context\DefaultEventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
@@ -38,17 +38,15 @@ final class DefaultEventContextResolverTest extends TestCase
     }
 
     /**
-     * The identity by type and id, and the request's IP address and user agent;
-     * no principal, tenant or session.
+     * The identity's type and id, and the client's address and user agent; no
+     * application, which the dispatcher names, and no principal, tenant or
+     * session.
      *
      * @return void
      */
-    public function testResolvesTheIdentityAndTheRequest(): void
+    public function testResolvesTheIdentityAndTheClient(): void
     {
-        $request = Request::create('/', 'GET', server: ['REMOTE_ADDR' => '203.0.113.9', 'HTTP_USER_AGENT' => 'Mozilla/5.0']);
-        $request->setLaravelSession($this->container()->make('session.store'));
-
-        $context = $this->resolver()->resolve(new NonEloquentIdentity(identifier: 5), $request);
+        $context = $this->resolver()->resolve(new NonEloquentIdentity(identifier: 5), new ClientContext('203.0.113.9', 'Mozilla/5.0'));
 
         self::assertSame([
             'identity_type'  => NonEloquentIdentity::class,
@@ -90,29 +88,22 @@ final class DefaultEventContextResolverTest extends TestCase
     }
 
     /**
-     * A bound application resolver names the request's application; without a
-     * request it is not asked.
+     * The application is never read from a resolver: the dispatcher names the
+     * one the operation ran through.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testABoundApplicationResolverNamesTheApplication(): void
+    public function testNoApplicationIsRead(): void
     {
-        $this->container()->instance(ApplicationResolver::class, new class implements ApplicationResolver {
-            /**
-             * Name the application after the request's path.
-             *
-             * @param  \Illuminate\Http\Request  $request
-             * @return string
-             */
-            #[\Override]
-            public function resolve(Request $request): string
-            {
-                return 'app-' . $request->path();
-            }
-        });
+        $resolver = \Mockery::mock(ApplicationResolver::class);
 
-        self::assertSame('app-admin', $this->resolver()->resolve(null, Request::create('/admin'))['application']);
-        self::assertNull($this->resolver()->resolve(null, null)['application']);
+        $resolver->shouldNotReceive('resolve');
+
+        $this->container()->instance(ApplicationResolver::class, $resolver);
+
+        self::assertNull($this->resolver()->resolve(null, new ClientContext('203.0.113.9'))['application']);
     }
 
     /**

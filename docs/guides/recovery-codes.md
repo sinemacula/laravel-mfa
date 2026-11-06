@@ -27,11 +27,13 @@ keeps them (see [Secrets](secrets.md)). A route a cookie authenticates needs CSR
 [CSRF protection](middleware.md#csrf-protection)):
 
 ```php
+use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
 
-Route::post('/mfa/recovery-codes', function () {
-    $generation = Mfa::generateRecoveryCodes();
+Route::post('/mfa/recovery-codes', function (Request $request) {
+    $generation = Mfa::generateRecoveryCodes(CallerContext::fromRequest($request));
 
     if (! $generation->wasGenerated()) {
         return response()->json(['reason' => $generation->reason->value], 403);
@@ -73,15 +75,17 @@ the old set intact.
 
 ## Redeeming a code
 
-`Mfa::verify(Submission::recoveryCode($code), $purpose)` redeems a code wherever a factor's code is taken: to complete a
-pending sign-in or to step up (see [Verification](verification.md)). A code that passes is used up, and its proof is
-handed over like a factor's (see [Proofs](proofs.md)): kind `recovery_code`, method `recovery_code`, no channel.
+`Mfa::verify($caller, Submission::recoveryCode($code), $purpose)` redeems a code wherever a factor's code is taken: to
+complete a pending sign-in or to step up (see [Verification](verification.md)). A code that passes is used up, and its
+proof is handed over like a factor's (see [Proofs](proofs.md)): kind `recovery_code`, method `recovery_code`, no
+channel.
 
 ```php
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 
-$result = Mfa::verify(Submission::recoveryCode((string) $request->input('code')));
+$result = Mfa::verify(CallerContext::fromRequest($request), Submission::recoveryCode((string) $request->input('code')));
 
 if ($result->isFailed()) {
     return back()->withErrors(['code' => 'That code did not work.']);
@@ -107,7 +111,7 @@ These are refused before any attempt is made, so nothing is counted and no code 
 | `type_not_enabled`  | The application does not accept recovery codes                    |
 | `no_factor`         | The identity has no confirmed factor                              |
 | `not_accepted`      | The session's first factor is not known                           |
-| `not_found`         | The request serves nobody, or the identity has no sign-in         |
+| `not_found`         | Nobody is served, or the identity has no sign-in                  |
 
 A code that matches nothing fails with `invalid_code`, and an attempt a lockout refuses with `locked`. An identity at
 the failure ceiling is `locked` with no time, while a usable factor can still recover it. Every failure but the last row
@@ -123,7 +127,7 @@ the code already used.
 `Mfa::recoveryCodeStatus()` reports where the identity's set stands, without a code:
 
 ```php
-$status = Mfa::recoveryCodeStatus();
+$status = Mfa::recoveryCodeStatus($caller);
 
 $status?->remaining;    // unused codes of the current set
 $status?->generation;   // 0 before the first set

@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\SecondaryUser;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -67,16 +68,16 @@ final class PolymorphicIdentityTest extends TestCase
         // the current identity on every call, scoped by morph class as well as
         // identifier.
         $this->actingAs($primary);
-        self::assertFalse(Mfa::requirement()->isEmpty());
+        self::assertFalse(Mfa::requirement(Callers::current())->isEmpty());
 
-        $primaryFactors = Mfa::factors();
+        $primaryFactors = Mfa::factors(Callers::current());
         self::assertCount(1, $primaryFactors);
         self::assertSame('totp', $primaryFactors[0]->type);
 
         $this->actingAs($secondary);
-        self::assertFalse(Mfa::requirement()->isEmpty());
+        self::assertFalse(Mfa::requirement(Callers::current())->isEmpty());
 
-        $secondaryFactors = Mfa::factors();
+        $secondaryFactors = Mfa::factors(Callers::current());
         self::assertCount(1, $secondaryFactors);
         self::assertSame('email', $secondaryFactors[0]->type);
     }
@@ -114,12 +115,12 @@ final class PolymorphicIdentityTest extends TestCase
         ]);
 
         $this->actingAs($primary);
-        self::assertCount(1, Mfa::factors());
+        self::assertCount(1, Mfa::factors(Callers::current()));
 
         $this->actingAs($secondary);
         // Without per-class scoping this would erroneously list the primary's
         // factor, as it shares the id.
-        self::assertSame([], Mfa::factors());
+        self::assertSame([], Mfa::factors(Callers::current()));
     }
 
     /**
@@ -141,9 +142,9 @@ final class PolymorphicIdentityTest extends TestCase
         ]);
 
         $this->actingAs($primary);
-        self::assertTrue(Mfa::requirement()->isEmpty());
+        self::assertTrue(Mfa::requirement(Callers::current())->isEmpty());
 
         $this->actingAs($secondary);
-        self::assertTrue(Mfa::requirement()->isEmpty());
+        self::assertTrue(Mfa::requirement(Callers::current())->isEmpty());
     }
 }

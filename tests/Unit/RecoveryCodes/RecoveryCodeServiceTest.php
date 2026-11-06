@@ -79,10 +79,10 @@ final class RecoveryCodeServiceTest extends TestCase
         $neighbor = FactorHolder::query()->create(['email' => 'neighbor@example.com']);
 
         $this->addFactor($neighbor);
-        $this->recoveryCodes()->generate($neighbor);
+        $this->recoveryCodes()->generate($neighbor, 'web');
 
         $holder = $this->signInHolder();
-        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $codes  = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
         $status = $this->recoveryCodes()->status($holder);
 
         self::assertSame(10, $status->remaining);
@@ -97,7 +97,7 @@ final class RecoveryCodeServiceTest extends TestCase
 
         $this->travelTo(CarbonImmutable::parse('2026-11-03 08:00:00'));
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         $status = $this->recoveryCodes()->status($holder);
 
@@ -118,7 +118,7 @@ final class RecoveryCodeServiceTest extends TestCase
     {
         $holder = $this->signInHolder();
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         $statements = 0;
 
@@ -145,7 +145,7 @@ final class RecoveryCodeServiceTest extends TestCase
 
         $holder = $this->signInHolder();
 
-        foreach (self::plaintexts($this->recoveryCodes()->generate($holder)) as $code) {
+        foreach (self::plaintexts($this->recoveryCodes()->generate($holder, 'web')) as $code) {
             $this->recoveryCodes()->redeem($holder, $code, self::redemptionBinding($holder, Purpose::SIGN_IN));
         }
 
@@ -168,7 +168,7 @@ final class RecoveryCodeServiceTest extends TestCase
     {
         $holder = $this->signInHolder();
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         Event::fake([RecoveryCodesRemoved::class]);
 
@@ -201,8 +201,8 @@ final class RecoveryCodeServiceTest extends TestCase
         $holder = $this->signInHolder();
         $actor  = new Actor('admin', '9');
 
-        $this->recoveryCodes()->generate($holder);
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
+        $this->recoveryCodes()->generate($holder, 'web');
 
         Event::fake([RecoveryCodesRemoved::class]);
 
@@ -228,7 +228,7 @@ final class RecoveryCodeServiceTest extends TestCase
     {
         $holder = $this->signInHolder();
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         RecoveryCode::query()->delete();
 
@@ -280,7 +280,7 @@ final class RecoveryCodeServiceTest extends TestCase
     {
         $holder = $this->signInHolder();
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         IdentityState::saving(static fn (): bool => false);
 
@@ -314,7 +314,7 @@ final class RecoveryCodeServiceTest extends TestCase
     {
         $holder = $this->signInHolder();
 
-        $this->recoveryCodes()->generate($holder);
+        $this->recoveryCodes()->generate($holder, 'web');
 
         try {
             $this->recoveryCodes()->removeSet($holder);
@@ -342,13 +342,13 @@ final class RecoveryCodeServiceTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-10-01 00:00:00'));
 
         $holder = $this->signInHolder();
-        $first  = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $first  = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
 
         $this->recoveryCodes()->redeem($holder, $first[0], self::redemptionBinding($holder, Purpose::SIGN_IN));
 
         $this->travelTo(CarbonImmutable::parse('2026-10-10 00:00:00'));
 
-        $second = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $second = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
 
         $this->travelTo(CarbonImmutable::parse('2026-10-20 00:00:00'));
 
@@ -421,19 +421,19 @@ final class RecoveryCodeServiceTest extends TestCase
     public function testAGateRunsBeforeTheLockAndAgainUnderIt(): void
     {
         $holder   = $this->signInHolder();
-        $previous = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $previous = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
         $asked    = [];
 
-        $this->recoveryCodes()->generate($holder, null, null, static function (?Collection $factors) use (&$asked): void {
+        $this->recoveryCodes()->generate($holder, 'web', null, static function (?Collection $factors) use (&$asked): void {
             $asked[] = $factors?->count();
         });
 
         self::assertSame([null, 1], $asked);
 
-        $current = self::plaintexts($this->recoveryCodes()->generate($holder));
+        $current = self::plaintexts($this->recoveryCodes()->generate($holder, 'web'));
 
         try {
-            $this->recoveryCodes()->generate($holder, null, null, static function (?Collection $factors): void {
+            $this->recoveryCodes()->generate($holder, 'web', null, static function (?Collection $factors): void {
                 OperationRefusedException::byPackageUnless($factors !== null, FailureReason::NOT_FRESH, 'Refused before the lock.');
             });
             self::fail('The gate was expected to refuse before the lock.');

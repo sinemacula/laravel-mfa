@@ -8,11 +8,11 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Assurance\Evaluation;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
-use SineMacula\Laravel\Mfa\Proofs\ProofService;
 
 /**
  * The default `FreshnessGate`, which works from the proof store alone: the
@@ -54,6 +54,7 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
     /**
      * Whether the current session is fresh for the operation.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return bool
@@ -63,9 +64,9 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
-    public function isFresh(string $operation, ?Requirement $callerRequirement = null): bool
+    public function isFresh(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): bool
     {
-        return $this->evaluation($operation, $callerRequirement)?->meetsRequirement() === true;
+        return $this->evaluation($caller, $operation, $callerRequirement)?->meetsRequirement() === true;
     }
 
     /**
@@ -73,6 +74,7 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
      * proofs it holds now: `null` when it is not fresh, and when the bound
      * policy reports no such time for a requirement bounded by a maximum age.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return ?\Carbon\CarbonImmutable
@@ -82,15 +84,16 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
-    public function freshUntil(string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
+    public function freshUntil(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
     {
-        return $this->evaluation($operation, $callerRequirement)?->metUntil;
+        return $this->evaluation($caller, $operation, $callerRequirement)?->metUntil;
     }
 
     /**
      * The requirement the application configures for the operation, with the
      * caller's: the stricter of the two, either alone when the other is absent.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
@@ -99,11 +102,9 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
      * @throws \InvalidArgumentException
      */
     #[\Override]
-    public function requirement(string $operation, ?Requirement $callerRequirement = null): ?Requirement
+    public function requirement(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?Requirement
     {
-        $application = $this->container->make(ProofService::class)->application();
-
-        return (new OperationRequirements($this->container->make(Repository::class)))->effective($application, $operation, $callerRequirement);
+        return (new OperationRequirements($this->container->make(Repository::class)))->effective($caller->application, $operation, $callerRequirement);
     }
 
     /**
@@ -111,6 +112,7 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
      * requirement, or `null` without a requirement or an active person it
      * serves.
      *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
      * @return ?\SineMacula\Laravel\Mfa\Assurance\Evaluation
@@ -119,11 +121,11 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private function evaluation(string $operation, ?Requirement $callerRequirement): ?Evaluation
+    private function evaluation(CallerContext $caller, string $operation, ?Requirement $callerRequirement): ?Evaluation
     {
-        $application = $this->container->make(ProofService::class)->application();
-        $requirement = $this->requirement($operation, $callerRequirement);
-        $identity    = $this->container->make(CallerContextResolver::class)->resolve(null)?->identity;
+        $application = $caller->application;
+        $requirement = $this->requirement($caller, $operation, $callerRequirement);
+        $identity    = $this->container->make(CallerContextResolver::class)->resolve($caller, null)?->identity;
 
         if ($requirement === null || $identity === null || !$identity->isMfaActive()) {
             return null;

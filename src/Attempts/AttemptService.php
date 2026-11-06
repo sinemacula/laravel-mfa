@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -23,8 +24,8 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
-use SineMacula\Laravel\Mfa\Support\CurrentIdentity;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
+use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
  * Counts failed attempts, applies and lifts lockouts, and disables a factor at
@@ -266,14 +267,20 @@ final readonly class AttemptService
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  ?string  $application
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return bool
      *
      * @throws \Throwable
      *
      * @imperative
      */
-    public function liftLockout(MultiFactorAuthenticatable $identity, ?Factor $factor = null, ?Actor $actor = null, ?string $application = null): bool
-    {
+    public function liftLockout(
+        MultiFactorAuthenticatable $identity,
+        ?Factor $factor = null,
+        ?Actor $actor = null,
+        ?string $application = null,
+        ?ClientContext $client = null,
+    ): bool {
         $subject = $this->subject($identity);
 
         $lifted = FactorStateTransaction::forIdentity($identity, $this->factorModel($factor), function (Collection $factors) use ($subject, $factor): bool {
@@ -292,7 +299,7 @@ final readonly class AttemptService
 
         if ($lifted) {
             $this->events->dispatch(new LockoutLifted(
-                $this->events->context($identity, $application),
+                $this->events->context($identity, $application, $client),
                 $factor === null ? null : FactorSummary::fromFactor($factor),
                 $actor,
             ));
@@ -514,7 +521,7 @@ final readonly class AttemptService
 
         $state->save();
 
-        $events[] = new LockoutApplied($this->events->context($attempt->identity, $attempt->application), null, $until, $attempt->purpose);
+        $events[] = new LockoutApplied($this->events->context($attempt->identity, $attempt->application, $attempt->client), null, $until, $attempt->purpose);
 
         return $state->consecutive_failures;
     }
@@ -553,7 +560,8 @@ final readonly class AttemptService
             $factor->setAttribute($factor->getDisabledAtName(), $now);
             $factor->persist();
 
-            $events[] = new FactorDisabled($this->events->context($attempt->identity, $attempt->application), FactorSummary::fromFactor($factor), $attempt->purpose);
+            $context  = $this->events->context($attempt->identity, $attempt->application, $attempt->client);
+            $events[] = new FactorDisabled($context, FactorSummary::fromFactor($factor), $attempt->purpose);
 
             return;
         }
@@ -570,7 +578,7 @@ final readonly class AttemptService
         $factor->setAttribute($factor->getLockedUntilName(), $until);
         $factor->persist();
 
-        $context = $this->events->context($attempt->identity, $attempt->application);
+        $context = $this->events->context($attempt->identity, $attempt->application, $attempt->client);
 
         $events[] = new LockoutApplied($context, FactorSummary::fromFactor($factor), $until, $attempt->purpose);
     }
@@ -810,6 +818,6 @@ final readonly class AttemptService
             throw new UnsupportedIdentifierException(sprintf('An identity key must be a non-empty string or an integer to count its attempts; got [%s].', get_debug_type($key)));
         }
 
-        return [CurrentIdentity::typeOf($identity), (string) $key];
+        return [IdentityType::of($identity), (string) $key];
     }
 }

@@ -4,7 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Seams;
 
-use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
@@ -37,16 +37,16 @@ final readonly class ObjectContextResolver implements EventContextResolver
      * when given no identity and told to.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  ?\Illuminate\Http\Request  $request
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return array<string, int|string|null>
      */
     #[\Override]
-    public function resolve(?MultiFactorAuthenticatable $identity, ?Request $request): array
+    public function resolve(?MultiFactorAuthenticatable $identity, ?ClientContext $client): array
     {
         // The object breaks the contract on purpose, for the kit to reject.
         if ($this->forIdentity) {
             // @phpstan-ignore return.type
-            return $identity === null ? ['identity_id' => null] : ['identity_id' => 'person-1', 'request' => $request];
+            return $identity === null ? ['identity_id' => null] : ['identity_id' => 'person-1', 'client' => $client];
         }
 
         // @phpstan-ignore return.type

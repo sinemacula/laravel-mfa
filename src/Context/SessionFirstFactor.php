@@ -42,35 +42,31 @@ final readonly class SessionFirstFactor
      * Constructor.
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
-     * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      */
     public function __construct(
 
-        /** The container the store and the resolver are resolved from. */
+        /** The container the store is resolved from. */
         private Container $container,
-
-        /** The reader of the request's pending session. */
-        private CallerContextResolver $callers,
     ) {}
 
     /**
      * The first factor of the session the binding names: the pending session's
-     * when the request carries one and the binding names it, otherwise the
+     * when the caller holds one and the binding names it, otherwise the
      * identity's current sign-in's when the binding names it; `null` for any
-     * other session. A request carrying a pending session is never answered
-     * from an active sign-in, so its credential reaches no other session.
+     * other session. A caller holding a pending session is never answered from
+     * an active sign-in, so its credential reaches no other session.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function forBinding(MultiFactorAuthenticatable $identity, ProofBinding $binding): ?Proof
+    public function forBinding(MultiFactorAuthenticatable $identity, ProofBinding $binding, ?PendingContext $pending): ?Proof
     {
-        $owner   = ProofOwner::of($identity);
-        $pending = $this->callers->pending();
+        $owner = ProofOwner::of($identity);
 
         if (!$owner->owns($binding)) {
             return null;

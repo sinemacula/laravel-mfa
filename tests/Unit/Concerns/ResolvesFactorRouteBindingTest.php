@@ -6,7 +6,6 @@ namespace Tests\Unit\Concerns;
 
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -95,7 +94,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
         $identity = new NonEloquentIdentity('machine-1', person: false);
         $factor   = $this->factor(NonEloquentIdentity::class, 'machine-1');
 
-        Auth::shouldReceive('user')->andReturn($identity);
+        $this->actingAs($identity);
 
         DB::enableQueryLog();
 
@@ -134,7 +133,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
         $identity = new NonEloquentIdentity(['nested' => 'array']);
         $factor   = $this->factor(NonEloquentIdentity::class, 'plain-1');
 
-        Auth::shouldReceive('user')->andReturn($identity);
+        $this->actingAs($identity);
 
         self::assertNull((new Factor)->resolveRouteBinding($factor->id));
     }
@@ -271,7 +270,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
      */
     public function testAnOwnerDifferingOnlyInCaseMisses(): void
     {
-        Auth::shouldReceive('user')->andReturn(new NonEloquentIdentity('plain-a'));
+        $this->actingAs(new NonEloquentIdentity('plain-a'));
 
         $key  = $this->factor(NonEloquentIdentity::class, 'PLAIN-A');
         $type = $this->factor(strtolower(NonEloquentIdentity::class), 'plain-a');
@@ -291,7 +290,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     {
         $factor = $this->factor(NonEloquentIdentity::class, '7');
 
-        Auth::shouldReceive('user')->andReturn(new NonEloquentIdentity(7));
+        $this->actingAs(new NonEloquentIdentity(7));
 
         self::assertSame($factor->id, (new Factor)->resolveRouteBinding($factor->id)?->getKey());
     }

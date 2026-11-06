@@ -29,6 +29,7 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -79,9 +80,9 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code))->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, $code))->isVerified());
 
-        $proofs = Mfa::proofs();
+        $proofs = Mfa::proofs(Callers::current());
 
         self::assertCount(1, $proofs);
         self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proofs[0]->kind);
@@ -105,9 +106,9 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        self::assertTrue(Mfa::verify(Submission::factor($factor->id, $code), Purpose::SIGN_IN)->isVerified());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, $code), Purpose::SIGN_IN)->isVerified());
 
-        $proofs = Mfa::proofs();
+        $proofs = Mfa::proofs(Callers::current());
 
         self::assertCount(1, $proofs);
         self::assertSame(Purpose::SIGN_IN, $proofs[0]->binding->purpose);
@@ -126,12 +127,12 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        Mfa::verify(Submission::factor($factor->id, $code));
+        Mfa::verify(Callers::current(), Submission::factor($factor->id, $code));
 
         Auth::logout();
         Auth::setUser($user);
 
-        self::assertSame([], Mfa::proofs());
+        self::assertSame([], Mfa::proofs(Callers::current()));
     }
 
     /**
@@ -148,14 +149,14 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        Mfa::verify(Submission::factor($factor->id, $code));
+        Mfa::verify(Callers::current(), Submission::factor($factor->id, $code));
 
-        self::assertCount(1, Mfa::proofs());
+        self::assertCount(1, Mfa::proofs(Callers::current()));
 
         Auth::logoutCurrentDevice();
         Auth::setUser($user);
 
-        self::assertSame([], Mfa::proofs());
+        self::assertSame([], Mfa::proofs(Callers::current()));
     }
 
     /**
@@ -175,20 +176,20 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        Mfa::verify(Submission::factor($factor->id, $code));
+        Mfa::verify(Callers::current(), Submission::factor($factor->id, $code));
 
         Auth::guard('admin')->login($user);
 
-        self::assertCount(1, Mfa::proofs());
+        self::assertCount(1, Mfa::proofs(Callers::current()));
 
         Auth::guard('admin')->logout();
 
-        self::assertCount(1, Mfa::proofs());
+        self::assertCount(1, Mfa::proofs(Callers::current()));
 
         // The step just accepted is never accepted again, so the next one is
         // proved.
-        self::assertTrue(Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->isVerified());
-        self::assertCount(2, Mfa::proofs());
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->isVerified());
+        self::assertCount(2, Mfa::proofs(Callers::current()));
     }
 
     /**
@@ -210,18 +211,18 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        Mfa::verify(Submission::factor($factor->id, $code));
+        Mfa::verify(Callers::current(), Submission::factor($factor->id, $code));
 
         Auth::guard('admin')->setUser($user);
         Auth::shouldUse('admin');
 
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->reason);
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->reason);
 
-        $admin = Mfa::proofs();
+        $admin = Mfa::proofs(Callers::current());
 
         Auth::shouldUse('web');
 
-        $web = Mfa::proofs();
+        $web = Mfa::proofs(Callers::current());
 
         self::assertSame([], $admin);
         self::assertCount(1, $web);
@@ -251,17 +252,17 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($alice);
 
-        Mfa::verify(Submission::factor($factor->id, $code));
+        Mfa::verify(Callers::current(), Submission::factor($factor->id, $code));
 
-        self::assertCount(1, Mfa::proofs());
+        self::assertCount(1, Mfa::proofs(Callers::current()));
 
         Auth::login($bob);
 
-        self::assertSame([], Mfa::proofs());
+        self::assertSame([], Mfa::proofs(Callers::current()));
 
         Auth::login($alice);
 
-        self::assertSame([], Mfa::proofs());
+        self::assertSame([], Mfa::proofs(Callers::current()));
     }
 
     /**
@@ -281,8 +282,8 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Submission::factor($factor->id, $code))->reason);
-        self::assertSame([], Mfa::proofs());
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Callers::current(), Submission::factor($factor->id, $code))->reason);
+        self::assertSame([], Mfa::proofs(Callers::current()));
 
         $this->expectException(InsufficientAuthenticationException::class);
 
@@ -319,16 +320,16 @@ final class SignInProofsTest extends TestCase
 
         [$factor, $code] = $this->enrollTotp($user);
 
-        Mfa::verify(Submission::factor($factor->id, $code));
+        Mfa::verify(Callers::current(), Submission::factor($factor->id, $code));
 
-        $proofs = Mfa::proofs();
+        $proofs = Mfa::proofs(Callers::current());
 
         self::assertSame([ProofKind::FIRST_FACTOR, ProofKind::ADDITIONAL_FACTOR], array_map(static fn (Proof $proof): ProofKind => $proof->kind, $proofs));
         self::assertSame('guard-session-1', $proofs[1]->binding->sessionId);
 
         GuardHooks::signedOut($user, 'web');
 
-        self::assertSame([], Mfa::proofs());
+        self::assertSame([], Mfa::proofs(Callers::current()));
     }
 
     /**
