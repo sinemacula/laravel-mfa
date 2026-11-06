@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
@@ -23,6 +24,7 @@ use SineMacula\Laravel\Mfa\Requirements\OperationRequirements;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
+use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
@@ -165,6 +167,39 @@ final class ConfiguredFreshnessGateTest extends TestCase
 
         self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
         self::assertNull($this->gate()->freshUntil(Callers::current(), 'mfa.add_factor'));
+    }
+
+    /**
+     * The bound active state resolver, not the identity, decides who is
+     * inactive: a person it finds inactive is never fresh, whatever proofs the
+     * store holds, and an identity it finds active is judged by its proofs.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAnIdentityTheBoundResolverFindsInactiveIsNeverFresh(): void
+    {
+        $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password(), $signIn->totp()]);
+
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
+
+        $this->container()->instance(ActiveStateResolver::class, new InvertedActiveState);
+
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
+        self::assertNull($this->gate()->freshUntil(Callers::current(), 'mfa.add_factor'));
+
+        $identity = new NonEloquentIdentity('someone-1', active: false);
+        $signIn   = SignInProofs::of($identity);
+        $store    = $this->container()->make(ProofStore::class);
+
+        $this->actingAs($identity);
+
+        $store->begin($identity, SignInProofs::APPLICATION, SignInProofs::SESSION);
+        $store->record($signIn->password());
+        $store->record($signIn->totp());
+
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
     }
 
     /**

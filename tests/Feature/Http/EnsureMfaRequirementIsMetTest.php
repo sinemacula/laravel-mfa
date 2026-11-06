@@ -10,6 +10,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
@@ -31,6 +32,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
+use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
 use Tests\Fixtures\Http\NeverFreshGate;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -563,6 +565,32 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
         self::assertFalse($bare->hasConfirmedFactor);
         self::assertSame([], $bare->offered);
         self::assertSame(['additional_verification' => ['max_age' => 300]], $operation->requirement->toArray());
+    }
+
+    /**
+     * The bound active state resolver, not the identity, decides who is
+     * inactive: under `never`, a person it finds inactive is refused with
+     * nothing from the gate, and an identity it finds active is let on.
+     *
+     * @return void
+     */
+    public function testAnIdentityTheBoundResolverFindsInactiveIsRefused(): void
+    {
+        $this->configureTheOperation();
+
+        $this->container()->instance(ActiveStateResolver::class, new InvertedActiveState);
+
+        $this->signedInPerson();
+
+        $bare = $this->refusal(self::BARE);
+
+        self::assertSame([], $bare->requirement->toArray());
+        self::assertFalse($bare->hasConfirmedFactor);
+        self::assertSame([], $bare->offered);
+
+        $this->actingAs(new NonEloquentIdentity('person-1', mfaEnabled: true, active: false));
+
+        $this->get(self::BARE)->assertOk();
     }
 
     /**

@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Context\IdentityContractSubjectType;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -26,6 +27,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -208,6 +210,27 @@ final class ChallengeCountersTest extends TestCase
         $binding  = new ProofBinding(NonEloquentIdentity::class, 'plain-1', 'web', self::CHALLENGE_SESSION, Purpose::SIGN_IN);
 
         self::assertSame(FailureReason::IDENTITY_INACTIVE, DB::transaction(fn () => $this->counters()->isUsable(Callers::of($inactive, 'web'), $this->factor, $binding))->reason);
+    }
+
+    /**
+     * The bound active state resolver, not the identity, decides who is
+     * inactive: an identity it finds inactive is refused, and one it finds
+     * active is not, whatever each says of itself.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheBoundActiveStateResolverDecidesWhoIsInactive(): void
+    {
+        $this->container()->instance(ActiveStateResolver::class, new InvertedActiveState);
+
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->admission()->reason);
+
+        $inactive = new NonEloquentIdentity('plain-1', active: false);
+        $binding  = new ProofBinding(NonEloquentIdentity::class, 'plain-1', 'web', self::CHALLENGE_SESSION, Purpose::SIGN_IN);
+
+        self::assertSame(FailureReason::NOT_FOUND, DB::transaction(fn () => $this->counters()->isUsable(Callers::of($inactive, 'web'), $this->factor, $binding))->reason);
     }
 
     /**
