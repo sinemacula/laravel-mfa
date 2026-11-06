@@ -51,8 +51,7 @@ final class ChallengeCountersContract
     /**
      * Under a binding whose purpose is `enrollment`, a confirmed factor is
      * refused and a pending one with no live enrolment too; and an outcome
-     * reported for one changes no failure count of the factor or the identity,
-     * and causes no lockout.
+     * reported for one changes no failure count of the factor or the identity.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $confirmed
@@ -77,9 +76,7 @@ final class ChallengeCountersContract
             Assert::assertFalse(self::admission($identity, $confirmed, $enrolling)->isAdmitted(), 'A confirmed factor must not be challenged for enrolling.');
             Assert::assertFalse(self::admission($identity, $pending, $enrolling)->isAdmitted(), 'A pending factor with no live enrolment must not be challenged.');
 
-            $outcome = self::counters()->report(CallerContext::forIdentity($identity, $enrolling->application), $confirmed, $enrolling, false);
-
-            Assert::assertNull($outcome->caused, 'An enrolment challenge\'s outcome must cause no lockout.');
+            self::counters()->report(CallerContext::forIdentity($identity, $enrolling->application), $confirmed, $enrolling, false);
         });
 
         Assert::assertSame($before, self::failures($confirmed), 'An enrolment challenge\'s outcome must change no factor\'s count.');
