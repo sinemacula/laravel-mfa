@@ -41,6 +41,14 @@ separate operations, and all are described here.
 - A refused attempt is refused before the verification runs, in the order a factor or identity at the ceiling, then the
   lockout that ends last (`Lockout::strictest()`), and counted nowhere: it never extends a lockout or a throttle. The
   outcome carries the `Attempts\Lockout`: its scope and when it ends, or no time at the ceiling.
+- A failure that counting locks or disables carries the lockout it caused as `AttemptOutcome::$caused` (and
+  `causedLockout()` is true), while `$lockout` stays null, since nothing refused it. It is the lockout the next attempt
+  naming the same factor would be refused by, judged as that refusal is: the strictest of the identity's lockout and
+  the factor's own, or, for an attempt naming no stateful factor, the identity's run at the ceiling too. A factor
+  disabled by the identity's run reaching the ceiling is reported as the factor disabled, not as an identity lock,
+  since another factor can still be proved. One failure can lock the identity and the factor together; the outcome
+  names the strictest of them, and the events name each. The address's throttle is never reported here: it is a slot
+  of a window, not a count this failure made.
 - The verification is handed the factor as stored under the lock (`Attempts\LockedFactors::find()`), not the instance
   the caller read, so a replaced secret is the one checked, and what it writes to that factor commits with the count.
   A delivered code is checked by the code service inside the same transaction, against the code the request's session
@@ -86,9 +94,9 @@ separate operations, and all are described here.
   `Codes\PackageChallengeGateway`) is counted through `Attempts\ChallengeCounters`, inside the owner's transaction on
   the storage connection: `isUsable()` reads the lockouts under the identity's lock (`lockedOut()`, without an address)
   and checks the factor is the identity's, confirmed, of an enabled type and accepted after the session's first factor;
-  `report()` counts the outcome as `attempt()` does, without an address. Both refuse outside a transaction, so the lock
-  is held until the owner commits and parallel guesses cannot overrun the identity's cap (see
-  [Seam Contracts](seam-contracts.md)).
+  `report()` counts the outcome as `attempt()` does, without an address, and answers the same outcome, a failure with
+  the lockout it caused. Both refuse outside a transaction, so the lock is held until the owner commits and parallel
+  guesses cannot overrun the identity's cap (see [Seam Contracts](seam-contracts.md)).
 - A factor that is not an Eloquent model implementing `EloquentFactor` keeps no state: it has no failures in a row,
   lockout or ceiling of its own, and its attempts are counted against the identity and the address, so the identity's
   ceiling refuses it as it does a recovery code.

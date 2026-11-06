@@ -63,6 +63,9 @@ public function isMfaActive(): bool
 }
 ```
 
+With an authentication layer that knows whether an identity is active, the adapter binds `Contracts\ActiveStateResolver`
+instead, and the bound resolver answers in place of the model (see [Extending](extending.md)).
+
 ## Requirements of the identity's own
 
 An identity may require an additional factor of every sign-in, whatever the application asks, for example platform

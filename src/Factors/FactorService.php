@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -177,11 +178,12 @@ final readonly class FactorService
     private function served(CallerContext $context): Caller|FactorChange
     {
         $caller = $this->container->make(CallerContextResolver::class)->resolve($context, null);
+        $active = $this->container->make(ActiveStateResolver::class);
 
         return match (true) {
-            $caller === null                  => FactorChange::refused(FailureReason::NOT_FOUND),
-            !$caller->identity->isMfaActive() => FactorChange::refused(FailureReason::IDENTITY_INACTIVE),
-            default                           => $caller,
+            $caller === null                      => FactorChange::refused(FailureReason::NOT_FOUND),
+            !$active->isActive($caller->identity) => FactorChange::refused(FailureReason::IDENTITY_INACTIVE),
+            default                               => $caller,
         };
     }
 

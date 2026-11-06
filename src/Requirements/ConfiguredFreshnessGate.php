@@ -11,6 +11,7 @@ use SineMacula\Laravel\Mfa\Assurance\Evaluation;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 
@@ -127,7 +128,7 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
         $requirement = $this->requirement($caller, $operation, $callerRequirement);
         $identity    = $this->container->make(CallerContextResolver::class)->resolve($caller, null)?->identity;
 
-        if ($requirement === null || $identity === null || !$identity->isMfaActive()) {
+        if ($requirement === null || $identity === null || !$this->container->make(ActiveStateResolver::class)->isActive($identity)) {
             return null;
         }
 

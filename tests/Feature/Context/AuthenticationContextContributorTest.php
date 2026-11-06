@@ -10,6 +10,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
@@ -26,6 +27,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\PlainUser;
@@ -440,6 +442,33 @@ final class AuthenticationContextContributorTest extends TestCase
         $this->actingAs(new NonEloquentIdentity('person-1', mfaEnabled: true, active: false));
 
         self::assertSame(self::NEUTRAL, $this->context());
+    }
+
+    /**
+     * The bound active state resolver, not the identity, decides who is
+     * inactive: a person it finds inactive has the neutral context, whatever
+     * they have met, and an identity it finds active is read from its proofs.
+     *
+     * @return void
+     */
+    public function testAnIdentityTheBoundResolverFindsInactiveIsNeutral(): void
+    {
+        $user = $this->signedInPerson();
+
+        $this->totpFactor($user);
+
+        $this->prove($user, static fn (SignInProofs $signIn): array => [$signIn->password(3600), $signIn->totp(90)]);
+
+        self::assertTrue($this->context()['accepted']);
+
+        $this->container()->instance(ActiveStateResolver::class, new InvertedActiveState);
+
+        self::assertSame(self::NEUTRAL, $this->context());
+
+        $inactive = new NonEloquentIdentity('person-1', mfaEnabled: true, active: false);
+        $signIn   = SignInProofs::of($inactive)->inSession('named-sign-in');
+
+        self::assertTrue($this->contributor()->contributeFor($inactive, self::APPLICATION, 'named-sign-in', $signIn->password(3600), $signIn->totp(90))['accepted']);
     }
 
     /**

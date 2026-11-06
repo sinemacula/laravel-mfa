@@ -14,8 +14,10 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Context\IdentityContractSubjectType;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Database\TableNames;
+use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\LockoutApplied;
@@ -26,6 +28,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -211,6 +214,27 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
+     * The bound active state resolver, not the identity, decides who is
+     * inactive: an identity it finds inactive is refused, and one it finds
+     * active is not, whatever each says of itself.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheBoundActiveStateResolverDecidesWhoIsInactive(): void
+    {
+        $this->container()->instance(ActiveStateResolver::class, new InvertedActiveState);
+
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->admission()->reason);
+
+        $inactive = new NonEloquentIdentity('plain-1', active: false);
+        $binding  = new ProofBinding(NonEloquentIdentity::class, 'plain-1', 'web', self::CHALLENGE_SESSION, Purpose::SIGN_IN);
+
+        self::assertSame(FailureReason::NOT_FOUND, DB::transaction(fn () => $this->counters()->isUsable(Callers::of($inactive, 'web'), $this->factor, $binding))->reason);
+    }
+
+    /**
      * A factor disabled at the failure ceiling and an identity locked out are
      * refused as locked, with when the lockout ends.
      *
@@ -257,6 +281,7 @@ final class ChallengeCountersTest extends TestCase
         $failed = DB::transaction(fn () => $this->counters()->report(Callers::of($this->user, 'web'), $this->factor, $binding, false));
 
         self::assertTrue($failed->isFailed());
+        self::assertFalse($failed->causedLockout());
         self::assertSame(1, $this->failures());
         self::assertSame(1, IdentityState::query()->sole()->consecutive_failures);
 
@@ -285,9 +310,9 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * Competing failures cannot overrun the identity's cap: once it locks, a
-     * further outcome is refused and counted nowhere, and the lockout is
-     * reported once the change commits.
+     * Competing failures cannot overrun the identity's cap: the failure that
+     * locks it names the lockout it caused, a further outcome is refused and
+     * counted nowhere, and the lockout is reported once the change commits.
      *
      * @return void
      *
@@ -307,8 +332,12 @@ final class ChallengeCountersTest extends TestCase
         ]);
 
         self::assertTrue($outcomes[0]->isFailed());
+        self::assertNull($outcomes[0]->caused);
         self::assertTrue($outcomes[1]->isFailed());
+        self::assertSame(AttemptScope::IDENTITY, $outcomes[1]->caused?->scope);
+        self::assertEquals($outcomes[2]->lockout?->until, $outcomes[1]->caused->until);
         self::assertTrue($outcomes[2]->isRefused());
+        self::assertNull($outcomes[2]->caused);
         self::assertSame(2, $this->failures());
         self::assertFalse($this->admission()->isAdmitted());
         Event::assertDispatched(LockoutApplied::class);
