@@ -30,10 +30,10 @@ nothing is stored in their place.
     for nothing. The resolver's default (`Requirements\NoActiveTenant`) names none, and a session has none before any
     principal is chosen, so nothing is added at the identity level. `EventContextResolver`'s `tenant_id` is descriptive
     metadata and plays no part: omitted audit data must never drop a requirement.
-- `Mfa::requirement()` is the current identity's sign-in requirement on the current application (the application a
-  bound `ApplicationResolver` names, through the default guard when it is a `GuardApplicationResolver`, or the default
-  guard's name), with the active tenant's where one applies; it is
-  empty without an MFA-capable identity. The `mfa` middleware enforces nothing when it is empty.
+- `Mfa::requirement($caller)` is the caller's sign-in requirement on the caller's application, with the active tenant's
+  where one applies; it is empty without an MFA-capable identity. The application is the one the caller was built with:
+  `CallerContext::fromRequest($request, $guard)` takes it from a bound `ApplicationResolver`, through the guard when it
+  is a `GuardApplicationResolver`, or else the guard's name. The `mfa` middleware enforces nothing when it is empty.
 - The default `Contracts\RequirementPolicy`, `Requirements\ConfiguredRequirementPolicy`, answers with that requirement,
   or with none when the first factor meets all of it on its own, as a passkey whose assertion observed user verification
   meets an additional verification. The first factor is judged by the bound `RequirementCheck` like any proof, so one
