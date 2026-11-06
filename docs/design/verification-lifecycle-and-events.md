@@ -58,7 +58,7 @@ Mfa::verify(CallerContext, Submission, ?Purpose)
  11      check(none, firstFactor, proof)->accepted false         -> throw, rolled back, not_accepted
  12      evaluation = check(whole requirement, all proofs including this one)
  13      result = VerificationResult::verified(proof, evaluation, amr, type)
- 14      completion = PendingCompletion::complete(pending, result) or StepUp::stepUp(context, result)   <- last write
+ 14      completion = PendingCompletion::complete(context, result) or StepUp::stepUp(context, result)   <- last write
  15      queue VerificationPassed, then RecoveryCodeUsed and RecoveryCodesLow
  16    })
  17  })

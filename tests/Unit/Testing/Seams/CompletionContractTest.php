@@ -12,7 +12,9 @@ use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\PendingCompletionTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\StepUpTests;
@@ -55,7 +57,31 @@ final class CompletionContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        PendingCompletionContract::assertRefusesAResultOfAnotherBinding(new CheckingCompletion('sign-in-1', false), $this->pendingContext(), $this->resultOfAnotherBinding());
+        PendingCompletionContract::assertRefusesAResultOfAnotherBinding(new CheckingCompletion('sign-in-1', false), $this->pendingCaller(), $this->resultOfAnotherBinding());
+    }
+
+    /**
+     * The kit rejects a pending completion that takes a result from a caller
+     * with no pending session, and one that refuses a result of its own pending
+     * session.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRejectsAPendingCompletionThatTakesNoPendingSessionOrRefusesItsOwn(): void
+    {
+        $caller   = $this->pendingCaller();
+        $matching = $this->resultOfThePendingSession();
+        $taker    = new CheckingCompletion('sign-in-1', false);
+        $refuser  = new RefusingCompletion(new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'Refused.'));
+        $taking   = self::rejection(static fn () => PendingCompletionContract::assertRefusesACallerWithNoPendingSession($taker, $caller, $matching));
+        $refusing = self::rejection(static fn () => PendingCompletionContract::assertAcceptsAResultOfThePendingSession($refuser, $caller, $matching));
+
+        self::assertNotNull($taking);
+        self::assertStringContainsString('no pending session must be refused', $taking->getMessage());
+        self::assertNotNull($refusing);
+        self::assertStringContainsString('must be accepted', $refusing->getMessage());
     }
 
     /**
@@ -117,6 +143,21 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
+     * A result bound to the pending session.
+     *
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[\Override]
+    protected function resultOfThePendingSession(): VerificationResult
+    {
+        $proof = SignInProofs::of(new NonEloquentIdentity)->inSession('pending-1')->totp();
+
+        return VerificationResult::verified($proof, $this->container()->make(RequirementCheck::class)->check(Requirement::none(), $proof), ['otp'], 'totp');
+    }
+
+    /**
      * A result bound to another session.
      *
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
@@ -166,5 +207,23 @@ final class CompletionContractTest extends TestCase
     protected function stepUpCaller(): CallerContext
     {
         return Callers::current();
+    }
+
+    /**
+     * The failure a check that must reject what it is given fails with, or
+     * `null` when it accepts it.
+     *
+     * @param  \Closure(): void  $check
+     * @return ?\PHPUnit\Framework\AssertionFailedError
+     */
+    private static function rejection(\Closure $check): ?AssertionFailedError
+    {
+        try {
+            $check();
+        } catch (AssertionFailedError $failure) {
+            return $failure;
+        }
+
+        return null;
     }
 }

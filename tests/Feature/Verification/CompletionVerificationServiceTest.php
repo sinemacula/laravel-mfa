@@ -289,6 +289,40 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
+     * The pending session's completion is handed the caller: its pending
+     * session, and the client the verification was served to, with the facts a
+     * same-site check reads.
+     *
+     * @return void
+     */
+    public function testACompletionIsHandedTheCallerAndItsClient(): void
+    {
+        $user   = $this->person();
+        $factor = $this->totpFactor($user);
+
+        $this->pendingSession($user, Requirement::none());
+
+        $request = $this->container()->make('request');
+
+        $request->headers->set('Origin', 'https://app.example.test');
+        $request->headers->set('X-CSRF-Token', 'present');
+
+        $seam = new CheckingCompletion('unused', false);
+
+        $this->container()->instance(PendingCompletion::class, $seam);
+
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
+        self::assertCount(1, $seam->callers);
+
+        $caller = $seam->callers[0];
+
+        self::assertSame($user, $caller->pending?->identity);
+        self::assertSame('https://app.example.test', $caller->client->origin);
+        self::assertSame($request->getSchemeAndHttpHost(), $caller->client->schemeAndHost);
+        self::assertTrue($caller->client->carriesHeader('X_CSRF_TOKEN'));
+    }
+
+    /**
      * Requirement parts add up across two verifications of one session.
      *
      * @return void

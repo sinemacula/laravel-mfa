@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Assurance\Evaluation;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -519,7 +520,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
 
         $this->expectException(OperationRefusedException::class);
 
-        $this->container()->make(ProofStoreCompletion::class)->complete($pending, VerificationResult::verified(
+        $this->container()->make(ProofStoreCompletion::class)->complete(CallerContext::forPending($pending), VerificationResult::verified(
             new Proof(
                 ProofKind::ADDITIONAL_FACTOR,
                 'totp',
