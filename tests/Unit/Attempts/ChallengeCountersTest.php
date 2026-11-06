@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Context\IdentityContractSubjectType;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Database\TableNames;
+use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\LockoutApplied;
@@ -257,6 +258,7 @@ final class ChallengeCountersTest extends TestCase
         $failed = DB::transaction(fn () => $this->counters()->report(Callers::of($this->user, 'web'), $this->factor, $binding, false));
 
         self::assertTrue($failed->isFailed());
+        self::assertFalse($failed->causedLockout());
         self::assertSame(1, $this->failures());
         self::assertSame(1, IdentityState::query()->sole()->consecutive_failures);
 
@@ -285,9 +287,9 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * Competing failures cannot overrun the identity's cap: once it locks, a
-     * further outcome is refused and counted nowhere, and the lockout is
-     * reported once the change commits.
+     * Competing failures cannot overrun the identity's cap: the failure that
+     * locks it names the lockout it caused, a further outcome is refused and
+     * counted nowhere, and the lockout is reported once the change commits.
      *
      * @return void
      *
@@ -307,8 +309,12 @@ final class ChallengeCountersTest extends TestCase
         ]);
 
         self::assertTrue($outcomes[0]->isFailed());
+        self::assertNull($outcomes[0]->caused);
         self::assertTrue($outcomes[1]->isFailed());
+        self::assertSame(AttemptScope::IDENTITY, $outcomes[1]->caused?->scope);
+        self::assertEquals($outcomes[2]->lockout?->until, $outcomes[1]->caused->until);
         self::assertTrue($outcomes[2]->isRefused());
+        self::assertNull($outcomes[2]->caused);
         self::assertSame(2, $this->failures());
         self::assertFalse($this->admission()->isAdmitted());
         Event::assertDispatched(LockoutApplied::class);
