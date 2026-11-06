@@ -257,7 +257,7 @@ final readonly class PasskeyChangeGate
         $factor  = $this->store($identity, $application, $registration->credentialId, $label);
         $id      = self::storedId($factor);
         $summary = FactorSummary::fromFactor($factor);
-        $context = $this->events->context($identity, $application, $caller->client);
+        $context = $this->events->context($identity, $application, $caller->client, $registration->binding->sessionId);
         $proof   = self::proofOf($identity, $registration, $id);
 
         $this->associations->associate(ProofOwner::of($identity), $id, $registration->credentialId);

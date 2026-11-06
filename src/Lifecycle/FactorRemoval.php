@@ -121,7 +121,7 @@ final readonly class FactorRemoval
 
         $id      = self::idOf($factor);
         $summary = FactorSummary::fromFactor($factor);
-        $context = $this->events->context($identity, $application, $client);
+        $context = $this->events->context($identity, $application, $client, $session);
 
         $this->erase($identity, $factor);
 
@@ -142,7 +142,7 @@ final readonly class FactorRemoval
         $this->events->dispatch(new FactorRemoved($context, $summary));
 
         if ($setRemoved) {
-            $this->recoveryCodes->reportSetRemoved($identity, null, $application, $client);
+            $this->recoveryCodes->reportSetRemoved($identity, null, $application, $client, $session);
         }
 
         return FactorRemovalResult::made($summary, $judgement->outstanding, $judgement->completion());

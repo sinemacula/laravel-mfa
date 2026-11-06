@@ -424,7 +424,7 @@ final readonly class VerificationService
         $binding    = $proof->binding;
         $result     = $acceptance->evaluate($caller, $proof, $driverAmr, $type);
         $completion = $acceptance->handOver($caller, $result);
-        $context    = $this->events->context($caller->identity, $binding->application, $caller->client);
+        $context    = $this->events->context($caller->identity, $binding->application, $caller->client, $binding->sessionId);
 
         $this->events->dispatch(new VerificationPassed($context, $summary, $type, $binding->purpose, $proof->challengeId));
 
@@ -450,7 +450,9 @@ final readonly class VerificationService
      */
     private function refused(Caller $caller, string $application, Purpose $purpose, FailureReason $reason, string $detail): VerificationResult
     {
-        $this->events->dispatch(new VerificationFailed($this->events->context($caller->identity, $application, $caller->client), null, null, $purpose, $reason));
+        $context = $this->events->context($caller->identity, $application, $caller->client, $caller->pending?->sessionId);
+
+        $this->events->dispatch(new VerificationFailed($context, null, null, $purpose, $reason));
 
         return VerificationResult::failed($reason, $detail);
     }
@@ -482,7 +484,7 @@ final readonly class VerificationService
         $reason = $check->reason ?? FailureReason::INVALID_CODE;
 
         $this->events->dispatch(new VerificationFailed(
-            $this->events->context($caller->identity, $binding->application, $caller->client),
+            $this->events->context($caller->identity, $binding->application, $caller->client, $binding->sessionId),
             $summary,
             $type,
             $binding->purpose,
