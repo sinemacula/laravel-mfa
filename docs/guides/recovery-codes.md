@@ -75,9 +75,10 @@ the old set intact.
 
 ## Redeeming a code
 
-`Mfa::verify($caller, Submission::recoveryCode($code), $purpose)` redeems a code wherever a factor's code is taken: to complete a
-pending sign-in or to step up (see [Verification](verification.md)). A code that passes is used up, and its proof is
-handed over like a factor's (see [Proofs](proofs.md)): kind `recovery_code`, method `recovery_code`, no channel.
+`Mfa::verify($caller, Submission::recoveryCode($code), $purpose)` redeems a code wherever a factor's code is taken: to
+complete a pending sign-in or to step up (see [Verification](verification.md)). A code that passes is used up, and its
+proof is handed over like a factor's (see [Proofs](proofs.md)): kind `recovery_code`, method `recovery_code`, no
+channel.
 
 ```php
 use SineMacula\Laravel\Mfa\Context\CallerContext;

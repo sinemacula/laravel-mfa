@@ -85,8 +85,8 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   `FactorConfirmed` and, with codes, `RecoveryCodesGenerated` are dispatched on the commit.
 - To remove a passkey, it calls `removing()` in the transaction that deletes the credential; the factor goes with it.
 - To verify a passkey factor, `Mfa::requestAssertion()` asks `PasskeyAssertions` for the options of a ceremony, and
-  `Mfa::verify($caller, Submission::assertion(...))` hands the client's response back under the identity's lock and makes a proof
-  of what the returned assertion observed, with the challenge it answered when the gateway reports one.
+  `Mfa::verify($caller, Submission::assertion(...))` hands the client's response back under the identity's lock and
+  makes a proof of what the returned assertion observed, with the challenge it answered when the gateway reports one.
 
 ## Failure / Edge Cases
 

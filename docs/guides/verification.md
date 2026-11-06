@@ -104,9 +104,9 @@ Recovery codes are not offered. Offers are advisory: sending and verifying repea
 
 ## Sending a code
 
-`Mfa::sendCode($caller, $factorId, $purpose)` asks the bound `Contracts\ChallengeGateway` to send a code for a delivered factor,
-and answers with a `Codes\SendResult`: the challenge's id and when the code stops working, or the reason nothing was
-sent, such as `sending_capped`, and, when waiting will help, `retryAfter` in seconds. A send is not an attempt: it
+`Mfa::sendCode($caller, $factorId, $purpose)` asks the bound `Contracts\ChallengeGateway` to send a code for a delivered
+factor, and answers with a `Codes\SendResult`: the challenge's id and when the code stops working, or the reason nothing
+was sent, such as `sending_capped`, and, when waiting will help, `retryAfter` in seconds. A send is not an attempt: it
 resets no count, lifts no lockout and reports only `CodeSent`. A failing delivery throws
 `Exceptions\CodeDeliveryFailedException`.
 

@@ -40,8 +40,8 @@ credential the route uses, through the model's own lookup. It also records what 
 - `GET /factors/{factor}` behind `auth`: the signed-in person's factor.
 - `POST /sign-in/factors/{factor}/verify` with a pending credential the bound `PendingSessionResolver` validates: the
   pending session's own factor, `Mfa::verify()` then asking for `mfa.verify` itself.
-- A helper takes the factor's id, not the model: `Mfa::removeFactor($caller, $factor->getFactorIdentifier())`. `getRouteKey()` is
-  not the same value under a custom key.
+- A helper takes the factor's id, not the model: `Mfa::removeFactor($caller, $factor->getFactorIdentifier())`.
+  `getRouteKey()` is not the same value under a custom key.
 
 ## Failure / Edge Cases
 
