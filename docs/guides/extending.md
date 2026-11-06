@@ -239,6 +239,12 @@ service provider:
 | `EmailSender`            | `Codes\NullEmailSender`                    | Throws: the application binds one to enable `email`                         |
 | `ApplicationResolver`    | None bound                                 | The application is the guard's name                                         |
 
+A bound `ApplicationResolver` that serves several guards also implements `Contracts\GuardApplicationResolver`: its
+`resolveForGuard()` is asked with the guard wherever one is known, the caller of a request and a sign-in or sign-out
+alike, so a sign-in on a guard other than the default is bound to the application its caller is served on. Its kit,
+`Concerns\GuardApplicationResolverTests`, is used beside `ApplicationResolverTests`, with the hooks
+`guardApplicationResolver()`, `guardApplicationRequest()` and `applicationGuard()`.
+
 The rest of `Contracts` is what the flows take rather than seams with a default: `Factor` and `EloquentFactor`,
 `RecoveryCode` and `MultiFactorAuthenticatable` for your models, `FactorDriver`, `CodeDeliveryDriver` and
 `ProvisioningDriver` for your drivers, and `MfaEvent`, which every event implements.
@@ -284,7 +290,7 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Contracts\SessionRevoker`                                                            | `Auth::sessions()->factorRemoved()` with the factor, the application and the session, answered as judged, and `factorReset()` for a reset                                                                                            |
 | `Contracts\SubjectTypeResolver`                                                       | `Contracts\MachineIdentity`                                                                                                                                                                                                          |
 | `Contracts\ActiveStateResolver`                                                       | `Contracts\CanBeActive::isActive()`                                                                                                                                                                                                  |
-| `Contracts\ApplicationResolver`                                                       | The session's `getGuard()`, from `Auth::session()`                                                                                                                                                                                   |
+| `Contracts\ApplicationResolver`                                                       | The session's `getGuard()`, from `Auth::session()`, and `Contracts\GuardApplicationResolver` for the guard of a sign-in or sign-out                                                                                                  |
 | `Contracts\EventContextResolver`                                                      | `Auth::identity()`, `Auth::principal()`, `Auth::tenant()` and `Auth::session()`                                                                                                                                                      |
 | `Contracts\PasskeyGateway`                                                            | `Auth::passkeys()->passkeys()`, `factorOptions()` and `verifyFactor()`                                                                                                                                                               |
 | `Contracts\SmsSender`, `Contracts\EmailSender`                                        | `Contracts\OneTimeCodeSender`, bound to the same gateway: map `Codes\CodeMessage` and its `Enums\Purpose` into the gateway's own message                                                                                             |

@@ -8,11 +8,13 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Proofs\BeginSignInOnLogin;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
+use Tests\Fixtures\Context\GuardPortalResolver;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
 use Tests\Fixtures\Identities\PlainUser;
 use Tests\Fixtures\Identities\TestUser;
@@ -90,6 +92,28 @@ final class BeginSignInOnLoginTest extends TestCase
 
         self::assertSame('sign-in-1', $store->currentSession($user, 'web'));
         self::assertIsString($store->currentSession($user, 'admin'));
+    }
+
+    /**
+     * With a guard application resolver bound, the sign-in begins on the
+     * application it names through the event's guard, not the one it names
+     * without it.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBeginsTheSignInOnTheApplicationNamedThroughTheGuard(): void
+    {
+        $store = $this->bindStore(new SessionProofStore(new Store('test', new ArraySessionHandler(10))));
+        $user  = $this->user();
+
+        $this->container()->instance(ApplicationResolver::class, new GuardPortalResolver);
+
+        $this->listener()(new Login('admin', $user, false));
+
+        self::assertIsString($store->currentSession($user, 'admin-portal'));
+        self::assertNull($store->currentSession($user, 'web-portal'));
     }
 
     /**

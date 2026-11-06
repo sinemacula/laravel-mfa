@@ -10,11 +10,11 @@ use SineMacula\Laravel\Mfa\Events\EventContext;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
- * The event context without an authentication layer: the identity, the
- * application a bound `ApplicationResolver` names for the request, and the
- * request's IP address and user agent. It knows no principal, tenant or
- * session, which stay `null`: the Laravel session's id is a bearer secret and
- * never leaves it.
+ * The event context without an authentication layer: the identity, and the IP
+ * address and user agent of the client the action was served to (the event adds
+ * the application it ran through). It knows no principal, tenant or session,
+ * which stay `null`: the Laravel session's id is a bearer secret and never
+ * leaves it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

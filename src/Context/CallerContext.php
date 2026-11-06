@@ -7,7 +7,6 @@ namespace SineMacula\Laravel\Mfa\Context;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Container\Container as ContainerContract;
 use Illuminate\Http\Request;
-use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 
@@ -117,7 +116,8 @@ final readonly class CallerContext
      * user. Otherwise the caller is the user the named guard authenticated for
      * the request, when it is one this package serves, or nobody. The
      * application is the one a bound `ApplicationResolver` names for the
-     * request, or else the guard's name.
+     * request, through the guard when it is a `GuardApplicationResolver`, or
+     * else the guard's name (see `RequestApplication`).
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  ?string  $guard
@@ -138,7 +138,7 @@ final readonly class CallerContext
         }
 
         $guard ??= $container->make('auth')->getDefaultDriver();
-        $application = $container->bound(ApplicationResolver::class) ? $container->make(ApplicationResolver::class)->resolve($request) : $guard;
+        $application = RequestApplication::of($container, $request, $guard);
         $identity    = $container->make('auth')->guard($guard)->user();
 
         return $identity instanceof MultiFactorAuthenticatable
