@@ -163,7 +163,7 @@ final readonly class VerificationService
         try {
             $factor = $this->guard->factor($caller->identity, $submission->factorId, $binding->application);
         } catch (OperationRefusedException $exception) {
-            return $this->refused($caller, $binding->application, $binding->purpose, $exception->reason, $exception->getMessage());
+            return $this->refused($caller, $binding->application, $binding->purpose, $exception->reason, $exception->getMessage(), $binding->sessionId);
         }
 
         $driver = $this->container->make(DriverResolver::class)->fromContainer($this->container, $factor->getType());
@@ -436,21 +436,24 @@ final readonly class VerificationService
     }
 
     /**
-     * Report a refusal made before any factor or attempt.
+     * Report a refusal made before any factor or attempt, naming the sign-in
+     * the verification was bound to when the binding was captured, or else the
+     * pending session's.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
+     * @param  ?string  $signInId
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    private function refused(Caller $caller, string $application, Purpose $purpose, FailureReason $reason, string $detail): VerificationResult
+    private function refused(Caller $caller, string $application, Purpose $purpose, FailureReason $reason, string $detail, ?string $signInId = null): VerificationResult
     {
-        $context = $this->events->context($caller->identity, $application, $caller->client, $caller->pending?->sessionId);
+        $context = $this->events->context($caller->identity, $application, $caller->client, $signInId ?? $caller->pending?->sessionId);
 
         $this->events->dispatch(new VerificationFailed($context, null, null, $purpose, $reason));
 

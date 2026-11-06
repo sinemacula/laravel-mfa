@@ -437,7 +437,11 @@ A kit for a seam that is handed the caller asks for one through a hook, built as
 `Context\CallerContext::forIdentity()` for an active session: `freshnessCaller()`, whose session the fresh gate must
 find fresh for the fresh operation; `challengeCaller()`, the caller the challenged binding is for; and `stepUpCaller()`,
 on an active session whose own result would be accepted. The session revoker's kit asks for the application the
-identity's sessions are on, with `revokedApplication()`.
+identity's sessions are on, with `revokedApplication()`. The event context resolver's kit checks that a subject naming
+no sign-in, or one the resolver does not know, leaves the session, principal and tenant unknown: override
+`arrangeServedEventSession()` to sign the identity in through the authentication layer first, so a resolver that read
+the session being served is caught, and `knownEventSignIn()` to return an application and a sign-in on it the resolver
+maps, whose session it must then name.
 
 The kits check safety guarantees, not capabilities a default lacks: a refusing reauthenticator passes, and a revoker
 passes when other sessions stop counting whether or not it ends them. The factor change gate's kit hands its hooks each

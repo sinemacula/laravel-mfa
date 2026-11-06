@@ -53,6 +53,7 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Lifecycle\FixedFreshnessGate;
 use Tests\Fixtures\Requirements\FreshOnceGate;
 use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\AmbientSessionContextResolver;
 use Tests\Fixtures\Seams\DriftingSeams;
 use Tests\Fixtures\Seams\FaultySeams;
 use Tests\Fixtures\Seams\ObjectContextResolver;
@@ -260,6 +261,26 @@ final class SeamsWithoutStateContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
 
         SeamAssert::scalars(['identity_type' => 'person', 'identity_id' => new \stdClass], 'An event context must hold integers, strings and nulls only.');
+    }
+
+    /**
+     * The kit rejects a resolver that names the session being served for a
+     * subject naming no sign-in, or one it does not know; and one that names no
+     * session for a sign-in it was said to know.
+     *
+     * @return void
+     */
+    public function testRejectsAResolverThatNamesASessionItWasNotGiven(): void
+    {
+        $identity = new NonEloquentIdentity;
+        $default  = new DefaultEventContextResolver;
+        $ambient  = self::rejection(static fn () => EventContextResolverContract::assertNamesNoSessionItIsNotGiven(new AmbientSessionContextResolver, $identity));
+        $unmapped = self::rejection(static fn () => EventContextResolverContract::assertNamesTheSessionOfAKnownSignIn($default, $identity, 'web', 'sign-in-1'));
+
+        self::assertNotNull($ambient);
+        self::assertStringContainsString('must leave `session_id` unknown', $ambient->getMessage());
+        self::assertNotNull($unmapped);
+        self::assertStringContainsString('must name its session', $unmapped->getMessage());
     }
 
     /**
