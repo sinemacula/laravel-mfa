@@ -5,6 +5,8 @@ declare(strict_types = 1);
 namespace Tests\Unit\Secrets;
 
 use Illuminate\Log\Logger;
+use Monolog\Formatter\JsonFormatter;
+use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger as Monolog;
 use Monolog\LogRecord;
@@ -14,7 +16,9 @@ use Psr\Log\NullLogger;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecrets;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecretsInLogs;
 use Tests\Fixtures\Secrets\AddsCodeToExtra;
+use Tests\Fixtures\Secrets\Enums\RefusingCase;
 use Tests\Fixtures\Secrets\RefusesToBeLogged;
+use Tests\Fixtures\Secrets\SerializingException;
 
 /**
  * Tests for the `RedactSecretsInLogs` tap: one processor runs last on a Monolog
@@ -98,6 +102,35 @@ final class RedactSecretsInLogsTest extends TestCase
         $monolog->info('Secret issued.', ['issued' => new RefusesToBeLogged]);
 
         self::assertSame([RefusesToBeLogged::class => '[unserializable]'], $handler->getRecords()[0]->context['issued'] ?? null);
+    }
+
+    /**
+     * An exception or an enum that gives its own JSON form is logged as that
+     * form, redacted, and as its class alone when the form throws, so neither
+     * Monolog's JSON nor its line formatter throws or writes the code.
+     *
+     * @return void
+     */
+    public function testLogsTheOwnFormOfAnExceptionOrAnEnumRedacted(): void
+    {
+        foreach ([new JsonFormatter, new LineFormatter] as $formatter) {
+
+            $handler = new TestHandler;
+
+            $handler->setFormatter($formatter);
+
+            $monolog = new Monolog('mfa', [$handler]);
+
+            (new RedactSecretsInLogs)(new Logger($monolog));
+
+            $monolog->error('Delivery failed.', ['exception' => new SerializingException, 'refused' => new SerializingException(true), 'nested' => [RefusingCase::HELD]]);
+            $record = $handler->getRecords()[0];
+
+            self::assertSame([SerializingException::class => ['code' => '[redacted]', 'label' => 'Phone']], $record->context['exception'] ?? null);
+            self::assertSame([SerializingException::class => '[unserializable]'], $record->context['refused'] ?? null);
+            self::assertSame([[RefusingCase::class => '[unserializable]']], $record->context['nested'] ?? null);
+            self::assertStringNotContainsString(SerializingException::CODE, (string) $record->formatted);
+        }
     }
 
     /**

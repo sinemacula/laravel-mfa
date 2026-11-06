@@ -266,7 +266,9 @@ final class Redactor
 
     /**
      * The value with every object in it normalised, bounded as the redaction
-     * is.
+     * is. An exception or an enum that gives its own JSON form is normalised as
+     * any other object is, since Monolog logs that form rather than the
+     * exception or the case.
      *
      * @param  mixed  $value
      * @param  int  $depth
@@ -275,7 +277,8 @@ final class Redactor
     private static function normalizeValue(mixed $value, int $depth): mixed
     {
         return match (true) {
-            is_array($value) => $depth > self::MAX_DEPTH ? self::TRUNCATED : self::normalizeArray($value, $depth),
+            is_array($value)                                                                                     => $depth > self::MAX_DEPTH ? self::TRUNCATED : self::normalizeArray($value, $depth),
+            $value instanceof \JsonSerializable && ($value instanceof \Throwable || $value instanceof \UnitEnum) => self::normalizeObject($value, $depth),
             !is_object($value),
             $value instanceof RevealedSecret,
             $value instanceof \SensitiveParameterValue,
