@@ -72,6 +72,9 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
 - `SubjectTypeResolver` is bound to `Context\IdentityContractSubjectType`: a person is a `MultiFactorAuthenticatable`
   whose `canHoldFactors()` is true. The bound resolver is the authority: `Factors\OperationGuard`, the challenge
   counters and every helper ask it.
+- `ActiveStateResolver` is bound to `Context\IdentityContractActiveState`: an identity is active when its
+  `isMfaActive()` is true. The bound resolver is the authority in the same way: an inactive identity is refused every
+  operation, offered no factor, meets no requirement, is never fresh and gets the neutral authentication context.
 - `FirstFactorResolver` is bound to `Applications\DeclaredFirstFactorResolver`: the application's `first_factor`, for
   an identity with a sign-in on it, as a first factor naming no destination or credential, observing nothing, bound to
   the sign-in under the identity's current verification generation and dated at the Unix epoch. When it was made is not
@@ -156,6 +159,7 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
 | `LastFactorPolicy`       | Whether the identity's last factor may be removed                            | Nothing, or a tenant-aware policy of the iam layer |
 | `SelfServiceRecovery`    | Whether an application offers its own recovery, and starting it              | Nothing: the application's own                     |
 | `SubjectTypeResolver`    | Whether an identity is a person                                              | Its subject type                                   |
+| `ActiveStateResolver`    | Whether an identity is active                                                | Its identity's active state                        |
 | `ApplicationResolver`    | The application a request is for                                             | The session's application                          |
 | `EventContextResolver`   | The scalar context every event carries                                       | Its event context                                  |
 | `SmsSender`              | Delivers a code by SMS, given its neutral details as a `Codes\CodeMessage`   | The gateway its own codes are sent through         |

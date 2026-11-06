@@ -84,9 +84,11 @@ codes and full destinations out of the application's logs and error reports:
     `Log::error($e->getMessage(), ['exception' => $e])` copies it, loses them too, and a logged exception loses a
     code logged beside it even when PHP recorded no arguments. A code message's values are replaced wherever they
     appear; any other value only where the message is the value, or contains it and it is six characters or more;
-  - the secrets held in an object, which is logged as what Monolog would make of it, keyed by its class: a
-    collection's or model's array form, a `JsonSerializable`'s JSON form, a `Stringable`'s string, or a plain
-    object's public properties, each redacted as above;
+  - the secrets held in an object, which is logged as what Monolog would make of it, keyed by its class: a collection's
+    or model's array form, a `JsonSerializable`'s JSON form, a `Stringable`'s string, or a plain object's public
+    properties, each redacted as above, and so is the JSON form of an exception or an enum that gives one, which Monolog
+    logs in its place. An object that throws rather than give that form, as a value that refuses to be logged does on
+    purpose, is logged as its class keyed to `[unserializable]`, so the log line is still written;
   - the message and the trace arguments of an exception in the context, as below.
 
   A masked destination, such as a `FactorSummary`'s, is kept. The walk stops ten levels deep and after the first

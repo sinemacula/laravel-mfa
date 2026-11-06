@@ -98,6 +98,7 @@ final class AttemptServiceTest extends TestCase
         $outcome = $this->attempt($user, $factor, false);
 
         self::assertTrue($outcome->isFailed());
+        self::assertFalse($outcome->causedLockout());
         self::assertSame(1, $this->fresh($factor)->getConsecutiveFailures());
         self::assertSame(1, $this->state($user)?->consecutive_failures);
         self::assertSame(1, $this->hits($this->keys()->identity($user::class, (string) $user->id)));
@@ -193,18 +194,21 @@ final class AttemptServiceTest extends TestCase
         $user   = $this->user();
         $factor = $this->factor($user, failures: 1);
 
-        $this->attempt($user, $factor, false);
-
+        self::assertNull($this->attempt($user, $factor, false)->caused);
         self::assertNull($this->service()->lockout($user, $factor));
         Event::assertNotDispatched(LockoutApplied::class);
 
-        $this->attempt($user, $factor, false);
-
+        $locking = $this->attempt($user, $factor, false);
         $lockout = $this->service()->lockout($user, $factor);
 
         self::assertNotNull($lockout);
         self::assertSame(AttemptScope::FACTOR, $lockout->scope);
         self::assertEquals(CarbonImmutable::now()->addSeconds(300), $lockout->until);
+        self::assertTrue($locking->isFailed());
+        self::assertFalse($locking->isRefused());
+        self::assertTrue($locking->causedLockout());
+        self::assertSame(AttemptScope::FACTOR, $locking->caused?->scope);
+        self::assertEquals($lockout->until, $locking->caused->until);
         Event::assertDispatchedTimes(LockoutApplied::class, 1);
         Event::assertDispatched(
             LockoutApplied::class,
@@ -385,6 +389,83 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * A failure that locks the identity and the factor at once names the
+     * strictest of the two: the identity's, which ends no sooner; and a failure
+     * of a factor that keeps no state, which brings the identity's run to the
+     * failure ceiling, names the identity at the ceiling.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailureNamesTheStrictestLockoutItCaused(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 2);
+        config()->set('mfa.attempts.identity_limit', 2);
+        config()->set('mfa.attempts.lockout_seconds', 300);
+
+        $user   = $this->user();
+        $factor = $this->factor($user);
+
+        $this->attempt($user, $factor, false);
+
+        $locking = $this->attempt($user, $factor, false);
+
+        self::assertNotNull($this->fresh($factor)->getLockedUntil());
+        self::assertSame(AttemptScope::IDENTITY, $locking->caused?->scope);
+        self::assertEquals(CarbonImmutable::now()->addSeconds(300), $locking->caused->until);
+
+        config()->set('mfa.attempts.identity_limit', 100);
+        config()->set('mfa.attempts.failure_ceiling', 2);
+
+        $other     = $this->user('ceiling@example.com');
+        $stateless = new InMemoryFactor;
+
+        self::assertNull($this->attempt($other, $stateless, false)->caused);
+
+        $reaching = $this->attempt($other, $stateless, false);
+
+        self::assertSame(AttemptScope::IDENTITY, $reaching->caused?->scope);
+        self::assertTrue($reaching->caused->isDisabled());
+    }
+
+    /**
+     * A model event that cancels the save of the identity's lockout throws and
+     * rolls everything back, rather than report a lockout that was never
+     * stored.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACancelledSaveOfTheIdentityLockoutRollsItBack(): void
+    {
+        config()->set('mfa.attempts.identity_limit', 1);
+
+        Event::fake([LockoutApplied::class]);
+
+        $user = $this->user();
+
+        $this->attempt($user, null, true);
+
+        IdentityState::saving(static fn (): bool => false);
+
+        try {
+            $this->attempt($user, null, false);
+
+            self::fail('A cancelled save must not be counted as made.');
+        } catch (WriteCanceledException $exception) {
+            self::assertStringContainsString('the identity\'s lockout', $exception->getMessage());
+        } finally {
+            IdentityState::flushEventListeners();
+        }
+
+        self::assertNull($this->state($user)?->locked_until);
+        self::assertSame(0, $this->hits($this->keys()->identity($user::class, (string) $user->id)));
+        Event::assertNotDispatched(LockoutApplied::class);
+    }
+
+    /**
      * A custom column with no cast declared works once the model is read back
      * from storage: the deadline is written to it, refuses from it and is
      * lifted from it. The shipped column is never touched.
@@ -522,9 +603,12 @@ final class AttemptServiceTest extends TestCase
 
         $this->attempt($user, $first, false);
         $this->attempt($user, $this->factor($user), false);
-        $this->attempt($user, null, false);
 
+        $locking = $this->attempt($user, null, false);
         $refused = $this->attempt($user, $first, true);
+
+        self::assertSame(AttemptScope::IDENTITY, $locking->caused?->scope);
+        self::assertEquals(CarbonImmutable::now()->addSeconds(900), $locking->caused->until);
 
         self::assertTrue($refused->isRefused());
         self::assertSame(AttemptScope::IDENTITY, $refused->lockout?->scope);
@@ -650,9 +734,11 @@ final class AttemptServiceTest extends TestCase
         $user   = $this->user();
         $factor = $this->factor($user, failures: 2);
 
-        $this->attempt($user, $factor, false);
+        $disabling = $this->attempt($user, $factor, false);
+        $refused   = $this->attempt($user, $factor, true);
 
-        $refused = $this->attempt($user, $factor, true);
+        self::assertSame(AttemptScope::FACTOR, $disabling->caused?->scope);
+        self::assertTrue($disabling->caused->isDisabled());
 
         $disabledAt = $this->fresh($factor)->getDisabledAt();
 
@@ -689,10 +775,13 @@ final class AttemptServiceTest extends TestCase
         $factor = $this->factor($user);
 
         $this->attempt($user, null, false);
-        $this->attempt($user, $factor, false);
+
+        $disabling = $this->attempt($user, $factor, false);
 
         self::assertNotNull($this->fresh($factor)->getDisabledAt());
         self::assertNull($this->fresh($factor)->getLockedUntil());
+        self::assertSame(AttemptScope::FACTOR, $disabling->caused?->scope);
+        self::assertTrue($disabling->caused->isDisabled());
         Event::assertDispatched(FactorDisabled::class);
         Event::assertNotDispatched(LockoutApplied::class);
     }
@@ -1025,7 +1114,11 @@ final class AttemptServiceTest extends TestCase
 
         $this->attempt($user, null, false);
         $this->attempt($user, $stateless, false);
-        $this->attempt($user, null, false);
+
+        $reaching = $this->attempt($user, null, false);
+
+        self::assertSame(AttemptScope::IDENTITY, $reaching->caused?->scope);
+        self::assertTrue($reaching->caused->isDisabled());
 
         $refused = $this->service()->throttled(self::IP, fn (): AttemptOutcome => $this->service()->attempt(
             new Attempt($user, null, Purpose::SIGN_IN),

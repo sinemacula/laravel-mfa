@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Context;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
@@ -110,7 +111,7 @@ final readonly class AuthenticationContextContributor
      */
     public function contributeFor(MultiFactorAuthenticatable $identity, string $application, string $session, Proof ...$proofs): array
     {
-        if (!$this->container->make(SubjectTypeResolver::class)->isPerson($identity) || !$identity->isMfaActive()) {
+        if (!$this->container->make(SubjectTypeResolver::class)->isPerson($identity) || !$this->container->make(ActiveStateResolver::class)->isActive($identity)) {
             return self::neutral();
         }
 

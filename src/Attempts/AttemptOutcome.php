@@ -8,7 +8,9 @@ namespace SineMacula\Laravel\Mfa\Attempts;
  * How an attempt ended: passed, failed (and counted), refused before it reached
  * the driver by the lockout it names (and counted nowhere), not found, when the
  * factor it names is not among the identity's factors as stored (and counted
- * nowhere either), or refused for any other reason, counted nowhere.
+ * nowhere either), or refused for any other reason, counted nowhere. A failure
+ * that was counted names the lockout it caused, if counting it locked or
+ * disabled what the next attempt would name.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,6 +24,7 @@ final readonly class AttemptOutcome
      * @param  ?\SineMacula\Laravel\Mfa\Attempts\Lockout  $lockout
      * @param  bool  $found
      * @param  bool  $counted
+     * @param  ?\SineMacula\Laravel\Mfa\Attempts\Lockout  $caused
      */
     private function __construct(
 
@@ -36,6 +39,9 @@ final readonly class AttemptOutcome
 
         /** Whether an attempt that did not pass was counted as a failure. */
         public bool $counted = true,
+
+        /** The strictest lockout that counting this failure applied, if it applied one. */
+        public ?Lockout $caused = null,
     ) {}
 
     /**
@@ -49,13 +55,15 @@ final readonly class AttemptOutcome
     }
 
     /**
-     * An attempt the driver refused, counted against every scope it charges.
+     * An attempt the driver refused, counted against every scope it charges,
+     * with the strictest lockout counting it applied, if any.
      *
+     * @param  ?\SineMacula\Laravel\Mfa\Attempts\Lockout  $caused
      * @return self
      */
-    public static function fail(): self
+    public static function fail(?Lockout $caused = null): self
     {
-        return new self(false);
+        return new self(false, null, true, true, $caused);
     }
 
     /**
@@ -120,5 +128,16 @@ final readonly class AttemptOutcome
     public function isRefused(): bool
     {
         return $this->lockout !== null;
+    }
+
+    /**
+     * Determine whether counting the failure locked or disabled what the next
+     * attempt would name.
+     *
+     * @return bool
+     */
+    public function causedLockout(): bool
+    {
+        return $this->caused !== null;
     }
 }
