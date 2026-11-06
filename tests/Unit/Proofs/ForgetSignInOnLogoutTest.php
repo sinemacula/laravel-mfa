@@ -9,11 +9,13 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Proofs\ForgetSignInOnLogout;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
+use Tests\Fixtures\Context\GuardPortalResolver;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
 use Tests\Fixtures\Identities\PlainUser;
 use Tests\Fixtures\Identities\TestUser;
@@ -66,6 +68,31 @@ final class ForgetSignInOnLogoutTest extends TestCase
 
         self::assertNull($store->currentSession($user, 'web'));
         self::assertSame('sign-in-2', $store->currentSession($user, 'admin'));
+    }
+
+    /**
+     * With a guard application resolver bound, the sign-in ends on the
+     * application it names through the event's guard, and the one it names
+     * without it is left alone.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testForgetsTheSignInOnTheApplicationNamedThroughTheGuard(): void
+    {
+        $store = $this->bindStore(new SessionProofStore(new Store('test', new ArraySessionHandler(10))));
+        $user  = $this->user();
+
+        $this->container()->instance(ApplicationResolver::class, new GuardPortalResolver);
+
+        $store->begin($user, 'web-portal', 'sign-in-1');
+        $store->begin($user, 'admin-portal', 'sign-in-2');
+
+        $this->listener()(new Logout('admin', $user));
+
+        self::assertNull($store->currentSession($user, 'admin-portal'));
+        self::assertSame('sign-in-1', $store->currentSession($user, 'web-portal'));
     }
 
     /**

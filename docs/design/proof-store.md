@@ -35,11 +35,12 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
   and earlier first factors never crowd out an additional proof. It is bound, not shared: every resolution reads the
   session of the request at hand.
 - Laravel's `Login` event begins a sign-in, named by a fresh lowercase ULID, for an identity that can hold factors, on
-  the application the event's guard acts for (a bound `ApplicationResolver`'s answer for the request, or the guard's
-  name); `Logout` and `CurrentDeviceLogout` forget it there. A guard that fires none of them calls
-  `Proofs\GuardHooks::signedIn()` with the proof of the first factor it signed the identity in with, whose binding names
-  the application, and `GuardHooks::signedOut()` with the application. A guard that does neither leaves no sign-in,
-  so nothing is recorded for it and nothing counts, whatever sign-in the identity holds on another application.
+  the application the event's guard acts for (a bound `ApplicationResolver`'s answer for the request, asked through the
+  event's guard when it is a `GuardApplicationResolver`, or the guard's name); `Logout` and `CurrentDeviceLogout` forget
+  it there. A guard that fires none of them calls `Proofs\GuardHooks::signedIn()` with the proof of the first factor it
+  signed the identity in with, whose binding names the application, and `GuardHooks::signedOut()` with the application.
+  A guard that does neither leaves no sign-in, so nothing is recorded for it and nothing counts, whatever sign-in the
+  identity holds on another application.
 - A successful verification's proof reaches the store through the seams its result is handed to: by default
   `Proofs\ProofStoreCompletion`, the `PendingCompletion` and `StepUp` of a package with no authentication layer. It
   refuses a failed result, and a binding whose owner, application or session is not the store's current sign-in, and for
