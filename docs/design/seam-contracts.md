@@ -47,7 +47,9 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
   nothing is bound yet, so a binding made before the package's provider is kept and one made after replaces it.
   `SelfServiceRecovery` is bound to `Lifecycle\NoSelfServiceRecovery`, which offers none; nothing in the package
   resolves it, and an application's own flow does. `ApplicationResolver` has no binding: without one, the application
-  is the guard's name.
+  is the guard's name. A resolver that also implements `GuardApplicationResolver` is asked through the guard wherever
+  one is known, by `CallerContext::fromRequest()` and the sign-in and sign-out listeners alike (through
+  `Context\RequestApplication`), so a sign-in on a guard other than the default is named as its caller is.
 - `PendingCompletion` and `StepUp` are both bound to `Proofs\ProofStoreCompletion`, which records the proof in the bound
   proof store once the transaction commits, refusing a binding that is not the store's current sign-in, and for a
   pending session the pending context's as well, as `not_accepted` (see [Proof Store](proof-store.md)).

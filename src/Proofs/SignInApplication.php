@@ -6,14 +6,16 @@ namespace SineMacula\Laravel\Mfa\Proofs;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Http\Request;
-use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
+use SineMacula\Laravel\Mfa\Context\RequestApplication;
 
 /**
  * The application a guard signs an identity in to or out of, for the sign-in
  * and sign-out listeners: the edge where Laravel's `Login` and `Logout` events
  * arrive, and the only place outside `Context\CallerContext::fromRequest()`
  * that reads the request. It is the one a bound `ApplicationResolver` names for
- * the request being served, or else the guard's name.
+ * the request being served, through the event's guard when it is a
+ * `GuardApplicationResolver`, or else the guard's name (see
+ * `Context\RequestApplication`).
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -40,10 +42,6 @@ final class SignInApplication
     {
         $request = $container->bound('request') ? $container->make('request') : null;
 
-        if ($request instanceof Request && $container->bound(ApplicationResolver::class)) {
-            return $container->make(ApplicationResolver::class)->resolve($request);
-        }
-
-        return $guard;
+        return $request instanceof Request ? RequestApplication::of($container, $request, $guard) : $guard;
     }
 }

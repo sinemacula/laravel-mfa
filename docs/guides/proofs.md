@@ -23,8 +23,9 @@ foreach (Mfa::proofs(CallerContext::fromRequest($request)) as $proof) {
 ```
 
 The caller's application is the one `CallerContext::fromRequest()` takes from a bound `Contracts\ApplicationResolver`,
-or the guard's name without one (see [The caller](helpers.md#the-caller)). The list is empty without an MFA-capable
-identity or a sign-in, and on a pending session.
+through the guard when it is a `Contracts\GuardApplicationResolver`, or the guard's name without one (see [The
+caller](helpers.md#the-caller)). The list is empty without an MFA-capable identity or a sign-in, and on a pending
+session.
 
 A recorded proof stops counting, and is left out, when:
 
@@ -52,7 +53,9 @@ another identity on a reused session, or the same identity signing in again, inh
 
 Each application keeps its own sign-in. With two session guards over the same users, such as `web` and `admin`,
 signing in to or out of one leaves the other's sign-in and proofs alone. A guard's application is the one a bound
-`Contracts\ApplicationResolver` names for the request, or the guard's name.
+`Contracts\ApplicationResolver` names for the request, or the guard's name. A resolver that serves several guards
+implements `Contracts\GuardApplicationResolver` too, and its `resolveForGuard()` is asked with the guard, so signing in
+to `admin` begins the sign-in on the application it names for `admin`.
 
 A guard that sets the user without firing `Login` leaves no sign-in, so a verification is refused as `not_found` and
 nothing is sent or recorded, and the `mfa` middleware keeps requiring one. That includes Laravel's `actingAs()` in

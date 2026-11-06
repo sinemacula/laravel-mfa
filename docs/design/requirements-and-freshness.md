@@ -31,7 +31,8 @@ nothing is stored in their place.
     principal is chosen, so nothing is added at the identity level. `EventContextResolver`'s `tenant_id` is descriptive
     metadata and plays no part: omitted audit data must never drop a requirement.
 - `Mfa::requirement()` is the current identity's sign-in requirement on the current application (the application a
-  bound `ApplicationResolver` names, or the default guard's name), with the active tenant's where one applies; it is
+  bound `ApplicationResolver` names, through the default guard when it is a `GuardApplicationResolver`, or the default
+  guard's name), with the active tenant's where one applies; it is
   empty without an MFA-capable identity. The `mfa` middleware enforces nothing when it is empty.
 - The default `Contracts\RequirementPolicy`, `Requirements\ConfiguredRequirementPolicy`, answers with that requirement,
   or with none when the first factor meets all of it on its own, as a passkey whose assertion observed user verification

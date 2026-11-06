@@ -8,11 +8,13 @@ use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Proofs\SignInApplication;
+use Tests\Fixtures\Context\GuardPortalResolver;
 use Tests\TestCase;
 
 /**
  * Tests for `SignInApplication`: the application a guard signs an identity in
- * to is its own name, unless a bound resolver names one for the request.
+ * to is its own name, unless a bound resolver names one for the request,
+ * through the guard when it is a guard application resolver.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -51,6 +53,21 @@ final class SignInApplicationTest extends TestCase
         $this->container()->instance(ApplicationResolver::class, $resolver);
 
         self::assertSame('mobile', SignInApplication::of($this->container(), 'admin'));
+    }
+
+    /**
+     * A guard application resolver names the application through the event's
+     * guard, not the one it would name without it.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAGuardApplicationResolverNamesTheApplicationThroughTheGuard(): void
+    {
+        $this->container()->instance(ApplicationResolver::class, new GuardPortalResolver);
+
+        self::assertSame('admin-portal', SignInApplication::of($this->container(), 'admin'));
     }
 
     /**
