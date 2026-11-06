@@ -235,8 +235,11 @@ final class EventDispatcherTest extends TestCase
         $this->dispatcher()->context($identity, 'web', $client, 'sign-in-1');
         $this->dispatcher()->context(null);
 
-        self::assertEquals(new EventSubject($identity, 'web', 'sign-in-1', $client), $seen[0]);
-        self::assertSame($client, $seen[0]->client);
+        $subject = $seen[0];
+
+        self::assertInstanceOf(EventSubject::class, $subject);
+        self::assertEquals(new EventSubject($identity, 'web', 'sign-in-1', $client), $subject);
+        self::assertSame($client, $subject->client);
         self::assertEquals(new EventSubject(null, null, null, ClientContext::unknown()), $seen[1]);
     }
 
