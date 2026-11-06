@@ -8,6 +8,7 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
@@ -73,7 +74,7 @@ final readonly class OperationGuard
             throw OperationRefusedException::byPackage(FailureReason::MACHINE_IDENTITY, 'The identity is not a person, so it cannot hold factors.');
         }
 
-        if (!$identity->isMfaActive()) {
+        if (!$this->container->make(ActiveStateResolver::class)->isActive($identity)) {
             throw OperationRefusedException::byPackage(FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.');
         }
     }

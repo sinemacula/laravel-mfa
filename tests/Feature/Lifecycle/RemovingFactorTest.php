@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\FactorChangeGate;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
@@ -48,6 +49,7 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
+use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
@@ -158,6 +160,32 @@ final class RemovingFactorTest extends TestCase
         $this->actingAs(new NonEloquentIdentity('plain-1', active: false));
 
         self::assertSame(FailureReason::IDENTITY_INACTIVE, Mfa::removeFactor(Callers::current(), 'missing')->reason);
+    }
+
+    /**
+     * The bound active state resolver, not the identity, decides who is
+     * inactive: a fresh person it finds inactive is refused and keeps the
+     * factor, and an identity it finds active is looked at further.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnIdentityTheBoundResolverFindsInactiveIsRefused(): void
+    {
+        $this->container()->instance(ActiveStateResolver::class, new InvertedActiveState);
+
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+
+        $this->stepUpWith($user, $factor);
+
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, Mfa::removeFactor(Callers::current(), $factor->id)->reason);
+        self::assertTrue($this->isStored($factor));
+
+        $this->actingAs(new NonEloquentIdentity('plain-1', active: false));
+
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::removeFactor(Callers::current(), 'missing')->reason);
     }
 
     /**

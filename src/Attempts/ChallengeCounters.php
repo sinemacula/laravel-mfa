@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
@@ -210,11 +211,12 @@ final readonly class ChallengeCounters
     private function identityRefusal(MultiFactorAuthenticatable $identity, ProofBinding $binding): ?ChallengeAdmission
     {
         $people = $this->container->make(SubjectTypeResolver::class);
+        $active = $this->container->make(ActiveStateResolver::class);
 
         return match (true) {
             !ProofOwner::of($identity)->owns($binding) => ChallengeAdmission::refuse(FailureReason::NOT_FOUND, 'The challenge\'s binding names another identity.'),
             !$people->isPerson($identity)              => ChallengeAdmission::refuse(FailureReason::MACHINE_IDENTITY, 'The identity is not a person.'),
-            !$identity->isMfaActive()                  => ChallengeAdmission::refuse(FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.'),
+            !$active->isActive($identity)              => ChallengeAdmission::refuse(FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.'),
             default                                    => null,
         };
     }

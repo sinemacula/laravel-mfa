@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
@@ -18,6 +19,7 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Factors\IntegerKeyedFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -113,6 +115,21 @@ final class OperationGuardTest extends TestCase
         $this->container()->instance(SubjectTypeResolver::class, $resolver);
 
         self::assertSame(FailureReason::MACHINE_IDENTITY, $this->refusal(fn () => $this->guard()->identity(new NonEloquentIdentity)));
+    }
+
+    /**
+     * The bound active state resolver is the authority on who is active: one
+     * that finds an active identity inactive, and an inactive one active, is
+     * honoured.
+     *
+     * @return void
+     */
+    public function testTheBoundActiveStateResolverDecidesWhoIsActive(): void
+    {
+        $this->container()->instance(ActiveStateResolver::class, new InvertedActiveState);
+
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->refusal(fn () => $this->guard()->identity(new NonEloquentIdentity)));
+        self::assertNull($this->refusal(fn () => $this->guard()->identity(new NonEloquentIdentity(active: false))));
     }
 
     /**

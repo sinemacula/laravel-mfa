@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
@@ -166,7 +167,7 @@ final readonly class EnsureMfaRequirementIsMet
      */
     private function isMet(Caller $caller, string $application, Requirement $requirement, RequirementService $requirements, ?string $operation): bool
     {
-        if (!$caller->identity->isMfaActive()) {
+        if (!$this->container->make(ActiveStateResolver::class)->isActive($caller->identity)) {
             return false;
         }
 
