@@ -128,7 +128,7 @@ final class ProofStoreCompletionTest extends TestCase
 
         $proof = $this->proof(Purpose::SIGN_IN, 'pending-1');
 
-        self::assertNull($this->pendingCompletion()->complete($this->pendingContext(), $this->resultOf($proof)));
+        self::assertNull($this->pendingCompletion()->complete(CallerContext::forPending($this->pendingContext()), $this->resultOf($proof)));
         self::assertSame([$proof->toArray()], $this->storedArrays());
     }
 
@@ -205,12 +205,29 @@ final class ProofStoreCompletionTest extends TestCase
 
         $this->store()->begin($this->user, 'web', 'pending-1');
 
-        $this->assertNotAccepted(fn () => $this->pendingCompletion()->complete($pending, $this->resultOf($this->proof(Purpose::STEP_UP, 'pending-1'))));
-        $this->assertNotAccepted(fn () => $this->pendingCompletion()->complete($pending, $this->resultOf($this->proof(Purpose::SIGN_IN, 'another'))));
+        $this->assertNotAccepted(fn () => $this->pendingCompletion()->complete(CallerContext::forPending($pending), $this->resultOf($this->proof(Purpose::STEP_UP, 'pending-1'))));
+        $this->assertNotAccepted(fn () => $this->pendingCompletion()->complete(CallerContext::forPending($pending), $this->resultOf($this->proof(Purpose::SIGN_IN, 'another'))));
 
         $this->store()->begin($this->user, 'web', 'another');
 
-        $this->assertNotAccepted(fn () => $this->pendingCompletion()->complete($pending, $this->resultOf($this->proof(Purpose::SIGN_IN, 'pending-1'))));
+        $this->assertNotAccepted(fn () => $this->pendingCompletion()->complete(CallerContext::forPending($pending), $this->resultOf($this->proof(Purpose::SIGN_IN, 'pending-1'))));
+    }
+
+    /**
+     * A caller with no pending session is refused, even with a proof the
+     * pending session would take, and nothing is recorded.
+     *
+     * @return void
+     */
+    public function testAPendingCompletionRefusesACallerWithNoPendingSession(): void
+    {
+        $this->store()->begin($this->user, 'web', 'pending-1');
+
+        $active = CallerContext::forIdentity($this->user, 'web');
+
+        $this->assertNotAccepted(fn () => $this->pendingCompletion()->complete($active, $this->resultOf($this->proof(Purpose::SIGN_IN, 'pending-1'))));
+
+        self::assertSame([], $this->storedArrays());
     }
 
     /**

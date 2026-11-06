@@ -7,7 +7,6 @@ namespace SineMacula\Laravel\Mfa\Proofs;
 use Illuminate\Contracts\Container\Container;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
-use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -56,11 +55,12 @@ final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
     ) {}
 
     /**
-     * Record a successful verification on the pending session, whose sign-in
-     * the store must hold under the pending session's public id: a proof made
-     * for the sign-in, or an additional factor confirmed by its enrolment.
+     * Record a successful verification on the caller's pending session, whose
+     * sign-in the store must hold under the pending session's public id: a
+     * proof made for the sign-in, or an additional factor confirmed by its
+     * enrolment. A caller with no pending session is refused.
      *
-     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return null
      *
@@ -69,9 +69,12 @@ final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
     #[\Override]
-    public function complete(PendingContext $pending, VerificationResult $result): null
+    public function complete(CallerContext $caller, VerificationResult $result): null
     {
-        $proof = self::proofOf($result);
+        $proof   = self::proofOf($result);
+        $pending = $caller->pending;
+
+        OperationRefusedException::unless($pending !== null, FailureReason::NOT_ACCEPTED, 'The caller has no pending session to complete.');
 
         $purpose = $proof->binding->purpose;
 

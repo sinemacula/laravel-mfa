@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams;
 
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -13,6 +14,7 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
  * What every `PendingCompletion` must guarantee, as assertions: a result whose
  * binding does not validate against the pending session, and a failed result,
  * are refused by throwing an `OperationRefusedException`, never by returning.
+ * Each is handed as the pending session's caller would hand it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,7 +39,9 @@ final class PendingCompletionContract
      */
     public static function assertRefusesAResultOfAnotherBinding(PendingCompletion $completion, PendingContext $pending, VerificationResult $mismatched): void
     {
-        SeamAssert::refusesWithAReason(static fn () => $completion->complete($pending, $mismatched), 'A result bound elsewhere must be refused with a reason.');
+        $caller = CallerContext::forPending($pending);
+
+        SeamAssert::refusesWithAReason(static fn () => $completion->complete($caller, $mismatched), 'A result bound elsewhere must be refused with a reason.');
     }
 
     /**
@@ -50,7 +54,8 @@ final class PendingCompletionContract
     public static function assertRefusesAFailedResult(PendingCompletion $completion, PendingContext $pending): void
     {
         $failed = VerificationResult::failed(FailureReason::INVALID_CODE, 'The code did not match.');
+        $caller = CallerContext::forPending($pending);
 
-        SeamAssert::refusesWithAReason(static fn () => $completion->complete($pending, $failed), 'A failed result must be refused with a reason.');
+        SeamAssert::refusesWithAReason(static fn () => $completion->complete($caller, $failed), 'A failed result must be refused with a reason.');
     }
 }

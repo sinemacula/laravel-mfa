@@ -4,7 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Contracts;
 
-use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
@@ -25,7 +25,11 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 interface PendingCompletion
 {
     /**
-     * Hand a successful verification to the pending session it was made in.
+     * Hand a successful verification to the pending session it was made in: the
+     * caller's, whose `pending` is that session and whose `client` is the
+     * client the verification was served to, with the facts a same-site check
+     * reads. A caller with no pending session is refused as a result bound
+     * elsewhere is.
      *
      * It runs as the last write of the identity's factor state transaction, on
      * the storage connection, after the code is spent and counted. Returning
@@ -37,11 +41,11 @@ interface PendingCompletion
      * the reason, never by returning, so the code's use and the count roll back
      * with it. Any other throwable propagates to the caller.
      *
-     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    public function complete(PendingContext $pending, VerificationResult $result): ?object;
+    public function complete(CallerContext $caller, VerificationResult $result): ?object;
 }

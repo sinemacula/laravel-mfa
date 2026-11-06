@@ -108,7 +108,7 @@ final readonly class ProofAcceptance
     {
         return $caller->pending === null
             ? $this->container->make(StepUp::class)->stepUp($caller->context(), $result)
-            : $this->container->make(PendingCompletion::class)->complete($caller->pending, $result);
+            : $this->container->make(PendingCompletion::class)->complete($caller->context(), $result);
     }
 
     /**

@@ -34,13 +34,15 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
   `OperationRefusedException`, which a bound gate's caller receives as the package's refusal; for a grant it answers
   the instant the grant ends, and the package refuses one that is `null` or not in the future. It replaces the
   package's freshness judgement of those changes, so the package asks no `FreshnessGate` for them besides it.
-- `PendingCompletion` and `StepUp` are the last write of a verification's transaction, and refuse by throwing an
-  `OperationRefusedException` with a reason, which rolls the verification back and is answered as a failed result;
-  anything else they throw propagates. Returning means the proof was accepted, a session still pending included, and
-  what they return is opaque to this package and reaches the caller as `VerificationResult::completion()`, so an
-  authentication layer's tokens need no request state kept anywhere and no reference to a sibling class. Turning that
-  layer's refused result into a throw is the adapter's job. The rollback holds only when the adapter's writes share the
-  storage connection.
+- `PendingCompletion` and `StepUp` are each handed the caller (`complete($caller, $result)` and `stepUp($caller,
+  $result)`), so the client the verification was served to, with its same-site facts, reaches the session write;
+  `complete()` refuses a caller with no pending session. They are the last write of a verification's transaction, and
+  refuse by throwing an `OperationRefusedException` with a reason, which rolls the verification back and is answered as
+  a failed result; anything else they throw propagates. Returning means the proof was accepted, a session still pending
+  included, and what they return is opaque to this package and reaches the caller as `VerificationResult::completion()`,
+  so an authentication layer's tokens need no request state kept anywhere and no reference to a sibling class. Turning
+  that layer's refused result into a throw is the adapter's job. The rollback holds only when the adapter's writes share
+  the storage connection.
 - Results cross the seams as structured values, never reduced to `amr`.
 - Every seam has a default that works without an authentication layer and fails closed, bound by the `*Bindings` class
   of the capability whose state it reads (or `Seams\SeamBindings` for one that reads nothing of the package) only when
