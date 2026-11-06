@@ -14,6 +14,7 @@ use Psr\Log\NullLogger;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecrets;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecretsInLogs;
 use Tests\Fixtures\Secrets\AddsCodeToExtra;
+use Tests\Fixtures\Secrets\RefusesToBeLogged;
 
 /**
  * Tests for the `RedactSecretsInLogs` tap: one processor runs last on a Monolog
@@ -79,6 +80,24 @@ final class RedactSecretsInLogsTest extends TestCase
         $monolog->info('Code checked.');
 
         self::assertSame('[redacted]', $handler->getRecords()[0]->extra['code'] ?? null);
+    }
+
+    /**
+     * A record holding a value that refuses to be logged is still written, with
+     * the value as its class alone.
+     *
+     * @return void
+     */
+    public function testWritesARecordHoldingAValueThatRefusesToBeLogged(): void
+    {
+        $handler = new TestHandler;
+        $monolog = new Monolog('mfa', [$handler]);
+
+        (new RedactSecretsInLogs)(new Logger($monolog));
+
+        $monolog->info('Secret issued.', ['issued' => new RefusesToBeLogged]);
+
+        self::assertSame([RefusesToBeLogged::class => '[unserializable]'], $handler->getRecords()[0]->context['issued'] ?? null);
     }
 
     /**

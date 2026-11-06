@@ -62,7 +62,9 @@ it.
 - An object in a record is turned into what Monolog would log for it, keyed by its class, and that is redacted: an
   `Arrayable`'s array form (so a collection holding a `RevealedSecret` is redacted rather than refusing to encode),
   a `JsonSerializable`'s JSON form, a `Stringable`'s string form, or any other object's public properties. An
-  exception is scrubbed in place and kept; a date or an enum is kept.
+  exception is scrubbed in place and kept; a date or an enum is kept. An object that throws rather than give that form,
+  as a value that refuses to be logged does on purpose, becomes its class keyed to `[unserializable]`, so the logger
+  never throws and nothing the object holds is read another way.
 - The walk is bounded: an array or object deeper than ten levels becomes `[truncated]`, and an array keeps its first
   thousand entries, the rest replaced by one `...` entry of `[truncated]`, so a recursive or very large context ends.
 - `Secrets\ExceptionScrubber::scrub()` rewrites the recorded trace and the message of an exception and of every

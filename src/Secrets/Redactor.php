@@ -43,6 +43,9 @@ final class Redactor
     /** @var string The marker that replaces what the walk does not reach. */
     public const string TRUNCATED = '[truncated]';
 
+    /** @var string The marker that replaces the form of an object that refuses to give one. */
+    public const string UNSERIALIZABLE = '[unserializable]';
+
     /** @var int The deepest level the walk reaches; deeper arrays and objects are truncated. */
     public const int MAX_DEPTH = 10;
 
@@ -287,7 +290,10 @@ final class Redactor
     /**
      * A logged object as what Monolog would log for it, keyed by its class: its
      * array form, its JSON form, its string form or its public properties,
-     * themselves normalised.
+     * themselves normalised. An object that throws rather than give its form,
+     * as a value that refuses to be logged does on purpose, is logged as its
+     * class alone, so the log line is written and nothing it holds is read
+     * another way.
      *
      * @param  object  $value
      * @param  int  $depth
@@ -299,12 +305,18 @@ final class Redactor
             return self::TRUNCATED;
         }
 
-        $form = match (true) {
-            $value instanceof Arrayable         => $value->toArray(),
-            $value instanceof \JsonSerializable => $value->jsonSerialize(),
-            $value instanceof \Stringable       => (string) $value,
-            default                             => get_object_vars($value),
-        };
+        // Any of the forms may throw, an error included, and static analysis
+        // traces none of them through the object, so the catch is marked.
+        try {
+            $form = match (true) {
+                $value instanceof Arrayable         => $value->toArray(),
+                $value instanceof \JsonSerializable => $value->jsonSerialize(),
+                $value instanceof \Stringable       => (string) $value,
+                default                             => get_object_vars($value),
+            };
+        } catch (\Throwable) { // @phpstan-ignore catch.neverThrown
+            return [get_debug_type($value) => self::UNSERIALIZABLE];
+        }
 
         return [get_debug_type($value) => self::normalizeValue($form, $depth + 1)];
     }
