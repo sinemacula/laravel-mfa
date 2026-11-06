@@ -20,8 +20,11 @@ $caller = CallerContext::fromRequest($request, 'admin'); // through the guard na
 pending credential that does not validate throws, so the request is refused rather than served as the guard's user.
 Otherwise the caller is the guard's user, when it is an identity this package serves, and nobody when it is not. The
 application is what a bound `Contracts\ApplicationResolver` names for the request, through the guard when it is a
-`Contracts\GuardApplicationResolver`, or else the guard's name. The client
-is the request's IP address and user agent, which reach the events and the per-address throttle.
+`Contracts\GuardApplicationResolver`, or else the guard's name. The client is the request's IP address and user agent,
+which reach the events and the per-address throttle, and the facts a same-site check reads: its `Origin`, its scheme and
+host, and the names (never the values) of the headers that carry a value, lower-cased with underscores read as hyphens,
+which `carriesHeader()` answers about. Only the address and the user agent reach events; the rest is for a seam, such as
+an authentication layer's `PendingCompletion`, that judges a cookie-borne session.
 
 Away from a request, in a queued job, a console command or a transport of your own, build one from plain values:
 
@@ -29,7 +32,7 @@ Away from a request, in a queued job, a console command or a transport of your o
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\ClientContext;
 
-CallerContext::forIdentity($user, 'web', new ClientContext($ip, $userAgent));
+CallerContext::forIdentity($user, 'web', new ClientContext($ip, $userAgent, $origin, $schemeAndHost, $headerNames));
 CallerContext::forPending($pending, $client); // a pending session your resolver read
 CallerContext::nobody('web');
 ```

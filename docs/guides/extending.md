@@ -282,7 +282,7 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Contracts\ActiveTenantResolver`                                                      | `Auth::tenant()`                                                                                                                                                                                                                     |
 | `Contracts\PendingSessionResolver`                                                    | `Auth::sessions()->pending()`, answering a `Sessions\PendingSession`, from `fromRequest()` and again from `revalidate()` with the credential kept                                                                                    |
 | `Enums\PendingAction`                                                                 | `Sessions\Enums\PendingAction`, with the same values                                                                                                                                                                                 |
-| `Contracts\PendingCompletion`                                                         | `Auth::sessions()->satisfy()`, recording the proof's own `multifactor` from the result's `refreshesMultifactor`                                                                                                                      |
+| `Contracts\PendingCompletion`                                                         | `Auth::sessions()->satisfy()`, recording the proof's own `multifactor` from the result's `refreshesMultifactor`, with the caller's client translated to its own                                                                      |
 | `Contracts\StepUp`                                                                    | `Auth::sessions()->stepUp()`, recording the proof's own `multifactor` from the result's `refreshesMultifactor`                                                                                                                       |
 | `Contracts\FreshnessGate`                                                             | `Contracts\FreshnessPolicy::freshProof()` and `freshUntil()`                                                                                                                                                                         |
 | `Contracts\FactorChangeGate`                                                          | `Auth::sessions()->factorChange()`, inside this package's transaction, after its locks                                                                                                                                               |
@@ -445,7 +445,12 @@ A kit for a seam that is handed the caller asks for one through a hook, built as
 `Context\CallerContext::forIdentity()` for an active session: `freshnessCaller()`, whose session the fresh gate must
 find fresh for the fresh operation; `challengeCaller()`, the caller the challenged binding is for; and `stepUpCaller()`,
 on an active session whose own result would be accepted. The session revoker's kit asks for the application the
-identity's sessions are on, with `revokedApplication()`.
+identity's sessions are on, with `revokedApplication()`. The pending completion's kit hands every result through
+`pendingCaller()`, the pending session's caller, which by default knows nothing of the client: a completion that judges
+the client, such as one that checks a cookie-borne request is same-site, overrides it with a client carrying what that
+check needs, so each refusal the kit asserts is the one it means. It also asks for `resultOfThePendingSession()`, a
+successful result the completion accepts, which it must take from that caller and refuse from the same identity with no
+pending session.
 
 The kits check safety guarantees, not capabilities a default lacks: a refusing reauthenticator passes, and a revoker
 passes when other sessions stop counting whether or not it ends them. The factor change gate's kit hands its hooks each

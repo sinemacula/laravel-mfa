@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Seams;
 
 use SineMacula\Laravel\Mfa\Context\CallerContext;
-use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -26,6 +25,9 @@ final class CheckingCompletion implements PendingCompletion, StepUp
 {
     /** @var list<\SineMacula\Laravel\Mfa\Verification\VerificationResult> The results accepted. */
     public array $accepted = [];
+
+    /** @var list<\SineMacula\Laravel\Mfa\Context\CallerContext> The callers each result was handed with. */
+    public array $callers = [];
 
     /**
      * Constructor.
@@ -49,16 +51,18 @@ final class CheckingCompletion implements PendingCompletion, StepUp
     /**
      * Accept a successful result bound to the pending session.
      *
-     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
     #[\Override]
-    public function complete(PendingContext $pending, VerificationResult $result): ?object
+    public function complete(CallerContext $caller, VerificationResult $result): ?object
     {
-        return $this->accept($result, $pending->sessionId);
+        $this->callers[] = $caller;
+
+        return $this->accept($result, $caller->pending->sessionId ?? '');
     }
 
     /**

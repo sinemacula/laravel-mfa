@@ -7,7 +7,6 @@ namespace Tests\Fixtures\Verification;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Cookie\QueueingFactory;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
-use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
@@ -53,7 +52,7 @@ final readonly class TokenIssuingCompletion implements PendingCompletion, StepUp
     /**
      * Complete the pending session and issue its tokens.
      *
-     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return \Tests\Fixtures\Verification\IssuedTokens
      *
@@ -62,9 +61,9 @@ final readonly class TokenIssuingCompletion implements PendingCompletion, StepUp
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
     #[\Override]
-    public function complete(PendingContext $pending, VerificationResult $result): IssuedTokens
+    public function complete(CallerContext $caller, VerificationResult $result): IssuedTokens
     {
-        $this->store->complete($pending, $result);
+        $this->store->complete($caller, $result);
 
         return $this->issued();
     }

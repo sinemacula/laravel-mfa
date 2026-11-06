@@ -178,8 +178,9 @@ while another usable factor can still recover the identity.
 ## Completion
 
 A success goes to `Contracts\PendingCompletion` on a pending session and `Contracts\StepUp` on an active one, as the
-last write of the transaction, after the code is spent and counted. Which seam is decided by pending or active, never by
-the purpose.
+last write of the transaction, after the code is spent and counted. Each is handed the caller, so the pending session
+and the client, with the facts a same-site check reads, reach the seam. Which seam is decided by pending or active,
+never by the purpose.
 
 The defaults, both `Proofs\ProofStoreCompletion`, record the proof in the bound proof store once the transaction
 commits. They refuse a binding whose owner, application or session is not the store's current sign-in, and for a pending
