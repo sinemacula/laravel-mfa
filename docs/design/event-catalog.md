@@ -33,10 +33,18 @@ event carries is built, and why every event is dispatched only after the change 
   `Contracts\EventContextResolver` and cut down to those keys and to integers and strings by
   `Events\EventDispatcher::context()`, so a resolver cannot put a model in a payload; the application an operation ran
   through names the application.
+- The resolver is handed an `Events\EventSubject`: the identity, the application, the sign-in the operation was bound
+  to (`signInId`, the session id of its proof binding or pending session) and the client. The sign-in is given only
+  where the operation captured one, never looked up to decorate an event: verifications (a failure refused before any
+  binding names the pending session's alone), challenges, enrolments from start to confirmation, expiry and abandonment,
+  passkey registration, recovery code redemption and the sets generated with a binding or a first factor, and a factor
+  removal with the recovery set it takes. A rename, a preferred factor, an attempt's lockout or failure ceiling, an
+  operator's action and a reset name none; a pruned owner keeps its stored-owner context.
 - The default resolver, `Context\DefaultEventContextResolver`, gives the identity and the IP address and user agent of
   the caller's `Context\ClientContext`, which `CallerContext::fromRequest()` read from the request; it reads no request
-  itself. The application is always the one the operation ran through. It never gives the Laravel session's id, a
-  bearer secret. An operator's action (a reset or an unlock) carries the client it is given, or none.
+  itself, and gives no session for the sign-in, which is this package's own id. The application is always the one the
+  operation ran through. It never gives the Laravel session's id, a bearer secret. An operator's action (a reset or an
+  unlock) carries the client it is given, or none.
 - `Events\EventDispatcher::dispatch()` is the one way the package dispatches an event: at once when the storage
   connection has no open transaction, when that transaction commits otherwise, and never when it rolls back. A
   transaction on another connection neither delays nor drops it. The transactions manager is read when the event is

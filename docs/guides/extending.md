@@ -224,7 +224,7 @@ service provider:
 | `PendingSessionResolver` | `Context\NoPendingSessionResolver`         | No request carries a pending session                                        |
 | `SubjectTypeResolver`    | `Context\IdentityContractSubjectType`      | A person is an identity whose `canHoldFactors()` is true                    |
 | `ActiveStateResolver`    | `Context\IdentityContractActiveState`      | An identity is active when its `isMfaActive()` is true                      |
-| `EventContextResolver`   | `Context\DefaultEventContextResolver`      | The identity, the application and the caller's client                       |
+| `EventContextResolver`   | `Context\DefaultEventContextResolver`      | The identity and the caller's client; the dispatcher names the application  |
 | `FirstFactorResolver`    | `Applications\DeclaredFirstFactorResolver` | The application's `first_factor`, dated at the Unix epoch                   |
 | `Reauthenticator`        | `Seams\RefusingReauthenticator`            | Nothing proves the first factor again                                       |
 | `SessionRevoker`         | `Proofs\GenerationSessionRevoker`          | The verification generation advances; other sessions verify again           |
@@ -291,7 +291,7 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Contracts\SubjectTypeResolver`                                                       | `Contracts\MachineIdentity`                                                                                                                                                                                                          |
 | `Contracts\ActiveStateResolver`                                                       | `Contracts\CanBeActive::isActive()`                                                                                                                                                                                                  |
 | `Contracts\ApplicationResolver`                                                       | The session's `getGuard()`, from `Auth::session()`, and `Contracts\GuardApplicationResolver` for the guard of a sign-in or sign-out                                                                                                  |
-| `Contracts\EventContextResolver`                                                      | `Auth::identity()`, `Auth::principal()`, `Auth::tenant()` and `Auth::session()`                                                                                                                                                      |
+| `Contracts\EventContextResolver`                                                      | The subject's `signInId` mapped to its session, principal and tenant; none when no sign-in is given                                                                                                                                  |
 | `Contracts\PasskeyGateway`                                                            | `Auth::passkeys()->passkeys()`, `factorOptions()` and `verifyFactor()`                                                                                                                                                               |
 | `Contracts\SmsSender`, `Contracts\EmailSender`                                        | `Contracts\OneTimeCodeSender`, bound to the same gateway: map `Codes\CodeMessage` and its `Enums\Purpose` into the gateway's own message                                                                                             |
 | `Secrets\RevealedSecret`, `Secrets\SecretResponse`                                    | Nothing to bind: a secret it reveals is its own, so check its documentation for how it sends one uncached                                                                                                                            |
@@ -450,7 +450,10 @@ identity's sessions are on, with `revokedApplication()`. The pending completion'
 the client, such as one that checks a cookie-borne request is same-site, overrides it with a client carrying what that
 check needs, so each refusal the kit asserts is the one it means. It also asks for `resultOfThePendingSession()`, a
 successful result the completion accepts, which it must take from that caller and refuse from the same identity with no
-pending session.
+pending session. The event context resolver's kit checks that a subject naming no sign-in, or one the resolver does not
+know, leaves the session, principal and tenant unknown: override `arrangeServedEventSession()` to sign the identity in
+through the authentication layer first, so a resolver that read the session being served is caught, and
+`knownEventSignIn()` to return an application and a sign-in on it the resolver maps, whose session it must then name.
 
 The kits check safety guarantees, not capabilities a default lacks: a refusing reauthenticator passes, and a revoker
 passes when other sessions stop counting whether or not it ends them. The factor change gate's kit hands its hooks each

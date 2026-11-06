@@ -163,7 +163,7 @@ final readonly class VerificationService
         try {
             $factor = $this->guard->factor($caller->identity, $submission->factorId, $binding->application);
         } catch (OperationRefusedException $exception) {
-            return $this->refused($caller, $binding->application, $binding->purpose, $exception->reason, $exception->getMessage());
+            return $this->refused($caller, $binding->application, $binding->purpose, $exception->reason, $exception->getMessage(), $binding->sessionId);
         }
 
         $driver = $this->container->make(DriverResolver::class)->fromContainer($this->container, $factor->getType());
@@ -424,7 +424,7 @@ final readonly class VerificationService
         $binding    = $proof->binding;
         $result     = $acceptance->evaluate($caller, $proof, $driverAmr, $type);
         $completion = $acceptance->handOver($caller, $result);
-        $context    = $this->events->context($caller->identity, $binding->application, $caller->client);
+        $context    = $this->events->context($caller->identity, $binding->application, $caller->client, $binding->sessionId);
 
         $this->events->dispatch(new VerificationPassed($context, $summary, $type, $binding->purpose, $proof->challengeId));
 
@@ -436,21 +436,26 @@ final readonly class VerificationService
     }
 
     /**
-     * Report a refusal made before any factor or attempt.
+     * Report a refusal made before any factor or attempt, naming the sign-in
+     * the verification was bound to when the binding was captured, or else the
+     * pending session's.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
+     * @param  ?string  $signInId
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      */
-    private function refused(Caller $caller, string $application, Purpose $purpose, FailureReason $reason, string $detail): VerificationResult
+    private function refused(Caller $caller, string $application, Purpose $purpose, FailureReason $reason, string $detail, ?string $signInId = null): VerificationResult
     {
-        $this->events->dispatch(new VerificationFailed($this->events->context($caller->identity, $application, $caller->client), null, null, $purpose, $reason));
+        $context = $this->events->context($caller->identity, $application, $caller->client, $signInId ?? $caller->pending?->sessionId);
+
+        $this->events->dispatch(new VerificationFailed($context, null, null, $purpose, $reason));
 
         return VerificationResult::failed($reason, $detail);
     }
@@ -482,7 +487,7 @@ final readonly class VerificationService
         $reason = $check->reason ?? FailureReason::INVALID_CODE;
 
         $this->events->dispatch(new VerificationFailed(
-            $this->events->context($caller->identity, $binding->application, $caller->client),
+            $this->events->context($caller->identity, $binding->application, $caller->client, $binding->sessionId),
             $summary,
             $type,
             $binding->purpose,

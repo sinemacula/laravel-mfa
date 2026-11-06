@@ -290,7 +290,7 @@ final readonly class EnrollmentStarter
 
         $this->assertCombination($caller, $binding, $driver, $destination, $factors);
 
-        $context = $this->events->context($identity, $application, $caller->client);
+        $context = $this->events->context($identity, $application, $caller->client, $binding->sessionId);
 
         $this->discard($identity, $binding, $request->type, $factors, $context);
         $this->assertPendingLimit($binding);

@@ -55,8 +55,9 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
 - `PendingCompletion` and `StepUp` are both bound to `Proofs\ProofStoreCompletion`, which records the proof in the bound
   proof store once the transaction commits, refusing a binding that is not the store's current sign-in, and for a
   pending session the pending context's as well, as `not_accepted` (see [Proof Store](proof-store.md)).
-- `EventContextResolver` is bound to `Context\DefaultEventContextResolver`, which gives the identity, the application
-  and the caller's client (see [Event Catalogue](event-catalog.md)).
+- `EventContextResolver` is bound to `Context\DefaultEventContextResolver`, which gives the identity and the caller's
+  client from the `Events\EventSubject` it is handed, and leaves the session unknown; the dispatcher names the
+  application (see [Event Catalogue](event-catalog.md)).
 - `ProofStore` is bound to `Proofs\SessionProofStore`, which keeps each sign-in's proofs in the Laravel session (see
   [Proof Store and Sign-Ins](proof-store.md)).
 - `CombinationPolicy` is bound to `Assurance\DefaultCombinationPolicy` (see

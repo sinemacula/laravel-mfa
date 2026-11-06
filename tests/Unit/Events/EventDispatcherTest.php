@@ -13,9 +13,9 @@ use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
+use SineMacula\Laravel\Mfa\Events\EventSubject;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\TestCase;
@@ -189,12 +189,16 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * The resolver is handed the identity and the client the action was served
-     * to.
+     * The resolver is handed the subject: the identity, the application the
+     * operation ran through, the sign-in it was bound to and the client it was
+     * served to; with none of them given, a subject of which nothing is known
+     * but an unknown client.
      *
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testTheResolverIsHandedTheIdentityAndTheClient(): void
+    public function testTheResolverIsHandedTheSubject(): void
     {
         $identity = new NonEloquentIdentity;
         $client   = new ClientContext('192.0.2.1', 'agent');
@@ -216,24 +220,27 @@ final class EventDispatcherTest extends TestCase
             /**
              * Record what the resolver was handed.
              *
-             * @param  ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-             * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
+             * @param  \SineMacula\Laravel\Mfa\Events\EventSubject  $subject
              * @return array<string, int|string|null>
              */
             #[\Override]
-            public function resolve(?MultiFactorAuthenticatable $identity, ?ClientContext $client): array
+            public function resolve(EventSubject $subject): array
             {
-                $this->seen->append($identity);
-                $this->seen->append($client);
+                $this->seen->append($subject);
 
                 return [];
             }
         });
 
-        $this->dispatcher()->context($identity, 'web', $client);
+        $this->dispatcher()->context($identity, 'web', $client, 'sign-in-1');
+        $this->dispatcher()->context(null);
 
-        self::assertSame($identity, $seen[0]);
-        self::assertSame($client, $seen[1]);
+        $subject = $seen[0];
+
+        self::assertInstanceOf(EventSubject::class, $subject);
+        self::assertEquals(new EventSubject($identity, 'web', 'sign-in-1', $client), $subject);
+        self::assertSame($client, $subject->client);
+        self::assertEquals(new EventSubject(null, null, null, ClientContext::unknown()), $seen[1]);
     }
 
     /**
@@ -274,12 +281,11 @@ final class EventDispatcherTest extends TestCase
             /**
              * Answer the values, whatever they are.
              *
-             * @param  ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-             * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
+             * @param  \SineMacula\Laravel\Mfa\Events\EventSubject  $subject
              * @return array<string, int|string|null>
              */
             #[\Override]
-            public function resolve(?MultiFactorAuthenticatable $identity, ?ClientContext $client): array
+            public function resolve(EventSubject $subject): array
             {
                 /** @var array<string, int|string|null> */
                 return $this->values;

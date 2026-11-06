@@ -10,6 +10,7 @@ use SineMacula\Laravel\Mfa\Context\DefaultEventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Events\EventContext;
+use SineMacula\Laravel\Mfa\Events\EventSubject;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
@@ -40,13 +41,13 @@ final class DefaultEventContextResolverTest extends TestCase
     /**
      * The identity's type and id, and the client's address and user agent; no
      * application, which the dispatcher names, and no principal, tenant or
-     * session.
+     * session, the sign-in being this package's own id and no session's.
      *
      * @return void
      */
     public function testResolvesTheIdentityAndTheClient(): void
     {
-        $context = $this->resolver()->resolve(new NonEloquentIdentity(identifier: 5), new ClientContext('203.0.113.9', 'Mozilla/5.0'));
+        $context = $this->resolver()->resolve(new EventSubject(new NonEloquentIdentity(identifier: 5), 'web', 'sign-in-1', new ClientContext('203.0.113.9', 'Mozilla/5.0')));
 
         self::assertSame([
             'identity_type'  => NonEloquentIdentity::class,
@@ -71,7 +72,7 @@ final class DefaultEventContextResolverTest extends TestCase
         $user = new TestUser;
         $user->setAttribute('id', 3);
 
-        $context = $this->resolver()->resolve($user, null);
+        $context = $this->resolver()->resolve(new EventSubject($user));
 
         self::assertSame($user->getMorphClass(), $context['identity_type']);
         self::assertSame('3', $context['identity_id']);
@@ -84,7 +85,7 @@ final class DefaultEventContextResolverTest extends TestCase
      */
     public function testWithoutAnIdentityOrARequestNothingIsKnown(): void
     {
-        self::assertSame(array_fill_keys(EventContext::KEYS, null), $this->resolver()->resolve(null, null));
+        self::assertSame(array_fill_keys(EventContext::KEYS, null), $this->resolver()->resolve(new EventSubject));
     }
 
     /**
@@ -103,7 +104,7 @@ final class DefaultEventContextResolverTest extends TestCase
 
         $this->container()->instance(ApplicationResolver::class, $resolver);
 
-        self::assertNull($this->resolver()->resolve(null, new ClientContext('203.0.113.9'))['application']);
+        self::assertNull($this->resolver()->resolve(new EventSubject(null, 'web', null, new ClientContext('203.0.113.9')))['application']);
     }
 
     /**

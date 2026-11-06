@@ -48,19 +48,22 @@ final readonly class EventDispatcher
 
     /**
      * The context of an event about the identity, from the bound resolver for
-     * the client the action was served to, cut down to `EventContext::KEYS`, on
-     * the application the operation ran through. No request is read.
+     * the client the action was served to and the sign-in the operation was
+     * bound to when it captured one, cut down to `EventContext::KEYS`, on the
+     * application the operation ran through. No request is read.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?string  $application
      * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
+     * @param  ?string  $signInId
      * @return array<string, int|string|null>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function context(?MultiFactorAuthenticatable $identity, ?string $application = null, ?ClientContext $client = null): array
+    public function context(?MultiFactorAuthenticatable $identity, ?string $application = null, ?ClientContext $client = null, ?string $signInId = null): array
     {
-        $context = EventContext::allowlist($this->container->make(EventContextResolver::class)->resolve($identity, $client));
+        $subject = new EventSubject($identity, $application, $signInId, $client);
+        $context = EventContext::allowlist($this->container->make(EventContextResolver::class)->resolve($subject));
 
         $context['application'] = $application;
 

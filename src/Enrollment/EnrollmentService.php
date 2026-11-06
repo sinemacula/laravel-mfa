@@ -201,7 +201,7 @@ final readonly class EnrollmentService
 
                 $this->enrollments->discard($enrollment, $factor);
 
-                $context = $this->events->context($still->identity, $binding->application, $still->client);
+                $context = $this->events->context($still->identity, $binding->application, $still->client, $binding->sessionId);
 
                 $this->events->dispatch(new EnrollmentAbandoned($context, FactorSummary::fromFactor($factor)));
 
@@ -267,7 +267,7 @@ final readonly class EnrollmentService
         if ($challengeId !== null) {
             $this->enrollments->recordChallenge($enrollment, $challengeId);
 
-            $context = $this->events->context($caller->identity, $binding->application, $caller->client);
+            $context = $this->events->context($caller->identity, $binding->application, $caller->client, $binding->sessionId);
 
             $this->events->dispatch(new CodeSent($context, FactorSummary::fromFactor($factor), Purpose::ENROLLMENT, $challengeId));
         }

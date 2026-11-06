@@ -107,7 +107,7 @@ final readonly class RecoveryCodeIssuance
             return self::refusedBy($exception);
         }
 
-        $this->codes->reportGenerated($caller->identity, $binding->application, count($codes), $generation, null, $caller->client);
+        $this->codes->reportGenerated($caller->identity, $binding->application, count($codes), $generation, null, $caller->client, $binding->sessionId);
 
         return RecoveryCodeGeneration::generated($codes);
     }
@@ -142,7 +142,7 @@ final readonly class RecoveryCodeIssuance
         $requirement = Requirement::none()->withMinimumLevel($settings->recoveryCodeLevel());
 
         return $this->container->make(RequirementCheck::class)->check($requirement, $firstFactor, $proof)->meetsRequirement()
-            ? $this->codes->generate($identity, $application, client: $client)
+            ? $this->codes->generate($identity, $application, client: $client, signInId: $proof->binding->sessionId)
             : [];
     }
 

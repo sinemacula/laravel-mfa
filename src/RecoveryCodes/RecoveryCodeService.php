@@ -135,7 +135,8 @@ final readonly class RecoveryCodeService
      * event cancels throws `WriteCanceledException` and rolls it all back.
      * `RecoveryCodesGenerated` is dispatched once it has committed. The codes
      * are returned unformatted, in the order they were drawn. The application
-     * is the current request's unless the caller names the one it acts on.
+     * is the current request's unless the caller names the one it acts on, and
+     * the event names the sign-in given, when the operation captured one.
      *
      * A gate, when given, refuses by throwing: it runs before the codes are
      * drawn, given no factors, and again first under the lock, given the
@@ -147,20 +148,27 @@ final readonly class RecoveryCodeService
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  (\Closure(?\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>): void)|null  $gate
      * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
+     * @param  ?string  $signInId
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      * @throws \Throwable
      */
-    public function generate(MultiFactorAuthenticatable $identity, string $application, ?Actor $actor = null, ?\Closure $gate = null, ?ClientContext $client = null): array
-    {
+    public function generate(
+        MultiFactorAuthenticatable $identity,
+        string $application,
+        ?Actor $actor = null,
+        ?\Closure $gate = null,
+        ?ClientContext $client = null,
+        ?string $signInId = null,
+    ): array {
         ['codes' => $codes, 'generation' => $generation] = $this->replaceSet($identity, $application, $gate);
 
         // Dispatched from out here, so inside a caller's transaction it keeps
         // its place among the caller's events rather than running ahead of them
         // with this nested transaction's.
-        $this->reportGenerated($identity, $application, count($codes), $generation, $actor, $client);
+        $this->reportGenerated($identity, $application, count($codes), $generation, $actor, $client, $signInId);
 
         return $codes;
     }
@@ -228,6 +236,7 @@ final readonly class RecoveryCodeService
      * @param  int  $generation
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
+     * @param  ?string  $signInId
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -240,8 +249,9 @@ final readonly class RecoveryCodeService
         int $generation,
         ?Actor $actor = null,
         ?ClientContext $client = null,
+        ?string $signInId = null,
     ): void {
-        $this->events->dispatch(new RecoveryCodesGenerated($this->events->context($identity, $application, $client), $count, $generation, $actor));
+        $this->events->dispatch(new RecoveryCodesGenerated($this->events->context($identity, $application, $client, $signInId), $count, $generation, $actor));
     }
 
     /**
@@ -339,7 +349,7 @@ final readonly class RecoveryCodeService
      */
     public function reportRedeemed(MultiFactorAuthenticatable $identity, ProofBinding $binding, int $remaining, ?ClientContext $client = null): void
     {
-        $context  = $this->events->context($identity, $binding->application, $client);
+        $context  = $this->events->context($identity, $binding->application, $client, $binding->sessionId);
         $lowCount = (new RecoveryCodeSettings($this->config))->lowCount();
 
         $this->events->dispatch(new RecoveryCodeUsed($context, $remaining, $binding->purpose));
@@ -494,13 +504,19 @@ final readonly class RecoveryCodeService
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  ?string  $application
      * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
+     * @param  ?string  $signInId
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function reportSetRemoved(MultiFactorAuthenticatable $identity, ?Actor $actor = null, ?string $application = null, ?ClientContext $client = null): void
-    {
-        $this->events->dispatch(new RecoveryCodesRemoved($this->events->context($identity, $application, $client), $actor));
+    public function reportSetRemoved(
+        MultiFactorAuthenticatable $identity,
+        ?Actor $actor = null,
+        ?string $application = null,
+        ?ClientContext $client = null,
+        ?string $signInId = null,
+    ): void {
+        $this->events->dispatch(new RecoveryCodesRemoved($this->events->context($identity, $application, $client, $signInId), $actor));
     }
 
     /**

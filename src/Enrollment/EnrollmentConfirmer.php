@@ -408,7 +408,7 @@ final readonly class EnrollmentConfirmer
         $acceptance = $this->container->make(ProofAcceptance::class);
         $result     = $caller->pending === null ? null : $acceptance->evaluate($caller, $proof, $driver->amr(), $type);
         $summary    = FactorSummary::fromFactor($factor);
-        $context    = $this->events->context($identity, $application, $caller->client);
+        $context    = $this->events->context($identity, $application, $caller->client, $binding->sessionId);
 
         $this->events->dispatch(new VerificationPassed($context, $summary, $type, Purpose::ENROLLMENT, $check->challengeId));
         $this->events->dispatch(new FactorConfirmed($context, $summary));
@@ -473,7 +473,7 @@ final readonly class EnrollmentConfirmer
 
         $summary = FactorSummary::fromFactor($factor);
 
-        $this->events->dispatch(new EnrollmentExpired($this->events->context($caller->identity, $binding->application, $caller->client), $summary));
+        $this->events->dispatch(new EnrollmentExpired($this->events->context($caller->identity, $binding->application, $caller->client, $binding->sessionId), $summary));
 
         return $this->failed($caller, $binding, $summary, FailureReason::EXPIRED);
     }
@@ -510,7 +510,7 @@ final readonly class EnrollmentConfirmer
 
         $this->enrollments->discard($enrollment, $factor);
 
-        $this->events->dispatch(new EnrollmentAbandoned($this->events->context($caller->identity, $binding->application, $caller->client), $summary));
+        $this->events->dispatch(new EnrollmentAbandoned($this->events->context($caller->identity, $binding->application, $caller->client, $binding->sessionId), $summary));
 
         return EnrollmentConfirmation::failed($reason, abandoned: true);
     }
@@ -539,7 +539,7 @@ final readonly class EnrollmentConfirmer
         ?CarbonImmutable $lockedUntil = null,
     ): EnrollmentConfirmation {
         $this->events->dispatch(new VerificationFailed(
-            $this->events->context($caller->identity, $binding->application, $caller->client),
+            $this->events->context($caller->identity, $binding->application, $caller->client, $binding->sessionId),
             $summary,
             $summary?->type,
             Purpose::ENROLLMENT,

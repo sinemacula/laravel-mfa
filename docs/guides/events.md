@@ -104,10 +104,16 @@ AuditLog::map(MfaEvent::class, MfaAuditMapper::class);
 This is the mapping that package has agreed, ahead of its first release, so check the namespaces against its own
 documentation once it is released.
 
-The context is read through `Contracts\EventContextResolver`. Alone, the package's default gives the identity, the
-application a bound `Contracts\ApplicationResolver` names, and the request's IP address and user agent; it never gives
-the Laravel session's id, which is a bearer secret. An authentication layer's adapter binds its own, which also knows
-the principal, the active tenant and the session. Whatever a resolver returns is cut down to the keys above and to
+The context is read through `Contracts\EventContextResolver`, handed an `Events\EventSubject`: the identity, the
+application the operation ran through, the sign-in it was bound to, and the client it was served to. The sign-in is this
+package's own id, the session id a proof binding or a pending session carries, given only where the operation captured
+one: a verification, a challenge, an enrolment, a passkey registration, a recovery code redemption or set, and a factor
+removed from a session. An operator's action, an attempt's lockout and a rename name none. Alone, the package's default
+gives the identity and the client's IP address and user agent; it leaves the session unknown, since its sign-in id is no
+session of any authentication layer, and never gives the Laravel session's id, which is a bearer secret. An
+authentication layer's adapter binds its own, which maps the sign-in to its session, principal and tenant, and leaves
+them unknown when none is given rather than read whichever session the process serves. The application is always the one
+the operation ran through, whatever a resolver answers. Whatever a resolver returns is cut down to the keys above and to
 integers and strings, so a model or an array returned by mistake never travels in a payload.
 
 ## What events never carry
