@@ -98,14 +98,35 @@ final class ClientContextTest extends TestCase
 
     /**
      * Header names given to the constructor are kept as a request's are:
-     * lower-cased, underscores read as hyphens, once each.
+     * lower-cased, underscores read as hyphens, once each, and only those that
+     * are HTTP tokens.
      *
      * @return void
      */
     public function testHeaderNamesAreKeptAsARequestKeysThem(): void
     {
-        $client = new ClientContext(null, null, null, null, ['X_CSRF_Token', 'x-csrf-token', 'Accept']);
+        $client = new ClientContext(null, null, null, null, ['X_CSRF_Token', 'x-csrf-token', 'Accept', '', 'bad name', "caf\u{e9}"]);
 
         self::assertSame(['x-csrf-token', 'accept'], $client->nonEmptyHeaders);
+        self::assertFalse($client->carriesHeader(''));
+        self::assertFalse($client->carriesHeader('bad name'));
+    }
+
+    /**
+     * An origin, or a scheme and host, is kept only when it is 1 to 512
+     * printable ASCII characters with no spaces, as an authentication layer's
+     * own client context keeps it.
+     *
+     * @return void
+     */
+    public function testAnOriginIsKeptOnlyWhenItIsWellFormed(): void
+    {
+        self::assertSame('https://app.example.test', (new ClientContext(origin: 'https://app.example.test'))->origin);
+        self::assertSame(str_repeat('a', 512), (new ClientContext(origin: str_repeat('a', 512)))->origin);
+
+        foreach (['', 'https://app example.test', "https://caf\u{e9}.test", str_repeat('a', 513), "https://app.test\n"] as $malformed) {
+            self::assertNull((new ClientContext(origin: $malformed))->origin);
+            self::assertNull((new ClientContext(schemeAndHost: $malformed))->schemeAndHost);
+        }
     }
 }

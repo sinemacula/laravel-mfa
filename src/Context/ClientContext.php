@@ -16,8 +16,10 @@ use Symfony\Component\HttpFoundation\Exception\RequestExceptionInterface;
  *
  * `fromRequest()` is the one place it is read from a request, through the
  * request's own `ip()`, so the application's trusted proxies apply. The facts
- * are kept as the request gave them, for the seam that judges them; only the IP
- * address and the user agent reach events.
+ * are cleaned as an authentication layer's own client context cleans them (an
+ * origin of up to 512 printable characters, header names that are HTTP tokens),
+ * so the two answer a same-site check alike, and are otherwise kept for the
+ * seam that judges them; only the IP address and the user agent reach events.
  *
  * @api
  *
@@ -26,13 +28,19 @@ use Symfony\Component\HttpFoundation\Exception\RequestExceptionInterface;
  */
 final readonly class ClientContext
 {
+    /** @var string What an origin, or a scheme and host, must be to be kept: 1 to 512 printable ASCII characters, no spaces. */
+    private const string ORIGIN_PATTERN = '/^[\x21-\x7E]{1,512}$/D';
+
+    /** @var string What a header's name must be, once normalised, to be kept: an HTTP token. */
+    private const string TOKEN_PATTERN = '/^[!#$%&\'*+.^`|~0-9a-z-]+$/D';
+
     /** @var ?string The client's IP address, when it is known. */
     public ?string $ip;
 
     /** @var ?string The client's user agent, when it is known. */
     public ?string $userAgent;
 
-    /** @var ?string The request's `Origin` header, as it was sent, when it was. */
+    /** @var ?string The request's `Origin` header, as it was sent, when it was and is well formed. */
     public ?string $origin;
 
     /** @var ?string The request's scheme and host, such as `https://example.test`, when it has a host. */
@@ -54,9 +62,9 @@ final readonly class ClientContext
     {
         $this->ip              = $ip;
         $this->userAgent       = $userAgent;
-        $this->origin          = $origin;
-        $this->schemeAndHost   = $schemeAndHost;
-        $this->nonEmptyHeaders = array_values(array_unique(array_map(self::headerName(...), $nonEmptyHeaders)));
+        $this->origin          = self::cleanOrigin($origin);
+        $this->schemeAndHost   = self::cleanOrigin($schemeAndHost);
+        $this->nonEmptyHeaders = self::headerNames($nonEmptyHeaders);
     }
 
     /**
@@ -93,6 +101,32 @@ final readonly class ClientContext
     public function carriesHeader(string $name): bool
     {
         return in_array(self::headerName($name), $this->nonEmptyHeaders, true);
+    }
+
+    /**
+     * An origin, or a scheme and host, kept only when it is 1 to 512 printable
+     * ASCII characters with no spaces; anything else is not known.
+     *
+     * @param  ?string  $origin
+     * @return ?string
+     */
+    private static function cleanOrigin(?string $origin): ?string
+    {
+        return $origin !== null && preg_match(self::ORIGIN_PATTERN, $origin) === 1 ? $origin : null;
+    }
+
+    /**
+     * The header names as they are kept: normalised, each an HTTP token, once
+     * each, in the order given.
+     *
+     * @param  array<array-key, string>  $names
+     * @return list<string>
+     */
+    private static function headerNames(array $names): array
+    {
+        $normalised = array_map(self::headerName(...), $names);
+
+        return array_values(array_unique(array_filter($normalised, static fn (string $name): bool => preg_match(self::TOKEN_PATTERN, $name) === 1)));
     }
 
     /**

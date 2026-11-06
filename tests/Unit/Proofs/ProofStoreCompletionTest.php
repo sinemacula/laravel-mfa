@@ -261,6 +261,19 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
+     * A sign-in proof of the pending session, whose sign-in the store holds.
+     *
+     * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
+     */
+    #[\Override]
+    protected function resultOfThePendingSession(): VerificationResult
+    {
+        $this->store()->begin($this->user, 'web', 'pending-1');
+
+        return $this->resultOf($this->proof(Purpose::SIGN_IN, 'pending-1'));
+    }
+
+    /**
      * A result bound to another session.
      *
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
