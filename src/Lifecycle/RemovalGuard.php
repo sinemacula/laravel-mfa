@@ -8,6 +8,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -84,7 +85,7 @@ final readonly class RemovalGuard
         Collection $factors,
         ?string $session = null,
     ): EloquentFactor&Model {
-        OperationRefusedException::unless($identity->isMfaActive(), FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.');
+        OperationRefusedException::unless($this->container->make(ActiveStateResolver::class)->isActive($identity), FailureReason::IDENTITY_INACTIVE, 'The identity is inactive.');
 
         if ($factor === null || $factor->getApplication() !== $application) {
             throw new OperationRefusedException(FailureReason::NOT_FOUND, 'The identity has no factor with that id enrolled through this application.');

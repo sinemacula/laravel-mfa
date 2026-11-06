@@ -12,7 +12,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\DefaultEventContextResolver;
+use SineMacula\Laravel\Mfa\Context\IdentityContractActiveState;
 use SineMacula\Laravel\Mfa\Context\IdentityContractSubjectType;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
@@ -32,7 +34,9 @@ use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
 use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\SessionChange;
+use SineMacula\Laravel\Mfa\Testing\Seams\ActiveStateResolverContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\ApplicationResolverContract;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ActiveStateResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ApplicationResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\EventContextResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\FreshnessGateTests;
@@ -55,6 +59,7 @@ use Tests\Fixtures\Requirements\FreshOnceGate;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\DriftingSeams;
 use Tests\Fixtures\Seams\FaultySeams;
+use Tests\Fixtures\Seams\FixedActiveState;
 use Tests\Fixtures\Seams\ObjectContextResolver;
 use Tests\Fixtures\Seams\RecordingSessionTransition;
 use Tests\Fixtures\Seams\ScriptedFreshnessGate;
@@ -63,9 +68,9 @@ use Tests\TestCase;
 /**
  * The contract kits of the seams whose answers depend on no stored state: the
  * freshness gate, the identity and tenant requirements, the application, the
- * subject type, the event context and the session transition. Each proves the
- * package's default (or, for the application resolver, which has none, an
- * application's own), and rejects a faulty one.
+ * subject type, the active state, the event context and the session transition.
+ * Each proves the package's default (or, for the application resolver, which
+ * has none, an application's own), and rejects a faulty one.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -76,10 +81,12 @@ use Tests\TestCase;
 #[CoversClass(RequirementSeamContract::class)]
 #[CoversClass(ApplicationResolverContract::class)]
 #[CoversClass(SubjectTypeResolverContract::class)]
+#[CoversClass(ActiveStateResolverContract::class)]
 #[CoversClass(EventContextResolverContract::class)]
 #[CoversClass(SessionTransitionContract::class)]
 #[CoversClass(SeamAssert::class)]
 #[CoversClass(IdentityContractSubjectType::class)]
+#[CoversClass(IdentityContractActiveState::class)]
 #[CoversClass(MiddlewareSessionTransition::class)]
 #[CoversClass(ConfiguredFreshnessGate::class)]
 #[CoversClass(IdentityContractRequirement::class)]
@@ -87,6 +94,7 @@ use Tests\TestCase;
 #[CoversClass(DefaultEventContextResolver::class)]
 final class SeamsWithoutStateContractTest extends TestCase
 {
+    use ActiveStateResolverTests;
     use ApplicationResolverTests, EventContextResolverTests, FreshnessGateTests, IdentityRequirementTests, SessionTransitionTests, SubjectTypeResolverTests, TenantRequirementTests;
 
     /**
@@ -248,6 +256,32 @@ final class SeamsWithoutStateContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
 
         SubjectTypeResolverContract::assertAMachineIsNotAPerson(new FaultySeams, $this->machineIdentity());
+    }
+
+    /**
+     * The kit rejects a resolver that finds an inactive identity active.
+     *
+     * @return void
+     */
+    public function testRejectsAResolverThatFindsAnInactiveIdentityActive(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('An inactive identity must not be active.');
+
+        ActiveStateResolverContract::assertAnInactiveIdentityIsNotActive(new FixedActiveState(true), $this->inactiveIdentity());
+    }
+
+    /**
+     * The kit rejects a resolver that finds an active identity inactive.
+     *
+     * @return void
+     */
+    public function testRejectsAResolverThatFindsAnActiveIdentityInactive(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('An active identity must be active.');
+
+        ActiveStateResolverContract::assertAnActiveIdentityIsActive(new FixedActiveState(false), $this->activeIdentity());
     }
 
     /**
@@ -628,6 +662,39 @@ final class SeamsWithoutStateContractTest extends TestCase
     protected function machineIdentity(): Authenticatable
     {
         return new NonEloquentIdentity('machine-1', person: false);
+    }
+
+    /**
+     * The bound default.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver
+     */
+    #[\Override]
+    protected function activeStateResolver(): ActiveStateResolver
+    {
+        return $this->container()->make(ActiveStateResolver::class);
+    }
+
+    /**
+     * An active person.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     */
+    #[\Override]
+    protected function activeIdentity(): MultiFactorAuthenticatable
+    {
+        return new NonEloquentIdentity;
+    }
+
+    /**
+     * An inactive person.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     */
+    #[\Override]
+    protected function inactiveIdentity(): MultiFactorAuthenticatable
+    {
+        return new NonEloquentIdentity('inactive-1', active: false);
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Feature\Factors;
 
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Events\FactorRenamed;
@@ -14,6 +15,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorLabel;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\Fixtures\Factors\IntegerKeyedFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -229,5 +231,31 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
 
         self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->renameFactor(Callers::current(), 'any', 'New')->reason);
         self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->setPreferredFactor(Callers::current(), 'any')->reason);
+    }
+
+    /**
+     * The bound active state resolver, not the identity, decides who is served:
+     * a person it finds inactive is refused and their factor left as it was,
+     * and an identity it finds active is served.
+     *
+     * @return void
+     */
+    public function testTheBoundActiveStateResolverDecidesWhoIsServed(): void
+    {
+        $this->container()->instance(ActiveStateResolver::class, new InvertedActiveState);
+
+        $user   = $this->signedInPerson();
+        $factor = $this->totpFactor($user, ['application' => self::APPLICATION, 'label' => 'Old']);
+
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->renameFactor(Callers::current(), $factor->id, 'New')->reason);
+        self::assertSame(FailureReason::IDENTITY_INACTIVE, $this->mfa()->setPreferredFactor(Callers::current(), $factor->id)->reason);
+        self::assertSame('Old', $factor->refresh()->getLabel());
+        self::assertSame(0, Factor::query()->where('preferred', true)->count());
+        self::assertSame([], $this->reported);
+
+        $this->actingAs(new NonEloquentIdentity(active: false));
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->renameFactor(Callers::current(), 'any', 'New')->reason);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->setPreferredFactor(Callers::current(), 'any')->reason);
     }
 }

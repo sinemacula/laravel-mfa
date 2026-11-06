@@ -29,8 +29,8 @@ credential the route uses, through the model's own lookup. It also records what 
   - either way, only a person, as the bound `SubjectTypeResolver` says.
 - The binding is an ownership rule, not permission to run the route. A list-only credential binds on a verify URL, and
   `Mfa::verify()` then refuses it. Visibility matches `Mfa::factor()`: pending and disabled factors and those enrolled
-  through another application bind, and each helper enforces its own rules. `isMfaActive()` is not read, as `factors()`
-  does not read it.
+  through another application bind, and each helper enforces its own rules. Whether the identity is active is not read,
+  as `factors()` does not read it.
 - `WriteConnection::during()` sets `useWriteConnectionWhenReading()` on the model's connection and restores the earlier
   mode in `finally`, reading the protected flag through a bound closure, as Laravel offers no getter. Eager loads on
   that connection read the writer too.
