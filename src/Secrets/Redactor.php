@@ -277,8 +277,8 @@ final class Redactor
     private static function normalizeValue(mixed $value, int $depth): mixed
     {
         return match (true) {
-            is_array($value)                                                                                     => $depth > self::MAX_DEPTH ? self::TRUNCATED : self::normalizeArray($value, $depth),
-            $value instanceof \JsonSerializable && ($value instanceof \Throwable || $value instanceof \UnitEnum) => self::normalizeObject($value, $depth),
+            is_array($value)              => $depth > self::MAX_DEPTH ? self::TRUNCATED : self::normalizeArray($value, $depth),
+            self::givesItsOwnForm($value) => self::normalizeObject($value, $depth),
             !is_object($value),
             $value instanceof RevealedSecret,
             $value instanceof \SensitiveParameterValue,
@@ -288,6 +288,18 @@ final class Redactor
             $value instanceof \UnitEnum => $value,
             default                     => self::normalizeObject($value, $depth),
         };
+    }
+
+    /**
+     * Whether the value is an exception or an enum that gives its own JSON
+     * form, which Monolog logs in its place.
+     *
+     * @param  mixed  $value
+     * @return bool
+     */
+    private static function givesItsOwnForm(mixed $value): bool
+    {
+        return $value instanceof \JsonSerializable && ($value instanceof \Throwable || $value instanceof \UnitEnum);
     }
 
     /**

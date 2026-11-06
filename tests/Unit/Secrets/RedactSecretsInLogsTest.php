@@ -129,7 +129,8 @@ final class RedactSecretsInLogsTest extends TestCase
             self::assertSame([SerializingException::class => ['code' => '[redacted]', 'label' => 'Phone']], $record->context['exception'] ?? null);
             self::assertSame([SerializingException::class => '[unserializable]'], $record->context['refused'] ?? null);
             self::assertSame([[RefusingCase::class => '[unserializable]']], $record->context['nested'] ?? null);
-            self::assertStringNotContainsString(SerializingException::CODE, (string) $record->formatted);
+            self::assertIsString($record->formatted);
+            self::assertStringNotContainsString(SerializingException::CODE, $record->formatted);
         }
     }
 
