@@ -164,9 +164,10 @@ final readonly class ChallengeCounters
      * Count the outcome of a challenge the caller has just checked and
      * consumed, inside the same transaction: a success resets the factor's and
      * the identity's failures in a row, a failure counts against both and may
-     * lock or disable. An outcome is refused, and counted nowhere, while a
-     * lockout applies, and answered as not found for a factor no longer among
-     * the identity's.
+     * lock or disable, and a failure that does names the lockout it caused (see
+     * `AttemptOutcome::$caused`). An outcome is refused, and counted nowhere,
+     * while a lockout applies, and answered as not found for a factor no longer
+     * among the identity's.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor

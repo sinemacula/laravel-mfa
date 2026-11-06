@@ -378,8 +378,9 @@ final readonly class AttemptService
      * Under the lock: answer an attempt on a factor that is not among the
      * identity's stored factors as not found, refuse the attempt while a
      * lockout applies, otherwise run the verification on the factor as stored
-     * and count its outcome. The events to dispatch once the transaction has
-     * committed are added to `$events`.
+     * and count its outcome, a failure with the lockout counting it caused. The
+     * events to dispatch once the transaction has committed are added to
+     * `$events`.
      *
      * @formatter:off
      *
@@ -395,6 +396,7 @@ final readonly class AttemptService
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private function decide(Attempt $attempt, Collection $factors, \Closure $verify, AttemptSettings $settings, array &$events): AttemptOutcome
     {
@@ -427,7 +429,9 @@ final readonly class AttemptService
             $this->countFactorFailure($attempt, $factor, $settings, $now, $run >= $settings->failureCeiling(), $events);
         }
 
-        return AttemptOutcome::fail();
+        // No lockout held before the failure was counted, so whatever holds now
+        // is the one counting it caused, judged as the next attempt would be.
+        return AttemptOutcome::fail($this->heldLockout($state, $factor, $settings, $now));
     }
 
     /**
@@ -495,6 +499,7 @@ final readonly class AttemptService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
     private function countIdentityFailure(Attempt $attempt, array $subject, ?IdentityState $state, AttemptSettings $settings, CarbonImmutable $now, array &$events): int
     {
@@ -510,7 +515,7 @@ final readonly class AttemptService
 
         if (($this->store->read([$key])[$key]['hits'] ?? 0) < $settings->identityLimit()) {
 
-            $state->save();
+            self::saveState($state, 'the identity\'s failures in a row');
 
             return $state->consecutive_failures;
         }
@@ -519,7 +524,7 @@ final readonly class AttemptService
 
         $state->locked_until = $until;
 
-        $state->save();
+        self::saveState($state, 'the identity\'s lockout');
 
         $events[] = new LockoutApplied($this->events->context($attempt->identity, $attempt->application, $attempt->client), null, $until, $attempt->purpose);
 

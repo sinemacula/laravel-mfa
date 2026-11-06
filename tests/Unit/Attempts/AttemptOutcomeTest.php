@@ -50,9 +50,29 @@ final class AttemptOutcomeTest extends TestCase
 
         self::assertFalse($outcome->passed);
         self::assertNull($outcome->lockout);
+        self::assertNull($outcome->caused);
         self::assertTrue($outcome->isFailed());
         self::assertFalse($outcome->isRefused());
         self::assertFalse($outcome->isNotFound());
+        self::assertFalse($outcome->causedLockout());
+    }
+
+    /**
+     * A failure that locked what it was made against names the lockout it
+     * caused, and is still a counted failure that no lockout refused.
+     *
+     * @return void
+     */
+    public function testAFailureThatCausedALockout(): void
+    {
+        $lockout = Lockout::endingAt(AttemptScope::FACTOR, CarbonImmutable::parse('2026-11-01 12:15:00'));
+        $outcome = AttemptOutcome::fail($lockout);
+
+        self::assertSame($lockout, $outcome->caused);
+        self::assertNull($outcome->lockout);
+        self::assertTrue($outcome->causedLockout());
+        self::assertTrue($outcome->isFailed());
+        self::assertFalse($outcome->isRefused());
     }
 
     /**
