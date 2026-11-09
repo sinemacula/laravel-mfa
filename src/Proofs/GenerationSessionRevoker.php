@@ -70,7 +70,7 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
     {
         $store      = $this->container->make(ProofStore::class);
         $current    = $store->currentSession($identity, $application) === $session;
-        $kept       = $current ? self::without($factorId, $store->proofs($identity, $application)) : [];
+        $kept       = $current ? self::without($factorId, $store->proofs($identity, $application, $session)) : [];
         $generation = VerificationGeneration::advance($identity);
 
         if ($kept !== []) {
@@ -122,7 +122,7 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
 
             try {
                 foreach ($kept as $proof) {
-                    $store->record($proof->withGeneration($generation));
+                    $store->record($identity, $proof->withGeneration($generation));
                 }
             } catch (ProofRefusedException) {
                 // Fail closed: the current session verifies again.

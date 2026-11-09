@@ -480,9 +480,9 @@ final class SeamsWithoutStateContractTest extends TestCase
         $store = $this->container()->make(ProofStore::class);
 
         $store->begin($user, SignInProofs::APPLICATION, SignInProofs::SESSION);
-        $store->record(SignInProofs::of($user)->password());
+        $store->record($user, SignInProofs::of($user)->password());
 
-        $before = $store->proofs($user, 'web');
+        $before = $store->proofs($user, 'web', SignInProofs::SESSION);
 
         self::assertCount(1, $before);
 
@@ -491,7 +491,7 @@ final class SeamsWithoutStateContractTest extends TestCase
 
         self::assertNull((new MiddlewareSessionTransition)->factorChanged($short));
 
-        self::assertSame($before[0]->toArray(), $store->proofs($user, 'web')[0]->toArray());
+        self::assertSame($before[0]->toArray(), $store->proofs($user, 'web', SignInProofs::SESSION)[0]->toArray());
     }
 
     /**
@@ -566,8 +566,8 @@ final class SeamsWithoutStateContractTest extends TestCase
         $this->actingAs($identity);
 
         $store->begin($identity, SignInProofs::APPLICATION, SignInProofs::SESSION);
-        $store->record($proofs->password(60));
-        $store->record($proofs->totp(30));
+        $store->record($identity, $proofs->password(60));
+        $store->record($identity, $proofs->totp(30));
 
         return $this->container()->make(FreshnessGate::class);
     }

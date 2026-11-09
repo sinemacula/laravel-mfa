@@ -241,7 +241,7 @@ final class EnrollmentRaceTest extends TestCase
         $this->actingAs($user);
 
         $store->begin($user, 'web', 'race-sign-in');
-        $store->record(SignInProofs::of($user)->inSession('race-sign-in')->password(60));
+        $store->record($user, SignInProofs::of($user)->inSession('race-sign-in')->password(60));
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store));
 

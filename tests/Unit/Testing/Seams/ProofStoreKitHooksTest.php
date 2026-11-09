@@ -121,6 +121,18 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
+     * Another person.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     */
+    #[\Override]
+    protected function otherProofStoreIdentity(): MultiFactorAuthenticatable
+    {
+        /** @var \Tests\Fixtures\Identities\TestUser */
+        return TestUser::query()->firstOrCreate(['email' => 'other-rows@example.test']);
+    }
+
+    /**
      * The application.
      *
      * @return string
@@ -145,6 +157,25 @@ final class ProofStoreKitHooksTest extends TestCase
         $this->signIns[] = $session;
 
         return $session;
+    }
+
+    /**
+     * Sign the identity in again, as the layer would, and make that sign-in
+     * current.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @return string
+     */
+    protected function replaceProofStoreSignIn(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): string
+    {
+        $replacement = $this->store->arrange($identity, $application);
+
+        $this->store->begin($identity, $application, $replacement);
+
+        return $replacement;
     }
 
     /**

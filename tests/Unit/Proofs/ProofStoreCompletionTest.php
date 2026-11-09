@@ -129,7 +129,7 @@ final class ProofStoreCompletionTest extends TestCase
         $proof = $this->proof(Purpose::SIGN_IN, 'pending-1');
 
         self::assertNull($this->pendingCompletion()->complete(CallerContext::forPending($this->pendingContext()), $this->resultOf($proof)));
-        self::assertSame([$proof->toArray()], $this->storedArrays());
+        self::assertSame([$proof->toArray()], $this->storedArrays('pending-1'));
     }
 
     /**
@@ -146,11 +146,11 @@ final class ProofStoreCompletionTest extends TestCase
         DB::beginTransaction();
         $seam->stepUp(Callers::current(), $this->resultOf($proof));
 
-        $during = $this->store()->proofs($this->user, 'web');
+        $during = $this->store()->proofs($this->user, 'web', self::SESSION);
 
         DB::rollBack();
 
-        $rolledBack = $this->store()->proofs($this->user, 'web');
+        $rolledBack = $this->store()->proofs($this->user, 'web', self::SESSION);
 
         DB::beginTransaction();
         $seam->stepUp(Callers::current(), $this->resultOf($proof));
@@ -158,7 +158,7 @@ final class ProofStoreCompletionTest extends TestCase
 
         self::assertSame([], $during);
         self::assertSame([], $rolledBack);
-        self::assertCount(1, $this->store()->proofs($this->user, 'web'));
+        self::assertCount(1, $this->store()->proofs($this->user, 'web', self::SESSION));
     }
 
     /**
@@ -227,7 +227,7 @@ final class ProofStoreCompletionTest extends TestCase
 
         $this->assertNotAccepted(fn () => $this->pendingCompletion()->complete($active, $this->resultOf($this->proof(Purpose::SIGN_IN, 'pending-1'))));
 
-        self::assertSame([], $this->storedArrays());
+        self::assertSame([], $this->storedArrays('pending-1'));
     }
 
     /**
@@ -375,13 +375,15 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * The proofs the store holds for the person, in their stored form.
+     * The proofs the store holds for the person's sign-in, in their stored
+     * form.
      *
+     * @param  string  $session
      * @return list<array<string, mixed>>
      */
-    private function storedArrays(): array
+    private function storedArrays(string $session = self::SESSION): array
     {
-        return array_map(static fn (Proof $proof): array => $proof->toArray(), $this->store()->proofs($this->user, 'web'));
+        return array_map(static fn (Proof $proof): array => $proof->toArray(), $this->store()->proofs($this->user, 'web', $session));
     }
 
     /**

@@ -861,16 +861,16 @@ final class PasskeyChangeGateTest extends TestCase
         $other   = new SessionProofStore(new Store('other-device', new ArraySessionHandler(10)));
 
         $other->begin($user, self::APPLICATION, 'other-sign-in');
-        $other->record(SignInProofs::of($user)->inSession('other-sign-in')->totp());
+        $other->record($user, SignInProofs::of($user)->inSession('other-sign-in')->totp());
 
         $this->stepUpWith($user, $passkey);
         $this->stepUpWith($user, $totp);
 
         $this->registrar()->remove($user, self::APPLICATION, self::CREDENTIAL);
 
-        $kept = array_map(static fn (Proof $proof): ?string => $proof->reference, $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION));
+        $kept = array_map(static fn (Proof $proof): ?string => $proof->reference, $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION));
 
-        self::assertSame([], $other->proofs($user, self::APPLICATION));
+        self::assertSame([], $other->proofs($user, self::APPLICATION, 'other-sign-in'));
         self::assertSame([$totp->id], $kept);
     }
 

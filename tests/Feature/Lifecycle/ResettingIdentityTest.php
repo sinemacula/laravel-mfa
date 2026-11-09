@@ -182,7 +182,7 @@ final class ResettingIdentityTest extends TestCase
         self::assertNull($state->locked_until);
         self::assertSame(0, $state->consecutive_failures);
         self::assertGreaterThan($generation, VerificationGeneration::current($user));
-        self::assertSame([], $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION));
+        self::assertSame([], $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION));
     }
 
     /**
@@ -608,7 +608,7 @@ final class ResettingIdentityTest extends TestCase
 
         self::assertTrue($raced);
         self::assertSame(FailureReason::NOT_FOUND, $result->reason);
-        self::assertSame([], $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION));
+        self::assertSame([], $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION));
     }
 
     /**
@@ -674,7 +674,7 @@ final class ResettingIdentityTest extends TestCase
         $user  = $this->signedInPerson();
         $store = $this->container()->make(ProofStore::class);
 
-        $store->record(SignInProofs::of($user)->password(60));
+        $store->record($user, SignInProofs::of($user)->password(60));
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store));
 
@@ -719,7 +719,7 @@ final class ResettingIdentityTest extends TestCase
         $this->actingAs($fresh);
 
         $store->begin($fresh, self::APPLICATION, 'after-the-reset');
-        $store->record(SignInProofs::of($fresh)->inSession('after-the-reset')->password(60));
+        $store->record($fresh, SignInProofs::of($fresh)->inSession('after-the-reset')->password(60));
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store));
 
@@ -770,7 +770,7 @@ final class ResettingIdentityTest extends TestCase
      */
     private function recordFirstFactor(TestUser $user): void
     {
-        $this->container()->make(ProofStore::class)->record(SignInProofs::of($user)->password());
+        $this->container()->make(ProofStore::class)->record($user, SignInProofs::of($user)->password());
     }
 
     /**

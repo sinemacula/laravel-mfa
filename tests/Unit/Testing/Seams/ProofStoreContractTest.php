@@ -11,6 +11,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ProofStoreTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\ProofStoreContract;
@@ -91,6 +92,279 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
+     * The kit rejects a store that keeps a proof it refuses.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatKeepsAProofItRefuses(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A refused proof must change nothing.');
+
+        $store = new FlawedProofStore(ProofStoreFlaw::KEEPS_A_REFUSED_PROOF);
+
+        ProofStoreContract::assertRefusesAProofOfAnotherSignIn($store, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
+    }
+
+    /**
+     * The kit rejects a store that keeps a proof of another identity on the
+     * identity's current sign-in.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatKeepsAProofOfAnotherIdentity(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A proof of another identity must be refused by throwing a ProofRefusedException.');
+
+        $store = new FlawedProofStore(ProofStoreFlaw::ACCEPTS_ANY_IDENTITY);
+
+        $this->assertRefusesAProofOfAnotherIdentity($store);
+    }
+
+    /**
+     * The kit rejects a store that judges a proof by the identity its binding
+     * names rather than the one it is recorded for, which a proof naming an
+     * identity with no sign-in would not show.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatJudgesTheIdentityTheBindingNames(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A proof of another identity must be refused by throwing a ProofRefusedException.');
+
+        $this->assertRefusesAProofOfAnotherIdentity(new FlawedProofStore(ProofStoreFlaw::KEYS_BY_BINDING), 'other-sign-in');
+    }
+
+    /**
+     * The kit rejects a store that forgets the current sign-in and its proofs
+     * before it throws a refusal, on each kind of refusal.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatDestroysTheSignInOnARefusal(): void
+    {
+        $identity = $this->proofStoreIdentity();
+        $session  = ProofStoreContract::SESSION;
+        $checks   = [
+            'another sign-in'     => static fn (ProofStore $store) => ProofStoreContract::assertRefusesAProofOfAnotherSignIn($store, $identity, 'web', $session),
+            'another identity'    => fn (ProofStore $store) => $this->assertRefusesAProofOfAnotherIdentity($store),
+            'another application' => static fn (ProofStore $store) => ProofStoreContract::assertRefusesAProofOfAnotherApplication($store, $identity, 'web', $session),
+        ];
+
+        foreach ($checks as $refusal => $check) {
+            try {
+                $check(new FlawedProofStore(ProofStoreFlaw::DESTROYS_ON_REFUSAL));
+            } catch (AssertionFailedError $failure) {
+                self::assertSame('A refused proof must leave the sign-in current.', explode("\n", $failure->getMessage())[0], $refusal);
+
+                continue;
+            }
+
+            self::fail(sprintf('The refusal of a proof of %s must catch a store that destroys the sign-in.', $refusal));
+        }
+    }
+
+    /**
+     * The kit rejects a store that keeps a refused proof for the identity its
+     * binding names.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatKeepsARefusedProofForTheIdentityItNames(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A refused proof must not be kept for the identity it names.');
+
+        $this->assertRefusesAProofOfAnotherIdentity(new FlawedProofStore(ProofStoreFlaw::KEEPS_FOR_THE_NAMED_IDENTITY));
+    }
+
+    /**
+     * The kit rejects a store that ends the sign-in of the identity a refused
+     * proof's binding names.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatEndsTheNamedIdentitysSignInOnARefusal(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A refused proof must leave the other identity\'s sign-in as it was.');
+
+        $this->assertRefusesAProofOfAnotherIdentity(new FlawedProofStore(ProofStoreFlaw::ENDS_THE_NAMED_SIGN_IN));
+    }
+
+    /**
+     * The kit rejects a refusal checked on a sign-in that holds no proof, which
+     * could not show a refusal that changed it.
+     *
+     * @return void
+     */
+    public function testRejectsARefusalOnASignInHoldingNoProof(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A proof of the current sign-in must be kept before the refusal.');
+
+        $store = new LayerWrittenProofStore;
+
+        ProofStoreContract::assertRefusesAProofOfAnotherSignIn($store, $this->proofStoreIdentity(), 'web', $store->signIn(), static function (): void {});
+    }
+
+    /**
+     * The kit rejects a replacement that begins no other sign-in.
+     *
+     * @return void
+     */
+    public function testRejectsAReplacementThatBeginsNoOtherSignIn(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('Replacing the sign-in must begin another.');
+
+        $store   = new LayerWrittenProofStore;
+        $session = $store->signIn();
+
+        ProofStoreContract::assertReadsOnlyTheNamedSignIn($store, $this->proofStoreIdentity(), 'web', $session, static fn (): string => $session, $store->write(...));
+    }
+
+    /**
+     * The kit rejects a replacement the store does not name as current.
+     *
+     * @return void
+     */
+    public function testRejectsAReplacementThatIsNotCurrent(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('The sign-in that replaced it must be the current one.');
+
+        $store = new LayerWrittenProofStore;
+
+        ProofStoreContract::assertReadsOnlyTheNamedSignIn($store, $this->proofStoreIdentity(), 'web', $store->signIn(), $store->signIn(...), $store->write(...));
+    }
+
+    /**
+     * The kit rejects a store that reads no proof for the sign-in that replaced
+     * another.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatReadsNothingForTheReplacement(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A proof of the sign-in that replaced it must be read for it.');
+
+        $identity = $this->proofStoreIdentity();
+        $store    = new LayerWrittenProofStore;
+        $session  = $store->signIn();
+
+        ProofStoreContract::assertReadsOnlyTheNamedSignIn(
+            $store,
+            $identity,
+            'web',
+            $session,
+            static function () use ($store, $identity): string {
+                $replacement = $store->signIn();
+
+                $store->begin($identity, 'web', $replacement);
+
+                return $replacement;
+            },
+            static function (Proof $proof) use ($store, $session): void {
+                if ($proof->binding->sessionId !== $session) {
+                    return;
+                }
+
+                $store->write($proof);
+            },
+        );
+    }
+
+    /**
+     * The kit rejects a store that still reads the proofs of a sign-in it has
+     * since replaced.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatReadsAReplacedSignIn(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A sign-in since replaced must yield no proof, though it held one.');
+
+        $store = new FlawedProofStore(ProofStoreFlaw::RETAINS_SIGN_INS);
+
+        ProofStoreContract::assertReadsOnlyTheNamedSignIn($store, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
+    }
+
+    /**
+     * The kit rejects a store that keeps a proof of another application under
+     * the current sign-in's id.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatKeepsAProofOfAnotherApplication(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A proof bound to another application must be refused by throwing a ProofRefusedException.');
+
+        $store = new FlawedProofStore(ProofStoreFlaw::ACCEPTS_ANY_APPLICATION);
+
+        ProofStoreContract::assertRefusesAProofOfAnotherApplication($store, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
+    }
+
+    /**
+     * The kit rejects a store that reads the current sign-in's proofs for
+     * whichever sign-in is named.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatReadsAnySignIn(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A session never begun must yield no proof.');
+
+        $store = new FlawedProofStore(ProofStoreFlaw::READS_ANY_SIGN_IN);
+
+        ProofStoreContract::assertReadsOnlyTheNamedSignIn($store, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
+    }
+
+    /**
+     * The kit rejects a store that reads no proof for the sign-in named.
+     *
+     * @return void
+     */
+    public function testRejectsAStoreThatReadsNothingForTheNamedSignIn(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A proof of the current sign-in must be read for it.');
+
+        $store = new FlawedProofStore(ProofStoreFlaw::DROPS_PROOFS);
+
+        ProofStoreContract::assertReadsOnlyTheNamedSignIn($store, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
+    }
+
+    /**
+     * Each refusal and the named read pass on a store that keeps them, and fail
+     * on none of its other flaws.
+     *
+     * @return void
+     */
+    public function testTheNewChecksPassAStoreThatKeepsThem(): void
+    {
+        $identity = $this->proofStoreIdentity();
+
+        foreach ([ProofStoreFlaw::KEEPS_SESSION, ProofStoreFlaw::KEEPS_PROOFS, ProofStoreFlaw::RETAINS_SIGN_INS] as $flaw) {
+            ProofStoreContract::assertRefusesAProofOfAnotherSignIn(new FlawedProofStore($flaw), $identity, 'web', ProofStoreContract::SESSION);
+            $this->assertRefusesAProofOfAnotherIdentity(new FlawedProofStore($flaw));
+            ProofStoreContract::assertRefusesAProofOfAnotherApplication(new FlawedProofStore($flaw), $identity, 'web', ProofStoreContract::SESSION);
+        }
+
+        foreach ([ProofStoreFlaw::ACCEPTS_ANY_IDENTITY, ProofStoreFlaw::KEYS_BY_BINDING, ProofStoreFlaw::DESTROYS_ON_REFUSAL] as $flaw) {
+            ProofStoreContract::assertReadsOnlyTheNamedSignIn(new FlawedProofStore($flaw), $identity, 'web', ProofStoreContract::SESSION);
+        }
+
+        $this->addToAssertionCount(1);
+    }
+
+    /**
      * Rows of a store that breaks one part of forgetting a sign-in.
      *
      * @return iterable<string, array{\Tests\Fixtures\Seams\Enums\ProofStoreFlaw}>
@@ -144,6 +418,15 @@ final class ProofStoreContractTest extends TestCase
         ProofStoreContract::assertForgettingASignInForgetsItsProofs($store, $identity, 'web', $store->signIn(), $store->write(...), $store->signOut(...));
         ProofStoreContract::assertVoidedProofsStopCounting($store, $identity, 'web', $store->signIn(), $store->signOut(...), $store->write(...));
         ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting($store, $identity, 'web', $store->signIn(), $store->enrol(), $store->write(...));
+        ProofStoreContract::assertRefusesAProofOfAnotherSignIn($store, $identity, 'web', $store->signIn(), $store->write(...));
+        ProofStoreContract::assertRefusesAProofOfAnotherApplication($store, $identity, 'web', $store->signIn(), $store->write(...));
+        ProofStoreContract::assertReadsOnlyTheNamedSignIn($store, $identity, 'web', $store->signIn(), static function () use ($store, $identity): string {
+            $replacement = $store->signIn();
+
+            $store->begin($identity, 'web', $replacement);
+
+            return $replacement;
+        }, $store->write(...));
 
         $this->addToAssertionCount(1);
     }
@@ -220,6 +503,18 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
+     * Another person.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     */
+    #[\Override]
+    protected function otherProofStoreIdentity(): MultiFactorAuthenticatable
+    {
+        /** @var \Tests\Fixtures\Identities\TestUser */
+        return TestUser::query()->firstOrCreate(['email' => 'other-store@example.test']);
+    }
+
+    /**
      * The application.
      *
      * @return string
@@ -228,5 +523,25 @@ final class ProofStoreContractTest extends TestCase
     protected function proofStoreApplication(): string
     {
         return 'web';
+    }
+
+    /**
+     * Assert the store refuses the identity a proof of the other identity's
+     * sign-in, begun under the id given.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  string  $otherSession
+     * @return void
+     */
+    private function assertRefusesAProofOfAnotherIdentity(ProofStore $store, string $otherSession = ProofStoreContract::SESSION): void
+    {
+        ProofStoreContract::assertRefusesAProofOfAnotherIdentity(
+            $store,
+            $this->proofStoreIdentity(),
+            $this->otherProofStoreIdentity(),
+            'web',
+            ProofStoreContract::SESSION,
+            $otherSession,
+        );
     }
 }

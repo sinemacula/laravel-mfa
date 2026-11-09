@@ -126,7 +126,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
         $store = $this->container()->make(ProofStore::class);
 
         $store->begin($identity, self::APPLICATION, self::SESSION);
-        $store->record(SignInProofs::of($identity)->inSession(self::SESSION)->password(60));
+        $store->record($identity, SignInProofs::of($identity)->inSession(self::SESSION)->password(60));
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store));
 
@@ -320,7 +320,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
 
         $store->forget($user, self::APPLICATION);
         $store->begin($user, self::APPLICATION, self::SESSION);
-        $store->record($this->emailFirstFactor($user, self::SESSION));
+        $store->record($user, $this->emailFirstFactor($user, self::SESSION));
 
         $this->forgetReports();
 
@@ -351,7 +351,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
 
         $store->forget($user, self::APPLICATION);
         $store->begin($user, self::APPLICATION, self::SESSION);
-        $store->record($this->emailFirstFactor($user, self::SESSION));
+        $store->record($user, $this->emailFirstFactor($user, self::SESSION));
 
         $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
 

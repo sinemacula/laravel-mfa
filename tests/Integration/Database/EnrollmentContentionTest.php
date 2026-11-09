@@ -96,7 +96,7 @@ final class EnrollmentContentionTest extends TestCase
         Auth::setUser($identity);
 
         $store->begin($identity, 'web', 'sign-in-1');
-        $store->record(SignInProofs::of($identity)->password(60));
+        $store->record($identity, SignInProofs::of($identity)->password(60));
 
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store));
 

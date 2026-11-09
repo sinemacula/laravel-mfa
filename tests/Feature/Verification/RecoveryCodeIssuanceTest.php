@@ -23,6 +23,7 @@ use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
@@ -35,7 +36,9 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FreshOnceGate;
 use Tests\Fixtures\Requirements\RefusingFreshnessGate;
+use Tests\Fixtures\Requirements\ReplacingFactorChangeGate;
 use Tests\Fixtures\Requirements\ScriptedFactorChangeGate;
+use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\InterruptingProofStore;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
@@ -294,6 +297,22 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
+     * A sign-in replaced once the operation has checked it lends that operation
+     * nothing: the level is read for the sign-in the codes were asked on, which
+     * no longer counts, not for the one that replaced it.
+     *
+     * @return void
+     */
+    public function testASignInReplacedAfterItIsCheckedLendsItsSuccessorsLevelToNothing(): void
+    {
+        $user = $this->steppedUpPerson();
+
+        $this->container()->instance(FactorChangeGate::class, new ReplacingFactorChangeGate(fn () => $this->replaceSignIn($user)));
+
+        $this->assertRefused();
+    }
+
+    /**
      * Each of the package's own reasons on this path is an answer, not an
      * exception, leaving the old set in place.
      *
@@ -501,6 +520,25 @@ final class RecoveryCodeIssuanceTest extends TestCase
         self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
 
         return $user;
+    }
+
+    /**
+     * Replace the person's sign-in with one that verified with a password and
+     * an authenticator app, as signing in again elsewhere would.
+     *
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function replaceSignIn(TestUser $user): void
+    {
+        $store  = $this->container()->make(ProofStore::class);
+        $signIn = SignInProofs::of($user)->inSession('sign-in-b')->underGeneration(VerificationGeneration::current($user));
+
+        $store->begin($user, self::APPLICATION, 'sign-in-b');
+        $store->record($user, $signIn->password(60));
+        $store->record($user, $signIn->totp(30));
     }
 
     /**

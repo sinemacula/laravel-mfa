@@ -365,18 +365,24 @@ trait ArrangesVerification
     {
         $proofs = SignInProofs::of($user)->inSession($session)->underGeneration(VerificationGeneration::current($user));
 
-        $this->container()->make(ProofStore::class)->record($proofs->password(60));
+        $this->container()->make(ProofStore::class)->record($user, $proofs->password(60));
     }
 
     /**
-     * The proofs the store holds for the person's sign-in.
+     * The proofs the store holds for the person's sign-in: the one named, or
+     * else whichever the store holds as current, active or pending; none
+     * without one.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @param  ?string  $session
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */
-    protected function storedProofs(TestUser $user): array
+    protected function storedProofs(TestUser $user, ?string $session = null): array
     {
-        return $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION);
+        $store = $this->container()->make(ProofStore::class);
+        $session ??= $store->currentSession($user, self::APPLICATION);
+
+        return $session === null ? [] : $store->proofs($user, self::APPLICATION, $session);
     }
 
     /**

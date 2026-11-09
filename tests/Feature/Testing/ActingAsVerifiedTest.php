@@ -363,7 +363,7 @@ final class ActingAsVerifiedTest extends TestCase
 
         $this->container()->instance(ProofStore::class, $store);
 
-        $store->record($this->hardwarePasskeyFirstFactor($user));
+        $store->record($user, $this->hardwarePasskeyFirstFactor($user));
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Requested aal2 with additional verification; reached aal3; unmet: none.');
@@ -534,7 +534,7 @@ final class ActingAsVerifiedTest extends TestCase
 
         $this->container()->instance(ProofStore::class, $store);
 
-        $store->record(SignInProofs::of($user)->inSession('kept')->password(60));
+        $store->record($user, SignInProofs::of($user)->inSession('kept')->password(60));
 
         $this->actingAsVerified($user);
 
@@ -559,8 +559,8 @@ final class ActingAsVerifiedTest extends TestCase
 
         $this->container()->instance(ProofStore::class, $store);
 
-        $store->record(SignInProofs::of($user)->inSession('kept')->password(60));
-        $store->record(SignInProofs::of($user)->inSession('kept')->totp(30));
+        $store->record($user, SignInProofs::of($user)->inSession('kept')->password(60));
+        $store->record($user, SignInProofs::of($user)->inSession('kept')->totp(30));
 
         try {
             $this->actingAsVerified($user);
@@ -586,7 +586,7 @@ final class ActingAsVerifiedTest extends TestCase
 
         $this->container()->instance(ProofStore::class, $store);
 
-        $store->record(SignInProofs::of($user)->inSession('kept')->password(60));
+        $store->record($user, SignInProofs::of($user)->inSession('kept')->password(60));
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Requested aal2 with additional verification; reached aal1; unmet: additional_verification, minimum_level.');
@@ -830,7 +830,8 @@ final class ActingAsVerifiedTest extends TestCase
     }
 
     /**
-     * The proofs the bound store holds for the identity on the application.
+     * The proofs the bound store holds for the identity's current sign-in on
+     * the application, which the helper names afresh each time it acts.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -838,7 +839,10 @@ final class ActingAsVerifiedTest extends TestCase
      */
     private function heldBy(MultiFactorAuthenticatable $identity, string $application): array
     {
-        return $this->container()->make(ProofStore::class)->proofs($identity, $application);
+        $store   = $this->container()->make(ProofStore::class);
+        $session = $store->currentSession($identity, $application);
+
+        return $session === null ? [] : $store->proofs($identity, $application, $session);
     }
 
     /**

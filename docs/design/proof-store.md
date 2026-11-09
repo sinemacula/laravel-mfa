@@ -18,8 +18,14 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
   an integer is refused with `UnsupportedIdentifierException` rather than collapsing identities onto one record.
 - Beginning a sign-in forgets every proof of the identity's previous one on that application, even under the same
   session id.
-- A proof is recorded only for its identity's current sign-in on its application: one bound to another session id, or
-  to an identity with no sign-in there, is refused with `ProofRefusedException`, never kept.
+- A proof is recorded only for the identity it is handed with, on that identity's current sign-in on the proof's
+  application: one bound to another identity, another session id, or an application where the identity has no sign-in,
+  is refused with `ProofRefusedException`, never kept, and changes nothing.
+- The sign-in an operation is about is chosen once, through `currentSession()` or the binding the operation captured,
+  and named to `proofs()`, which reads that sign-in only and yields none once it is no longer current. A sign-in
+  replaced between two reads lends its proofs to neither, and a store backed by another layer's sessions never has to
+  infer the sign-in a read is about. `currentSession()` is asked again only to check the named sign-in is still current,
+  as `SessionFirstFactor` does before it relies on the bound resolver's first factor.
 - A recorded proof counts only when it is bound to the identity, the application and the current sign-in it is read
   for, was made no later than now, and was made under the identity's current verification generation. Anything else,
   and a stored entry that cannot be read back as a proof, is left out. The proofs come back oldest first, with proofs

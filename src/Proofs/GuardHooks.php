@@ -59,7 +59,7 @@ final class GuardHooks
         $store = self::store();
 
         $store->begin($identity, $firstFactor->binding->application, $firstFactor->binding->sessionId);
-        $store->record($firstFactor);
+        $store->record($identity, $firstFactor);
     }
 
     /**

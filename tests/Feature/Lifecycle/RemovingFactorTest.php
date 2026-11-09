@@ -44,6 +44,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
+use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
@@ -58,6 +59,7 @@ use Tests\Fixtures\Lifecycle\RecordingSessionRevoker;
 use Tests\Fixtures\Lifecycle\ScriptedLastFactorPolicy;
 use Tests\Fixtures\Requirements\FixedActiveTenant;
 use Tests\Fixtures\Requirements\FixedIdentityRequirement;
+use Tests\Fixtures\Requirements\ReplacingFactorChangeGate;
 use Tests\Fixtures\Requirements\ScriptedFactorChangeGate;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\RecordingSessionTransition;
@@ -416,7 +418,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->confirmedFactor($user);
 
-        $this->container()->make(ProofStore::class)->record(new Proof(
+        $this->container()->make(ProofStore::class)->record($user, new Proof(
             kind      : ProofKind::RECOVERY_CODE,
             method    : 'recovery_code',
             channel   : null,
@@ -614,7 +616,7 @@ final class RemovingFactorTest extends TestCase
         $other = new SessionProofStore(new Store('other-device', new ArraySessionHandler(10)));
 
         $other->begin($user, self::APPLICATION, 'other-sign-in');
-        $other->record(SignInProofs::of($user)->inSession('other-sign-in')->totp());
+        $other->record($user, SignInProofs::of($user)->inSession('other-sign-in')->totp());
 
         $this->stepUpWith($user, $kept);
         $this->stepUpWith($user, $gone);
@@ -622,13 +624,13 @@ final class RemovingFactorTest extends TestCase
         $seen = null;
 
         Event::listen(FactorRemoved::class, function () use ($user, &$seen): void {
-            $seen = self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION));
+            $seen = self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION));
         });
 
         self::assertTrue(Mfa::removeFactor(Callers::current(), $gone->id)->wasMade());
-        self::assertSame([], $other->proofs($user, self::APPLICATION));
+        self::assertSame([], $other->proofs($user, self::APPLICATION, 'other-sign-in'));
         self::assertSame([$kept->id], $seen);
-        self::assertSame([$kept->id], self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION)));
+        self::assertSame([$kept->id], self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION)));
     }
 
     /**
@@ -753,7 +755,7 @@ final class RemovingFactorTest extends TestCase
         self::assertTrue($this->isStored($factor));
         self::assertSame(10, RecoveryCode::query()->count());
         self::assertSame([], $this->reportedNames());
-        self::assertSame([], self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION)));
+        self::assertSame([], self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION)));
     }
 
     /**
@@ -821,6 +823,40 @@ final class RemovingFactorTest extends TestCase
         self::assertNull($result->outstanding);
         self::assertCount(1, $transition->changes);
         self::assertNull($transition->changes[0]->outstanding);
+    }
+
+    /**
+     * A sign-in replaced once the removal has checked it lends the removal none
+     * of its proofs: the session the factor was removed on is judged on what it
+     * still holds, which is nothing, not on what replaced it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASignInReplacedAfterItIsCheckedLendsTheRemovalNoProof(): void
+    {
+        $transition  = new RecordingSessionTransition;
+        $requirement = Requirement::none()->withAdditionalVerification();
+
+        $this->container()->instance(SessionTransition::class, $transition);
+        $this->container()->instance(IdentityRequirement::class, new FixedIdentityRequirement($requirement));
+
+        $user    = $this->signedInPerson();
+        $factor  = $this->confirmedFactor($user);
+        $other   = $this->confirmedFactor($user);
+        $session = $this->container()->make(ProofStore::class)->currentSession($user, self::APPLICATION);
+
+        $this->stepUpWith($user, $other);
+
+        $this->container()->instance(FactorChangeGate::class, new ReplacingFactorChangeGate(fn () => $this->replaceSignIn($user)));
+
+        $result = Mfa::removeFactor(Callers::current(), $factor->id);
+
+        self::assertTrue($result->wasMade());
+        self::assertCount(1, $transition->changes);
+        self::assertSame($session, $transition->changes[0]->session);
+        self::assertSame($requirement->toArray(), $transition->changes[0]->outstanding?->toArray());
     }
 
     /**
@@ -1105,5 +1141,24 @@ final class RemovingFactorTest extends TestCase
         $additional = array_filter($proofs, static fn (Proof $proof): bool => $proof->kind === ProofKind::ADDITIONAL_FACTOR);
 
         return array_values(array_map(static fn (Proof $proof): ?string => $proof->reference, $additional));
+    }
+
+    /**
+     * Replace the person's sign-in with one that verified with a password and
+     * an authenticator app, as signing in again elsewhere would.
+     *
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function replaceSignIn(TestUser $user): void
+    {
+        $store  = $this->container()->make(ProofStore::class);
+        $signIn = SignInProofs::of($user)->inSession('sign-in-b')->underGeneration(VerificationGeneration::current($user));
+
+        $store->begin($user, self::APPLICATION, 'sign-in-b');
+        $store->record($user, $signIn->password(60));
+        $store->record($user, $signIn->totp(30));
     }
 }

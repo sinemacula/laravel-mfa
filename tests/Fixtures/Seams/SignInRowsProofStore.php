@@ -33,8 +33,8 @@ final class SignInRowsProofStore implements ProofStore
     /** @var array<string, list<\SineMacula\Laravel\Mfa\Proofs\Proof>> The proofs of each sign-in arranged, as rows an authentication layer holds. */
     private array $rows = [];
 
-    /** @var ?string The current sign-in. */
-    private ?string $session = null;
+    /** @var array<string, string> Each identity's current sign-in on each application, by its slot and the application. */
+    private array $current = [];
 
     /**
      * Arrange a sign-in, as signing in through the layer would, holding the
@@ -90,7 +90,7 @@ final class SignInRowsProofStore implements ProofStore
             throw new \InvalidArgumentException('No such sign-in.');
         }
 
-        $this->session = $sessionId;
+        $this->current[self::key($identity, $application)] = $sessionId;
     }
 
     /**
@@ -103,39 +103,42 @@ final class SignInRowsProofStore implements ProofStore
     #[\Override]
     public function currentSession(MultiFactorAuthenticatable $identity, string $application): ?string
     {
-        return $this->session;
+        return $this->current[self::key($identity, $application)] ?? null;
     }
 
     /**
-     * Keep a proof of the current sign-in, refusing any other.
+     * Keep the identity's proof of the current sign-in, refusing any other.
      *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
-    public function record(Proof $proof): void
+    public function record(MultiFactorAuthenticatable $identity, Proof $proof): void
     {
-        if ($this->session === null || $proof->binding->sessionId !== $this->session) {
+        if (!$this->isOfTheCurrentSignIn($identity, $proof)) {
             throw new ProofRefusedException('No such sign-in is current.');
         }
 
-        $this->rows[$this->session][] = $proof;
+        $this->rows[$proof->binding->sessionId][] = $proof;
     }
 
     /**
-     * The proofs of the current sign-in, whatever generation they were made
-     * under.
+     * The proofs of the sign-in named, when it is the current one, whatever
+     * generation they were made under.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $sessionId
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */
     #[\Override]
-    public function proofs(MultiFactorAuthenticatable $identity, string $application): array
+    public function proofs(MultiFactorAuthenticatable $identity, string $application, string $sessionId): array
     {
-        return $this->session === null ? [] : $this->rows[$this->session];
+        return $this->currentSession($identity, $application) === $sessionId ? $this->rows[$sessionId] : [];
     }
 
     /**
@@ -154,19 +157,53 @@ final class SignInRowsProofStore implements ProofStore
     }
 
     /**
-     * Forget the current sign-in and its proofs.
+     * Forget the identity's current sign-in on the application and its proofs.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
     public function forget(MultiFactorAuthenticatable $identity, string $application): void
     {
-        if ($this->session !== null) {
-            unset($this->rows[$this->session]);
+        $key = self::key($identity, $application);
+
+        if (isset($this->current[$key])) {
+            unset($this->rows[$this->current[$key]]);
         }
 
-        $this->session = null;
+        unset($this->current[$key]);
+    }
+
+    /**
+     * Whether the proof is the identity's, bound to the current sign-in on its
+     * application.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+     * @return bool
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private function isOfTheCurrentSignIn(MultiFactorAuthenticatable $identity, Proof $proof): bool
+    {
+        return ProofOwner::of($identity)->owns($proof->binding)
+            && $proof->binding->sessionId === $this->currentSession($identity, $proof->binding->application);
+    }
+
+    /**
+     * The key of the identity's current sign-in on the application.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @return string
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private static function key(MultiFactorAuthenticatable $identity, string $application): string
+    {
+        return ProofOwner::of($identity)->slot() . '#' . $application;
     }
 }

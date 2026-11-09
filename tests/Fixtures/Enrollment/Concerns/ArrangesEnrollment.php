@@ -84,7 +84,7 @@ trait ArrangesEnrollment
     {
         $user = $this->signedInPerson();
 
-        $this->container()->make(ProofStore::class)->record(SignInProofs::of($user)->inSession(self::SESSION)->password($secondsAgo + 60));
+        $this->container()->make(ProofStore::class)->record($user, SignInProofs::of($user)->inSession(self::SESSION)->password($secondsAgo + 60));
 
         $this->recordStepUp($user, $this->totpFactor($user, ['application' => self::APPLICATION, ...$attributes]), $secondsAgo);
 
@@ -103,7 +103,7 @@ trait ArrangesEnrollment
     {
         $owner = ProofOwner::of($user);
 
-        $this->container()->make(ProofStore::class)->record(new Proof(
+        $this->container()->make(ProofStore::class)->record($user, new Proof(
             kind      : ProofKind::ADDITIONAL_FACTOR,
             method    : 'totp',
             channel   : new Channel(ChannelKind::AUTHENTICATOR_APP, $factor->id),

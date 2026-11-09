@@ -75,34 +75,37 @@ final class InterruptingProofStore implements ProofStore
     }
 
     /**
-     * Record the proof, unless proofs are refused.
+     * Record the identity's proof, unless proofs are refused.
      *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
-    public function record(Proof $proof): void
+    public function record(MultiFactorAuthenticatable $identity, Proof $proof): void
     {
         if ($this->refusesRecords) {
             throw new ProofRefusedException('The store refused the proof.');
         }
 
-        $this->store->record($proof);
+        $this->store->record($identity, $proof);
     }
 
     /**
-     * The proofs of the sign-in.
+     * The proofs of the sign-in named, as the wrapped store reads them.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $sessionId
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */
     #[\Override]
-    public function proofs(MultiFactorAuthenticatable $identity, string $application): array
+    public function proofs(MultiFactorAuthenticatable $identity, string $application, string $sessionId): array
     {
-        return $this->store->proofs($identity, $application);
+        return $this->store->proofs($identity, $application, $sessionId);
     }
 
     /**

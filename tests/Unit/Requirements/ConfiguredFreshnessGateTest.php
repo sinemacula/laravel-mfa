@@ -162,8 +162,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
         $this->actingAs($identity);
 
         $store->begin($identity, SignInProofs::APPLICATION, SignInProofs::SESSION);
-        $store->record($signIn->password());
-        $store->record($signIn->totp());
+        $store->record($identity, $signIn->password());
+        $store->record($identity, $signIn->totp());
 
         self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
         self::assertNull($this->gate()->freshUntil(Callers::current(), 'mfa.add_factor'));
@@ -196,8 +196,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
         $this->actingAs($identity);
 
         $store->begin($identity, SignInProofs::APPLICATION, SignInProofs::SESSION);
-        $store->record($signIn->password());
-        $store->record($signIn->totp());
+        $store->record($identity, $signIn->password());
+        $store->record($identity, $signIn->totp());
 
         self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
     }
@@ -535,7 +535,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
         $store->begin($user, SignInProofs::APPLICATION, SignInProofs::SESSION);
 
         foreach ($proofs(SignInProofs::of($user)) as $proof) {
-            $store->record($proof);
+            $store->record($user, $proof);
         }
 
         return $user;

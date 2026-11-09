@@ -85,7 +85,7 @@ trait ArrangesFactorChanges
         $store->begin($user, SignInProofs::APPLICATION, SignInProofs::SESSION);
 
         foreach ($proofs(SignInProofs::of($user)) as $proof) {
-            $store->record($proof);
+            $store->record($user, $proof);
         }
 
         return $user;

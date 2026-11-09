@@ -147,7 +147,7 @@ trait ArrangesPasskeys
             ? new Channel(ChannelKind::PASSKEY, $factor->credential_reference)
             : new Channel(ChannelKind::AUTHENTICATOR_APP, $factor->id);
 
-        $this->container()->make(ProofStore::class)->record(new Proof(
+        $this->container()->make(ProofStore::class)->record($user, new Proof(
             kind      : ProofKind::ADDITIONAL_FACTOR,
             method    : $factor->type,
             channel   : $channel,

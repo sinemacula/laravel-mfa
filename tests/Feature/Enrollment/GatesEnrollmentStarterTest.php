@@ -500,7 +500,7 @@ final class GatesEnrollmentStarterTest extends TestCase
         Enrollment::query()->delete();
         Factor::query()->delete();
 
-        $store->record($this->emailFirstFactor($user, self::SESSION));
+        $store->record($user, $this->emailFirstFactor($user, self::SESSION));
 
         self::assertSame(FailureReason::NOT_ACCEPTED, $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS))->reason);
         self::assertTrue($this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', 'other@example.test'))->hasStarted());

@@ -51,7 +51,7 @@ final class GuardHooksTest extends TestCase
         GuardHooks::signedIn($user, $proof);
 
         self::assertSame('guard-session-1', $this->store()->currentSession($user, 'web'));
-        self::assertSame([$proof->toArray()], array_map(static fn (Proof $proof): array => $proof->toArray(), $this->store()->proofs($user, 'web')));
+        self::assertSame([$proof->toArray()], array_map(static fn (Proof $proof): array => $proof->toArray(), $this->store()->proofs($user, 'web', 'guard-session-1')));
     }
 
     /**
@@ -69,7 +69,7 @@ final class GuardHooksTest extends TestCase
         GuardHooks::signedIn($user, $this->firstFactor(7, 'guard-session-2'));
 
         self::assertSame('guard-session-2', $this->store()->currentSession($user, 'web'));
-        self::assertCount(1, $this->store()->proofs($user, 'web'));
+        self::assertCount(1, $this->store()->proofs($user, 'web', 'guard-session-2'));
     }
 
     /**
@@ -89,9 +89,9 @@ final class GuardHooksTest extends TestCase
         GuardHooks::signedOut($user, 'web');
 
         self::assertNull($this->store()->currentSession($user, 'web'));
-        self::assertSame([], $this->store()->proofs($user, 'web'));
+        self::assertSame([], $this->store()->proofs($user, 'web', 'guard-session-1'));
         self::assertSame('guard-session-2', $this->store()->currentSession($user, 'admin'));
-        self::assertCount(1, $this->store()->proofs($user, 'admin'));
+        self::assertCount(1, $this->store()->proofs($user, 'admin', 'guard-session-2'));
     }
 
     /**

@@ -64,26 +64,28 @@ final class RetainingProofStore implements ProofStore
     /**
      * Keep the proof.
      *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
      */
     #[\Override]
-    public function record(Proof $proof): void
+    public function record(MultiFactorAuthenticatable $identity, Proof $proof): void
     {
         $this->proofs[] = $proof;
     }
 
     /**
-     * Every proof held.
+     * Every proof held, when the sign-in named is the one the store knows of.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $sessionId
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */
     #[\Override]
-    public function proofs(MultiFactorAuthenticatable $identity, string $application): array
+    public function proofs(MultiFactorAuthenticatable $identity, string $application, string $sessionId): array
     {
-        return $this->proofs;
+        return $sessionId === $this->session ? $this->proofs : [];
     }
 
     /**

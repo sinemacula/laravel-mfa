@@ -105,17 +105,21 @@ under `mfa.proofs`, at most 50 proofs per sign-in (the earliest recorded is forg
 factor). A guard with no session (tokens, JWTs) binds its own `Contracts\ProofStore`, keyed by the identity, the
 application and an id that names one sign-in, not merely a device:
 
-| Method                                       | Does                                                                           |
-|----------------------------------------------|--------------------------------------------------------------------------------|
-| `begin($identity, $application, $sessionId)` | Begins a sign-in on the application, forgetting the previous one's proofs      |
-| `currentSession($identity, $application)`    | The current sign-in's session id on the application, or `null` without one     |
-| `record($proof)`                             | Keeps a proof bound to its identity's current sign-in, refusing any other      |
-| `proofs($identity, $application)`            | The current sign-in's proofs on the application that still count, oldest first |
-| `forgetFactor($identity, $factorId)`         | Stops counting the proofs made with the factor, on every application           |
-| `forget($identity, $application)`            | Forgets the current sign-in on the application and its proofs                  |
+| Method                                        | Does                                                                                 |
+|-----------------------------------------------|--------------------------------------------------------------------------------------|
+| `begin($identity, $application, $sessionId)`  | Begins a sign-in on the application, forgetting the previous one's proofs            |
+| `currentSession($identity, $application)`     | The current sign-in's session id on the application, or `null` without one           |
+| `record($identity, $proof)`                   | Keeps the identity's proof bound to its current sign-in, refusing any other          |
+| `proofs($identity, $application, $sessionId)` | The named sign-in's proofs that still count, oldest first; none unless it is current |
+| `forgetFactor($identity, $factorId)`          | Stops counting the proofs made with the factor, on every application                 |
+| `forget($identity, $application)`             | Forgets the current sign-in on the application and its proofs                        |
 
 A store refuses a proof it cannot keep by throwing `Exceptions\ProofRefusedException`, and fails closed when it reads:
-no record, a proof in the future, another generation, identity, application or sign-in all mean not verified.
+no record, a proof in the future, another generation, identity, application or sign-in all mean not verified. The
+package chooses the sign-in an operation is about once, through `currentSession()` or the binding it captured, and names
+it to `proofs()`, so a sign-in replaced between two reads lends its proofs to neither, and a store never has to work out
+which sign-in a read is about. It asks `currentSession()` again only to check that sign-in is still current, as before
+it relies on a first factor the bound resolver answers.
 
 ```php
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
