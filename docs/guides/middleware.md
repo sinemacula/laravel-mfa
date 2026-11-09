@@ -147,6 +147,16 @@ meet this requirement, so a refusal asking for AAL2 can offer only an email code
 first factor can meet a requirement, and `$offered` being empty can also mean an unknown first factor or every factor
 disabled. Enrolling has checks of its own (see [Enrolment](enrollment.md)).
 
+### Raising the refusal yourself
+
+`Mfa::stepUpRefusal($caller, $requirement, $operation)` builds the same refusal for a decision made elsewhere, such as
+an authorisation layer that finds a caller short: the factors offered to the caller and whether its identity has a
+confirmed factor, filled in as the gate fills them. It is returned, not thrown. The requirement is taken as given, so
+compose it first with `Mfa::requirement()` and `Requirement::strictest()`, and the operation only names the refusal: it
+adds no freshness. A pending caller is reported as its pending session's identity, as the gate reports it, though it is
+offered only what its credential lets it list. Any other caller serving nobody, or naming an identity that is not a
+person, is offered nothing and has no confirmed factor.
+
 ### The refusal's wording
 
 The exception's message is translated in the locale it is raised in (see [Localisation](localization.md)), so a locale
@@ -161,8 +171,9 @@ authentication context, always all of them, and the neutral context to a pending
 `Context\AuthenticationContextContributor::neutral()` gives that neutral context. `contributeFor($identity,
 $application, $session, ...$proofs)` gives the same keys for a named sign-in, from proofs the caller read from a trusted
 record of it: for an authentication layer building the context of another session, or in a queued job. It reads only the
-proofs that count for that sign-in, as the proof store does, and the caller leaves out any made with a factor since
-removed and gives a pending, revoked or ended session the neutral context itself:
+proofs that count for that sign-in, as the proof store does, oldest first, taking proofs made at the same instant in the
+order given, and the caller leaves out any made with a factor since removed and gives a pending, revoked or ended
+session the neutral context itself:
 
 | Key                             | Type           | Means                                                                        |
 |---------------------------------|----------------|------------------------------------------------------------------------------|

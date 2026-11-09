@@ -589,6 +589,25 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
+     * Proofs made at the same instant are taken in the order given, so the
+     * types they name follow it.
+     *
+     * @return void
+     */
+    public function testProofsAtOneInstantAreTakenInTheOrderGiven(): void
+    {
+        $user = TestUser::query()->create(['email' => 'instant@example.test']);
+
+        $signIn = SignInProofs::of($user)->inSession('named-sign-in');
+
+        $emailFirst = $this->contributor()->contributeFor($user, self::APPLICATION, 'named-sign-in', $signIn->password(3600), $signIn->email(60), $signIn->totp(60));
+        $totpFirst  = $this->contributor()->contributeFor($user, self::APPLICATION, 'named-sign-in', $signIn->password(3600), $signIn->totp(60), $signIn->email(60));
+
+        self::assertSame(['email', 'totp'], $emailFirst['factor_types']);
+        self::assertSame(['totp', 'email'], $totpFirst['factor_types']);
+    }
+
+    /**
      * A named sign-in reads only the proofs that count for it: none of another
      * sign-in, another application or an older verification generation, and
      * none dated in the future.

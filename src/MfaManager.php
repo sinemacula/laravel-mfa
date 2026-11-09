@@ -22,6 +22,7 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
+use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
 use SineMacula\Laravel\Mfa\Factors\FactorChange;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
@@ -39,6 +40,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
+use SineMacula\Laravel\Mfa\Requirements\StepUpRefusal;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
 use SineMacula\Laravel\Mfa\Verification\FactorOffers;
@@ -200,6 +202,31 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     public function isFresh(CallerContext $caller, string $operation, ?Requirement $requirement = null): bool
     {
         return $this->service(RequirementService::class)->isFresh($caller, $operation, $requirement);
+    }
+
+    /**
+     * The refusal asking the caller to step up to the requirement, as the route
+     * gate raises it: the requirement as given, the factors offered to the
+     * caller, the operation as a label, and whether the identity has a factor
+     * whose stored status is exactly `confirmed`. Nothing is added to the
+     * requirement, and the operation adds no freshness; compose the requirement
+     * first, as with `requirement()` and `Requirement::strictest()`. A pending
+     * caller is reported as its pending session's identity; any other caller
+     * serving nobody, or naming an identity that is not a person, has no
+     * confirmed factor reported. It is returned, not thrown.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
+     * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
+     * @param  ?string  $operation
+     * @return \SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     */
+    public function stepUpRefusal(CallerContext $caller, Requirement $requirement, ?string $operation = null): InsufficientAuthenticationException
+    {
+        return $this->service(StepUpRefusal::class)->of($caller, $requirement, $operation);
     }
 
     /**

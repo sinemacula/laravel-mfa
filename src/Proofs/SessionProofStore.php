@@ -132,7 +132,8 @@ final readonly class SessionProofStore implements ProofStore
 
     /**
      * The proofs of the identity's sign-in on the application the session names
-     * that still count, oldest first; none unless it is the current one.
+     * that still count, oldest first, with proofs made at the same instant in
+     * the order they were recorded; none unless it is the current one.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

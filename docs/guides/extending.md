@@ -171,7 +171,7 @@ registers it with the container, and the classes only it uses:
 | `Factors`       | Factor reads, `FactorSummary` and `OperationGuard`                                                                |
 | `Drivers`       | The TOTP, email, SMS and passkey drivers, the resolver the services run drivers through                           |
 | `Codes`         | Delivered codes: `CodeService`, `CodeMessage`, the senders' defaults, `PackageChallengeGateway`, `MfaCodeMessage` |
-| `Requirements`  | `requirement()`, `isFresh()`, `Requirement` and the requirement seams' defaults                                   |
+| `Requirements`  | `requirement()`, `isFresh()`, `stepUpRefusal()`, `Requirement` and the requirement seams' defaults                |
 | `Proofs`        | The sign-in's proofs, `SessionProofStore`, `ProofStoreCompletion`, `GuardHooks`, `Proof`                          |
 | `Verification`  | `verify()`, `sendCode()`, `offeredFactors()`, `Submission` and `VerificationResult`                               |
 | `Assurance`     | `Channel`, `ObservedProperties`, `Evaluation` and the default `DefaultCombinationPolicy`                          |

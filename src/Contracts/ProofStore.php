@@ -85,9 +85,10 @@ interface ProofStore
 
     /**
      * The proofs of the identity's sign-in on the application the session names
-     * that still count, oldest first: none unless that sign-in is the
-     * identity's current one there, so a sign-in replaced since the caller
-     * named it yields nothing.
+     * that still count, oldest first, with proofs made at the same instant in
+     * the order they were recorded: none unless that sign-in is the identity's
+     * current one there, so a sign-in replaced since the caller named it yields
+     * nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
