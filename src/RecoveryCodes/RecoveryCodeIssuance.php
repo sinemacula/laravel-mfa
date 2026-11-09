@@ -189,7 +189,7 @@ final readonly class RecoveryCodeIssuance
             $this->container->make(FactorChanges::class)->allow($caller->identity, $binding->application, $binding->sessionId, FactorChange::GENERATE_RECOVERY_CODES, $factors);
         }
 
-        $proofs   = $this->firstFactors->proofs($caller->identity, $binding->application);
+        $proofs   = $this->firstFactors->proofsOf($caller->identity, $binding->application, $binding->sessionId);
         $level    = $this->container->make(RequirementCheck::class)->check(Requirement::none(), ...$proofs)->level;
         $settings = new ApplicationSettings($this->container->make(Repository::class), $binding->application);
 

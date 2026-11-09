@@ -425,7 +425,7 @@ final readonly class EnrollmentConfirmer
             return EnrollmentConfirmation::confirmed($summary, $codes, $result->withCompletion($acceptance->handOver($caller, $result)));
         }
 
-        $proofs    = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
+        $proofs    = $this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $binding->sessionId);
         $judgement = $this->container->make(SessionReevaluation::class)->judge($identity, $application, $binding->sessionId, FactorChangeMade::CONFIRMED, $summary, $proofs);
 
         return EnrollmentConfirmation::confirmed($summary, $codes, completion: $judgement->completion());

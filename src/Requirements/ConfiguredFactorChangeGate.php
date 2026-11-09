@@ -183,7 +183,7 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
         OperationRefusedException::byPackageUnless($requirement !== null, FailureReason::NOT_FRESH, 'Removing a factor has no freshness to judge it by.');
 
         $proofs = array_filter(
-            $this->container->make(SessionFirstFactor::class)->proofs($request->identity, $request->application),
+            $this->container->make(SessionFirstFactor::class)->proofsOf($request->identity, $request->application, $request->session),
             static fn (Proof $proof): bool => $proof->reference !== $id,
         );
 

@@ -28,11 +28,8 @@ final class LayerWrittenProofStore implements ProofStore
     /** @var array<string, list<\SineMacula\Laravel\Mfa\Proofs\Proof>> The proofs of each sign-in the layer holds. */
     private array $rows = [];
 
-    /** @var ?string The current sign-in. */
-    private ?string $session = null;
-
-    /** @var ?string The application the current sign-in is on. */
-    private ?string $application = null;
+    /** @var array<string, string> Each identity's current sign-in on each application, by its slot and the application. */
+    private array $current = [];
 
     /** @var list<string> The factors the identity holds. */
     private array $factors = [];
@@ -63,17 +60,17 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * End the current sign-in through the layer.
+     * End every current sign-in through the layer.
      *
      * @return void
      */
     public function signOut(): void
     {
-        if ($this->session !== null) {
-            unset($this->rows[$this->session]);
+        foreach ($this->current as $session) {
+            unset($this->rows[$session]);
         }
 
-        $this->session = null;
+        $this->current = [];
     }
 
     /**
@@ -107,8 +104,7 @@ final class LayerWrittenProofStore implements ProofStore
             throw new \InvalidArgumentException('No such sign-in.');
         }
 
-        $this->session     = $sessionId;
-        $this->application = $application;
+        $this->current[self::key($identity, $application)] = $sessionId;
     }
 
     /**
@@ -121,7 +117,7 @@ final class LayerWrittenProofStore implements ProofStore
     #[\Override]
     public function currentSession(MultiFactorAuthenticatable $identity, string $application): ?string
     {
-        return $this->session;
+        return $this->current[self::key($identity, $application)] ?? null;
     }
 
     /**
@@ -155,7 +151,7 @@ final class LayerWrittenProofStore implements ProofStore
     #[\Override]
     public function proofs(MultiFactorAuthenticatable $identity, string $application, string $sessionId): array
     {
-        $proofs = $this->session === $sessionId ? $this->rows[$sessionId] : [];
+        $proofs = $this->currentSession($identity, $application) === $sessionId ? $this->rows[$sessionId] : [];
 
         return array_values(array_filter($proofs, fn (Proof $proof): bool => $proof->reference === null || in_array($proof->reference, $this->factors, true)));
     }
@@ -198,9 +194,21 @@ final class LayerWrittenProofStore implements ProofStore
      */
     private function isOfTheCurrentSignIn(MultiFactorAuthenticatable $identity, Proof $proof): bool
     {
-        return $this->session !== null
-            && $proof->binding->sessionId   === $this->session
-            && $proof->binding->application === $this->application
-            && ProofOwner::of($identity)->owns($proof->binding);
+        return ProofOwner::of($identity)->owns($proof->binding)
+            && $proof->binding->sessionId === $this->currentSession($identity, $proof->binding->application);
+    }
+
+    /**
+     * The key of the identity's current sign-in on the application.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @return string
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private static function key(MultiFactorAuthenticatable $identity, string $application): string
+    {
+        return ProofOwner::of($identity)->slot() . '#' . $application;
     }
 }

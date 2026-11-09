@@ -130,7 +130,7 @@ final readonly class FactorRemoval
 
         // What the current session still holds is read before the revocation,
         // which hides every proof it does not record again once committed.
-        $kept = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
+        $kept = $this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $session);
 
         $revocation   = $this->container->make(SessionRevoker::class)->factorRemoved($identity, $id, $application, $session);
         $reevaluation = $this->container->make(SessionReevaluation::class);

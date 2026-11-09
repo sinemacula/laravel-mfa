@@ -116,8 +116,10 @@ application and an id that names one sign-in, not merely a device:
 
 A store refuses a proof it cannot keep by throwing `Exceptions\ProofRefusedException`, and fails closed when it reads:
 no record, a proof in the future, another generation, identity, application or sign-in all mean not verified. The
-package asks `currentSession()` once and names its answer to `proofs()`, so a sign-in replaced between the two reads
-lends its proofs to neither, and a store never has to work out which sign-in a read is about.
+package chooses the sign-in an operation is about once, through `currentSession()` or the binding it captured, and names
+it to `proofs()`, so a sign-in replaced between two reads lends its proofs to neither, and a store never has to work out
+which sign-in a read is about. It asks `currentSession()` again only to check that sign-in is still current, as before
+it relies on a first factor the bound resolver answers.
 
 ```php
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;

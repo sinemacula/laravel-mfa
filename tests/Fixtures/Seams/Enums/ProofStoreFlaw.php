@@ -33,6 +33,15 @@ enum ProofStoreFlaw
     /** Keeps a proof of another sign-in, though it refuses it. */
     case KEEPS_A_REFUSED_PROOF;
 
+    /** Judges a proof by the identity its binding names, not the one it is recorded for. */
+    case KEYS_BY_BINDING;
+
+    /** Forgets the current sign-in and its proofs before it throws a refusal. */
+    case DESTROYS_ON_REFUSAL;
+
+    /** Still reads the proofs of a sign-in it has since replaced. */
+    case RETAINS_SIGN_INS;
+
     /** Accepts a proof of the current sign-in and keeps none. */
     case DROPS_PROOFS;
 
