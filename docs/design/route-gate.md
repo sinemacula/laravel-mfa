@@ -67,7 +67,8 @@ response if the commit fails.
 
 - A shortfall throws `InsufficientAuthenticationException` with the strictest of the requirement and the gate's
   requirement for the operation (`freshnessRequirement()`, whose name is non-nullable, hence the guard), the session's
-  offers and whether a factor is confirmed. One query, on the failure path only.
+  offers and whether a factor is confirmed. One query, on the failure path only. `Requirements\StepUpRefusal` builds it,
+  for the gate and for `Mfa::stepUpRefusal()` alike, taking the requirement as given.
 - An invalid pending credential makes the resolver throw. That propagates: it is not disguised as a refusal.
 - An inactive identity, as the bound `ActiveStateResolver` says, is short-circuited and no gate judges it, though
   `freshnessRequirement()` is read for the exception.
@@ -104,7 +105,8 @@ response if the commit fails.
 - `src/Http/Middleware/EnsureMfaRequirementIsMet.php`: `handle()`, `gate()`, `isMet()`, `isExempt()`, `parse()`.
 - `src/Http/Middleware/ExemptFromMfa.php`; `src/Http/HttpBindings.php`: `boot()`;
   `src/Http/MiddlewareSessionTransition.php`.
-- `src/Exceptions/InsufficientAuthenticationException.php`.
+- `src/Exceptions/InsufficientAuthenticationException.php`; `src/Requirements/StepUpRefusal.php`: `of()`;
+  `src/MfaManager.php`: `stepUpRefusal()`.
 - `src/Context/AuthenticationContextContributor.php`; `src/MfaManager.php`: `authenticationContext()`.
 - `src/Requirements/ConfiguredFreshnessGate.php`: `evaluation()`, which answers not fresh for anyone the package does
   not serve; `src/Requirements/RequirementService.php`: `requirementFor()`, `isFresh()`, `freshnessRequirement()`.
@@ -121,6 +123,8 @@ response if the commit fails.
   enrolment gates the next request under the default transition, until the person verifies with it.
 - `tests/Unit/Exceptions/InsufficientAuthenticationExceptionTest.php`: status, no header, exact header strings,
   `toArray()`.
+- `tests/Feature/Requirements/StepUpRefusalTest.php`: the refusal built without a request, for a person, a pending
+  caller and a caller not served, with the requirement taken as given.
 - `tests/Feature/Context/AuthenticationContextContributorTest.php`: each kind of session pinned exactly.
 - `tests/Feature/Verification/CommitFailureTest.php`: a failed commit on a pending verification, a step-up and a pending
   enrolment confirmation reaches the caller with neither token nor cookie, and leaves nothing to run alongside a retry,
