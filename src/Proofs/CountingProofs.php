@@ -11,7 +11,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
  * Which of a sign-in's proofs still count, by the rules every read of them
  * applies: bound to the identity, the application and the sign-in, made in the
  * identity's current verification generation, and not dated in the future. What
- * counts is returned oldest first.
+ * counts is returned oldest first, and proofs made at the same instant keep the
+ * order they were given in.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

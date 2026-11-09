@@ -22,7 +22,8 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
   to an identity with no sign-in there, is refused with `ProofRefusedException`, never kept.
 - A recorded proof counts only when it is bound to the identity, the application and the current sign-in it is read
   for, was made no later than now, and was made under the identity's current verification generation. Anything else,
-  and a stored entry that cannot be read back as a proof, is left out. The proofs come back oldest first.
+  and a stored entry that cannot be read back as a proof, is left out. The proofs come back oldest first, with proofs
+  made at the same instant in the order they were recorded, an order a bound store must keep too.
 - The verification generation is `verification_generation` on the identity's row in the identity states table, 0 when
   it has none, read from the write connection. `Proofs\VerificationGeneration::advance()` creates the row when needed
   and moves the generation on by one inside a transaction on the storage connection; called inside the identity's

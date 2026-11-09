@@ -446,6 +446,26 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
+     * Proofs made at the same instant come back in the order they were
+     * recorded.
+     *
+     * @return void
+     */
+    public function testReturnsProofsOfOneInstantInTheOrderRecorded(): void
+    {
+        $store   = $this->store();
+        $instant = CarbonImmutable::now()->subMinute();
+        $second  = $this->proofFor($this->user(), ['provedAt' => $instant, 'reference' => 'factor-2']);
+        $first   = $this->proofFor($this->user(), ['provedAt' => $instant, 'reference' => 'factor-1']);
+
+        $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
+        $store->record($second);
+        $store->record($first);
+
+        self::assertSame([$second->toArray(), $first->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION)));
+    }
+
+    /**
      * Forgetting a factor stops its proofs counting and keeps the others and
      * the sign-in.
      *
