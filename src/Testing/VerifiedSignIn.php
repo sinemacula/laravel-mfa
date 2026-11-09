@@ -9,7 +9,6 @@ use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\Evaluation;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
@@ -29,18 +28,21 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\SignInApplication;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
 
 /**
  * Arranges what `Concerns\InteractsWithMfa::actingAsVerified()` promises: an
  * identity acting on a guard with a sign-in the proof store holds, whose proofs
  * were made at a given time and evaluate at exactly a given level.
  *
- * The arguments are checked before anything changes. The proofs carry synthetic
- * references, since nothing judges a reference against factor rows when they
- * are read. There is one table of further proofs and no branch on a level: the
- * bound combination policy judges the evidence, and the outcome is read back
- * through the same `SessionFirstFactor::proofs()` and `RequirementCheck` the
- * route gate uses.
+ * The sign-in is begun and its proofs recorded through the bound
+ * `Testing\Contracts\VerifiedSignInRecorder`, by default the proof store
+ * itself, and read back through the store. The arguments are checked before
+ * anything changes. The proofs carry synthetic references, since nothing judges
+ * a reference against factor rows when they are read. There is one table of
+ * further proofs and no branch on a level: the bound combination policy judges
+ * the evidence, and the outcome is read back through the same
+ * `SessionFirstFactor::proofs()` and `RequirementCheck` the route gate uses.
  *
  * It has to be exactly the level because this builds a fixture: at least the
  * level would let a test asking for AAL1 pass a route it meant to fail. It asks
@@ -103,13 +105,14 @@ final readonly class VerifiedSignIn
 
         $application ??= SignInApplication::of($this->container, $guardName);
 
-        $store   = $this->container->make(ProofStore::class);
-        $session = self::begin($store, $identity, $application);
+        $store    = $this->container->make(ProofStore::class);
+        $recorder = $this->recorder($store);
+        $session  = self::begin($store, $recorder, $identity, $application);
 
         $generation = VerificationGeneration::current($identity);
 
         if (!self::holdsFirstFactor($store, $identity, $application, $session)) {
-            $store->record($identity, new Proof(
+            $recorder->record($identity, new Proof(
                 kind: ProofKind::FIRST_FACTOR,
                 method: 'password',
                 channel: new Channel(ChannelKind::PASSWORD),
@@ -121,7 +124,7 @@ final readonly class VerifiedSignIn
             ));
         }
 
-        $store->record($identity, self::furtherProof($level, $provedAt, self::binding($identity, $application, $session), $generation));
+        $recorder->record($identity, self::furtherProof($level, $provedAt, self::binding($identity, $application, $session), $generation));
 
         $this->assertReached($level, $this->evaluate($identity, $application, $session, $level));
     }
@@ -158,23 +161,24 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * Begin a new sign-in and name it, refusing a store that knows of none.
+     * Begin a new sign-in through the recorder and name it, refusing one the
+     * store does not name as the identity's current sign-in.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  \SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder  $recorder
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return string
      *
      * @throws \LogicException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private static function begin(ProofStore $store, MultiFactorAuthenticatable $identity, string $application): string
+    private static function begin(ProofStore $store, VerifiedSignInRecorder $recorder, MultiFactorAuthenticatable $identity, string $application): string
     {
-        $store->begin($identity, $application, Str::lower((string) Str::ulid()));
+        $session = $recorder->begin($identity, $application);
 
-        $session = $store->currentSession($identity, $application);
-
-        if ($session === null) {
-            throw new \LogicException(sprintf('The proof store knows of no sign-in on [%s]: a store whose begin() does nothing needs its session arranged first.', $application));
+        if ($store->currentSession($identity, $application) !== $session) {
+            throw new \LogicException(sprintf('The sign-in the recorder began on [%s] is not the one the proof store names as current.', $application));
         }
 
         return $session;
@@ -277,6 +281,21 @@ final readonly class VerifiedSignIn
         $user = $guard->user();
 
         return $user !== null && $user::class === $identity::class && $user->getAuthIdentifier() === $identity->getAuthIdentifier();
+    }
+
+    /**
+     * The bound recorder, or the default one over the store.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @return \SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function recorder(ProofStore $store): VerifiedSignInRecorder
+    {
+        return $this->container->bound(VerifiedSignInRecorder::class)
+            ? $this->container->make(VerifiedSignInRecorder::class)
+            : new ProofStoreRecorder($store);
     }
 
     /**
