@@ -80,11 +80,12 @@ final readonly class AuthenticationContextContributor
      * `isMfaEnabled()` still holds the identity to MFA for it. Only the proofs
      * that count are read, by the rules the proof store applies (bound to the
      * identity, the application and the sign-in, made in the identity's current
-     * verification generation, and not dated in the future), oldest first. The
-     * caller reads them from a trusted record of that sign-in, never from
-     * input, leaves out any made with a factor since removed, and gives a
-     * pending, revoked or ended session, or none, the neutral context without
-     * asking. A machine and an inactive identity have the neutral context.
+     * verification generation, and not dated in the future), oldest first;
+     * proofs made at the same instant are taken in the order given. The caller
+     * reads them from a trusted record of that sign-in, never from input,
+     * leaves out any made with a factor since removed, and gives a pending,
+     * revoked or ended session, or none, the neutral context without asking. A
+     * machine and an inactive identity have the neutral context.
      *
      * @formatter:off
      *
