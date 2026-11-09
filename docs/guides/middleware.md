@@ -171,8 +171,9 @@ authentication context, always all of them, and the neutral context to a pending
 `Context\AuthenticationContextContributor::neutral()` gives that neutral context. `contributeFor($identity,
 $application, $session, ...$proofs)` gives the same keys for a named sign-in, from proofs the caller read from a trusted
 record of it: for an authentication layer building the context of another session, or in a queued job. It reads only the
-proofs that count for that sign-in, as the proof store does, and the caller leaves out any made with a factor since
-removed and gives a pending, revoked or ended session the neutral context itself:
+proofs that count for that sign-in, as the proof store does, oldest first, taking proofs made at the same instant in the
+order given, and the caller leaves out any made with a factor since removed and gives a pending, revoked or ended
+session the neutral context itself:
 
 | Key                             | Type           | Means                                                                        |
 |---------------------------------|----------------|------------------------------------------------------------------------------|
