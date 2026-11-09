@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> factorModel()
  * @method static \SineMacula\Laravel\Mfa\Requirements\Requirement requirement(\SineMacula\Laravel\Mfa\Context\CallerContext $caller)
  * @method static bool isFresh(\SineMacula\Laravel\Mfa\Context\CallerContext $caller, string $operation, ?\SineMacula\Laravel\Mfa\Requirements\Requirement $requirement = null)
+ * @method static \SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException stepUpRefusal(\SineMacula\Laravel\Mfa\Context\CallerContext $caller, \SineMacula\Laravel\Mfa\Requirements\Requirement $requirement, ?string $operation = null)
  * @method static list<\SineMacula\Laravel\Mfa\Proofs\Proof> proofs(\SineMacula\Laravel\Mfa\Context\CallerContext $caller)
  * @method static array{accepted: bool, multifactor: bool, factor_types: list<string>, level: string, phishing_resistant: bool, user_verification: bool, last_verification_age_seconds: ?int, has_confirmed_factor: bool} authenticationContext(\SineMacula\Laravel\Mfa\Context\CallerContext $caller)
  * @method static list<\SineMacula\Laravel\Mfa\Factors\FactorSummary> factors(\SineMacula\Laravel\Mfa\Context\CallerContext $caller)
