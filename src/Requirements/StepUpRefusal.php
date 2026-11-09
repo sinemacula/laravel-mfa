@@ -19,9 +19,10 @@ use SineMacula\Laravel\Mfa\Verification\FactorOffers;
  *
  * The requirement is taken as the deciding site composed it; nothing is added
  * here, and the operation only labels the refusal, adding no freshness. The
- * identity whose factors are reported is the pending session's, or the person
- * signed in; a caller serving nobody, or an identity that is not a person, has
- * no confirmed factor.
+ * identity whose factors are reported is the pending session's, whatever it is,
+ * as the gate reports it, or otherwise the person signed in; any other caller
+ * serving nobody, or naming an identity that is not a person, has no confirmed
+ * factor.
  *
  * Stateless: the seams are resolved on every call.
  *

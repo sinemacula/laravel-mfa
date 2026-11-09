@@ -210,9 +210,10 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
      * caller, the operation as a label, and whether the identity has a factor
      * whose stored status is exactly `confirmed`. Nothing is added to the
      * requirement, and the operation adds no freshness; compose the requirement
-     * first, as with `requirement()` and `Requirement::strictest()`. A caller
-     * serving nobody, or an identity that is not a person, has no confirmed
-     * factor reported. It is returned, not thrown.
+     * first, as with `requirement()` and `Requirement::strictest()`. A pending
+     * caller is reported as its pending session's identity; any other caller
+     * serving nobody, or naming an identity that is not a person, has no
+     * confirmed factor reported. It is returned, not thrown.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement

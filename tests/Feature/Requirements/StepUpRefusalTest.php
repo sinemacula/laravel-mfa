@@ -4,16 +4,18 @@ declare(strict_types = 1);
 
 namespace Tests\Feature\Requirements;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
+use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\StepUpRefusal;
-use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
@@ -129,20 +131,74 @@ final class StepUpRefusalTest extends TestCase
 
     /**
      * A caller serving nobody, or an identity that is not a person, is offered
-     * nothing and reported as holding no confirmed factor.
+     * nothing and reported as holding no confirmed factor, even one it holds.
      *
      * @return void
      */
     public function testACallerNotServedHasNothing(): void
     {
-        $robot = new NonEloquentIdentity('robot-1', mfaEnabled: true, person: false);
+        $user = $this->signedInPerson();
 
-        foreach ([CallerContext::nobody(self::APPLICATION), CallerContext::forIdentity($robot, self::APPLICATION)] as $caller) {
+        $this->totpFactor($user);
+        $this->noPersons();
+
+        foreach ([CallerContext::nobody(self::APPLICATION), CallerContext::forIdentity($user, self::APPLICATION)] as $caller) {
 
             $refusal = Mfa::stepUpRefusal($caller, Requirement::none()->withAdditionalVerification());
 
             self::assertFalse($refusal->hasConfirmedFactor);
             self::assertSame([], $refusal->offered);
         }
+    }
+
+    /**
+     * A pending caller is reported by its pending identity whatever it is, as
+     * the gate reports it, though it is offered nothing when it is not a person
+     * or its credential may not list factors.
+     *
+     * @return void
+     */
+    public function testAPendingCallerIsReportedThoughOfferedNothing(): void
+    {
+        $user = $this->person();
+
+        $this->totpFactor($user);
+
+        $unlisted = $this->pendingSession($user, Requirement::none()->withAdditionalVerification(), [PendingAction::VERIFY]);
+        $refusal  = Mfa::stepUpRefusal(CallerContext::forPending($unlisted), $unlisted->requirement);
+
+        self::assertTrue($refusal->hasConfirmedFactor);
+        self::assertSame([], $refusal->offered);
+
+        $pending = $this->pendingSession($user, Requirement::none()->withAdditionalVerification());
+
+        $this->noPersons();
+
+        $refusal = Mfa::stepUpRefusal(CallerContext::forPending($pending), $pending->requirement);
+
+        self::assertTrue($refusal->hasConfirmedFactor);
+        self::assertSame([], $refusal->offered);
+    }
+
+    /**
+     * Bind a subject type resolver that finds no identity a person.
+     *
+     * @return void
+     */
+    private function noPersons(): void
+    {
+        $this->container()->instance(SubjectTypeResolver::class, new class implements SubjectTypeResolver {
+            /**
+             * Whether the identity is a person: never.
+             *
+             * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
+             * @return bool
+             */
+            #[\Override]
+            public function isPerson(Authenticatable $identity): bool
+            {
+                return false;
+            }
+        });
     }
 }
