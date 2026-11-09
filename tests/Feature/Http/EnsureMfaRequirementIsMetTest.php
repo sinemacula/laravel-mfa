@@ -1054,7 +1054,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
         $signIn = SignInProofs::of($user)->onApplication($application)->inSession($session)->underGeneration(VerificationGeneration::current($user));
 
         foreach ($proofs($signIn) as $proof) {
-            $this->container()->make(ProofStore::class)->record($proof);
+            $this->container()->make(ProofStore::class)->record($user, $proof);
         }
     }
 

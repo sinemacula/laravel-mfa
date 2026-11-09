@@ -80,7 +80,7 @@ final readonly class SessionFirstFactor
 
         $session = $this->container->make(ProofStore::class)->currentSession($identity, $binding->application);
 
-        return $session !== null && $session === $binding->sessionId ? $this->current($identity, $binding->application) : null;
+        return $session !== null && $session === $binding->sessionId ? $this->firstFactorOf($identity, $binding->application, $session) : null;
     }
 
     /**
@@ -112,24 +112,9 @@ final readonly class SessionFirstFactor
      */
     public function current(MultiFactorAuthenticatable $identity, string $application): ?Proof
     {
-        $store   = $this->container->make(ProofStore::class);
-        $session = $store->currentSession($identity, $application);
+        $session = $this->container->make(ProofStore::class)->currentSession($identity, $application);
 
-        if ($session === null) {
-            return null;
-        }
-
-        $recorded = null;
-
-        foreach ($store->proofs($identity, $application) as $proof) {
-            $recorded = $proof->kind === ProofKind::FIRST_FACTOR ? $proof : $recorded;
-        }
-
-        if ($recorded !== null) {
-            return $recorded;
-        }
-
-        return $this->resolved($identity, $application, $session);
+        return $session === null ? null : $this->firstFactorOf($identity, $application, $session);
     }
 
     /**
@@ -147,14 +132,28 @@ final readonly class SessionFirstFactor
      */
     public function proofs(MultiFactorAuthenticatable $identity, string $application): array
     {
-        $store   = $this->container->make(ProofStore::class);
-        $session = $store->currentSession($identity, $application);
+        $session = $this->container->make(ProofStore::class)->currentSession($identity, $application);
 
-        if ($session === null) {
-            return [];
-        }
+        return $session === null ? [] : $this->proofsOf($identity, $application, $session);
+    }
 
-        $proofs = $store->proofs($identity, $application);
+    /**
+     * The proofs of the identity's sign-in on the application the session
+     * names, as `proofs()` reads them, read only for that sign-in: none when it
+     * is no longer the identity's current sign-in there, so a sign-in replaced
+     * between two reads lends its successor's proofs to neither.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function proofsOf(MultiFactorAuthenticatable $identity, string $application, string $session): array
+    {
+        $proofs = $this->container->make(ProofStore::class)->proofs($identity, $application, $session);
 
         foreach ($proofs as $proof) {
             if ($proof->kind === ProofKind::FIRST_FACTOR) {
@@ -168,8 +167,33 @@ final readonly class SessionFirstFactor
     }
 
     /**
+     * The first factor of the identity's sign-in on the application the session
+     * names: the one the store records for it, or else the bound resolver's,
+     * when it may count for that sign-in.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    private function firstFactorOf(MultiFactorAuthenticatable $identity, string $application, string $session): ?Proof
+    {
+        $recorded = null;
+
+        foreach ($this->container->make(ProofStore::class)->proofs($identity, $application, $session) as $proof) {
+            $recorded = $proof->kind === ProofKind::FIRST_FACTOR ? $proof : $recorded;
+        }
+
+        return $recorded ?? $this->resolved($identity, $application, $session);
+    }
+
+    /**
      * The bound resolver's first factor of the identity's current sign-in, when
-     * it may count.
+     * it may count: only while the session named is still that sign-in, so a
+     * resolver answering for a sign-in since replaced lends it nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -181,6 +205,10 @@ final readonly class SessionFirstFactor
      */
     private function resolved(MultiFactorAuthenticatable $identity, string $application, string $session): ?Proof
     {
+        if ($this->container->make(ProofStore::class)->currentSession($identity, $application) !== $session) {
+            return null;
+        }
+
         $resolved = $this->container->make(FirstFactorResolver::class)->resolve($identity, $application);
 
         return $resolved !== null && self::isTrusted($resolved, $identity, $application, $session) ? $resolved : null;

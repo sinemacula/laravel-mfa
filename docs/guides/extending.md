@@ -466,13 +466,14 @@ which suits a store keeping its own sign-ins. A store over an authentication lay
 `voidProofStoreProofs()` to void them as that layer does on a reset. The sign-in may already hold the first factor the
 layer recorded on signing in: each check counts against what it held when begun. A store whose proofs and sign-ins that
 layer alone writes also overrides `arrangeProofStoreProof()` to record each proof a check needs through the layer (by
-default through the store's `record()`), `endProofStoreSignIn()` to sign the identity out through it (by default
-`forget()`), and `proofStoreFactor()` to enrol a factor the identity holds and return its id (by default
+default through the store's `record($identity, $proof)`), `endProofStoreSignIn()` to sign the identity out through it
+(by default `forget()`), and `proofStoreFactor()` to enrol a factor the identity holds and return its id (by default
 `ProofStoreContract::FACTOR`). The two new hooks are handed the store under test. Each check asserts that the proofs it
 arranged count before it voids them or forgets their factor, so a hook that records nothing fails rather than passes.
 The checks arrange a password first factor on top of what the sign-in holds: an adapter that cannot record one records
 an equivalent proof, never skips it. Either way, a proof of a sign-in that is not current, or that the store cannot
-find, is refused by throwing `Exceptions\ProofRefusedException`, as `ProofStore::record()` declares. Each check is a
-static assertion on a `*Contract` class beside its trait, so a test can also call one directly. The kits need PHPUnit
-and a database migrated with the package's tables, as any test of an adapter does.
+find, or of another identity or application, is refused by throwing `Exceptions\ProofRefusedException`, as
+`ProofStore::record()` declares, and changes nothing; and `proofs()` for a session that is not the current sign-in
+yields none. Each check is a static assertion on a `*Contract` class beside its trait, so a test can also call one
+directly. The kits need PHPUnit and a database migrated with the package's tables, as any test of an adapter does.
 

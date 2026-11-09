@@ -54,6 +54,10 @@ interface ProofStore
      * one a proof must be bound to for the store to keep it, or `null` when the
      * identity has no sign-in there the store knows of.
      *
+     * This is the one question of which sign-in is current. A caller asks it
+     * once and names the answer to `proofs()`, so the sign-in it reads is the
+     * one it asked about.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?string
@@ -63,30 +67,36 @@ interface ProofStore
     public function currentSession(MultiFactorAuthenticatable $identity, string $application): ?string;
 
     /**
-     * Record a proof for the sign-in it is bound to.
+     * Record the identity's proof for the sign-in it is bound to.
      *
-     * A proof that is not bound to its identity's current sign-in on its
-     * application is refused by throwing, never kept, so a caller recording it
-     * inside a transaction rolls that change back with it.
+     * A proof that is not bound to the identity, or not to the identity's
+     * current sign-in on its application, is refused by throwing, never kept,
+     * so a caller recording it inside a transaction rolls that change back with
+     * it, and a refused proof changes nothing.
      *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function record(Proof $proof): void;
+    public function record(MultiFactorAuthenticatable $identity, Proof $proof): void;
 
     /**
-     * The proofs of the identity's current sign-in on the application that
-     * still count, oldest first.
+     * The proofs of the identity's sign-in on the application the session names
+     * that still count, oldest first: none unless that sign-in is the
+     * identity's current one there, so a sign-in replaced since the caller
+     * named it yields nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $sessionId
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function proofs(MultiFactorAuthenticatable $identity, string $application): array;
+    public function proofs(MultiFactorAuthenticatable $identity, string $application, string $sessionId): array;
 
     /**
      * Stop counting every proof the identity made with the factor, on the

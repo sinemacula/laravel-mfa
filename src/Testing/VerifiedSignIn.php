@@ -108,8 +108,8 @@ final readonly class VerifiedSignIn
 
         $generation = VerificationGeneration::current($identity);
 
-        if (!self::holdsFirstFactor($store, $identity, $application)) {
-            $store->record(new Proof(
+        if (!self::holdsFirstFactor($store, $identity, $application, $session)) {
+            $store->record($identity, new Proof(
                 kind: ProofKind::FIRST_FACTOR,
                 method: 'password',
                 channel: new Channel(ChannelKind::PASSWORD),
@@ -121,9 +121,9 @@ final readonly class VerifiedSignIn
             ));
         }
 
-        $store->record(self::furtherProof($level, $provedAt, self::binding($identity, $application, $session), $generation));
+        $store->record($identity, self::furtherProof($level, $provedAt, self::binding($identity, $application, $session), $generation));
 
-        $this->assertReached($level, $this->evaluate($identity, $application, $level));
+        $this->assertReached($level, $this->evaluate($identity, $application, $session, $level));
     }
 
     /**
@@ -189,15 +189,16 @@ final readonly class VerifiedSignIn
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $session
      * @return bool
      *
      * @throws \LogicException
      */
-    private static function holdsFirstFactor(ProofStore $store, MultiFactorAuthenticatable $identity, string $application): bool
+    private static function holdsFirstFactor(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): bool
     {
         $holds = false;
 
-        foreach ($store->proofs($identity, $application) as $proof) {
+        foreach ($store->proofs($identity, $application, $session) as $proof) {
             if ($proof->kind !== ProofKind::FIRST_FACTOR) {
                 throw new \LogicException(sprintf('The proof store already holds further proofs for the identity on [%s], so the time cannot be honoured.', $application));
             }
@@ -315,15 +316,16 @@ final readonly class VerifiedSignIn
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $session
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private function evaluate(MultiFactorAuthenticatable $identity, string $application, AssuranceLevel $level): Evaluation
+    private function evaluate(MultiFactorAuthenticatable $identity, string $application, string $session, AssuranceLevel $level): Evaluation
     {
-        $proofs = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
+        $proofs = $this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $session);
 
         $requirement = Requirement::none()->withAdditionalVerification()->withMinimumLevel($level);
 

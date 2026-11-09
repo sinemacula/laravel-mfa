@@ -250,7 +250,7 @@ final class LifecycleRaceTest extends TestCase
         $after = Mfa::verify(Callers::current(), Submission::factor($factor->id, $code));
 
         self::assertSame(FailureReason::NOT_FOUND, $after->reason);
-        self::assertSame([], $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION));
+        self::assertSame([], $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION));
     }
 
     /**
@@ -481,7 +481,7 @@ final class LifecycleRaceTest extends TestCase
     private function additionalProofs(TestUser $user): array
     {
         return array_filter(
-            $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION),
+            $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION),
             static fn ($proof): bool => $proof->kind === ProofKind::ADDITIONAL_FACTOR,
         );
     }

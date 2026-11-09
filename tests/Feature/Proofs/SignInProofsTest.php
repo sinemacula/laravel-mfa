@@ -347,7 +347,7 @@ final class SignInProofsTest extends TestCase
         $phone   = new SessionProofStore(new Store('phone', new ArraySessionHandler(10)));
         $laptop  = new SessionProofStore(new Store('laptop', new ArraySessionHandler(10)));
         $proveOn = static function (SessionProofStore $store, string $session, int $generation) use ($user): void {
-            $store->record(new Proof(
+            $store->record($user, new Proof(
                 ProofKind::ADDITIONAL_FACTOR,
                 'totp',
                 new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-1'),
@@ -366,13 +366,13 @@ final class SignInProofsTest extends TestCase
 
         VerificationGeneration::advance($user);
 
-        self::assertSame([], $phone->proofs($user, 'web'));
-        self::assertSame([], $laptop->proofs($user, 'web'));
+        self::assertSame([], $phone->proofs($user, 'web', 'phone-sign-in'));
+        self::assertSame([], $laptop->proofs($user, 'web', 'laptop-sign-in'));
 
         $proveOn($laptop, 'laptop-sign-in', 1);
 
-        self::assertSame([], $phone->proofs($user, 'web'));
-        self::assertCount(1, $laptop->proofs($user, 'web'));
+        self::assertSame([], $phone->proofs($user, 'web', 'phone-sign-in'));
+        self::assertCount(1, $laptop->proofs($user, 'web', 'laptop-sign-in'));
     }
 
     /**

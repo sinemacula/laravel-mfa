@@ -10,9 +10,11 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Testing\Seams\ProofStoreContract;
 
 /**
- * The `ProofStore` contract kit: a proof of another sign-in is refused, a
- * sign-in's proofs go with it, a proof made before the identity's proofs are
- * voided stops counting, and forgetting a factor stops its proofs counting.
+ * The `ProofStore` contract kit: a proof of another sign-in, identity or
+ * application is refused, the proofs read for a sign-in are the current
+ * sign-in's only, a sign-in's proofs go with it, a proof made before the
+ * identity's proofs are voided stops counting, and forgetting a factor stops
+ * its proofs counting.
  *
  * A test case proves its implementation by using this trait and implementing
  * the hooks; each check delegates to `ProofStoreContract`. A store backed by an
@@ -46,6 +48,50 @@ trait ProofStoreTests
         [$identity, $application] = [$this->proofStoreIdentity(), $this->proofStoreApplication()];
 
         ProofStoreContract::assertRefusesAProofOfAnotherSignIn($this->proofStore(), $identity, $application, $this->proofStoreSignIn($identity, $application));
+    }
+
+    /**
+     * A proof bound to another identity is refused, and not kept.
+     *
+     * @return void
+     */
+    public function testProofStoreRefusesAProofOfAnotherIdentity(): void
+    {
+        [$identity, $application] = [$this->proofStoreIdentity(), $this->proofStoreApplication()];
+
+        ProofStoreContract::assertRefusesAProofOfAnotherIdentity($this->proofStore(), $identity, $application, $this->proofStoreSignIn($identity, $application));
+    }
+
+    /**
+     * A proof bound to another application is refused, and not kept.
+     *
+     * @return void
+     */
+    public function testProofStoreRefusesAProofOfAnotherApplication(): void
+    {
+        [$identity, $application] = [$this->proofStoreIdentity(), $this->proofStoreApplication()];
+
+        ProofStoreContract::assertRefusesAProofOfAnotherApplication($this->proofStore(), $identity, $application, $this->proofStoreSignIn($identity, $application));
+    }
+
+    /**
+     * The proofs read for a sign-in are the current sign-in's only.
+     *
+     * @return void
+     */
+    public function testProofStoreReadsOnlyTheNamedSignIn(): void
+    {
+        [$store, $identity, $application] = [$this->proofStore(), $this->proofStoreIdentity(), $this->proofStoreApplication()];
+
+        $session = $this->proofStoreSignIn($identity, $application);
+
+        ProofStoreContract::assertReadsOnlyTheNamedSignIn(
+            $store,
+            $identity,
+            $application,
+            $session,
+            fn (Proof $proof) => $this->arrangeProofStoreProof($store, $identity, $application, $session, $proof),
+        );
     }
 
     /**
@@ -154,12 +200,12 @@ trait ProofStoreTests
      */
     protected function arrangeProofStoreProof(
         ProofStore $store,
-        MultiFactorAuthenticatable $identity, // NOSONAR: for an override
+        MultiFactorAuthenticatable $identity,
         string $application, // NOSONAR: for an override
         string $session, // NOSONAR: for an override
         Proof $proof,
     ): void {
-        $store->record($proof);
+        $store->record($identity, $proof);
     }
 
     /**

@@ -81,7 +81,7 @@ final class SessionProofStoreTest extends TestCase
         $store = $this->store();
 
         self::assertNull($store->currentSession($this->user(), self::APPLICATION));
-        self::assertSame([], $store->proofs($this->user(), self::APPLICATION));
+        self::assertSame([], $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
     }
 
     /**
@@ -96,7 +96,7 @@ final class SessionProofStoreTest extends TestCase
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
 
         self::assertSame(self::SIGN_IN, $store->currentSession($this->user(), self::APPLICATION));
-        self::assertSame([], $store->proofs($this->user(), self::APPLICATION));
+        self::assertSame([], $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
     }
 
     /**
@@ -124,9 +124,9 @@ final class SessionProofStoreTest extends TestCase
         $proof = $this->proofFor($this->user());
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($proof);
+        $store->record($this->user(), $proof);
 
-        self::assertSame([$proof->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION)));
+        self::assertSame([$proof->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION, self::SIGN_IN)));
     }
 
     /**
@@ -143,7 +143,55 @@ final class SessionProofStoreTest extends TestCase
         $this->expectException(ProofRefusedException::class);
         $this->expectExceptionMessage('The proof is not bound to its identity\'s current sign-in, so it cannot be recorded.');
 
-        $store->record($this->proofFor($this->user(), ['session' => 'sign-in-2']));
+        $store->record($this->user(), $this->proofFor($this->user(), ['session' => 'sign-in-2']));
+    }
+
+    /**
+     * A proof bound to another identity, though it names the identity's current
+     * sign-in, is refused and changes nothing.
+     *
+     * @return void
+     */
+    public function testRefusesAProofOfAnotherIdentity(): void
+    {
+        $store = $this->store();
+        $kept  = $this->proofFor($this->user());
+
+        $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
+        $store->begin($this->user(8), self::APPLICATION, self::SIGN_IN);
+        $store->record($this->user(), $kept);
+
+        try {
+            $store->record($this->user(), $this->proofFor($this->user(8)));
+
+            self::fail('A proof of another identity must be refused.');
+        } catch (ProofRefusedException $exception) {
+            self::assertSame('The proof is not bound to the identity, so it cannot be recorded.', $exception->getMessage());
+        }
+
+        self::assertSame([$kept->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION, self::SIGN_IN)));
+        self::assertSame([], $store->proofs($this->user(8), self::APPLICATION, self::SIGN_IN));
+    }
+
+    /**
+     * The proofs read for a session that is not the identity's current sign-in
+     * are none, though the current one holds proofs.
+     *
+     * @return void
+     */
+    public function testReadsNoProofsForASignInThatIsNotCurrent(): void
+    {
+        $store = $this->store();
+
+        $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
+        $store->record($this->user(), $this->proofFor($this->user()));
+
+        self::assertCount(1, $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
+        self::assertSame([], $store->proofs($this->user(), self::APPLICATION, 'sign-in-2'));
+
+        $store->begin($this->user(), self::APPLICATION, 'sign-in-2');
+
+        self::assertSame([], $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
     }
 
     /**
@@ -155,7 +203,7 @@ final class SessionProofStoreTest extends TestCase
     {
         $this->expectException(ProofRefusedException::class);
 
-        $this->store()->record($this->proofFor($this->user()));
+        $this->store()->record($this->user(), $this->proofFor($this->user()));
     }
 
     /**
@@ -172,7 +220,7 @@ final class SessionProofStoreTest extends TestCase
 
         $this->expectException(ProofRefusedException::class);
 
-        $store->record($this->proofFor($this->user(), ['application' => self::OTHER_APPLICATION]));
+        $store->record($this->user(), $this->proofFor($this->user(), ['application' => self::OTHER_APPLICATION]));
     }
 
     /**
@@ -188,23 +236,23 @@ final class SessionProofStoreTest extends TestCase
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
         $store->begin($this->user(), self::OTHER_APPLICATION, 'sign-in-2');
-        $store->record($this->proofFor($this->user()));
-        $store->record($admin);
+        $store->record($this->user(), $this->proofFor($this->user()));
+        $store->record($this->user(), $admin);
 
         self::assertSame(self::SIGN_IN, $store->currentSession($this->user(), self::APPLICATION));
         self::assertSame('sign-in-2', $store->currentSession($this->user(), self::OTHER_APPLICATION));
-        self::assertSame([$admin->toArray()], self::serialized($store->proofs($this->user(), self::OTHER_APPLICATION)));
+        self::assertSame([$admin->toArray()], self::serialized($store->proofs($this->user(), self::OTHER_APPLICATION, 'sign-in-2')));
 
         $store->begin($this->user(), self::APPLICATION, 'sign-in-3');
 
-        self::assertSame([], $store->proofs($this->user(), self::APPLICATION));
-        self::assertSame([$admin->toArray()], self::serialized($store->proofs($this->user(), self::OTHER_APPLICATION)));
+        self::assertSame([], $store->proofs($this->user(), self::APPLICATION, 'sign-in-3'));
+        self::assertSame([$admin->toArray()], self::serialized($store->proofs($this->user(), self::OTHER_APPLICATION, 'sign-in-2')));
 
         $store->forget($this->user(), self::APPLICATION);
 
         self::assertNull($store->currentSession($this->user(), self::APPLICATION));
         self::assertSame('sign-in-2', $store->currentSession($this->user(), self::OTHER_APPLICATION));
-        self::assertSame([$admin->toArray()], self::serialized($store->proofs($this->user(), self::OTHER_APPLICATION)));
+        self::assertSame([$admin->toArray()], self::serialized($store->proofs($this->user(), self::OTHER_APPLICATION, 'sign-in-2')));
 
         $store->forget($this->user(), self::OTHER_APPLICATION);
 
@@ -222,10 +270,10 @@ final class SessionProofStoreTest extends TestCase
         $store = $this->store();
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($this->proofFor($this->user()));
+        $store->record($this->user(), $this->proofFor($this->user()));
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
 
-        self::assertSame([], $store->proofs($this->user(), self::APPLICATION));
+        self::assertSame([], $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
     }
 
     /**
@@ -256,10 +304,10 @@ final class SessionProofStoreTest extends TestCase
         $counting = $this->proofFor($this->user(), ['reference' => 'factor-2']);
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($this->proofFor($this->user(), $overrides));
-        $store->record($counting);
+        $store->record($this->user(), $this->proofFor($this->user(), $overrides));
+        $store->record($this->user(), $counting);
 
-        self::assertSame([$counting->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION)));
+        self::assertSame([$counting->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION, self::SIGN_IN)));
     }
 
     /**
@@ -273,9 +321,9 @@ final class SessionProofStoreTest extends TestCase
         $proof = $this->proofFor($this->user(), ['provedAt' => CarbonImmutable::now()]);
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($proof);
+        $store->record($this->user(), $proof);
 
-        self::assertCount(1, $store->proofs($this->user(), self::APPLICATION));
+        self::assertCount(1, $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
     }
 
     /**
@@ -292,15 +340,15 @@ final class SessionProofStoreTest extends TestCase
         $store = $this->store();
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($this->proofFor($this->user()));
+        $store->record($this->user(), $this->proofFor($this->user()));
 
         VerificationGeneration::advance($this->user());
 
         $fresh = $this->proofFor($this->user(), ['reference' => 'factor-2', 'generation' => 1]);
 
-        $store->record($fresh);
+        $store->record($this->user(), $fresh);
 
-        self::assertSame([$fresh->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION)));
+        self::assertSame([$fresh->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION, self::SIGN_IN)));
     }
 
     /**
@@ -318,10 +366,10 @@ final class SessionProofStoreTest extends TestCase
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
         $store->begin($secondary, self::APPLICATION, self::SIGN_IN);
-        $store->record($this->proofFor($this->user()));
+        $store->record($this->user(), $this->proofFor($this->user()));
 
-        self::assertSame([], $store->proofs($secondary, self::APPLICATION));
-        self::assertCount(1, $store->proofs($this->user(), self::APPLICATION));
+        self::assertSame([], $store->proofs($secondary, self::APPLICATION, self::SIGN_IN));
+        self::assertCount(1, $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
     }
 
     /**
@@ -336,7 +384,7 @@ final class SessionProofStoreTest extends TestCase
 
         $this->plant([$planted->toArray()]);
 
-        self::assertSame([], $this->store()->proofs($this->user(), self::APPLICATION));
+        self::assertSame([], $this->store()->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
     }
 
     /**
@@ -351,7 +399,7 @@ final class SessionProofStoreTest extends TestCase
 
         $this->plant([$planted->toArray()]);
 
-        self::assertSame([], $this->store()->proofs($this->user(), self::APPLICATION));
+        self::assertSame([], $this->store()->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
     }
 
     /**
@@ -366,7 +414,7 @@ final class SessionProofStoreTest extends TestCase
 
         $this->plant([['kind' => 'unknown'], 'not-an-array', $proof->toArray()]);
 
-        self::assertSame([$proof->toArray()], self::serialized($this->store()->proofs($this->user(), self::APPLICATION)));
+        self::assertSame([$proof->toArray()], self::serialized($this->store()->proofs($this->user(), self::APPLICATION, self::SIGN_IN)));
     }
 
     /**
@@ -397,7 +445,7 @@ final class SessionProofStoreTest extends TestCase
         $this->session->put(SessionProofStore::SESSION_KEY, [$slot => [self::APPLICATION => ['session' => self::SIGN_IN, 'proofs' => 'none']]]);
 
         self::assertNull($this->store()->currentSession($this->user(), self::APPLICATION));
-        self::assertSame([], $this->store()->proofs($this->user(), self::APPLICATION));
+        self::assertSame([], $this->store()->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
     }
 
     /**
@@ -411,7 +459,7 @@ final class SessionProofStoreTest extends TestCase
         $store = $this->store();
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($this->proofFor($this->user()));
+        $store->record($this->user(), $this->proofFor($this->user()));
 
         $slot   = (new ProofOwner(TestUser::class, '7'))->slot();
         $record = $this->session->get(SessionProofStore::SESSION_KEY)[$slot][self::APPLICATION];
@@ -422,7 +470,7 @@ final class SessionProofStoreTest extends TestCase
             $this->session->put(SessionProofStore::SESSION_KEY, [$slot => [self::APPLICATION => $object]]);
 
             self::assertNull($store->currentSession($this->user(), self::APPLICATION), $object::class);
-            self::assertSame([], $store->proofs($this->user(), self::APPLICATION), $object::class);
+            self::assertSame([], $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN), $object::class);
         }
     }
 
@@ -439,10 +487,10 @@ final class SessionProofStoreTest extends TestCase
         $older = $this->proofFor($this->user(), ['provedAt' => CarbonImmutable::now()->subMinutes(5)]);
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($newer);
-        $store->record($older);
+        $store->record($this->user(), $newer);
+        $store->record($this->user(), $older);
 
-        self::assertSame([$older->toArray(), $newer->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION)));
+        self::assertSame([$older->toArray(), $newer->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION, self::SIGN_IN)));
     }
 
     /**
@@ -457,12 +505,12 @@ final class SessionProofStoreTest extends TestCase
         $kept  = $this->proofFor($this->user(), ['reference' => 'factor-2']);
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($this->proofFor($this->user()));
-        $store->record($kept);
+        $store->record($this->user(), $this->proofFor($this->user()));
+        $store->record($this->user(), $kept);
         $store->forgetFactor($this->user(), 'factor-1');
 
         self::assertSame(self::SIGN_IN, $store->currentSession($this->user(), self::APPLICATION));
-        self::assertSame([$kept->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION)));
+        self::assertSame([$kept->toArray()], self::serialized($store->proofs($this->user(), self::APPLICATION, self::SIGN_IN)));
     }
 
     /**
@@ -477,12 +525,12 @@ final class SessionProofStoreTest extends TestCase
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
         $store->begin($this->user(), self::OTHER_APPLICATION, 'sign-in-2');
-        $store->record($this->proofFor($this->user()));
-        $store->record($this->proofFor($this->user(), ['application' => self::OTHER_APPLICATION, 'session' => 'sign-in-2']));
+        $store->record($this->user(), $this->proofFor($this->user()));
+        $store->record($this->user(), $this->proofFor($this->user(), ['application' => self::OTHER_APPLICATION, 'session' => 'sign-in-2']));
         $store->forgetFactor($this->user(), 'factor-1');
 
-        self::assertSame([], $store->proofs($this->user(), self::APPLICATION));
-        self::assertSame([], $store->proofs($this->user(), self::OTHER_APPLICATION));
+        self::assertSame([], $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
+        self::assertSame([], $store->proofs($this->user(), self::OTHER_APPLICATION, 'sign-in-2'));
         self::assertSame('sign-in-2', $store->currentSession($this->user(), self::OTHER_APPLICATION));
     }
 
@@ -501,10 +549,10 @@ final class SessionProofStoreTest extends TestCase
         $store = $this->store();
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($this->proofFor($this->user()));
+        $store->record($this->user(), $this->proofFor($this->user()));
         $store->forgetFactor($this->user(), 'factor-1');
 
-        self::assertSame([], $store->proofs($this->user(), self::APPLICATION));
+        self::assertSame([], $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
         self::assertSame('not-a-record', $this->session->get(SessionProofStore::SESSION_KEY)[$slot][self::OTHER_APPLICATION]);
     }
 
@@ -535,16 +583,16 @@ final class SessionProofStoreTest extends TestCase
         $other = $this->user(8);
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($this->proofFor($this->user()));
+        $store->record($this->user(), $this->proofFor($this->user()));
         $store->begin($other, self::APPLICATION, 'sign-in-2');
-        $store->record($this->proofFor($other, ['session' => 'sign-in-2']));
+        $store->record($other, $this->proofFor($other, ['session' => 'sign-in-2']));
 
         $store->forget($this->user(), self::APPLICATION);
 
         self::assertNull($store->currentSession($this->user(), self::APPLICATION));
-        self::assertSame([], $store->proofs($this->user(), self::APPLICATION));
+        self::assertSame([], $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
         self::assertSame('sign-in-2', $store->currentSession($other, self::APPLICATION));
-        self::assertCount(1, $store->proofs($other, self::APPLICATION));
+        self::assertCount(1, $store->proofs($other, self::APPLICATION, 'sign-in-2'));
     }
 
     /**
@@ -559,15 +607,15 @@ final class SessionProofStoreTest extends TestCase
         $first = $this->firstFactorFor($this->user());
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($first);
+        $store->record($this->user(), $first);
 
         for ($index = 1; $index <= SessionProofStore::LIMIT; $index++) {
             $provedAt = CarbonImmutable::now()->subSeconds(SessionProofStore::LIMIT - $index);
 
-            $store->record($this->proofFor($this->user(), ['reference' => 'factor-' . $index, 'provedAt' => $provedAt]));
+            $store->record($this->user(), $this->proofFor($this->user(), ['reference' => 'factor-' . $index, 'provedAt' => $provedAt]));
         }
 
-        $proofs = $store->proofs($this->user(), self::APPLICATION);
+        $proofs = $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN);
 
         self::assertCount(SessionProofStore::LIMIT, $proofs);
         self::assertSame(ProofKind::FIRST_FACTOR, $proofs[0]->kind);
@@ -589,16 +637,16 @@ final class SessionProofStoreTest extends TestCase
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
 
         for ($index = 0; $index <= SessionProofStore::LIMIT; $index++) {
-            $store->record($this->firstFactorFor($this->user(), 'password-' . $index));
+            $store->record($this->user(), $this->firstFactorFor($this->user(), 'password-' . $index));
         }
 
-        self::assertCount(SessionProofStore::LIMIT, $store->proofs($this->user(), self::APPLICATION));
+        self::assertCount(SessionProofStore::LIMIT, $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
 
         $additional = $this->proofFor($this->user());
 
-        $store->record($additional);
+        $store->record($this->user(), $additional);
 
-        $proofs  = $store->proofs($this->user(), self::APPLICATION);
+        $proofs  = $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN);
         $methods = array_map(static fn (Proof $proof): string => $proof->method, $proofs);
 
         self::assertCount(SessionProofStore::LIMIT, $proofs);
@@ -619,13 +667,13 @@ final class SessionProofStoreTest extends TestCase
         $store = $this->store();
 
         $store->begin($this->user(), self::APPLICATION, self::SIGN_IN);
-        $store->record($this->firstFactorFor($this->user()));
+        $store->record($this->user(), $this->firstFactorFor($this->user()));
 
         for ($index = 1; $index <= SessionProofStore::LIMIT + 5; $index++) {
-            $store->record($this->proofFor($this->user(), ['reference' => 'factor-' . $index]));
+            $store->record($this->user(), $this->proofFor($this->user(), ['reference' => 'factor-' . $index]));
         }
 
-        $references = array_map(static fn (Proof $proof): ?string => $proof->reference, $store->proofs($this->user(), self::APPLICATION));
+        $references = array_map(static fn (Proof $proof): ?string => $proof->reference, $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
 
         self::assertCount(SessionProofStore::LIMIT, $references);
         self::assertContains(null, $references);
@@ -653,9 +701,9 @@ final class SessionProofStoreTest extends TestCase
 
         $store = $this->store();
 
-        $store->record($this->proofFor($this->user(), ['reference' => 'factor-latest']));
+        $store->record($this->user(), $this->proofFor($this->user(), ['reference' => 'factor-latest']));
 
-        $references = array_map(static fn (Proof $proof): ?string => $proof->reference, $store->proofs($this->user(), self::APPLICATION));
+        $references = array_map(static fn (Proof $proof): ?string => $proof->reference, $store->proofs($this->user(), self::APPLICATION, self::SIGN_IN));
 
         self::assertCount(SessionProofStore::LIMIT, $references);
         self::assertContains(null, $references);

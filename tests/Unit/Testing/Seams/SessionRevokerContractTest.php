@@ -295,8 +295,8 @@ final class SessionRevokerContractTest extends TestCase
         $proofs = SignInProofs::of($identity)->underGeneration(VerificationGeneration::current($identity));
         $store  = $this->container()->make(ProofStore::class);
 
-        $store->record($proofs->password());
-        $store->record($proofs->totp());
+        $store->record($identity, $proofs->password());
+        $store->record($identity, $proofs->totp());
 
         return SignInProofs::SESSION;
     }
@@ -310,7 +310,7 @@ final class SessionRevokerContractTest extends TestCase
     #[\Override]
     protected function doesCurrentSessionCount(MultiFactorAuthenticatable $identity): bool
     {
-        return $this->container()->make(ProofStore::class)->proofs($identity, SignInProofs::APPLICATION) !== [];
+        return $this->container()->make(ProofStore::class)->proofs($identity, SignInProofs::APPLICATION, SignInProofs::SESSION) !== [];
     }
 
     /**
@@ -325,8 +325,8 @@ final class SessionRevokerContractTest extends TestCase
         $proofs = SignInProofs::of($identity)->inSession('other-sign-in')->underGeneration(VerificationGeneration::current($identity));
 
         $this->otherDevice->begin($identity, SignInProofs::APPLICATION, 'other-sign-in');
-        $this->otherDevice->record($proofs->password());
-        $this->otherDevice->record($proofs->totp());
+        $this->otherDevice->record($identity, $proofs->password());
+        $this->otherDevice->record($identity, $proofs->totp());
     }
 
     /**
@@ -338,7 +338,7 @@ final class SessionRevokerContractTest extends TestCase
     #[\Override]
     protected function doesAnotherSessionCount(MultiFactorAuthenticatable $identity): bool
     {
-        return $this->otherDevice->proofs($identity, SignInProofs::APPLICATION) !== [];
+        return $this->otherDevice->proofs($identity, SignInProofs::APPLICATION, 'other-sign-in') !== [];
     }
 
     /**

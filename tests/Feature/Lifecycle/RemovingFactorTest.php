@@ -416,7 +416,7 @@ final class RemovingFactorTest extends TestCase
 
         $this->confirmedFactor($user);
 
-        $this->container()->make(ProofStore::class)->record(new Proof(
+        $this->container()->make(ProofStore::class)->record($user, new Proof(
             kind      : ProofKind::RECOVERY_CODE,
             method    : 'recovery_code',
             channel   : null,
@@ -614,7 +614,7 @@ final class RemovingFactorTest extends TestCase
         $other = new SessionProofStore(new Store('other-device', new ArraySessionHandler(10)));
 
         $other->begin($user, self::APPLICATION, 'other-sign-in');
-        $other->record(SignInProofs::of($user)->inSession('other-sign-in')->totp());
+        $other->record($user, SignInProofs::of($user)->inSession('other-sign-in')->totp());
 
         $this->stepUpWith($user, $kept);
         $this->stepUpWith($user, $gone);
@@ -622,13 +622,13 @@ final class RemovingFactorTest extends TestCase
         $seen = null;
 
         Event::listen(FactorRemoved::class, function () use ($user, &$seen): void {
-            $seen = self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION));
+            $seen = self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION));
         });
 
         self::assertTrue(Mfa::removeFactor(Callers::current(), $gone->id)->wasMade());
-        self::assertSame([], $other->proofs($user, self::APPLICATION));
+        self::assertSame([], $other->proofs($user, self::APPLICATION, 'other-sign-in'));
         self::assertSame([$kept->id], $seen);
-        self::assertSame([$kept->id], self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION)));
+        self::assertSame([$kept->id], self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION)));
     }
 
     /**
@@ -753,7 +753,7 @@ final class RemovingFactorTest extends TestCase
         self::assertTrue($this->isStored($factor));
         self::assertSame(10, RecoveryCode::query()->count());
         self::assertSame([], $this->reportedNames());
-        self::assertSame([], self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION)));
+        self::assertSame([], self::references($this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION)));
     }
 
     /**

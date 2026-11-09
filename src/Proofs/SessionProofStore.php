@@ -99,18 +99,25 @@ final readonly class SessionProofStore implements ProofStore
     }
 
     /**
-     * Record a proof for its identity's current sign-in on its application,
-     * refusing one bound to any other.
+     * Record the identity's proof for its current sign-in on the proof's
+     * application, refusing one bound to another identity or sign-in.
      *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
-    public function record(Proof $proof): void
+    public function record(MultiFactorAuthenticatable $identity, Proof $proof): void
     {
-        $owner       = ProofOwner::boundBy($proof->binding);
+        $owner = ProofOwner::of($identity);
+
+        if (!$owner->owns($proof->binding)) {
+            throw new ProofRefusedException('The proof is not bound to the identity, so it cannot be recorded.');
+        }
+
         $application = $proof->binding->application;
         $record      = $this->read($owner, $application);
 
@@ -124,27 +131,28 @@ final readonly class SessionProofStore implements ProofStore
     }
 
     /**
-     * The proofs of the identity's current sign-in on the application that
-     * still count, oldest first.
+     * The proofs of the identity's sign-in on the application the session names
+     * that still count, oldest first; none unless it is the current one.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  string  $sessionId
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
     #[\Override]
-    public function proofs(MultiFactorAuthenticatable $identity, string $application): array
+    public function proofs(MultiFactorAuthenticatable $identity, string $application, string $sessionId): array
     {
         $record = $this->read(ProofOwner::of($identity), $application);
 
-        if ($record === null) {
+        if ($record === null || $record['session'] !== $sessionId) {
             return [];
         }
 
         $restored = array_filter(array_map(self::restore(...), $record['proofs']));
 
-        return CountingProofs::of($identity, $application, $record['session'], $restored);
+        return CountingProofs::of($identity, $application, $sessionId, $restored);
     }
 
     /**

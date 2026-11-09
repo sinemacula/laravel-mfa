@@ -62,11 +62,11 @@ final class GenerationSessionRevokerTest extends TestCase
         $this->actingAs($user);
 
         $this->store()->begin($user, SignInProofs::APPLICATION, SignInProofs::SESSION);
-        $this->store()->record(SignInProofs::of($user)->password());
-        $this->store()->record(SignInProofs::of($user)->totp());
+        $this->store()->record($user, SignInProofs::of($user)->password());
+        $this->store()->record($user, SignInProofs::of($user)->totp());
 
         $this->otherDevice->begin($user, SignInProofs::APPLICATION, 'other-sign-in');
-        $this->otherDevice->record(SignInProofs::of($user)->inSession('other-sign-in')->totp());
+        $this->otherDevice->record($user, SignInProofs::of($user)->inSession('other-sign-in')->totp());
     }
 
     /**
@@ -85,9 +85,11 @@ final class GenerationSessionRevokerTest extends TestCase
         self::assertFalse($revocation->judgedCurrent);
         self::assertNull($revocation->completion());
 
-        self::assertSame([], $this->otherDevice->proofs($this->user, SignInProofs::APPLICATION));
+        self::assertSame([], $this->otherDevice->proofs($this->user, SignInProofs::APPLICATION, 'other-sign-in'));
         self::assertSame(['password', 'totp'], $this->methods());
-        self::assertSame([1, 1], array_map(static fn (Proof $proof): int => $proof->generation, $this->store()->proofs($this->user, SignInProofs::APPLICATION)));
+        $kept = $this->store()->proofs($this->user, SignInProofs::APPLICATION, SignInProofs::SESSION);
+
+        self::assertSame([1, 1], array_map(static fn (Proof $proof): int => $proof->generation, $kept));
     }
 
     /**
@@ -102,7 +104,7 @@ final class GenerationSessionRevokerTest extends TestCase
     {
         $this->revoker()->revokeAll($this->user);
 
-        self::assertSame([], $this->otherDevice->proofs($this->user, SignInProofs::APPLICATION));
+        self::assertSame([], $this->otherDevice->proofs($this->user, SignInProofs::APPLICATION, 'other-sign-in'));
         self::assertSame([], $this->methods());
         self::assertSame(1, VerificationGeneration::current($this->user));
     }
@@ -123,7 +125,7 @@ final class GenerationSessionRevokerTest extends TestCase
 
         DB::rollBack();
 
-        self::assertCount(1, $this->otherDevice->proofs($this->user, SignInProofs::APPLICATION));
+        self::assertCount(1, $this->otherDevice->proofs($this->user, SignInProofs::APPLICATION, 'other-sign-in'));
         self::assertSame(['password', 'totp'], $this->methods());
         self::assertSame(0, VerificationGeneration::current($this->user));
     }
@@ -183,8 +185,8 @@ final class GenerationSessionRevokerTest extends TestCase
         $this->container()->instance(ProofStore::class, $store);
 
         $store->begin($this->user, SignInProofs::APPLICATION, SignInProofs::SESSION);
-        $store->record(SignInProofs::of($this->user)->password());
-        $store->record(SignInProofs::of($this->user)->totp());
+        $store->record($this->user, SignInProofs::of($this->user)->password());
+        $store->record($this->user, SignInProofs::of($this->user)->totp());
 
         DB::transaction(function () use ($store): void {
             $this->removeFactor();
@@ -192,7 +194,7 @@ final class GenerationSessionRevokerTest extends TestCase
         });
 
         self::assertSame('sign-in-2', $store->currentSession($this->user, SignInProofs::APPLICATION));
-        self::assertSame([], $store->proofs($this->user, SignInProofs::APPLICATION));
+        self::assertSame([], $store->proofs($this->user, SignInProofs::APPLICATION, 'sign-in-2'));
     }
 
     /**
@@ -261,6 +263,28 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
+     * The proofs kept are read for the sign-in the removal names, once it is
+     * the current one, not for whichever the store answers afterwards.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheProofsKeptAreReadForTheSignInNamed(): void
+    {
+        $store = \Mockery::mock(ProofStore::class);
+        $store->shouldReceive('currentSession')->with($this->user, 'web')->andReturn(SignInProofs::SESSION);
+        $store->shouldReceive('proofs')->once()->with($this->user, 'web', SignInProofs::SESSION)->andReturn([]);
+
+        $this->container()->instance(ProofStore::class, $store);
+
+        $this->removeFactor();
+
+        $store->shouldHaveReceived('proofs')->once()->with($this->user, 'web', SignInProofs::SESSION);
+        self::assertSame(1, VerificationGeneration::current($this->user));
+    }
+
+    /**
      * Remove a factor the current sign-in's proofs were not made with, from the
      * current sign-in.
      *
@@ -282,7 +306,7 @@ final class GenerationSessionRevokerTest extends TestCase
      */
     private function methods(): array
     {
-        return array_map(static fn (Proof $proof): string => $proof->method, $this->store()->proofs($this->user, SignInProofs::APPLICATION));
+        return array_map(static fn (Proof $proof): string => $proof->method, $this->store()->proofs($this->user, SignInProofs::APPLICATION, SignInProofs::SESSION));
     }
 
     /**

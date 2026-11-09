@@ -34,6 +34,7 @@ use Tests\Fixtures\Identities\PlainUser;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
 use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\ReplacingProofStore;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
@@ -530,6 +531,38 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
+     * A sign-in replaced between reading which one is current and reading its
+     * proofs gives the neutral evidence: neither its own proofs, now gone, nor
+     * its successor's count for it.
+     *
+     * @return void
+     */
+    public function testASignInReplacedBetweenTheReadsLendsNothing(): void
+    {
+        $user = $this->signedInPerson();
+
+        $this->totpFactor($user);
+        $this->prove($user, static fn (SignInProofs $signIn): array => [$signIn->password(3600), $signIn->totp(90)]);
+
+        $store = $this->container()->make(ProofStore::class);
+
+        $this->container()->instance(ProofStore::class, new ReplacingProofStore($store, static function (ProofStore $wrapped) use ($user): void {
+            $signIn = SignInProofs::of($user)->inSession('sign-in-b')->underGeneration(VerificationGeneration::current($user));
+
+            $wrapped->begin($user, self::APPLICATION, 'sign-in-b');
+            $wrapped->record($user, $signIn->password(3600));
+            $wrapped->record($user, $signIn->totp(30));
+        }));
+
+        $context = Mfa::authenticationContext(Callers::current());
+
+        self::assertFalse($context['accepted']);
+        self::assertSame([], $context['factor_types']);
+        self::assertNull($context['last_verification_age_seconds']);
+        self::assertCount(2, $store->proofs($user, self::APPLICATION, 'sign-in-b'));
+    }
+
+    /**
      * A named sign-in's context is built from the proofs given, without the
      * request serving anyone.
      *
@@ -666,7 +699,7 @@ final class AuthenticationContextContributorTest extends TestCase
         $store->begin($user, self::APPLICATION, self::SESSION);
 
         foreach ($proofs($signIn) as $proof) {
-            $store->record($proof);
+            $store->record($user, $proof);
         }
     }
 

@@ -116,7 +116,7 @@ final class FactorRemovalTest extends TestCase
         self::assertSame(0, PasskeyAssociation::query()->where('factor_id', $passkey->id)->count());
         self::assertSame($generation, VerificationGeneration::current($user));
 
-        $proofs = $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION);
+        $proofs = $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION);
 
         self::assertSame([$other->id], array_map(static fn (Proof $proof): ?string => $proof->reference, $proofs));
     }

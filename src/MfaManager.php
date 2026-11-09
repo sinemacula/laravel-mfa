@@ -607,7 +607,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
         }
 
         $session = $this->service(ProofStore::class)->currentSession($served->identity, $served->application);
-        $proofs  = $session === null ? [] : $this->service(SessionFirstFactor::class)->proofs($served->identity, $served->application);
+        $proofs  = $session === null ? [] : $this->service(SessionFirstFactor::class)->proofsOf($served->identity, $served->application, $session);
 
         return $this->service(AuthenticationContextContributor::class)->contributeFor($served->identity, $served->application, $session ?? '', ...$proofs);
     }

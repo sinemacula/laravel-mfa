@@ -56,9 +56,9 @@ final class SessionFirstFactorTest extends TestCase
 
         $this->container()->instance(FirstFactorResolver::class, $resolver);
 
-        $this->store()->record($proofs->password(60));
-        $this->store()->record($latest);
-        $this->store()->record($proofs->totp());
+        $this->store()->record($user, $proofs->password(60));
+        $this->store()->record($user, $latest);
+        $this->store()->record($user, $proofs->totp());
 
         self::assertEquals($latest, $this->firstFactors()->current($user, 'web'));
         self::assertCount(3, $this->firstFactors()->proofs($user, 'web'));
@@ -80,7 +80,7 @@ final class SessionFirstFactorTest extends TestCase
         $first  = $proofs->password(60);
 
         $this->container()->instance(FirstFactorResolver::class, new FixedFirstFactorResolver($first));
-        $this->store()->record($proofs->totp());
+        $this->store()->record($user, $proofs->totp());
 
         self::assertEquals($first, $this->firstFactors()->current($user, 'web'));
         self::assertSame(
@@ -142,7 +142,7 @@ final class SessionFirstFactorTest extends TestCase
         $first = SignInProofs::of($user)->password();
         $owner = ProofOwner::of($user);
 
-        $this->store()->record($first);
+        $this->store()->record($user, $first);
 
         $found = $this->firstFactors()->forBinding($user, new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP), Callers::current()->pending);
 
@@ -237,13 +237,101 @@ final class SessionFirstFactorTest extends TestCase
         $user  = $this->signIn();
         $owner = ProofOwner::of($user);
 
-        $this->store()->record(SignInProofs::of($user)->password());
+        $this->store()->record($user, SignInProofs::of($user)->password());
 
         $first = SignInProofs::of($user)->onApplication('admin')->inSession('pending-1')->password();
 
         $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver(
             new PendingContext($user, 'admin', 'pending-1', $first, Requirement::none(), [PendingAction::VERIFY], CarbonImmutable::now()->addHour()),
         ));
+
+        $binding = new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP);
+
+        self::assertNull($this->firstFactors()->forBinding($user, $binding, $this->pendingOfTheRequest()));
+    }
+
+    /**
+     * The proofs read for a sign-in that has since been replaced are none,
+     * though its successor holds proofs of its own.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAReplacedSignInLendsNoProofs(): void
+    {
+        $user = $this->signIn();
+
+        $this->store()->record($user, SignInProofs::of($user)->password(60));
+        $this->store()->record($user, SignInProofs::of($user)->totp());
+
+        $this->store()->begin($user, 'web', 'sign-in-2');
+        $this->store()->record($user, SignInProofs::of($user)->inSession('sign-in-2')->password());
+
+        self::assertSame([], $this->firstFactors()->proofsOf($user, 'web', SignInProofs::SESSION));
+        self::assertCount(1, $this->firstFactors()->proofsOf($user, 'web', 'sign-in-2'));
+    }
+
+    /**
+     * The resolver's first factor is put ahead of a sign-in's proofs only when
+     * it is bound to the sign-in named.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTheResolvedFirstFactorMustBeOfTheNamedSignIn(): void
+    {
+        $user  = $this->signIn();
+        $first = SignInProofs::of($user)->inSession('sign-in-2')->password(60);
+
+        $this->container()->instance(FirstFactorResolver::class, new FixedFirstFactorResolver($first));
+
+        $this->store()->begin($user, 'web', 'sign-in-2');
+
+        self::assertSame([], $this->firstFactors()->proofsOf($user, 'web', SignInProofs::SESSION));
+        self::assertEquals([$first], $this->firstFactors()->proofsOf($user, 'web', 'sign-in-2'));
+    }
+
+    /**
+     * A resolver still answering the first factor of a sign-in since replaced
+     * lends it nothing: the sign-in named is no longer current.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAResolverAnsweringAReplacedSignInLendsItNothing(): void
+    {
+        $user  = $this->signIn();
+        $stale = SignInProofs::of($user)->password(60);
+
+        $this->container()->instance(FirstFactorResolver::class, new FixedFirstFactorResolver($stale));
+
+        self::assertEquals([$stale], $this->firstFactors()->proofsOf($user, 'web', SignInProofs::SESSION));
+
+        $this->store()->begin($user, 'web', 'sign-in-2');
+
+        self::assertSame([], $this->firstFactors()->proofsOf($user, 'web', SignInProofs::SESSION));
+        self::assertNull($this->firstFactors()->current($user, 'web'));
+    }
+
+    /**
+     * A binding of a sign-in that has since been replaced has no first factor,
+     * though the replacement records one.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testABindingOfAReplacedSignInHasNoFirstFactor(): void
+    {
+        $user  = $this->signIn();
+        $owner = ProofOwner::of($user);
+
+        $this->store()->record($user, SignInProofs::of($user)->password());
+        $this->store()->begin($user, 'web', 'sign-in-2');
+        $this->store()->record($user, SignInProofs::of($user)->inSession('sign-in-2')->password());
 
         $binding = new ProofBinding($owner->type, $owner->key, 'web', SignInProofs::SESSION, Purpose::STEP_UP);
 

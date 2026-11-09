@@ -115,7 +115,7 @@ final class DeclaredFirstFactorResolverTest extends TestCase
 
         self::assertFalse($this->container()->make(FreshnessGate::class)->isFresh(Callers::current(), 'billing.change_plan', $requirement));
 
-        $this->container()->make(ProofStore::class)->record(SignInProofs::of($user)->totp(60));
+        $this->container()->make(ProofStore::class)->record($user, SignInProofs::of($user)->totp(60));
 
         self::assertTrue($this->container()->make(FreshnessGate::class)->isFresh(Callers::current(), 'billing.change_plan', $requirement));
 

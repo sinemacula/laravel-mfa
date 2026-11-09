@@ -501,7 +501,7 @@ final class PasskeyAssertionsTest extends TestCase
             generation: 0,
         );
 
-        $this->container()->make(ProofStore::class)->record($first);
+        $this->container()->make(ProofStore::class)->record($this->user, $first);
     }
 
     /**

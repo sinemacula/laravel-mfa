@@ -97,7 +97,7 @@ final class PendingActionsTest extends TestCase
         $this->actingAs($guarded);
 
         $this->container()->make(ProofStore::class)->begin($guarded, 'web', SignInProofs::SESSION);
-        $this->container()->make(ProofStore::class)->record(SignInProofs::of($guarded)->password());
+        $this->container()->make(ProofStore::class)->record($guarded, SignInProofs::of($guarded)->password());
     }
 
     /**

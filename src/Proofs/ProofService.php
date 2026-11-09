@@ -54,7 +54,10 @@ final readonly class ProofService
             return [];
         }
 
-        return $this->store()->proofs($identity, $caller->application);
+        $store   = $this->store();
+        $session = $store->currentSession($identity, $caller->application);
+
+        return $session === null ? [] : $store->proofs($identity, $caller->application, $session);
     }
 
     /**

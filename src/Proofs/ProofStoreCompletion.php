@@ -147,7 +147,7 @@ final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
             'The proof is not bound to the identity\'s current sign-in.',
         );
 
-        AfterStorageCommit::run($this->container, static fn () => $store->record($proof));
+        AfterStorageCommit::run($this->container, static fn () => $store->record($identity, $proof));
     }
 
     /**
