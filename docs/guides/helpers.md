@@ -53,12 +53,13 @@ a pending session nothing, and "not read" takes no account of one.
 
 ### Requirements
 
-| Helper                                       | Returns            | Serves               | On a pending session |
-|----------------------------------------------|--------------------|----------------------|----------------------|
-| `requirement($caller)`                       | `Requirement`      | The signed-in person | Not read             |
-| `isFresh($caller, $operation, $requirement)` | `bool`             | The signed-in person | Never fresh          |
-| `proofs($caller)`                            | `list<Proof>`      | The signed-in person | Active only          |
-| `authenticationContext($caller)`             | The context's keys | The signed-in person | The neutral context  |
+| Helper                                             | Returns                               | Serves               | On a pending session           |
+|----------------------------------------------------|---------------------------------------|----------------------|--------------------------------|
+| `requirement($caller)`                             | `Requirement`                         | The signed-in person | Not read                       |
+| `isFresh($caller, $operation, $requirement)`       | `bool`                                | The signed-in person | Never fresh                    |
+| `stepUpRefusal($caller, $requirement, $operation)` | `InsufficientAuthenticationException` | The caller           | The pending session's identity |
+| `proofs($caller)`                                  | `list<Proof>`                         | The signed-in person | Active only                    |
+| `authenticationContext($caller)`                   | The context's keys                    | The signed-in person | The neutral context            |
 
 ### Factors
 

@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Http\Middleware;
 
-use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
@@ -14,15 +13,13 @@ use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
-use SineMacula\Laravel\Mfa\Factors\ConfirmedFactors;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
-use SineMacula\Laravel\Mfa\Verification\FactorOffers;
+use SineMacula\Laravel\Mfa\Requirements\StepUpRefusal;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -112,10 +109,10 @@ final readonly class EnsureMfaRequirementIsMet
         $pending = $context->pending;
 
         if ($pending !== null) {
-            throw $this->refusal($context, Requirement::strictest($pending->requirement, $level), $operation, $this->hasConfirmedFactor($pending->identity));
+            throw $this->refusal($context, Requirement::strictest($pending->requirement, $level), $operation);
         }
 
-        $caller = $callers->resolve($context, null) ?? throw $this->refusal($context, $level, $operation, false);
+        $caller = $callers->resolve($context, null) ?? throw $this->refusal($context, $level, $operation);
 
         return $this->gate($request, $next, $caller, $callers->application($caller), $level, $operation);
     }
@@ -147,7 +144,7 @@ final readonly class EnsureMfaRequirementIsMet
 
         $freshness = $operation === null ? null : $requirements->freshnessRequirement($caller->context(), $operation);
 
-        throw $this->refusal($caller->context(), Requirement::strictest($requirement, $freshness ?? Requirement::none()), $operation, $this->hasConfirmedFactor($caller->identity));
+        throw $this->refusal($caller->context(), Requirement::strictest($requirement, $freshness ?? Requirement::none()), $operation);
     }
 
     /**
@@ -197,36 +194,20 @@ final readonly class EnsureMfaRequirementIsMet
     }
 
     /**
-     * The refusal of the request.
+     * The refusal of the request (see `Requirements\StepUpRefusal`).
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  ?string  $operation
-     * @param  bool  $hasConfirmedFactor
      * @return \SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
-     */
-    private function refusal(CallerContext $context, Requirement $requirement, ?string $operation, bool $hasConfirmedFactor): InsufficientAuthenticationException
-    {
-        return new InsufficientAuthenticationException($requirement, $this->container->make(FactorOffers::class)->offered($context), $operation, $hasConfirmedFactor);
-    }
-
-    /**
-     * Determine whether the identity has a factor whose stored status is
-     * exactly `confirmed`, for the refusal to report as a fact (see
-     * `Factors\ConfirmedFactors`).
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @return bool
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
      */
-    private function hasConfirmedFactor(MultiFactorAuthenticatable $identity): bool
+    private function refusal(CallerContext $context, Requirement $requirement, ?string $operation): InsufficientAuthenticationException
     {
-        return ConfirmedFactors::isHeldBy($identity, $this->container->make(Repository::class));
+        return $this->container->make(StepUpRefusal::class)->of($context, $requirement, $operation);
     }
 
     /**
