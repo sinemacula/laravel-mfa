@@ -133,12 +133,16 @@ are refused with an `InvalidArgumentException` before anything changes.
 
 ### Stores, guards and sessions
 
-- The sign-in is begun and its proofs recorded through `Testing\Contracts\VerifiedSignInRecorder`, by default the
-  bound proof store itself. A store that refuses proofs it did not make, such as one backed by an authentication layer's
-  sessions, binds a recorder that begins the sign-in and records the evidence through that layer: `begin()` returns the
-  session id the store now names as current, and `record()` keeps each proof's time, method, kind of channel and
-  observed properties, or throws. The proofs are still read back through the store, so what the recorder writes must
-  count there: a store counting a proof only while the identity holds its factor needs that factor arranged too.
+- The sign-in is begun and its proofs recorded through `Testing\Contracts\VerifiedSignInRecorder`, by default the bound
+  proof store itself. A store that refuses proofs it did not make, such as one backed by an authentication layer's
+  sessions, binds a recorder that begins the sign-in and records the evidence through that layer. `begin()` is handed
+  the time the proofs are made at and returns the sign-in's session id. The helper then records a password first factor,
+  unless the store already holds one, and exactly one further proof, an additional factor bound for sign-in, both at
+  that time. `record()` keeps each proof's time, method, kind of channel and observed properties, or throws. A layer
+  that holds a sign-in pending until it is verified may complete it with the further proof, but the sign-in begun must
+  be the store's current one once the proofs are recorded, and never another. The proofs are still read back through the
+  store, so what the recorder writes must count there: a store counting a proof only while the identity holds its factor
+  needs that factor arranged too.
 - A store whose `begin()` does nothing needs its session arranged first, otherwise a `LogicException` says so. If it
   retains a first factor, that first factor is kept, and one later than `$at` fails, since the further proof would not
   count. If it retains anything further, a `LogicException` says the time cannot be honoured.

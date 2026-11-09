@@ -107,7 +107,7 @@ final readonly class VerifiedSignIn
 
         $store    = $this->container->make(ProofStore::class);
         $recorder = $this->recorder($store);
-        $session  = self::begin($store, $recorder, $identity, $application);
+        $session  = $recorder->begin($identity, $application, $provedAt);
 
         $generation = VerificationGeneration::current($identity);
 
@@ -125,6 +125,8 @@ final readonly class VerifiedSignIn
         }
 
         $recorder->record($identity, self::furtherProof($level, $provedAt, self::binding($identity, $application, $session), $generation));
+
+        self::assertCurrent($store, $identity, $application, $session);
 
         $this->assertReached($level, $this->evaluate($identity, $application, $session, $level));
     }
@@ -161,27 +163,24 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * Begin a new sign-in through the recorder and name it, refusing one the
-     * store does not name as the identity's current sign-in.
+     * Refuse a sign-in the store does not name as the identity's current one
+     * once its proofs are recorded: the recorder may hold it pending until the
+     * further proof completes it, but never switch to another.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
-     * @param  \SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder  $recorder
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
-     * @return string
+     * @param  string  $session
+     * @return void
      *
      * @throws \LogicException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    private static function begin(ProofStore $store, VerifiedSignInRecorder $recorder, MultiFactorAuthenticatable $identity, string $application): string
+    private static function assertCurrent(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): void
     {
-        $session = $recorder->begin($identity, $application);
-
         if ($store->currentSession($identity, $application) !== $session) {
-            throw new \LogicException(sprintf('The sign-in the recorder began on [%s] is not the one the proof store names as current.', $application));
+            throw new \LogicException(sprintf('The sign-in the recorder began on [%s] is not the proof store\'s current one once its proofs are recorded.', $application));
         }
-
-        return $session;
     }
 
     /**

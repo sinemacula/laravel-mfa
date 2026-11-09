@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -35,16 +36,18 @@ final readonly class ProofStoreRecorder implements VerifiedSignInRecorder
 
     /**
      * Begin a new sign-in named by a fresh id and return the session id the
-     * store names as current, refusing a store that knows of none.
+     * store names as current, refusing a store that knows of none. The time is
+     * not needed: the store keeps no time a sign-in began at.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  \Carbon\CarbonImmutable  $at
      * @return string
      *
      * @throws \LogicException
      */
     #[\Override]
-    public function begin(MultiFactorAuthenticatable $identity, string $application): string
+    public function begin(MultiFactorAuthenticatable $identity, string $application, CarbonImmutable $at): string // NOSONAR: the time is for another recorder
     {
         $this->store->begin($identity, $application, Str::lower((string) Str::ulid()));
 

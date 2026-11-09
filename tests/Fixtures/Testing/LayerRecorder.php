@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Testing;
 
+use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
@@ -38,10 +39,11 @@ final readonly class LayerRecorder implements VerifiedSignInRecorder
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
+     * @param  \Carbon\CarbonImmutable  $at
      * @return string
      */
     #[\Override]
-    public function begin(MultiFactorAuthenticatable $identity, string $application): string
+    public function begin(MultiFactorAuthenticatable $identity, string $application, CarbonImmutable $at): string // NOSONAR: the layer keeps no start time
     {
         $session = $this->layer->signIn();
 

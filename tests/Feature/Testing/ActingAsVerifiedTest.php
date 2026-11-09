@@ -38,6 +38,7 @@ use Tests\Fixtures\Requirements\UnacceptingCombinationPolicy;
 use Tests\Fixtures\Seams\LayerWrittenProofStore;
 use Tests\Fixtures\Testing\LayerRecorder;
 use Tests\Fixtures\Testing\LeveledCombinationPolicy;
+use Tests\Fixtures\Testing\PendingLayerRecorder;
 use Tests\Fixtures\Testing\RecordingGuard;
 use Tests\Fixtures\Testing\RetainingProofStore;
 use Tests\TestCase;
@@ -560,6 +561,30 @@ final class ActingAsVerifiedTest extends TestCase
     }
 
     /**
+     * A recorder may hold the sign-in pending until the further proof completes
+     * it, and is handed the time the proofs are made at.
+     *
+     * @return void
+     */
+    public function testARecorderMayCompleteAPendingSignInWithTheFurtherProof(): void
+    {
+        $layer    = new LayerWrittenProofStore;
+        $recorder = new PendingLayerRecorder($layer);
+        $user     = $this->person();
+        $at       = CarbonImmutable::now()->subMinutes(10);
+
+        $this->container()->instance(ProofStore::class, $layer);
+        $this->container()->instance(VerifiedSignInRecorder::class, $recorder);
+
+        $this->actingAsVerified($user, at: $at);
+
+        $this->getJson('verified/aal2')->assertOk();
+
+        self::assertNotNull($recorder->startedAt);
+        self::assertSame($at->getTimestamp(), $recorder->startedAt->getTimestamp());
+    }
+
+    /**
      * Without a recorder, a store whose sign-ins another layer writes cannot be
      * arranged: it begins no sign-in of its own.
      *
@@ -575,8 +600,8 @@ final class ActingAsVerifiedTest extends TestCase
     }
 
     /**
-     * A recorder naming a sign-in the store does not hold as current is refused
-     * before any proof is recorded.
+     * A recorder naming a sign-in the store does not hold as current once its
+     * proofs are recorded is refused, before the proofs are evaluated.
      *
      * @return void
      */
@@ -602,10 +627,11 @@ final class ActingAsVerifiedTest extends TestCase
              *
              * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
              * @param  string  $application
+             * @param  \Carbon\CarbonImmutable  $at
              * @return string
              */
             #[\Override]
-            public function begin(MultiFactorAuthenticatable $identity, string $application): string
+            public function begin(MultiFactorAuthenticatable $identity, string $application, CarbonImmutable $at): string
             {
                 $this->layer->begin($identity, $application, $this->layer->signIn());
 
@@ -613,23 +639,21 @@ final class ActingAsVerifiedTest extends TestCase
             }
 
             /**
-             * Refuse every proof: none should reach here.
+             * Record the proof through the layer.
              *
              * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
              * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
              * @return void
-             *
-             * @throws \LogicException
              */
             #[\Override]
             public function record(MultiFactorAuthenticatable $identity, Proof $proof): void
             {
-                throw new \LogicException('No proof should be recorded.');
+                $this->layer->write($proof);
             }
         });
 
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('not the one the proof store names as current');
+        $this->expectExceptionMessage('is not the proof store\'s current one');
 
         $this->actingAsVerified($this->person());
     }
@@ -662,10 +686,11 @@ final class ActingAsVerifiedTest extends TestCase
              *
              * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
              * @param  string  $application
+             * @param  \Carbon\CarbonImmutable  $at
              * @return string
              */
             #[\Override]
-            public function begin(MultiFactorAuthenticatable $identity, string $application): string
+            public function begin(MultiFactorAuthenticatable $identity, string $application, CarbonImmutable $at): string
             {
                 $session = $this->layer->signIn();
 
