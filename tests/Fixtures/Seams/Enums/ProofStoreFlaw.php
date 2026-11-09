@@ -39,6 +39,12 @@ enum ProofStoreFlaw
     /** Forgets the current sign-in and its proofs before it throws a refusal. */
     case DESTROYS_ON_REFUSAL;
 
+    /** Keeps a refused proof for the identity its binding names. */
+    case KEEPS_FOR_THE_NAMED_IDENTITY;
+
+    /** Ends the sign-in of the identity a refused proof's binding names. */
+    case ENDS_THE_NAMED_SIGN_IN;
+
     /** Still reads the proofs of a sign-in it has since replaced. */
     case RETAINS_SIGN_INS;
 

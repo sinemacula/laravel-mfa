@@ -48,6 +48,12 @@ final class ProofStoreContract
     /** @var string The sign-in a store that keeps its own begins. */
     public const string SESSION = 'contract-sign-in';
 
+    /** @var string A sign-in id no check begins, so never the identity's current one. */
+    public const string ELSEWHERE = 'contract-sign-in-elsewhere';
+
+    /** @var string An application no check signs the identity in to. */
+    public const string ELSEWHERE_APPLICATION = 'contract-application-elsewhere';
+
     /** @var string The factor the additional factor proof names by default. */
     public const string FACTOR = 'contract-factor';
 
@@ -75,7 +81,7 @@ final class ProofStoreContract
         string $session,
         ?\Closure $arrange = null,
     ): void {
-        $refused = self::firstFactor($identity, $application, 'another-' . $session);
+        $refused = self::firstFactor($identity, $application, self::ELSEWHERE);
 
         self::assertRefused($store, $identity, $application, $session, $refused, $arrange, 'A proof bound to another sign-in');
     }
@@ -135,7 +141,7 @@ final class ProofStoreContract
         string $session,
         ?\Closure $arrange = null,
     ): void {
-        $refused = self::firstFactor($identity, 'another-' . $application, $session);
+        $refused = self::firstFactor($identity, self::ELSEWHERE_APPLICATION, $session);
 
         self::assertRefused($store, $identity, $application, $session, $refused, $arrange, 'A proof bound to another application');
     }
@@ -181,7 +187,7 @@ final class ProofStoreContract
         $arrange(self::firstFactor($identity, $application, $session));
 
         Assert::assertCount($held + 1, $store->proofs($identity, $application, $session), 'A proof of the current sign-in must be read for it.');
-        Assert::assertSame([], $store->proofs($identity, $application, 'another-' . $session), 'A session never begun must yield no proof.');
+        Assert::assertSame([], $store->proofs($identity, $application, self::ELSEWHERE), 'A session never begun must yield no proof.');
 
         $replacement = $replace();
 

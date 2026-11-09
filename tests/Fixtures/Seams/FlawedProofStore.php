@@ -241,6 +241,16 @@ final class FlawedProofStore implements ProofStore
             $this->signIns[$slot]['proofs'][] = $proof;
         }
 
+        $named = ProofOwner::boundBy($proof->binding)->slot();
+
+        if (isset($this->signIns[$named]) && $this->flaw === ProofStoreFlaw::KEEPS_FOR_THE_NAMED_IDENTITY) {
+            $this->signIns[$named]['proofs'][] = $proof;
+        }
+
+        if (isset($this->signIns[$named]) && $this->flaw === ProofStoreFlaw::ENDS_THE_NAMED_SIGN_IN) {
+            $this->signIns[$named]['session'] = null;
+        }
+
         if (isset($this->signIns[$slot]) && $this->flaw === ProofStoreFlaw::DESTROYS_ON_REFUSAL) {
             $this->signIns[$slot]['session'] = null;
             $this->signIns[$slot]['proofs']  = [];
