@@ -279,7 +279,7 @@ final readonly class PasskeyChangeGate
             return new PasskeyAssociationResult($summary, $codes, $result->withCompletion($acceptance->handOver($caller, $result)));
         }
 
-        $proofs    = $this->container->make(SessionFirstFactor::class)->proofs($identity, $application);
+        $proofs    = $this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $registration->binding->sessionId);
         $judgement = $this->container->make(SessionReevaluation::class)
             ->judge($identity, $application, $registration->binding->sessionId, FactorChangeMade::PASSKEY_REGISTERED, $summary, $proofs);
 

@@ -68,7 +68,7 @@ final readonly class ProofAcceptance
         $binding      = $proof->binding;
         $pending      = $caller->pending;
         $proofs       = $pending === null
-            ? $this->container->make(SessionFirstFactor::class)->proofs($caller->identity, $binding->application)
+            ? $this->container->make(SessionFirstFactor::class)->proofsOf($caller->identity, $binding->application, $binding->sessionId)
             : [$pending->firstFactor, ...self::counting($pending, $proof->generation)];
         $firstFactor = self::firstFactorOf($proofs);
         $pair        = $firstFactor === null ? null : $requirements->check(Requirement::none(), $firstFactor, $proof);

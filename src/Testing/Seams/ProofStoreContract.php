@@ -58,71 +58,8 @@ final class ProofStoreContract
 
     /**
      * A proof bound to another sign-in than the identity's current one is
-     * refused by throwing, and not kept.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  string  $session
-     * @return void
-     */
-    public static function assertRefusesAProofOfAnotherSignIn(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): void
-    {
-        self::assertRefused($store, $identity, $application, $session, self::firstFactor($identity, $application, 'another-' . $session), 'A proof bound to another sign-in');
-    }
-
-    /**
-     * A proof bound to another identity than the one it is recorded for is
-     * refused by throwing, and not kept, though it names the identity's current
-     * sign-in.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  string  $session
-     * @return void
-     */
-    public static function assertRefusesAProofOfAnotherIdentity(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): void
-    {
-        $owner = ProofOwner::of($identity);
-        $own   = self::firstFactor($identity, $application, $session);
-        $proof = new Proof(
-            kind      : $own->kind,
-            method    : $own->method,
-            channel   : $own->channel,
-            reference : $own->reference,
-            properties: $own->properties,
-            provedAt  : $own->provedAt,
-            binding   : new ProofBinding($owner->type, 'another-' . $owner->key, $application, $session, Purpose::SIGN_IN),
-            generation: $own->generation,
-        );
-
-        self::assertRefused($store, $identity, $application, $session, $proof, 'A proof bound to another identity');
-    }
-
-    /**
-     * A proof bound to another application, where the identity has no sign-in
-     * of that id, is refused by throwing, and the sign-in begun keeps nothing
-     * of it.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  string  $session
-     * @return void
-     */
-    public static function assertRefusesAProofOfAnotherApplication(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): void
-    {
-        self::assertRefused($store, $identity, $application, $session, self::firstFactor($identity, 'another-' . $application, $session), 'A proof bound to another application');
-    }
-
-    /**
-     * The proofs read for a sign-in are that sign-in's only: a session that is
-     * not the identity's current sign-in yields none, though the current one
-     * holds a proof.
-     *
-     * The proof is put in by `$arrange`: by default the store's own `record()`,
-     * and for a store whose proofs another layer keeps, that layer's.
+     * refused by throwing, and changes nothing: the current sign-in and the
+     * proof `$arrange` put in it stay as they were.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -131,14 +68,111 @@ final class ProofStoreContract
      * @param  ?\Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void  $arrange
      * @return void
      */
-    public static function assertReadsOnlyTheNamedSignIn(
+    public static function assertRefusesAProofOfAnotherSignIn(
         ProofStore $store,
         MultiFactorAuthenticatable $identity,
         string $application,
         string $session,
         ?\Closure $arrange = null,
     ): void {
+        $refused = self::firstFactor($identity, $application, 'another-' . $session);
+
+        self::assertRefused($store, $identity, $application, $session, $refused, $arrange, 'A proof bound to another sign-in');
+    }
+
+    /**
+     * A proof of another identity's current sign-in, recorded for the identity,
+     * is refused by throwing, and changes neither identity's sign-in or proofs:
+     * a store must judge the identity it is handed, not the one the proof
+     * names.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $other
+     * @param  string  $application
+     * @param  string  $session
+     * @param  string  $otherSession
+     * @param  ?\Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void  $arrange
+     * @return void
+     */
+    public static function assertRefusesAProofOfAnotherIdentity(
+        ProofStore $store,
+        MultiFactorAuthenticatable $identity,
+        MultiFactorAuthenticatable $other,
+        string $application,
+        string $session,
+        string $otherSession,
+        ?\Closure $arrange = null,
+    ): void {
+        $store->begin($other, $application, $otherSession);
+
+        $current = $store->currentSession($other, $application);
+        $held    = $store->proofs($other, $application, $otherSession);
+        $refused = self::firstFactor($other, $application, $otherSession);
+
+        self::assertRefused($store, $identity, $application, $session, $refused, $arrange, 'A proof of another identity');
+
+        Assert::assertSame($current, $store->currentSession($other, $application), 'A refused proof must leave the other identity\'s sign-in as it was.');
+        Assert::assertEquals($held, $store->proofs($other, $application, $otherSession), 'A refused proof must not be kept for the identity it names.');
+    }
+
+    /**
+     * A proof bound to another application, where the identity has no sign-in
+     * of that id, is refused by throwing, and changes nothing on the sign-in
+     * begun.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @param  ?\Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void  $arrange
+     * @return void
+     */
+    public static function assertRefusesAProofOfAnotherApplication(
+        ProofStore $store,
+        MultiFactorAuthenticatable $identity,
+        string $application,
+        string $session,
+        ?\Closure $arrange = null,
+    ): void {
+        $refused = self::firstFactor($identity, 'another-' . $application, $session);
+
+        self::assertRefused($store, $identity, $application, $session, $refused, $arrange, 'A proof bound to another application');
+    }
+
+    /**
+     * The proofs read for a sign-in are that sign-in's only: once the sign-in
+     * is replaced, reading it yields none though it held a proof, the sign-in
+     * that replaced it is read on its own, and a session never begun yields
+     * none.
+     *
+     * The proofs are put in by `$arrange`, and the sign-in replaced by
+     * `$replace`, which returns the new sign-in's id: by default the store's
+     * own `record()` and `begin()`, and for a store whose proofs and sign-ins
+     * another layer keeps, that layer's.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @param  ?\Closure(): string  $replace
+     * @param  ?\Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void  $arrange
+     * @return void
+     */
+    public static function assertReadsOnlyTheNamedSignIn(
+        ProofStore $store,
+        MultiFactorAuthenticatable $identity,
+        string $application,
+        string $session,
+        ?\Closure $replace = null,
+        ?\Closure $arrange = null,
+    ): void {
         $arrange ??= static fn (Proof $proof) => $store->record($identity, $proof);
+        $replace ??= static function () use ($store, $identity, $application, $session): string {
+            $store->begin($identity, $application, 'replaced-' . $session);
+
+            return 'replaced-' . $session;
+        };
 
         $store->begin($identity, $application, $session);
 
@@ -147,7 +181,19 @@ final class ProofStoreContract
         $arrange(self::firstFactor($identity, $application, $session));
 
         Assert::assertCount($held + 1, $store->proofs($identity, $application, $session), 'A proof of the current sign-in must be read for it.');
-        Assert::assertSame([], $store->proofs($identity, $application, 'another-' . $session), 'A sign-in that is not the current one must yield no proof.');
+        Assert::assertSame([], $store->proofs($identity, $application, 'another-' . $session), 'A session never begun must yield no proof.');
+
+        $replacement = $replace();
+
+        Assert::assertNotSame($session, $replacement, 'Replacing the sign-in must begin another.');
+        Assert::assertSame($replacement, $store->currentSession($identity, $application), 'The sign-in that replaced it must be the current one.');
+        Assert::assertSame([], $store->proofs($identity, $application, $session), 'A sign-in since replaced must yield no proof, though it held one.');
+
+        $replacing = count($store->proofs($identity, $application, $replacement));
+
+        $arrange(self::firstFactor($identity, $application, $replacement));
+
+        Assert::assertCount($replacing + 1, $store->proofs($identity, $application, $replacement), 'A proof of the sign-in that replaced it must be read for it.');
     }
 
     /**
@@ -291,26 +337,44 @@ final class ProofStoreContract
 
     /**
      * The proof is refused by throwing a `ProofRefusedException`, and the
-     * sign-in begun holds no more than it did.
+     * sign-in begun, holding a proof `$arrange` put in it, stays current and
+     * holds what it did.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $session
-     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+     * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $refused
+     * @param  ?\Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void  $arrange
      * @param  string  $what
      * @return void
      */
-    private static function assertRefused(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session, Proof $proof, string $what): void
-    {
+    private static function assertRefused(
+        ProofStore $store,
+        MultiFactorAuthenticatable $identity,
+        string $application,
+        string $session,
+        Proof $refused,
+        ?\Closure $arrange,
+        string $what,
+    ): void {
+        $arrange ??= static fn (Proof $proof) => $store->record($identity, $proof);
+
         $store->begin($identity, $application, $session);
 
-        $held = $store->proofs($identity, $application, $session);
+        $held = count($store->proofs($identity, $application, $session));
+
+        $arrange(self::firstFactor($identity, $application, $session));
+
+        $kept = $store->proofs($identity, $application, $session);
+
+        Assert::assertCount($held + 1, $kept, 'A proof of the current sign-in must be kept before the refusal.');
 
         try {
-            $store->record($identity, $proof);
+            $store->record($identity, $refused);
         } catch (ProofRefusedException) {
-            Assert::assertEquals($held, $store->proofs($identity, $application, $session), 'A refused proof must change nothing.');
+            Assert::assertSame($session, $store->currentSession($identity, $application), 'A refused proof must leave the sign-in current.');
+            Assert::assertEquals($kept, $store->proofs($identity, $application, $session), 'A refused proof must change nothing.');
 
             return;
         }

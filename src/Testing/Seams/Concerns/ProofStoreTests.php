@@ -17,17 +17,20 @@ use SineMacula\Laravel\Mfa\Testing\Seams\ProofStoreContract;
  * its proofs counting.
  *
  * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `ProofStoreContract`. A store backed by an
- * authentication layer's sessions also overrides `proofStoreSignIn()`, to sign
- * the identity in for real, and `voidProofStoreProofs()`, to void its proofs
- * the way that layer does. A store whose proofs and sign-ins that layer alone
- * writes overrides `arrangeProofStoreProof()`, to record each proof the checks
- * need through the layer, `endProofStoreSignIn()`, to sign the identity out
- * through it, and `proofStoreFactor()`, to name a factor the identity holds.
- * The defaults suit a store that keeps its own sign-ins and proofs and honours
- * the verification generation. The checks arrange a password first factor on
- * top of whatever the sign-in already holds: an adapter that cannot record one
- * makes its override record an equivalent proof, never skip it.
+ * the hooks, among them `otherProofStoreIdentity()`, a second identity whose
+ * proof the identity must not be able to record; each check delegates to
+ * `ProofStoreContract`. A store backed by an authentication layer's sessions
+ * also overrides `proofStoreSignIn()`, to sign the identity in for real,
+ * `replaceProofStoreSignIn()`, to sign it in again, and
+ * `voidProofStoreProofs()`, to void its proofs the way that layer does. A store
+ * whose proofs and sign-ins that layer alone writes overrides
+ * `arrangeProofStoreProof()`, to record each proof the checks need through the
+ * layer, `endProofStoreSignIn()`, to sign the identity out through it, and
+ * `proofStoreFactor()`, to name a factor the identity holds. The defaults suit
+ * a store that keeps its own sign-ins and proofs and honours the verification
+ * generation. The checks arrange a password first factor on top of whatever the
+ * sign-in already holds: an adapter that cannot record one makes its override
+ * record an equivalent proof, never skip it.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -39,43 +42,60 @@ use SineMacula\Laravel\Mfa\Testing\Seams\ProofStoreContract;
 trait ProofStoreTests
 {
     /**
-     * A proof bound to another sign-in is refused, and not kept.
+     * A proof bound to another sign-in is refused, and changes nothing.
      *
      * @return void
      */
     public function testProofStoreRefusesAProofOfAnotherSignIn(): void
     {
-        [$identity, $application] = [$this->proofStoreIdentity(), $this->proofStoreApplication()];
+        [$store, $identity, $application] = [$this->proofStore(), $this->proofStoreIdentity(), $this->proofStoreApplication()];
 
-        ProofStoreContract::assertRefusesAProofOfAnotherSignIn($this->proofStore(), $identity, $application, $this->proofStoreSignIn($identity, $application));
+        $session = $this->proofStoreSignIn($identity, $application);
+
+        ProofStoreContract::assertRefusesAProofOfAnotherSignIn($store, $identity, $application, $session, $this->arrangingProofStoreProofs($store, $identity, $application));
     }
 
     /**
-     * A proof bound to another identity is refused, and not kept.
+     * A proof of another identity's sign-in, recorded for the identity, is
+     * refused, and changes neither identity's sign-in.
      *
      * @return void
      */
     public function testProofStoreRefusesAProofOfAnotherIdentity(): void
     {
-        [$identity, $application] = [$this->proofStoreIdentity(), $this->proofStoreApplication()];
+        [$store, $identity, $other, $application] = [$this->proofStore(), $this->proofStoreIdentity(), $this->otherProofStoreIdentity(), $this->proofStoreApplication()];
 
-        ProofStoreContract::assertRefusesAProofOfAnotherIdentity($this->proofStore(), $identity, $application, $this->proofStoreSignIn($identity, $application));
+        $otherSession = $this->proofStoreSignIn($other, $application);
+        $session      = $this->proofStoreSignIn($identity, $application);
+
+        ProofStoreContract::assertRefusesAProofOfAnotherIdentity(
+            $store,
+            $identity,
+            $other,
+            $application,
+            $session,
+            $otherSession,
+            $this->arrangingProofStoreProofs($store, $identity, $application),
+        );
     }
 
     /**
-     * A proof bound to another application is refused, and not kept.
+     * A proof bound to another application is refused, and changes nothing.
      *
      * @return void
      */
     public function testProofStoreRefusesAProofOfAnotherApplication(): void
     {
-        [$identity, $application] = [$this->proofStoreIdentity(), $this->proofStoreApplication()];
+        [$store, $identity, $application] = [$this->proofStore(), $this->proofStoreIdentity(), $this->proofStoreApplication()];
 
-        ProofStoreContract::assertRefusesAProofOfAnotherApplication($this->proofStore(), $identity, $application, $this->proofStoreSignIn($identity, $application));
+        $session = $this->proofStoreSignIn($identity, $application);
+
+        ProofStoreContract::assertRefusesAProofOfAnotherApplication($store, $identity, $application, $session, $this->arrangingProofStoreProofs($store, $identity, $application));
     }
 
     /**
-     * The proofs read for a sign-in are the current sign-in's only.
+     * The proofs read for a sign-in are that sign-in's only, before and after
+     * it is replaced.
      *
      * @return void
      */
@@ -90,7 +110,8 @@ trait ProofStoreTests
             $identity,
             $application,
             $session,
-            fn (Proof $proof) => $this->arrangeProofStoreProof($store, $identity, $application, $session, $proof),
+            fn (): string => $this->replaceProofStoreSignIn($store, $identity, $application, $session),
+            $this->arrangingProofStoreProofs($store, $identity, $application),
         );
     }
 
@@ -224,6 +245,25 @@ trait ProofStoreTests
     }
 
     /**
+     * Replace the identity's sign-in on the application with a new one, as
+     * signing in again does, and return the new sign-in's id: by default, by
+     * beginning one through the store. A store whose sign-ins another layer
+     * begins signs the identity in again through that layer.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @return string
+     */
+    protected function replaceProofStoreSignIn(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session): string
+    {
+        $store->begin($identity, $application, 'replaced-' . $session);
+
+        return 'replaced-' . $session;
+    }
+
+    /**
      * The factor the further proof names, asked once for the factor check: by
      * default `ProofStoreContract::FACTOR`. A store that counts a proof only
      * while the identity holds its factor enrols one here and returns its id.
@@ -251,9 +291,31 @@ trait ProofStoreTests
     abstract protected function proofStoreIdentity(): MultiFactorAuthenticatable;
 
     /**
+     * Another identity the store keeps proofs for, of the same kind, with no
+     * sign-in of its own until a check begins one.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     */
+    abstract protected function otherProofStoreIdentity(): MultiFactorAuthenticatable;
+
+    /**
      * The application its sign-ins are on.
      *
      * @return string
      */
     abstract protected function proofStoreApplication(): string;
+
+    /**
+     * Put each proof a check needs in the sign-in it is bound to, through
+     * `arrangeProofStoreProof()`.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @return \Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void
+     */
+    private function arrangingProofStoreProofs(ProofStore $store, MultiFactorAuthenticatable $identity, string $application): \Closure
+    {
+        return fn (Proof $proof) => $this->arrangeProofStoreProof($store, $identity, $application, $proof->binding->sessionId, $proof);
+    }
 }
