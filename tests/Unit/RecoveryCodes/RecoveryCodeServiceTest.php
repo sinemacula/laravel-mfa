@@ -13,6 +13,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
+use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesLow;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
@@ -447,6 +448,27 @@ final class RecoveryCodeServiceTest extends TestCase
 
         self::assertNotSame($previous, $current);
         self::assertSame(count($current), RecoveryCode::query()->whereNull('replaced_at')->count());
+    }
+
+    /**
+     * Replacing the set stores the next generation and returns its codes with
+     * it, and reports nothing, which is left to the caller.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testReplacingTheSetReturnsItsGenerationAndReportsNothing(): void
+    {
+        Event::fake([RecoveryCodesGenerated::class]);
+
+        $holder = $this->signInHolder();
+        $set    = $this->recoveryCodes()->replaceSet($holder, 'web');
+
+        self::assertSame(1, $set['generation']);
+        self::assertCount(10, $set['codes']);
+        self::assertSame(10, $this->recoveryCodes()->status($holder)->remaining);
+        Event::assertNotDispatched(RecoveryCodesGenerated::class);
     }
 
     /**
