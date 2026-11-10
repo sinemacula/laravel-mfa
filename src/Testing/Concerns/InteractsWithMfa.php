@@ -28,8 +28,9 @@ trait InteractsWithMfa
      *
      * This is a fixture for gating routes, not a statement that the
      * application's sign-in can reach the level. It dispatches no `Login` and
-     * no MFA event, enrols no factor, and bypasses no inactivity check,
-     * re-enrolment obligation or stricter requirement, and it needs the
+     * no MFA event, enrols no factor through the default recorder (see
+     * `Testing\Contracts\VerifiedSignInRecorder`), and bypasses no inactivity
+     * check, re-enrolment obligation or stricter requirement, and it needs the
      * package's migrations for the identity's verification generation.
      *
      * The application chooses where the proofs go, not what the next request
