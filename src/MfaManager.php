@@ -508,6 +508,29 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
+     * Enable the factor the failure ceiling disabled, for the actor: whether a
+     * disabled factor was enabled. Only the disabling goes: its failures in a
+     * row and any lockout stay, so its next failure disables it again, and
+     * nothing is proved or renewed. Who may enable whose factor, and whether a
+     * rebind is owed first, is the application's to decide.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  mixed  $factorId
+     * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
+     * @return bool
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Throwable
+     *
+     * @imperative
+     */
+    public function enableFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor, ?ClientContext $client = null): bool
+    {
+        return $this->service(LifecycleService::class)->enableFactor($identity, $factorId, $actor, $client);
+    }
+
+    /**
      * Lift the identity's temporary lockout, for the actor: whether a live one
      * was lifted. Failures in a row stay.
      *

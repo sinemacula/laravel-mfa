@@ -35,11 +35,16 @@ is built the way it is, and which test helpers deliberately stay private to the 
 3. The application is the argument, else `Proofs\SignInApplication::of($container, $guardName)`: the bound
    `ApplicationResolver`'s answer for the container's request, through the guard when it is a
    `GuardApplicationResolver`, else the guard's name.
-4. `ProofStore::begin()` with a lower-case ULID, then `currentSession()`.
-5. A password first factor is recorded at `$at`, unless the store already holds one, which is kept.
-6. The further proof is recorded at `$at`, an additional factor for sign-in, under the identity's current verification
-   generation, with synthetic references: nothing judges a reference against factor rows at read time.
-7. The proofs are read back and evaluated. Any shortfall or excess is a `LogicException` in one format, naming what was
+4. The bound `Testing\Contracts\VerifiedSignInRecorder` begins the sign-in at `$at`, by default `ProofStore::begin()`
+   with a lower-case ULID then `currentSession()`. A recorder over a layer that holds a sign-in pending may leave it
+   pending until the further proof completes it.
+5. A password first factor is recorded at `$at` through the recorder, unless the store already holds one, which is
+   kept.
+6. The further proof is recorded at `$at` through the recorder, an additional factor for sign-in, under the identity's
+   current verification generation, with synthetic references: nothing judges a reference against factor rows at read
+   time.
+7. The store must name the sign-in begun as current, or a `LogicException` says so.
+8. The proofs are read back and evaluated. Any shortfall or excess is a `LogicException` in one format, naming what was
    requested, what was reached and what is unmet.
 
 ## Failure / Edge Cases
@@ -53,8 +58,11 @@ is built the way it is, and which test helpers deliberately stay private to the 
   holds none, so two first factors cannot arise, and preserving it would make recipes fail on a declared `email` or
   `sms` first factor.
 - The route's whole requirement is not checked, since an application may ask more than the fixture arranges.
-- It dispatches no `Login` and no MFA event; `Authenticated` still fires from `setUser()`. It enrols no factor, and
-  bypasses no inactivity check, re-enrolment obligation or stricter requirement.
+- A recorder whose `begin()` names a sign-in the store does not hold as current once the proofs are recorded is a
+  `LogicException` before they are evaluated. A recorder that keeps nothing fails the read-back: the helper never takes
+  the recorder's word.
+- It dispatches no `Login` and no MFA event; `Authenticated` still fires from `setUser()`. Through the default recorder
+  it enrols no factor, and it bypasses no inactivity check, re-enrolment obligation or stricter requirement.
 - It needs the package's migrations, for the generation. Advancing the generation afterwards stops the proofs counting,
   as it should.
 - `Store::start()` is `array_replace($attributes, $handlerData)`, so stored values win when a test carries a session
@@ -78,7 +86,7 @@ to the package's own test identities and settings, so both stay fixtures.
 
 - `tests/Unit/Testing/AuthenticatorAppTest.php`: the published vectors, written out independently of the code; the real
   driver accepting a code once; each refusal, none showing the secret.
-- `tests/Feature/Testing/ActingAsVerifiedTest.php`: through the real `web` group and `mfa:` routes: each level, the
+- `tests/Feature/Testing/VerifiedSignInTest.php`: through the real `web` group and `mfa:` routes: each level, the
   time, each refusal leaving nothing changed, AAL3 under the default and a custom policy, a second request, guards and
   applications kept apart, a store with a no-op `begin()`, recording guards, the generation, the events.
 - `tests/Unit/Testing/FakeSmsSenderTest.php`, `tests/Unit/Testing/FakeEmailSenderTest.php`.

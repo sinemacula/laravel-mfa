@@ -27,13 +27,18 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Testing\Concerns\InteractsWithMfa;
+use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
+use SineMacula\Laravel\Mfa\Testing\ProofStoreRecorder;
 use SineMacula\Laravel\Mfa\Testing\VerifiedSignIn;
 use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Identities\SecondaryUser;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Requirements\UnacceptingCombinationPolicy;
+use Tests\Fixtures\Seams\LayerWrittenProofStore;
+use Tests\Fixtures\Testing\LayerRecorder;
 use Tests\Fixtures\Testing\LeveledCombinationPolicy;
+use Tests\Fixtures\Testing\PendingLayerRecorder;
 use Tests\Fixtures\Testing\RecordingGuard;
 use Tests\Fixtures\Testing\RetainingProofStore;
 use Tests\TestCase;
@@ -49,8 +54,9 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(VerifiedSignIn::class)]
+#[CoversClass(ProofStoreRecorder::class)]
 #[CoversTrait(InteractsWithMfa::class)]
-final class ActingAsVerifiedTest extends TestCase
+final class VerifiedSignInTest extends TestCase
 {
     use InteractsWithMfa;
 
@@ -522,6 +528,198 @@ final class ActingAsVerifiedTest extends TestCase
     }
 
     /**
+     * A bound recorder begins the sign-in and records its proofs, through a
+     * layer the store itself refuses proofs from, and the gate reads them back
+     * at the time given.
+     *
+     * @return void
+     */
+    public function testABoundRecorderBeginsAndRecordsTheSignIn(): void
+    {
+        $layer = new LayerWrittenProofStore;
+        $user  = $this->person();
+        $at    = CarbonImmutable::now()->subMinutes(10);
+
+        $this->container()->instance(ProofStore::class, $layer);
+        $this->container()->instance(VerifiedSignInRecorder::class, new LayerRecorder($layer));
+
+        $this->actingAsVerified($user, at: $at);
+
+        $this->getJson('verified/aal2')->assertOk();
+
+        $session = $layer->currentSession($user, 'web');
+
+        self::assertNotNull($session);
+
+        $proofs = $layer->proofs($user, 'web', $session);
+
+        self::assertSame([ProofKind::FIRST_FACTOR, ProofKind::ADDITIONAL_FACTOR], array_map(static fn (Proof $proof): ProofKind => $proof->kind, $proofs));
+
+        foreach ($proofs as $proof) {
+            self::assertSame($at->getTimestamp(), $proof->provedAt->getTimestamp());
+        }
+    }
+
+    /**
+     * A recorder may hold the sign-in pending until the further proof completes
+     * it, and is handed the time the proofs are made at.
+     *
+     * @return void
+     */
+    public function testARecorderMayCompleteAPendingSignInWithTheFurtherProof(): void
+    {
+        $layer    = new LayerWrittenProofStore;
+        $recorder = new PendingLayerRecorder($layer);
+        $user     = $this->person();
+        $at       = CarbonImmutable::now()->subMinutes(10);
+
+        $this->container()->instance(ProofStore::class, $layer);
+        $this->container()->instance(VerifiedSignInRecorder::class, $recorder);
+
+        $this->actingAsVerified($user, at: $at);
+
+        $this->getJson('verified/aal2')->assertOk();
+
+        self::assertNotNull($recorder->startedAt);
+        self::assertSame($at->getTimestamp(), $recorder->startedAt->getTimestamp());
+    }
+
+    /**
+     * Without a recorder, a store whose sign-ins another layer writes cannot be
+     * arranged: it begins no sign-in of its own.
+     *
+     * @return void
+     */
+    public function testALayerWrittenStoreNeedsARecorder(): void
+    {
+        $this->container()->instance(ProofStore::class, new LayerWrittenProofStore);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->actingAsVerified($this->person());
+    }
+
+    /**
+     * A recorder naming a sign-in the store does not hold as current once its
+     * proofs are recorded is refused, before the proofs are evaluated.
+     *
+     * @return void
+     */
+    public function testARecorderNamingASignInThatIsNotCurrentIsRefused(): void
+    {
+        $layer = new LayerWrittenProofStore;
+
+        $this->container()->instance(ProofStore::class, $layer);
+        $this->container()->instance(VerifiedSignInRecorder::class, new class ($layer) implements VerifiedSignInRecorder {
+            /**
+             * Constructor.
+             *
+             * @param  \Tests\Fixtures\Seams\LayerWrittenProofStore  $layer
+             */
+            public function __construct(
+
+                /** The store whose layer is signed in through. */
+                private readonly LayerWrittenProofStore $layer,
+            ) {}
+
+            /**
+             * Sign in through the layer, but name another sign-in.
+             *
+             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+             * @param  string  $application
+             * @param  \Carbon\CarbonImmutable  $at
+             * @return string
+             */
+            #[\Override]
+            public function begin(MultiFactorAuthenticatable $identity, string $application, CarbonImmutable $at): string
+            {
+                $this->layer->begin($identity, $application, $this->layer->signIn());
+
+                return 'elsewhere';
+            }
+
+            /**
+             * Record the proof through the layer.
+             *
+             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+             * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+             * @return void
+             */
+            #[\Override]
+            public function record(MultiFactorAuthenticatable $identity, Proof $proof): void
+            {
+                $this->layer->write($proof);
+            }
+        });
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('is not the proof store\'s current one');
+
+        $this->actingAsVerified($this->person());
+    }
+
+    /**
+     * A recorder that keeps nothing fails the read-back, naming what was
+     * reached: the helper never trusts the recorder's word.
+     *
+     * @return void
+     */
+    public function testARecorderThatKeepsNothingFails(): void
+    {
+        $layer = new LayerWrittenProofStore;
+
+        $this->container()->instance(ProofStore::class, $layer);
+        $this->container()->instance(VerifiedSignInRecorder::class, new class ($layer) implements VerifiedSignInRecorder {
+            /**
+             * Constructor.
+             *
+             * @param  \Tests\Fixtures\Seams\LayerWrittenProofStore  $layer
+             */
+            public function __construct(
+
+                /** The store whose layer is signed in through. */
+                private readonly LayerWrittenProofStore $layer,
+            ) {}
+
+            /**
+             * Sign in through the layer and make it current.
+             *
+             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+             * @param  string  $application
+             * @param  \Carbon\CarbonImmutable  $at
+             * @return string
+             */
+            #[\Override]
+            public function begin(MultiFactorAuthenticatable $identity, string $application, CarbonImmutable $at): string
+            {
+                $session = $this->layer->signIn();
+
+                $this->layer->begin($identity, $application, $session);
+
+                return $session;
+            }
+
+            /**
+             * Keep nothing.
+             *
+             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+             * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+             * @return void
+             */
+            #[\Override]
+            public function record(MultiFactorAuthenticatable $identity, Proof $proof): void
+            {
+                // Nothing is kept.
+            }
+        });
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('reached unclassified');
+
+        $this->actingAsVerified($this->person());
+    }
+
+    /**
      * A first factor a store retains across `begin()` is kept, and the further
      * proof follows it.
      *
@@ -620,7 +818,7 @@ final class ActingAsVerifiedTest extends TestCase
         $user  = $this->person();
         $guard = $this->recordingGuard();
 
-        $guard->arrange(TestUser::query()->findOrFail($user->getKey()));
+        $guard->arrange(TestUser::query()->whereKey($user->getKey())->firstOrFail());
 
         $this->actingAsVerified($user, guard: 'recording');
 

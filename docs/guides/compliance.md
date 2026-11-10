@@ -165,6 +165,9 @@ To claim a level, your application takes this on:
   [Recovery codes](#recovery-codes)), not another binding.
 - **Hold resets to the session's level.** `Attempts\AttemptService::enableFactor()` clears a factor's count, so call it
   only from a session whose level reaches the factor's, and only with the record cleared.
+- **Enabling is not rebinding.** `Mfa::enableFactor()` keeps the factor's count, so it grants no fresh run of guesses,
+  but it does not stand for the binding these sections ask for: keep your record of the owed rebinding authoritative,
+  and enable a factor only once it is cleared.
 
 Do not delete the factor from the listener. `Mfa::removeFactor()` serves only an active session fresh enough for it,
 which a failing sign-in is not. Deleting the row yourself skips the last factor policy, and under `requirement =>

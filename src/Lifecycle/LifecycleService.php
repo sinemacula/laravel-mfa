@@ -19,8 +19,11 @@ use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
+use SineMacula\Laravel\Mfa\Events\EventDispatcher;
+use SineMacula\Laravel\Mfa\Events\FactorEnabled;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
@@ -58,6 +61,7 @@ final readonly class LifecycleService
      * @param  \SineMacula\Laravel\Mfa\Lifecycle\RemovalGuard  $guard
      * @param  \SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval  $removal
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptService  $attempts
+     * @param  \SineMacula\Laravel\Mfa\Events\EventDispatcher  $events
      */
     public function __construct(
 
@@ -75,6 +79,9 @@ final readonly class LifecycleService
 
         /** The lockouts. */
         private AttemptService $attempts,
+
+        /** The dispatcher of the enabling event. */
+        private EventDispatcher $events,
     ) {}
 
     /**
@@ -116,6 +123,42 @@ final readonly class LifecycleService
             $factor = LockedFactors::withId($factorId, $factors);
 
             return $factor !== null && $this->attempts->liftLockout($identity, $factor, $actor, null, $client);
+        });
+    }
+
+    /**
+     * Enable the identity's factor the failure ceiling disabled, as an action
+     * the actor took: `true` when a disabled factor was enabled, `false` for an
+     * id that finds none of the identity's factors, or one not disabled,
+     * reporting nothing. Only `disabled_at` is cleared: the factor's failures
+     * in a row and any lockout stay, so its next failure disables it again.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  mixed  $factorId
+     * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
+     * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
+     * @return bool
+     *
+     * @throws \Throwable
+     *
+     * @imperative
+     */
+    public function enableFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor, ?ClientContext $client = null): bool
+    {
+        return FactorStateTransaction::forIdentity($identity, $this->factorModel(), function (Collection $factors) use ($identity, $factorId, $actor, $client): bool {
+
+            $factor = LockedFactors::withId($factorId, $factors);
+
+            if ($factor === null || $factor->getDisabledAt() === null) {
+                return false;
+            }
+
+            $factor->setAttribute($factor->getDisabledAtName(), null);
+            $factor->persist();
+
+            $this->events->dispatch(new FactorEnabled($this->events->context($identity, null, $client), FactorSummary::fromFactor($factor), $actor));
+
+            return true;
         });
     }
 

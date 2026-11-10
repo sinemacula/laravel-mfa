@@ -105,12 +105,13 @@ rule: there is no separate helper to redeem one.
 | `removeFactor($caller, $factorId)`                                | `FactorRemovalResult` | The signed-in person |
 | `resetIdentity($identity, $actor, $reason, $requireReenrollment)` | `void`                | The identity given   |
 | `unlockFactor($identity, $factorId, $actor)`                      | `bool`                | The identity given   |
+| `enableFactor($identity, $factorId, $actor)`                      | `bool`                | The identity given   |
 | `unlockIdentity($identity, $actor)`                               | `bool`                | The identity given   |
 | `forgetIdentity($identity)`                                       | `void`                | The identity given   |
 | `prune()`                                                         | `PruneResult`         | No identity          |
 
 `removeFactor()` serves active sessions only. The others are told the identity by their caller, so who may call them is
-your authorisation. `resetIdentity()`, `unlockFactor()` and `unlockIdentity()` also take an optional
+your authorisation. `resetIdentity()`, `unlockFactor()`, `enableFactor()` and `unlockIdentity()` also take an optional
 `Context\ClientContext` last, the operator's own client, which their events carry.
 
 ### Registry
@@ -148,9 +149,9 @@ if (! $assertion->hasStarted()) {
 return response()->json($assertion->options);
 ```
 
-Nobody served is `not_found`, as on `sendCode()` and `removeFactor()`. `cancelEnrollment()`, `unlockFactor()` and
-`unlockIdentity()` answer a `bool`, having no reason worth telling. `resetIdentity()` and `forgetIdentity()` are
-operator calls, and answer nothing.
+Nobody served is `not_found`, as on `sendCode()` and `removeFactor()`. `cancelEnrollment()`, `unlockFactor()`,
+`enableFactor()` and `unlockIdentity()` answer a `bool`, having no reason worth telling. `resetIdentity()` and
+`forgetIdentity()` are operator calls, and answer nothing.
 
 On `generateRecoveryCodes()` and `requestAssertion()`, an `Exceptions\OperationRefusedException` a seam of your own
 throws is not turned into a value: it is yours, and it propagates, with what the call did rolled back. The other helpers
@@ -211,5 +212,5 @@ The limits:
 - A scoped child binding through a parent model (`/users/{user}/factors/{factor}`) is the parent's own lookup, and never
   reaches the trait, so such a route must scope its parent to the caller itself.
 - A route that must bind other people's factors uses `Route::bind()`. An administrator does not need one:
-  `Mfa::unlockFactor()` and `Mfa::resetIdentity()` take the identity and a raw id.
+  `Mfa::unlockFactor()`, `Mfa::enableFactor()` and `Mfa::resetIdentity()` take the identity and a raw id.
 - A relation eager loaded on another connection is not read from its writer.

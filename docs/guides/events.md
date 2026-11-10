@@ -16,6 +16,7 @@ Every event the package dispatches is a class in `SineMacula\Laravel\Mfa\Events`
 | `PreferredFactorChanged`       | The identity chooses another preferred factor                               | `factor`, `previous`                                           |
 | `FactorRemoved`                | A factor is removed, by the identity or by someone else                     | `factor`, `actor`                                              |
 | `FactorDisabled`               | A factor, or the identity's run, reaches the failure ceiling                | `factor`, `purpose`                                            |
+| `FactorEnabled`                | An actor enables a factor the failure ceiling disabled                      | `factor`, `actor`                                              |
 | `FactorsReset`                 | Someone resets the identity's factors                                       | `actor`, `reason`, `reenrollmentRequired`, `unreadableFactors` |
 | `LockoutApplied`               | Failed attempts lock a factor, or the identity across its factors           | `factor` (null for the identity), `lockedUntil`, `purpose`     |
 | `LockoutLifted`                | A lockout is lifted before it ends                                          | `factor` (null for the identity), `actor`                      |
@@ -30,8 +31,9 @@ Every event the package dispatches is a class in `SineMacula\Laravel\Mfa\Events`
 Verification dispatches `CodeSent`, once for every code sent, resends included and whichever gateway sent it, and
 `VerificationPassed` and `VerificationFailed`, once per attempt: a check against the whole recovery code set is one
 attempt (see [Verification](verification.md)). `LockoutApplied`, `LockoutLifted` and `FactorDisabled` are dispatched by
-the attempt caps (see [Attempts and lockouts](attempts.md)), and the recovery code events by the set's own flows (see
-[Recovery codes](recovery-codes.md)).
+the attempt caps (see [Attempts and lockouts](attempts.md)), `FactorEnabled` by `Mfa::enableFactor()` alone (see [Factor
+lifecycle](lifecycle.md#unlocking)), and the recovery code events by the set's own flows (see [Recovery
+codes](recovery-codes.md)).
 
 The enrolment flow dispatches its events in the order [Enrolment](enrollment.md#events) sets out, and the lifecycle flow
 in the order [Factor lifecycle](lifecycle.md#events) sets out.

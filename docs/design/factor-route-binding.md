@@ -56,8 +56,8 @@ credential the route uses, through the model's own lookup. It also records what 
   the binding misses, failing closed. A lookup within one identity goes through `Mfa::factors()`.
 - A scoped child binding through a parent model (`/users/{user}/factors/{factor}`) is the parent's own lookup and never
   reaches the trait, so such a route must scope its parent to the caller itself. `Route::bind()` is the application's
-  own, and is the way to bind other people's factors; `unlockFactor()` and `resetIdentity()` take the identity and a raw
-  id, so an administrator needs no bound model.
+  own, and is the way to bind other people's factors; `unlockFactor()`, `enableFactor()` and `resetIdentity()` take the
+  identity and a raw id, so an administrator needs no bound model.
 - An eager load on another connection is not pinned to its writer, and is not a security input.
 - A model passed to a helper finds nothing, since a helper looks up an id: `Mfa::removeFactor($caller, $factor)` answers
   `not_found`.

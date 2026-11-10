@@ -65,13 +65,13 @@ from the person.
 Put these routes in Laravel's `web` middleware group, or otherwise under its CSRF protection, whenever they are
 authenticated by a cookie (the session guard, or Sanctum's stateful requests):
 
-| The route calls                                                                                       | Because                                                         |
-|-------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|
-| `startEnrollment()`, `confirmEnrollment()`, `resendEnrollmentCode()`, `cancelEnrollment()`            | A forged request could bind a factor, or send or discard a code |
-| `renameFactor()`, `setPreferredFactor()`, `removeFactor()`                                            | It could change or take away a person's factors                 |
-| `generateRecoveryCodes()`                                                                             | It could replace a person's recovery codes                      |
-| `resetIdentity()`, `unlockFactor()`, `unlockIdentity()`, `forgetIdentity()`, where a route calls them | It could act with an administrator's cookies                    |
-| `verify()`, `sendCode()`, `requestAssertion()`                                                        | It could spend attempts, redeem a code or send a person codes   |
+| The route calls                                                                                                         | Because                                                         |
+|-------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|
+| `startEnrollment()`, `confirmEnrollment()`, `resendEnrollmentCode()`, `cancelEnrollment()`                              | A forged request could bind a factor, or send or discard a code |
+| `renameFactor()`, `setPreferredFactor()`, `removeFactor()`                                                              | It could change or take away a person's factors                 |
+| `generateRecoveryCodes()`                                                                                               | It could replace a person's recovery codes                      |
+| `resetIdentity()`, `unlockFactor()`, `enableFactor()`, `unlockIdentity()`, `forgetIdentity()`, where a route calls them | It could act with an administrator's cookies                    |
+| `verify()`, `sendCode()`, `requestAssertion()`                                                                          | It could spend attempts, redeem a code or send a person codes   |
 
 `mfa.exempt` exempts a route from the gate and from nothing else: never add these routes to the CSRF exceptions because
 they are exempt. A step-up does not stand in for the check either, as a forged request made within a fresh session
