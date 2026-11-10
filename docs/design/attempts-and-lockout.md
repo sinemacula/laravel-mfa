@@ -85,6 +85,9 @@ separate operations, and all are described here.
   model event that cancels the save throws, so the lockout stays and is not reported.
 - `enableFactor($factor)` clears `disabled_at` and the factor's failures in a row under the lock, and leaves any lockout
   to end on its own. It reports nothing: rebinding and resetting, which call it, report themselves.
+- `Mfa::enableFactor($identity, $factorId, $actor)` is the administrative enable: it clears `disabled_at` alone, so the
+  factor's failures in a row stay at or past the ceiling and its next failure disables it again, and it reports
+  `FactorEnabled` with the actor (see [Factor Lifecycle](factor-lifecycle.md)).
 - `resetIdentityFailures($identity)` clears the identity's run under the lock, and nothing else.
 - `lockout()`, `liftLockout()`, `enableFactor()` and `resetIdentityFailures()` are the public operations; `throttled()`
   and `attempt()` are internal to the verification paths.

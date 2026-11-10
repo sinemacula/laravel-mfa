@@ -22,6 +22,7 @@ use SineMacula\Laravel\Mfa\Events\EnrollmentStarted;
 use SineMacula\Laravel\Mfa\Events\EventContext;
 use SineMacula\Laravel\Mfa\Events\FactorConfirmed;
 use SineMacula\Laravel\Mfa\Events\FactorDisabled;
+use SineMacula\Laravel\Mfa\Events\FactorEnabled;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
 use SineMacula\Laravel\Mfa\Events\FactorRenamed;
 use SineMacula\Laravel\Mfa\Events\FactorsReset;
@@ -64,6 +65,7 @@ use Tests\TestCase;
 #[CoversClass(PreferredFactorChanged::class)]
 #[CoversClass(FactorRemoved::class)]
 #[CoversClass(FactorDisabled::class)]
+#[CoversClass(FactorEnabled::class)]
 #[CoversClass(FactorsReset::class)]
 #[CoversClass(LockoutApplied::class)]
 #[CoversClass(LockoutLifted::class)]
@@ -130,6 +132,7 @@ final class EventCatalogTest extends TestCase
             static fn (FactorSummary $factor): MfaEvent => new LockoutApplied($context, $factor, CarbonImmutable::now()->addMinutes(15), Purpose::STEP_UP),
             Purpose::STEP_UP,
         ];
+        yield 'FactorEnabled' => [static fn (FactorSummary $factor): MfaEvent => new FactorEnabled($context, $factor, $actor), null];
         yield 'LockoutLifted' => [static fn (FactorSummary $factor): MfaEvent => new LockoutLifted($context, $factor, $actor), null];
         yield 'CodeSent' => [static fn (FactorSummary $factor): MfaEvent => new CodeSent($context, $factor, Purpose::SIGN_IN, 'challenge-1'), Purpose::SIGN_IN];
         yield 'VerificationPassed' => [

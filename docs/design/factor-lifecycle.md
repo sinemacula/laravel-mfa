@@ -70,6 +70,12 @@ in [Factor lifecycle](../guides/lifecycle.md).
   `SessionReevaluation`: every session is revoked.
 - A failure ceiling's `disabled_at` and failures in a row survive unlocking. Only temporary lockouts lift, and a
   factor's is `locked_until` on its row, so a removal takes it along.
+- `Mfa::enableFactor()` finds the factor by its id under the identity's factor state lock, as unlocking does, and clears
+  its `disabled_at` alone, dispatching `FactorEnabled` with the actor once that commits. Its failures in a row, any
+  lockout and the identity's run stay, so it grants another chance to prove the factor, not a fresh guessing budget;
+  `AttemptService::enableFactor()`, the step a rebind or a reset takes, clears the count as well. The event context
+  names no application, as unlocking's does. Enabling proves nothing: no proof, generation, freshness or session
+  judgement changes.
 - Saves of the identity's state that a model event cancels throw (`WriteCanceledException`), so a reset cannot commit
   with its lockout or failures intact, and an unlock cannot report a lockout lifted that stays in force.
 - `ActiveTenantResolver` is authoritative: it is what requirements are composed with, read from validated session

@@ -186,8 +186,19 @@ An id that is not one of the identity's factors answers `false`, reporting nothi
 not mean nothing changed: the identity's count within the current window is cleared even with no lockout live.
 
 Only temporary lockouts lift. Failures in a row are kept, since only a success resets them, so the next failure locks
-again, and a factor disabled at the failure ceiling stays disabled until another factor is proved, it is rebound, or the
-identity is reset. The lower-level helpers are in [Attempts and lockouts](attempts.md).
+again, and a factor disabled at the failure ceiling stays disabled until another factor is proved, it is rebound, the
+identity is reset, or it is enabled for an actor:
+
+```php
+Mfa::enableFactor($user, $factorId, Actor::of($agent));
+```
+
+It answers whether a disabled factor was enabled, and reports `FactorEnabled`, naming the actor, when one was. An id
+that is not one of the identity's factors, or a factor that is not disabled, answers `false`, reporting nothing. Only
+the disabling goes: the factor's failures in a row and any lockout stay, so its next failure disables it again, and the
+identity's own run at the ceiling is left as it is. Nothing is proved or renewed, and no session is judged again. Who
+may enable whose factor, and whether the person must bind it again first, is your authorisation (see
+[Compliance](compliance.md)). The lower-level helpers are in [Attempts and lockouts](attempts.md).
 
 ## Pruning
 

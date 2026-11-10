@@ -46,6 +46,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static \SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult removeFactor(\SineMacula\Laravel\Mfa\Context\CallerContext $caller, mixed $factorId)
  * @method static void resetIdentity(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable $identity, \SineMacula\Laravel\Mfa\Events\Actor $actor, string $reason, bool $requireReenrollment = true, ?\SineMacula\Laravel\Mfa\Context\ClientContext $client = null)
  * @method static bool unlockFactor(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable $identity, mixed $factorId, \SineMacula\Laravel\Mfa\Events\Actor $actor, ?\SineMacula\Laravel\Mfa\Context\ClientContext $client = null)
+ * @method static bool enableFactor(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable $identity, mixed $factorId, \SineMacula\Laravel\Mfa\Events\Actor $actor, ?\SineMacula\Laravel\Mfa\Context\ClientContext $client = null)
  * @method static bool unlockIdentity(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable $identity, \SineMacula\Laravel\Mfa\Events\Actor $actor, ?\SineMacula\Laravel\Mfa\Context\ClientContext $client = null)
  * @method static void forgetIdentity(\Illuminate\Contracts\Auth\Authenticatable $identity)
  * @method static \SineMacula\Laravel\Mfa\Lifecycle\PruneResult prune()
