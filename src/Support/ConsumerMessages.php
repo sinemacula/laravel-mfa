@@ -123,7 +123,7 @@ final class ConsumerMessages
 
         $english = (new MessageSelector)->choose(self::english($key), $minutes, 'en');
 
-        return str_replace(self::MINUTES_PLACEHOLDER, (string) $minutes, $english);
+        return is_string($english) ? str_replace(self::MINUTES_PLACEHOLDER, (string) $minutes, $english) : self::english($key);
     }
 
     /**

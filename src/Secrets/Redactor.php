@@ -296,6 +296,8 @@ final class Redactor
      *
      * @param  mixed  $value
      * @return bool
+     *
+     * @phpstan-assert-if-true (\JsonSerializable&\Throwable)|(\JsonSerializable&\UnitEnum) $value
      */
     private static function givesItsOwnForm(mixed $value): bool
     {

@@ -95,7 +95,7 @@ final readonly class TotpParameters
      * output, which RFC 6238 recommends for the key and is never under 160
      * bits.
      *
-     * @return int
+     * @return 20|32|64
      */
     public function secretLength(): int
     {

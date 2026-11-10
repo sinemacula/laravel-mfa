@@ -17,6 +17,7 @@ use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Drivers\Enums\NumberedDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 
@@ -129,6 +130,22 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
         $this->expectExceptionMessage('Driver [recovery_code] not supported.');
 
         $this->manager()->driver('recovery_code');
+    }
+
+    /**
+     * An integer-backed enum names no driver, so asking for one by it should
+     * fail before any driver is looked up.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAnIntegerBackedEnumNamesNoDriver(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('A driver is named by a string, or by a pure or string-backed enum.');
+
+        $this->manager()->driver(NumberedDriver::FIRST);
     }
 
     /**
