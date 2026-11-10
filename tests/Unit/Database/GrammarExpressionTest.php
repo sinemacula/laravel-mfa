@@ -30,9 +30,9 @@ final class GrammarExpressionTest extends TestCase
     public function testTheValueIsWrittenWithTheGrammarGiven(): void
     {
         $grammar    = DB::connection()->getQueryGrammar();
-        $expression = new GrammarExpression(static fn (Grammar $given): string => $given->wrap('codes.id') . ' = ' . $given->quoteString("o'clock"));
+        $expression = new GrammarExpression(static fn (Grammar $given): string => $given->wrap('codes.id') . ' = ' . $given->quoteString('o\'clock'));
 
-        self::assertSame($grammar->wrap('codes.id') . ' = ' . $grammar->quoteString("o'clock"), $expression->getValue($grammar));
+        self::assertSame($grammar->wrap('codes.id') . ' = ' . $grammar->quoteString('o\'clock'), $expression->getValue($grammar));
     }
 
     /**
