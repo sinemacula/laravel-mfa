@@ -21,7 +21,7 @@ use Illuminate\Database\Grammar;
 final readonly class GrammarExpression implements Expression
 {
     /**
-     * Create a new grammar expression.
+     * Constructor.
      *
      * @param  \Closure(\Illuminate\Database\Grammar): string  $write
      */
