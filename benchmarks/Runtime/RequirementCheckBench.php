@@ -16,6 +16,7 @@ use PhpBench\Attributes\Iterations;
 use PhpBench\Attributes\ParamProviders;
 use PhpBench\Attributes\Revs;
 use SineMacula\Laravel\Mfa\Assurance\DefaultCombinationPolicy;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet;
@@ -126,7 +127,7 @@ final class RequirementCheckBench
 
         $user   = BenchApplication::signedInPerson($app, 'gated@example.test', '198.51.100.3', 'bench-gate');
         $factor = BenchApplication::totpFactor($user);
-        $result = $app->make('mfa')->verify(Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+        $result = $app->make('mfa')->verify(CallerContext::fromRequest($app->make(Request::class), null, $app), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
 
         BenchOutcome::assert('requirement gate', $result->isVerified());
 

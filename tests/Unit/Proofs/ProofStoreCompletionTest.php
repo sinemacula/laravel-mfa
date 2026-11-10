@@ -178,9 +178,9 @@ final class ProofStoreCompletionTest extends TestCase
             $other->setAttribute('id', 8);
 
             $binding = new ProofBinding($other->getMorphClass(), '8', 'web', self::SESSION, Purpose::STEP_UP);
-            $parts   = self::parts(SignInProofs::of($other)->inSession(self::SESSION)->totp());
+            $proof   = self::rebound(SignInProofs::of($other)->inSession(self::SESSION)->totp(), $binding);
 
-            $this->stepUp()->stepUp(Callers::current(), $this->resultOf(new Proof(...[...$parts, 'binding' => $binding])));
+            $this->stepUp()->stepUp(Callers::current(), $this->resultOf($proof));
         });
 
         $this->store()->forget($this->user, 'web');
@@ -347,20 +347,21 @@ final class ProofStoreCompletionTest extends TestCase
      */
     private function proof(Purpose $purpose, string $session = self::SESSION): Proof
     {
-        $parts = self::parts(SignInProofs::of($this->user)->inSession($session)->totp());
+        $binding = new ProofBinding($this->user->getMorphClass(), '7', 'web', $session, $purpose);
 
-        return new Proof(...[...$parts, 'binding' => new ProofBinding($this->user->getMorphClass(), '7', 'web', $session, $purpose)]);
+        return self::rebound(SignInProofs::of($this->user)->inSession($session)->totp(), $binding);
     }
 
     /**
-     * What a proof holds, by the names its constructor takes.
+     * The proof under the binding given.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
-     * @return array<string, mixed>
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
-    private static function parts(Proof $proof): array
+    private static function rebound(Proof $proof, ProofBinding $binding): Proof
     {
-        return get_object_vars($proof);
+        return new Proof($proof->kind, $proof->method, $proof->channel, $proof->reference, $proof->properties, $proof->provedAt, $binding, $proof->generation, $proof->challengeId);
     }
 
     /**

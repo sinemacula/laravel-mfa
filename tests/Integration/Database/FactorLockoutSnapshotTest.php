@@ -360,13 +360,13 @@ final class FactorLockoutSnapshotTest extends TestCase
      * MySQL takes for its next transaction and PostgreSQL inside the current
      * one.
      *
-     * @param  string  $isolation
+     * @param  'READ COMMITTED'|'REPEATABLE READ'  $isolation
      * @return void
      */
     private function openTransaction(string $isolation): void
     {
         $connection = DB::connection();
-        $statement  = sprintf('SET TRANSACTION ISOLATION LEVEL %s', $isolation);
+        $statement  = 'SET TRANSACTION ISOLATION LEVEL ' . $isolation;
 
         if ($connection->getDriverName() === 'mysql') {
             $connection->unprepared($statement);

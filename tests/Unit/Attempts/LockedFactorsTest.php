@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Attempts;
 
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -12,6 +11,7 @@ use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
 use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use Tests\Fixtures\Factors\FactorSets;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 
@@ -52,7 +52,7 @@ final class LockedFactorsTest extends TestCase
     public function testAFactorIsFoundAsTheLockedInstance(): void
     {
         $locked = $this->factor('second');
-        $found  = LockedFactors::find($this->factor('second'), new Collection([$this->factor('first'), $locked]));
+        $found  = LockedFactors::find($this->factor('second'), FactorSets::of($this->factor('first'), $locked));
 
         self::assertSame($locked, $found);
     }
@@ -65,7 +65,7 @@ final class LockedFactorsTest extends TestCase
      */
     public function testNothingIsFoundWithoutAStoredMatch(): void
     {
-        $factors = new Collection([$this->factor('stored'), $this->factor('')]);
+        $factors = FactorSets::of($this->factor('stored'), $this->factor(''));
 
         self::assertNull(LockedFactors::find(null, $factors));
         self::assertNull(LockedFactors::find(new InMemoryFactor(identifier: 'stored'), $factors));

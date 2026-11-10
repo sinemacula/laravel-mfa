@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use Tests\Fixtures\Factors\FactorSets;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\TestCase;
@@ -154,7 +155,7 @@ final class RequiredFactorPolicyTest extends TestCase
         $other = $this->confirmedFactor($user);
 
         self::assertTrue($this->policy()->allowsRemoval($user, self::APPLICATION, $totp, $this->factorsOf($user)));
-        self::assertFalse($this->policy()->allowsRemoval($user, self::APPLICATION, $totp, Factor::query()->whereKey($totp->id)->get()));
+        self::assertFalse($this->policy()->allowsRemoval($user, self::APPLICATION, $totp, FactorSets::of($totp)));
 
         $other->update(['disabled_at' => CarbonImmutable::now()]);
 
@@ -190,11 +191,11 @@ final class RequiredFactorPolicyTest extends TestCase
      * The identity's factors, as a caller hands them to the policy.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
-     * @return \Illuminate\Database\Eloquent\Collection<int, \SineMacula\Laravel\Mfa\Models\Factor>
+     * @return \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      */
     private function factorsOf(TestUser $user): Collection
     {
-        return Factor::query()->where('authenticatable_id', (string) $user->id)->get();
+        return FactorSets::stored((string) $user->id);
     }
 
     /**

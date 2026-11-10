@@ -40,20 +40,37 @@ final class TotpDriverBench
     /** @var string The application the binding names. */
     private const string APPLICATION = 'web';
 
+    /** @var \SineMacula\Laravel\Mfa\Drivers\TotpSettings */
+    private readonly TotpSettings $settings;
+
     /** @var \SineMacula\Laravel\Mfa\Drivers\TotpDriver */
-    private TotpDriver $driver;
+    private readonly TotpDriver $driver;
 
     /** @var \Benchmarks\Support\TotpFactor */
-    private TotpFactor $factor;
+    private readonly TotpFactor $factor;
 
     /** @var \SineMacula\Laravel\Mfa\Proofs\ProofBinding */
-    private ProofBinding $binding;
+    private readonly ProofBinding $binding;
 
     /** @var string A code of the window. */
     private string $matching = '';
 
     /** @var string A code outside the window. */
     private string $mismatched = '';
+
+    /**
+     * Build the driver with the default settings, its factor and the binding
+     * the codes are checked under.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->settings = new TotpSettings(new Repository);
+        $this->driver   = new TotpDriver($this->settings);
+        $this->factor   = new TotpFactor(AuthenticatorApp::SECRET);
+        $this->binding  = new ProofBinding('user', '1', self::APPLICATION, 'sign-in-1', Purpose::STEP_UP);
+    }
 
     /**
      * Freeze the clock at a fixed time, so no step boundary is crossed, and
@@ -68,13 +85,7 @@ final class TotpDriverBench
     {
         CarbonImmutable::setTestNow('2026-11-01 12:00:00');
 
-        $settings = new TotpSettings(new Repository);
-
-        $this->driver  = new TotpDriver($settings);
-        $this->factor  = new TotpFactor(AuthenticatorApp::SECRET);
-        $this->binding = new ProofBinding('user', '1', self::APPLICATION, 'sign-in-1', Purpose::STEP_UP);
-
-        $window = $this->windowCodes($settings->windowFor(self::APPLICATION));
+        $window = $this->windowCodes($this->settings->windowFor(self::APPLICATION));
 
         $this->matching   = $window[0];
         $this->mismatched = self::firstCodeOutside($window);

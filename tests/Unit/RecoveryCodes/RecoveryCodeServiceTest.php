@@ -13,6 +13,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
+use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesLow;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
@@ -65,8 +66,8 @@ final class RecoveryCodeServiceTest extends TestCase
 
     /**
      * The status follows the set: its size and time once generated, one less
-     * per redemption, the next generation's size and time once replaced, and
-     * only the identity's own codes.
+     * per redemption, which passes and says so, the next generation's size and
+     * time once replaced, and only the identity's own codes.
      *
      * @return void
      *
@@ -90,9 +91,13 @@ final class RecoveryCodeServiceTest extends TestCase
         self::assertSame('2026-11-01 08:00:00', $status->generatedAt?->format('Y-m-d H:i:s'));
         self::assertTrue($status->exists());
 
-        $this->recoveryCodes()->redeem($holder, $codes[0], self::redemptionBinding($holder, Purpose::SIGN_IN));
-        $this->recoveryCodes()->redeem($holder, $codes[1], self::redemptionBinding($holder, Purpose::SIGN_IN));
+        $first  = $this->recoveryCodes()->redeem($holder, $codes[0], self::redemptionBinding($holder, Purpose::SIGN_IN));
+        $second = $this->recoveryCodes()->redeem($holder, $codes[1], self::redemptionBinding($holder, Purpose::SIGN_IN));
 
+        self::assertTrue($first->passed);
+        self::assertSame(9, $first->remaining);
+        self::assertTrue($second->passed);
+        self::assertSame(8, $second->remaining);
         self::assertSame(8, $this->recoveryCodes()->status($holder)->remaining);
 
         $this->travelTo(CarbonImmutable::parse('2026-11-03 08:00:00'));
@@ -443,6 +448,27 @@ final class RecoveryCodeServiceTest extends TestCase
 
         self::assertNotSame($previous, $current);
         self::assertSame(count($current), RecoveryCode::query()->whereNull('replaced_at')->count());
+    }
+
+    /**
+     * Replacing the set stores the next generation and returns its codes with
+     * it, and reports nothing, which is left to the caller.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testReplacingTheSetReturnsItsGenerationAndReportsNothing(): void
+    {
+        Event::fake([RecoveryCodesGenerated::class]);
+
+        $holder = $this->signInHolder();
+        $set    = $this->recoveryCodes()->replaceSet($holder, 'web');
+
+        self::assertSame(1, $set['generation']);
+        self::assertCount(10, $set['codes']);
+        self::assertSame(10, $this->recoveryCodes()->status($holder)->remaining);
+        Event::assertNotDispatched(RecoveryCodesGenerated::class);
     }
 
     /**

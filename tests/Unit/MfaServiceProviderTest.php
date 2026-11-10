@@ -427,7 +427,11 @@ final class MfaServiceProviderTest extends TestCase
 
         foreach ($channels as $name => $channel) {
             self::assertIsArray($channel);
-            self::assertContains(RedactSecretsInLogs::class, $channel['tap'] ?? [], (string) $name);
+
+            $taps = $channel['tap'] ?? [];
+
+            self::assertIsArray($taps);
+            self::assertContains(RedactSecretsInLogs::class, $taps, (string) $name);
         }
     }
 

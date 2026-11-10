@@ -8,6 +8,7 @@ use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Log\Logger;
@@ -192,7 +193,7 @@ final class SecretBindingsTest extends TestCase
     public function testTapsTheChannelsResolvedAlready(): void
     {
         $container = $this->container(true);
-        $log       = new LogManager($container);
+        $log       = new LogManager(self::createStub(Application::class));
         $context   = static fn (LogRecord $record): LogRecord => $record;
         $monolog   = new Monolog('early', [], [$context]);
 
@@ -223,7 +224,7 @@ final class SecretBindingsTest extends TestCase
     public function testTapsTheResolvedChannelsAfterALoggerThatIsNoChannel(): void
     {
         $container = $this->container(true);
-        $log       = new LogManager($container);
+        $log       = new LogManager(self::createStub(Application::class));
         $monolog   = new Monolog('late');
 
         (new \ReflectionProperty(LogManager::class, 'channels'))->setValue($log, [

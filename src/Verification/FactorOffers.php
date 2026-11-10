@@ -164,7 +164,8 @@ final readonly class FactorOffers
      */
     private static function rank(EloquentFactor&Model $factor): array
     {
-        $created = $factor->getAttribute($factor->getCreatedAtColumn());
+        $column  = $factor->getCreatedAtColumn();
+        $created = $column === null ? null : $factor->getAttribute($column);
 
         return [!$factor->isPreferred(), $created instanceof CarbonInterface ? $created->getTimestamp() : 0, LockedFactors::idOf($factor)];
     }

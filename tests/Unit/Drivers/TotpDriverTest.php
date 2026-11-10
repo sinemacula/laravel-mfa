@@ -6,7 +6,6 @@ namespace Tests\Unit\Drivers;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Config\Repository;
-use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;

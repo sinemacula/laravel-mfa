@@ -59,7 +59,7 @@ final class MetUntilEvaluationTest extends TestCase
 
         $evaluation = $this->evaluate(Requirement::none()->withAdditionalVerification(900), $proofs->password(1000), $proofs->totp(800));
 
-        self::assertTrue(self::after(100)->equalTo($evaluation->metUntil));
+        self::assertMetUntil(100, $evaluation->metUntil);
     }
 
     /**
@@ -72,11 +72,11 @@ final class MetUntilEvaluationTest extends TestCase
         $proofs      = new SignInProofs;
         $requirement = Requirement::none()->withAdditionalVerification(300)->withMultifactor(900);
 
-        self::assertTrue(self::after(200)->equalTo($this->evaluate($requirement, $proofs->password(1000), $proofs->totp(100))->metUntil));
+        self::assertMetUntil(200, $this->evaluate($requirement, $proofs->password(1000), $proofs->totp(100))->metUntil);
 
         $requirement = Requirement::none()->withMultifactor(900)->withAdditionalVerification(300);
 
-        self::assertTrue(self::after(200)->equalTo($this->evaluate($requirement, $proofs->password(1000), $proofs->totp(100))->metUntil));
+        self::assertMetUntil(200, $this->evaluate($requirement, $proofs->password(1000), $proofs->totp(100))->metUntil);
     }
 
     /**
@@ -89,8 +89,8 @@ final class MetUntilEvaluationTest extends TestCase
         $proofs      = new SignInProofs;
         $requirement = Requirement::none()->withAdditionalVerification(900);
 
-        self::assertTrue(self::after(800)->equalTo($this->evaluate($requirement, $proofs->password(1000), $proofs->totp(500), $proofs->totp(100))->metUntil));
-        self::assertTrue(self::after(800)->equalTo($this->evaluate($requirement, $proofs->password(1000), $proofs->totp(100), $proofs->totp(500))->metUntil));
+        self::assertMetUntil(800, $this->evaluate($requirement, $proofs->password(1000), $proofs->totp(500), $proofs->totp(100))->metUntil);
+        self::assertMetUntil(800, $this->evaluate($requirement, $proofs->password(1000), $proofs->totp(100), $proofs->totp(500))->metUntil);
     }
 
     /**
@@ -107,7 +107,7 @@ final class MetUntilEvaluationTest extends TestCase
 
         $until = $this->evaluate($requirement, $proofs->password(500), $proofs->email(10))->metUntil;
 
-        self::assertTrue(self::after(100)->equalTo($until));
+        self::assertMetUntil(100, $until);
     }
 
     /**
@@ -121,11 +121,11 @@ final class MetUntilEvaluationTest extends TestCase
         $proofs = new SignInProofs;
 
         self::assertNull($this->evaluate(Requirement::none()->withAdditionalVerification(), $proofs->password(100), $proofs->totp(50))->metUntil);
-        self::assertTrue(self::after(250)->equalTo($this->evaluate(
+        self::assertMetUntil(250, $this->evaluate(
             Requirement::none()->withAdditionalVerification()->withMultifactor(300),
             $proofs->password(100),
             $proofs->totp(50),
-        )->metUntil));
+        )->metUntil);
     }
 
     /**
@@ -174,7 +174,7 @@ final class MetUntilEvaluationTest extends TestCase
         $combination = Combination::alone((new SignInProofs)->password(10));
 
         self::assertNull($combination->heldUntil(static fn (Combination $candidate): bool => $candidate->accepted, 60));
-        self::assertTrue(self::after(50)->equalTo($combination->heldUntil(static fn (Combination $candidate): bool => !$candidate->accepted, 60)));
+        self::assertMetUntil(50, $combination->heldUntil(static fn (Combination $candidate): bool => !$candidate->accepted, 60));
     }
 
     /**
@@ -198,5 +198,18 @@ final class MetUntilEvaluationTest extends TestCase
     private function evaluate(Requirement $requirement, Proof ...$proofs): Evaluation
     {
         return (new DefaultCombinationPolicy)->evaluate($requirement, ...$proofs);
+    }
+
+    /**
+     * Assert the time is the given number of seconds from now.
+     *
+     * @param  int  $seconds
+     * @param  ?\Carbon\CarbonImmutable  $until
+     * @return void
+     */
+    private static function assertMetUntil(int $seconds, ?CarbonImmutable $until): void
+    {
+        self::assertNotNull($until);
+        self::assertTrue(self::after($seconds)->equalTo($until));
     }
 }

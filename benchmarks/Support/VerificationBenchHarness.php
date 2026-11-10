@@ -5,6 +5,8 @@ declare(strict_types = 1);
 namespace Benchmarks\Support;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Http\Request;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
@@ -77,6 +79,9 @@ final class VerificationBenchHarness
     /** @var \SineMacula\Laravel\Mfa\Verification\Submission What the timed call submits. */
     private readonly Submission $submission;
 
+    /** @var \SineMacula\Laravel\Mfa\Context\CallerContext Who the timed call is made for. */
+    private readonly CallerContext $caller;
+
     /** @var ?\SineMacula\Laravel\Mfa\Verification\VerificationResult What the timed call answered. */
     private ?VerificationResult $result = null;
 
@@ -100,9 +105,12 @@ final class VerificationBenchHarness
         $this->mailbox = FakeEmailSender::fake($this->app);
         $this->manager = $this->app->make('mfa');
 
-        $this->prove($this->manager->verify($this->arrange('warm-up@example.test', '198.51.100.1', 'bench-warm-up')));
+        $warmUp = $this->arrange('warm-up@example.test', '198.51.100.1', 'bench-warm-up');
+
+        $this->prove($this->manager->verify($this->currentCaller(), $warmUp));
 
         $this->submission = $this->arrange('timed@example.test', '198.51.100.2', 'bench-timed');
+        $this->caller     = $this->currentCaller();
     }
 
     /**
@@ -120,7 +128,7 @@ final class VerificationBenchHarness
 
         self::$spent[$this->branch] = true;
 
-        $this->result = $this->manager->verify($this->submission);
+        $this->result = $this->manager->verify($this->caller, $this->submission);
     }
 
     /**
@@ -171,8 +179,8 @@ final class VerificationBenchHarness
         return match ($this->branch) {
             self::TOTP_HIT          => $this->totpSubmission($user, 0),
             self::TOTP_MISS         => $this->totpSubmission($user, self::WRONG_STEPS),
-            self::CODE_HIT          => $this->codeSubmission($user, true),
-            self::CODE_MISS         => $this->codeSubmission($user, false),
+            self::CODE_HIT          => $this->codeSubmission($user, $email, true),
+            self::CODE_MISS         => $this->codeSubmission($user, $email, false),
             self::RECOVERY_CODE_HIT => Submission::recoveryCode($this->recoveryCode($user)),
             default                 => $this->wrongRecoveryCode($user),
         };
@@ -196,16 +204,17 @@ final class VerificationBenchHarness
      * The code sent to a new email factor, or a wrong one.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @param  string  $email
      * @param  bool  $right
      * @return \SineMacula\Laravel\Mfa\Verification\Submission
      *
      * @throws \LogicException
      */
-    private function codeSubmission(TestUser $user, bool $right): Submission
+    private function codeSubmission(TestUser $user, string $email, bool $right): Submission
     {
         $factor    = BenchApplication::emailFactor($user);
-        $challenge = $this->manager->sendCode($factor->id)->challengeId;
-        $code      = $this->mailbox->lastCodeTo($user->email);
+        $challenge = $this->manager->sendCode($this->currentCaller(), $factor->id)->challengeId;
+        $code      = $this->mailbox->lastCodeTo($email);
 
         if ($challenge === null || $code === null) {
             throw new \LogicException(sprintf('The %s benchmark could not send its code.', $this->branch));
@@ -242,12 +251,23 @@ final class VerificationBenchHarness
     {
         BenchApplication::totpFactor($user);
 
-        $code = $this->app->make(RecoveryCodeService::class)->generate($user, null, BenchApplication::APPLICATION)[0] ?? null;
+        $code = $this->app->make(RecoveryCodeService::class)->generate($user, BenchApplication::APPLICATION)[0] ?? null;
 
         if (!$code instanceof RevealedSecret) {
             throw new \LogicException(sprintf('The %s benchmark could not generate its recovery codes.', $this->branch));
         }
 
         return $code->reveal();
+    }
+
+    /**
+     * The caller of the request the last person seeded signed in on, as an
+     * application's controller builds it.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\CallerContext
+     */
+    private function currentCaller(): CallerContext
+    {
+        return CallerContext::fromRequest($this->app->make(Request::class), null, $this->app);
     }
 }

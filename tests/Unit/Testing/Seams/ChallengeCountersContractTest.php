@@ -633,13 +633,13 @@ final class ChallengeCountersContractTest extends TestCase
      * Give the factor a live enrolment bound to the binding's sign-in, as an
      * enrolment challenge would admit.
      *
-     * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
+     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function enroll(Factor $factor, ProofBinding $binding): void
+    private function enroll(EloquentFactor&Model $factor, ProofBinding $binding): void
     {
         $this->container()->make(PendingEnrollments::class)->create(
             (string) LockedFactors::idOf($factor),

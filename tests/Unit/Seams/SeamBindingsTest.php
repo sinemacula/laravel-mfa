@@ -11,8 +11,8 @@ use SineMacula\Laravel\Mfa\Seams\SeamBindings;
 use Tests\TestCase;
 
 /**
- * Tests for `SeamBindings`: the refusing reauthenticator is the default,
- * built afresh, and an application may rebind it.
+ * Tests for `SeamBindings`: the refusing reauthenticator is the default, built
+ * afresh, and an application may rebind it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

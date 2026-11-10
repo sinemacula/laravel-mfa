@@ -6,10 +6,11 @@ namespace SineMacula\Laravel\Mfa\Attempts;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Grammar;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Database\BoundedDelete;
+use SineMacula\Laravel\Mfa\Database\GrammarExpression;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
@@ -88,20 +89,22 @@ final readonly class AttemptStore
      */
     public function record(string $key, AttemptScope $scope, int $now, int $end): void
     {
-        $grammar = $this->connection()->getQueryGrammar();
-        $table   = TableNames::of(TableNames::ATTEMPTS);
-        $hits    = $grammar->wrap($table . '.hits');
-        $window  = $grammar->wrap($table . '.window_ends_at');
-        $ended   = "{$window} <= " . $grammar->quoteString($this->format($now));
+        $table  = TableNames::of(TableNames::ATTEMPTS);
+        $nowAt  = $this->format($now);
+        $endAt  = $this->format($end);
+        $window = static fn (Grammar $grammar): string => $grammar->wrap($table . '.window_ends_at');
+        $ended  = static fn (Grammar $grammar): string => $window($grammar) . ' <= ' . $grammar->quoteString($nowAt);
+        $hits   = static fn (Grammar $grammar): string => "case when {$ended($grammar)} then 1 else {$grammar->wrap($table . '.hits')} + 1 end";
+        $ends   = static fn (Grammar $grammar): string => "case when {$ended($grammar)} then {$grammar->quoteString($endAt)} else {$window($grammar)} end";
 
         $this->table()->upsert([[
             'key'            => $key,
             'scope'          => $scope->value,
             'hits'           => 1,
-            'window_ends_at' => $this->format($end),
+            'window_ends_at' => $endAt,
         ]], ['key'], [
-            'hits'           => new Expression("case when {$ended} then 1 else {$hits} + 1 end"),
-            'window_ends_at' => new Expression("case when {$ended} then " . $grammar->quoteString($this->format($end)) . " else {$window} end"),
+            'hits'           => new GrammarExpression($hits),
+            'window_ends_at' => new GrammarExpression($ends),
         ]);
     }
 

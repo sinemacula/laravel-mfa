@@ -21,8 +21,8 @@ final class TransactionsManagerUnawareOfFailedCommits extends DatabaseTransactio
     /**
      * Roll back, unless it is the connection reporting a failed commit.
      *
-     * @param  mixed  $connection
-     * @param  mixed  $newTransactionLevel
+     * @param  string  $connection
+     * @param  int  $newTransactionLevel
      * @return void
      */
     #[\Override]

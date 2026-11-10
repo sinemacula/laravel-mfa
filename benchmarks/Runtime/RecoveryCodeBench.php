@@ -51,6 +51,16 @@ final class RecoveryCodeBench
     private string $submitted = '';
 
     /**
+     * Start at the cheapest cost, until a case arranges its own hasher.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->hasher = new BcryptHasher(['rounds' => 4]);
+    }
+
+    /**
      * The sets compared against at the cheapest cost, by how many codes are
      * unused, and the index of the code submitted, `null` for a miss.
      *

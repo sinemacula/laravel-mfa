@@ -6,6 +6,7 @@ namespace Tests\Unit\Support;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -88,7 +89,7 @@ final class FactorStateTransactionTest extends TestCase
         $factors = FactorStateTransaction::forIdentity($user, new Factor, static fn (Collection $factors): Collection => $factors);
 
         self::assertEqualsCanonicalizing([$first->getKey(), $second->getKey()], $factors->modelKeys());
-        $stored = $factors->first(static fn (Factor $factor): bool => $factor->is($second));
+        $stored = $factors->first(static fn (Model $factor): bool => $factor->is($second));
 
         self::assertSame('Stored', $stored?->getAttribute('label'));
     }

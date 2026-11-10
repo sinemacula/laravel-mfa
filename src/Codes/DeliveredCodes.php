@@ -7,12 +7,10 @@ namespace SineMacula\Laravel\Mfa\Codes;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
-use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
@@ -63,6 +61,9 @@ final readonly class DeliveredCodes
     /** @var \SineMacula\Laravel\Mfa\Codes\CodeKeys The keyed digests of codes and sessions. */
     private CodeKeys $keys;
 
+    /** @var \SineMacula\Laravel\Mfa\Codes\SendWaits The waits the caps on sends impose. */
+    private SendWaits $waits;
+
     /**
      * Constructor.
      *
@@ -79,6 +80,7 @@ final readonly class DeliveredCodes
     ) {
         $this->settings = new CodeSettings($config);
         $this->keys     = new CodeKeys($config);
+        $this->waits    = new SendWaits($this->settings);
     }
 
     /**
@@ -104,8 +106,8 @@ final readonly class DeliveredCodes
         $target  = $this->keys->destination($binding, $factorId, $destination);
         $open    = $this->open($factorId, $binding, $session, $now);
         $wait    = max(
-            $this->capWait($target, $binding, $now),
-            $open === null ? $this->restartWait($target, $binding, $now) : $this->resendWait($open, $now),
+            $this->waits->caps($target, $binding, $now),
+            $open === null ? $this->waits->restart($target, $binding, $now) : $this->resendWait($open, $now),
         );
 
         if ($wait > 0) {
@@ -222,68 +224,6 @@ final readonly class DeliveredCodes
         }
 
         return $open->sent_at->getTimestamp() + $this->settings->resendCooldownSeconds() - $now->getTimestamp();
-    }
-
-    /**
-     * The seconds until a new enrolment challenge may send to the destination:
-     * until the cooldown since the last enrolment code to it has passed, whose
-     * factor a restart has discarded. Zero or less means now, as it is for any
-     * other purpose, whose new challenge has no code before it to wait out.
-     *
-     * @param  string  $target
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @param  \Carbon\CarbonImmutable  $now
-     * @return int
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function restartWait(string $target, ProofBinding $binding, CarbonImmutable $now): int
-    {
-        if ($binding->purpose !== Purpose::ENROLLMENT) {
-            return 0;
-        }
-
-        $last = WriteConnection::query(Code::query())
-            ->where('destination_hash', $target)
-            ->where('purpose', Purpose::ENROLLMENT->value)
-            ->orderByDesc('sent_at')
-            ->first();
-
-        return $last === null ? 0 : $last->sent_at->getTimestamp() + $this->settings->resendCooldownSeconds() - $now->getTimestamp();
-    }
-
-    /**
-     * The seconds until the factor's destination and the identity are both
-     * under their caps on codes sent within the send window, across every
-     * session; zero or less when they are now.
-     *
-     * @param  string  $target
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @param  \Carbon\CarbonImmutable  $now
-     * @return int
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function capWait(string $target, ProofBinding $binding, CarbonImmutable $now): int
-    {
-        $window = $this->settings->sendWindowMinutes() * 60;
-        $since  = (new Code)->fromDateTime($now->subSeconds($window));
-
-        $destination = WriteConnection::query(Code::query())
-            ->where('destination_hash', $target)
-            ->where('sent_at', '>', $since)
-            ->get();
-
-        $identity = WriteConnection::query(Code::query())
-            ->where('authenticatable_type', $binding->identityType)
-            ->where('authenticatable_id', $binding->identityKey)
-            ->where('sent_at', '>', $since)
-            ->get();
-
-        return max(
-            self::windowWait($destination, $this->settings->factorSendLimit(), $window, $now),
-            self::windowWait($identity, $this->settings->identitySendLimit(), $window, $now),
-        );
     }
 
     /**
@@ -564,34 +504,5 @@ final readonly class DeliveredCodes
             $row->attempts >= $max                                   => CodeCheck::EXHAUSTED,
             default                                                  => null,
         };
-    }
-
-    /**
-     * The seconds until fewer than the limit of the rows' sends are within the
-     * window: until the send that must leave it for one more to fit has left, a
-     * window after it was made. Each send leaves the window on its own, and one
-     * already outside it gives no wait. Zero or less means now.
-     *
-     * @param  \Illuminate\Database\Eloquent\Collection<int, \SineMacula\Laravel\Mfa\Models\Code>  $rows
-     * @param  int  $limit
-     * @param  int  $window
-     * @param  \Carbon\CarbonImmutable  $now
-     * @return int
-     */
-    private static function windowWait(Collection $rows, int $limit, int $window, CarbonImmutable $now): int
-    {
-        $times = [];
-
-        foreach ($rows as $row) {
-            array_push($times, ...$row->sent_times);
-        }
-
-        if (count($times) < $limit) {
-            return 0;
-        }
-
-        sort($times);
-
-        return $times[count($times) - $limit] + $window - $now->getTimestamp();
     }
 }

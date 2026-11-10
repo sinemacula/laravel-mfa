@@ -34,9 +34,9 @@ final class RecordingTranslator implements Translator
     /**
      * Note the arguments and answer.
      *
-     * @param  mixed  $key
+     * @param  string  $key
      * @param  array<array-key, mixed>  $replace
-     * @param  mixed  $locale
+     * @param  ?string  $locale
      * @return mixed
      */
     #[\Override]
@@ -50,10 +50,10 @@ final class RecordingTranslator implements Translator
     /**
      * Note the arguments and answer.
      *
-     * @param  mixed  $key
+     * @param  string  $key
      * @param  array<array-key, mixed>|\Countable|float|int  $number
      * @param  array<array-key, mixed>  $replace
-     * @param  mixed  $locale
+     * @param  ?string  $locale
      * @return string
      */
     #[\Override]
@@ -78,7 +78,7 @@ final class RecordingTranslator implements Translator
     /**
      * Set the decorated translator's locale.
      *
-     * @param  mixed  $locale
+     * @param  string  $locale
      * @return void
      */
     #[\Override]

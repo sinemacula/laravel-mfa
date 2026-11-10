@@ -307,7 +307,7 @@ final class TotpReplayRaceTest extends TestCase
             $send(sprintf('%s: %s', $exception::class, str_replace("\n", ' ', $exception->getMessage())));
         }
 
-        posix_kill(getmypid(), SIGKILL);
+        posix_kill(posix_getpid(), SIGKILL);
 
         exit(1);
     }

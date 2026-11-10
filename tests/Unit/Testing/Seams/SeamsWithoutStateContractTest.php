@@ -95,8 +95,14 @@ use Tests\TestCase;
 #[CoversClass(DefaultEventContextResolver::class)]
 final class SeamsWithoutStateContractTest extends TestCase
 {
-    use ActiveStateResolverTests;
-    use ApplicationResolverTests, EventContextResolverTests, FreshnessGateTests, IdentityRequirementTests, SessionTransitionTests, SubjectTypeResolverTests, TenantRequirementTests;
+    use ActiveStateResolverTests,
+        ApplicationResolverTests,
+        EventContextResolverTests,
+        FreshnessGateTests,
+        IdentityRequirementTests,
+        SessionTransitionTests,
+        SubjectTypeResolverTests,
+        TenantRequirementTests;
 
     /**
      * The kit rejects a gate that finds everything fresh.
