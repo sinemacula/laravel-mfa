@@ -99,7 +99,8 @@ trait FlowCatalog
             'enrollment cancel', 'enrollment cancel refused', 'remove factor', 'remove last factor',
             'remove factor falling short', 'remove factor refused', 'rename factor', 'rename factor missing',
             'set preferred', 'set preferred missing', 'unlock factor', 'unlock factor not locked',
-            'unlock identity', 'unlock identity not locked', 'reset identity', 'forget identity',
+            'enable factor', 'enable factor not disabled', 'unlock identity', 'unlock identity not locked',
+            'reset identity', 'forget identity',
             'generate recovery codes', 'generate recovery codes refused', 'prune', 'passkey registering',
             'passkey registering refused', 'passkey removing', 'passkey removing foreign',
             'challenge counters usable', 'challenge counters report passed', 'challenge counters report failed',
@@ -257,6 +258,8 @@ trait FlowCatalog
             'set preferred missing'           => $this->preferringNothing(...),
             'unlock factor'                   => $this->unlockingAFactor(...),
             'unlock factor not locked'        => $this->unlockingAnUnlockedFactor(...),
+            'enable factor'                   => $this->enablingAFactor(...),
+            'enable factor not disabled'      => $this->enablingAnEnabledFactor(...),
             'unlock identity'                 => $this->unlockingAnIdentity(...),
             'unlock identity not locked'      => $this->unlockingAnUnlockedIdentity(...),
             'reset identity'                  => $this->resettingAnIdentity(...),
@@ -961,6 +964,32 @@ trait FlowCatalog
         [$user, $factor] = $this->holdingTotp();
 
         return static fn (): bool => !Mfa::unlockFactor($user, $factor->id, new Actor('admin', '9'));
+    }
+
+    /**
+     * An administrator enables a factor the failure ceiling disabled.
+     *
+     * @return \Closure(): bool
+     */
+    private function enablingAFactor(): \Closure
+    {
+        [$user, $factor] = $this->holdingTotp();
+
+        $factor->update(['disabled_at' => CarbonImmutable::now()]);
+
+        return static fn (): bool => Mfa::enableFactor($user, $factor->id, new Actor('admin', '9'));
+    }
+
+    /**
+     * An administrator enables a factor that is not disabled.
+     *
+     * @return \Closure(): bool
+     */
+    private function enablingAnEnabledFactor(): \Closure
+    {
+        [$user, $factor] = $this->holdingTotp();
+
+        return static fn (): bool => !Mfa::enableFactor($user, $factor->id, new Actor('admin', '9'));
     }
 
     /**
