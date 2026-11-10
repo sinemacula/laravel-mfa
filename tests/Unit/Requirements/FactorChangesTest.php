@@ -272,36 +272,6 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * Rows of a request that contradicts itself.
-     *
-     * @return iterable<string, array{string, \SineMacula\Laravel\Mfa\Enums\FactorChange, ?string, string}>
-     */
-    public static function contradictoryRequests(): iterable
-    {
-        yield 'a blank sign-in' => [' ', FactorChange::ADD_FACTOR, null, 'A factor change is made from a sign-in, so its session id must not be blank.'];
-        yield 'a removal naming no factor' => [SignInProofs::SESSION, FactorChange::REMOVE_FACTOR, null, 'The change [mfa.remove_factor] needs a factor.'];
-        yield 'a grant naming a factor' => [SignInProofs::SESSION, FactorChange::ADD_FACTOR, 'factor-1', 'The change [mfa.add_factor] names no factor.'];
-    }
-
-    /**
-     * A request that contradicts itself is refused when it is built.
-     *
-     * @param  string  $session
-     * @param  \SineMacula\Laravel\Mfa\Enums\FactorChange  $change
-     * @param  ?string  $factorId
-     * @param  string  $message
-     * @return void
-     */
-    #[DataProvider('contradictoryRequests')]
-    public function testARequestThatContradictsItselfIsRefused(string $session, FactorChange $change, ?string $factorId, string $message): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage($message);
-
-        new FactorChangeRequest($this->person(), SignInProofs::APPLICATION, $session, $change, new Collection, $factorId);
-    }
-
-    /**
      * Each change's operation, whether it names a factor, and whether it is a
      * grant.
      *

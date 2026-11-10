@@ -43,7 +43,7 @@ trait ArrangesFactorChanges
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorChange  $change
      * @param  ?string  $factorId
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
-     * @param  ?\Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
+     * @param  ?\Illuminate\Database\Eloquent\Collection<int, covariant \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
      * @return \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest
      *
      * @formatter:on
