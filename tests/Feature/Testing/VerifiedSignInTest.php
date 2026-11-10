@@ -56,7 +56,7 @@ use Tests\TestCase;
 #[CoversClass(VerifiedSignIn::class)]
 #[CoversClass(ProofStoreRecorder::class)]
 #[CoversTrait(InteractsWithMfa::class)]
-final class ActingAsVerifiedTest extends TestCase
+final class VerifiedSignInTest extends TestCase
 {
     use InteractsWithMfa;
 
@@ -818,7 +818,7 @@ final class ActingAsVerifiedTest extends TestCase
         $user  = $this->person();
         $guard = $this->recordingGuard();
 
-        $guard->arrange(TestUser::query()->findOrFail($user->getKey()));
+        $guard->arrange(TestUser::query()->whereKey($user->getKey())->firstOrFail());
 
         $this->actingAsVerified($user, guard: 'recording');
 
