@@ -221,9 +221,9 @@ final readonly class AttemptService
         $stored   = $this->storedFactor($factor);
 
         return Lockout::strictest(
-            $stored === null ? $this->identityCeiling($state, $settings) : null,
-            $this->identityLockout($state, $now),
-            $this->factorLockout($stored, $now),
+            $stored === null ? HeldLockouts::identityCeiling($state, $settings) : null,
+            HeldLockouts::identity($state, $now),
+            HeldLockouts::factor($stored, $now),
             $this->ipThrottle->lockout($ip, $settings, $now),
         );
     }
@@ -248,7 +248,7 @@ final readonly class AttemptService
     {
         $state = $this->identityState($this->subject($identity), true);
 
-        return $this->heldLockout($state, $factor, new AttemptSettings($this->config), CarbonImmutable::now());
+        return HeldLockouts::strictest($state, $factor, new AttemptSettings($this->config), CarbonImmutable::now());
     }
 
     /**
@@ -410,7 +410,7 @@ final readonly class AttemptService
         $subject = $this->subject($attempt->identity);
         $state   = $this->identityState($subject, true);
 
-        $lockout = $this->heldLockout($state, $factor, $settings, $now);
+        $lockout = HeldLockouts::strictest($state, $factor, $settings, $now);
 
         if ($lockout !== null) {
             return AttemptOutcome::refuse($lockout);
@@ -431,7 +431,7 @@ final readonly class AttemptService
 
         // No lockout held before the failure was counted, so whatever holds now
         // is the one counting it caused, judged as the next attempt would be.
-        return AttemptOutcome::fail($this->heldLockout($state, $factor, $settings, $now));
+        return AttemptOutcome::fail(HeldLockouts::strictest($state, $factor, $settings, $now));
     }
 
     /**
@@ -669,85 +669,6 @@ final readonly class AttemptService
         if (!$state->save()) {
             throw new WriteCanceledException(sprintf('A model event cancelled the save of %s.', $what));
         }
-    }
-
-    /**
-     * The strictest lockout that refuses an attempt against the factor as
-     * stored: the identity's run at the failure ceiling when the attempt names
-     * no factor of its own, the identity's lockout, and the factor's.
-     *
-     * @param  ?\SineMacula\Laravel\Mfa\Models\IdentityState  $state
-     * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
-     * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptSettings  $settings
-     * @param  \Carbon\CarbonImmutable  $now
-     * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function heldLockout(?IdentityState $state, (EloquentFactor&Model)|null $factor, AttemptSettings $settings, CarbonImmutable $now): ?Lockout
-    {
-        return Lockout::strictest(
-            $factor === null ? $this->identityCeiling($state, $settings) : null,
-            $this->identityLockout($state, $now),
-            $this->factorLockout($factor, $now),
-        );
-    }
-
-    /**
-     * The identity's lockout, while it is live.
-     *
-     * @param  ?\SineMacula\Laravel\Mfa\Models\IdentityState  $state
-     * @param  \Carbon\CarbonImmutable  $now
-     * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
-     */
-    private function identityLockout(?IdentityState $state, CarbonImmutable $now): ?Lockout
-    {
-        $until = $state?->locked_until;
-
-        return $until !== null && $until->getTimestamp() > $now->getTimestamp()
-            ? Lockout::endingAt(AttemptScope::IDENTITY, CarbonImmutable::instance($until))
-            : null;
-    }
-
-    /**
-     * The identity's run of failures at the failure ceiling, which refuses an
-     * attempt that names no factor of its own.
-     *
-     * @param  ?\SineMacula\Laravel\Mfa\Models\IdentityState  $state
-     * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptSettings  $settings
-     * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function identityCeiling(?IdentityState $state, AttemptSettings $settings): ?Lockout
-    {
-        return $state !== null && $state->consecutive_failures >= $settings->failureCeiling() ? Lockout::disabled(AttemptScope::IDENTITY) : null;
-    }
-
-    /**
-     * The factor's lockout: disabled at the failure ceiling, or locked by its
-     * failures in a row while that lockout is live. It is read off the instance
-     * given, so the row as locked answers for an attempt.
-     *
-     * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
-     * @param  \Carbon\CarbonImmutable  $now
-     * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
-     */
-    private function factorLockout((EloquentFactor&Model)|null $factor, CarbonImmutable $now): ?Lockout
-    {
-        if ($factor === null) {
-            return null;
-        }
-
-        if ($factor->getDisabledAt() !== null) {
-            return Lockout::disabled();
-        }
-
-        $until = $factor->getLockedUntil();
-
-        return $until !== null && $until->getTimestamp() > $now->getTimestamp()
-            ? Lockout::endingAt(AttemptScope::FACTOR, CarbonImmutable::instance($until))
-            : null;
     }
 
     /**
