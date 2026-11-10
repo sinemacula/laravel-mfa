@@ -145,15 +145,14 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     #[\Override]
     public function driver($driver = null): mixed
     {
-        // phpcs:ignore SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly.ReferenceViaFullyQualifiedName
-        $name = \Illuminate\Support\enum_value($driver) ?: $this->getDefaultDriver();
-
-        if (!is_string($name)) {
-            throw new \InvalidArgumentException('A driver is named by a string, or by a pure or string-backed enum.');
-        }
+        $name = match (true) {
+            $driver instanceof \BackedEnum => (string) $driver->value,
+            $driver instanceof \UnitEnum   => $driver->name,
+            default                        => $driver,
+        };
 
         /** @var \SineMacula\Laravel\Mfa\Contracts\FactorDriver */
-        return $this->createDriver($name);
+        return $this->createDriver($name ?: $this->getDefaultDriver());
     }
 
     /**

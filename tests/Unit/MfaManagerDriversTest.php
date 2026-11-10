@@ -7,6 +7,7 @@ namespace Tests\Unit;
 use Illuminate\Config\Repository;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Drivers\EmailDriver;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
@@ -18,6 +19,7 @@ use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Drivers\Enums\NumberedDriver;
+use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 
@@ -133,19 +135,21 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * An integer-backed enum names no driver, so asking for one by it should
-     * fail before any driver is looked up.
+     * An integer-backed enum names the driver registered under its value, as
+     * Laravel's manager names it.
      *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAnIntegerBackedEnumNamesNoDriver(): void
+    public function testAnIntegerBackedEnumNamesTheDriverOfItsValue(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('A driver is named by a string, or by a pure or string-backed enum.');
+        $manager = $this->manager();
+        $driver  = new NoopFactorDriver;
 
-        $this->manager()->driver(NumberedDriver::FIRST);
+        $manager->extend('1', fn (): FactorDriver => $driver);
+
+        self::assertSame($driver, $manager->driver(NumberedDriver::FIRST));
     }
 
     /**
