@@ -29,8 +29,6 @@ final class OrderedRouteKeyFactor extends Factor
      * @return \Illuminate\Contracts\Database\Eloquent\Builder
      *
      * @throws \InvalidArgumentException
-     *
-     * @phpstan-ignore sineMaculaLaravel.modelBehaviour
      */
     #[\Override]
     public function resolveRouteBindingQuery(mixed $query, mixed $value, mixed $field = null)

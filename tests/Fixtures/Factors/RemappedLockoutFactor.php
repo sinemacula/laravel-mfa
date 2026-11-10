@@ -39,8 +39,6 @@ final class RemappedLockoutFactor extends Model implements EloquentFactor
      * Name the package's factor table.
      *
      * @return string
-     *
-     * @phpstan-ignore sineMaculaLaravel.modelBehaviour
      */
     #[\Override]
     public function getTable(): string
