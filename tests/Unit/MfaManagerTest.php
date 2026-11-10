@@ -143,6 +143,7 @@ final class MfaManagerTest extends TestCase
 
         yield 'removeFactor' => ['removeFactor', LifecycleService::class, 'removeFactor', [$caller, 'factor-1'], FactorRemovalResult::refused(FailureReason::NOT_FOUND)];
         yield 'unlockFactor' => ['unlockFactor', LifecycleService::class, 'unlockFactor', [$identity, 'factor-1', $actor, new ClientContext('192.0.2.7')], true];
+        yield 'enableFactor' => ['enableFactor', LifecycleService::class, 'enableFactor', [$identity, 'factor-1', $actor, new ClientContext('192.0.2.7')], true];
         yield 'unlockIdentity' => ['unlockIdentity', LifecycleService::class, 'unlockIdentity', [$identity, $actor, null], false];
         yield 'resetIdentity' => ['resetIdentity', IdentityReset::class, 'reset', [$identity, $actor, 'Lost phone.', false, null], null];
         yield 'forgetIdentity' => ['forgetIdentity', ForgetIdentity::class, 'forget', [$identity], null];
