@@ -16,12 +16,12 @@ use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
 use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -31,7 +31,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ChallengeCountersTests;
 use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
 use Tests\Fixtures\Context\Callers;
-use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -141,9 +140,9 @@ final class ChallengeCountersContractTest extends TestCase
     public function testRejectsAnEnrollmentChallengeThatChargesTheFactor(): void
     {
         $this->expectException(AssertionFailedError::class);
-        $this->expectExceptionMessage('An enrolment challenge\'s outcome must change no factor\'s count.');
+        $this->expectExceptionMessage('An enrolment challenge\'s failed outcome must change no factor\'s count.');
 
-        $report = $this->chargingTheFactor(...);
+        $report = $this->hasChargedTheFactor(...);
 
         ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->factor, $this->pendingFactor(), $this->countedBinding(), $this->challengeAdmission(), $report);
     }
@@ -159,9 +158,9 @@ final class ChallengeCountersContractTest extends TestCase
     public function testRejectsAnEnrollmentChallengeThatChargesTheIdentity(): void
     {
         $this->expectException(AssertionFailedError::class);
-        $this->expectExceptionMessage('An enrolment challenge\'s outcome must change no identity\'s count.');
+        $this->expectExceptionMessage('An enrolment challenge\'s failed outcome must change no identity\'s count.');
 
-        $report = $this->chargingTheIdentity(...);
+        $report = $this->hasChargedTheIdentity(...);
 
         ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->factor, $this->pendingFactor(), $this->countedBinding(), $this->challengeAdmission(), $report);
     }
@@ -177,16 +176,16 @@ final class ChallengeCountersContractTest extends TestCase
     public function testRejectsAnEnrollmentSuccessThatResetsTheCounts(): void
     {
         $factor    = $this->factor;
-        $resetting = static function (EloquentFactor&Model $counted, ProofBinding $binding, bool $passed) use ($factor): void {
-            if (!$passed) {
-                return;
+        $resetting = static function (EloquentFactor&Model $counted, ProofBinding $binding, bool $passed) use ($factor): bool {
+            if ($passed) {
+                WriteConnection::query($factor->newQuery())->whereKey($factor->getKey())->update([$factor->getConsecutiveFailuresName() => 0]);
             }
 
-            WriteConnection::query($factor->newQuery())->whereKey($factor->getKey())->update([$factor->getConsecutiveFailuresName() => 0]);
+            return true;
         };
 
         $this->expectException(AssertionFailedError::class);
-        $this->expectExceptionMessage('An enrolment challenge\'s outcome must change no factor\'s count.');
+        $this->expectExceptionMessage('An enrolment challenge\'s passed outcome must change no factor\'s count.');
 
         ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->factor, $this->pendingFactor(), $this->countedBinding(), $this->challengeAdmission(), $resetting);
     }
@@ -201,16 +200,10 @@ final class ChallengeCountersContractTest extends TestCase
      */
     public function testRejectsAnEnrollmentFailureThatChargesTheFactor(): void
     {
-        $charging = function (EloquentFactor&Model $factor, ProofBinding $binding, bool $passed): void {
-            if ($passed) {
-                return;
-            }
-
-            $this->chargingTheFactor($factor);
-        };
+        $charging = fn (EloquentFactor&Model $factor, ProofBinding $binding, bool $passed): bool => $passed || $this->hasChargedTheFactor($factor);
 
         $this->expectException(AssertionFailedError::class);
-        $this->expectExceptionMessage('An enrolment challenge\'s outcome must change no factor\'s count.');
+        $this->expectExceptionMessage('An enrolment challenge\'s failed outcome must change no factor\'s count.');
 
         ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->factor, $this->pendingFactor(), $this->countedBinding(), $this->challengeAdmission(), $charging);
     }
@@ -225,21 +218,89 @@ final class ChallengeCountersContractTest extends TestCase
      */
     public function testRejectsAnEnrollmentSuccessThatResetsTheIdentity(): void
     {
-        $resetting = static function (EloquentFactor&Model $factor, ProofBinding $binding, bool $passed): void {
-            if (!$passed) {
-                return;
+        $resetting = static function (EloquentFactor&Model $factor, ProofBinding $binding, bool $passed): bool {
+            if ($passed) {
+                IdentityState::query()
+                    ->where('authenticatable_type', $binding->identityType)
+                    ->where('authenticatable_id', $binding->identityKey)
+                    ->update(['consecutive_failures' => 0]);
             }
 
-            IdentityState::query()
-                ->where('authenticatable_type', $binding->identityType)
-                ->where('authenticatable_id', $binding->identityKey)
-                ->update(['consecutive_failures' => 0]);
+            return true;
+        };
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('An enrolment challenge\'s passed outcome must change no identity\'s count.');
+
+        ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->factor, $this->pendingFactor(), $this->countedBinding(), $this->challengeAdmission(), $resetting);
+    }
+
+    /**
+     * The kit rejects an enrolment challenge whose failed outcome is counted
+     * and whose passed outcome takes the count back, though the two cancel out.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRejectsAnEnrollmentChallengeWhoseOutcomesCancelOut(): void
+    {
+        $factor       = $this->factor;
+        $compensating = static fn (EloquentFactor&Model $counted, ProofBinding $binding, bool $passed): bool => WriteConnection::query($factor->newQuery())
+            ->whereKey($factor->getKey())
+            ->increment($factor->getConsecutiveFailuresName(), $passed ? -1 : 1) > 0;
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('An enrolment challenge\'s failed outcome must change no factor\'s count.');
+
+        ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->factor, $this->pendingFactor(), $this->countedBinding(), $this->challengeAdmission(), $compensating);
+    }
+
+    /**
+     * The kit rejects an enrolment challenge whose report counts only once the
+     * transaction commits.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRejectsAnEnrollmentChallengeCountedOnCommit(): void
+    {
+        $factor   = $this->factor;
+        $deferred = static function (EloquentFactor&Model $counted, ProofBinding $binding, bool $passed) use ($factor): bool {
+            DB::connection(StorageConnection::name())->afterCommit(static function () use ($factor): void {
+                WriteConnection::query($factor->newQuery())->whereKey($factor->getKey())->increment($factor->getConsecutiveFailuresName());
+            });
+
+            return true;
+        };
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('An enrolment challenge\'s outcome must change no factor\'s count.');
+
+        ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->factor, $this->pendingFactor(), $this->countedBinding(), $this->challengeAdmission(), $deferred);
+    }
+
+    /**
+     * The kit rejects an enrolment challenge whose report counts against the
+     * identity only once the transaction commits.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRejectsAnEnrollmentChallengeCountedAgainstTheIdentityOnCommit(): void
+    {
+        $deferred = function (EloquentFactor&Model $factor, ProofBinding $binding): bool {
+            DB::connection(StorageConnection::name())->afterCommit(fn (): bool => $this->hasChargedTheIdentity($factor, $binding));
+
+            return true;
         };
 
         $this->expectException(AssertionFailedError::class);
         $this->expectExceptionMessage('An enrolment challenge\'s outcome must change no identity\'s count.');
 
-        ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->factor, $this->pendingFactor(), $this->countedBinding(), $this->challengeAdmission(), $resetting);
+        ChallengeCountersContract::assertAnEnrollmentChallengeIsItsOwn($this->factor, $this->pendingFactor(), $this->countedBinding(), $this->challengeAdmission(), $deferred);
     }
 
     /**
@@ -396,7 +457,13 @@ final class ChallengeCountersContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
         $this->expectExceptionMessage('A challenge of the identity\'s own factor under its own binding must be admitted.');
 
-        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused($this->factor, $this->countedBinding(), static fn (): bool => false, $this->challengeReport());
+        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused(
+            $this->factor,
+            $this->countedBinding(),
+            $this->otherCountedIdentity(),
+            static fn (): bool => false,
+            $this->challengeReport(),
+        );
     }
 
     /**
@@ -411,7 +478,13 @@ final class ChallengeCountersContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
         $this->expectExceptionMessage('A binding of another identity must not be admitted.');
 
-        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused($this->factor, $this->countedBinding(), static fn (): bool => true, $this->challengeReport());
+        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused(
+            $this->factor,
+            $this->countedBinding(),
+            $this->otherCountedIdentity(),
+            static fn (): bool => true,
+            $this->challengeReport(),
+        );
     }
 
     /**
@@ -427,7 +500,41 @@ final class ChallengeCountersContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
         $this->expectExceptionMessage('A report under a binding of another identity must be refused.');
 
-        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused($this->factor, $this->countedBinding(), $this->challengeAdmission(), static function (): void {});
+        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused(
+            $this->factor,
+            $this->countedBinding(),
+            $this->otherCountedIdentity(),
+            $this->challengeAdmission(),
+            static fn (): bool => true,
+        );
+    }
+
+    /**
+     * The kit accepts a path that refuses a report under a binding of another
+     * identity by answering `false`, counting nothing, as an adapter whose
+     * contract refuses by value does.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAcceptsAReportRefusedByValue(): void
+    {
+        $report = $this->challengeReport();
+
+        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused(
+            $this->factor,
+            $this->countedBinding(),
+            $this->otherCountedIdentity(),
+            $this->challengeAdmission(),
+            static function (EloquentFactor&Model $factor, ProofBinding $binding, bool $passed) use ($report): bool {
+                try {
+                    return $report($factor, $binding, $passed);
+                } catch (OperationRefusedException) {
+                    return false;
+                }
+            },
+        );
     }
 
     /**
@@ -457,11 +564,11 @@ final class ChallengeCountersContractTest extends TestCase
     public function testRejectsAPathThatCountsAReportForAnotherIdentity(string $charged, string $message): void
     {
         $charge = match ($charged) {
-            'factor'   => $this->chargingTheFactor(...),
-            'identity' => $this->chargingTheIdentity(...),
-            default    => static function (EloquentFactor&Model $factor, ProofBinding $binding): void {
-                IdentityState::query()->create(['authenticatable_type' => $binding->identityType, 'authenticatable_id' => $binding->identityKey, 'consecutive_failures' => 1]);
-            },
+            'factor'   => $this->hasChargedTheFactor(...),
+            'identity' => $this->hasChargedTheIdentity(...),
+            default    => static fn (EloquentFactor&Model $factor, ProofBinding $binding): bool => IdentityState::query()
+                ->create(['authenticatable_type' => $binding->identityType, 'authenticatable_id' => $binding->identityKey, 'consecutive_failures' => 1])
+                ->exists,
         };
 
         $this->expectException(AssertionFailedError::class);
@@ -470,12 +577,9 @@ final class ChallengeCountersContractTest extends TestCase
         ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused(
             $this->factor,
             $this->countedBinding(),
+            $this->otherCountedIdentity(),
             $this->challengeAdmission(),
-            static function (EloquentFactor&Model $factor, ProofBinding $binding) use ($charge): void {
-                $charge($factor, $binding);
-
-                throw new \RuntimeException('Refused once counted.');
-            },
+            static fn (EloquentFactor&Model $factor, ProofBinding $binding): bool => !$charge($factor, $binding),
         );
     }
 
@@ -684,46 +788,46 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit accepts healthy counters for an identity whose key is the suffix
-     * it names another identity by: the binding it makes from that key must
-     * still name another identity, not the identity itself, whose factor and
-     * sign-in are admissible.
+     * The kit refuses an other identity that is the counted one, whose binding
+     * the counters would rightly admit.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testAcceptsHealthyCountersForAnIdentityKeyedLikeTheSuffix(): void
+    public function testRejectsAnOtherIdentityThatIsTheCountedOne(): void
     {
-        $identity = new NonEloquentIdentity('-other');
-        $owner    = ProofOwner::of($identity);
-        $factor   = Factor::query()->create([
-            'authenticatable_type' => $owner->type,
-            'authenticatable_id'   => $owner->key,
-            'type'                 => 'email',
-            'destination'          => 'suffixed@example.test',
-            'status'               => 'confirmed',
-            'confirmed_at'         => CarbonImmutable::now(),
-            'application'          => self::CHALLENGE_APPLICATION,
-        ]);
-        $binding = new ProofBinding($owner->type, $owner->key, self::CHALLENGE_APPLICATION, self::CHALLENGE_SESSION, Purpose::SIGN_IN);
-
-        $this->actingAs($identity);
-
-        $this->container()->make(ProofStore::class)->begin($identity, self::CHALLENGE_APPLICATION, self::CHALLENGE_SESSION);
-
-        self::assertTrue(
-            DB::connection(StorageConnection::name())->transaction(fn (): bool => $this->counters()->isUsable(Callers::of($identity, 'web'), $factor, $binding)->isAdmitted()),
-            'The identity\'s own factor and sign-in were expected to be admissible.',
-        );
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('The other identity must not be the counted one.');
 
         ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused(
-            $factor,
-            $binding,
-            fn (EloquentFactor&Model $counted, ProofBinding $bound): bool => $this->isChallengeAdmitted($identity, $counted, $bound),
-            function (EloquentFactor&Model $counted, ProofBinding $bound, bool $passed) use ($identity): void {
-                $this->reportChallenge($identity, $counted, $bound, $passed);
-            },
+            $this->factor,
+            $this->countedBinding(),
+            $this->user,
+            $this->challengeAdmission(),
+            $this->challengeReport(),
+        );
+    }
+
+    /**
+     * An error a report throws under a binding of another identity escapes the
+     * kit rather than passing as a refusal.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnErrorFromAReportEscapes(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('The adapter failed.');
+
+        ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused(
+            $this->factor,
+            $this->countedBinding(),
+            $this->otherCountedIdentity(),
+            $this->challengeAdmission(),
+            static fn (): bool => throw new \RuntimeException('The adapter failed.'),
         );
     }
 
@@ -872,6 +976,18 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
+     * Another person.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     */
+    #[\Override]
+    protected function otherCountedIdentity(): MultiFactorAuthenticatable
+    {
+        /** @var \Tests\Fixtures\Identities\TestUser */
+        return TestUser::query()->firstOrCreate(['email' => 'other-counted@example.test']);
+    }
+
+    /**
      * Ask the counters whether they admit the challenge, as an owner would.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -898,14 +1014,14 @@ final class ChallengeCountersContractTest extends TestCase
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  bool  $passed
-     * @return void
+     * @return bool
      */
     #[\Override]
-    protected function reportChallenge(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding, bool $passed): void
+    protected function isChallengeReported(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding, bool $passed): bool
     {
         $call = fn (): mixed => $this->counters()->report(Callers::of($identity, $binding->application), $factor, $binding, $passed);
 
-        $this->asBroken('report', $call);
+        return $this->asBroken('report', $call) !== null;
     }
 
     /**
@@ -984,14 +1100,15 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * A report that counts a failure against the factor, whatever it is told.
+     * A report that counts a failure against the factor, whatever it is told,
+     * and answers whether it counted one.
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
-     * @return void
+     * @return bool
      */
-    private function chargingTheFactor(EloquentFactor&Model $factor): void
+    private function hasChargedTheFactor(EloquentFactor&Model $factor): bool
     {
-        WriteConnection::query($factor->newQuery())->whereKey($factor->getKey())->increment($factor->getConsecutiveFailuresName());
+        return WriteConnection::query($factor->newQuery())->whereKey($factor->getKey())->increment($factor->getConsecutiveFailuresName()) > 0;
     }
 
     /**
@@ -999,13 +1116,13 @@ final class ChallengeCountersContractTest extends TestCase
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @return void
+     * @return bool
      */
-    private function chargingTheIdentity(EloquentFactor&Model $factor, ProofBinding $binding): void
+    private function hasChargedTheIdentity(EloquentFactor&Model $factor, ProofBinding $binding): bool
     {
         $owner = ProofOwner::of($this->user);
 
-        IdentityState::query()->where('authenticatable_type', $owner->type)->where('authenticatable_id', $owner->key)->increment('consecutive_failures');
+        return IdentityState::query()->where('authenticatable_type', $owner->type)->where('authenticatable_id', $owner->key)->increment('consecutive_failures') > 0;
     }
 
     /**

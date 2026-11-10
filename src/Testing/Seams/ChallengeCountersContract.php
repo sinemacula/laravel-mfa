@@ -19,8 +19,10 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
  * What a challenge owner's wiring to `Attempts\ChallengeCounters` must
@@ -56,8 +58,9 @@ final class ChallengeCountersContract
      * Under a binding whose purpose is `enrollment`, a confirmed factor is
      * refused and a pending one with no live enrolment too; and an outcome
      * reported for one, failed or passed, changes no failure count of the
-     * factor or the identity. Both counts are raised above zero first, so a
-     * passed outcome that wrongly resets them shows.
+     * factor or the identity, read after each outcome and again once the
+     * transaction commits. Both counts are raised above zero first, so a passed
+     * outcome that wrongly resets them shows.
      *
      * @formatter:off
      *
@@ -65,7 +68,7 @@ final class ChallengeCountersContract
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $pending
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding): bool  $admit
-     * @param  \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding, bool): mixed  $report
+     * @param  \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding, bool): bool  $report
      * @return void
      *
      * @formatter:on
@@ -86,13 +89,19 @@ final class ChallengeCountersContract
         $before         = self::failures($confirmed);
         $identityBefore = self::identityFailures($binding);
 
-        DB::connection(StorageConnection::name())->transaction(static function () use ($confirmed, $pending, $enrolling, $admit, $report): void {
+        $connection = DB::connection(StorageConnection::name());
+
+        $connection->transaction(static function () use ($confirmed, $pending, $binding, $enrolling, $admit, $report, $before, $identityBefore): void {
 
             Assert::assertFalse($admit($confirmed, $enrolling), 'A confirmed factor must not be challenged for enrolling.');
             Assert::assertFalse($admit($pending, $enrolling), 'A pending factor with no live enrolment must not be challenged.');
 
-            $report($confirmed, $enrolling, false);
-            $report($confirmed, $enrolling, true);
+            foreach ([[false, 'failed'], [true, 'passed']] as [$passed, $outcome]) {
+                $report($confirmed, $enrolling, $passed);
+
+                Assert::assertSame($before, self::failures($confirmed), sprintf('An enrolment challenge\'s %s outcome must change no factor\'s count.', $outcome));
+                Assert::assertSame($identityBefore, self::identityFailures($binding), sprintf('An enrolment challenge\'s %s outcome must change no identity\'s count.', $outcome));
+            }
         });
 
         Assert::assertSame($before, self::failures($confirmed), 'An enrolment challenge\'s outcome must change no factor\'s count.');
@@ -309,7 +318,7 @@ final class ChallengeCountersContract
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding): bool  $admit
-     * @param  \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding, bool): mixed  $report
+     * @param  \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding, bool): bool  $report
      * @return void
      *
      * @formatter:on
@@ -327,38 +336,50 @@ final class ChallengeCountersContract
 
     /**
      * The path admits a challenge of the identity's own factor under its own
-     * binding, and refuses one under a binding that names another identity: it
-     * admits nothing, and a report under it is refused and changes no count of
-     * the factor or the identity.
+     * binding, and refuses one under the same binding naming another identity:
+     * it admits nothing, and a report under it is refused, by answering `false`
+     * or throwing an `OperationRefusedException`, and changes no count of the
+     * factor or of either identity. Any other exception is an error, not a
+     * refusal, and escapes.
      *
      * @formatter:off
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $other
      * @param  \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding): bool  $admit
-     * @param  \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding, bool): mixed  $report
+     * @param  \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding, bool): bool  $report
      * @return void
      *
      * @formatter:on
      *
      * @throws \Throwable
      */
-    public static function assertABindingOfAnotherIdentityIsRefused(EloquentFactor&Model $factor, ProofBinding $binding, \Closure $admit, \Closure $report): void
-    {
-        $other          = new ProofBinding($binding->identityType, $binding->identityKey . '-other', $binding->application, $binding->sessionId, Purpose::SIGN_IN);
+    public static function assertABindingOfAnotherIdentityIsRefused(
+        EloquentFactor&Model $factor,
+        ProofBinding $binding,
+        MultiFactorAuthenticatable $other,
+        \Closure $admit,
+        \Closure $report,
+    ): void {
+        $owner   = ProofOwner::of($other);
+        $foreign = new ProofBinding($owner->type, $owner->key, $binding->application, $binding->sessionId, Purpose::SIGN_IN);
+
+        Assert::assertFalse($owner->type === $binding->identityType && $owner->key === $binding->identityKey, 'The other identity must not be the counted one.');
+
         $before         = self::failures($factor);
         $identityBefore = self::identityFailures($binding);
 
-        DB::connection(StorageConnection::name())->transaction(static function () use ($factor, $binding, $other, $admit, $report): void {
+        DB::connection(StorageConnection::name())->transaction(static function () use ($factor, $binding, $foreign, $admit, $report): void {
 
             Assert::assertTrue($admit($factor, $binding), 'A challenge of the identity\'s own factor under its own binding must be admitted.');
-            Assert::assertFalse($admit($factor, $other), 'A binding of another identity must not be admitted.');
-            Assert::assertNotNull(self::outcomeOf(static fn () => $report($factor, $other, false)), 'A report under a binding of another identity must be refused.');
+            Assert::assertFalse($admit($factor, $foreign), 'A binding of another identity must not be admitted.');
+            Assert::assertTrue(self::refuses(static fn (): bool => $report($factor, $foreign, false)), 'A report under a binding of another identity must be refused.');
         });
 
         Assert::assertSame($before, self::failures($factor), 'A report under a binding of another identity must change no factor\'s count.');
         Assert::assertSame($identityBefore, self::identityFailures($binding), 'A report under a binding of another identity must change no identity\'s count.');
-        Assert::assertSame(0, self::identityFailures($other), 'A report under a binding of another identity must count nothing against it.');
+        Assert::assertSame(0, self::identityFailures($foreign), 'A report under a binding of another identity must count nothing against it.');
     }
 
     /**
@@ -422,6 +443,22 @@ final class ChallengeCountersContract
             ->value('consecutive_failures');
 
         return is_numeric($count) ? (int) $count : 0;
+    }
+
+    /**
+     * Whether a report was refused: it answered `false`, or threw an
+     * `OperationRefusedException`. Any other exception escapes.
+     *
+     * @param  \Closure(): bool  $report
+     * @return bool
+     */
+    private static function refuses(\Closure $report): bool
+    {
+        try {
+            return !$report();
+        } catch (OperationRefusedException) {
+            return true;
+        }
     }
 
     /**

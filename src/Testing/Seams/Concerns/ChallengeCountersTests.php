@@ -31,7 +31,7 @@ use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
  *
  * @api
  */
-trait ChallengeCountersTests
+trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
     /**
      * A failed challenge is counted against its factor.
@@ -140,6 +140,7 @@ trait ChallengeCountersTests
         ChallengeCountersContract::assertABindingOfAnotherIdentityIsRefused(
             $this->countedFactor(),
             $this->countedBinding(),
+            $this->otherCountedIdentity(),
             $this->challengeAdmission(),
             $this->challengeReport(),
         );
@@ -169,6 +170,14 @@ trait ChallengeCountersTests
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     abstract protected function countedIdentity(): MultiFactorAuthenticatable;
+
+    /**
+     * Another identity of the same kind, not the counted one, whose binding the
+     * adapter must refuse. It need hold no factor.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     */
+    abstract protected function otherCountedIdentity(): MultiFactorAuthenticatable;
 
     /**
      * The identity's confirmed delivered factor, as stored.
@@ -228,14 +237,17 @@ trait ChallengeCountersTests
      *
      * Call the adapter itself, with the binding as given: never inside a
      * transaction of the hook's own, and letting every exception through.
+     * Return whether the adapter took the report: a refusal answers `false`, or
+     * throws an `Exceptions\OperationRefusedException`; any other exception is
+     * an error.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  bool  $passed
-     * @return void
+     * @return bool
      */
-    abstract protected function reportChallenge(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding, bool $passed): void;
+    abstract protected function isChallengeReported(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding, bool $passed): bool;
 
     /**
      * The admission hook, for the counted identity.
@@ -252,14 +264,12 @@ trait ChallengeCountersTests
     /**
      * The report hook, for the counted identity.
      *
-     * @return \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding, bool): void
+     * @return \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding, bool): bool
      */
     private function challengeReport(): \Closure
     {
         $identity = $this->countedIdentity();
 
-        return function (EloquentFactor&Model $factor, ProofBinding $binding, bool $passed) use ($identity): void {
-            $this->reportChallenge($identity, $factor, $binding, $passed);
-        };
+        return fn (EloquentFactor&Model $factor, ProofBinding $binding, bool $passed): bool => $this->isChallengeReported($identity, $factor, $binding, $passed);
     }
 }
