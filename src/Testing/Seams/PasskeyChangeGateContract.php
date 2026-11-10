@@ -4,24 +4,20 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams;
 
-use Illuminate\Container\Container;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Assert;
-use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
-use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
-use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Passkeys\CredentialId;
-use SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate;
-use SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration;
-use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
  * What a registration path's wiring to `Passkeys\PasskeyChangeGate` must
  * guarantee, as assertions: the gate is called inside the registration's own
- * change, so a registration the gate refuses keeps nothing; and the gate itself
- * refuses a call made outside a transaction.
+ * change, so a registration the gate refuses keeps nothing; and the path's own
+ * calls into the gate refuse a call made outside a transaction, so a path that
+ * opens one of its own around the gate, or swallows its refusal, is caught.
  *
  * The closures given register a passkey through the path under test, and say
  * whether its credential was kept. The gate is made to refuse by associating
@@ -87,40 +83,41 @@ final class PasskeyChangeGateContract
     }
 
     /**
-     * Each of the gate's calls refuses with a `LogicException` outside a
-     * transaction on the storage connection.
+     * The path's calls into the gate, registering and removing a passkey with
+     * the contract's credential id, each refuse with a `LogicException` outside
+     * a transaction on the storage connection: the path neither opens one of
+     * its own around the gate nor swallows its refusal. The check must itself
+     * be made outside any transaction on that connection.
      *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
+     * @param  \Closure(string): mixed  $registering
+     * @param  \Closure(string): mixed  $removing
      * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public static function assertTheGateNeedsTheCallersTransaction(MultiFactorAuthenticatable $identity, string $application): void
+    public static function assertTheGateNeedsTheCallersTransaction(\Closure $registering, \Closure $removing): void
     {
-        $gate         = Container::getInstance()->make(PasskeyChangeGate::class);
-        $owner        = ProofOwner::of($identity);
-        $registration = new PasskeyRegistration(
-            self::CREDENTIAL,
-            new ObservedProperties(userPresence: true),
-            new ProofBinding($owner->type, $owner->key, $application, 'contract-sign-in', Purpose::ENROLLMENT),
-        );
+        Assert::assertSame(0, DB::connection(StorageConnection::name())->transactionLevel(), 'The check must be made outside any transaction on the storage connection.');
 
-        $calls = [
-            static fn () => $gate->registering(CallerContext::forIdentity($identity, $application), $registration),
-            static fn () => $gate->removing(CallerContext::forIdentity($identity, $application), self::CREDENTIAL),
-        ];
+        $registration = self::outcomeOf(static fn () => $registering(self::CREDENTIAL));
+        $removal      = self::outcomeOf(static fn () => $removing(self::CREDENTIAL));
 
-        foreach ($calls as $call) {
-            $outcome = null;
+        Assert::assertInstanceOf(\LogicException::class, $registration, 'The path must refuse to register a passkey outside the caller\'s transaction.');
+        Assert::assertInstanceOf(\LogicException::class, $removal, 'The path must refuse to remove a passkey outside the caller\'s transaction.');
+    }
 
-            try {
-                $call();
-            } catch (\Throwable $exception) {
-                $outcome = $exception;
-            }
-
-            Assert::assertInstanceOf(\LogicException::class, $outcome, 'The gate must refuse a call made outside the caller\'s transaction.');
+    /**
+     * What a call threw, or `null` when it threw nothing.
+     *
+     * @param  \Closure(): mixed  $call
+     * @return ?\Throwable
+     */
+    private static function outcomeOf(\Closure $call): ?\Throwable
+    {
+        try {
+            $call();
+        } catch (\Throwable $exception) {
+            return $exception;
         }
+
+        return null;
     }
 }

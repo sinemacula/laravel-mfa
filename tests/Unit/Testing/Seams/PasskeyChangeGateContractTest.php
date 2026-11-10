@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
@@ -46,6 +47,12 @@ final class PasskeyChangeGateContractTest extends TestCase
 
     /** @var \Tests\Fixtures\Identities\TestUser The person registering passkeys. */
     private TestUser $user;
+
+    /** @var ?string The gate call whose hook swallows the gate's refusal, if any. */
+    private ?string $swallows = null;
+
+    /** @var ?string The gate call whose hook makes it in a transaction of its own, if any. */
+    private ?string $ownTransaction = null;
 
     /**
      * Enable passkeys, sign a person in, and let them prove their password
@@ -160,26 +167,107 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate that needs no transaction of the caller's to join,
-     * shown by calling it inside one.
+     * The kit rejects a path that opens a transaction of its own around the
+     * gate's `registering()`.
+     *
+     * @return void
+     */
+    public function testRejectsARegistrationCallInATransactionOfItsOwn(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('The path must refuse to register a passkey outside the caller\'s transaction.');
+
+        $this->ownTransaction = 'registering';
+
+        PasskeyChangeGateContract::assertTheGateNeedsTheCallersTransaction($this->registeringCall(), $this->removalCall());
+    }
+
+    /**
+     * The kit rejects a path that opens a transaction of its own around the
+     * gate's `removing()`, though its registration call is sound.
+     *
+     * @return void
+     */
+    public function testRejectsARemovalCallInATransactionOfItsOwn(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('The path must refuse to remove a passkey outside the caller\'s transaction.');
+
+        $this->ownTransaction = 'removing';
+
+        PasskeyChangeGateContract::assertTheGateNeedsTheCallersTransaction($this->registeringCall(), $this->removalCall());
+    }
+
+    /**
+     * The kit rejects a path that swallows the gate's refusal of a call outside
+     * a transaction.
+     *
+     * @return void
+     */
+    public function testRejectsACallThatSwallowsTheGatesRefusal(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('The path must refuse to remove a passkey outside the caller\'s transaction.');
+
+        $this->swallows = 'removing';
+
+        PasskeyChangeGateContract::assertTheGateNeedsTheCallersTransaction($this->registeringCall(), $this->removalCall());
+    }
+
+    /**
+     * The kit refuses to make the check inside a transaction, where a sound
+     * path's calls would not be refused.
      *
      * @return void
      *
      * @throws \Throwable
      */
-    public function testRejectsAGateThatNeedsNoTransaction(): void
+    public function testRejectsACheckMadeInsideATransaction(): void
     {
         $connection = DB::connection(StorageConnection::name());
 
         $connection->beginTransaction();
 
         $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('The check must be made outside any transaction on the storage connection.');
 
         try {
-            PasskeyChangeGateContract::assertTheGateNeedsTheCallersTransaction($this->user, self::APPLICATION);
+            PasskeyChangeGateContract::assertTheGateNeedsTheCallersTransaction($this->registeringCall(), $this->removalCall());
         } finally {
             $connection->rollBack();
         }
+    }
+
+    /**
+     * The kit's test hands the contract the test case's own registration hook,
+     * so one that swallows the gate's refusal fails it.
+     *
+     * @return void
+     */
+    public function testTheKitCallsTheRegistrationHook(): void
+    {
+        $this->swallows = 'registering';
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('The path must refuse to register a passkey outside the caller\'s transaction.');
+
+        $this->testPasskeyChangeGateNeedsTheCallersTransaction();
+    }
+
+    /**
+     * The kit's test hands the contract the test case's own removal hook, so
+     * one that swallows the gate's refusal fails it.
+     *
+     * @return void
+     */
+    public function testTheKitCallsTheRemovalHook(): void
+    {
+        $this->swallows = 'removing';
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('The path must refuse to remove a passkey outside the caller\'s transaction.');
+
+        $this->testPasskeyChangeGateNeedsTheCallersTransaction();
     }
 
     /**
@@ -216,15 +304,9 @@ final class PasskeyChangeGateContractTest extends TestCase
     #[\Override]
     protected function registerPasskey(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] string $credentialId): mixed
     {
-        $owner = ProofOwner::of($identity);
+        $registrar = new StandInRegistrar($this->container()->make(PasskeyChangeGate::class));
 
-        $registration = new PasskeyRegistration(
-            $credentialId,
-            new ObservedProperties(userPresence: true),
-            new ProofBinding($owner->type, $owner->key, self::APPLICATION, self::SESSION, Purpose::ENROLLMENT),
-        );
-
-        return (new StandInRegistrar($this->container()->make(PasskeyChangeGate::class)))->register($identity, self::APPLICATION, $registration);
+        return $registrar->register($identity, self::APPLICATION, $this->registration($identity, self::APPLICATION, $credentialId));
     }
 
     /**
@@ -238,5 +320,108 @@ final class PasskeyChangeGateContractTest extends TestCase
     protected function isPasskeyStored(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] string $credentialId): bool
     {
         return StandInRegistrar::stores($identity, $credentialId);
+    }
+
+    /**
+     * Call the gate's `registering()` as an adapter would, broken as the test
+     * says.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $credentialId
+     * @return mixed
+     */
+    #[\Override]
+    protected function gateRegistering(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId): mixed
+    {
+        $call = fn (): mixed => $this->container()->make(PasskeyChangeGate::class)->registering(
+            CallerContext::forIdentity($identity, $application),
+            $this->registration($identity, $application, $credentialId),
+        );
+
+        return $this->asBroken('registering', $call);
+    }
+
+    /**
+     * Call the gate's `removing()` as an adapter would, broken as the test
+     * says.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $credentialId
+     * @return mixed
+     */
+    #[\Override]
+    protected function gateRemoving(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId): mixed
+    {
+        $call = fn (): mixed => $this->container()->make(PasskeyChangeGate::class)->removing(CallerContext::forIdentity($identity, $application), $credentialId);
+
+        return $this->asBroken('removing', $call);
+    }
+
+    /**
+     * A registration of the credential for the identity on the application.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $credentialId
+     * @return \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration
+     */
+    private function registration(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId): PasskeyRegistration
+    {
+        $owner = ProofOwner::of($identity);
+
+        return new PasskeyRegistration(
+            $credentialId,
+            new ObservedProperties(userPresence: true),
+            new ProofBinding($owner->type, $owner->key, $application, self::SESSION, Purpose::ENROLLMENT),
+        );
+    }
+
+    /**
+     * The gate's `registering()` for the person on the application, as the
+     * adapter's call.
+     *
+     * @return \Closure(string): mixed
+     */
+    private function registeringCall(): \Closure
+    {
+        return fn (#[\SensitiveParameter] string $credentialId): mixed => $this->gateRegistering($this->user, self::APPLICATION, $credentialId);
+    }
+
+    /**
+     * The gate's `removing()` for the person on the application, as the
+     * adapter's call.
+     *
+     * @return \Closure(string): mixed
+     */
+    private function removalCall(): \Closure
+    {
+        return fn (#[\SensitiveParameter] string $credentialId): mixed => $this->gateRemoving($this->user, self::APPLICATION, $credentialId);
+    }
+
+    /**
+     * Make the hook's call as the test says: in a transaction of its own, with
+     * a `LogicException` swallowed, or as it is.
+     *
+     * @param  string  $hook
+     * @param  \Closure(): mixed  $call
+     * @return mixed
+     */
+    private function asBroken(string $hook, \Closure $call): mixed
+    {
+        if ($this->ownTransaction === $hook) {
+            return DB::connection(StorageConnection::name())->transaction($call);
+        }
+
+        if ($this->swallows !== $hook) {
+            return $call();
+        }
+
+        try {
+            return $call();
+        } catch (\LogicException) {
+            return null;
+        }
     }
 }
