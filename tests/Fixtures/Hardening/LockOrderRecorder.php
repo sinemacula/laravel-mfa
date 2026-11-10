@@ -208,7 +208,7 @@ final class LockOrderRecorder
                 continue;
             }
 
-            $owners[] = implode('|', array_slice($entry['bindings'], 0, 2));
+            $owners[] = implode('|', array_filter(array_slice($entry['bindings'], 0, 2), is_string(...)));
         }
 
         return count(array_unique($owners)) > 1

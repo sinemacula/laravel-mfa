@@ -12,7 +12,6 @@ use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Proofs\BeginSignInOnLogin;
-use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use Tests\Fixtures\Context\GuardPortalResolver;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
@@ -178,12 +177,10 @@ final class BeginSignInOnLoginTest extends TestCase
      * The listener under test.
      *
      * @return \SineMacula\Laravel\Mfa\Proofs\BeginSignInOnLogin
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     private function listener(): BeginSignInOnLogin
     {
-        return new BeginSignInOnLogin($this->container()->make(ProofService::class));
+        return new BeginSignInOnLogin;
     }
 
     /**

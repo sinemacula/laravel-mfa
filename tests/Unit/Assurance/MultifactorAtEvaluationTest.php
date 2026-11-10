@@ -56,7 +56,7 @@ final class MultifactorAtEvaluationTest extends TestCase
     {
         $proofs = new SignInProofs;
 
-        self::assertTrue(self::ago(100)->equalTo($this->evaluate($proofs->password(1000), $proofs->totp(100))->multifactorAt));
+        self::assertMultifactorAt(100, $this->evaluate($proofs->password(1000), $proofs->totp(100))->multifactorAt);
     }
 
     /**
@@ -69,7 +69,7 @@ final class MultifactorAtEvaluationTest extends TestCase
     {
         $proofs = new SignInProofs;
 
-        self::assertTrue(self::ago(1000)->equalTo($this->evaluate($proofs->passkey(true, 1000), $proofs->email(10))->multifactorAt));
+        self::assertMultifactorAt(1000, $this->evaluate($proofs->passkey(true, 1000), $proofs->email(10))->multifactorAt);
     }
 
     /**
@@ -82,7 +82,7 @@ final class MultifactorAtEvaluationTest extends TestCase
     {
         $proofs = new SignInProofs;
 
-        self::assertTrue(self::ago(10)->equalTo($this->evaluate($proofs->passkey(true, 1000), $proofs->passkeyFactor(true, 10))->multifactorAt));
+        self::assertMultifactorAt(10, $this->evaluate($proofs->passkey(true, 1000), $proofs->passkeyFactor(true, 10))->multifactorAt);
     }
 
     /**
@@ -95,8 +95,8 @@ final class MultifactorAtEvaluationTest extends TestCase
     {
         $proofs = new SignInProofs;
 
-        self::assertTrue(self::ago(100)->equalTo($this->evaluate($proofs->password(1000), $proofs->totp(500), $proofs->totp(100))->multifactorAt));
-        self::assertTrue(self::ago(800)->equalTo($this->evaluate($proofs->password(1000), $proofs->totp(800), $proofs->email(10))->multifactorAt));
+        self::assertMultifactorAt(100, $this->evaluate($proofs->password(1000), $proofs->totp(500), $proofs->totp(100))->multifactorAt);
+        self::assertMultifactorAt(800, $this->evaluate($proofs->password(1000), $proofs->totp(800), $proofs->email(10))->multifactorAt);
     }
 
     /**
@@ -154,8 +154,8 @@ final class MultifactorAtEvaluationTest extends TestCase
         $proofs      = new SignInProofs;
         $multifactor = static fn (Combination $combination): bool => $combination->isMultifactor();
 
-        self::assertTrue(self::ago(100)->equalTo(Combination::after($proofs->password(1000), $proofs->totp(100))->evidencedAt($multifactor)));
-        self::assertTrue(self::ago(1000)->equalTo(Combination::after($proofs->passkey(true, 1000), $proofs->email(10))->evidencedAt($multifactor)));
+        self::assertMultifactorAt(100, Combination::after($proofs->password(1000), $proofs->totp(100))->evidencedAt($multifactor));
+        self::assertMultifactorAt(1000, Combination::after($proofs->passkey(true, 1000), $proofs->email(10))->evidencedAt($multifactor));
         self::assertNull(Combination::after($proofs->password(1000), $proofs->email(10))->evidencedAt($multifactor));
     }
 
@@ -201,5 +201,18 @@ final class MultifactorAtEvaluationTest extends TestCase
     private static function ago(int $seconds): CarbonImmutable
     {
         return CarbonImmutable::parse(self::NOW)->subSeconds($seconds);
+    }
+
+    /**
+     * Assert the time is the frozen time less the seconds given.
+     *
+     * @param  int  $seconds
+     * @param  ?\Carbon\CarbonImmutable  $at
+     * @return void
+     */
+    private static function assertMultifactorAt(int $seconds, ?CarbonImmutable $at): void
+    {
+        self::assertNotNull($at);
+        self::assertTrue(self::ago($seconds)->equalTo($at));
     }
 }

@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace Tests\Unit\Requirements;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Collection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -15,6 +14,7 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
+use Tests\Fixtures\Factors\FactorSets;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Lifecycle\FixedFreshnessGate;
 use Tests\Fixtures\Requirements\Concerns\ArrangesFactorChanges;
@@ -93,7 +93,7 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     public function testAStaleSessionIsRefusedEveryChange(): void
     {
         $user  = $this->signInWith(static fn (SignInProofs $signIn): array => [$signIn->password(7200)]);
-        $alone = new Collection([self::factorWith(self::STEPPED_UP_WITH)]);
+        $alone = FactorSets::of(self::factorWith(self::STEPPED_UP_WITH));
 
         foreach (FactorChange::cases() as $change) {
             $this->assertRefused($this->changeRequest($user, $change, $change->namesFactor() ? self::OTHER_FACTOR : null));
@@ -112,8 +112,8 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     public function testAFactorAuthorizesItsOwnRemovalOnlyWhileNoOtherIsConfirmed(): void
     {
         $user    = $this->steppedUp();
-        $alone   = new Collection([self::factorWith(self::STEPPED_UP_WITH)]);
-        $pending = new Collection([self::factorWith(self::STEPPED_UP_WITH), self::factorWith(self::OTHER_FACTOR, 'pending')]);
+        $alone   = FactorSets::of(self::factorWith(self::STEPPED_UP_WITH));
+        $pending = FactorSets::of(self::factorWith(self::STEPPED_UP_WITH), self::factorWith(self::OTHER_FACTOR, 'pending'));
 
         self::assertNull($this->authorize($this->changeRequest($user, FactorChange::REMOVE_FACTOR, self::STEPPED_UP_WITH, null, $alone)));
         self::assertNull($this->authorize($this->changeRequest($user, FactorChange::REMOVE_FACTOR, self::STEPPED_UP_WITH, null, $pending)));

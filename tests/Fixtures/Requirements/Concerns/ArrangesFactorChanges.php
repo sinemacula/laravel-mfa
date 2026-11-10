@@ -10,6 +10,7 @@ use SineMacula\Laravel\Mfa\Enums\FactorChange;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use Tests\Fixtures\Factors\FactorSets;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
 
@@ -50,7 +51,7 @@ trait ArrangesFactorChanges
      */
     protected function changeRequest(TestUser $user, FactorChange $change, ?string $factorId, ?Requirement $requirement = null, ?Collection $factors = null): FactorChangeRequest
     {
-        $factors ??= new Collection([self::factorWith(self::STEPPED_UP_WITH), self::factorWith(self::OTHER_FACTOR)]);
+        $factors ??= FactorSets::of(self::factorWith(self::STEPPED_UP_WITH), self::factorWith(self::OTHER_FACTOR));
 
         return new FactorChangeRequest($user, SignInProofs::APPLICATION, SignInProofs::SESSION, $change, $factors, $factorId, $requirement);
     }

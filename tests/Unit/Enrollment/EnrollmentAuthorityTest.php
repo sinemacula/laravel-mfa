@@ -22,6 +22,7 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use Tests\Fixtures\Factors\FactorSets;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\Fixtures\Requirements\ScriptedFactorChangeGate;
@@ -335,7 +336,7 @@ final class EnrollmentAuthorityTest extends TestCase
     private function reconfirmed(EnrollmentAuthorization $kind): ?FailureReason
     {
         try {
-            $this->authority()->reconfirm($kind, self::APPLICATION, 'totp', Factor::query()->get());
+            $this->authority()->reconfirm($kind, self::APPLICATION, 'totp', FactorSets::stored());
         } catch (OperationRefusedException $exception) {
             return $exception->reason;
         }
@@ -372,7 +373,7 @@ final class EnrollmentAuthorityTest extends TestCase
      */
     private function authorized(Caller $caller, string $type): GrantAuthority
     {
-        return DB::transaction(fn (): GrantAuthority => $this->container()->make(EnrollmentAuthority::class)->authorize($caller, self::APPLICATION, $type, Factor::query()->get()));
+        return DB::transaction(fn (): GrantAuthority => $this->container()->make(EnrollmentAuthority::class)->authorize($caller, self::APPLICATION, $type, FactorSets::stored()));
     }
 
     /**

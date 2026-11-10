@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Lifecycle;
 
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -21,6 +20,7 @@ use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Factors\FactorSets;
 use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\Fixtures\Lifecycle\RecordingSessionRevoker;
 use Tests\Fixtures\Requirements\SignInProofs;
@@ -58,7 +58,7 @@ final class FactorRemovalTest extends TestCase
         $factor = $this->confirmedFactor($user);
 
         try {
-            $this->removal()->remove($user, self::APPLICATION, $factor, new Collection([$factor]), SignInProofs::SESSION);
+            $this->removal()->remove($user, self::APPLICATION, $factor, FactorSets::of($factor), SignInProofs::SESSION);
             self::fail('A removal outside a transaction was expected to be refused.');
         } catch (\LogicException $exception) {
             self::assertSame('A factor is removed only inside the identity\'s factor state transaction.', $exception->getMessage());
@@ -84,7 +84,7 @@ final class FactorRemovalTest extends TestCase
         $this->expectException(UnsupportedFactorException::class);
         $this->expectExceptionMessage('A factor is removed by its id.');
 
-        DB::transaction(fn () => $this->removal()->remove($user, self::APPLICATION, $factor, new Collection([$factor]), SignInProofs::SESSION));
+        DB::transaction(fn () => $this->removal()->remove($user, self::APPLICATION, $factor, FactorSets::of($factor), SignInProofs::SESSION));
     }
 
     /**
@@ -212,7 +212,7 @@ final class FactorRemovalTest extends TestCase
 
         $this->container()->instance(SessionTransition::class, $transition);
 
-        $factors = new Collection([$factor, $other]);
+        $factors = FactorSets::of($factor, $other);
         $result  = DB::transaction(fn (): FactorRemovalResult => $this->removal()->remove($user, self::APPLICATION, $factor, $factors, SignInProofs::SESSION));
 
         self::assertSame($completion, $result->completion());
@@ -225,7 +225,7 @@ final class FactorRemovalTest extends TestCase
 
         $this->container()->instance(SessionRevoker::class, new RecordingSessionRevoker(judges: true, completion: $answer));
 
-        $result = DB::transaction(fn (): FactorRemovalResult => $this->removal()->remove($user, self::APPLICATION, $other, new Collection([$other]), SignInProofs::SESSION));
+        $result = DB::transaction(fn (): FactorRemovalResult => $this->removal()->remove($user, self::APPLICATION, $other, FactorSets::of($other), SignInProofs::SESSION));
 
         self::assertSame($answer, $result->completion());
         self::assertCount(1, $transition->changes);

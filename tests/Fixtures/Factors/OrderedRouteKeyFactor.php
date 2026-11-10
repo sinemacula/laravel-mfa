@@ -21,9 +21,9 @@ final class OrderedRouteKeyFactor extends Factor
     /**
      * Retrieve the model for a bound value, lowest primary key first.
      *
-     * @param  mixed  $query
+     * @param  \Illuminate\Database\Eloquent\Model|\Illuminate\Database\Eloquent\Relations\Relation<*, *, *>  $query
      * @param  mixed  $value
-     * @param  mixed  $field
+     * @param  ?string  $field
      * @return \Illuminate\Contracts\Database\Eloquent\Builder
      *
      * @phpstan-ignore sineMaculaLaravel.modelBehaviour

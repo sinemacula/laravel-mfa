@@ -67,6 +67,7 @@ use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
+use Tests\Fixtures\Factors\FactorSets;
 use Tests\Fixtures\Factors\UnwrittenFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
@@ -443,7 +444,7 @@ final class GatesEnrollmentStarterTest extends TestCase
         $authority = $this->container()->make(EnrollmentAuthority::class);
 
         try {
-            $authority->authorize(new Caller($user, $pending, $pending->application), self::APPLICATION, 'totp', Factor::query()->get(), PendingAction::START_BOOTSTRAP_ENROLLMENT);
+            $authority->authorize(new Caller($user, $pending, $pending->application), self::APPLICATION, 'totp', FactorSets::stored(), PendingAction::START_BOOTSTRAP_ENROLLMENT);
 
             self::fail('A credential lacking the action was expected to be refused.');
         } catch (OperationRefusedException $exception) {

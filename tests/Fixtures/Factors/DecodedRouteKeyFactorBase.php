@@ -52,7 +52,7 @@ abstract class DecodedRouteKeyFactorBase extends Model implements EloquentFactor
      * Decode the value, and look the factor up by what it decodes to.
      *
      * @param  mixed  $value
-     * @param  mixed  $field
+     * @param  ?string  $field
      * @return ?\Illuminate\Database\Eloquent\Model
      *
      * @phpstan-ignore sineMaculaLaravel.modelBehaviour

@@ -73,7 +73,7 @@ final class CountingHasher implements Hasher
     /**
      * Get information about the given hashed value.
      *
-     * @param  mixed  $hashedValue
+     * @param  string  $hashedValue
      * @return array<string, mixed>
      */
     #[\Override]
@@ -85,22 +85,22 @@ final class CountingHasher implements Hasher
     /**
      * Hash the given value.
      *
-     * @param  mixed  $value
+     * @param  string  $value
      * @param  array<mixed>  $options
      * @return string
      */
     #[\Override]
     public function make(#[\SensitiveParameter] mixed $value, array $options = []): string
     {
-        return $this->inner?->make($value, $options) ?? self::PREFIX . self::text($value);
+        return $this->inner?->make($value, $options) ?? self::PREFIX . $value;
     }
 
     /**
      * Count and record the check, run the hook when it is due, and check the
      * value against the hash.
      *
-     * @param  mixed  $value
-     * @param  mixed  $hashedValue
+     * @param  string  $value
+     * @param  string  $hashedValue
      * @param  array<mixed>  $options
      * @return bool
      *
@@ -109,7 +109,7 @@ final class CountingHasher implements Hasher
     #[\Override]
     public function check(#[\SensitiveParameter] mixed $value, mixed $hashedValue, array $options = []): bool
     {
-        $this->checked[] = self::text($value);
+        $this->checked[] = $value;
 
         if ($this->hook !== null && count($this->checked) === $this->hookAt) {
 
@@ -119,13 +119,13 @@ final class CountingHasher implements Hasher
             $hook();
         }
 
-        return $this->inner?->check($value, $hashedValue, $options) ?? $hashedValue === self::PREFIX . self::text($value);
+        return $this->inner?->check($value, $hashedValue, $options) ?? $hashedValue === self::PREFIX . $value;
     }
 
     /**
      * Whether the hash needs rehashing: never.
      *
-     * @param  mixed  $hashedValue
+     * @param  string  $hashedValue
      * @param  array<mixed>  $options
      * @return bool
      */
@@ -133,17 +133,5 @@ final class CountingHasher implements Hasher
     public function needsRehash(mixed $hashedValue, array $options = []): bool
     {
         return false;
-    }
-
-    /**
-     * The value as text: a hasher is only ever given a string, which the
-     * contract leaves untyped.
-     *
-     * @param  mixed  $value
-     * @return string
-     */
-    private static function text(mixed $value): string
-    {
-        return is_string($value) ? $value : '';
     }
 }

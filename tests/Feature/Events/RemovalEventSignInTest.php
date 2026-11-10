@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Tests\Feature\Events;
 
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
@@ -17,6 +16,7 @@ use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Factors\FactorSets;
 use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\Fixtures\Seams\RecordingEventContextResolver;
 use Tests\TestCase;
@@ -73,7 +73,7 @@ final class RemovalEventSignInTest extends TestCase
         $this->recoveryCodesOf($user);
 
         $removal = $this->container()->make(FactorRemoval::class);
-        $result  = DB::transaction(static fn (): FactorRemovalResult => $removal->remove($user, self::APPLICATION, $factor, new Collection([$factor]), self::ELSEWHERE));
+        $result  = DB::transaction(static fn (): FactorRemovalResult => $removal->remove($user, self::APPLICATION, $factor, FactorSets::of($factor), self::ELSEWHERE));
 
         self::assertTrue($result->wasMade());
         self::assertSame([self::ELSEWHERE], RecordingEventContextResolver::signInsOf($this->reported, FactorRemoved::class));
