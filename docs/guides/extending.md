@@ -371,7 +371,15 @@ too, and never report a delivery. The lock order is the identity's state, then i
 `Testing\Seams\Concerns\ChallengeCountersTests` proves an owner's wiring: a failure is counted before the owner's
 transaction commits and not at all when it, or a nested transaction around the challenge, rolls back; the identity's
 limit locks it; a consumed challenge answered again never counts as a success; and a disabled factor is not challenged.
-Its hooks fail one challenge, and consume one and answer it again, through the owner's own path.
+Its hooks fail one challenge, and consume one and answer it again, through the owner's own path. Two more hooks make the
+owner's own calls into the counters, each calling your adapter directly, never inside a transaction of the hook's own,
+and letting every exception through: `isChallengeAdmitted()` answers whether a challenge is admitted, and
+`isChallengeReported()` reports an outcome and answers whether the adapter took it, a refusal answering `false` or
+throwing an `Exceptions\OperationRefusedException`. `otherCountedIdentity()` names a second identity of the same kind.
+Through them the kit checks that each call is refused outside the owner's transaction, so an adapter that opens its own
+or swallows the refusal fails; that the identity's own binding is admitted, and the same binding naming the other
+identity is neither admitted nor counted; and that an enrolment challenge admits no confirmed factor and counts nothing,
+failed or passed, before or after the transaction commits.
 
 ## Passkeys
 
@@ -409,6 +417,12 @@ fresh step-up made with another factor where the identity has one), and the last
 returned for your layer, such as the pending session's new credential when it judged the session itself, or else what
 the bound `SessionTransition` returned. A refusal throws an `OperationRefusedException`; let it roll back your own
 change, since catching it and committing breaks the gate.
+
+`Testing\Seams\Concerns\PasskeyChangeGateTests` proves the wiring: a registration the gate refuses keeps no credential
+and associates nothing, through `registerPasskey()` and `isPasskeyStored()`; and your adapter's own calls into the gate
+are refused outside your transaction, through `gateRegistering()` and `gateRemoving()`. Those two call the adapter's
+call into the gate itself, not the registration or removal path around it, which may rightly open a transaction: never
+inside a transaction of the hook's own, and letting every exception through.
 
 ## Proving an adapter
 
