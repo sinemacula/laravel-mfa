@@ -12,6 +12,8 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\TestCase;
@@ -48,7 +50,8 @@ final class EnablingTest extends TestCase
 
     /**
      * A disabled factor is enabled, naming the actor and reporting it as it
-     * stands once enabled; its failures in a row and its lockout stay.
+     * stands once enabled; its failures in a row, its lockout and the
+     * identity's run stay.
      *
      * @return void
      *
@@ -62,6 +65,8 @@ final class EnablingTest extends TestCase
 
         $factor->update(['consecutive_failures' => 100, 'disabled_at' => CarbonImmutable::now(), 'locked_until' => $until]);
 
+        IdentityState::query()->create(['authenticatable_type' => ProofOwner::of($user)->type, 'authenticatable_id' => ProofOwner::of($user)->key, 'consecutive_failures' => 7]);
+
         self::assertTrue(Mfa::enableFactor($user, $factor->id, self::actor()));
         self::assertSame(['FactorEnabled'], $this->reportedNames());
         self::assertInstanceOf(FactorEnabled::class, $this->reported[0]);
@@ -74,6 +79,7 @@ final class EnablingTest extends TestCase
         self::assertNull($stored->getDisabledAt());
         self::assertSame(100, $stored->getConsecutiveFailures());
         self::assertSame($until->getTimestamp(), $stored->getLockedUntil()?->getTimestamp());
+        self::assertSame(7, IdentityState::query()->where('authenticatable_id', ProofOwner::of($user)->key)->sole()->consecutive_failures);
     }
 
     /**
