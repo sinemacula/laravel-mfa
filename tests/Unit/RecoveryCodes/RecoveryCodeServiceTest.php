@@ -65,8 +65,8 @@ final class RecoveryCodeServiceTest extends TestCase
 
     /**
      * The status follows the set: its size and time once generated, one less
-     * per redemption, the next generation's size and time once replaced, and
-     * only the identity's own codes.
+     * per redemption, which passes and says so, the next generation's size and
+     * time once replaced, and only the identity's own codes.
      *
      * @return void
      *
@@ -90,9 +90,13 @@ final class RecoveryCodeServiceTest extends TestCase
         self::assertSame('2026-11-01 08:00:00', $status->generatedAt?->format('Y-m-d H:i:s'));
         self::assertTrue($status->exists());
 
-        $this->recoveryCodes()->redeem($holder, $codes[0], self::redemptionBinding($holder, Purpose::SIGN_IN));
-        $this->recoveryCodes()->redeem($holder, $codes[1], self::redemptionBinding($holder, Purpose::SIGN_IN));
+        $first  = $this->recoveryCodes()->redeem($holder, $codes[0], self::redemptionBinding($holder, Purpose::SIGN_IN));
+        $second = $this->recoveryCodes()->redeem($holder, $codes[1], self::redemptionBinding($holder, Purpose::SIGN_IN));
 
+        self::assertTrue($first->passed);
+        self::assertSame(9, $first->remaining);
+        self::assertTrue($second->passed);
+        self::assertSame(8, $second->remaining);
         self::assertSame(8, $this->recoveryCodes()->status($holder)->remaining);
 
         $this->travelTo(CarbonImmutable::parse('2026-11-03 08:00:00'));
