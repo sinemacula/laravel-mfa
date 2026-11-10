@@ -31,7 +31,7 @@ final readonly class FactorChangeRequest
      * @param  string  $application
      * @param  string  $session
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorChange  $change
-     * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
+     * @param  \Illuminate\Database\Eloquent\Collection<int, covariant \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
      * @param  ?string  $factorId
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      *

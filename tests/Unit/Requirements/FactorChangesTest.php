@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
 use SineMacula\Laravel\Mfa\Requirements\FactorChanges;
 use Tests\Fixtures\Identities\TestUser;
@@ -299,6 +300,21 @@ final class FactorChangesTest extends TestCase
         $this->expectExceptionMessage($message);
 
         new FactorChangeRequest($this->person(), SignInProofs::APPLICATION, $session, $change, new Collection, $factorId);
+    }
+
+    /**
+     * A request takes a collection of the shipped factor model as it is, and
+     * carries it unchanged.
+     *
+     * @return void
+     */
+    public function testARequestTakesTheShippedFactorModelsCollection(): void
+    {
+        $factors = new Collection([new Factor]);
+
+        $request = new FactorChangeRequest($this->person(), SignInProofs::APPLICATION, SignInProofs::SESSION, FactorChange::ADD_FACTOR, $factors);
+
+        self::assertSame($factors, $request->factors);
     }
 
     /**
