@@ -4,16 +4,12 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\RecoveryCodes;
 
-use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Hashing\Hasher;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Database\Query\JoinClause;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
@@ -26,10 +22,8 @@ use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RecoveryCode;
-use SineMacula\Laravel\Mfa\Database\BoundedDelete;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\OpenTransaction;
-use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Events\Actor;
@@ -39,10 +33,8 @@ use SineMacula\Laravel\Mfa\Events\RecoveryCodesLow;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
-use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\ConfirmedFactors;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
-use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
@@ -81,6 +73,9 @@ final readonly class RecoveryCodeService
     /** @var string The type a recovery code is reported and proved as. */
     public const string TYPE = 'recovery_code';
 
+    /** @var \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeRows The identity's stored codes and the set's state. */
+    private RecoveryCodeRows $rows;
+
     /**
      * Constructor.
      *
@@ -118,7 +113,9 @@ final readonly class RecoveryCodeService
 
         /** The resolver of who the request serves. */
         private CallerContextResolver $callers,
-    ) {}
+    ) {
+        $this->rows = new RecoveryCodeRows($config);
+    }
 
     /**
      * Generate a new set for the identity, replacing any earlier one, and
@@ -217,7 +214,7 @@ final readonly class RecoveryCodeService
 
             self::requireConfirmedFactor($confirmed, 'The identity no longer has a confirmed factor.');
 
-            return $this->replace(ProofOwner::of($identity), $hashes);
+            return $this->rows->replace(ProofOwner::of($identity), $hashes);
         });
 
         return [
@@ -279,7 +276,7 @@ final readonly class RecoveryCodeService
 
         $settings = new ApplicationSettings($this->config, $binding->application);
         $owner    = ProofOwner::of($identity);
-        $known    = $this->hasKnownFirstFactor($identity, $binding, $pending);
+        $known    = $this->firstFactors->forBinding($identity, $binding, $pending) !== null;
 
         return match (true) {
             !$settings->acceptsRecoveryCodes() => ChallengeAdmission::refuse(FailureReason::TYPE_NOT_ENABLED, 'The application does not accept recovery codes.'),
@@ -374,39 +371,7 @@ final readonly class RecoveryCodeService
      */
     public function status(MultiFactorAuthenticatable $identity): RecoveryCodeStatus
     {
-        $owner = ProofOwner::of($identity);
-        $code  = $this->codeModel();
-        $state = new IdentityState;
-
-        [$typeColumn, $keyColumn] = self::ownerColumns($code);
-
-        $codes      = $code->getTable();
-        $generation = $state->qualifyColumn('recovery_codes_generation');
-        $generated  = $state->qualifyColumn('recovery_codes_generated_at');
-
-        $query = WriteConnection::query($state->newQuery())
-            ->leftJoin($codes, static function (JoinClause $join) use ($state, $code, $codes, $typeColumn, $keyColumn, $generation): void {
-                $join->on($codes . '.' . $typeColumn, '=', $state->qualifyColumn('authenticatable_type'))
-                    ->on($codes . '.' . $keyColumn, '=', $state->qualifyColumn('authenticatable_id'))
-                    ->on($codes . '.' . $code->getGenerationName(), '=', $generation)
-                    ->whereNull($codes . '.' . $code->getUsedAtName())
-                    ->whereNull($codes . '.' . $code->getReplacedAtName());
-            })
-            ->where($state->qualifyColumn('authenticatable_type'), $owner->type)
-            ->where($state->qualifyColumn('authenticatable_id'), $owner->key)
-            ->groupBy($generation, $generated)
-            ->select([$generation, $generated]);
-
-        $row = $query->selectRaw('count(' . $query->getQuery()->getGrammar()->wrap($codes . '.' . $code->getKeyName()) . ') as remaining')->first();
-
-        $remaining = $row?->getAttribute('remaining');
-        $at        = $row?->recovery_codes_generated_at;
-
-        return new RecoveryCodeStatus(
-            is_numeric($remaining) ? (int) $remaining : 0,
-            $row->recovery_codes_generation ?? 0,
-            $at === null ? null : CarbonImmutable::instance($at),
-        );
+        return $this->rows->status(ProofOwner::of($identity));
     }
 
     /**
@@ -481,19 +446,9 @@ final readonly class RecoveryCodeService
      */
     public function deleteSet(MultiFactorAuthenticatable $identity): bool
     {
-        self::requireTransaction();
+        OpenTransaction::assertOpen('A recovery code set is removed only inside the identity\'s factor state transaction.');
 
-        $owner   = ProofOwner::of($identity);
-        $state   = $this->lockedState($owner);
-        $deleted = $this->owned($this->codeModel(), $owner)->toBase()->delete();
-        $existed = $state->recovery_codes_generated_at !== null || $deleted > 0;
-
-        if ($state->recovery_codes_generated_at !== null) {
-            $state->recovery_codes_generated_at = null;
-            self::save($state);
-        }
-
-        return $existed;
+        return $this->rows->delete(ProofOwner::of($identity));
     }
 
     /**
@@ -534,14 +489,7 @@ final readonly class RecoveryCodeService
      */
     public function prune(CarbonInterface $before): int
     {
-        $code = $this->codeModel();
-
-        return BoundedDelete::run($code->newQuery()
-            ->toBase()
-            ->where(static function (QueryBuilder $query) use ($code, $before): void {
-                $query->where($code->getUsedAtName(), '<', $before)
-                    ->orWhere($code->getReplacedAtName(), '<', $before);
-            }));
+        return $this->rows->prune($before);
     }
 
     /**
@@ -580,64 +528,6 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Refuse removing a set outside a transaction on the storage connection:
-     * the removal is part of the change that removes the last confirmed factor.
-     *
-     * @return void
-     *
-     * @throws \LogicException
-     */
-    private static function requireTransaction(): void
-    {
-        OpenTransaction::assertOpen('A recovery code set is removed only inside the identity\'s factor state transaction.');
-    }
-
-    /**
-     * Under the identity's lock: mark every code of the identity not yet
-     * replaced as replaced, store the new codes' hashes under the next
-     * generation, and record the generation and its time on the identity's
-     * state row. Returns the new generation. Every save must be made, so a
-     * cancelled one throws and the whole replacement rolls back.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
-     * @param  list<string>  $hashes
-     * @return int
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
-     */
-    private function replace(ProofOwner $owner, array $hashes): int
-    {
-        $now   = CarbonImmutable::now();
-        $state = $this->lockedState($owner);
-        $model = $this->codeModel();
-
-        $generation = $state->recovery_codes_generation + 1;
-
-        $this->owned($model, $owner)
-            ->whereNull($model->getReplacedAtName())
-            ->update([$model->getReplacedAtName() => $now]);
-
-        [$typeColumn, $keyColumn] = self::ownerColumns($model);
-
-        foreach ($hashes as $hash) {
-            $code = $model->newInstance();
-
-            $code->setAttribute($typeColumn, $owner->type);
-            $code->setAttribute($keyColumn, $owner->key);
-            $code->setAttribute($model->getGenerationName(), $generation);
-            $code->setAttribute($model->getCodeHashName(), $hash);
-            self::save($code);
-        }
-
-        $state->recovery_codes_generation   = $generation;
-        $state->recovery_codes_generated_at = $now;
-        self::save($state);
-
-        return $generation;
-    }
-
-    /**
      * Under the identity's lock: check the normalised code against every unused
      * code of the current generation and mark the match used.
      *
@@ -649,12 +539,12 @@ final readonly class RecoveryCodeService
      */
     private function check(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] ?string $normalized): Redemption
     {
-        $usable  = $this->usableCodes(ProofOwner::of($identity));
+        $usable  = $this->rows->usable(ProofOwner::of($identity));
         $hashes  = $usable->map(static fn (Model&RecoveryCode $code): string => $code->getCodeHash() ?? '')->all();
         $index   = RecoveryCodeMatcher::find($this->hasher(), $hashes, $normalized);
         $matched = $index === null ? null : $usable->get($index);
 
-        if ($matched === null || !$this->markUsed($matched)) {
+        if ($matched === null || !$this->rows->markUsed($matched)) {
             return Redemption::failed(FailureReason::INVALID_CODE, 'The code matched no unused recovery code.', $usable->count());
         }
 
@@ -673,83 +563,6 @@ final readonly class RecoveryCodeService
     private static function checked(?Redemption $checked): Redemption
     {
         return $checked ?? throw new \LogicException('An attempt that was not refused checks the code.');
-    }
-
-    /**
-     * Save the model, and throw when a model event cancels the save, so the
-     * change it is part of rolls back rather than commit without it.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model  $model
-     * @return void
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
-     */
-    private static function save(Model $model): void
-    {
-        if (!$model->save()) {
-            throw new WriteCanceledException(sprintf('A model event cancelled the save of a [%s], so the change it is part of was rolled back.', $model::class));
-        }
-    }
-
-    /**
-     * Mark the code used, only while it is still neither used nor replaced.
-     * Returns whether this redemption marked it.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\RecoveryCode  $code
-     * @return bool
-     *
-     * @imperative
-     */
-    private function markUsed(Model&RecoveryCode $code): bool
-    {
-        return WriteConnection::query($code->newQuery())
-            ->whereKey($code->getKey())
-            ->whereNull($code->getUsedAtName())
-            ->whereNull($code->getReplacedAtName())
-            ->update([$code->getUsedAtName() => CarbonImmutable::now()]) === 1;
-    }
-
-    /**
-     * The identity's codes of its current generation that are neither used nor
-     * replaced, read with a locking read so a code used in the meantime is seen
-     * as used.
-     *
-     * @formatter:off
-     *
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
-     * @return \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\RecoveryCode>
-     *
-     * @formatter:on
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
-     */
-    private function usableCodes(ProofOwner $owner): Collection
-    {
-        $model      = $this->codeModel();
-        $generation = $this->lockedState($owner)->recovery_codes_generation;
-
-        return $this->owned($model, $owner)
-            ->where($model->getGenerationName(), $generation)
-            ->whereNull($model->getUsedAtName())
-            ->whereNull($model->getReplacedAtName())
-            ->lockForUpdate()
-            ->get();
-    }
-
-    /**
-     * Whether the first factor of the session the binding names is known.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
-     * @return bool
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
-     */
-    private function hasKnownFirstFactor(MultiFactorAuthenticatable $identity, ProofBinding $binding, ?PendingContext $pending): bool
-    {
-        return $this->firstFactors->forBinding($identity, $binding, $pending) !== null;
     }
 
     /**
@@ -779,73 +592,6 @@ final readonly class RecoveryCodeService
             ->get();
 
         return ConfirmedFactors::isAmong($factors->filter(static fn (EloquentFactor&Model $stored): bool => FactorOwnerColumns::owns($stored, $owner->type, $owner->key)));
-    }
-
-    /**
-     * The identity's state row, read with a locking read: the identity's factor
-     * state lock, which every caller holds, creates it.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
-     * @return \SineMacula\Laravel\Mfa\Models\IdentityState
-     *
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
-     */
-    private function lockedState(ProofOwner $owner): IdentityState
-    {
-        return IdentityState::query()
-            ->where('authenticatable_type', $owner->type)
-            ->where('authenticatable_id', $owner->key)
-            ->lockForUpdate()
-            ->firstOrFail();
-    }
-
-    /**
-     * The identity's codes, found by the owner columns of the model's
-     * `authenticatable` relation, on the write connection.
-     *
-     * @formatter:off
-     *
-     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\RecoveryCode  $model
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
-     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\RecoveryCode>
-     *
-     * @formatter:on
-     */
-    private function owned(Model&RecoveryCode $model, ProofOwner $owner): Builder
-    {
-        [$typeColumn, $keyColumn] = self::ownerColumns($model);
-
-        return WriteConnection::query($model->newQuery())
-            ->where($typeColumn, $owner->type)
-            ->where($keyColumn, $owner->key);
-    }
-
-    /**
-     * The owner columns of the recovery code model's `authenticatable`
-     * relation, which an application's own model may name differently.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\RecoveryCode  $model
-     * @return array{0: string, 1: string}
-     */
-    private static function ownerColumns(Model&RecoveryCode $model): array
-    {
-        $relation = $model->authenticatable();
-
-        return [$relation->getMorphType(), $relation->getForeignKeyName()];
-    }
-
-    /**
-     * A blank instance of the configured recovery code model.
-     *
-     * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\RecoveryCode
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
-     */
-    private function codeModel(): Model&RecoveryCode
-    {
-        $model = ConfiguredModels::recoveryCode($this->config);
-
-        return new $model;
     }
 
     /**
