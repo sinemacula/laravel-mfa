@@ -137,9 +137,10 @@ One that queues the message must encrypt the whole queued payload, destination i
 implements `ShouldBeEncrypted`, and none may log the code. A queued job that fails later cannot take back a code already
 reported sent.
 
-`Codes\MailEmailSender` lays the code out in the configured `mfa.codes.mailable` (`Codes\MfaCodeMessage` or a
-subclass), in the locale it is sent in, and encrypts it whenever it is queued. For SMS, `Codes\SmsCodeText::of()` gives
-the package's own wording, the `mfa::messages.sms_code` line in the current locale (see
+`Codes\MailEmailSender` lays the code out in the configured `mfa.codes.mailable` (`Codes\MfaCodeMessage` or a subclass),
+in the locale it is sent in, and encrypts it whenever it is queued. A subclass overrides `content()` or `renderHtml()`
+to use its own view, which can render the public `$code` and `$expiresInMinutes`. For SMS, `Codes\SmsCodeText::of()`
+gives the package's own wording, the `mfa::messages.sms_code` line in the current locale (see
 [Localisation](localization.md)), for a sender that keeps it. In tests, `Testing\FakeSmsSender::fake()` and
 `Testing\FakeEmailSender::fake()` bind a sender that keeps the messages instead of delivering them (see
 [Testing](testing.md)).
