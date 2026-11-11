@@ -19,16 +19,8 @@ use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
 use Tests\TestCase;
 
 /**
- * The factor state lock is taken on the storage connection and released when
- * its transaction rolls back.
- *
- * The package's tables live in a SQLite file reached through two connections:
- * `storage`, the configured storage connection, and `observer`, standing in for
- * a concurrent request with no wait for locks. While a factor state transaction
- * holds the identity's lock, the observer cannot take it (SQLite holds the
- * write lock of the whole file, MySQL and PostgreSQL the row's); once the
- * transaction rolls back, it can, and nothing the transaction wrote remains.
- * The default connection is never used for the lock.
+ * The factor state lock is taken on the storage connection; `observer` plays a
+ * concurrent request on the same SQLite file that never waits for a lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -40,15 +32,13 @@ final class FactorStateLockTest extends TestCase
 {
     use MigratesTheStorageConnection;
 
-    /** @var string The key of the identity whose factor state is locked. */
+    /** @var string Identity whose factor state is locked. */
     private const string IDENTITY_KEY = 'person-1';
 
-    /** @var string The SQLite file the package's tables live in. */
+    /** @var string SQLite file holding the package's tables. */
     private string $database = '';
 
     /**
-     * Create the package's tables on the storage connection.
-     *
      * @return void
      */
     #[\Override]
@@ -60,8 +50,6 @@ final class FactorStateLockTest extends TestCase
     }
 
     /**
-     * Remove the SQLite file once the application is gone.
-     *
      * @return void
      */
     #[\Override]
@@ -77,9 +65,6 @@ final class FactorStateLockTest extends TestCase
     }
 
     /**
-     * While the transaction runs, it holds the identity's lock on the storage
-     * connection, and the default connection holds no transaction.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -103,8 +88,6 @@ final class FactorStateLockTest extends TestCase
     }
 
     /**
-     * A rollback releases the lock and leaves nothing the transaction wrote.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -143,9 +126,6 @@ final class FactorStateLockTest extends TestCase
     }
 
     /**
-     * Point the package's tables at a fresh SQLite file reached through two
-     * connections, neither of which waits for a lock.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -179,9 +159,6 @@ final class FactorStateLockTest extends TestCase
     }
 
     /**
-     * Take the test identity's lock as a concurrent request would, outside any
-     * transaction of the observer's own.
-     *
      * @return void
      */
     private function lockAsObserver(): void
@@ -198,9 +175,6 @@ final class FactorStateLockTest extends TestCase
     }
 
     /**
-     * Assert the observer cannot take the test identity's lock while it is
-     * held.
-     *
      * @return void
      */
     private function assertObserverIsLockedOut(): void
@@ -214,9 +188,7 @@ final class FactorStateLockTest extends TestCase
             self::assertStringContainsString('database is locked', $exception->getMessage());
         }
 
-        // The refused statement keeps the observer's read lock on the file
-        // until it is finalised, and the exception's trace keeps it alive, so
-        // both are let go before anything else touches the file.
+        // The refused statement, kept alive by the trace, holds a read lock.
         unset($exception);
 
         DB::purge('observer');

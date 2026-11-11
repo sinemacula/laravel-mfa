@@ -35,19 +35,8 @@ use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
 use Tests\TestCase;
 
 /**
- * The identity's factors, whether it has a confirmed one, and its re-enrolment
- * obligation are read from the write connection when the storage connection
- * splits its reads and writes.
- *
- * The storage connection reads from one SQLite file and writes to another,
- * standing in for a replica that has not yet caught up with the primary: both
- * hold the package's tables, but a factor written since is only on the writer.
- * A plain read through the connection misses it; the package's read finds it.
- *
- * Each piece of state a verification depends on has a case here: the replica
- * catches up, the state changes on the writer, the replica is shown to be
- * behind, and the answer is the writer's: a replay refused, a lockout met, a
- * proof that no longer counts.
+ * State a verification depends on is read from the writer: the storage
+ * connection reads one SQLite file and writes another, as a lagging replica.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -66,16 +55,13 @@ final class WriteConnectionReadTest extends TestCase
 {
     use ArrangesVerification, MigratesTheStorageConnection;
 
-    /** @var string The SQLite file reads are served from. */
+    /** @var string SQLite file reads are served from. */
     private string $reader = '';
 
-    /** @var string The SQLite file writes go to. */
+    /** @var string SQLite file writes go to. */
     private string $writer = '';
 
     /**
-     * Create the package's tables on the writer, then copy them to the reader
-     * before anything is written, as a replica would hold them.
-     *
      * @return void
      */
     #[\Override]
@@ -91,8 +77,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * Remove both SQLite files once the application is gone.
-     *
      * @return void
      */
     #[\Override]
@@ -110,9 +94,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A factor on the writer and not yet on the reader is still among the
-     * identity's factors.
-     *
      * @return void
      */
     public function testAFactorNotYetOnTheReaderIsStillRead(): void
@@ -133,8 +114,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A factor on the writer and not yet on the reader binds to a route.
-     *
      * @return void
      */
     public function testAFactorNotYetOnTheReaderStillBinds(): void
@@ -155,8 +134,7 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A factor confirmed on the writer and not yet on the reader enables MFA
-     * for an identity using the shipped trait, and the listing agrees.
+     * Through the shipped `HasFactors` trait.
      *
      * @return void
      */
@@ -178,9 +156,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A factor removed on the writer and still on the reader no longer enables
-     * MFA, and the listing agrees.
-     *
      * @return void
      */
     public function testAFactorRemovedButStillOnTheReaderNoLongerEnablesMfa(): void
@@ -206,10 +181,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A re-enrolment obligation set on the writer and not yet on the reader
-     * still obliges the identity, so its sign-in still requires an additional
-     * verification.
-     *
      * @return void
      */
     public function testAnObligationNotYetOnTheReaderStillObliges(): void
@@ -234,9 +205,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A time step accepted on the writer and not yet on the reader is still a
-     * replay.
-     *
      * @return void
      */
     public function testAnAcceptedStepNotYetOnTheReaderStillRefusesTheReplay(): void
@@ -255,8 +223,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A factor's lockout on the writer and not yet on the reader still holds.
-     *
      * @return void
      */
     public function testAFactorLockoutNotYetOnTheReaderStillHolds(): void
@@ -275,9 +241,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * An identity's lockout on the writer and not yet on the reader still
-     * holds.
-     *
      * @return void
      */
     public function testAnIdentityLockoutNotYetOnTheReaderStillHolds(): void
@@ -303,9 +266,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * Failures counted on the writer and not yet on the reader still add up, so
-     * the last one locks the factor.
-     *
      * @return void
      */
     public function testAnAttemptCountNotYetOnTheReaderStillAddsUp(): void
@@ -326,9 +286,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A code consumed on the writer and not yet on the reader cannot be spent
-     * again.
-     *
      * @return void
      */
     public function testACodeConsumedOnTheWriterCannotBeSpentAgain(): void
@@ -351,9 +308,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A recovery code used on the writer and not yet on the reader cannot be
-     * used again.
-     *
      * @return void
      */
     public function testARecoveryCodeUsedOnTheWriterCannotBeUsedAgain(): void
@@ -374,8 +328,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A factor removed on the writer and still on the reader verifies nothing.
-     *
      * @return void
      */
     public function testAFactorRemovedOnTheWriterVerifiesNothing(): void
@@ -394,9 +346,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A generation advanced on the writer and not yet on the reader stops the
-     * proofs of the earlier one counting.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -419,9 +368,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * A credential associated on the writer and not yet on the reader is
-     * associated.
-     *
      * @return void
      */
     public function testAnAssociationNotYetOnTheReaderIsStillFound(): void
@@ -441,9 +387,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * Put the package's tables on a connection that reads from one SQLite file
-     * and writes to another.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -486,8 +429,6 @@ final class WriteConnectionReadTest extends TestCase
     }
 
     /**
-     * Bring the replica up to the writer, as it stood a moment ago.
-     *
      * @return void
      */
     private function replicaCatchesUp(): void

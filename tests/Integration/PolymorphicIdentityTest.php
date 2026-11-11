@@ -15,12 +15,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Polymorphic-identity integration test.
- *
- * Verifies that the package's polymorphic Factor relation enforces MFA
- * correctly against more than one Eloquent identity class within the same
- * application.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -32,10 +26,6 @@ final class PolymorphicIdentityTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Factors persisted against one identity class must not leak into a sibling
-     * identity class — the polymorphic relation scopes by
-     * `authenticatable_type` correctly.
-     *
      * @return void
      */
     public function testFactorsAreScopedToTheirOwningIdentityType(): void
@@ -64,9 +54,7 @@ final class PolymorphicIdentityTest extends TestCase
             'destination'          => $secondary->email,
         ]);
 
-        // Identity switches need nothing in between: the factors are read for
-        // the current identity on every call, scoped by morph class as well as
-        // identifier.
+        // Factors are read per call, scoped by morph class and identifier.
         $this->actingAs($primary);
         self::assertFalse(Mfa::requirement(Callers::current())->isEmpty());
 
@@ -83,11 +71,6 @@ final class PolymorphicIdentityTest extends TestCase
     }
 
     /**
-     * Two MFA-capable identity classes that share a primary-key value
-     * (`User #1` and `Admin #1`) MUST read their own factors within the same
-     * request — without scoping by class the second identity would see the
-     * first identity's factor.
-     *
      * @return void
      */
     public function testFactorReadsScopeByIdentityClassEvenWhenIdentifiersCollide(): void
@@ -97,8 +80,7 @@ final class PolymorphicIdentityTest extends TestCase
             'mfa_enabled' => true,
         ]);
 
-        // Force the secondary onto the same primary-key value so the only thing
-        // distinguishing the two identities is the morph class.
+        // Share the primary key so only the morph class tells them apart.
         $secondary = SecondaryUser::create([
             'email'       => 'shared-secondary@example.test',
             'mfa_enabled' => true,
@@ -106,7 +88,6 @@ final class PolymorphicIdentityTest extends TestCase
         $secondary->forceFill(['id' => $primary->getKey()])->saveQuietly();
         $secondary->refresh();
 
-        // Only the primary identity owns a factor.
         Factor::create([
             'authenticatable_type' => $primary::class,
             'authenticatable_id'   => (string) $primary->id,
@@ -118,15 +99,10 @@ final class PolymorphicIdentityTest extends TestCase
         self::assertCount(1, Mfa::factors(Callers::current()));
 
         $this->actingAs($secondary);
-        // Without per-class scoping this would erroneously list the primary's
-        // factor, as it shares the id.
         self::assertSame([], Mfa::factors(Callers::current()));
     }
 
     /**
-     * The sign-in requirement must be empty for both identity classes alike
-     * when neither requires anything of its own.
-     *
      * @return void
      */
     public function testEnforcementWorksAcrossBothIdentityClasses(): void

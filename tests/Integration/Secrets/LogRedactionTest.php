@@ -36,10 +36,8 @@ use Tests\Fixtures\Secrets\SecretCarryingException;
 use Tests\TestCase;
 
 /**
- * Tests that secrets, codes and full destinations never reach a log through the
- * application's own channels: in a log's context, objects in it included, in
- * Laravel's shared context, in what a channel's processors add, in a reported
- * exception's context and message, and in a trace's arguments.
+ * Secrets, codes and full destinations never reach a log through the
+ * application's own channels.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -63,9 +61,6 @@ final class LogRedactionTest extends TestCase
     private const string DESTINATION = '+447700900123';
 
     /**
-     * Secrets, codes and destinations in a log's context are redacted, and the
-     * rest of the context is kept.
-     *
      * @return void
      */
     public function testRedactsSecretsInALogsContext(): void
@@ -86,8 +81,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A provisioning URI in a log's message is redacted.
-     *
      * @return void
      */
     public function testRedactsAProvisioningUriInALogsMessage(): void
@@ -98,8 +91,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A code in Laravel's shared context, which every log carries, is redacted.
-     *
      * @return void
      */
     public function testRedactsSecretsInTheSharedContext(): void
@@ -112,8 +103,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * The context of an exception the exception handler reports is redacted.
-     *
      * @return void
      */
     public function testRedactsSecretsInAReportedExceptionsContext(): void
@@ -129,9 +118,7 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A code passed through the facade, into the package and on to a driver
-     * outside it, is scrubbed from every frame of a reported exception's trace,
-     * the facade's and the driver's included, before it is logged.
+     * Every frame is scrubbed, the facade's and the outside driver's included.
      *
      * @return void
      */
@@ -149,9 +136,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A code recorded in the trace of an exception logged directly is scrubbed
-     * too.
-     *
      * @return void
      */
     public function testScrubsTheTraceOfALoggedException(): void
@@ -165,9 +149,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A provisioning URI in the message of a logged exception, or of a previous
-     * one, never reaches the written record.
-     *
      * @return void
      */
     public function testRedactsProvisioningUrisInLoggedExceptionMessages(): void
@@ -185,9 +166,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * Secrets held in objects in a log's context, a plain object and a
-     * collection, never reach the written record.
-     *
      * @return void
      */
     public function testRedactsSecretsHeldInObjects(): void
@@ -207,8 +185,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A recursive context is truncated rather than walked without end.
-     *
      * @return void
      */
     public function testTruncatesARecursiveContext(): void
@@ -224,8 +200,7 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * What a channel's own processors add to a record is redacted, since the
-     * redaction runs after them.
+     * The redaction runs after the channel's own processors.
      *
      * @return void
      */
@@ -237,9 +212,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A channel resolved before the package boots is tapped as it boots, so its
-     * records are redacted for the rest of the process.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -263,9 +235,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * Every configured channel is tapped, and a stack built from tapped
-     * channels redacts once.
-     *
      * @return void
      */
     public function testTapsEveryChannelAndRedactsOnceInAStack(): void
@@ -286,9 +255,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * Log through a test channel, through a stack of it, both recorded by one
-     * test handler, and through a channel with a processor of its own.
-     *
      * @param  mixed  $app
      * @return void
      */
@@ -307,8 +273,7 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * The exception thrown below a call through the facade, which hands the
-     * code into the package and on to a driver outside it.
+     * Thrown by an outside driver the facade handed the code to.
      *
      * @return \Throwable
      *
@@ -338,8 +303,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A channel's logger.
-     *
      * @param  string  $channel
      * @return \Illuminate\Log\Logger
      */
@@ -357,8 +320,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * A channel's Monolog logger.
-     *
      * @param  string  $channel
      * @return \Monolog\Logger
      */
@@ -372,8 +333,6 @@ final class LogRedactionTest extends TestCase
     }
 
     /**
-     * The last record a channel's test handler recorded.
-     *
      * @param  string  $channel
      * @return \Monolog\LogRecord
      */

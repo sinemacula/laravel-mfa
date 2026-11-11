@@ -21,30 +21,8 @@ use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use Tests\TestCase;
 
 /**
- * Two requests racing with codes for one TOTP factor: only one records the
- * step, whichever database holds the factors.
- *
- * The second request runs on a connection of its own (`racer`) to the same
- * database, and opens its transaction and reads the factor before the first
- * request verifies, so its copy shows no step accepted, and on MySQL its reads
- * come from a snapshot taken before the first request committed. The first
- * request then verifies and commits on the default connection, and the second
- * verifies with the same code, or one for an earlier step. The step is checked
- * by the database as it records it, against the row as committed, so the second
- * request is refused although everything it read says otherwise. On SQLite,
- * whose in-memory test database one connection holds, both requests share that
- * connection, and the first records its step inside the second's transaction.
- *
- * Two requests also verify the same code at the same time, each in a process
- * and on a connection of its own: the first records its step without
- * committing, the second, in a forked worker, issues its own while the first
- * still holds the row, and the test waits until the database reports the worker
- * waiting on that row's lock before the first commits. This needs a database
- * that serves several connections, so it is skipped on SQLite.
- *
- * The tables are committed rather than wrapped in a transaction of the test's
- * own, so the second connection sees what the first commits; the migrations
- * roll them back after each test.
+ * Racing TOTP requests record the step once: the database checks it against the
+ * committed row, whatever the losing request's stale copy says.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -55,24 +33,22 @@ use Tests\TestCase;
 #[CoversTrait(ActsAsFactor::class)]
 final class TotpReplayRaceTest extends TestCase
 {
-    /** @var int The frozen time: 15 seconds into time step 60000000. */
+    /** @var int Frozen time, 15 seconds into step 60000000. */
     private const int NOW = 1800000015;
 
-    /** @var int The time step the frozen time falls in. */
+    /** @var int Step the frozen time falls in. */
     private const int STEP = 60000000;
 
-    /** @var int How long to wait for the worker, in microseconds, between looks. */
+    /** @var int Wait between polls, in microseconds. */
     private const int POLL_INTERVAL = 150000;
 
-    /** @var int How many times to look for the worker waiting on the row. */
+    /** @var int Polls for the worker waiting on the row. */
     private const int POLLS = 400;
 
-    /** @var string The connection the second request runs on. */
+    /** @var string Second request's connection; shares `testing` on in-memory SQLite. */
     private string $racer = 'testing';
 
     /**
-     * Freeze time in the middle of a step.
-     *
      * @return void
      */
     #[\Override]
@@ -84,9 +60,6 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * Of two requests with the same code, only the one that records the step
-     * first passes.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -103,9 +76,6 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * Once one request records a step, a request with a code for an earlier
-     * step of the window is refused, though its copy shows no step accepted.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -125,9 +95,7 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * Of two requests verifying the same code at the same time, the second
-     * waits on the row the first changed but has not committed, then finds the
-     * step recorded and is refused.
+     * The forked second request waits on the uncommitted row, then is refused.
      *
      * @return void
      *
@@ -200,9 +168,6 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * Give the second request a connection of its own to the test database,
-     * unless the database is SQLite in memory, which only one connection holds.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -232,8 +197,6 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * What a verification in the race is bound to.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
     private static function binding(): ProofBinding
@@ -242,9 +205,7 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * Run the race: the second request opens its transaction and reads the
-     * factor, the first verifies its code and commits, then the second verifies
-     * its own and commits. Returns whether each passed.
+     * The second request reads the factor before the first verifies.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @param  \Closure(\SineMacula\Laravel\Mfa\Models\Factor): string  $firstCode
@@ -281,11 +242,8 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * Verify the code as the second request, in the forked worker, on the
-     * racer's connection, which the test never opened, so the worker shares no
-     * connection with the test. The worker reports its connection's id before
-     * it verifies and the outcome after, then kills itself, so nothing the test
-     * process set up is torn down twice.
+     * Uses the racer connection the test never opened, and kills itself so
+     * nothing the test set up is torn down twice.
      *
      * @param  \SineMacula\Laravel\Mfa\Drivers\TotpDriver  $driver
      * @param  string  $id
@@ -313,12 +271,7 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * Wait until the database reports the worker's connection waiting for a row
-     * lock, failing when it never does.
-     *
-     * InnoDB refreshes what `innodb_trx` reports only once nothing has read it
-     * for 100 milliseconds, so looking any more often than that would keep
-     * returning the first answer, and never see the worker start waiting.
+     * InnoDB refreshes `innodb_trx` only after 100ms unread, so poll no faster.
      *
      * @param  string  $backend
      * @return void
@@ -345,8 +298,6 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * Build the driver over the test's configuration.
-     *
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -357,8 +308,6 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * Store a confirmed TOTP factor with no step accepted.
-     *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
     private function storedFactor(): Factor
@@ -372,8 +321,6 @@ final class TotpReplayRaceTest extends TestCase
     }
 
     /**
-     * The step stored in the factor's row, as committed.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return ?int
      *

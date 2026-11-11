@@ -20,23 +20,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * A challenge owner's parallel guesses cannot overrun the identity's cap, on
- * MySQL and PostgreSQL.
- *
- * The package's tables live on the default connection, which a second
- * connection to the same database, `observer`, stands in for a concurrent
- * challenge owner on, with a lock timeout of a second. While one owner holds
- * its transaction between asking whether the factor may be challenged and
- * reporting the outcome, a parallel owner asking about the same identity waits
- * for the identity's state lock and times out; once the first has reported the
- * failure that locks the identity, the parallel one finds the lockout.
- *
- * The parallel owner's wait times out inside the nested transaction the
- * counters open in its own, which Laravel reports on MySQL as a
- * `DeadlockException` wrapping the query's failure.
- *
- * SQLite serialises every writer on the whole file, so these tests run on the
- * server databases only.
+ * Parallel guesses cannot overrun the identity's cap: the `observer` connection
+ * plays a second owner. SQLite serialises all writers, so this needs a server.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -55,8 +40,6 @@ final class ParallelChallengeCountersTest extends TestCase
     private ?ChallengeAdmission $parallel = null;
 
     /**
-     * Skip on SQLite, and give the observer a lock timeout of a second.
-     *
      * @return void
      */
     #[\Override]
@@ -74,9 +57,6 @@ final class ParallelChallengeCountersTest extends TestCase
     }
 
     /**
-     * A parallel owner waits for the first owner's report, and then finds the
-     * identity it locked.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -96,6 +76,7 @@ final class ParallelChallengeCountersTest extends TestCase
             try {
                 $this->parallel = $this->asObserver($user, $factor);
             } catch (DeadlockException|QueryException $exception) {
+                // MySQL reports a nested transaction's timeout as a deadlock.
                 $this->stopped = $exception instanceof DeadlockException ? $exception->getPrevious() : $exception;
             }
 
@@ -109,8 +90,6 @@ final class ParallelChallengeCountersTest extends TestCase
     }
 
     /**
-     * Add the observer: a second connection to the test database.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -131,9 +110,6 @@ final class ParallelChallengeCountersTest extends TestCase
     }
 
     /**
-     * Ask about the factor on the observer, inside a transaction of its own, as
-     * a concurrent owner would.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission
@@ -156,8 +132,6 @@ final class ParallelChallengeCountersTest extends TestCase
     }
 
     /**
-     * The counters under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeCounters
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

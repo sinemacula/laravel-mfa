@@ -9,9 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * A proof store one request binds in its own sandbox, built with the marker the
- * configuration of the application that built it holds, which notes what it is
- * asked to do, so a test can tell which application a listener reached.
+ * Notes each call with the configured marker it was built with, so a test can
+ * tell which application's sandbox a listener reached.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,12 +19,10 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  */
 final class ConfigurationReadingProofStore implements ProofStore
 {
-    /** @var list<string> What was asked of the store, each with the marker it was built with. */
+    /** @var list<string> Each call, suffixed with the store's marker. */
     public array $calls = [];
 
     /**
-     * Constructor.
-     *
      * @param  string  $marker
      */
     public function __construct(
@@ -35,8 +32,6 @@ final class ConfigurationReadingProofStore implements ProofStore
     ) {}
 
     /**
-     * Note the sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -49,8 +44,6 @@ final class ConfigurationReadingProofStore implements ProofStore
     }
 
     /**
-     * There is no sign-in to answer with.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?string
@@ -62,8 +55,6 @@ final class ConfigurationReadingProofStore implements ProofStore
     }
 
     /**
-     * Nothing is kept.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
@@ -75,8 +66,6 @@ final class ConfigurationReadingProofStore implements ProofStore
     }
 
     /**
-     * There are no proofs to answer with.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -89,8 +78,6 @@ final class ConfigurationReadingProofStore implements ProofStore
     }
 
     /**
-     * Nothing is kept.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @return void
@@ -102,8 +89,6 @@ final class ConfigurationReadingProofStore implements ProofStore
     }
 
     /**
-     * Note the sign-out.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void

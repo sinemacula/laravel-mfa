@@ -17,13 +17,8 @@ use Laravel\Octane\Testing\Fakes\FakeWorker;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Serves requests through one Laravel Octane worker, as Octane's own suite
- * does: the test's booted application, warmed with Octane's default services,
- * is the worker's root application, and every request runs through the real
- * `Worker`, which clones it into a sandbox and dispatches Octane's listeners
- * (the configuration sandbox, the flush of the guards and the session, the new
- * request instance, the flush of scoped instances) around the HTTP kernel. Only
- * the server is fake: no Swoole, RoadRunner or FrankenPHP.
+ * Serves requests through Octane's real `Worker` and listeners over the test's
+ * booted application, as Octane's own suite does; only the server is fake.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -32,16 +27,13 @@ use Symfony\Component\HttpFoundation\Response;
  */
 trait ServesRequestsThroughOctane
 {
-    /** @var ?\Laravel\Octane\Testing\Fakes\FakeWorker The worker every request is served by. */
+    /** @var ?\Laravel\Octane\Testing\Fakes\FakeWorker Serves every request. */
     private ?FakeWorker $octaneWorker = null;
 
     /** @var ?\Laravel\Octane\Testing\Fakes\FakeClient The fake server the worker answers. */
     private ?FakeClient $octaneClient = null;
 
     /**
-     * Register Octane on the test's application, warm it as a worker does at
-     * boot, and boot a worker on it.
-     *
      * @return void
      */
     protected function bootOctaneWorker(): void
@@ -57,8 +49,7 @@ trait ServesRequestsThroughOctane
     }
 
     /**
-     * Serve the request through the worker and return its response, failing the
-     * test when the worker itself caught an error.
+     * Fails the test when the worker caught an error.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Testing\TestResponse<\Symfony\Component\HttpFoundation\Response>
@@ -87,10 +78,7 @@ trait ServesRequestsThroughOctane
     }
 
     /**
-     * Octane's application factory over the booted application, in place of one
-     * that would bootstrap from a skeleton: the worker binds its instances on
-     * it, and it is warmed with Octane's default services, as a worker does
-     * with the application it creates at start.
+     * Warms the booted application instead of bootstrapping a skeleton.
      *
      * @param  \Illuminate\Foundation\Application  $app
      * @return \Laravel\Octane\ApplicationFactory
@@ -113,13 +101,8 @@ trait ServesRequestsThroughOctane
     }
 
     /**
-     * Hand the services Octane gave the request's sandbox (the database
-     * manager, the router, the HTTP kernel and the rest) back to the root
-     * application, so the test can read the database between requests: the
-     * sandbox they hold has been flushed once the worker is done with it. Only
-     * the application they hold is replaced, as the next request's own
-     * listeners replace it again; nothing is reset, so whatever the next
-     * request does not see is down to Octane's lifecycle alone.
+     * Points services back at the root application so the test can read the
+     * database between requests; nothing is reset, so isolation is Octane's.
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Symfony\Component\HttpFoundation\Response  $response
@@ -141,8 +124,6 @@ trait ServesRequestsThroughOctane
     }
 
     /**
-     * The test's booted application.
-     *
      * @return \Illuminate\Foundation\Application
      */
     private function octaneApplication(): Application

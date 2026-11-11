@@ -59,11 +59,8 @@ use Tests\Integration\Octane\Fixtures\ConfigurationReadingProofStore;
 use Tests\TestCase;
 
 /**
- * Consecutive requests for different people served by one Octane worker, with
- * the package's services resolved at boot, as `octane.warm` or an early
- * `Mfa::extend()` would. The identity comes from a header through a request
- * guard, and each person keeps one session cookie over a real session on files,
- * so what a person proved lasts between their requests and nothing else does.
+ * One Octane worker serves different people with the package's services
+ * resolved at boot, as `octane.warm` would; nothing leaks between them.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -92,7 +89,7 @@ final class ConsecutiveRequestsTest extends TestCase
     /** @var string The address the email factor delivers to. */
     private const string ADDRESS = 'alice@example.test';
 
-    /** @var string The configuration a request sets for itself, read back by what it binds. */
+    /** @var string Config key a request sets for itself. */
     private const string MARKER = 'mfa-test.marker';
 
     /** @var string The directory the sessions are kept in. */
@@ -105,9 +102,6 @@ final class ConsecutiveRequestsTest extends TestCase
     private bool $failNextCommit = false;
 
     /**
-     * Freeze the clock, install a sender, resolve the package's services on the
-     * booted application and boot the worker.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -157,8 +151,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Release the clock and remove the sessions.
-     *
      * @return void
      */
     #[\Override]
@@ -180,11 +172,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Alice verifies and passes the gate; Bob, who holds no factors, sees
-     * nothing of hers and is refused; Alice removes a factor, and her list and
-     * the gate change with it while Bob's answers do not; Alice is still as she
-     * was left.
-     *
      * @return void
      */
     public function testConsecutiveRequestsForDifferentPeopleShareNothing(): void
@@ -247,10 +234,7 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * `Login`, `Logout` and `CurrentDeviceLogout`, fired by name, each reach
-     * the proof store the request bound in its own sandbox, built from that
-     * sandbox's configuration, though the listeners are registered once, on the
-     * booted application.
+     * The listeners are registered once, on the booted application.
      *
      * @return void
      */
@@ -264,9 +248,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * What one request configures and binds reaches the services it calls, and
-     * none of it reaches the next request.
-     *
      * @return void
      */
     public function testConfigurationAndSeamsOfOneRequestStayInIt(): void
@@ -278,8 +259,7 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * A dispatcher one request binds receives that request's report, and the
-     * booted dispatcher does not; the next request's goes to the booted one.
+     * The booted dispatcher misses that report and gets the next request's.
      *
      * @return void
      */
@@ -303,9 +283,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * A write connection pin whose callback throws is released, so the next
-     * request reads as configured.
-     *
      * @return void
      */
     public function testAPinThatThrowsIsReleasedForTheNextRequest(): void
@@ -320,9 +297,7 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * A commit that fails is a server error for the request it was part of, and
-     * leaves nothing waiting for the next one: the retry is the only report and
-     * the only proof.
+     * The retry is the only report and the only proof.
      *
      * @return void
      */
@@ -350,8 +325,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Define the routes the requests call.
-     *
      * @param  \Illuminate\Routing\Router  $router
      * @return void
      */
@@ -421,9 +394,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Identify people through the header, keep sessions on files, and declare
-     * the application with no requirement of its own, the gate asking for AAL2.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -460,8 +430,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * The ids of the factors the person sees.
-     *
      * @return \Illuminate\Http\JsonResponse
      */
     private static function factorIds(): JsonResponse
@@ -470,8 +438,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * The methods of the proofs the person's session holds.
-     *
      * @return \Illuminate\Http\JsonResponse
      */
     private static function proofMethods(): JsonResponse
@@ -480,8 +446,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Send the code the request asks for.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -491,8 +455,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Remove the factor the request names.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -502,8 +464,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Whether the storage connection routes reads to the writer now.
-     *
      * @return \Illuminate\Http\JsonResponse
      */
     private static function pinState(): JsonResponse
@@ -512,8 +472,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Fire `Login` for the person the request acts for.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -523,8 +481,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Fire `Logout` for the person the request acts for.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -534,8 +490,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Fire `CurrentDeviceLogout` for the person the request acts for.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -545,8 +499,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * The person the guard resolved for the request.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private static function user(): TestUser
@@ -556,8 +508,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * The event dispatcher of the application serving.
-     *
      * @return \Illuminate\Contracts\Events\Dispatcher
      */
     private static function dispatcher(): Dispatcher
@@ -566,8 +516,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Verify what the request submits.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -579,8 +527,7 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Bind a proof store in this request's sandbox, built from its
-     * configuration, fire the event and answer with what reached the store.
+     * Binds a proof store built from this sandbox's config; answers its calls.
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Closure(\Tests\Fixtures\Identities\TestUser): object  $event
@@ -608,9 +555,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * What the services answer from: the digits the TOTP driver reads, and what
-     * the requirement asks for.
-     *
      * @return \Illuminate\Http\JsonResponse
      */
     private static function settings(): JsonResponse
@@ -623,8 +567,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Whether the connection routes reads to the write connection.
-     *
      * @param  \Illuminate\Database\Connection  $connection
      * @return bool
      */
@@ -634,7 +576,7 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * A request acting for the person, carrying that person's session cookie.
+     * Carries the person's session cookie.
      *
      * @param  string  $method
      * @param  string  $uri
@@ -654,8 +596,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -666,8 +606,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * A confirmed factor of the person's, enrolled through the application.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $person
      * @param  array<string, mixed>  $attributes
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -686,8 +624,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * The ids of the factors the person sees.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $person
      * @return list<string>
      */
@@ -698,8 +634,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * The methods of the proofs the person's session holds.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $person
      * @return list<string>
      */
@@ -710,8 +644,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Assert the gate refuses the person.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $person
      * @return void
      */
@@ -721,8 +653,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * A request submitting the code the factor's authenticator app shows.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $person
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return \Illuminate\Http\Request
@@ -733,8 +663,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Assert the person verifies with what the factor's app shows.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $person
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return void
@@ -745,8 +673,6 @@ final class ConsecutiveRequestsTest extends TestCase
     }
 
     /**
-     * Assert how many passed verifications the booted dispatcher reported.
-     *
      * @param  int  $count
      * @return void
      */

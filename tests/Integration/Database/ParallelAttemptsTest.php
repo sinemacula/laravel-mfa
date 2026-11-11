@@ -23,20 +23,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Parallel guesses cannot overrun a cap, on MySQL and PostgreSQL.
- *
- * The package's tables live on the default connection, which a second
- * connection to the same database, `observer`, stands in for a concurrent
- * request on, with a lock timeout of a second. While one attempt runs its
- * verification, a parallel attempt for the same identity cannot read the
- * counts: it waits for the identity's state lock and times out. Once the first
- * attempt has counted its failure, the parallel one finds the lockout it
- * applied. A parallel attempt from the same address for another identity finds
- * the slot the first attempt took, and is throttled without waiting, and two
- * identities counting their first failure at once do not wait on each other.
- *
- * SQLite serialises every writer on the whole file, so these tests run on the
- * server databases only.
+ * Parallel guesses cannot overrun a cap: the `observer` connection plays a
+ * concurrent request. SQLite serialises all writers, so this needs a server.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -47,7 +35,7 @@ use Tests\TestCase;
 #[CoversClass(AttemptStore::class)]
 final class ParallelAttemptsTest extends TestCase
 {
-    /** @var string The address both attempts come from. */
+    /** @var string Both attempts come from this address. */
     private const string IP = '192.0.2.1';
 
     /** @var ?\Throwable What stopped the parallel attempt, if anything did. */
@@ -57,8 +45,6 @@ final class ParallelAttemptsTest extends TestCase
     private ?AttemptOutcome $parallel = null;
 
     /**
-     * Skip on SQLite, and give the observer a lock timeout of a second.
-     *
      * @return void
      */
     #[\Override]
@@ -76,8 +62,7 @@ final class ParallelAttemptsTest extends TestCase
     }
 
     /**
-     * A parallel guess for the same identity waits for the first guess's count
-     * and lockout, so with a limit of one, only one guess reaches a driver.
+     * With a limit of one, only one guess reaches a driver.
      *
      * @return void
      *
@@ -112,9 +97,7 @@ final class ParallelAttemptsTest extends TestCase
     }
 
     /**
-     * A parallel guess from the same address for another identity finds the
-     * slot the first guess took, so with a limit of one it is throttled without
-     * reaching its driver or waiting for the first.
+     * The guess is throttled without reaching its driver or waiting.
      *
      * @return void
      *
@@ -147,9 +130,7 @@ final class ParallelAttemptsTest extends TestCase
     }
 
     /**
-     * Two identities recording their first failure at the same time do not wait
-     * on each other: the count is one upsert, so the observer's open
-     * transaction holds no lock on the gap the second identity's row goes in.
+     * The count is one upsert, so no gap lock blocks the second identity's row.
      *
      * @return void
      *
@@ -191,8 +172,6 @@ final class ParallelAttemptsTest extends TestCase
     }
 
     /**
-     * Add the observer: a second connection to the test database.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -213,8 +192,7 @@ final class ParallelAttemptsTest extends TestCase
     }
 
     /**
-     * Make an attempt on the observer, as a concurrent request would, whose
-     * verification must never run.
+     * The attempt's verification must never run.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $factorId
@@ -240,8 +218,6 @@ final class ParallelAttemptsTest extends TestCase
     }
 
     /**
-     * Create a confirmed TOTP factor for the user.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
@@ -257,8 +233,6 @@ final class ParallelAttemptsTest extends TestCase
     }
 
     /**
-     * Create a test user.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -269,8 +243,6 @@ final class ParallelAttemptsTest extends TestCase
     }
 
     /**
-     * Resolve the attempt service.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

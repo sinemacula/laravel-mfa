@@ -19,11 +19,8 @@ use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
 use Tests\TestCase;
 
 /**
- * Nothing in any flow reads the package's state from a replica. The storage
- * connection's read PDO is a closure that throws, with the identities on
- * another connection, so an unrouted read anywhere ends the flow: there is no
- * enclosing transaction, sticky reads are off and no writer pin covers the
- * connection, which a control query shows by reaching the poison.
+ * No flow reads package state from a replica: the storage connection's read PDO
+ * throws, and with sticky reads off any unrouted read ends the flow.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,12 +32,10 @@ final class PoisonedReaderTest extends TestCase
 {
     use FlowCatalog, MigratesTheStorageConnection;
 
-    /** @var string The SQLite file the package's tables are on. */
+    /** @var string SQLite file holding the package's tables. */
     private string $writer = '';
 
     /**
-     * Create the package's tables and arrange the flows.
-     *
      * @return void
      */
     #[\Override]
@@ -54,8 +49,6 @@ final class PoisonedReaderTest extends TestCase
     }
 
     /**
-     * Remove the SQLite file once the application is gone.
-     *
      * @return void
      */
     #[\Override]
@@ -71,8 +64,6 @@ final class PoisonedReaderTest extends TestCase
     }
 
     /**
-     * The flow reaches its branch without touching the poisoned reader.
-     *
      * @param  string  $flow
      * @return void
      */
@@ -91,8 +82,7 @@ final class PoisonedReaderTest extends TestCase
     }
 
     /**
-     * The control: a plain read on the storage connection does reach the
-     * poison, so the flows above show something.
+     * The control: a plain read does reach the poison.
      *
      * @return void
      */
@@ -108,9 +98,6 @@ final class PoisonedReaderTest extends TestCase
     }
 
     /**
-     * Put the package's tables on a connection that splits its reads and
-     * writes, with sticky reads off, and leave the identities on the default.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -144,8 +131,6 @@ final class PoisonedReaderTest extends TestCase
     }
 
     /**
-     * Make every read that reaches the storage connection's read PDO throw.
-     *
      * @return void
      */
     private function poisonTheReader(): void
@@ -154,8 +139,6 @@ final class PoisonedReaderTest extends TestCase
     }
 
     /**
-     * What a read that reached the replica runs into.
-     *
      * @return never
      *
      * @throws \Tests\Fixtures\Exceptions\MidRotationFailureException
@@ -166,8 +149,6 @@ final class PoisonedReaderTest extends TestCase
     }
 
     /**
-     * The storage connection.
-     *
      * @return \Illuminate\Database\Connection
      */
     private function storage(): Connection

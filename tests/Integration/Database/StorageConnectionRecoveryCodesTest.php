@@ -22,14 +22,8 @@ use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
 use Tests\TestCase;
 
 /**
- * Recovery codes on a storage connection other than the default one.
- *
- * With `mfa.storage.connection` naming a `secondary` connection, the shipped
- * migrations create the package's tables there, the shipped recovery code model
- * reads and writes them there, and the replacement's transaction and the
- * identity's lock are taken there, so a failure partway through rolls back on
- * the connection the rows live on; a code is redeemed there too. The identity
- * itself stays on the default connection.
+ * Recovery codes, their transactions and the identity's lock all use the
+ * `secondary` storage connection while the identity stays on the default.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -42,8 +36,6 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     use MigratesTheStorageConnection;
 
     /**
-     * Create the package's tables on the storage connection.
-     *
      * @return void
      */
     #[\Override]
@@ -55,9 +47,6 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     }
 
     /**
-     * Generating a set writes the codes and the identity's state row on the
-     * storage connection, and none of them reaches the default one.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -78,9 +67,6 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     }
 
     /**
-     * A code generated on the storage connection is redeemed there, once, in
-     * the owner's factor state transaction.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -97,10 +83,6 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     }
 
     /**
-     * A failure partway through a replacement rolls back every write on the
-     * storage connection: the previous set still redeems, its generation is
-     * kept and no partial set remains.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -131,8 +113,6 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     }
 
     /**
-     * Put the package's tables on a secondary in-memory SQLite connection.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -164,8 +144,6 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     }
 
     /**
-     * The recovery code service.
-     *
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -176,8 +154,6 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     }
 
     /**
-     * Sign in as a fresh MFA-enabled `TestUser` with a confirmed factor.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function loginUser(): TestUser
@@ -200,9 +176,7 @@ final class StorageConnectionRecoveryCodesTest extends TestCase
     }
 
     /**
-     * Count the user's rows in a package table on the default connection: none
-     * when the table is not there, as on a database only this test uses; a
-     * database other tests share may hold the table, but not these rows.
+     * A shared test database may hold the table, so count only these rows.
      *
      * @param  string  $table
      * @param  string  $identifier

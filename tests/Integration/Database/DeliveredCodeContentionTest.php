@@ -26,15 +26,8 @@ use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
 use Tests\TestCase;
 
 /**
- * Delivered codes under requests that compete on separate connections.
- *
- * The package's tables live in a SQLite file reached through two connections:
- * `storage`, the configured storage connection, and `observer`, standing in for
- * a concurrent request with no wait for locks, which the package is pointed at
- * while that request runs. A send holds the identity's lock until its code is
- * delivered, so a competing send cannot start until it commits, and then sees
- * what it sent; of two checks of the same code that interleave, only one is
- * accepted.
+ * Delivered codes under competing requests; `observer` plays a concurrent
+ * request on the same SQLite file that never waits for a lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -47,19 +40,16 @@ final class DeliveredCodeContentionTest extends TestCase
 {
     use MigratesTheStorageConnection;
 
-    /** @var string The key of the identity the codes are sent to. */
+    /** @var string Identity the codes are sent to. */
     private const string IDENTITY_KEY = 'person-1';
 
-    /** @var string The code the engine draws. */
+    /** @var string Code the engine draws. */
     private const string CODE = '123456';
 
-    /** @var string The SQLite file the package's tables live in. */
+    /** @var string SQLite file holding the package's tables. */
     private string $database = '';
 
     /**
-     * Create the package's tables on the storage connection, the identity's
-     * email factor, and an engine drawing a known code.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -85,8 +75,6 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * Remove the SQLite file once the application is gone.
-     *
      * @return void
      */
     #[\Override]
@@ -102,9 +90,7 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * While a send delivers its code it holds the identity's lock, so a send on
-     * another connection cannot start; once it commits, the other send reads
-     * its code and is refused by the factor's cap.
+     * Once the first commits, the factor's cap refuses the competing send.
      *
      * @return void
      *
@@ -129,9 +115,7 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * Of two checks of the same code that interleave on separate connections,
-     * the one that uses the code first is accepted, and the other, which read
-     * the challenge before that, finds it used.
+     * The first check to use the code wins; the earlier reader finds it spent.
      *
      * @return void
      *
@@ -161,9 +145,6 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * Point the package's tables at a fresh SQLite file reached through two
-     * connections, neither of which waits for a lock.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -197,8 +178,6 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * Run the callback as a concurrent request on the observer connection.
-     *
      * @template TReturn
      *
      * @param  \Closure(): TReturn  $callback
@@ -216,9 +195,6 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * Assert a send on the observer connection cannot take the identity's lock
-     * while a send on the storage connection holds it.
-     *
      * @return void
      */
     private function assertCompetingSendIsLockedOut(): void
@@ -232,9 +208,7 @@ final class DeliveredCodeContentionTest extends TestCase
             self::assertSame(5, $exception->errorInfo[1] ?? null, 'SQLite answers with SQLITE_BUSY.');
         }
 
-        // The refused statement keeps the observer's read lock on the file
-        // until it is finalised, and the exception's trace keeps it alive, so
-        // both are let go before anything else touches the file.
+        // The refused statement, kept alive by the trace, holds a read lock.
         unset($exception);
 
         DB::purge('observer');
@@ -243,8 +217,6 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * The code service.
-     *
      * @return \SineMacula\Laravel\Mfa\Codes\CodeService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -255,8 +227,6 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * The identity the factor belongs to and the codes are sent to.
-     *
      * @return \Tests\Fixtures\Identities\NonEloquentIdentity
      */
     private static function identity(): NonEloquentIdentity
@@ -265,7 +235,7 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * The identity's factor, read on the connection the package is pointed at.
+     * Read on whichever connection the package is pointed at.
      *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
@@ -275,8 +245,6 @@ final class DeliveredCodeContentionTest extends TestCase
     }
 
     /**
-     * The sign-in binding of the identity's codes in the session.
-     *
      * @param  string  $session
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */

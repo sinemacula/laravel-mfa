@@ -24,22 +24,8 @@ use Tests\Fixtures\RecoveryCodes\CountingHasher;
 use Tests\TestCase;
 
 /**
- * Recovery codes redeemed and replaced concurrently, on MySQL and PostgreSQL.
- *
- * The package's tables live on the default connection, which a second
- * connection to the same database, `observer`, stands in for a concurrent
- * request on, with a lock timeout of a second. While one redemption checks the
- * set, a parallel redemption of the same code cannot read it: it waits for the
- * identity's state lock and times out; once the first has committed, the
- * parallel one finds the code used, so the code passes once. While a new set
- * replaces the old one, a concurrent reader sees the old set whole, and a
- * parallel redemption waits for the lock; once the replacement has committed,
- * the old codes fail and the new ones redeem, so there is never a moment when
- * both sets work or neither does.
- *
- * SQLite serialises every writer on the whole file, so these tests run on the
- * server databases only; the same guarantees are proved on one connection by
- * the unit tests of the recovery code service.
+ * Concurrent redemption and replacement, with `observer` as a concurrent
+ * request. SQLite serialises all writers, so this needs a server.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -56,8 +42,6 @@ final class RecoveryCodeRaceTest extends TestCase
     private ?Redemption $parallel = null;
 
     /**
-     * Skip on SQLite, and give the observer a lock timeout of a second.
-     *
      * @return void
      */
     #[\Override]
@@ -75,8 +59,7 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * Of two concurrent redemptions of one code, the second waits for the first
-     * to commit, then finds the code used: the code passes once.
+     * The second waits for the first to commit, then finds the code used.
      *
      * @return void
      *
@@ -110,9 +93,7 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * While a new set replaces the old one, a concurrent reader sees the old
-     * set whole and a concurrent redemption waits; once the replacement has
-     * committed, the old codes fail and the new ones redeem.
+     * There is never a moment when both sets work or neither does.
      *
      * @return void
      *
@@ -158,9 +139,6 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * Add the observer, a second connection to the test database, accept
-     * recovery codes on the `web` application and hash cheaply.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -186,9 +164,6 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * Redeem the code on the observer, as a concurrent request would, noting
-     * how it ended or what stopped it.
-     *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
      * @param  string  $code
      * @return void
@@ -205,8 +180,6 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * What a redemption by the identity is bound to.
-     *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
@@ -216,8 +189,6 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * Run the callback with the package's tables reached through the observer.
-     *
      * @template TReturn
      *
      * @param  \Closure(): TReturn  $callback
@@ -237,8 +208,6 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * Count the hasher's checks from now on, handing each to the real hasher.
-     *
      * @return \Tests\Fixtures\RecoveryCodes\CountingHasher
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -253,8 +222,6 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * Generate a set for the identity.
-     *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
      * @return list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>
      *
@@ -266,8 +233,6 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * Create an identity with a confirmed factor and sign it in.
-     *
      * @return \Tests\Fixtures\Identities\FactorHolder
      */
     private function signIn(): FactorHolder
@@ -288,8 +253,6 @@ final class RecoveryCodeRaceTest extends TestCase
     }
 
     /**
-     * Resolve the recovery code service.
-     *
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

@@ -14,6 +14,6 @@ namespace Tests\Integration\Process\Fixtures;
  */
 final class JobObservations
 {
-    /** @var list<array{job: string, identity: mixed, factors: list<string>, proofs: int, changed: bool}> What each job saw, oldest first. */
+    /** @var list<array{job: string, identity: mixed, factors: list<string>, proofs: int, changed: bool}> Oldest first. */
     public array $seen = [];
 }

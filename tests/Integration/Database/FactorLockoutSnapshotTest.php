@@ -24,31 +24,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * A factor's lockout committed after an application's own transaction took its
- * snapshot still refuses an attempt made inside that transaction, as the
- * deadline is read off the factor's row under the factor state lock.
- *
- * The package's tables live on the default connection, which the application's
- * transaction is opened on; a second connection to the same database,
- * `observer`, stands in for a concurrent request and commits the lockout with a
- * real failed attempt. A plain read inside the transaction shows the snapshot
- * is older than that commit. The identity is kept below its own limit, so only
- * the factor's lockout can refuse the attempt.
- *
- * The databases differ, and each is held to what it documents: MySQL answers a
- * locking read inside `REPEATABLE READ` with the row as committed, so the
- * attempt is refused where it stands. PostgreSQL's `READ COMMITTED` takes a new
- * snapshot for every statement, so it refuses too; under its `REPEATABLE READ`
- * locking a row changed since the snapshot is a serialisation failure, and the
- * whole outer transaction is to be retried, when the attempt is refused.
- *
- * A real failed attempt changes the identity's state row as well as the
- * factor's, so each database is also held to a deadline written directly to the
- * factor's row alone: the identity's lock is then uncontended, and the refusal
- * or the failure can only come from reading the factor's row.
- *
- * SQLite serialises every writer on the whole file, so these tests run on the
- * server databases only.
+ * A lockout `observer` commits after the application's transaction took its
+ * snapshot still refuses an attempt in it, as the lock read sees the commit.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -59,8 +36,7 @@ use Tests\TestCase;
 final class FactorLockoutSnapshotTest extends TestCase
 {
     /**
-     * End a transaction a failed test left open, before the migrations roll
-     * back on the same connection.
+     * Ends a transaction a failed test left open before migrations roll back.
      *
      * @return void
      */
@@ -77,9 +53,7 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * On MySQL, a lockout committed after the snapshot is hidden from a plain
-     * read, the advisory `lockout()` included, and still refuses the attempt
-     * without running its verification.
+     * A plain read, `lockout()` included, misses it; the attempt does not.
      *
      * @return void
      *
@@ -108,9 +82,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * On PostgreSQL's `READ COMMITTED`, every statement sees what has been
-     * committed, so the read and the attempt alike find the lockout.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -136,11 +107,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * On PostgreSQL's `REPEATABLE READ`, taking the lock on a row changed since
-     * the snapshot fails with a serialisation failure rather than answer from
-     * it; retrying the whole outer transaction then refuses the attempt, and
-     * the verification runs in neither.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -178,9 +144,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * On MySQL, a deadline committed to the factor's row alone after the
-     * snapshot refuses the attempt, with nothing else to refuse it.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -206,9 +169,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * On PostgreSQL's `READ COMMITTED`, a deadline committed to the factor's
-     * row alone refuses the attempt, with nothing else to refuse it.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -232,11 +192,7 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * On PostgreSQL's `REPEATABLE READ`, a deadline committed to the factor's
-     * row alone leaves the identity's lock uncontended, so the serialisation
-     * failure comes from locking the factor's row; retrying the whole outer
-     * transaction then refuses the attempt, and the verification runs in
-     * neither.
+     * With the identity's lock uncontended, the factor's row lock raises it.
      *
      * @return void
      *
@@ -275,8 +231,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Add the observer: a second connection to the test database.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -297,9 +251,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Assert the failure is the database's serialisation failure, however the
-     * nested transaction raised it, on a statement against the table.
-     *
      * @param  \PDOException  $failure
      * @param  string  $table
      * @return void
@@ -314,8 +265,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Skip unless the test database is the given one.
-     *
      * @param  string  $driver
      * @return void
      */
@@ -329,8 +278,7 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Commit a user, a confirmed factor and the identity's state row, with a
-     * limit that one failure of the factor reaches and the identity's does not.
+     * One failure reaches the factor's limit but not the identity's.
      *
      * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
      */
@@ -356,9 +304,7 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Open the application's own transaction at the isolation level, which
-     * MySQL takes for its next transaction and PostgreSQL inside the current
-     * one.
+     * MySQL sets the level before the transaction, PostgreSQL inside it.
      *
      * @param  'READ COMMITTED'|'REPEATABLE READ'  $isolation
      * @return void
@@ -380,9 +326,7 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Read the factor with a plain read, as an application's transaction does
-     * before it verifies, which fixes the snapshot of a repeatable read. It is
-     * the copy the attempt is then made with.
+     * A plain read fixes a repeatable-read snapshot, as an application's would.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -393,9 +337,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Lock the factor from the observer with a real failed attempt, as a
-     * concurrent request would, and return the deadline as committed.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return \Carbon\CarbonImmutable
@@ -425,9 +366,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Commit a deadline to the factor's row from the observer, touching nothing
-     * else, and return it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return \Carbon\CarbonImmutable
      */
@@ -441,9 +379,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Make an attempt on the application's connection whose verification must
-     * never run.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome
@@ -458,9 +393,7 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Assert the factor's own lockout refused the attempt, and that nothing but
-     * the failures the observer made is counted, with the deadline as it
-     * committed and the identity below its limit, unlocked.
+     * Only the observer's failures count, and the identity stays unlocked.
      *
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome  $outcome
      * @param  \Tests\Fixtures\Identities\TestUser  $user
@@ -494,8 +427,6 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
-     * Resolve the attempt service.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

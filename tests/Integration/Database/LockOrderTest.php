@@ -39,14 +39,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * The lock order every flow shares, read from its statements on the storage
- * connection and its calls to the session seams, in one log: the identity's row
- * first, one owner's only, and nothing of the package's after a session seam,
- * so a package row is never locked after a session row.
- *
- * This is evidence of the order of the statements. Whether two changes contend
- * is left to the tests run on MySQL and PostgreSQL: SQLite cannot show the
- * absence of a gap or next-key deadlock.
+ * Every flow locks the identity's row first, one owner's only, and no package
+ * row after a session seam; contention is left to the server-database tests.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -63,13 +57,10 @@ final class LockOrderTest extends TestCase
 {
     use FlowCatalog;
 
-    /** @var \Tests\Fixtures\Hardening\LockOrderRecorder The log of the flow. */
+    /** @var \Tests\Fixtures\Hardening\LockOrderRecorder Statement and seam log. */
     private LockOrderRecorder $recorder;
 
     /**
-     * Arrange the flows, record the storage connection, and put a spy in place
-     * of each session seam.
-     *
      * @return void
      */
     #[\Override]
@@ -95,8 +86,6 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * The flow keeps the lock order.
-     *
      * @param  string  $flow
      * @return void
      */
@@ -107,8 +96,6 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * Rows of a flow that revokes the identity's sessions.
-     *
      * @return iterable<string, array{string}>
      */
     public static function revokingFlows(): iterable
@@ -119,8 +106,7 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * The default revoker's own advance of the generation is the seam's work on
-     * the owner's own row; nothing orchestrating it writes after it.
+     * The default revoker's generation bump is the seam's own write.
      *
      * @param  string  $flow
      * @return void
@@ -136,9 +122,7 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * The recorder sees what it must, or the sweep above shows nothing: a
-     * removal locks the owner's row first, calls the seams, and its recovery
-     * codes are gone before the first of them.
+     * The control: the recorder sees what the sweep relies on.
      *
      * @return void
      */
@@ -168,9 +152,6 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * A listener on each removal event finds the proofs the session kept, on
-     * the default revoker, in the order the events have always had.
-     *
      * @return void
      */
     public function testListenersOnRemovalEventsFindTheKeptProofs(): void
@@ -196,8 +177,7 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * A revoker sees no recovery code when it is called, so what it locks comes
-     * after every package row has changed.
+     * Whatever the revoker locks comes after every package row has changed.
      *
      * @return void
      */
@@ -217,8 +197,6 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * A grant is looked up, locked, within its owner's rows.
-     *
      * @return void
      */
     public function testTheGrantsLockingLookupNamesItsOwner(): void
@@ -241,8 +219,7 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * The lookup that locks a credential names who is removing it, so someone
-     * else's is never returned or acted on, and is refused all the same.
+     * Someone else's credential is never returned or acted on.
      *
      * @return void
      */
@@ -266,8 +243,6 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * The only person seeded.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function sole(): TestUser
@@ -276,8 +251,6 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * The bindings of each locking read of the table by the column.
-     *
      * @param  string  $column
      * @param  string  $table
      * @return list<array<int|string, mixed>>
@@ -299,8 +272,6 @@ final class LockOrderTest extends TestCase
     }
 
     /**
-     * Seed the flow, run it and assert its log keeps the lock order.
-     *
      * @param  string  $flow
      * @return void
      */
