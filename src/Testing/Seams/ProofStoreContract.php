@@ -278,6 +278,7 @@ final class ProofStoreContract
      * @param  string  $session
      * @param  string  $factor
      * @param  ?\Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void  $arrange
+     * @param  ?\Closure(): void  $forget
      * @return void
      */
     public static function assertForgettingAFactorStopsItsProofsCounting(
@@ -287,8 +288,10 @@ final class ProofStoreContract
         string $session,
         string $factor = self::FACTOR,
         ?\Closure $arrange = null,
+        ?\Closure $forget = null,
     ): void {
         $arrange ??= static fn (Proof $proof) => $store->record($identity, $proof);
+        $forget  ??= static fn () => $store->forgetFactor($identity, $factor);
 
         $store->begin($identity, $application, $session);
 
@@ -303,7 +306,7 @@ final class ProofStoreContract
 
         self::deleteFactor($factor);
 
-        $store->forgetFactor($identity, $factor);
+        $forget();
 
         $kinds = self::kinds($store->proofs($identity, $application, $session));
 

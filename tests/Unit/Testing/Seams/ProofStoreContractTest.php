@@ -397,6 +397,29 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
+     * A store whose revoker voids the factor's proofs passes when the check is
+     * handed what forgets them.
+     *
+     * @return void
+     */
+    public function testTheCheckForgetsThroughTheClosureGiven(): void
+    {
+        $identity = $this->proofStoreIdentity();
+        $voiding  = $this->proofStore();
+        $store    = new InterceptedProofStore($voiding, static function (): void {});
+
+        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting(
+            $store,
+            $identity,
+            'web',
+            ProofStoreContract::SESSION,
+            forget: static fn () => $voiding->forgetFactor($identity, ProofStoreContract::FACTOR),
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    /**
      * The synthetic default names no stored factor, so no factor is looked up.
      *
      * @return void
