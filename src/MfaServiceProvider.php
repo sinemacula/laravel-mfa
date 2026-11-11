@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa;
 
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use SineMacula\Laravel\Mfa\Assurance\AssuranceBindings;
@@ -81,6 +82,37 @@ final class MfaServiceProvider extends ServiceProvider
     }
 
     /**
+     * Whether the contract is still bound to one of this package's classes, so
+     * a sibling package can replace the default and keep an application's own
+     * binding. An alias, an instance, a shared binding, an extender, or a
+     * rebinding of the class the default names is never the default.
+     *
+     * @param  \Illuminate\Container\Container  $container
+     * @param  string  $contract
+     * @return bool
+     */
+    public static function isPackageDefault(Container $container, string $contract): bool
+    {
+        $concrete = $container->getBindings()[$contract]['concrete'] ?? null;
+
+        if (!$concrete instanceof \Closure || $container->isAlias($contract) || $container->isShared($contract) || self::isExtended($container, $contract)) {
+            return false;
+        }
+
+        $closure = new \ReflectionFunction($concrete);
+        $scope   = $closure->getClosureScopeClass()?->getName();
+
+        if ($scope !== Container::class) {
+            return is_string($scope) && str_starts_with($scope, __NAMESPACE__ . '\\');
+        }
+
+        // A class bound by name is wrapped in a closure the container defines.
+        $class = $closure->getStaticVariables()['concrete'] ?? null;
+
+        return is_string($class) && str_starts_with($class, __NAMESPACE__ . '\\') && !$container->bound($class);
+    }
+
+    /**
      * The shipped drivers are registered inside the factory, before any
      * consumer extender runs, so a consumer's registration always wins.
      *
@@ -132,5 +164,19 @@ final class MfaServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../lang' => $this->app->langPath('vendor/mfa'),
         ], 'mfa-lang');
+    }
+
+    /**
+     * Laravel offers no public read of a binding's extenders.
+     *
+     * @param  \Illuminate\Container\Container  $container
+     * @param  string  $contract
+     * @return bool
+     */
+    private static function isExtended(Container $container, string $contract): bool
+    {
+        $extenders = (new \ReflectionProperty(Container::class, 'extenders'))->getValue($container); // NOSONAR
+
+        return is_array($extenders) && ($extenders[$contract] ?? []) !== [];
     }
 }

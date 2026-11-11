@@ -192,7 +192,7 @@ registers it with the container, and the classes only it uses:
 `Contracts`, `Concerns`, `Models`, `Events`, `Exceptions`, `Enums` and `Facades` hold what their names say for every
 capability (the events and how they are dispatched are in [Events](events.md), and the values and enums assurance is
 described with in [Proofs, assurance and requirements](assurance.md)), and `Config`, `Database` and `Support` the
-internal helpers the capabilities share, among them `Config\ConfigurationValidator` (see [Checking the
+helpers the capabilities share, among them `Config\ConfigurationValidator` (see [Checking the
 configuration](configuration.md#checking-the-configuration)), `Database\StorageConnection` and
 `Support\FactorStateTransaction` (see [Storage](configuration.md#storage)). Each capability reads its own block of
 `config/mfa.php` through its `*Settings` class, on every call. `Contracts` also declares the seams the requirement,
@@ -306,6 +306,12 @@ A row that says what a seam needs names no method, as there is no public name to
 documentation for it. Until the layer provides it, `Contracts\ProofStore` must still be rebound. The default keeps
 proofs in the Laravel session, which a stateless layer does not have, so there is no sign-in and every verification
 answers `not_found`.
+
+An adapter can reuse three of this package's helpers. `MfaServiceProvider::isPackageDefault($container, $contract)` says
+whether a contract is still bound to one of this package's classes, so the adapter replaces the default and keeps a
+binding the application made. `Proofs\ProofOwner::of($identity)` gives the type and key this package records an identity
+under, with `Support\IdentityType::of()` for the type alone. `Database\AfterStorageCommit::run($container, $callback)`
+runs work once the storage connection's open transaction commits, at once when none is open, and never on rollback.
 
 `Contracts\SessionTransition::factorChanged()` is called after every factor change made on an active session, whether
 or not this package finds the session short: a factor confirmed, a passkey registered as a factor, and a removal the
@@ -484,13 +490,15 @@ factor the layer recorded on signing in: each check counts against what it held 
 sign-ins that layer alone writes also overrides `arrangeProofStoreProof()` to record each proof a check needs through
 the layer (by default through the store's `record($identity, $proof)`), `endProofStoreSignIn()` to sign the identity out
 through it (by default `forget()`), and `proofStoreFactor()` to enrol a factor the identity holds and return its id (by
-default `ProofStoreContract::FACTOR`). `arrangeProofStoreProof()`, `endProofStoreSignIn()` and
-`replaceProofStoreSignIn()` are handed the store under test. Each check asserts that the proofs it arranged count before
-it voids them or forgets their factor, so a hook that records nothing fails rather than passes. The checks arrange a
-password first factor on top of what the sign-in holds: an adapter that cannot record one records an equivalent proof,
-never skips it. Either way, a proof of a sign-in that is not current, or that the store cannot find, or of another
-identity or application, is refused by throwing `Exceptions\ProofRefusedException`, as `ProofStore::record()` declares,
-and changes nothing; and `proofs()` for a session that is not the current sign-in yields none. Each check is a static
-assertion on a `*Contract` class beside its trait, so a test can also call one directly. The kits need PHPUnit and a
-database migrated with the package's tables, as any test of an adapter does.
+default `ProofStoreContract::FACTOR`). A store whose bound `SessionRevoker` voids a removed factor's proofs overrides
+`forgetProofStoreFactor()` to call the revoker's `factorRemoved()` as well (by default the store's `forgetFactor()`).
+`arrangeProofStoreProof()`, `endProofStoreSignIn()` and `replaceProofStoreSignIn()` are handed the store under test.
+Each check asserts that the proofs it arranged count before it voids them or forgets their factor, so a hook that
+records nothing fails rather than passes. The checks arrange a password first factor on top of what the sign-in holds:
+an adapter that cannot record one records an equivalent proof, never skips it. Either way, a proof of a sign-in that is
+not current, or that the store cannot find, or of another identity or application, is refused by throwing
+`Exceptions\ProofRefusedException`, as `ProofStore::record()` declares, and changes nothing; and `proofs()` for a
+session that is not the current sign-in yields none. Each check is a static assertion on a `*Contract` class beside its
+trait, so a test can also call one directly. The kits need PHPUnit and a database migrated with the package's tables, as
+any test of an adapter does.
 

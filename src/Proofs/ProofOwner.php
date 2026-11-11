@@ -15,7 +15,7 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
- * @internal
+ * @api
  */
 final readonly class ProofOwner
 {
@@ -84,6 +84,8 @@ final readonly class ProofOwner
     /**
      * Prefixed with the type's length, so a separator inside either part cannot
      * make two owners meet.
+     *
+     * @internal
      *
      * @return string
      */
