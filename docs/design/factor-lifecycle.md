@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note documents what happens to a factor after it is enrolled: how it is listed, what a removal checks and when,
+This note records what happens to a factor after it is enrolled: how it is listed, what a removal checks and when,
 what a reset does and in which order, what unlocking leaves alone, and what pruning may and may not delete. The API is
 in [Factor lifecycle](../guides/lifecycle.md).
 
@@ -62,8 +62,8 @@ in [Factor lifecycle](../guides/lifecycle.md).
 - A reset removes every factor of the identity, whatever its stored state, as it is the remedy for one that cannot be
   read. A factor whose summary, status or deadline throws is not read for a lift, so its deadline goes with its row; it
   gets no `FactorRemoved` or `EnrollmentAbandoned`, since its summary cannot be built honestly, and
-  `FactorsReset::$unreadableFactors` counts it.
-  The event context is captured before the revocation, which could clear the authentication context it reads.
+  `FactorsReset::$unreadableFactors` counts it. The event context is captured before the revocation, which could clear
+  the authentication context it reads.
 - A reset advances the generation itself, as a rebound revoker may not. With the default revoker it therefore moves
   twice; what is specified is that it only ever goes up, so nothing depends on the increment.
 - A reset writes the obligation to the stated value, so `false` clears an earlier `true`, and it does not call

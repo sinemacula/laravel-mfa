@@ -36,7 +36,8 @@ referencing another's.
   combination, and `mca` only for an accepted one that is not. A replaced combination policy therefore cannot report
   more than it found.
 - A verification result is verified (a proof and its evaluation) or failed (a reason and a non-blank detail), never
-  both. Only a `locked` failure carries the time the lockout lifts, and it always does.
+  both. Only a `locked` failure carries the time the lockout lifts, and none at the failure ceiling, which does not lift
+  by itself.
 - The serialised forms use snake_case keys and enum values. A proof's time is ISO-8601 to the microsecond with its
   offset. Reading a form back (`fromArray()` on `Channel`, `ObservedProperties`, `ProofBinding`, `Proof` and
   `Requirement`) refuses a required field that is missing or of another type, and any field the form does not know,

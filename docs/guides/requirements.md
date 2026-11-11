@@ -6,8 +6,8 @@ What a sign-in must prove, and how fresh a session must be before a sensitive op
 
 ## What a sign-in must prove
 
-`Mfa::requirement()` returns the requirement the caller's sign-in on the caller's application must meet. It
-is empty when nothing further is needed, and without an MFA-capable identity. The `mfa` middleware enforces it on the
+`Mfa::requirement()` returns the requirement the caller's sign-in on the caller's application must meet. It is empty
+when nothing further is needed, and without an MFA-capable identity. The `mfa` middleware enforces it on the
 routes that carry it (see [Route middleware](middleware.md)).
 
 ```php
@@ -164,10 +164,9 @@ requirement. A gate bound in place of the default, such as an adapter over an au
 must apply the stricter of that and its own setting for the operation, never either alone, answer "not fresh" when it
 has neither, and keep no state between calls. Its `requirement()` says what it holds a session to, which removing a
 factor judges on the proofs made without that factor, so it must ask at least what the caller asks. It is asked with the
-operation's own name (`mfa.add_factor`, never a
-name of the authentication layer's), so the layer's own setting for that name is the one that applies; configure it
-there. It may be stricter than the package: a setting that takes only an additional factor or a recovery code refuses
-a fresh passkey reauthentication that the package alone would accept.
+operation's own name (`mfa.add_factor`, never a name of the authentication layer's), so the layer's own setting for that
+name is the one that applies; configure it there. It may be stricter than the package: a setting that takes only an
+additional factor or a recovery code refuses a fresh passkey reauthentication that the package alone would accept.
 
 A `FactorChangeGate` bound in place of the default, such as an adapter over an authentication layer's own factor-change
 gate, replaces the package's judgement of those changes rather than adding to it, so the freshness gate is not asked for

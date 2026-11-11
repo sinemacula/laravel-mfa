@@ -37,10 +37,9 @@ translation cannot be used, and what is deliberately left out.
 - A sender is given the code's neutral details (`Codes\CodeMessage`), not wording. The package's wording is applied
   only where a sender keeps it: `Codes\SmsCodeText::of()` words the SMS when it is called, in the current locale.
 - `Codes\MailEmailSender::send()` builds the configured message, then captures the current locale on one that chose
-  none. `Mailable::send()`
-  and `render()` enter that locale before building the envelope and the content, and `SerializesModels` carries it
-  through the queue, encryption included, so a queued subclass renders in the person's locale on the worker, and the
-  worker's is put back.
+  none. `Mailable::send()` and `render()` enter that locale before building the envelope and the content, and
+  `SerializesModels` carries it through the queue, encryption included, so a queued subclass renders in the person's
+  locale on the worker, and the worker's is put back.
 - `minutesLine()` looks at the line first, since an array would otherwise reach the selector; calls `choice()`; then
   looks at the selected answer, since `One minute|` passes the first look and selects nothing for two. On any unusable
   answer it runs `MessageSelector::choose()` over the shipped line with English plural rules, whatever the locale.

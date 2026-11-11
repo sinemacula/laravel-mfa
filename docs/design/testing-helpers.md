@@ -19,7 +19,7 @@ is built the way it is, and which test helpers deliberately stay private to the 
 - There is one table of further proofs and no branch on a level: the bound policy judges real evidence. Under the
   default policy, which caps at AAL2, AAL3 fails loudly naming `aal2`, while a custom policy can rate the
   hardware-bound, verified, phishing-resistant evidence `aal3`.
-- The fixture is exact: the requirement's parts must all be met AND `evaluation->level` must equal the level asked for.
+- The fixture is exact: the requirement's parts must all be met and `evaluation->level` must equal the level asked for.
   With `meets()`, a test asking for AAL1 could get AAL2 and pass a route it meant to fail. It asks for additional
   verification as well, because the level alone reads AAL1 from the password when the email proof was rejected.
 - `VerifiedSignIn` is stateless and resolves everything on each call. The trait depends on no base test case, since
@@ -51,7 +51,7 @@ is built the way it is, and which test helpers deliberately stay private to the 
 
 - A store whose `begin()` does nothing and that knows no session is a `LogicException`: it needs its session arranged.
 - Such a store retaining further proofs is a `LogicException`, since the time cannot be honoured. The shipped store has
-  just cleared, so this only bites a no-op `begin()`.
+  just cleared them, so this applies only to a no-op `begin()`.
 - A retained first factor later than `$at` needs no branch: the further proof does not count, and the read-back reports
   it.
 - A resolver's first factor is not preserved. `SessionFirstFactor::proofs()` consults the resolver only when the store

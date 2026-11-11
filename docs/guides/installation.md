@@ -54,7 +54,7 @@ factors are independent of the sign-in, so the configuration check fails. Every 
 [Applications](configuration.md#applications).
 
 Then give your identity model the contract and the trait (see [Identity models](identity-models.md)), and check the
-result, which is worth doing from your deploy pipeline as well:
+result, here and in your deploy pipeline:
 
 ```bash
 php artisan mfa:check
@@ -116,11 +116,10 @@ A sender is given a `Codes\CodeMessage`: the code, its destination, its purpose,
 identity it is for, so it can word and lay out each message as the application wants. The package owns drawing,
 hashing, binding and checking the code, the resend cooldown, the delivery caps and the lockouts, so a sender stays thin.
 A sender that queues the message must encrypt the whole queued payload, and none may log the code (see
-[Factor drivers](extending.md#factor-drivers)). Sending for a
-factor answers a `Codes\SendResult`: sent, with the challenge's id and expiry, or refused with a failure reason, such as
-`sending_capped`, and the seconds to wait when there are any (see [Sending a code](verification.md#sending-a-code)). In
-tests, `Testing\FakeSmsSender::fake()` and `Testing\FakeEmailSender::fake()` keep the messages
-instead (see [Testing](testing.md)).
+[Factor drivers](extending.md#factor-drivers)). Sending for a factor answers a `Codes\SendResult`: sent, with the
+challenge's id and expiry, or refused with a failure reason, such as `sending_capped`, and the seconds to wait when there
+are any (see [Sending a code](verification.md#sending-a-code)). In tests, `Testing\FakeSmsSender::fake()` and
+`Testing\FakeEmailSender::fake()` keep the messages instead (see [Testing](testing.md)).
 
 The `passkey` type needs a `Contracts\PasskeyGateway` the same way, as this package stores no WebAuthn credentials and
 runs no ceremonies (see [Passkeys](extending.md#passkeys)).

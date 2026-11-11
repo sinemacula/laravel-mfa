@@ -217,9 +217,9 @@ tenant's requirement is not asked for and the request can pass. An `mfa` from an
 middleware on the route, so select the tenant ahead of it. `mfa` also runs before `SubstituteBindings`, even when a
 route lists the bindings first, so a resolver must not rely on bound route models.
 
-If your application replaces the priority list with `withMiddleware()`, keep authentication ahead of `mfa`. Replacing it
-does not simply fail closed: when the default guard already holds a strongly authenticated identity, `mfa` passes for
-it, and `auth:api` then selects another.
+If your application replaces the priority list with `withMiddleware()`, keep authentication ahead of `mfa`. Otherwise it
+can fail open: when the default guard already holds a strongly authenticated identity, `mfa` passes for it, and
+`auth:api` then selects another.
 
 ## Without an authentication layer
 

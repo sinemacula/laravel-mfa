@@ -14,9 +14,9 @@
 
 </div>
 
-Driver-based multi-factor authentication for Laravel. Adds factors (**TOTP**, **email codes**, **SMS codes** and
-**passkeys**), **recovery codes**, step-up verification and a route gate to any guard, and says what a session's proofs
-add up to on the scale NIST SP 800-63B-4 defines.
+Driver-based multi-factor authentication for Laravel. Adds factors (TOTP, email codes, SMS codes and passkeys),
+recovery codes, step-up verification and a route gate to any guard, and says what a session's proofs add up to on the
+scale NIST SP 800-63B-4 defines.
 
 Works alone behind any Laravel guard and any `Authenticatable` model, or with `sinemacula/laravel-authentication`
 through adapters you or `sinemacula/laravel-iam` bind: this package references no class of another. Routes, controllers
@@ -35,33 +35,6 @@ and user interfaces stay yours.
 
 Factors belong to the identity and are the same in every application; proofs belong to one sign-in. Everything the
 package decides about a session is worked out from its proofs, never from a single "verified at" time.
-
-## Features
-
-- **Factor types**: TOTP (computed by the package, with each time step accepted once), email and SMS codes (stored only
-  as keyed hashes bound to one sign-in and purpose), passkeys through a gateway you bind, and your own drivers through
-  `Mfa::extend()`.
-- **Enrolment**: start, then confirm, within a grant no longer lived than the step-up that authorised it, with verified
-  destinations, per-application limits and a bootstrap path for a pending sign-in.
-- **One way to verify**: `Mfa::verify()` takes a factor's code, a challenge's code, a recovery code or a passkey's
-  assertion, and answers with a structured result or a machine-readable failure reason.
-- **Requirements and step-up**: composed from the application, the identity, a re-enrolment obligation and an active
-  tenant, with a requirement and a maximum age per named operation.
-- **A route gate**: `mfa` judges a route's whole requirement, `mfa:level=aal2` and `mfa:operation=name` add to it,
-  `mfa.exempt` marks the routes that complete a verification, and a refusal carries what RFC 9470 needs.
-- **Recovery codes**: a set shown once, stored as salted hashes, replaced atomically and redeemed as one attempt against
-  the whole unused set.
-- **Attempt caps and lockouts**: failures counted per factor, per identity and per IP address in the database, with a
-  failure ceiling that disables a factor.
-- **Factor lifecycle**: list, rename and remove factors, reset someone who lost theirs, unlock, forget a deleted
-  identity and prune, each change serialised on the identity.
-- **Secrets shown once**: a value that refuses to be serialised, cast or dumped, a response no cache keeps, and the
-  redaction of secrets, codes and full destinations from logs and traces.
-- **Events**: a catalogue with a scalar context and no secret, dispatched once the change commits.
-- **A seam for everything else**: every policy is a contract with a default that fails closed, a contract test kit for
-  your adapter, testing helpers for your application, and every message translated.
-- **Ready for production**: safe under Octane and in queue workers, with reads from the write connection, no dependency
-  on a cache, and a configuration check at boot and from `mfa:check`.
 
 ## Installation
 

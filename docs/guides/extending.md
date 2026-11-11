@@ -3,7 +3,7 @@
 ## Extensibility
 
 Concrete classes in this package are `final` except `MfaManager`, the shipped `Models\Factor` and `Models\RecoveryCode`
-models and the `Codes\MfaCodeMessage` mailable. Extension is through **composition and DI**, not inheritance:
+models and the `Codes\MfaCodeMessage` mailable. Extend the package by composition and dependency injection:
 
 | Extension point            | How                                                                                    |
 |----------------------------|----------------------------------------------------------------------------------------|
@@ -190,19 +190,18 @@ registers it with the container, and the classes only it uses:
 
 `Contracts`, `Concerns`, `Models`, `Events`, `Exceptions`, `Enums` and `Facades` hold what their names say for every
 capability (the events and how they are dispatched are in [Events](events.md), and the values and enums assurance is
-described with in [Proofs, assurance and requirements](assurance.md)),
-and `Config`, `Database` and `Support` the internal helpers the capabilities share, among them
-`Config\ConfigurationValidator` (see [Checking the configuration](configuration.md#checking-the-configuration)),
-`Database\StorageConnection` and `Support\FactorStateTransaction` (see [Storage](configuration.md#storage)). Each
-capability reads its own block of `config/mfa.php` through its `*Settings` class, on every call.
-`Contracts` also declares the seams the requirement, verification, enrolment and lifecycle flows are built against,
-listed in [the seam contracts design note](../design/seam-contracts.md), and those an authentication layer meets in
-[Seams with an authentication layer](#seams-with-an-authentication-layer). Each has a default that works without an
-authentication layer and fails closed (see [Seam defaults](#seam-defaults)). The `Mfa` facade and
-`MfaManager` stay the entry point: each manager method hands its call to the service of its capability, so nothing you
-call changes with the layout. The services and `*Bindings` classes are internal; extend the package through the points
-in the table above. How the layout works is described in
-[the capability services design note](../design/capability-services.md).
+described with in [Proofs, assurance and requirements](assurance.md)), and `Config`, `Database` and `Support` the
+internal helpers the capabilities share, among them `Config\ConfigurationValidator` (see [Checking the
+configuration](configuration.md#checking-the-configuration)), `Database\StorageConnection` and
+`Support\FactorStateTransaction` (see [Storage](configuration.md#storage)). Each capability reads its own block of
+`config/mfa.php` through its `*Settings` class, on every call. `Contracts` also declares the seams the requirement,
+verification, enrolment and lifecycle flows are built against, listed in [the seam contracts design
+note](../design/seam-contracts.md), and those an authentication layer meets in [Seams with an authentication
+layer](#seams-with-an-authentication-layer). Each has a default that works without an authentication layer and fails
+closed (see [Seam defaults](#seam-defaults)). The `Mfa` facade and `MfaManager` stay the entry point: each manager
+method hands its call to the service of its capability, so nothing you call changes with the layout. The services and
+`*Bindings` classes are internal; extend the package through the points in the table above. How the layout works is
+described in [the capability services design note](../design/capability-services.md).
 
 ## Seam defaults
 
@@ -331,8 +330,8 @@ layer's `FactorChangeResult` carrying a pending session's new credential, comes 
 `completion()`. A session the layer ended, or found no longer live, is an outcome to return, not a refusal. Refuse by
 throwing, which rolls the whole change back.
 
-> **Do not enable `passkey` over a layer whose register and remove paths do not call
-> `Passkeys\PasskeyChangeGate`.** The gate has no default that can act for it, because the caller has to invoke it.
+> Do not enable `passkey` over a layer whose register and remove paths do not call
+> `Passkeys\PasskeyChangeGate`. The gate has no default that can act for it, because the caller has to invoke it.
 > Binding `Contracts\PasskeyGateway` over such a layer lets a passkey be removed with no step-up, last factor check or
 > revocation, and an event after the fact cannot stand in for the gate.
 
@@ -364,9 +363,9 @@ DB::transaction(function () use ($counters, $caller, $factor, $binding, $code): 
 `$caller` is the `Context\CallerContext` the gateway's `send()` or `verify()` was handed, or one the owner builds for
 the identity with `CallerContext::forIdentity()`. A pending one carries the session's first factor, which the factor
 must be accepted after. Both calls refuse with a `LogicException` outside a transaction, and with an
-`InvalidArgumentException` for a caller that is nobody. `isUsable()` takes the identity's factor state lock,
-which is held until the owner commits, so parallel guesses are counted one after the other; ask it before sending a code
-too, and never report a delivery. The lock order is the identity's state, then its factors, then the owner's challenge.
+`InvalidArgumentException` for a caller that is nobody. `isUsable()` takes the identity's factor state lock, which is
+held until the owner commits, so parallel guesses are counted one after the other; ask it before sending a code too, and
+never report a delivery. The lock order is the identity's state, then its factors, then the owner's challenge.
 
 `Testing\Seams\Concerns\ChallengeCountersTests` proves an owner's wiring: a failure is counted before the owner's
 transaction commits and not at all when it, or a nested transaction around the challenge, rolls back; the identity's
@@ -484,12 +483,13 @@ factor the layer recorded on signing in: each check counts against what it held 
 sign-ins that layer alone writes also overrides `arrangeProofStoreProof()` to record each proof a check needs through
 the layer (by default through the store's `record($identity, $proof)`), `endProofStoreSignIn()` to sign the identity out
 through it (by default `forget()`), and `proofStoreFactor()` to enrol a factor the identity holds and return its id (by
-default `ProofStoreContract::FACTOR`). The two new hooks are handed the store under test. Each check asserts that the
-proofs it arranged count before it voids them or forgets their factor, so a hook that records nothing fails rather than
-passes. The checks arrange a password first factor on top of what the sign-in holds: an adapter that cannot record one
-records an equivalent proof, never skips it. Either way, a proof of a sign-in that is not current, or that the store
-cannot find, or of another identity or application, is refused by throwing `Exceptions\ProofRefusedException`, as
-`ProofStore::record()` declares, and changes nothing; and `proofs()` for a session that is not the current sign-in
-yields none. Each check is a static assertion on a `*Contract` class beside its trait, so a test can also call one
-directly. The kits need PHPUnit and a database migrated with the package's tables, as any test of an adapter does.
+default `ProofStoreContract::FACTOR`). `arrangeProofStoreProof()`, `endProofStoreSignIn()` and
+`replaceProofStoreSignIn()` are handed the store under test. Each check asserts that the proofs it arranged count before
+it voids them or forgets their factor, so a hook that records nothing fails rather than passes. The checks arrange a
+password first factor on top of what the sign-in holds: an adapter that cannot record one records an equivalent proof,
+never skips it. Either way, a proof of a sign-in that is not current, or that the store cannot find, or of another
+identity or application, is refused by throwing `Exceptions\ProofRefusedException`, as `ProofStore::record()` declares,
+and changes nothing; and `proofs()` for a session that is not the current sign-in yields none. Each check is a static
+assertion on a `*Contract` class beside its trait, so a test can also call one directly. The kits need PHPUnit and a
+database migrated with the package's tables, as any test of an adapter does.
 

@@ -47,10 +47,10 @@ response if the commit fails.
   (a shared channel is rejected too) and `RequirementCheck` exposes no contributing proofs. It is exact under the
   default policy. A bound check may accept a pair yet refuse the set, so these fields are accepted recorded evidence,
   not what a policy selected.
-- A `VerificationResult` or `EnrollmentConfirmation` exists for its caller only after our outermost commit. `accept()`
-  hands over and calls `withCompletion()` inside `FactorStateTransaction`'s `transaction()`; `settled()` catches only
-  `SignInChangedException` and `RefusedUnderLockException`, `AttemptService::throttled()` rethrows, and the outer
-  `$settled` is assigned only after `transaction()` returns. So a commit failure propagates, and what a completion
+- A `VerificationResult` or `EnrollmentConfirmation` exists for its caller only after the package's outermost commit.
+  `accept()` hands over and calls `withCompletion()` inside `FactorStateTransaction`'s `transaction()`; `settled()`
+  catches only `SignInChangedException` and `RefusedUnderLockException`, `AttemptService::throttled()` rethrows, and the
+  outer `$settled` is assigned only after `transaction()` returns. So a commit failure propagates, and what a completion
   returned, with its tokens and cookie, reaches no response. A refusal after hand-over returns a failed result whose
   `completion()` is `null`.
 
@@ -87,16 +87,16 @@ response if the commit fails.
   for and the request can pass. An `mfa` from an outer group runs before a tenant middleware on the route, and the
   priority places `mfa` before `SubstituteBindings` even when a route lists the bindings first, so a resolver must not
   rely on bound route models.
-- An application replacing the priority list does not simply fail closed: if the default guard already holds a strongly
+- An application replacing the priority list can fail open: if the default guard already holds a strongly
   authenticated identity, `mfa` passes for it and `auth:api` then selects another.
 - The guarantee is the outermost commit's. An application that wraps `Mfa::verify()` in its own transaction on the
-  storage connection makes our commit a savepoint, so the result reaches its closure first. Nested transactions stay
-  supported. Returning a response from such a closure is safe, as `transaction()` must finish before it escapes;
-  emitting it or publishing the completion inside the closure is not.
-- A failed commit of our own takes the work waiting for it along (`Database\StorageTransaction`), on every supported
-  Laravel version. The commit of an application's own outer transaction is Laravel's: Laravel 12 keeps the work waiting
-  for it and runs it on the connection's next commit. An application that catches that failure and carries on in the
-  same process must discard it with `app('db.transactions')->rollback($connection, 0)`.
+  storage connection makes the package's commit a savepoint, so the result reaches its closure first. Nested
+  transactions stay supported. Returning a response from such a closure is safe, as `transaction()` must finish before
+  it escapes; emitting it or publishing the completion inside the closure is not.
+- A failed commit of the package's own takes the work waiting for it along (`Database\StorageTransaction`), on every
+  supported Laravel version. The commit of an application's own outer transaction is Laravel's: Laravel 12 keeps the
+  work waiting for it and runs it on the connection's next commit. An application that catches that failure and carries
+  on in the same process must discard it with `app('db.transactions')->rollback($connection, 0)`.
 - A listener throwing after a real commit is a separate case: the session did activate and the result is lost. That is
   an honest server error, not a commit failure.
 

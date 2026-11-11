@@ -194,7 +194,7 @@ separate answers:
 | External provider                        | Any enabled factor                                   | Yes      | No          | The further proof's own level |
 | Unknown, or none                         | Any                                                  | No       | No          | Unclassified                  |
 
-Behind the table are a few rules. A password is something the person knows; an SMS code, a TOTP code, a recovery code
+The table follows from a few rules. A password is something the person knows; an SMS code, a TOTP code, a recovery code
 and a passkey are something they have; a passkey whose assertion observed user verification is a multi-factor
 authenticator on its own. Something known with something had, or a multi-factor authenticator, is multifactor
 authentication and supports AAL2; anything else that is known or had supports AAL1. An email code is not an
@@ -342,11 +342,15 @@ context keys are in [Events](events.md), and the configuration keys in [Configur
 | `Enums\EnrollmentAuthorization` | `step_up`, `reauthentication`, `bootstrap`                                                                                                                                                                                                                                                                                                             |
 | `Enums\Operation`               | `mfa.add_factor`, `mfa.replace_factor`, `mfa.remove_factor`, `mfa.generate_recovery_codes`                                                                                                                                                                                                                                                             |
 | `Enums\PendingAction`           | `mfa.list_factors`, `mfa.send_code`, `mfa.verify`, `mfa.start_bootstrap_enrollment`, `mfa.confirm_bootstrap_enrollment`                                                                                                                                                                                                                                |
+| `Enums\FactorChange`            | `mfa.add_first_additional_factor`, `mfa.add_factor`, `mfa.remove_factor`, `mfa.generate_recovery_codes`                                                                                                                                                                                                                                                |
+| `Enums\FactorChangeMade`        | `factor_confirmed`, `passkey_factor_registered`, `factor_removed`                                                                                                                                                                                                                                                                                      |
 
 A failure reason says what a caller may be told, not why in detail: a factor that does not exist and one that belongs
 to someone else both answer `not_found`. Operations name the package's own step-up checks (adding a further factor,
 replacing or removing one, generating recovery codes); an application names its own beside them. Pending actions name
-what a pending session may do towards completing its sign-in, and `laravel-authentication` uses the same values.
+what a pending session may do towards completing its sign-in, and `laravel-authentication` uses the same values. Factor
+changes name what a `FactorChangeGate` is asked to authorise, and the changes made name what a `SessionTransition` is
+told changed.
 
 How the values are built and why they refuse what they do is described in
 [the assurance vocabulary design note](../design/assurance-vocabulary.md).

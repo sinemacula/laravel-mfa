@@ -1,20 +1,19 @@
 # Design Notes
 
-These notes document the package's security and lifecycle contracts that are easy to miss if you only read the
-quick-start material or skim the test suite.
+These notes record the package's security and lifecycle contracts, and the reasons for them, that the guides and the
+test suite do not state on their own.
 
-Each note is intentionally short and follows the same structure:
+Each note follows the same structure, with extra sections where a note needs them:
 
 - `Purpose`
 - `Invariants`
 - `Success Path`
 - `Failure / Edge Cases`
-- `Seams Left`, where a note has parts with nothing yet behind them
 - `Implementation Anchors`
 - `Authoritative Tests`
 - `Change Triggers`
 
-The current note set is:
+The notes:
 
 - `operating-modes.md`: the three ways the package runs (alone, with `laravel-authentication`, within `laravel-iam`),
   and the rule that this repository never references a sibling or detects one.
@@ -88,5 +87,5 @@ The current note set is:
 - `budgets-and-benchmarks.md`: the exact query budgets and what they count, on which drivers, the benchmarks and what
   each measures and leaves out, and why a benchmark proves its outcome and never fails on time.
 
-These documents are secondary to the code and tests, not a replacement for them. If a note and a cited test disagree,
-the test should be treated as authoritative until the mismatch is resolved.
+The code and tests come first. If a note and a cited test disagree, the test is authoritative until the mismatch is
+resolved.

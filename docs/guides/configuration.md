@@ -178,17 +178,16 @@ no connection does, while the models use the default connection, so run them on 
 its `migrations` table on the migrator's connection either way.
 
 The tables share one connection because the changes that depend on an identity's whole factor state (replacing its
-recovery codes, removing a factor, a reset, a verification racing one of them) write several of them in one
-transaction, which two connections cannot commit as one. Each such change locks the identity's row in the identity
-states table first and its factors second, so two changes for one identity run one after the other. The factor model
-must therefore live there too: the shipped models take the storage connection unless a subclass names a connection of
-its own, and a factor or recovery code model, shipped or custom, on any other connection fails the configuration check
-when the package boots, and with a `ModelOffStorageConnectionException` before any such change opens its transaction,
-rather than splitting a change across two transactions.
-Connections are compared by name, a model's own or the default one, so two names for one database count as two
-connections. Identity models may live on any connection: the shipped factor model always names the storage connection,
-the default one included, so an identity's factor relation reads and writes the factors there rather than on the
-identity's own connection. A custom factor model that names no connection of its own should do the same.
+recovery codes, removing a factor, a reset, a verification racing one of them) write several of them in one transaction,
+which two connections cannot commit as one. Each such change locks the identity's row in the identity states table first
+and its factors second, so two changes for one identity run one after the other. The factor model must therefore live
+there too: the shipped models take the storage connection unless a subclass names a connection of its own, and a factor
+or recovery code model, shipped or custom, on any other connection fails the configuration check when the package boots,
+and with a `ModelOffStorageConnectionException` before any such change opens its transaction, rather than splitting a
+change across two transactions. Connections are compared by name, a model's own or the default one, so two names for one
+database count as two connections. Identity models may live on any connection: the shipped factor model always names the
+storage connection, the default one included, so an identity's factor relation reads and writes the factors there rather
+than on the identity's own connection. A custom factor model that names no connection of its own should do the same.
 
 When the storage connection splits reads and writes (`read` and `write` hosts), the reads that decide a verification, a
 lockout or who owns a factor go to the write host, so a replica that has not caught up cannot pass a used code or miss

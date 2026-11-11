@@ -37,9 +37,9 @@ public function handle(): void
 ```
 
 An application on plain Laravel guards still clears them before each job, so its own code in a job never acts as the
-last job's person. It clears the session too: the default proof store keeps its records
-in the session, and a worker's session lives in memory for as long as the worker does, so without this a job would read
-the proofs an earlier job made for the same person. Leave `sync` jobs out: they run inside the request that dispatched
+last job's person. It clears the session too: the default proof store keeps its records in the session, and a worker's
+session lives in memory for as long as the worker does, so without this a job would read the proofs an earlier job made
+for the same person. Leave `sync` jobs out: they run inside the request that dispatched
 them, and clearing its guards and its session would sign that request out.
 
 ```php

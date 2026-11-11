@@ -2,10 +2,10 @@
 
 ## Purpose
 
-This note documents how a passkey becomes, stays and stops being a factor: the association record, the change gate
-every registration and removal of a passkey passes through, and the assertions a passkey factor is verified with. This
-package stores no WebAuthn credentials and runs no ceremonies of its own: those belong to the
-authentication layer, reached through `Contracts\PasskeyGateway`.
+This note records how a passkey becomes, stays and stops being a factor: the association record, the change gate every
+registration and removal of a passkey passes through, and the assertions a passkey factor is verified with. This package
+stores no WebAuthn credentials and runs no ceremonies of its own: those belong to the authentication layer, reached
+through `Contracts\PasskeyGateway`.
 
 ## Invariants
 
@@ -52,9 +52,9 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   association, forgets the factor's proofs on the current session at once, deletes the recovery codes with the last
   confirmed factor, revokes the identity's other sessions through the bound `SessionRevoker`, evaluates the current
   session's requirement again on the proofs it kept and hands the removal, with any shortfall, to the bound
-  `SessionTransition` unless the revoker judged the session itself, and reports
-  `FactorRemoved`, then the recovery codes' removal. The locking query names the owner, so another identity's
-  association is never returned or acted on: the unlocked `exists()` finds it, and it is answered `not_found`.
+  `SessionTransition` unless the revoker judged the session itself, and reports `FactorRemoved`, then the recovery
+  codes' removal. The locking query names the owner, so another identity's association is never returned or acted on:
+  the unlocked `exists()` finds it, and it is answered `not_found`.
 - The default `LastFactorPolicy` (`Lifecycle\RequiredFactorPolicy`) counts a remaining passkey only while its
   association matches it, so an unusable passkey never lets the last usable factor go.
 - `Passkeys\PasskeyAssertions` holds the ceremony's checks for one factor at a time, allowing exactly its associated
@@ -63,8 +63,8 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   first factor. No ceremony starts with an empty or wider allowlist. `Mfa::requestAssertion()` starts one, and answers
   with a `Passkeys\AssertionRequest`: the options, or the package's reason for refusing, nobody served being
   `not_found`. A gateway's own exception propagates, and `PasskeyAssertions::options()` itself stays throwing. Verifying
-  is `Mfa::verify($caller, Submission::assertion(...))`, an attempt through `Attempts\AttemptService`, so a reason the gateway
-  returns counts against the factor and the identity, and an assertion verified for another credential fails as
+  is `Mfa::verify($caller, Submission::assertion(...))`, an attempt through `Attempts\AttemptService`, so a reason the
+  gateway returns counts against the factor and the identity, and an assertion verified for another credential fails as
   `invalid_code`. A gateway that cannot verify at all refuses with an `OperationRefusedException`, which counts nothing.
   A pending session needs `mfa.verify`.
 - Starting an enrolment of the `passkey` type is refused as `not_accepted`: only the gate associates one.
@@ -73,9 +73,9 @@ authentication layer, reached through `Contracts\PasskeyGateway`.
   goes through `Verification\ProofAcceptance` to the bound `PendingCompletion` as the last write, its result on
   `PasskeyAssociationResult::$verification`. On an active session the requirement is evaluated again on the proofs the
   session holds, as for any other factor, and the registration goes to the bound `SessionTransition` with any shortfall,
-  what it returns on `PasskeyAssociationResult::completion()`. A refusal rolls back the whole registration, and
-  whatever either completion returned must not leave before the caller's commit. Recovery codes
-  come through `RecoveryCodes\RecoveryCodeIssuance::withFirstFactor()`, as for any other factor.
+  what it returns on `PasskeyAssociationResult::completion()`. A refusal rolls back the whole registration, and whatever
+  either completion returned must not leave before the caller's commit. Recovery codes come through
+  `RecoveryCodes\RecoveryCodeIssuance::withFirstFactor()`, as for any other factor.
 
 ## Success Path
 

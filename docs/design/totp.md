@@ -18,15 +18,16 @@ itself over `hash_hmac`; it depends on no TOTP library, so there is none to be m
   after the configuration changes. The bounds are those of the configuration: `sha1`, `sha256` or `sha512`, 6 to 8
   digits, a period of 15 to 120 seconds. A factor holding no parameters, or parameters out of bounds, verifies nothing;
   it never falls back to the configured ones.
-- A code is the HOTP value (RFC 4226 §5.3) of the time step, `floor(unix time / period)`: the HMAC of the step as an
-  8-byte big-endian counter, dynamically truncated to 31 bits, reduced to the factor's digits and zero-padded.
+- A code is the HOTP value (RFC 4226 section 5.3) of the time step, `floor(unix time / period)`: the HMAC of the step as
+  an 8-byte big-endian counter, dynamically truncated to 31 bits, reduced to the factor's digits and zero-padded.
 - A submitted code is compared with the code of every step of the window, each with `hash_equals()`. The window is the
-  `totp_window` of the application the verification is bound to, or `mfa.totp.window` when that application sets none
-  or has no block (default 1, at most 3). No comparison is skipped when an earlier one matches, and a malformed code is
+  `totp_window` of the application the verification is bound to, or `mfa.totp.window` when that application sets none or
+  has no block (default 1, at most 3). No comparison is skipped when an earlier one matches, and a malformed code is
   compared like any other, so the work does not depend on which step matches or whether one does. The latest matching
   step is the one accepted. The window is read from the configuration on every call, so a driver built once serves each
-  application with its own, and nothing widens it, failures included; the package does not resynchronise (RFC 6238 §6).
-- A time step is single-use per factor (RFC 6238 §5.2). A matching code is accepted only when
+  application with its own, and nothing widens it, failures included; the package does not resynchronise (RFC 6238
+  section 6).
+- A time step is single-use per factor (RFC 6238 section 5.2). A matching code is accepted only when
   `EloquentFactor::storeAcceptedStep()` records its step, and it records it only when it is later than
   `last_accepted_step`: one compare-and-set, `UPDATE ... SET last_accepted_step = :step WHERE id = :id AND
   (last_accepted_step IS NULL OR last_accepted_step < :step)`, accepted when it changed the row. The database applies
