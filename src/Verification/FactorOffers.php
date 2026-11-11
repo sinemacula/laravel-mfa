@@ -90,7 +90,7 @@ final readonly class FactorOffers
 
         $offered = array_filter(
             $factors,
-            fn (EloquentFactor&Model $factor): bool => $settings->enables($factor->getType()) && $this->canBeOffered($caller->identity, $factor, $firstFactor),
+            fn (EloquentFactor&Model $factor): bool => $settings->enables($factor->getType()) && $this->canBeOffered($caller->identity, $application, $factor, $firstFactor),
         );
 
         usort($offered, static fn (EloquentFactor&Model $left, EloquentFactor&Model $right): int => self::rank($left) <=> self::rank($right));
@@ -120,19 +120,20 @@ final readonly class FactorOffers
      * after the first factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function canBeOffered(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, Proof $firstFactor): bool
+    private function canBeOffered(MultiFactorAuthenticatable $identity, string $application, EloquentFactor&Model $factor, Proof $firstFactor): bool
     {
         if (!$factor->isConfirmed() || $factor->getDisabledAt() !== null) {
             return false;
         }
 
-        if ($factor->getType() === PasskeyAssertions::TYPE && !$this->passkeys->canTakePart($identity, $factor)) {
+        if ($factor->getType() === PasskeyAssertions::TYPE && !$this->passkeys->canTakePart($identity, $application, $factor)) {
             return false;
         }
 

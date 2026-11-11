@@ -30,10 +30,11 @@ final readonly class UnavailablePasskeyGateway implements PasskeyGateway
 
     /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @return list<string>
      */
     #[\Override]
-    public function credentialIds(MultiFactorAuthenticatable $identity): array
+    public function credentialIds(MultiFactorAuthenticatable $identity, string $application): array
     {
         return [];
     }

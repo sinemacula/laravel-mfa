@@ -28,6 +28,9 @@ final class FakePasskeyGateway implements PasskeyGateway
     /** @var list<list<string>> Allowlists verified, oldest first. */
     public array $verified = [];
 
+    /** @var list<string> Applications the passkeys were listed for, oldest first. */
+    public array $listedFor = [];
+
     /**
      * @param  list<string>  $registered
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion  $assertion
@@ -72,11 +75,14 @@ final class FakePasskeyGateway implements PasskeyGateway
 
     /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @return list<string>
      */
     #[\Override]
-    public function credentialIds(MultiFactorAuthenticatable $identity): array
+    public function credentialIds(MultiFactorAuthenticatable $identity, string $application): array
     {
+        $this->listedFor[] = $application;
+
         return $this->registered;
     }
 

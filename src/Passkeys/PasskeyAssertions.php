@@ -106,17 +106,18 @@ final readonly class PasskeyAssertions
      * still lists the credential.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return bool
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      */
-    public function canTakePart(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor): bool
+    public function canTakePart(MultiFactorAuthenticatable $identity, string $application, EloquentFactor&Model $factor): bool
     {
         return $this->gateway()->isAvailable()
             && $this->isAssociated($identity, $factor)
-            && in_array($factor->getCredentialReference(), $this->registered($identity), true);
+            && in_array($factor->getCredentialReference(), $this->registered($identity, $application), true);
     }
 
     /**
@@ -145,7 +146,7 @@ final readonly class PasskeyAssertions
         $this->refuseUnusable($factor, $binding);
 
         OperationRefusedException::byPackageUnless(
-            in_array($credential, $this->registered($identity), true),
+            in_array($credential, $this->registered($identity, $binding->application), true),
             FailureReason::NOT_FOUND,
             'The passkey gateway no longer lists the factor\'s credential.',
         );
@@ -196,13 +197,14 @@ final readonly class PasskeyAssertions
      * Canonical ids only; any other encoding is left out.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @return list<string>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    private function registered(MultiFactorAuthenticatable $identity): array
+    private function registered(MultiFactorAuthenticatable $identity, string $application): array
     {
-        return array_values(array_filter($this->gateway()->credentialIds($identity), CredentialId::isCanonical(...)));
+        return array_values(array_filter($this->gateway()->credentialIds($identity, $application), CredentialId::isCanonical(...)));
     }
 
     /**

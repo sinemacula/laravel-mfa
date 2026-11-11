@@ -27,7 +27,7 @@ trait PasskeyGatewayTests
      */
     public function testPasskeyGatewayListsNothingWhenUnavailable(): void
     {
-        PasskeyGatewayContract::assertAnUnavailableGatewayListsNothing($this->passkeyGateway(), $this->passkeyIdentity());
+        PasskeyGatewayContract::assertAnUnavailableGatewayListsNothing($this->passkeyGateway(), $this->passkeyIdentity(), $this->passkeyBinding()->application);
     }
 
     /**

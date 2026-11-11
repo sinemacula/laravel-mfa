@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
- * @internal
+ * @api
  */
 final class AfterStorageCommit
 {
@@ -50,6 +50,8 @@ final class AfterStorageCommit
     /**
      * Forget work left by a failed outermost commit, which Laravel 12 would
      * otherwise run on the connection's next commit.
+     *
+     * @internal
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @return void

@@ -44,7 +44,7 @@ final class PasskeyGatewayContractTest extends TestCase
         $gateway = new UnavailablePasskeyGateway;
 
         self::assertFalse($gateway->isAvailable());
-        self::assertSame([], $gateway->credentialIds($this->passkeyIdentity()));
+        self::assertSame([], $gateway->credentialIds($this->passkeyIdentity(), $this->passkeyBinding()->application));
 
         try {
             $gateway->verifyAssertion($this->passkeyIdentity(), $this->passkeyBinding(), ['Y3JlZGVudGlhbC1vbmU'], ['id' => 'x']);
@@ -69,7 +69,7 @@ final class PasskeyGatewayContractTest extends TestCase
     {
         $gateway = self::verifying(true);
 
-        PasskeyGatewayContract::assertAnUnavailableGatewayListsNothing($gateway, $this->passkeyIdentity());
+        PasskeyGatewayContract::assertAnUnavailableGatewayListsNothing($gateway, $this->passkeyIdentity(), $this->passkeyBinding()->application);
         PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential($gateway, $this->passkeyIdentity(), $this->passkeyBinding(), ['id' => 'x']);
         PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies($gateway, $this->passkeyIdentity(), $this->passkeyBinding());
     }
@@ -94,7 +94,7 @@ final class PasskeyGatewayContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        PasskeyGatewayContract::assertAnUnavailableGatewayListsNothing(self::verifying(false), $this->passkeyIdentity());
+        PasskeyGatewayContract::assertAnUnavailableGatewayListsNothing(self::verifying(false), $this->passkeyIdentity(), $this->passkeyBinding()->application);
     }
 
     /**
