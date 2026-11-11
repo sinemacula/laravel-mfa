@@ -4,8 +4,10 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Testing\Seams;
 
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -383,7 +385,34 @@ final class ProofStoreContractTest extends TestCase
             $store->forgetFactor($identity, $id);
         });
 
+        $deleted = false;
+
+        Factor::deleting(static function () use (&$deleted): void {
+            $deleted = true;
+        });
+
         ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting($deletedFirst, $identity, 'web', ProofStoreContract::SESSION, $factor->id);
+
+        self::assertTrue($deleted, 'The factor must be deleted through its model.');
+    }
+
+    /**
+     * The synthetic default names no stored factor, so no factor is looked up.
+     *
+     * @return void
+     */
+    public function testTheSyntheticFactorIsNeverLookedUp(): void
+    {
+        $table   = (new Factor)->getTable();
+        $queries = [];
+
+        DB::listen(static function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting($this->proofStore(), $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
+
+        self::assertSame([], array_values(array_filter($queries, static fn (string $sql): bool => str_contains($sql, $table))));
     }
 
     /**

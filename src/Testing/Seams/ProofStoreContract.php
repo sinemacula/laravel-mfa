@@ -356,7 +356,8 @@ final class ProofStoreContract
     }
 
     /**
-     * The package deletes a factor before it asks the store to forget it.
+     * The package deletes a factor through its model before it asks the store
+     * to forget it; the synthetic default names no stored factor.
      *
      * @param  string  $factor
      * @return void
@@ -365,9 +366,13 @@ final class ProofStoreContract
      */
     private static function deleteFactor(string $factor): void
     {
+        if ($factor === self::FACTOR) {
+            return;
+        }
+
         $model = ConfiguredModels::factor(Container::getInstance()->make(Repository::class));
 
-        WriteConnection::query((new $model)->newQuery())->whereKey($factor)->delete();
+        WriteConnection::query((new $model)->newQuery())->find($factor)?->delete();
     }
 
     /**
