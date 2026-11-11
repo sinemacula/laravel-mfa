@@ -519,6 +519,22 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
+     * No default is shared, so resolving one leaves it the default.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAResolvedDefaultIsStillThePackages(): void
+    {
+        foreach ([SmsSender::class, ProofStore::class, PasskeyGateway::class, SessionRevoker::class] as $contract) {
+            $this->container()->make($contract);
+
+            self::assertTrue(MfaServiceProvider::isPackageDefault($this->container(), $contract), $contract);
+        }
+    }
+
+    /**
      * Anything an application binds, or holds, is not the package's default.
      *
      * @return void
