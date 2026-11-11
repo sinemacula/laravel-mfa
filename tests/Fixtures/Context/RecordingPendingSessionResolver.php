@@ -9,9 +9,8 @@ use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 
 /**
- * A pending session resolver that answers the same pending session for every
- * request, and records the credential of each pending session it is asked to
- * read again.
+ * Answers the same pending session for every request and records the credential
+ * of each one it revalidates.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,23 +19,19 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
  */
 final class RecordingPendingSessionResolver implements PendingSessionResolver
 {
-    /** @var list<?string> The credential of each pending session read again, in order. */
+    /** @var list<?string> */
     public array $revalidated = [];
 
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      */
     public function __construct(
 
-        /** The pending session answered. */
+        /** Answered for every request. */
         private readonly PendingContext $pending,
     ) {}
 
     /**
-     * The fixed pending session.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
      */
@@ -47,8 +42,6 @@ final class RecordingPendingSessionResolver implements PendingSessionResolver
     }
 
     /**
-     * Record the credential presented, and answer the pending session again.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
      */

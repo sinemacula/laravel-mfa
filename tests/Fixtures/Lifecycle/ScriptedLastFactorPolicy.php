@@ -10,9 +10,9 @@ use SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
 /**
- * A last factor policy that answers from a script, one answer per ask, and runs
- * a step before it answers its first ask: it stands in for a concurrent change
- * made between the check before the lock and the check under it.
+ * Answers from a script and runs a step before its first answer, standing in
+ * for a concurrent change between the check before the lock and the one under
+ * it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,27 +21,23 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
  */
 final class ScriptedLastFactorPolicy implements LastFactorPolicy
 {
-    /** @var int How many times the policy was asked. */
+    /** @var int */
     public int $asked = 0;
 
     /**
-     * Constructor.
-     *
      * @param  list<bool|\SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy>  $answers
      * @param  ?\Closure(): void  $beforeFirstAnswer
      */
     public function __construct(
 
-        /** The answers, in order: a policy to ask, or the answer itself. */
+        /** In order: a policy to ask, or the answer itself. */
         private readonly array $answers,
 
-        /** What happens before the first answer. */
+        /** Runs before the first answer. */
         private readonly ?\Closure $beforeFirstAnswer = null,
     ) {}
 
     /**
-     * Run the step on the first ask, and answer from the script.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity

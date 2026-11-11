@@ -9,8 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Guard;
 
 /**
- * A guard holding a user arranged beforehand, as a guard with a context of its
- * own does, that records each `setUser()` it is asked for.
+ * Holds a user arranged beforehand and records each `setUser()` call.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,12 +20,10 @@ final class RecordingGuard implements Guard
 {
     use GuardHelpers;
 
-    /** @var list<\Illuminate\Contracts\Auth\Authenticatable> The users set, oldest first. */
+    /** @var list<\Illuminate\Contracts\Auth\Authenticatable> Oldest first. */
     public array $set = [];
 
     /**
-     * The user arranged.
-     *
      * @return ?\Illuminate\Contracts\Auth\Authenticatable
      */
     #[\Override]
@@ -36,8 +33,6 @@ final class RecordingGuard implements Guard
     }
 
     /**
-     * Validate nothing.
-     *
      * @param  array<array-key, mixed>  $credentials
      * @return bool
      */
@@ -48,8 +43,6 @@ final class RecordingGuard implements Guard
     }
 
     /**
-     * Hold the user and note the call.
-     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
      * @return self
      */
@@ -64,7 +57,7 @@ final class RecordingGuard implements Guard
     }
 
     /**
-     * Hold a user without noting it, as the guard's own helper arranges one.
+     * Holds a user without recording the call.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
      * @return void

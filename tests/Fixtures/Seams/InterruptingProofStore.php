@@ -10,9 +10,8 @@ use SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * A proof store whose current sign-in changes from a given read on, as an
- * authoritative store shows another request's write, while it keeps its records
- * in the store it wraps.
+ * Answers another sign-in from a given read on, as a store shows another
+ * request's write, while keeping its records in the store it wraps.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,12 +20,10 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  */
 final class InterruptingProofStore implements ProofStore
 {
-    /** @var int How many times the current sign-in has been read. */
+    /** @var int */
     private int $reads = 0;
 
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  int  $readsBefore
      * @param  ?string  $next
@@ -34,22 +31,20 @@ final class InterruptingProofStore implements ProofStore
      */
     public function __construct(
 
-        /** The store the records are kept in. */
+        /** Keeps the records. */
         private readonly ProofStore $store,
 
         /** How many reads answer as the wrapped store does. */
         private readonly int $readsBefore = 1,
 
-        /** The sign-in every later read answers with. */
+        /** Answered by every later read. */
         private readonly ?string $next = 'sign-in-b',
 
-        /** Whether a proof is refused when it reaches the store. */
+        /** Whether every proof is refused. */
         private readonly bool $refusesRecords = false,
     ) {}
 
     /**
-     * Begin the sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -62,8 +57,6 @@ final class InterruptingProofStore implements ProofStore
     }
 
     /**
-     * The wrapped store's answer, then the next sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?string
@@ -75,8 +68,6 @@ final class InterruptingProofStore implements ProofStore
     }
 
     /**
-     * Record the identity's proof, unless proofs are refused.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
@@ -95,8 +86,6 @@ final class InterruptingProofStore implements ProofStore
     }
 
     /**
-     * The proofs of the sign-in named, as the wrapped store reads them.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -109,8 +98,6 @@ final class InterruptingProofStore implements ProofStore
     }
 
     /**
-     * Forget the factor's proofs.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @return void
@@ -122,8 +109,6 @@ final class InterruptingProofStore implements ProofStore
     }
 
     /**
-     * Forget the sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void

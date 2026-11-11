@@ -13,9 +13,8 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * A challenge gateway that sends nothing and answers each code as its script
- * says, so the challenge gateway kit can be shown a gateway that refuses every
- * code, one that checks only a code's format, and one with a fixed code.
+ * Sends nothing and answers each code as its script says, for showing the
+ * challenge gateway kit faulty gateways.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,23 +24,19 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 final readonly class ScriptedChallengeGateway implements ChallengeGateway
 {
     /**
-     * Constructor.
-     *
      * @param  \Closure(string, string): \SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome  $answers
      * @param  ?\SineMacula\Laravel\Mfa\Codes\SendResult  $sent
      */
     public function __construct(
 
-        /** How the code and the challenge named are answered. */
+        /** Answers the code and challenge id. */
         private \Closure $answers,
 
-        /** What a send answers, or a challenge sent. */
+        /** What a send answers; a challenge sent when `null`. */
         private ?SendResult $sent = null,
     ) {}
 
     /**
-     * The answer scripted, or a challenge id with nothing sent.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -54,8 +49,6 @@ final readonly class ScriptedChallengeGateway implements ChallengeGateway
     }
 
     /**
-     * The outcome the script gives the code.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding

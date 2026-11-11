@@ -10,17 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use Tests\Fixtures\Exceptions\UnsupportedFixtureMethodException;
 
 /**
- * Default implementation of the `EloquentFactor` contract for test stubs.
- * Extends `AbstractFactorStub` (which covers the parent `Factor` surface) and
- * adds safe defaults for every persistence method — no-op mutators,
- * conventional column-name strings, and a loud-throwing `authenticatable()`
- * that surfaces accidental future callers rather than returning a half-built
- * relation.
- *
- * Test fixtures override only the methods relevant to the scenario they
- * exercise. Keeps each anonymous subclass well below the project's
- * max-methods-per-class threshold without resorting to `@SuppressWarnings`
- * annotations.
+ * Defaults for every `EloquentFactor` persistence method: no-op mutators,
+ * conventional column names and a throwing `authenticatable()`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,9 +21,7 @@ use Tests\Fixtures\Exceptions\UnsupportedFixtureMethodException;
 abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements EloquentFactor
 {
     /**
-     * Polymorphic relation accessor — required by the contract but almost never
-     * exercised on a non-Model fixture. Throws so an accidental future caller
-     * fails loudly rather than receiving a half-built relation.
+     * Throws, since a stub that is not a model has no relation to give.
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphTo<\Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model>
      *
@@ -41,17 +30,13 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     #[\Override]
     public function authenticatable(): MorphTo
     {
-        // Wrapping the throw in a `match` keeps the `return` syntactically
-        // present so CodeSniffer's `InvalidNoReturn` does not flag the @return
-        // tag, even though the function is logically `never`-returning.
+        // The `match` keeps a `return` for CodeSniffer's `InvalidNoReturn`.
         return match (true) {
             default => throw new UnsupportedFixtureMethodException('authenticatable() is unsupported on this stub fixture; override it in the subclass if your test needs it.'),
         };
     }
 
     /**
-     * Return the conventional type column name.
-     *
      * @return string
      */
     #[\Override]
@@ -61,8 +46,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional label column name.
-     *
      * @return string
      */
     #[\Override]
@@ -72,8 +55,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional destination column name.
-     *
      * @return string
      */
     #[\Override]
@@ -83,8 +64,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional credential reference column name.
-     *
      * @return string
      */
     #[\Override]
@@ -94,8 +73,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional TOTP algorithm column name.
-     *
      * @return string
      */
     #[\Override]
@@ -105,8 +82,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional TOTP digits column name.
-     *
      * @return string
      */
     #[\Override]
@@ -116,8 +91,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional TOTP period column name.
-     *
      * @return string
      */
     #[\Override]
@@ -127,8 +100,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional last accepted step column name.
-     *
      * @return string
      */
     #[\Override]
@@ -138,8 +109,7 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Record nothing — the fixture keeps no time step, so no step is ever
-     * accepted.
+     * No step is ever accepted, since none is kept.
      *
      * @param  int  $step
      * @return bool
@@ -151,8 +121,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional status column name.
-     *
      * @return string
      */
     #[\Override]
@@ -162,8 +130,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional preferred column name.
-     *
      * @return string
      */
     #[\Override]
@@ -173,8 +139,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional consecutive failures column name.
-     *
      * @return string
      */
     #[\Override]
@@ -184,8 +148,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional disabled-at column name.
-     *
      * @return string
      */
     #[\Override]
@@ -195,8 +157,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return no lockout deadline: a stub holds none.
-     *
      * @return ?\Carbon\CarbonInterface
      */
     #[\Override]
@@ -206,8 +166,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional locked-until column name.
-     *
      * @return string
      */
     #[\Override]
@@ -217,8 +175,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional application column name.
-     *
      * @return string
      */
     #[\Override]
@@ -228,8 +184,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional confirmed-at column name.
-     *
      * @return string
      */
     #[\Override]
@@ -239,8 +193,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional last-used-at column name.
-     *
      * @return string
      */
     #[\Override]
@@ -250,8 +202,6 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * Return the conventional secret column name.
-     *
      * @return string
      */
     #[\Override]
@@ -261,37 +211,31 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
     }
 
     /**
-     * No-op — the fixture does not track verifications.
-     *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
     #[\Override]
     public function recordVerification(?CarbonInterface $at = null): void
     {
-        // Intentionally empty — see method docblock.
+        // Not tracked.
     }
 
     /**
-     * No-op — the fixture does not track confirmation.
-     *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
     #[\Override]
     public function confirm(?CarbonInterface $at = null): void
     {
-        // Intentionally empty — see method docblock.
+        // Not tracked.
     }
 
     /**
-     * No-op — the fixture does not persist anywhere.
-     *
      * @return void
      */
     #[\Override]
     public function persist(): void
     {
-        // Intentionally empty — see method docblock.
+        // Not tracked.
     }
 }

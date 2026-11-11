@@ -5,8 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Secrets;
 
 /**
- * A value that refuses to be logged on purpose, as another package's secret
- * does: its JSON and string forms throw rather than give what it holds.
+ * A value whose JSON and string forms throw, as another package's secret does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -15,23 +14,19 @@ namespace Tests\Fixtures\Secrets;
  */
 final readonly class RefusesToBeLogged implements \JsonSerializable, \Stringable
 {
-    /** @var string The value it holds. */
+    /** @var string */
     public const string VALUE = '582014';
 
     /**
-     * Constructor.
-     *
      * @param  string  $value
      */
     public function __construct(
 
-        /** The value it holds, which it never gives up. */
+        /** Never given up. */
         public string $value = self::VALUE,
     ) {}
 
     /**
-     * Refuse to give the string form.
-     *
      * @return string
      *
      * @throws \LogicException
@@ -43,8 +38,6 @@ final readonly class RefusesToBeLogged implements \JsonSerializable, \Stringable
     }
 
     /**
-     * Refuse to give the JSON form.
-     *
      * @return never
      *
      * @throws \LogicException

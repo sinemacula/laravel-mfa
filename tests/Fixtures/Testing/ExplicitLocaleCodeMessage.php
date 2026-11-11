@@ -17,8 +17,6 @@ use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 final class ExplicitLocaleCodeMessage extends MfaCodeMessage
 {
     /**
-     * Constructor.
-     *
      * @param  string  $code
      * @param  int  $expiresInMinutes
      */

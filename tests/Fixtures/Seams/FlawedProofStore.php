@@ -12,12 +12,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\Fixtures\Seams\Enums\ProofStoreFlaw;
 
 /**
- * An in-memory proof store that keeps the contract but for one flaw: each
- * identity has a sign-in of its own, and the store refuses a proof before one
- * is begun and one of another sign-in, identity or application, keeps the
- * current sign-in's proofs and reads them for that sign-in only, forgets a
- * factor's proofs, and forgets the sign-in with its proofs, except where its
- * flaw says otherwise.
+ * An in-memory proof store that keeps the contract except for the one flaw it
+ * is given.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,26 +22,22 @@ use Tests\Fixtures\Seams\Enums\ProofStoreFlaw;
  */
 final class FlawedProofStore implements ProofStore
 {
-    /** @var array<string, array{session: ?string, application: ?string, begun: ?string, proofs: list<\SineMacula\Laravel\Mfa\Proofs\Proof>}> Each identity's sign-in, by its slot. */
+    /** @var array<string, array{session: ?string, application: ?string, begun: ?string, proofs: list<\SineMacula\Laravel\Mfa\Proofs\Proof>}> By identity slot. */
     private array $signIns = [];
 
-    /** @var array<string, array<string, list<\SineMacula\Laravel\Mfa\Proofs\Proof>>> The proofs of each sign-in since replaced, by slot and sign-in. */
+    /** @var array<string, array<string, list<\SineMacula\Laravel\Mfa\Proofs\Proof>>> Proofs of replaced sign-ins, by slot and sign-in. */
     private array $replaced = [];
 
     /**
-     * Constructor.
-     *
      * @param  \Tests\Fixtures\Seams\Enums\ProofStoreFlaw  $flaw
      */
     public function __construct(
 
-        /** The store's one flaw. */
+        /** @var \Tests\Fixtures\Seams\Enums\ProofStoreFlaw */
         private readonly ProofStoreFlaw $flaw,
     ) {}
 
     /**
-     * Begin the identity's sign-in, with no proof.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -67,8 +59,6 @@ final class FlawedProofStore implements ProofStore
     }
 
     /**
-     * The identity's sign-in begun last.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?string
@@ -88,8 +78,6 @@ final class FlawedProofStore implements ProofStore
     }
 
     /**
-     * Keep the identity's proof of its current sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
@@ -117,10 +105,6 @@ final class FlawedProofStore implements ProofStore
     }
 
     /**
-     * Every proof kept for the identity's sign-in named, when it is the current
-     * one, or, for a store that keeps the proofs, the one begun last though it
-     * was forgotten.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -147,8 +131,6 @@ final class FlawedProofStore implements ProofStore
     }
 
     /**
-     * Forget the proofs made with the factor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @return void
@@ -168,8 +150,6 @@ final class FlawedProofStore implements ProofStore
     }
 
     /**
-     * Forget the identity's sign-in and its proofs.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void
@@ -197,7 +177,7 @@ final class FlawedProofStore implements ProofStore
     }
 
     /**
-     * Why the owner's sign-in does not take the proof, or `null` when it does.
+     * Why the owner's sign-in refuses the proof, or `null` when it takes it.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
@@ -225,9 +205,6 @@ final class FlawedProofStore implements ProofStore
     }
 
     /**
-     * Refuse the proof by throwing, keeping it first for a store that keeps a
-     * refused proof, and forgetting the sign-in first for one that destroys it.
-     *
      * @param  string  $slot
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @param  string  $reason

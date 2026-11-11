@@ -24,11 +24,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Passkeys\FakePasskeyGateway;
 
 /**
- * Arranges the passkey tests: the `web` application with passkeys and TOTP
- * enabled, a declared password first factor and a fake passkey gateway; a
- * signed-in person with a sign-in the proof store knows; their confirmed
- * factors, a passkey with its association; a step-up recorded with one of
- * them; and a registration bound to their sign-in.
+ * Arranges the passkey tests on `web` with a fake passkey gateway and a
+ * signed-in person.
  *
  * @phpstan-require-extends \Tests\TestCase
  *
@@ -39,23 +36,19 @@ use Tests\Fixtures\Passkeys\FakePasskeyGateway;
  */
 trait ArrangesPasskeys
 {
-    /** @var string The application the passkeys are used on. */
+    /** @var string */
     protected const string APPLICATION = 'web';
 
-    /** @var string The session id of the person's sign-in. */
+    /** @var string */
     protected const string SESSION = 'sign-in-1';
 
-    /** @var string A canonical credential id. */
+    /** @var string Canonical credential id. */
     protected const string CREDENTIAL = 'Y3JlZGVudGlhbC1vbmU';
 
-    /** @var string Another canonical credential id. */
+    /** @var string Canonical credential id. */
     protected const string OTHER_CREDENTIAL = 'Y3JlZGVudGlhbC10d28';
 
     /**
-     * Enable passkeys and TOTP on the application with a declared password
-     * first factor and any further settings given, and bind a fake gateway
-     * listing the given credentials.
-     *
      * @param  array<string, mixed>  $settings
      * @param  list<string>  $registered
      * @return \Tests\Fixtures\Passkeys\FakePasskeyGateway
@@ -75,9 +68,6 @@ trait ArrangesPasskeys
     }
 
     /**
-     * A person, signed in through the guard, with a sign-in on the application
-     * the proof store knows.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      *
@@ -96,8 +86,7 @@ trait ArrangesPasskeys
     }
 
     /**
-     * A confirmed factor of the user's, enrolled through the application; a
-     * passkey is associated with its credential.
+     * A passkey is associated with its credential.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $type
@@ -131,9 +120,6 @@ trait ArrangesPasskeys
     }
 
     /**
-     * Record a proof the user made with the factor on its sign-in, the given
-     * number of seconds ago.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @param  int  $secondsAgo
@@ -160,8 +146,7 @@ trait ArrangesPasskeys
     }
 
     /**
-     * A registration of the credential bound to the user's enrolment on its
-     * sign-in, observing the properties given or user presence alone.
+     * Observes user presence alone unless given properties.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $credential
@@ -179,8 +164,6 @@ trait ArrangesPasskeys
     }
 
     /**
-     * What a proof of the user's on the application's sign-in is bound to.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  string  $session

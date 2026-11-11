@@ -12,10 +12,8 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * A freshness gate that is fresh until the read named, which it refuses with
- * its own exception, as a gate of an application's may: the first read is made
- * before the lock, the second under it. Read `0` refuses none, so it is always
- * fresh.
+ * Fresh until the numbered read, which it refuses with its own exception. The
+ * first read is made before the lock, the second under it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,12 +22,10 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  */
 final class RefusingFreshnessGate implements FreshnessGate
 {
-    /** @var int How many times the gate was asked. */
+    /** @var int */
     private int $reads = 0;
 
     /**
-     * Constructor.
-     *
      * @param  int  $refuseOnRead
      */
     public function __construct(
@@ -39,8 +35,6 @@ final class RefusingFreshnessGate implements FreshnessGate
     ) {}
 
     /**
-     * Fresh, unless this read is refused.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -59,8 +53,6 @@ final class RefusingFreshnessGate implements FreshnessGate
     }
 
     /**
-     * An hour on.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -73,8 +65,6 @@ final class RefusingFreshnessGate implements FreshnessGate
     }
 
     /**
-     * The caller's requirement, unchanged.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement

@@ -8,9 +8,8 @@ use Illuminate\Http\Request;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 
 /**
- * Names the application a request is for from its `X-Application` header, or a
- * fixed name when the header is missing, so a test can send consecutive
- * requests for different applications through one driver.
+ * Names the application from the `X-Application` header, so consecutive
+ * requests through one driver can be for different applications.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,23 +18,19 @@ use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
  */
 final readonly class HeaderApplicationResolver implements ApplicationResolver
 {
-    /** @var string The header naming the application. */
+    /** @var string */
     public const string HEADER = 'X-Application';
 
     /**
-     * Constructor.
-     *
      * @param  string  $default
      */
     public function __construct(
 
-        /** The application of a request without the header. */
+        /** For a request without the header. */
         private string $default = 'web',
     ) {}
 
     /**
-     * The application the request's header names, or the default one.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return string
      */
@@ -48,8 +43,6 @@ final readonly class HeaderApplicationResolver implements ApplicationResolver
     }
 
     /**
-     * A request for the named application.
-     *
      * @param  string  $application
      * @return \Illuminate\Http\Request
      */

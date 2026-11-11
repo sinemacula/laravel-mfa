@@ -10,8 +10,7 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 /**
- * An identity's factors as the factor state transaction hands them to a caller,
- * for a test that calls what takes them directly.
+ * An identity's factors as the factor state transaction hands them over.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,8 +25,6 @@ final class FactorSets
     private function __construct() {}
 
     /**
-     * The factors given.
-     *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  ...$factors
      * @return \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      */
@@ -37,8 +34,6 @@ final class FactorSets
     }
 
     /**
-     * Every factor stored, or those of the owner key given.
-     *
      * @param  ?string  $ownerKey
      * @return \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      */

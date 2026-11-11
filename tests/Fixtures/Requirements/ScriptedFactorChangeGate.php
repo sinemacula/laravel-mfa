@@ -11,9 +11,8 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
 
 /**
- * A factor change gate as an authentication layer's adapter might bind it: it
- * records every request with the transaction level it was asked at, then
- * refuses with the refusal given, or allows until the instant given.
+ * Records every request with its transaction level, then refuses with the given
+ * refusal or allows until the given instant.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,30 +21,26 @@ use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
  */
 final class ScriptedFactorChangeGate implements FactorChangeGate
 {
-    /** @var list<\SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest> The requests asked, oldest first. */
+    /** @var list<\SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest> Oldest first. */
     public array $requests = [];
 
-    /** @var list<int> The storage connection's transaction level at each request. */
+    /** @var list<int> The storage connection's transaction level per request. */
     public array $levels = [];
 
     /**
-     * Constructor.
-     *
      * @param  ?\Carbon\CarbonImmutable  $until
      * @param  ?\Throwable  $refusal
      */
     public function __construct(
 
-        /** When the authorisation ends, if it is given. */
+        /** When the authorisation ends. */
         private readonly ?CarbonImmutable $until = null,
 
-        /** What it throws instead of allowing, if anything. */
+        /** Thrown instead of allowing. */
         private readonly ?\Throwable $refusal = null,
     ) {}
 
     /**
-     * Record the request, then refuse or allow.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @return ?\Carbon\CarbonImmutable
      *

@@ -8,10 +8,8 @@ use Carbon\CarbonInterface;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 
 /**
- * The `Factor` accessors a test double rarely needs to vary, answering as a
- * confirmed factor no one has used yet: no credential reference, no TOTP
- * parameters or accepted step, not preferred, no failures, not disabled, no
- * application and no times.
+ * The `Factor` accessors a test double rarely varies, answering as a confirmed
+ * factor no one has used yet.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,8 +19,6 @@ use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 trait ReportsUsableFactorDefaults
 {
     /**
-     * No credential reference.
-     *
      * @return ?string
      */
     public function getCredentialReference(): ?string
@@ -31,8 +27,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * No TOTP algorithm.
-     *
      * @return ?string
      */
     public function getTotpAlgorithm(): ?string
@@ -41,8 +35,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * No TOTP digits.
-     *
      * @return ?int
      */
     public function getTotpDigits(): ?int
@@ -51,8 +43,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * No TOTP period.
-     *
      * @return ?int
      */
     public function getTotpPeriod(): ?int
@@ -61,8 +51,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * No accepted step.
-     *
      * @return ?int
      */
     public function getLastAcceptedStep(): ?int
@@ -71,8 +59,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * Confirmed.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\FactorStatus
      */
     public function getStatus(): FactorStatus
@@ -81,8 +67,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * Confirmed.
-     *
      * @return bool
      */
     public function isConfirmed(): bool
@@ -91,8 +75,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * Not preferred.
-     *
      * @return bool
      */
     public function isPreferred(): bool
@@ -101,8 +83,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * No failures.
-     *
      * @return int
      */
     public function getConsecutiveFailures(): int
@@ -111,8 +91,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * Not disabled.
-     *
      * @return ?\Carbon\CarbonInterface
      */
     public function getDisabledAt(): ?CarbonInterface
@@ -121,8 +99,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * No application.
-     *
      * @return ?string
      */
     public function getApplication(): ?string
@@ -131,8 +107,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * Never confirmed at a known time.
-     *
      * @return ?\Carbon\CarbonInterface
      */
     public function getConfirmedAt(): ?CarbonInterface
@@ -141,8 +115,6 @@ trait ReportsUsableFactorDefaults
     }
 
     /**
-     * Never used.
-     *
      * @return ?\Carbon\CarbonInterface
      */
     public function getLastUsedAt(): ?CarbonInterface

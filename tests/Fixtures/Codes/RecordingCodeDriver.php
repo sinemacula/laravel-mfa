@@ -9,10 +9,8 @@ use SineMacula\Laravel\Mfa\Drivers\AbstractCodeDriver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 
 /**
- * A code delivery driver for tests: records every code it is asked to deliver,
- * with its destination and expiry, and throws instead when told to fail, so a
- * test can read the code sent and prove a failed delivery keeps nothing. A
- * callback given runs at each delivery, while the send still holds its locks.
+ * Records every code delivered, or throws when told to fail. `$onSend` runs
+ * while the send still holds its locks.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,18 +19,16 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
  */
 final class RecordingCodeDriver extends AbstractCodeDriver
 {
-    /** @var list<array{destination: string, code: string, expires_at: \Carbon\CarbonImmutable, message: \SineMacula\Laravel\Mfa\Codes\CodeMessage}> The codes delivered, oldest first. */
+    /** @var list<array{destination: string, code: string, expires_at: \Carbon\CarbonImmutable, message: \SineMacula\Laravel\Mfa\Codes\CodeMessage}> Oldest first. */
     public array $delivered = [];
 
-    /** @var bool Whether the next delivery throws instead. */
+    /** @var bool Whether deliveries throw. */
     public bool $fail = false;
 
-    /** @var (\Closure(): void)|null Run at each delivery, before anything else. */
+    /** @var (\Closure(): void)|null Runs first at each delivery. */
     public ?\Closure $onSend = null;
 
     /**
-     * A code sent by email, as the fixture's channel.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
      */
     #[\Override]
@@ -42,8 +38,6 @@ final class RecordingCodeDriver extends AbstractCodeDriver
     }
 
     /**
-     * The destination as given, or `null` when it is blank.
-     *
      * @param  string  $destination
      * @return ?string
      */
@@ -54,8 +48,6 @@ final class RecordingCodeDriver extends AbstractCodeDriver
     }
 
     /**
-     * The code last delivered, or `null` when none was.
-     *
      * @return ?string
      */
     public function lastCode(): ?string
@@ -64,8 +56,6 @@ final class RecordingCodeDriver extends AbstractCodeDriver
     }
 
     /**
-     * Record the code, or throw when told to fail.
-     *
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      *

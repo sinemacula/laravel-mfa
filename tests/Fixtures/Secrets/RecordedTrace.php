@@ -5,13 +5,8 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Secrets;
 
 /**
- * Throws for real with the arguments of every call recorded, or with none, and
- * reads the strings a trace recorded.
- *
- * Whether PHP records arguments in a trace depends on
- * `zend.exception_ignore_args`, which differs between development and
- * production configurations, so the setting is turned off for the call, or on
- * when the call is to run as it would with arguments ignored.
+ * Throws for real with or without trace arguments, setting
+ * `zend.exception_ignore_args` for the call since its default varies.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,9 +21,6 @@ final class RecordedTrace
     private function __construct() {}
 
     /**
-     * The exception the call throws, with the arguments of every call in its
-     * trace, or with none.
-     *
      * @param  \Closure(): mixed  $call
      * @param  bool  $arguments
      * @return \Throwable
@@ -51,7 +43,7 @@ final class RecordedTrace
     }
 
     /**
-     * Every string the exception's trace recorded as an argument, at any depth.
+     * Every string argument in the trace, at any depth.
      *
      * @param  \Throwable  $throwable
      * @return list<string>
@@ -62,8 +54,6 @@ final class RecordedTrace
     }
 
     /**
-     * Every string in the value, at any depth.
-     *
      * @param  mixed  $value
      * @return list<string>
      */

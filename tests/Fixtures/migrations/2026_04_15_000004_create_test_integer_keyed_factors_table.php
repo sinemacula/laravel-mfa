@@ -7,8 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Create the table an application's own factor model keeps its factors in under
- * an integer key, for the tests that a factor is found by such a key.
+ * Factors under an integer key, for a factor model that does not use ULIDs.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -16,8 +15,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     /**
-     * Run the migrations.
-     *
      * @return void
      */
     public function up(): void
@@ -37,8 +34,6 @@ return new class extends Migration {
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      */
     public function down(): void

@@ -12,8 +12,8 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * A combination policy that records the proofs each evaluation is given, then
- * answers as the package's default does.
+ * Records the proofs each evaluation is given, then answers as the default
+ * policy does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,12 +22,10 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  */
 final class RecordingCombinationPolicy implements CombinationPolicy
 {
-    /** @var list<list<\SineMacula\Laravel\Mfa\Proofs\Proof>> The proofs each evaluation was given, in order. */
+    /** @var list<list<\SineMacula\Laravel\Mfa\Proofs\Proof>> */
     public array $handed = [];
 
     /**
-     * Whether a factor may follow the first factor, as the default answers.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $factor
      * @return bool
@@ -39,8 +37,6 @@ final class RecordingCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Record the proofs, then evaluate them as the default does.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation

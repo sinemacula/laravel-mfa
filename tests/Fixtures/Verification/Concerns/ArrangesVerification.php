@@ -45,11 +45,8 @@ use Tests\Fixtures\Passkeys\FakePasskeyGateway;
 use Tests\Fixtures\Requirements\SignInProofs;
 
 /**
- * Arranges the verification tests: the `web` application with every code type
- * and recovery codes enabled and a declared password first factor, the clock
- * frozen, a mailbox for the codes sent; a signed-in person with a sign-in the
- * proof store knows, or a person on a pending session; their factors; and what
- * was reported and counted.
+ * Arranges the verification tests on `web` with every code type and recovery
+ * codes enabled, the clock frozen and every event recorded.
  *
  * @phpstan-require-extends \Tests\TestCase
  *
@@ -60,30 +57,28 @@ use Tests\Fixtures\Requirements\SignInProofs;
  */
 trait ArrangesVerification
 {
-    /** @var string The application the verification is made on. */
+    /** @var string */
     protected const string APPLICATION = 'web';
 
-    /** @var string The session id of the person's sign-in. */
+    /** @var string */
     protected const string SESSION = 'sign-in-a';
 
-    /** @var string The session id of a pending session. */
+    /** @var string */
     protected const string PENDING = 'pending-a';
 
-    /** @var string A canonical credential id. */
+    /** @var string Canonical credential id. */
     protected const string CREDENTIAL = 'Y3JlZGVudGlhbC1vbmU';
 
-    /** @var string The address an email factor delivers to. */
+    /** @var string */
     protected const string ADDRESS = 'person@example.test';
 
-    /** @var \SineMacula\Laravel\Mfa\Testing\FakeEmailSender The codes sent. */
+    /** @var \SineMacula\Laravel\Mfa\Testing\FakeEmailSender */
     protected FakeEmailSender $mailbox;
 
-    /** @var list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent> What was reported, oldest first. */
+    /** @var list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent> Oldest first. */
     protected array $reported = [];
 
     /**
-     * Freeze the clock, enable the application and listen for every event.
-     *
      * @return void
      */
     protected function arrangeVerification(): void
@@ -102,8 +97,6 @@ trait ArrangesVerification
     }
 
     /**
-     * Enable the application with the settings given over the defaults.
-     *
      * @param  array<string, mixed>  $settings
      * @return void
      */
@@ -117,9 +110,6 @@ trait ArrangesVerification
     }
 
     /**
-     * A person, signed in through the guard, with a sign-in on the application
-     * the proof store knows.
-     *
      * @param  string  $session
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -135,8 +125,6 @@ trait ArrangesVerification
     }
 
     /**
-     * A person.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -147,8 +135,6 @@ trait ArrangesVerification
     }
 
     /**
-     * Begin the identity's sign-in in the proof store, as a guard would.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $session
      * @return void
@@ -159,8 +145,7 @@ trait ArrangesVerification
     }
 
     /**
-     * Serve the request as a pending session of the person, which by default
-     * allows everything verification needs.
+     * By default the pending session allows everything verification needs.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
@@ -190,8 +175,6 @@ trait ArrangesVerification
     }
 
     /**
-     * Stop serving a pending session.
-     *
      * @return void
      */
     protected function noPendingSession(): void
@@ -200,8 +183,6 @@ trait ArrangesVerification
     }
 
     /**
-     * A confirmed TOTP factor of the person's.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  array<string, mixed>  $attributes
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -212,8 +193,6 @@ trait ArrangesVerification
     }
 
     /**
-     * A confirmed email factor of the person's.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $address
      * @param  array<string, mixed>  $attributes
@@ -225,8 +204,6 @@ trait ArrangesVerification
     }
 
     /**
-     * A confirmed factor of the person's with the attributes given.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  array<string, mixed>  $attributes
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -244,8 +221,6 @@ trait ArrangesVerification
     }
 
     /**
-     * Send the email factor a code and return what the verification needs.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return array{0: string, 1: string}
@@ -262,8 +237,8 @@ trait ArrangesVerification
     }
 
     /**
-     * Generate the person's recovery codes, without the gate of the public
-     * path, and return the first in clear.
+     * Generates recovery codes past the public path's gate and returns the
+     * first in clear.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return string
@@ -280,8 +255,7 @@ trait ArrangesVerification
     }
 
     /**
-     * A submission of the kind named, for the provider rows that cover every
-     * route, with the code that passes when one is known.
+     * A submission for the named route, with a passing code when one is known.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $route
@@ -313,9 +287,6 @@ trait ArrangesVerification
     }
 
     /**
-     * Enable passkeys, with a fake gateway that lists one credential and
-     * verifies the assertion given.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion|null  $assertion
      * @return \Tests\Fixtures\Passkeys\FakePasskeyGateway
      */
@@ -332,9 +303,6 @@ trait ArrangesVerification
     }
 
     /**
-     * A confirmed passkey factor of the person's, associated with its
-     * credential.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $credential
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -355,8 +323,6 @@ trait ArrangesVerification
     }
 
     /**
-     * Record the proof the identity's first factor made on its sign-in.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $session
      * @return void
@@ -369,9 +335,8 @@ trait ArrangesVerification
     }
 
     /**
-     * The proofs the store holds for the person's sign-in: the one named, or
-     * else whichever the store holds as current, active or pending; none
-     * without one.
+     * Without a session named, reads whichever sign-in the store holds as
+     * current, active or pending.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  ?string  $session
@@ -386,8 +351,6 @@ trait ArrangesVerification
     }
 
     /**
-     * The additional proofs the store holds for the person's sign-in.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */
@@ -397,8 +360,6 @@ trait ArrangesVerification
     }
 
     /**
-     * Serve a request from the address.
-     *
      * @param  string  $ip
      * @return void
      */
@@ -408,8 +369,6 @@ trait ArrangesVerification
     }
 
     /**
-     * How many failures the address's window holds.
-     *
      * @param  string  $ip
      * @return int
      */
@@ -421,8 +380,6 @@ trait ArrangesVerification
     }
 
     /**
-     * The identity's run of failures.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return int
      */
@@ -434,8 +391,6 @@ trait ArrangesVerification
     }
 
     /**
-     * The factor's failures in a row, as stored.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return int
      */
@@ -445,8 +400,6 @@ trait ArrangesVerification
     }
 
     /**
-     * Forget what was reported so far.
-     *
      * @return void
      */
     protected function forgetReports(): void
@@ -455,8 +408,6 @@ trait ArrangesVerification
     }
 
     /**
-     * The one failure reported.
-     *
      * @return \SineMacula\Laravel\Mfa\Events\VerificationFailed
      */
     protected function failureReported(): VerificationFailed
@@ -470,8 +421,6 @@ trait ArrangesVerification
     }
 
     /**
-     * What a proof made now under the binding is bound to, as an array.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $session
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -485,8 +434,6 @@ trait ArrangesVerification
     }
 
     /**
-     * The package's manager.
-     *
      * @return \SineMacula\Laravel\Mfa\MfaManager
      */
     protected function mfa(): MfaManager

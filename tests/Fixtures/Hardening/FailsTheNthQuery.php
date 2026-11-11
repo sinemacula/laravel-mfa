@@ -8,12 +8,8 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
 
 /**
- * Counts the statements a connection runs and, once armed, fails one of them
- * with a real `QueryException`, whose message and driver text quote the string
- * bindings, as a driver reporting a duplicate value does, or as a deadlock when
- * asked, which Laravel raises as its `DeadlockException` inside a nested
- * transaction. The failure is raised once: whatever carries on past it is what
- * a test looks for.
+ * Once armed, fails the nth statement once with a real `QueryException` quoting
+ * the string bindings, or with a deadlock.
  *
  * A callback cannot be taken off a connection, so a test registers one of these
  * and arms it as often as it needs.
@@ -25,30 +21,28 @@ use Illuminate\Database\QueryException;
  */
 final class FailsTheNthQuery
 {
-    /** @var int The statements counted since the last arming. */
+    /** @var int Statements counted since the last arming. */
     public int $seen = 0;
 
-    /** @var bool Whether the failure was raised. */
+    /** @var bool */
     public bool $fired = false;
 
-    /** @var bool Whether the failure was raised inside a transaction. */
+    /** @var bool */
     public bool $firedInTransaction = false;
 
-    /** @var bool Whether the failure was raised inside a nested transaction. */
+    /** @var bool */
     public bool $firedNested = false;
 
-    /** @var string The statement that failed. */
+    /** @var string */
     public string $failed = '';
 
-    /** @var ?int The statement to fail, counted from one. */
+    /** @var ?int Counted from one. */
     private ?int $failAt = null;
 
-    /** @var bool Whether the statement fails as a deadlock. */
+    /** @var bool */
     private bool $deadlock = false;
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Database\Connection  $connection
      */
     public function __construct(Connection $connection)
@@ -72,8 +66,7 @@ final class FailsTheNthQuery
     }
 
     /**
-     * Fail the statement with the given number, counted from now; none when
-     * given none.
+     * Counts from now; `null` fails nothing.
      *
      * @param  ?int  $statement
      * @param  bool  $deadlock
@@ -91,8 +84,6 @@ final class FailsTheNthQuery
     }
 
     /**
-     * What a driver raises, quoting what the statement bound.
-     *
      * @param  array<int|string, mixed>  $bindings
      * @return \PDOException
      */
@@ -107,8 +98,6 @@ final class FailsTheNthQuery
     }
 
     /**
-     * What a driver raises for a deadlock, quoting what the statement bound.
-     *
      * @param  array<int|string, mixed>  $bindings
      * @return \PDOException
      */

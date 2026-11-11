@@ -7,15 +7,8 @@ namespace Tests\Fixtures\Factors;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 /**
- * Consumer-style subclass of the shipped `Factor` model.
- *
- * Used by the configurable-factor-model integration test to prove that
- * `Mfa::factorModel()` honours `config('mfa.factor.model')` and that the
- * package never instantiates the shipped Factor when the consumer has bound a
- * different class.
- *
- * Carries a public sentinel constant so tests can assert resolution was
- * honoured without monkeying with class introspection.
+ * An application's subclass of the shipped `Factor` model, bound through
+ * `mfa.factor.model`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,6 +17,6 @@ use SineMacula\Laravel\Mfa\Models\Factor;
  */
 final class CustomFactor extends Factor
 {
-    /** @var string Sentinel string used in tests to identify this subclass. */
+    /** @var string Identifies this subclass in assertions. */
     public const string FIXTURE_TAG = 'custom-factor-fixture';
 }

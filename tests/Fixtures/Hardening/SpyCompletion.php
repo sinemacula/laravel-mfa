@@ -11,8 +11,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofStoreCompletion;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
- * The pending completion and step-up, noting each call and then recording the
- * proof as the default does, so the flow goes on as it would.
+ * Notes each call, then records the proof as the default does so the flow goes
+ * on.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,8 +22,6 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 final readonly class SpyCompletion implements PendingCompletion, StepUp
 {
     /**
-     * Constructor.
-     *
      * @param  \Tests\Fixtures\Hardening\LockOrderRecorder  $recorder
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofStoreCompletion  $default
      */
@@ -32,13 +30,11 @@ final readonly class SpyCompletion implements PendingCompletion, StepUp
         /** The log the calls go to. */
         private LockOrderRecorder $recorder,
 
-        /** What records the proof. */
+        /** Records the proof. */
         private ProofStoreCompletion $default,
     ) {}
 
     /**
-     * Note the call and complete the pending session.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object
@@ -54,8 +50,6 @@ final readonly class SpyCompletion implements PendingCompletion, StepUp
     }
 
     /**
-     * Note the call and step up.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object

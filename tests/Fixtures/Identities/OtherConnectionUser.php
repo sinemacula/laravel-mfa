@@ -15,13 +15,8 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
- * An identity on a named connection of its own, `identities`, other than the
- * default one and the storage connection, as an application whose users live in
- * another database has.
- *
- * Mirrors `TestUser`, reading the same `test_users` columns from the
- * `identities` connection, so a test can prove its factors are still read and
- * written on the storage connection.
+ * `TestUser` on its own `identities` connection, to prove its factors are still
+ * read and written on the storage connection.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -49,8 +44,6 @@ final class OtherConnectionUser extends Model implements Authenticatable, MultiF
     ];
 
     /**
-     * Determine whether the user has at least one enrolled factor.
-     *
      * @return bool
      */
     #[\Override]
@@ -60,8 +53,6 @@ final class OtherConnectionUser extends Model implements Authenticatable, MultiF
     }
 
     /**
-     * Return the MFA factor builder scoped to this user.
-     *
      * @formatter:off
      *
      * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
@@ -77,8 +68,6 @@ final class OtherConnectionUser extends Model implements Authenticatable, MultiF
     }
 
     /**
-     * Polymorphic `factors` relation.
-     *
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany<\SineMacula\Laravel\Mfa\Models\Factor, $this>
      */
     public function factors(): MorphMany
@@ -87,8 +76,6 @@ final class OtherConnectionUser extends Model implements Authenticatable, MultiF
     }
 
     /**
-     * The attributes that should be cast.
-     *
      * @return array<string, string>
      */
     #[\Override]
@@ -100,8 +87,7 @@ final class OtherConnectionUser extends Model implements Authenticatable, MultiF
     }
 
     /**
-     * Wrap the dynamic count() call so PHPStan does not flag it as a dynamic
-     * call to a static method.
+     * Stops PHPStan reading `count()` as a dynamic call to a static method.
      *
      * @formatter:off
      *
@@ -116,10 +102,7 @@ final class OtherConnectionUser extends Model implements Authenticatable, MultiF
     }
 
     /**
-     * Re-present the morph-relation builder under the intersection type
-     * required by the `MultiFactorAuthenticatable` contract. The shipped Factor
-     * model IS both an Eloquent Model and the Factor contract, so the cast is
-     * sound; this helper hides the generic-invariance gap from PHPStan.
+     * Narrows the relation's builder to the type the contract requires.
      *
      * @formatter:off
      *

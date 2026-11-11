@@ -12,8 +12,7 @@ use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
 /**
- * An identity model that is soft deleted, taking everything the `HasFactors`
- * trait gives, stored in the test users table.
+ * A soft-deleting identity model that uses `HasFactors`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

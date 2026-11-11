@@ -14,9 +14,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofStoreCompletion;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
- * A completion that behaves as an authentication layer's does: the proof is
- * recorded, tokens are issued and returned from inside the transaction, and the
- * refresh cookie is queued only once the storage connection commits.
+ * Records the proof and issues tokens inside the transaction, as an
+ * authentication layer does, queueing the refresh cookie only after commit.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,33 +24,29 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
  */
 final readonly class TokenIssuingCompletion implements PendingCompletion, StepUp
 {
-    /** @var string The access token every completion issues. */
+    /** @var string */
     public const string ACCESS_TOKEN = 'issued-access-token';
 
-    /** @var string The name of the refresh cookie. */
+    /** @var string */
     public const string COOKIE = 'refresh_credential';
 
-    /** @var string The value of the refresh cookie. */
+    /** @var string */
     public const string COOKIE_VALUE = 'issued-refresh-credential';
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofStoreCompletion  $store
      */
     public function __construct(
 
-        /** The container the cookie jar is resolved from. */
+        /** Resolves the cookie jar. */
         private Container $container,
 
-        /** What records the proof. */
+        /** Records the proof. */
         private ProofStoreCompletion $store,
     ) {}
 
     /**
-     * Complete the pending session and issue its tokens.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return \Tests\Fixtures\Verification\IssuedTokens
@@ -69,8 +64,6 @@ final readonly class TokenIssuingCompletion implements PendingCompletion, StepUp
     }
 
     /**
-     * Step the active session up and issue its token.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return \Tests\Fixtures\Verification\IssuedTokens
@@ -88,8 +81,6 @@ final readonly class TokenIssuingCompletion implements PendingCompletion, StepUp
     }
 
     /**
-     * Issue the tokens, and queue the cookie once the transaction commits.
-     *
      * @return \Tests\Fixtures\Verification\IssuedTokens
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

@@ -11,9 +11,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * The parts of the `FactorDriver` contract a test driver rarely needs: an
- * unknown channel, no `amr` values, no secret to start an enrolment with, and
- * confirmation checked as verification.
+ * The parts of the `FactorDriver` contract a test driver rarely needs.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,8 +21,6 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 trait DescribesNoChannel
 {
     /**
-     * An unknown channel.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
      */
     public function channelKind(): ChannelKind
@@ -33,8 +29,6 @@ trait DescribesNoChannel
     }
 
     /**
-     * No `amr` values.
-     *
      * @return list<string>
      */
     public function amr(): array
@@ -43,8 +37,6 @@ trait DescribesNoChannel
     }
 
     /**
-     * No secret to start an enrolment with.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return ?\SineMacula\Laravel\Mfa\Secrets\RevealedSecret
      */
@@ -54,8 +46,6 @@ trait DescribesNoChannel
     }
 
     /**
-     * Confirmed as it is verified.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding

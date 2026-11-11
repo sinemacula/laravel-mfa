@@ -5,8 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Secrets\Enums;
 
 /**
- * An enum whose JSON form throws, which Monolog would call for a case logged as
- * it is.
+ * An enum whose JSON form throws, as Monolog would call it for a logged case.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,8 +17,6 @@ enum RefusingCase implements \JsonSerializable
     case HELD;
 
     /**
-     * Refuse to give the JSON form.
-     *
      * @return never
      *
      * @throws \LogicException

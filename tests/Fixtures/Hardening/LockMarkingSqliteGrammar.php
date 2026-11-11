@@ -8,9 +8,8 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Grammars\SQLiteGrammar;
 
 /**
- * SQLite takes no row locks, so its grammar leaves a locking read's clause out.
- * This one writes it as a comment, so the order of a flow's locking reads can
- * be read from its statements on SQLite as it can on MySQL and PostgreSQL.
+ * Writes the locking clause SQLite omits as a comment, so the order of a flow's
+ * locking reads shows in its statements.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,8 +19,6 @@ use Illuminate\Database\Query\Grammars\SQLiteGrammar;
 final class LockMarkingSqliteGrammar extends SQLiteGrammar
 {
     /**
-     * The locking clause, as a comment SQLite ignores.
-     *
      * @param  \Illuminate\Database\Query\Builder  $query
      * @param  bool|string  $value
      * @return string

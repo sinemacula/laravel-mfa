@@ -19,9 +19,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 
 /**
- * Arranges the lifecycle tests on top of the passkey arrangements: a recovery
- * code set, a pending factor with its enrolment, the actor who resets and
- * unlocks, and a record of every event the package reports, in order.
+ * Arranges the lifecycle tests on top of the passkey arrangements, recording
+ * every event the package reports.
  *
  * @phpstan-require-extends \Tests\TestCase
  *
@@ -34,13 +33,10 @@ trait ArrangesLifecycle
 {
     use ArrangesPasskeys;
 
-    /** @var list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent> What the package reported, oldest first. */
+    /** @var list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent> Oldest first. */
     private array $reported = [];
 
     /**
-     * Enable the application with recovery codes, hash cheaply, freeze the time
-     * and start recording what is reported.
-     *
      * @param  array<string, mixed>  $settings
      * @return void
      */
@@ -58,9 +54,6 @@ trait ArrangesLifecycle
     }
 
     /**
-     * The short names of what was reported since the last time they were
-     * forgotten.
-     *
      * @return list<string>
      */
     protected function reportedNames(): array
@@ -69,8 +62,6 @@ trait ArrangesLifecycle
     }
 
     /**
-     * The person who acts on someone else's identity.
-     *
      * @return \SineMacula\Laravel\Mfa\Events\Actor
      */
     protected static function actor(): Actor
@@ -79,7 +70,7 @@ trait ArrangesLifecycle
     }
 
     /**
-     * Generate the user's recovery code set, reporting nothing further.
+     * Clears what was reported.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return void
@@ -94,9 +85,6 @@ trait ArrangesLifecycle
     }
 
     /**
-     * A pending factor of the user's, with its enrolment under way, expiring as
-     * given.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  ?\Carbon\CarbonImmutable  $expiresAt
      * @return array{\SineMacula\Laravel\Mfa\Models\Factor, \SineMacula\Laravel\Mfa\Models\Enrollment}
@@ -122,8 +110,6 @@ trait ArrangesLifecycle
     }
 
     /**
-     * Whether the factor is still stored.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return bool
      */
@@ -133,8 +119,6 @@ trait ArrangesLifecycle
     }
 
     /**
-     * Whether the enrolment is still stored.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @return bool
      */

@@ -11,8 +11,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 
 /**
- * No-op `FactorDriver` used by tests that need to register an extension whose
- * runtime behaviour does not matter.
+ * A driver to register where its behaviour does not matter.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,8 +23,6 @@ final class NoopFactorDriver implements FactorDriver
     use DescribesNoChannel;
 
     /**
-     * Always report verification failure — the fixture does not verify.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding

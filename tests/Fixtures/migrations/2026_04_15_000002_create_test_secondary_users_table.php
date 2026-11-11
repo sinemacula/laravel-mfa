@@ -7,8 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Create a second test users table so the integration suite can verify
- * polymorphic factor scoping across two identity classes.
+ * A second users table, for factor scoping across two identity classes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -16,8 +15,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     /**
-     * Run the migrations.
-     *
      * @return void
      */
     public function up(): void
@@ -33,8 +30,6 @@ return new class extends Migration {
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      */
     public function down(): void

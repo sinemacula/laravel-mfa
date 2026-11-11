@@ -5,11 +5,8 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Exceptions;
 
 /**
- * Thrown from inside a factor state change to simulate a failure partway
- * through, so a test can prove the transaction rolls back every write on the
- * storage connection and releases its lock.
- *
- * Test-only scaffold — production code never sees it.
+ * Thrown partway through a factor state change to prove the transaction rolls
+ * back and releases its lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

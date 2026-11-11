@@ -14,7 +14,7 @@ use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 
 /**
- * Code messages for tests, as the code service builds them for a factor.
+ * Code messages as the code service builds them for a factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +29,7 @@ final class CodeMessages
     private function __construct() {}
 
     /**
-     * A code message to the destination, for a sign-in on `web` by default,
-     * expiring in ten minutes unless told otherwise.
+     * A sign-in code message on `web`, expiring in ten minutes by default.
      *
      * @param  string  $destination
      * @param  string  $code

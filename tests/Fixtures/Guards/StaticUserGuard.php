@@ -9,8 +9,8 @@ use Illuminate\Contracts\Auth\Guard;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
- * Token-style `Guard` fixture that hands back a pre-bound `TestUser` — mimics
- * the lookup path Sanctum / Passport take.
+ * A token-style guard that returns a pre-bound `TestUser`, as Sanctum and
+ * Passport resolve one.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,20 +20,16 @@ use Tests\Fixtures\Identities\TestUser;
 final class StaticUserGuard implements Guard
 {
     /**
-     * Capture the resolved identity once at construction.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $resolved
      * @return void
      */
     public function __construct(
 
-        /** Resolved identity returned by the guard. */
+        /** @var \Tests\Fixtures\Identities\TestUser */
         private readonly TestUser $resolved,
     ) {}
 
     /**
-     * Report that the fixture always has an authenticated identity.
-     *
      * @imperative
      *
      * @return bool
@@ -45,8 +41,6 @@ final class StaticUserGuard implements Guard
     }
 
     /**
-     * Report that the fixture is never a guest.
-     *
      * @imperative
      *
      * @return bool
@@ -58,8 +52,6 @@ final class StaticUserGuard implements Guard
     }
 
     /**
-     * Return the pre-bound test user identity.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     #[\Override]
@@ -69,8 +61,6 @@ final class StaticUserGuard implements Guard
     }
 
     /**
-     * Return the bound identity's auth identifier.
-     *
      * @return int
      */
     #[\Override]
@@ -80,8 +70,6 @@ final class StaticUserGuard implements Guard
     }
 
     /**
-     * Accept any credentials — the fixture has a single pre-bound identity.
-     *
      * @param  array<array-key, mixed>  $credentials
      * @return bool
      */
@@ -92,8 +80,6 @@ final class StaticUserGuard implements Guard
     }
 
     /**
-     * Report that the fixture always has a bound identity.
-     *
      * @return bool
      */
     #[\Override]
@@ -103,7 +89,7 @@ final class StaticUserGuard implements Guard
     }
 
     /**
-     * No-op — the fixture binds its identity at construction time.
+     * The identity is bound at construction.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
      * @return self

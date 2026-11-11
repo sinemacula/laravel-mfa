@@ -5,8 +5,8 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Seams\Enums;
 
 /**
- * The one flaw a `FlawedProofStore` has, so each of the proof store kit's
- * checks can be shown to reject a store that breaks it alone.
+ * The one flaw a `FlawedProofStore` has, so each proof store kit check can be
+ * shown to reject a store that breaks it alone.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

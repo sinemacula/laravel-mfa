@@ -9,8 +9,7 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * A faulty proof store: it keeps every proof it is given, whatever it is bound
- * to or whenever it was made, and forgets nothing.
+ * A faulty proof store that keeps every proof it is given and forgets nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,15 +18,13 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  */
 final class KeepingProofStore implements ProofStore
 {
-    /** @var list<\SineMacula\Laravel\Mfa\Proofs\Proof> The proofs kept. */
+    /** @var list<\SineMacula\Laravel\Mfa\Proofs\Proof> */
     private array $proofs = [];
 
     /** @var ?string The sign-in begun last. */
     private ?string $session = null;
 
     /**
-     * Note the sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -40,8 +37,6 @@ final class KeepingProofStore implements ProofStore
     }
 
     /**
-     * The sign-in begun last.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?string
@@ -53,8 +48,6 @@ final class KeepingProofStore implements ProofStore
     }
 
     /**
-     * Keep the proof, whatever it is bound to.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
@@ -66,8 +59,6 @@ final class KeepingProofStore implements ProofStore
     }
 
     /**
-     * Every proof kept, whichever sign-in is named.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -80,8 +71,6 @@ final class KeepingProofStore implements ProofStore
     }
 
     /**
-     * Forget nothing.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @return void
@@ -93,8 +82,6 @@ final class KeepingProofStore implements ProofStore
     }
 
     /**
-     * Forget nothing.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void

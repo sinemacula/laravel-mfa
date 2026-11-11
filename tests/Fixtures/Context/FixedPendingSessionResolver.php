@@ -10,9 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
 
 /**
- * A pending session resolver that answers the same pending session, or none,
- * for every request, or refuses every request as carrying a pending credential
- * that does not validate.
+ * Answers the same pending session, or none, for every request, or refuses
+ * every request's credential.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,14 +21,12 @@ use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
 final readonly class FixedPendingSessionResolver implements PendingSessionResolver
 {
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  bool  $invalid
      */
     public function __construct(
 
-        /** The pending session answered, or `null` for none. */
+        /** `null` for none. */
         private ?PendingContext $pending = null,
 
         /** Whether every request carries a credential that does not validate. */
@@ -37,8 +34,6 @@ final readonly class FixedPendingSessionResolver implements PendingSessionResolv
     ) {}
 
     /**
-     * The fixed pending session, or a refusal.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
      *
@@ -55,9 +50,6 @@ final readonly class FixedPendingSessionResolver implements PendingSessionResolv
     }
 
     /**
-     * The fixed pending session again, when it is still the one given and the
-     * credential still validates; otherwise none.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
      */

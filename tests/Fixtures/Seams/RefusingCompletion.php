@@ -10,8 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
- * A pending completion and step-up that answer every result by throwing what
- * they are given, as an adapter over an authentication layer refuses or fails.
+ * Throws the given refusal for every result, as an adapter whose authentication
+ * layer refuses or fails.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,19 +21,15 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 final readonly class RefusingCompletion implements PendingCompletion, StepUp
 {
     /**
-     * Constructor.
-     *
      * @param  \Throwable  $refusal
      */
     public function __construct(
 
-        /** What every result is answered with. */
+        /** Thrown for every result. */
         private \Throwable $refusal,
     ) {}
 
     /**
-     * Refuse the result.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object
@@ -47,8 +43,6 @@ final readonly class RefusingCompletion implements PendingCompletion, StepUp
     }
 
     /**
-     * Refuse the result.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object

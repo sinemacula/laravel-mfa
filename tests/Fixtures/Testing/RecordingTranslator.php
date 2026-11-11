@@ -7,8 +7,8 @@ namespace Tests\Fixtures\Testing;
 use Illuminate\Contracts\Translation\Translator;
 
 /**
- * A translator that answers as the one it decorates and notes everything it is
- * given, to show a code never reaches it.
+ * Records everything the decorated translator is given, to show a code never
+ * reaches it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -17,23 +17,19 @@ use Illuminate\Contracts\Translation\Translator;
  */
 final class RecordingTranslator implements Translator
 {
-    /** @var list<mixed> Everything the translator was given. */
+    /** @var list<mixed> */
     public array $given = [];
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Translation\Translator  $translator
      */
     public function __construct(
 
-        /** The translator that answers. */
+        /** Answers every call. */
         private readonly Translator $translator,
     ) {}
 
     /**
-     * Note the arguments and answer.
-     *
      * @param  string  $key
      * @param  array<array-key, mixed>  $replace
      * @param  ?string  $locale
@@ -48,8 +44,6 @@ final class RecordingTranslator implements Translator
     }
 
     /**
-     * Note the arguments and answer.
-     *
      * @param  string  $key
      * @param  array<array-key, mixed>|\Countable|float|int  $number
      * @param  array<array-key, mixed>  $replace
@@ -65,8 +59,6 @@ final class RecordingTranslator implements Translator
     }
 
     /**
-     * The decorated translator's locale.
-     *
      * @return string
      */
     #[\Override]
@@ -76,8 +68,6 @@ final class RecordingTranslator implements Translator
     }
 
     /**
-     * Set the decorated translator's locale.
-     *
      * @param  string  $locale
      * @return void
      */

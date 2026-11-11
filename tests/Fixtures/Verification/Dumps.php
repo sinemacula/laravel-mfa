@@ -8,9 +8,7 @@ use Symfony\Component\VarDumper\Cloner\VarCloner;
 use Symfony\Component\VarDumper\Dumper\CliDumper;
 
 /**
- * Every way a value can be dumped, so a test can assert none of them shows a
- * secret: `print_r`, `var_dump`, `var_export`, an array cast and Symfony's
- * VarDumper behind Laravel's `dump()` and `dd()`.
+ * Every way a value can be dumped, so a test can assert none shows a secret.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,8 +23,6 @@ final class Dumps
     private function __construct() {}
 
     /**
-     * What each way of dumping the value shows, keyed by the way.
-     *
      * @param  object  $value
      * @return array<string, string>
      */

@@ -7,9 +7,8 @@ namespace Tests\Fixtures\Database;
 use Illuminate\Database\DatabaseTransactionsManager;
 
 /**
- * A transactions manager a failed commit is never reported to, as Laravel 12's
- * is, so that what follows from that can be tested on every supported version:
- * the work of the transaction stays pending, and runs on the next commit.
+ * Never hears of a failed commit, as on Laravel 12, so the pending work running
+ * on the next commit can be tested on every version.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,7 +18,7 @@ use Illuminate\Database\DatabaseTransactionsManager;
 final class TransactionsManagerUnawareOfFailedCommits extends DatabaseTransactionsManager
 {
     /**
-     * Roll back, unless it is the connection reporting a failed commit.
+     * Ignores the rollback the connection reports for a failed commit.
      *
      * @param  string  $connection
      * @param  int  $newTransactionLevel

@@ -9,9 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * A proof store whose sign-in is replaced just after the current one is first
- * read, as another request signing the identity in again would replace it,
- * while it keeps its records in the store it wraps.
+ * Replaces the sign-in just after it is first read, as a concurrent sign-in
+ * would, while keeping its records in the store it wraps.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,18 +19,16 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  */
 final class ReplacingProofStore implements ProofStore
 {
-    /** @var bool Whether the sign-in has been replaced yet. */
+    /** @var bool */
     private bool $replaced = false;
 
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\ProofStore): void  $replace
      */
     public function __construct(
 
-        /** The store the records are kept in. */
+        /** Keeps the records. */
         private readonly ProofStore $store,
 
         /** Replaces the sign-in in the wrapped store, once. */
@@ -39,8 +36,6 @@ final class ReplacingProofStore implements ProofStore
     ) {}
 
     /**
-     * Begin the sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -53,9 +48,6 @@ final class ReplacingProofStore implements ProofStore
     }
 
     /**
-     * The wrapped store's answer, after which the sign-in is replaced the first
-     * time.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?string
@@ -75,8 +67,6 @@ final class ReplacingProofStore implements ProofStore
     }
 
     /**
-     * Record the identity's proof.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
@@ -91,8 +81,6 @@ final class ReplacingProofStore implements ProofStore
     }
 
     /**
-     * The proofs of the sign-in named, as the wrapped store reads them.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -107,8 +95,6 @@ final class ReplacingProofStore implements ProofStore
     }
 
     /**
-     * Forget the factor's proofs.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @return void
@@ -122,8 +108,6 @@ final class ReplacingProofStore implements ProofStore
     }
 
     /**
-     * Forget the sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void

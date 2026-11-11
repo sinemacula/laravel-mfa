@@ -15,11 +15,8 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * Builds the proofs of one session for the combination policy's tests: the
- * first factors a sign-in can start with, a reauthentication with the first
- * factor, and the further proofs that can follow, each made a given number of
- * seconds before a fixed time and bound to the same identity and application
- * unless told otherwise.
+ * Builds the proofs of one session, each made a given number of seconds before
+ * a fixed time and bound to the same identity and application by default.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,34 +25,34 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  */
 final class SessionProofs
 {
-    /** @var string The phone number the session signed in with. */
+    /** @var string Signed in with. */
     public const string PHONE = '+447700900123';
 
-    /** @var string Another phone number, enrolled as an SMS factor. */
+    /** @var string Enrolled as an SMS factor. */
     public const string OTHER_PHONE = '+447700900456';
 
-    /** @var string The email address the session signed in with. */
+    /** @var string Signed in with. */
     public const string EMAIL = 'person@example.com';
 
-    /** @var string Another email address, enrolled as an email factor. */
+    /** @var string Enrolled as an email factor. */
     public const string OTHER_EMAIL = 'other@example.com';
 
-    /** @var string The passkey the session signed in with. */
+    /** @var string Signed in with. */
     public const string PASSKEY = 'credential-1';
 
-    /** @var string Another passkey, associated as a factor. */
+    /** @var string Associated as a factor. */
     public const string OTHER_PASSKEY = 'credential-2';
 
-    /** @var string The identity's type. */
+    /** @var string */
     public const string IDENTITY_TYPE = 'user';
 
-    /** @var string The identity's key. */
+    /** @var string */
     public const string IDENTITY_KEY = '42';
 
-    /** @var string The application the session is on. */
+    /** @var string */
     public const string APPLICATION = 'admin';
 
-    /** @var string The time every proof's age is measured from. */
+    /** @var string Every proof's age is measured from it. */
     private const string NOW = '2026-11-01T12:00:00.000000+00:00';
 
     /**
@@ -64,8 +61,6 @@ final class SessionProofs
     private function __construct() {}
 
     /**
-     * The time every proof's age is measured from.
-     *
      * @return \Carbon\CarbonImmutable
      */
     public static function now(): CarbonImmutable
@@ -74,8 +69,6 @@ final class SessionProofs
     }
 
     /**
-     * A password first factor.
-     *
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
@@ -85,7 +78,7 @@ final class SessionProofs
     }
 
     /**
-     * A phone-code first factor, to the given phone or to an unknown one.
+     * `null` for an unknown phone.
      *
      * @param  ?string  $phone
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -96,8 +89,6 @@ final class SessionProofs
     }
 
     /**
-     * An email-code first factor, to the given address.
-     *
      * @param  string  $address
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
@@ -107,8 +98,6 @@ final class SessionProofs
     }
 
     /**
-     * A passkey first factor, with what its assertion observed.
-     *
      * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -119,8 +108,6 @@ final class SessionProofs
     }
 
     /**
-     * An external provider's first factor.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
     public static function externalProvider(): Proof
@@ -129,8 +116,6 @@ final class SessionProofs
     }
 
     /**
-     * A first factor whose channel is not known.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
     public static function unknownFirstFactor(): Proof
@@ -139,8 +124,6 @@ final class SessionProofs
     }
 
     /**
-     * A reauthentication with the first factor on the given channel.
-     *
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $channel
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -160,8 +143,6 @@ final class SessionProofs
     }
 
     /**
-     * A TOTP factor's proof, bound to the given identity and application.
-     *
      * @param  int  $secondsAgo
      * @param  string  $identityType
      * @param  string  $identityKey
@@ -184,8 +165,6 @@ final class SessionProofs
     }
 
     /**
-     * An SMS factor's proof, to the given phone.
-     *
      * @param  string  $phone
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
@@ -195,8 +174,6 @@ final class SessionProofs
     }
 
     /**
-     * An email factor's proof, to the given address.
-     *
      * @param  string  $address
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
@@ -206,8 +183,6 @@ final class SessionProofs
     }
 
     /**
-     * A passkey factor's proof, with what its assertion observed.
-     *
      * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
      * @param  string  $credential
      * @param  int  $secondsAgo
@@ -219,8 +194,6 @@ final class SessionProofs
     }
 
     /**
-     * A recovery code's proof.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
     public static function recoveryCode(): Proof
@@ -238,8 +211,7 @@ final class SessionProofs
     }
 
     /**
-     * What a passkey assertion observed when it verified the person: presence,
-     * verification and resistance to phishing.
+     * Presence, verification and phishing resistance.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\KeyProtection  $keyProtection
      * @return \SineMacula\Laravel\Mfa\Assurance\ObservedProperties
@@ -250,8 +222,7 @@ final class SessionProofs
     }
 
     /**
-     * What a passkey assertion observed when it did not verify the person:
-     * presence and resistance to phishing, with verification as given.
+     * Presence and phishing resistance, with verification as given.
      *
      * @param  ?bool  $userVerification
      * @return \SineMacula\Laravel\Mfa\Assurance\ObservedProperties
@@ -262,9 +233,6 @@ final class SessionProofs
     }
 
     /**
-     * The binding of a proof made for the given purpose by the identity on the
-     * application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
@@ -274,8 +242,6 @@ final class SessionProofs
     }
 
     /**
-     * A first factor's proof, made at sign-in.
-     *
      * @param  string  $method
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $channel
      * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
@@ -297,8 +263,6 @@ final class SessionProofs
     }
 
     /**
-     * An additional factor's proof, made at sign-in unless bound otherwise.
-     *
      * @param  string  $method
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $channel
      * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties

@@ -10,8 +10,8 @@ use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 
 /**
- * A pending session resolver that answers what the request it is handed holds,
- * so a test can tell which request was read.
+ * Answers what the request it is handed holds, so a test can tell which request
+ * was read.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,12 +20,10 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
  */
 final readonly class RequestAttributePendingSessionResolver implements PendingSessionResolver
 {
-    /** @var string The request attribute holding the pending session. */
+    /** @var string */
     public const string ATTRIBUTE = 'pending_session';
 
     /**
-     * The pending session the request holds, if any.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
      */
@@ -38,9 +36,8 @@ final readonly class RequestAttributePendingSessionResolver implements PendingSe
     }
 
     /**
-     * The pending session the request being served carries now, when it is
-     * still the one given: a test changes the attribute to stand for a session
-     * revoked or changed meanwhile.
+     * Reads the request being served, so a test can change the attribute to
+     * revoke or change the session meanwhile.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext

@@ -9,7 +9,7 @@ use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * A reauthenticator that answers the same proof, or none, whoever asks.
+ * Answers the same proof, or none, whoever asks.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,19 +19,15 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 final readonly class FixedReauthenticator implements Reauthenticator
 {
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      */
     public function __construct(
 
-        /** The proof answered, or `null` for none. */
+        /** `null` for none. */
         private ?Proof $proof,
     ) {}
 
     /**
-     * Answer the fixed proof.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof

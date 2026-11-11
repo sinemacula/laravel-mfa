@@ -18,10 +18,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * A proof store standing in for one backed by an authentication layer's
- * sessions: a sign-in is arranged first, holding the first factor proved on
- * signing in, `begin()` only makes it current, and its proofs stop counting
- * when it voids them, not when the verification generation advances.
+ * A store backed by an authentication layer's sessions: `begin()` only makes an
+ * arranged sign-in current, and proofs stop counting when the layer voids them
+ * whatever the verification generation.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,15 +29,15 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  */
 final class SignInRowsProofStore implements ProofStore
 {
-    /** @var array<string, list<\SineMacula\Laravel\Mfa\Proofs\Proof>> The proofs of each sign-in arranged, as rows an authentication layer holds. */
+    /** @var array<string, list<\SineMacula\Laravel\Mfa\Proofs\Proof>> Proofs by sign-in. */
     private array $rows = [];
 
-    /** @var array<string, string> Each identity's current sign-in on each application, by its slot and the application. */
+    /** @var array<string, string> Current sign-in by identity slot and application. */
     private array $current = [];
 
     /**
-     * Arrange a sign-in, as signing in through the layer would, holding the
-     * first factor proved on signing in, and return its id.
+     * A sign-in holding its first factor proof, as signing in through the layer
+     * leaves one.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -64,7 +63,7 @@ final class SignInRowsProofStore implements ProofStore
     }
 
     /**
-     * Void every proof, as the layer does on a reset.
+     * As the layer does on a reset.
      *
      * @return void
      */
@@ -74,8 +73,6 @@ final class SignInRowsProofStore implements ProofStore
     }
 
     /**
-     * Make the arranged sign-in current, refusing one never arranged.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -94,8 +91,6 @@ final class SignInRowsProofStore implements ProofStore
     }
 
     /**
-     * The current sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?string
@@ -107,8 +102,6 @@ final class SignInRowsProofStore implements ProofStore
     }
 
     /**
-     * Keep the identity's proof of the current sign-in, refusing any other.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
@@ -127,8 +120,7 @@ final class SignInRowsProofStore implements ProofStore
     }
 
     /**
-     * The proofs of the sign-in named, when it is the current one, whatever
-     * generation they were made under.
+     * Ignores the generation the proofs were made under.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -142,8 +134,6 @@ final class SignInRowsProofStore implements ProofStore
     }
 
     /**
-     * Stop counting the proofs made with the factor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @return void
@@ -157,8 +147,6 @@ final class SignInRowsProofStore implements ProofStore
     }
 
     /**
-     * Forget the identity's current sign-in on the application and its proofs.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void
@@ -178,9 +166,6 @@ final class SignInRowsProofStore implements ProofStore
     }
 
     /**
-     * Whether the proof is the identity's, bound to the current sign-in on its
-     * application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return bool
@@ -194,8 +179,6 @@ final class SignInRowsProofStore implements ProofStore
     }
 
     /**
-     * The key of the identity's current sign-in on the application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return string

@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 /**
- * A parent model with a real factor relation, as an application binding
- * `/users/{user}/factors/{factor}` with scoped bindings has.
+ * A parent model with a factor relation, for scoped bindings such as
+ * `/users/{user}/factors/{factor}`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,8 +28,6 @@ final class ScopedFactorOwner extends Model
     protected $fillable = ['email'];
 
     /**
-     * The owner's factors.
-     *
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany<\SineMacula\Laravel\Mfa\Models\Factor, $this>
      */
     public function factors(): MorphMany

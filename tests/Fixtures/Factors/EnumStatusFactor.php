@@ -8,9 +8,8 @@ use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 /**
- * A factor model that casts its status to the enum, as an application's own
- * model may, so a stored value the enum does not know throws Laravel's
- * `ValueError` when it is read.
+ * Casts its status to the enum, so an unknown stored value throws a
+ * `ValueError` when read.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,9 +19,6 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 final class EnumStatusFactor extends Factor
 {
     /**
-     * The attributes that should be cast: the shipped ones, with the status as
-     * the enum.
-     *
      * @return array<string, string>
      */
     #[\Override]

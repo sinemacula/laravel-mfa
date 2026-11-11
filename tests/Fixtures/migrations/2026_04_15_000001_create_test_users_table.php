@@ -7,16 +7,12 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Create the test users table used across the MFA test suites.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 
 return new class extends Migration {
     /**
-     * Run the migrations.
-     *
      * @return void
      */
     public function up(): void
@@ -33,8 +29,6 @@ return new class extends Migration {
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      */
     public function down(): void

@@ -12,11 +12,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 
 /**
- * A driver outside the package that hands the code it is given to a check of
- * its own, which fails, as an application's driver whose store is down would.
- *
- * Neither method marks the code as sensitive, so PHP records it in both frames
- * of the trace.
+ * Hands the code to a failing check of its own, as a driver whose store is down
+ * would, without marking it sensitive so PHP records it in the trace.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,7 +25,7 @@ final class CodeForwardingDriver implements FactorDriver
     use DescribesNoChannel;
 
     /**
-     * An authenticator app's channel, so the code reaches the driver.
+     * So the code reaches the driver.
      *
      * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
      */
@@ -39,8 +36,6 @@ final class CodeForwardingDriver implements FactorDriver
     }
 
     /**
-     * Check the code, which fails.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -53,8 +48,6 @@ final class CodeForwardingDriver implements FactorDriver
     }
 
     /**
-     * Whether the code is accepted, which fails to be known.
-     *
      * @param  string  $code
      * @return bool
      *

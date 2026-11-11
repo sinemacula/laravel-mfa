@@ -9,9 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 
 /**
- * A session revoker that advances nothing and records what it was asked to do,
- * as an authentication layer's would, and throws when told to; told to judge
- * the current session itself, it says so, returning the completion given.
+ * Records what it was asked to revoke, or throws when told to fail. When told
+ * to judge the current session itself, it returns the given completion.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,15 +19,13 @@ use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
  */
 final class RecordingSessionRevoker implements SessionRevoker
 {
-    /** @var list<string> The calls made, oldest first. */
+    /** @var list<string> Oldest first. */
     public array $calls = [];
 
-    /** @var list<array{factor: string, session: string}> The removals it was told of, oldest first. */
+    /** @var list<array{factor: string, session: string}> Oldest first. */
     public array $removals = [];
 
     /**
-     * Constructor.
-     *
      * @param  bool  $fails
      * @param  bool  $judges
      * @param  ?object  $completion
@@ -41,13 +38,11 @@ final class RecordingSessionRevoker implements SessionRevoker
         /** Whether it judges the current session again itself. */
         private readonly bool $judges = false,
 
-        /** What it returns for the caller when it judges the session. */
+        /** Returned when it judges the session. */
         private readonly ?object $completion = null,
     ) {}
 
     /**
-     * Record the revocation of the other sessions for the factor's removal.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @param  string  $application
@@ -67,8 +62,6 @@ final class RecordingSessionRevoker implements SessionRevoker
     }
 
     /**
-     * Record the revocation of every session.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      *
@@ -81,8 +74,6 @@ final class RecordingSessionRevoker implements SessionRevoker
     }
 
     /**
-     * Record the call, or throw.
-     *
      * @param  string  $call
      * @return void
      *

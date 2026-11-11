@@ -7,9 +7,8 @@ namespace Tests\Fixtures\Factors;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 /**
- * A factor model whose label cannot be read, failing with its own destination
- * in the message and in a helper's arguments, as a careless application model
- * might: the code service reads the label while it builds a code's message.
+ * Fails to read its label with the destination in the message and in a helper's
+ * arguments, as a careless application model might.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,8 +18,6 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 final class LeakingLabelFactor extends Factor
 {
     /**
-     * Fail to read the label, quoting the destination.
-     *
      * @return ?string
      *
      * @throws \RuntimeException
@@ -32,8 +29,6 @@ final class LeakingLabelFactor extends Factor
     }
 
     /**
-     * Refuse, quoting the destination given.
-     *
      * @param  string  $destination
      * @return never
      *

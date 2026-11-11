@@ -8,14 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 use Tests\Fixtures\Factors\Concerns\ReportsUsableFactorDefaults;
 
 /**
- * Minimal in-memory Factor implementation used by MfaManager tests that need to
- * exercise the non-Eloquent branch of the orchestration pipeline without
- * touching the database.
- *
- * Satisfies only the read-only `Factor` contract; the manager's verification
- * pipeline explicitly skips state mutation when the factor does not implement
- * `EloquentFactor`, which is exactly the branch this fixture is designed to
- * exercise.
+ * A read-only `Factor` that is not an `EloquentFactor`, so the manager skips
+ * state changes for it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,8 +21,6 @@ final class InMemoryFactor implements Factor
     use ReportsUsableFactorDefaults;
 
     /**
-     * Build an in-memory factor double with the provided immutable state.
-     *
      * @param  string  $type
      * @param  ?string  $secret
      * @param  ?string  $destination
@@ -38,25 +30,23 @@ final class InMemoryFactor implements Factor
      */
     public function __construct(
 
-        /** Type reported by the factor. */
+        /** @var string */
         private readonly string $type = 'totp',
 
-        /** Stored secret value. */
+        /** @var ?string */
         private readonly ?string $secret = null,
 
-        /** Delivery destination (email address, phone number, etc). */
+        /** @var ?string */
         private readonly ?string $destination = null,
 
-        /** Human-readable factor label. */
+        /** @var ?string */
         private readonly ?string $label = null,
 
-        /** Factor identifier returned by `getFactorIdentifier()`. */
+        /** @var mixed */
         private readonly mixed $identifier = 'factor-id',
     ) {}
 
     /**
-     * Return the configured factor identifier verbatim.
-     *
      * @return mixed
      */
     #[\Override]
@@ -66,8 +56,6 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the type this in-memory factor reports.
-     *
      * @return string
      */
     #[\Override]
@@ -77,8 +65,6 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the optional human-readable label.
-     *
      * @return ?string
      */
     #[\Override]
@@ -88,8 +74,6 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the optional delivery destination.
-     *
      * @return ?string
      */
     #[\Override]
@@ -99,8 +83,6 @@ final class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the configured secret value.
-     *
      * @return ?string
      */
     #[\Override]

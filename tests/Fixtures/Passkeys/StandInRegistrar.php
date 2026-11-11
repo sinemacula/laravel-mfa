@@ -13,12 +13,9 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration;
 use Tests\Fixtures\Context\Callers;
 
 /**
- * Stands in for an authentication layer's passkey registration and removal: it
- * writes or deletes its own credential row in `test_credentials` and calls the
- * change gate, both inside one transaction on the storage connection, as the
- * gate requires. A callback given runs after the gate, inside the same
- * transaction, so a test can make the caller fail once the gate has allowed the
- * change.
+ * An authentication layer's passkey registration and removal, writing its own
+ * credential row and calling the change gate in one storage transaction. The
+ * `$after` callback runs in that transaction once the gate has allowed it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,24 +24,19 @@ use Tests\Fixtures\Context\Callers;
  */
 final readonly class StandInRegistrar
 {
-    /** @var string The stand-in credentials table. */
+    /** @var string */
     public const string TABLE = 'test_credentials';
 
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate  $gate
      */
     public function __construct(
 
-        /** The gate the registrar calls. */
+        /** @var \SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate */
         private PasskeyChangeGate $gate,
     ) {}
 
     /**
-     * Store the credential and associate it through the gate, in one
-     * transaction.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration  $registration
@@ -73,9 +65,6 @@ final readonly class StandInRegistrar
     }
 
     /**
-     * Delete the credential and remove its factor through the gate, in one
-     * transaction.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $credentialId
@@ -101,8 +90,7 @@ final readonly class StandInRegistrar
     }
 
     /**
-     * Store the identity's credential without the gate, as a faulty caller
-     * would.
+     * Skips the gate, as a faulty caller would.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $credentialId
@@ -117,8 +105,6 @@ final readonly class StandInRegistrar
     }
 
     /**
-     * Whether the identity's credential is stored.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $credentialId
      * @return bool
@@ -132,8 +118,6 @@ final readonly class StandInRegistrar
     }
 
     /**
-     * The identity's key as the credential row stores it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return string
      */

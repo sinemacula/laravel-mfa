@@ -19,8 +19,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 final readonly class FixedIdentityRequirement implements IdentityRequirement
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      */
     public function __construct(
@@ -30,8 +28,6 @@ final readonly class FixedIdentityRequirement implements IdentityRequirement
     ) {}
 
     /**
-     * The fixed requirement.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement

@@ -7,8 +7,7 @@ namespace Tests\Fixtures\Factors;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 /**
- * A factor model whose persistence seam neither writes the row nor throws, as
- * an application's own seam might by mistake.
+ * A factor model whose persistence seam neither writes the row nor throws.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,8 +17,6 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 final class UnwrittenFactor extends Factor
 {
     /**
-     * Write nothing.
-     *
      * @return void
      */
     #[\Override]

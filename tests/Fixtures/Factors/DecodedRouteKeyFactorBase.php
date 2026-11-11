@@ -12,14 +12,11 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
- * A base factor model with a route binding of its own, as a model decoding a
- * hashed route key has: the value in a URL is encoded, and the value `stranger`
- * finds a model of another class altogether.
+ * A factor model that decodes its route key, as one with hashed keys does, and
+ * finds a model of another class for `stranger`.
  *
- * The class-level suppression is for one method: the model-behaviour rule
- * reports a trait's public methods at the class that imports them, and its list
- * of framework hooks does not include Eloquent's trait initialiser,
- * `initializeActsAsFactor()`, which only sets casts.
+ * The suppression is for the trait initialiser `initializeActsAsFactor()`,
+ * which the model-behaviour rule does not know as a framework hook.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -32,12 +29,10 @@ abstract class DecodedRouteKeyFactorBase extends Model implements EloquentFactor
 {
     use ActsAsFactor, HasUlids;
 
-    /** @var string The value that finds a model of another class. */
+    /** @var string Finds a model of another class. */
     public const string STRANGER = 'stranger';
 
     /**
-     * Name the package's factor table.
-     *
      * @return string
      */
     #[\Override]
@@ -47,8 +42,6 @@ abstract class DecodedRouteKeyFactorBase extends Model implements EloquentFactor
     }
 
     /**
-     * Decode the value, and look the factor up by what it decodes to.
-     *
      * @param  mixed  $value
      * @param  ?string  $field
      * @return ?\Illuminate\Database\Eloquent\Model

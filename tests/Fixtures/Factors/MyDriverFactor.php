@@ -5,8 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Factors;
 
 /**
- * Minimal `Factor` fixture reporting against the `my_driver` name — feeds the
- * custom-driver dispatch path without touching persistence.
+ * A factor of the custom `my_driver` type, without persistence.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -16,8 +15,6 @@ namespace Tests\Fixtures\Factors;
 final class MyDriverFactor extends AbstractFactorStub
 {
     /**
-     * Return the fixture's fixed factor identifier.
-     *
      * @return mixed
      */
     #[\Override]
@@ -27,8 +24,6 @@ final class MyDriverFactor extends AbstractFactorStub
     }
 
     /**
-     * Return the fixture's custom driver name.
-     *
      * @return string
      */
     #[\Override]

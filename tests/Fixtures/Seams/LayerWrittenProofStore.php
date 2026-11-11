@@ -11,12 +11,9 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * A proof store standing in for one whose proofs and sign-ins an authentication
- * layer alone writes: `record()` keeps nothing it is given (a proof of the
- * current sign-in is one the layer already holds) and refuses any other,
- * `forget()` does nothing, since the layer ends a sign-in before the package is
- * told, and a proof naming a factor counts only while the identity holds that
- * factor. The layer's own writes are `write()`, `signOut()` and `enrol()`.
+ * A store whose proofs and sign-ins only an authentication layer writes,
+ * through `write()`, `signOut()` and `enrol()`. A proof naming a factor counts
+ * only while the identity holds that factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,18 +22,16 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  */
 final class LayerWrittenProofStore implements ProofStore
 {
-    /** @var array<string, list<\SineMacula\Laravel\Mfa\Proofs\Proof>> The proofs of each sign-in the layer holds. */
+    /** @var array<string, list<\SineMacula\Laravel\Mfa\Proofs\Proof>> Proofs by sign-in. */
     private array $rows = [];
 
-    /** @var array<string, string> Each identity's current sign-in on each application, by its slot and the application. */
+    /** @var array<string, string> Current sign-in by identity slot and application. */
     private array $current = [];
 
-    /** @var list<string> The factors the identity holds. */
+    /** @var list<string> */
     private array $factors = [];
 
     /**
-     * Sign the identity in through the layer, and return the sign-in's id.
-     *
      * @return string
      */
     public function signIn(): string
@@ -49,8 +44,6 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * Record the proof through the layer.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
      */
@@ -60,8 +53,6 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * End every current sign-in through the layer.
-     *
      * @return void
      */
     public function signOut(): void
@@ -74,8 +65,6 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * Enrol a factor for the identity, and return its id.
-     *
      * @return string
      */
     public function enrol(): string
@@ -88,8 +77,6 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * Make the layer's sign-in current, refusing one it does not hold.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -108,8 +95,6 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * The current sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?string
@@ -121,8 +106,8 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * Keep nothing: a proof of the identity's current sign-in is one the layer
-     * already holds, and any other is refused.
+     * Keeps nothing, since the layer already holds a proof of the current
+     * sign-in, and refuses any other.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
@@ -140,9 +125,6 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * The proofs of the sign-in named, when it is the current one, that name no
-     * factor, or one the identity still holds.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -157,8 +139,6 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * Stop counting the factor: the identity no longer holds it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @return void
@@ -170,7 +150,7 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * Do nothing: the layer ends a sign-in before the package is told.
+     * The layer ends a sign-in before the package is told.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -179,13 +159,10 @@ final class LayerWrittenProofStore implements ProofStore
     #[\Override]
     public function forget(MultiFactorAuthenticatable $identity, string $application): void
     {
-        // The layer has already ended the sign-in.
+        // Already ended by the layer.
     }
 
     /**
-     * Whether the proof is the identity's, bound to the current sign-in on its
-     * application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return bool
@@ -199,8 +176,6 @@ final class LayerWrittenProofStore implements ProofStore
     }
 
     /**
-     * The key of the identity's current sign-in on the application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return string

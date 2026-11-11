@@ -10,8 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * A freshness gate that answers fresh the first time it is asked, and never
- * again, as a session whose proof ages out between two checks.
+ * Fresh the first time it is asked only, as a session whose proof ages out
+ * between two checks.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,12 +20,10 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  */
 final class FreshOnceGate implements FreshnessGate
 {
-    /** @var int How many times the gate was asked. */
+    /** @var int */
     public int $reads = 0;
 
     /**
-     * Fresh the first time only.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -38,8 +36,6 @@ final class FreshOnceGate implements FreshnessGate
     }
 
     /**
-     * An hour on, the first time only.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -52,8 +48,6 @@ final class FreshOnceGate implements FreshnessGate
     }
 
     /**
-     * The caller's requirement, unchanged.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
