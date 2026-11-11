@@ -56,9 +56,8 @@ use Tests\Fixtures\Seams\InterruptingProofStore;
 use Tests\TestCase;
 
 /**
- * A grant confirms only in the session that started it, for the identity and
- * the application it was started for, on the kind of session its authority
- * serves. Every mismatch answers `not_found`, and the row keeps no secret.
+ * A grant confirms only in its session, for its identity and application, on
+ * the kind of session its authority serves; every mismatch is `not_found`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -102,8 +101,6 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -115,8 +112,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * Rows of what a stored enrolment is changed to, so it is no longer bound
-     * to who is asking.
+     * Changes that unbind a stored enrolment from the caller.
      *
      * @return iterable<string, array{array<string, string>}>
      */
@@ -130,7 +126,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A grant bound to anything else answers `not_found`, counting nothing.
+     * Counting nothing.
      *
      * @param  array<string, string>  $change
      * @return void
@@ -155,8 +151,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * An owner differing only in case is not the owner, wherever the database's
-     * collation would find them equal.
+     * Wherever the database's collation would find them equal.
      *
      * @return void
      */
@@ -171,8 +166,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * An unknown grant is not found, and so is the right grant once used, which
-     * returns none of the secrets again.
+     * A used grant returns none of the secrets again.
      *
      * @return void
      */
@@ -194,8 +188,6 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A grant whose pending factor is gone is not found.
-     *
      * @return void
      */
     public function testAGrantWhoseFactorIsGoneIsNotFound(): void
@@ -211,8 +203,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * The grant may be passed as the secret it was returned as, or as what was
-     * revealed from it.
+     * The secret it was returned as, or its revealed value.
      *
      * @return void
      */
@@ -251,7 +242,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * An advanced verification generation kills the grant, as `expired`.
+     * As `expired`.
      *
      * @return void
      */
@@ -269,8 +260,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A sign-in that changes between capture and lock counts nothing and
-     * reports nothing.
+     * Nothing is counted or reported.
      *
      * @return void
      */
@@ -292,9 +282,8 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A request that serves nobody, a person with no sign-in, and a pending
-     * credential that does not allow confirming, are all answered `not_found`
-     * and reported to nobody.
+     * Nobody served, no sign-in, or a credential that may not confirm; reported
+     * to nobody.
      *
      * @return void
      */
@@ -315,8 +304,7 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A credential that does not validate still throws through the resolver,
-     * which is not the same as serving nobody.
+     * Through the resolver, unlike serving nobody.
      *
      * @return void
      */
@@ -330,8 +318,8 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * The row holds a hash of the grant and a keyed digest of the sign-in,
-     * never either itself.
+     * A hash of the grant and a keyed digest of the sign-in, never either
+     * itself.
      *
      * @return void
      */

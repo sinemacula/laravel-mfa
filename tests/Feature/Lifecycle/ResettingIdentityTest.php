@@ -54,10 +54,8 @@ use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
 /**
- * Resetting an identity: everything it holds goes in one change, every proof
- * and session with it, the obligation is recorded, the events come in order
- * once it commits, and a verification racing it fails or has its proof
- * invalidated.
+ * Resetting an identity removes everything it holds in one change, reports in
+ * order once committed, and fails or invalidates a racing verification.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -77,8 +75,6 @@ final class ResettingIdentityTest extends TestCase
     private const string REASON = 'Lost phone, identity checked by support.';
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -90,7 +86,7 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A blank reason is refused before anything is written.
+     * Before anything is written.
      *
      * @return void
      *
@@ -114,7 +110,7 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A machine holds no factors, and is refused.
+     * It holds no factors.
      *
      * @return void
      *
@@ -141,9 +137,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * Everything the identity holds goes, with nobody signed in as it; every
-     * session is revoked and the generation moves even if the bound revoker's
-     * does not; another identity is untouched.
+     * The generation moves even if the bound revoker's does not; another
+     * identity is untouched.
      *
      * @return void
      *
@@ -186,8 +181,7 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * An inactive identity can be reset, by a console command with no caller at
-     * all.
+     * By a console command with no caller at all.
      *
      * @return void
      *
@@ -210,8 +204,7 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * Resetting the identity the request serves invalidates its own proofs too:
-     * they are not kept for it, and its next protected request finds none.
+     * Its next protected request finds none.
      *
      * @return void
      *
@@ -233,9 +226,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * The events come once the change commits, every lockout first, each factor
-     * in id order by how far it got, the codes, and the reset itself last, each
-     * naming the actor where it can; a lockout that had ended is not reported.
+     * Lockouts first, each factor in id order by how far it got, the codes,
+     * then the reset; an ended lockout is not reported.
      *
      * @return void
      *
@@ -289,8 +281,6 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * With no set, no codes' removal is reported.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -310,9 +300,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A reset removes a factor whose status cannot be read, beside one that
-     * can, reporting no removal for it, since its summary cannot be built
-     * honestly, and counting it on `FactorsReset` instead.
+     * No removal is reported for it, since its summary cannot be built
+     * honestly; it is counted on `FactorsReset`.
      *
      * @return void
      *
@@ -340,8 +329,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A reset removes a factor whose deadline cannot be read, clearing it with
-     * the row rather than reading it, and lifts nothing for it.
+     * It is cleared with the row rather than read, and nothing is lifted for
+     * it.
      *
      * @return void
      *
@@ -378,10 +367,6 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * Rows of `[column, stored value, exception]`: a value an application's own
-     * model, casting the status to the enum, cannot read, and what reading it
-     * throws.
-     *
      * @return iterable<string, array{0: string, 1: string, 2: class-string<\Throwable>}>
      */
     public static function unreadableFactors(): iterable
@@ -391,9 +376,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A reset removes a factor an application's own model cannot read, its cast
-     * throwing rather than the package's own refusal, beside one it can,
-     * reporting no removal for it and counting it on `FactorsReset` instead.
+     * Its cast throws rather than the package's refusal; no removal is reported
+     * and it counts on `FactorsReset`.
      *
      * @param  string  $column
      * @param  string  $value
@@ -440,9 +424,7 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A factor whose read fails for any other reason is not taken for one that
-     * cannot be read: the failure propagates from the first read, before the
-     * reset writes anything, so nothing changes and nothing is reported.
+     * It propagates from the first read, before the reset writes anything.
      *
      * @return void
      *
@@ -474,8 +456,6 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A failure inside the change undoes it all, and nothing is reported.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -503,8 +483,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A write a model event cancels rolls the reset back: the identity's state
-     * is never left with its failures or lockout intact while the rest goes.
+     * The identity's state is never left with its failures or lockout while the
+     * rest goes.
      *
      * @return void
      *
@@ -536,8 +516,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * An outer transaction that rolls back takes the reset and its events with
-     * it, and a listener's exception after the commit leaves it committed.
+     * An outer rollback takes the reset and its events with it; a listener's
+     * exception after the commit leaves it committed.
      *
      * @return void
      *
@@ -577,8 +557,7 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A verification that read the factor before a reset took it fails under
-     * the lock, as not found, and records no proof.
+     * It fails under the lock as not found and records no proof.
      *
      * @return void
      *
@@ -612,8 +591,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A verification that committed first keeps its success, which
-     * serialisation cannot undo, but the reset invalidates its proof.
+     * It keeps its success, which serialisation cannot undo, but loses its
+     * proof.
      *
      * @return void
      *
@@ -635,8 +614,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A recovery code submitted after a reset finds no set, and one redeemed
-     * before it leaves a proof the reset invalidates.
+     * One submitted after a reset finds no set; one redeemed before leaves a
+     * proof the reset invalidates.
      *
      * @return void
      *
@@ -662,8 +641,7 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * An enrolment grant from before a reset confirms nothing after it: the
-     * enrolment is gone, whichever came first.
+     * The enrolment is gone, whichever came first.
      *
      * @return void
      *
@@ -692,9 +670,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * The obligation is recorded by default, survives a new sign-in and a new
-     * read of the identity, applies in every application, and ends when a
-     * factor is confirmed.
+     * Recorded by default, it survives a new sign-in or read of the identity
+     * and applies in every application.
      *
      * @return void
      *
@@ -735,8 +712,7 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A reset that states no obligation clears one left by an earlier reset,
-     * and says so.
+     * It clears one left by an earlier reset, and says so.
      *
      * @return void
      *
@@ -761,8 +737,6 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * Record the first factor the session's verifications come after.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return void
      *
@@ -774,7 +748,7 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * A confirmed TOTP factor of the user's with a secret the test can answer.
+     * With a secret the test can answer.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor

@@ -62,8 +62,7 @@ use Tests\TestCase;
 
 /**
  * A delivered factor's destination is normalised and captured, proved by a code
- * of a purpose of its own, which never works as a sign-in code or the reverse;
- * a code that cannot go leaves nothing behind.
+ * of its own purpose; a code that cannot go leaves nothing behind.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -107,8 +106,6 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -120,8 +117,8 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * An email address is trimmed and put in lower case, and a code goes to it
-     * even when it is already the identity's own.
+     * Trimmed and lower-cased, and a code goes to it even when it is the
+     * identity's own.
      *
      * @return void
      */
@@ -141,8 +138,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A phone number loses its spaces, dashes and parentheses, and goes in
-     * E.164.
+     * Spaces, dashes and parentheses go, in E.164.
      *
      * @return void
      */
@@ -159,8 +155,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A later change to the identity's address does not redirect the codes, and
-     * the code confirms.
+     * The code still confirms.
      *
      * @return void
      */
@@ -180,7 +175,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A delivery that throws leaves no factor, no row, no code and no event.
+     * No factor, row, code or event.
      *
      * @return void
      *
@@ -192,8 +187,6 @@ final class DeliveredEnrollmentStarterTest extends TestCase
 
         $this->container()->instance(EmailSender::class, new class implements EmailSender {
             /**
-             * Fail.
-             *
              * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
              * @return void
              *
@@ -220,8 +213,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A sending cap refuses the start with how long to wait, leaving nothing,
-     * and restarting does not reset it.
+     * Refused with how long to wait, leaving nothing.
      *
      * @return void
      */
@@ -245,9 +237,8 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Restarting leaves the sends to a destination counted, although each
-     * restart makes a new factor: the cap on them refuses, keeping the
-     * enrolment under way, while another destination may still be sent to.
+     * Each restart makes a new factor, but sends to a destination stay counted;
+     * another destination may still be sent to.
      *
      * @return void
      */
@@ -270,9 +261,8 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Restarting waits out the cooldown since the last code to the destination,
-     * as a resend does, keeping the enrolment under way, and cancelling first
-     * makes no difference; another destination need not wait.
+     * As a resend does, and cancelling first makes no difference; another
+     * destination need not wait.
      *
      * @return void
      */
@@ -298,8 +288,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * An enrolment code does not work as a sign-in or a step-up code, and a
-     * sign-in code does not work for enrolment.
+     * An enrolment code fails as a sign-in or step-up code, and the reverse.
      *
      * @return void
      */
@@ -325,8 +314,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A code answering nothing the enrolment knows counts nothing, and a used
-     * one reports as the gateway does.
+     * A used one reports as the gateway does.
      *
      * @return void
      */
@@ -352,7 +340,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * The confirming code passes once, naming its challenge on the events.
+     * It passes once.
      *
      * @return void
      */
@@ -373,9 +361,8 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Under an enrolment binding only a pending factor holding a live enrolment
-     * bound to the caller is admitted; a confirmed one, one with none, one that
-     * expired and another session's are refused.
+     * A confirmed one, one without an enrolment, an expired one and another
+     * session's are refused.
      *
      * @return void
      */
@@ -413,8 +400,7 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A report under an enrolment binding changes no count either way, and
-     * still refuses a binding naming another identity.
+     * Either way; a binding naming another identity is still refused.
      *
      * @return void
      */
@@ -438,8 +424,8 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A credential that allows sending a code does not reach a pending factor's
-     * challenge, and one lacking the bootstrap actions is refused.
+     * Sending a code does not reach a pending factor's challenge; a credential
+     * lacking the bootstrap actions is refused.
      *
      * @return void
      */
@@ -465,8 +451,6 @@ final class DeliveredEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * What an active person's enrolment is bound to.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */

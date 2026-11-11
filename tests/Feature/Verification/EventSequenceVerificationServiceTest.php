@@ -41,9 +41,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * The events of a sign-in, a step-up and a recovery code's use come in order
- * once the change commits, with the proof already in the store, and none after
- * a rollback.
+ * Sign-in, step-up and recovery code events come in order once the change
+ * commits, with the proof stored, and none after a rollback.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -69,8 +68,6 @@ final class EventSequenceVerificationServiceTest extends TestCase
     use ArrangesVerification;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -82,8 +79,6 @@ final class EventSequenceVerificationServiceTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -95,8 +90,8 @@ final class EventSequenceVerificationServiceTest extends TestCase
     }
 
     /**
-     * A sign-in on a pending session sends one code and passes once, naming the
-     * challenge, the factor, the type and the purpose.
+     * One code sent and one pass, naming the challenge, factor, type and
+     * purpose.
      *
      * @return void
      */
@@ -131,8 +126,6 @@ final class EventSequenceVerificationServiceTest extends TestCase
     }
 
     /**
-     * A step-up passes once, and a listener already sees the new proof.
-     *
      * @return void
      */
     public function testAStepUpsListenerSeesTheProof(): void
@@ -155,8 +148,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
     }
 
     /**
-     * A recovery code's use reports the pass, then its use with the count left,
-     * then that the set is low.
+     * The pass, then its use with the count left, then that the set is low.
      *
      * @return void
      */
@@ -187,8 +179,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
     }
 
     /**
-     * A set above its low count reports its use and nothing more, and a low
-     * count of zero never reports it.
+     * A low count of zero never reports it.
      *
      * @return void
      */
@@ -208,7 +199,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
     }
 
     /**
-     * After a rollback, nothing is reported but the failure.
+     * Only the failure is reported.
      *
      * @return void
      */
@@ -231,8 +222,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
     }
 
     /**
-     * A failure's report names the challenge the attempt went through, and
-     * every event implements the catalogue's contract.
+     * Every event also implements the catalogue's contract.
      *
      * @return void
      */
@@ -258,8 +248,8 @@ final class EventSequenceVerificationServiceTest extends TestCase
     }
 
     /**
-     * A listener's refusal after the commit does not undo a code already
-     * delivered, nor is it answered as a refused send: it propagates.
+     * The delivered code stays delivered, and it is not answered as a refused
+     * send.
      *
      * @return void
      *
@@ -287,7 +277,7 @@ final class EventSequenceVerificationServiceTest extends TestCase
     }
 
     /**
-     * A passkey that reports a challenge has it on the pass and the proof.
+     * On the pass and the proof.
      *
      * @return void
      */

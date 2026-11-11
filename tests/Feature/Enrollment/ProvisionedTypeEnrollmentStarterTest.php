@@ -46,7 +46,7 @@ use Tests\TestCase;
 
 /**
  * An application's own type whose driver provisions an authenticator app starts
- * under an account name, and confirms through its own driver, as TOTP does.
+ * under an account name and confirms through its driver, as TOTP does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -90,7 +90,7 @@ final class ProvisionedTypeEnrollmentStarterTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application, with the type enabled and its driver registered.
+     * With the type enabled and its driver registered.
      *
      * @return void
      */
@@ -106,8 +106,8 @@ final class ProvisionedTypeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * The type starts under the account name and issuer given, returning its
-     * secret and its URI once, and confirms with the code its driver accepts.
+     * Its secret and URI are returned once, and it confirms with the code its
+     * driver accepts.
      *
      * @return void
      */
@@ -132,7 +132,7 @@ final class ProvisionedTypeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Without an issuer of its own, the configured one applies.
+     * Without an issuer of its own.
      *
      * @return void
      */
@@ -148,7 +148,7 @@ final class ProvisionedTypeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Asking for the type with no account name is a mistake of the caller's.
+     * Its absence is the caller's mistake.
      *
      * @return void
      */

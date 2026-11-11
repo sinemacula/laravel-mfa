@@ -15,8 +15,8 @@ use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\TestCase;
 
 /**
- * The default `SelfServiceRecovery`: none is offered, starting one is refused,
- * and nothing changes. An application's own binding replaces it.
+ * The default `SelfServiceRecovery` offers none and refuses to start one; an
+ * application's binding replaces it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,8 +30,7 @@ final class SelfServiceRecoveryTest extends TestCase
     use ArrangesLifecycle;
 
     /**
-     * By default no recovery is offered, and starting one refuses with its own
-     * reason and changes nothing.
+     * Starting one refuses with its own reason.
      *
      * @return void
      *

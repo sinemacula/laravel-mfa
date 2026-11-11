@@ -78,9 +78,8 @@ use Tests\Fixtures\Seams\InterruptingProofStore;
 use Tests\TestCase;
 
 /**
- * Every gate an enrolment passes before it starts: who is asking, the type, the
- * destination, the lockouts, what authorises it, the combination it would make,
- * and the limits; each refused with its reason, leaving nothing behind.
+ * Every gate before an enrolment starts, from the caller to the limits, refuses
+ * with its reason and leaves nothing behind.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -124,8 +123,6 @@ final class GatesEnrollmentStarterTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -137,9 +134,8 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Nobody signed in, a machine, a person with no sign-in the store knows of,
-     * and a pending credential that does not allow starting are all served
-     * nothing.
+     * Nobody signed in, a machine, a person with no known sign-in, and a
+     * pending credential that may not start.
      *
      * @return void
      */
@@ -166,8 +162,6 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * An inactive identity is refused.
-     *
      * @return void
      */
     public function testAnInactiveIdentityIsRefused(): void
@@ -182,8 +176,8 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A type the application does not enable is refused, and a passkey, which
-     * enrols only from its registration, before its driver is asked.
+     * A passkey, which enrols only from its registration, is refused before its
+     * driver is asked.
      *
      * @return void
      */
@@ -202,8 +196,6 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Rows of `[type, destination]` of destinations the type cannot deliver to.
-     *
      * @return iterable<string, array{string, string}>
      */
     public static function invalidDestinations(): iterable
@@ -219,8 +211,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A destination the type cannot deliver to is refused before anything is
-     * stored or sent.
+     * Before anything is stored or sent.
      *
      * @param  string  $type
      * @param  string  $destination
@@ -239,7 +230,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A delivered type with no destination is refused as one with a bad one.
+     * As one with a bad destination.
      *
      * @return void
      */
@@ -251,8 +242,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A type that provisions an authenticator app needs the account name it
-     * shows, which is the caller's mistake to make.
+     * The account name it shows; its absence is the caller's mistake.
      *
      * @return void
      */
@@ -267,8 +257,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * The address's throttle refuses a start, counting nothing against it when
-     * one goes ahead.
+     * Nothing counts against it when one goes ahead.
      *
      * @return void
      */
@@ -294,7 +283,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * An identity's lockout refuses a start, with when it lifts.
+     * With when it lifts.
      *
      * @return void
      */
@@ -314,7 +303,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * With a confirmed factor and no step-up, the session is not fresh.
+     * With a confirmed factor and no step-up.
      *
      * @return void
      */
@@ -329,8 +318,8 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * With no factor, the default reauthenticator refuses, and so does any
-     * proof that is not of the first factor made under the current generation.
+     * With no factor, the default reauthenticator refuses, as does any proof
+     * not of the current generation's first factor.
      *
      * @return void
      */
@@ -354,10 +343,8 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A stored factor whose status is none the package knows is not read as
-     * pending, which would let a first factor's reauthentication stand in for
-     * the step-up a confirmed one needs: the start throws, and nothing is
-     * written.
+     * Reading it as pending would let a reauthentication stand in for a
+     * confirmed factor's step-up, so the start throws and writes nothing.
      *
      * @return void
      *
@@ -383,9 +370,6 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * With a factor and a step-up the row records it as what authorised the
-     * enrolment.
-     *
      * @return void
      */
     public function testAStepUpIsRecordedAsTheAuthority(): void
@@ -396,7 +380,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Bootstrap is off by default, then each of its conditions refuses in turn.
+     * Off by default, then each condition refuses in turn.
      *
      * @return void
      */
@@ -428,8 +412,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * An action other than the one asked for does not stand in for it: a direct
-     * call of the authority on behalf of a credential lacking it refuses.
+     * A direct call for a credential lacking it refuses.
      *
      * @return void
      */
@@ -453,9 +436,8 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * On a bootstrap session the factor must be one the policy accepts after
-     * the first factor, and a session whose first factor is not known accepts
-     * none.
+     * The factor must be one the policy accepts, and with no known first factor
+     * none is.
      *
      * @return void
      */
@@ -477,9 +459,8 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * On an active session the same combination is refused only for the
-     * identity's first additional factor, and only while its first factor is
-     * known; a later factor is useful on another sign-in.
+     * Only for the first additional factor while its first factor is known; a
+     * later one is useful on another sign-in.
      *
      * @return void
      */
@@ -517,8 +498,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Limits on confirmed factors, per type and in all, count those enrolled
-     * through this application only.
+     * Per type and in all.
      *
      * @return void
      */
@@ -541,8 +521,6 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * The limit on pending enrolments counts this application's live ones.
-     *
      * @return void
      */
     public function testThePendingLimitCountsThisApplicationsLiveOnes(): void
@@ -562,7 +540,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A sign-in that changes between capture and lock starts nothing.
+     * Between capture and lock.
      *
      * @return void
      */
@@ -579,8 +557,6 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A model event that cancels the pending factor's save stops the start.
-     *
      * @return void
      */
     public function testACanceledSaveStopsTheStart(): void
@@ -595,8 +571,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A persistence seam that neither writes the factor nor throws stops the
-     * start all the same.
+     * A persistence seam that neither writes it nor throws.
      *
      * @return void
      */
@@ -613,7 +588,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A disabled passkey is refused as a disabled type, not as a passkey.
+     * Not as a passkey.
      *
      * @return void
      */
@@ -625,8 +600,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A driver of the application's own may keep a secret with no URI to read
-     * it from, which is returned alone.
+     * An application's own driver; the secret is returned alone.
      *
      * @return void
      */
@@ -636,8 +610,6 @@ final class GatesEnrollmentStarterTest extends TestCase
             use DescribesNoChannel;
 
             /**
-             * Travel as an authenticator app does.
-             *
              * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
              */
             #[\Override]
@@ -647,8 +619,6 @@ final class GatesEnrollmentStarterTest extends TestCase
             }
 
             /**
-             * Keep a fixed secret.
-             *
              * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
              * @return \SineMacula\Laravel\Mfa\Secrets\RevealedSecret
              */
@@ -659,8 +629,6 @@ final class GatesEnrollmentStarterTest extends TestCase
             }
 
             /**
-             * Accept one code.
-             *
              * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
              * @param  string  $code
              * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -685,8 +653,8 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A row whose pending factor is gone goes quietly, and what follows it is
-     * still looked at; one whose generation has moved on goes as expired.
+     * A row whose factor is gone goes quietly and the scan continues; one whose
+     * generation moved on goes as expired.
      *
      * @return void
      */
@@ -718,9 +686,7 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Replacing a factor is enrolling the new one and then removing the old:
-     * the old one keeps verifying while the new one is pending, which is
-     * refused until it is confirmed, and after that both verify.
+     * The new one is refused until confirmed, then both verify.
      *
      * @return void
      */

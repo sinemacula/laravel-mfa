@@ -44,10 +44,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * Generating a recovery code set for the person the request serves needs a
- * session fresh enough for the operation that also reaches the level the
- * application sets for issuing them, checked before the codes are drawn and
- * again under the lock.
+ * Issuing a recovery code set needs a session fresh enough for the operation
+ * and at the issuing level, checked before drawing and under the lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -62,8 +60,6 @@ final class RecoveryCodeIssuanceTest extends TestCase
     use ArrangesVerification;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -75,8 +71,6 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -90,8 +84,6 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A fresh step-up that reaches the level is issued a set, once.
-     *
      * @return void
      */
     public function testAFreshSessionAtTheLevelIsIssuedASet(): void
@@ -109,8 +101,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A session that is not fresh for the operation is refused, with nothing
-     * drawn or replaced.
+     * Nothing is drawn or replaced.
      *
      * @return void
      */
@@ -126,7 +117,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A fresh session below the level is refused, with the same reason.
+     * With the same reason.
      *
      * @return void
      */
@@ -140,7 +131,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * The level is the application's: a lower one is met by less.
+     * The level is the application's.
      *
      * @return void
      */
@@ -161,8 +152,8 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * An email code is accepted without reaching the default level, so it is
-     * refused even when fresh.
+     * An email code is accepted without reaching it, so it is refused even when
+     * fresh.
      *
      * @return void
      */
@@ -181,8 +172,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A pending session is served nothing here, even one that allows every
-     * action.
+     * Even one that allows every action.
      *
      * @return void
      */
@@ -197,8 +187,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A person with no sign-in is refused as not fresh, and nobody at all as
-     * not found.
+     * Nobody at all is refused as not found.
      *
      * @return void
      */
@@ -215,8 +204,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * Freshness is judged under the lock only, once: before it the bound factor
-     * change gate is never asked.
+     * Before the lock the bound factor change gate is never asked.
      *
      * @return void
      */
@@ -233,8 +221,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A bound factor change gate's refusal under the lock is a refused result,
-     * with the reason it gave, and the old set stays intact.
+     * Refused with the gate's reason.
      *
      * @return void
      */
@@ -260,8 +247,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A bound factor change gate is handed the sign-in and the requirement the
-     * application configures for the operation.
+     * With the requirement the application configures for the operation.
      *
      * @return void
      */
@@ -281,8 +267,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A sign-in that changes under the generation is refused, whatever the gate
-     * says of it.
+     * Whatever the gate says of it.
      *
      * @return void
      */
@@ -297,9 +282,8 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A sign-in replaced once the operation has checked it lends that operation
-     * nothing: the level is read for the sign-in the codes were asked on, which
-     * no longer counts, not for the one that replaced it.
+     * The level is read for the sign-in the codes were asked on, not the one
+     * that replaced it.
      *
      * @return void
      */
@@ -313,8 +297,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * Each of the package's own reasons on this path is an answer, not an
-     * exception, leaving the old set in place.
+     * Each leaves the old set in place.
      *
      * @return void
      */
@@ -336,7 +319,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * An inactive person is told so, with nothing stored.
+     * Nothing is stored.
      *
      * @return void
      */
@@ -353,8 +336,8 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A person the subject type resolver says is not one is served nothing, and
-     * a resolver that throws is not read as a refusal.
+     * A person it says is not one is served nothing; a resolver that throws is
+     * not read as a refusal.
      *
      * @return void
      *
@@ -385,8 +368,8 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A freshness gate's own refusal, asked by the default factor change gate
-     * under the lock, stays an exception, with the old set intact and working.
+     * Asked by the default factor change gate under the lock; the old set stays
+     * intact and working.
      *
      * @return void
      */
@@ -405,8 +388,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A combination policy's own refusal stays an exception at every call it is
-     * asked to make, before the lock and under it.
+     * At every call, before the lock and under it.
      *
      * @return void
      */
@@ -435,8 +417,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * Rows of what a listener may throw: a refusal marked as the package's own,
-     * and one not.
+     * A refusal marked as the package's own, and one not.
      *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException}>
      */
@@ -447,8 +428,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A listener's failure once the set has committed is not a refusal of it,
-     * whichever kind of refusal it throws: it propagates, with the set stored.
+     * Whichever refusal it throws, it propagates with the set stored.
      *
      * @param  \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException  $refusal
      * @return void
@@ -476,9 +456,6 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * Inside an application's transaction the set is reported when that
-     * transaction commits, and not before.
-     *
      * @return void
      */
     public function testAnOuterTransactionDefersTheEventToItsCommit(): void
@@ -501,8 +478,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * A person whose factor was stepped up with, on the application configured
-     * for the operation, with the settings given.
+     * Stepped up on the application configured for the operation.
      *
      * @param  array<string, mixed>  $settings
      * @return \Tests\Fixtures\Identities\TestUser
@@ -523,8 +499,8 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * Replace the person's sign-in with one that verified with a password and
-     * an authenticator app, as signing in again elsewhere would.
+     * As signing in again elsewhere would, with a password and an authenticator
+     * app.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return void
@@ -542,7 +518,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * Generating is refused as not fresh, leaving what was there.
+     * Refused as not fresh, leaving what was there.
      *
      * @return void
      */
@@ -558,7 +534,7 @@ final class RecoveryCodeIssuanceTest extends TestCase
     }
 
     /**
-     * Generating throws a seam's refusal, unmarked, leaving what was there.
+     * Throws a seam's unmarked refusal, leaving what was there.
      *
      * @return void
      *

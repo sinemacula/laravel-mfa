@@ -51,9 +51,8 @@ use Tests\Fixtures\Verification\Dumps;
 use Tests\TestCase;
 
 /**
- * A TOTP factor's secret and provisioning URI are returned once, as secrets; the
- * secret is stored encrypted; restarting discards it; and confirming records the
- * step, so the confirming code cannot be used again.
+ * A TOTP secret and URI are returned once, stored encrypted and discarded on
+ * restart; confirming records the step so the code cannot be reused.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -97,8 +96,6 @@ final class TotpEnrollmentStarterTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -110,8 +107,8 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * The secret and the URI come back as secrets, with the factor pending,
-     * labelled, enrolled through the application and holding its parameters.
+     * The factor is pending, labelled, enrolled through the application and
+     * holding its parameters.
      *
      * @return void
      */
@@ -146,8 +143,7 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * The request's issuer wins, then the configured one, then the
-     * application's name.
+     * Then the application's name.
      *
      * @return void
      */
@@ -163,8 +159,6 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * What cannot make a URI rolls the whole start back.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -185,8 +179,7 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * The secret is stored encrypted, as the verifier needs it, and nothing in
-     * the row or the result shows it through any dump, cast or encoding.
+     * Encrypted as the verifier needs it; no dump, cast or encoding shows it.
      *
      * @return void
      */
@@ -222,7 +215,7 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * The secrets go out in a response no cache keeps.
+     * In a response no cache keeps.
      *
      * @return void
      */
@@ -238,8 +231,8 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Starting again discards the pending secret and its grant: the code from
-     * the old secret fails under the new grant, and the old grant is not found.
+     * The old secret's code fails under the new grant, and the old grant is not
+     * found.
      *
      * @return void
      */
@@ -258,8 +251,8 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Confirming records the accepted step, so the confirming code is replayed
-     * at the next verification and a later one passes.
+     * The confirming code is replayed at the next verification; a later one
+     * passes.
      *
      * @return void
      */
@@ -284,7 +277,7 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * The window is the grant's application's, whatever else is configured.
+     * Whatever else is configured.
      *
      * @return void
      */
@@ -300,7 +293,7 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A factor stays unusable and unoffered until it is confirmed.
+     * Until it is confirmed.
      *
      * @return void
      */
@@ -320,7 +313,7 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A label is trimmed, a blank one is none, and one too long is refused.
+     * Trimmed, a blank one is none, and one too long is refused.
      *
      * @return void
      */
@@ -338,8 +331,6 @@ final class TotpEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * What a request holds of a destination stays out of its dumps.
-     *
      * @return void
      */
     public function testARequestHidesItsDestination(): void

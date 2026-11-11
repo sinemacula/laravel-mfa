@@ -76,10 +76,8 @@ use Tests\Fixtures\Verification\Dumps;
 use Tests\TestCase;
 
 /**
- * What a confirmation does for the session: on a pending one its proof goes to
- * `PendingCompletion` with the whole requirement evaluated again; on an active
- * one no proof is recorded and a shortfall goes to `SessionTransition`; recovery
- * codes come with the first factor; and a refusal rolls all of it back.
+ * A pending session's proof goes to `PendingCompletion`, an active session's
+ * shortfall to `SessionTransition`; a refusal rolls it all back.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -123,8 +121,6 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -136,8 +132,8 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * On a pending session the proof reaches the completion with the
-     * enrolment's purpose, and the whole requirement is evaluated with it.
+     * With the enrolment's purpose, and the whole requirement evaluated with
+     * it.
      *
      * @return void
      */
@@ -176,8 +172,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A new factor that cannot meet the requirement leaves the session pending,
-     * which is not a failure: the proof was accepted.
+     * Not a failure: the proof was accepted.
      *
      * @return void
      */
@@ -194,8 +189,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * The default completion records the proof, once it commits, on the pending
-     * session the store holds.
+     * Once it commits, on the pending session the store holds.
      *
      * @return void
      */
@@ -213,8 +207,8 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A completion's refusal rolls back the code's use, the step, the
-     * confirmation, the end of the obligation and the recovery codes.
+     * The code's use, the step, the confirmation, the obligation's end and the
+     * recovery codes.
      *
      * @return void
      */
@@ -249,7 +243,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * Any other failure of the completion propagates, and rolls back as well.
+     * It rolls back as well.
      *
      * @return void
      *
@@ -274,8 +268,8 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * On a pending session a factor the policy will not accept after the first
-     * factor is refused at confirmation too.
+     * A factor the policy will not accept after the first factor is refused at
+     * confirmation too.
      *
      * @return void
      */
@@ -292,10 +286,8 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * On an active session no proof is recorded and `StepUp` is not called;
-     * the bound transition judges the session again all the same, told the
-     * sign-in, the factor and that the requirement is still met, and what it
-     * returns is the confirmation's completion.
+     * `StepUp` is not called; the bound transition still judges the session and
+     * its result is the completion.
      *
      * @return void
      */
@@ -332,8 +324,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A transition's refusal on an active session rolls the confirmation back:
-     * the factor stays pending and no recovery codes are kept.
+     * The factor stays pending and no recovery codes are kept.
      *
      * @return void
      */
@@ -357,9 +348,8 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * On an application that requires a verification of an identity with a
-     * factor, the first factor leaves an active session short, which goes to
-     * the bound transition.
+     * Where verification is required, the first factor leaves an active session
+     * short.
      *
      * @return void
      */
@@ -382,8 +372,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * Recovery codes come with the first factor, returned once, and are hidden
-     * from every dump; a later factor brings none.
+     * Returned once and hidden from every dump; a later factor brings none.
      *
      * @return void
      */
@@ -415,8 +404,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * Recovery codes do not come where they are disabled, nor below the level
-     * the application issues them at.
+     * Not where disabled, nor below the application's issuing level.
      *
      * @return void
      */
@@ -451,8 +439,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * With the session's first factor not known no codes are issued, though the
-     * factor is confirmed.
+     * The factor is still confirmed.
      *
      * @return void
      */
@@ -476,7 +463,7 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * Confirming ends the obligation to enrol again, on both kinds of session.
+     * On both kinds of session.
      *
      * @return void
      */
@@ -506,8 +493,8 @@ final class OutcomeEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * The default completion takes an enrolment's additional factor on a
-     * pending session, and no other kind of proof made for enrolling.
+     * It takes an enrolment's additional factor on a pending session, and no
+     * other enrolment proof.
      *
      * @return void
      */

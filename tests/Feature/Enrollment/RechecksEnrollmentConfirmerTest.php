@@ -54,9 +54,8 @@ use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
 /**
- * What confirming an enrolment checks again, inside its transaction: the
- * identity, its lockout, the type, the limits and what the grant rested on.
- * Freshness is not one of them, and no refusal spends the code.
+ * What confirming checks again inside its transaction; freshness is not one of
+ * them, and no refusal spends the code.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -100,8 +99,6 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -113,7 +110,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * An identity gone inactive is refused and reported against the factor.
+     * Reported against the factor.
      *
      * @return void
      */
@@ -139,8 +136,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
 
         $this->forgetReports();
 
-        // Not its first factor, so nothing further along would refuse it
-        // instead.
+        // Not its first factor, so nothing later would refuse it instead.
         $this->rowOf($start)->update(['authority' => 'step_up']);
 
         Factor::query()->create([
@@ -160,8 +156,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * An identity locked meanwhile is refused with when it lifts, spending
-     * nothing.
+     * With when it lifts, spending nothing.
      *
      * @return void
      */
@@ -187,8 +182,6 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A type no longer enabled is refused.
-     *
      * @return void
      */
     public function testATypeNoLongerEnabledIsRefused(): void
@@ -205,8 +198,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * Limits reached meanwhile are refused; those through another application
-     * do not count.
+     * Those through another application do not count.
      *
      * @return void
      */
@@ -228,8 +220,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * Bootstrap switched off, or no longer allowing the type, refuses a grant
-     * started under it.
+     * Switched off, or no longer allowing the type.
      *
      * @return void
      */
@@ -251,9 +242,8 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A confirmed factor appearing meanwhile refuses a bootstrap grant and a
-     * reauthentication grant, whose authority was having none, and leaves a
-     * step-up grant alone.
+     * Bootstrap and reauthentication grants rested on having none; a step-up
+     * grant is left alone.
      *
      * @return void
      */
@@ -285,8 +275,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * No fresh step-up is asked for at confirmation: the grant already ends
-     * with the proof that authorised it.
+     * The grant already ends with the proof that authorised it.
      *
      * @return void
      */
@@ -303,8 +292,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A refusal after the code was accepted rolls back the code's step with
-     * everything else.
+     * The code's step rolls back with everything else.
      *
      * @return void
      */
@@ -337,8 +325,7 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * An active session's later factor is not judged against its first factor:
-     * it may serve another sign-in.
+     * It may serve another sign-in.
      *
      * @return void
      */

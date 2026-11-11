@@ -50,9 +50,8 @@ use Tests\Fixtures\Enrollment\UndatedCombinationPolicy;
 use Tests\TestCase;
 
 /**
- * An enrolment grant lives no longer than what authorised it: the expiry is
- * taken once, from the freshness of the step-up or reauthentication, or from
- * the pending session, and nothing renews it, a later proof included.
+ * A grant lives no longer than its authority: the expiry is taken once, from
+ * the step-up, reauthentication or pending session, and nothing renews it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -96,8 +95,6 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -109,8 +106,8 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A step-up 800 seconds old against a 900-second requirement leaves the
-     * grant 100 seconds, well below the configured lifetime.
+     * A step-up 800 seconds old against a 900-second requirement leaves 100
+     * seconds, below the configured lifetime.
      *
      * @return void
      */
@@ -126,7 +123,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * The configured lifetime caps the grant when it is the shortest.
+     * When it is the shortest.
      *
      * @return void
      */
@@ -141,8 +138,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A grant outliving its freshness is refused, and stays refused after a
-     * newer step-up in the same session: a later proof revives nothing.
+     * A later proof in the same session revives nothing.
      *
      * @return void
      */
@@ -168,7 +164,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A grant is live up to the second before its expiry.
+     * Up to the second before its expiry.
      *
      * @return void
      */
@@ -185,8 +181,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Neither a failed attempt, nor a resend, nor a later proof moves the
-     * stored expiry.
+     * Not a failed attempt, a resend or a later proof.
      *
      * @return void
      */
@@ -211,7 +206,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A reauthentication caps the grant at five minutes after it was proved.
+     * At five minutes after it was proved.
      *
      * @return void
      */
@@ -223,8 +218,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A pending session caps a bootstrap grant, and the configured lifetime
-     * caps it when that is shorter.
+     * The configured lifetime caps it when that is shorter.
      *
      * @return void
      */
@@ -242,8 +236,8 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A rebound policy that reports no time for a bounded requirement refuses
-     * the enrolment, though the session is fresh.
+     * A rebound policy reporting no time for a bounded requirement refuses,
+     * though the session is fresh.
      *
      * @return void
      */
@@ -258,8 +252,8 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A deadline already past once floored to the second is not fresh, and one
-     * that survives the floor stores the floored second.
+     * A deadline past once floored is not fresh; one that survives stores the
+     * floored second.
      *
      * @return void
      */
@@ -282,7 +276,7 @@ final class GrantLifetimeEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A name that is no operation's has no deadline, whatever the gate says.
+     * Whatever the gate says.
      *
      * @return void
      */

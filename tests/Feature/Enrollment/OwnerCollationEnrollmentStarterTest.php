@@ -53,9 +53,7 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Two owners who differ only in case stay apart on a database whose collation
- * compares them as equal: what one does never reaches the other's factors or
- * enrolments, nor counts them as its own.
+ * Owners differing only in case stay apart under a case-insensitive collation.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -102,9 +100,8 @@ final class OwnerCollationEnrollmentStarterTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application, and compare the owner columns of the factors and
-     * the enrolments as a case-insensitive collation does, on SQLite, where the
-     * statement making a table can be read back and made again with it.
+     * Gives the owner columns a case-insensitive collation by rebuilding the
+     * tables from SQLite's stored statements.
      *
      * @return void
      */
@@ -132,8 +129,6 @@ final class OwnerCollationEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A restart leaves another owner's pending factor and grant alone.
-     *
      * @return void
      */
     public function testARestartLeavesAnotherOwnersEnrollmentAlone(): void
@@ -154,9 +149,6 @@ final class OwnerCollationEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * A restart leaves another owner's grant alone even when its factor is
-     * gone.
-     *
      * @return void
      */
     public function testARestartLeavesAnotherOwnersOrphanedGrantAlone(): void
@@ -174,8 +166,7 @@ final class OwnerCollationEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Another owner's confirmed factor is not one's own, so it neither closes
-     * the bootstrap path nor counts towards a limit.
+     * It neither closes the bootstrap path nor counts towards a limit.
      *
      * @return void
      */
@@ -191,8 +182,8 @@ final class OwnerCollationEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Another owner's factor cannot be renamed or made preferred, and choosing
-     * one's own leaves another owner's preference where it is.
+     * It cannot be renamed or preferred; choosing one's own leaves another
+     * owner's preference.
      *
      * @return void
      */
@@ -213,8 +204,6 @@ final class OwnerCollationEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * Hand the enrolment under way to another owner.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return void
      */
@@ -227,7 +216,7 @@ final class OwnerCollationEnrollmentStarterTest extends TestCase
     }
 
     /**
-     * An owner type differing from the person's only in case.
+     * Differing from the person's only in case.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return string

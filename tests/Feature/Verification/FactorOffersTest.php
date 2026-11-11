@@ -24,9 +24,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * The factors offered to a session are the identity's confirmed ones of an
- * enabled type that can succeed after its first factor, the preferred first, as
- * summaries.
+ * Offers are the identity's confirmed factors of an enabled type that can
+ * succeed after its first factor, preferred first.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -40,8 +39,6 @@ final class FactorOffersTest extends TestCase
     use ArrangesVerification;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -53,8 +50,6 @@ final class FactorOffersTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -66,7 +61,7 @@ final class FactorOffersTest extends TestCase
     }
 
     /**
-     * The preferred factor comes first, then the oldest, then by id.
+     * The preferred factor first, then the oldest, then by id.
      *
      * @return void
      */
@@ -95,8 +90,8 @@ final class FactorOffersTest extends TestCase
     }
 
     /**
-     * A pending factor, a type not enabled, a factor at the ceiling and one the
-     * policy does not accept are left out; a temporarily locked factor stays.
+     * Pending, type not enabled, at the ceiling or not accepted by the policy;
+     * a temporarily locked factor stays.
      *
      * @return void
      */
@@ -120,8 +115,8 @@ final class FactorOffersTest extends TestCase
     }
 
     /**
-     * A passkey is left out when passkeys are unavailable, its association is
-     * missing or the gateway no longer lists its credential.
+     * Passkeys unavailable, its association missing, or its credential no
+     * longer listed by the gateway.
      *
      * @return void
      */
@@ -150,7 +145,7 @@ final class FactorOffersTest extends TestCase
     }
 
     /**
-     * A pending session must allow listing factors, and is offered its own.
+     * It is offered its own.
      *
      * @return void
      */
@@ -178,7 +173,7 @@ final class FactorOffersTest extends TestCase
     }
 
     /**
-     * Nobody served, and a first factor not known, are offered nothing.
+     * Nobody served, or a first factor not known.
      *
      * @return void
      */
@@ -198,8 +193,7 @@ final class FactorOffersTest extends TestCase
     }
 
     /**
-     * An inactive identity can send and verify nothing, so it is offered
-     * nothing.
+     * It can send and verify nothing.
      *
      * @return void
      */
@@ -225,9 +219,7 @@ final class FactorOffersTest extends TestCase
     }
 
     /**
-     * The bound active state resolver, not the identity, decides who is
-     * inactive: an identity it finds inactive is offered nothing, and one it
-     * finds active is offered its factors, whatever each says of itself.
+     * The resolver, not the identity, decides who is inactive.
      *
      * @return void
      */
@@ -255,8 +247,7 @@ final class FactorOffersTest extends TestCase
     }
 
     /**
-     * A pending session whose first factor no longer counts is offered nothing,
-     * since sending and verifying would refuse it.
+     * Sending and verifying would refuse it.
      *
      * @return void
      */
@@ -275,7 +266,7 @@ final class FactorOffersTest extends TestCase
     }
 
     /**
-     * A summary holds no secret, no code and no full destination.
+     * No secret, no code and no full destination.
      *
      * @return void
      */

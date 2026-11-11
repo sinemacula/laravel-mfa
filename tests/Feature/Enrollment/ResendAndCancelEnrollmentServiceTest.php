@@ -59,9 +59,8 @@ use Tests\Fixtures\Seams\InterruptingProofStore;
 use Tests\TestCase;
 
 /**
- * An enrolment's code is sent again through the delivered-code cooldown and
- * caps, renewing nothing, and an enrolment is cancelled with its grant, which
- * needs no step-up and works during a lockout.
+ * Resends go through the delivered-code cooldown and caps, renewing nothing;
+ * cancelling needs no step-up and works during a lockout.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -105,8 +104,6 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -118,7 +115,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A resend replaces the code, reports it and records its challenge.
+     * It reports it and records its challenge.
      *
      * @return void
      */
@@ -146,8 +143,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A resend after the challenge ended records the new challenge, and that is
-     * the one the code answers.
+     * That is the one the code answers.
      *
      * @return void
      */
@@ -172,8 +168,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A resend inside the cooldown is capped, keeps the challenge and reports
-     * nothing.
+     * It keeps the challenge and reports nothing.
      *
      * @return void
      */
@@ -195,7 +190,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * Each refusal of a resend, with what it said, leaving the enrolment.
+     * Each with what it said, leaving the enrolment.
      *
      * @return void
      */
@@ -249,8 +244,6 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A TOTP enrolment has no code to send again.
-     *
      * @return void
      */
     public function testATotpEnrollmentHasNoCodeToSend(): void
@@ -262,8 +255,8 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A resend needs the start action on a pending session, and is answered
-     * `not_found` with nobody served or the sign-in changed.
+     * The start action on a pending session; `not_found` with nobody served or
+     * the sign-in changed.
      *
      * @return void
      */
@@ -297,7 +290,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A sign-in that changes between capture and lock sends nothing again.
+     * Between capture and lock.
      *
      * @return void
      */
@@ -318,7 +311,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * The address's throttle refuses a resend with how long to wait.
+     * With how long to wait.
      *
      * @return void
      */
@@ -339,7 +332,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * Cancelling deletes the factor and the row, and reports it.
+     * The factor and the row go, and it is reported.
      *
      * @return void
      */
@@ -362,8 +355,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * Cancelling works during a lockout, and answers `false` for anything that
-     * does not match or a request serving nobody.
+     * It answers `false` for anything that does not match or nobody served.
      *
      * @return void
      */
@@ -385,7 +377,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * Cancelling needs the start action on a pending session.
+     * On a pending session.
      *
      * @return void
      */
@@ -404,8 +396,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A caller whose pending credential is revoked once it was read cancels
-     * nothing: the credential is read again under the identity's lock.
+     * The credential is read again under the identity's lock.
      *
      * @return void
      */
@@ -428,8 +419,6 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A person with no sign-in cancels nothing.
-     *
      * @return void
      */
     public function testAPersonWithNoSignInCancelsNothing(): void
@@ -440,7 +429,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * Lock the identity for five minutes.
+     * For five minutes.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return void
@@ -456,8 +445,6 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * Lift the identity's lockout.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return void
      */
