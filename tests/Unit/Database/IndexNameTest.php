@@ -9,8 +9,7 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Database\IndexName;
 
 /**
- * Unit tests for `IndexName`: the table's name and a suffix, cut short and
- * hashed when that would pass the 63 characters every engine keeps.
+ * 63 characters is the longest name every engine keeps.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,8 +20,6 @@ use SineMacula\Laravel\Mfa\Database\IndexName;
 final class IndexNameTest extends TestCase
 {
     /**
-     * A name that fits is the table's name and the suffix.
-     *
      * @return void
      */
     public function testANameThatFitsIsTheTableAndTheSuffix(): void
@@ -36,9 +33,6 @@ final class IndexNameTest extends TestCase
     }
 
     /**
-     * A name that would not fit is the start of the table's name, a hash of the
-     * whole and the suffix, 63 characters long and the same every time.
-     *
      * @return void
      */
     public function testANameThatWouldNotFitIsCutShortAndHashed(): void

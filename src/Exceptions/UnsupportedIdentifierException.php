@@ -5,12 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Exceptions;
 
 /**
- * Unsupported identifier exception.
- *
- * Thrown by the proof store and the factor state lock when the
- * authenticatable's auth identifier cannot be used as a storage key — typically
- * when the identifier is a non-scalar value such as an object or array. Fails
- * loud rather than silently collapsing distinct identities to a shared bucket.
+ * Thrown when an auth identifier is not scalar, rather than letting distinct
+ * identities share a storage key.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

@@ -23,11 +23,6 @@ use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
 /**
- * The `FactorChangeGate` contract kit proves the default, which judges each
- * change on the session's recorded proofs, and rejects gates that allow what
- * they must refuse, refuse some other way than the contract's, or give a grant
- * no end in the future.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -39,8 +34,6 @@ final class FactorChangeGateContractTest extends TestCase
     use ArrangesFactorChanges, FactorChangeGateTests;
 
     /**
-     * The kit rejects a gate that allows a change from a stale session.
-     *
      * @return void
      */
     public function testRejectsAGateThatAllowsAStaleChange(): void
@@ -51,9 +44,6 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate that refuses some other way than by throwing an
-     * `OperationRefusedException`.
-     *
      * @return void
      */
     public function testRejectsAGateThatRefusesWithAnotherException(): void
@@ -64,8 +54,6 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate that lets a factor authorise its own removal.
-     *
      * @return void
      */
     public function testRejectsAGateThatLetsAFactorAuthorizeItsOwnRemoval(): void
@@ -76,8 +64,6 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate the configured requirement does not bind.
-     *
      * @return void
      */
     public function testRejectsAGateTheConfiguredRequirementDoesNotBind(): void
@@ -88,8 +74,6 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate that gives a grant no end.
-     *
      * @return void
      */
     public function testRejectsAGrantWithNoEnd(): void
@@ -100,8 +84,6 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate that gives a grant an end already past.
-     *
      * @return void
      */
     public function testRejectsAGrantThatHasEnded(): void
@@ -114,8 +96,6 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * A change that is not a grant needs no end.
-     *
      * @return void
      */
     public function testAChangeThatIsNoGrantNeedsNoEnd(): void
@@ -126,8 +106,6 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\FactorChangeGate
      */
     #[\Override]
@@ -137,8 +115,8 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * A person who stepped up just now with a TOTP code, after a password, and
-     * proved the password again just now.
+     * Stepped up just now with TOTP after a password, and proved the password
+     * again just now.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorChange  $change
      * @return \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest
@@ -154,8 +132,7 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * A person who signed in two hours ago with a password, and proved nothing
-     * since.
+     * Signed in two hours ago with a password and proved nothing since.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorChange  $change
      * @return \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest
@@ -171,8 +148,8 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * A person who stepped up just now only with the factor they remove,
-     * holding another confirmed factor.
+     * Stepped up just now only with the factor being removed, holding another
+     * confirmed factor.
      *
      * @return \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest
      */
@@ -185,8 +162,8 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * A person who stepped up just now with a TOTP code, asked for a change the
-     * application configures to need AAL3.
+     * Stepped up just now with TOTP, for a change the application configures to
+     * need AAL3.
      *
      * @return \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest
      */
@@ -199,7 +176,7 @@ final class FactorChangeGateContractTest extends TestCase
     }
 
     /**
-     * A gate that allows every change, for a minute.
+     * Allows every change for a minute.
      *
      * @return \Tests\Fixtures\Requirements\ScriptedFactorChangeGate
      */

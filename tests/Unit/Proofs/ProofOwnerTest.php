@@ -16,10 +16,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `ProofOwner`: an identity is recorded by its morph class or class
- * name and its key as a string, a binding names its owner, and two owners never
- * share a slot.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -29,8 +25,6 @@ use Tests\TestCase;
 final class ProofOwnerTest extends TestCase
 {
     /**
-     * Forget any morph map a test set.
-     *
      * @return void
      */
     #[\Override]
@@ -42,8 +36,7 @@ final class ProofOwnerTest extends TestCase
     }
 
     /**
-     * An Eloquent identity is recorded by its morph class and its integer key
-     * as a string.
+     * Its integer key is recorded as a string.
      *
      * @return void
      */
@@ -62,8 +55,6 @@ final class ProofOwnerTest extends TestCase
     }
 
     /**
-     * An identity that is not an Eloquent model is recorded by its class name.
-     *
      * @return void
      */
     public function testRecordsAnotherIdentityByItsClassName(): void
@@ -75,8 +66,6 @@ final class ProofOwnerTest extends TestCase
     }
 
     /**
-     * The keys that cannot name an owner.
-     *
      * @return iterable<string, array{0: mixed, 1: string}>
      */
     public static function unsupportedKeys(): iterable
@@ -88,8 +77,8 @@ final class ProofOwnerTest extends TestCase
     }
 
     /**
-     * A key that is neither a non-empty string nor an integer is refused,
-     * naming its type.
+     * Only a non-empty string or an integer names one; the refusal names the
+     * type.
      *
      * @param  mixed  $key
      * @param  string  $type
@@ -105,8 +94,7 @@ final class ProofOwnerTest extends TestCase
     }
 
     /**
-     * The owner a binding names is its identity type and key, and owns that
-     * binding but none naming another type or key.
+     * The owner a binding names is its identity type and key.
      *
      * @return void
      */
@@ -123,9 +111,6 @@ final class ProofOwnerTest extends TestCase
     }
 
     /**
-     * The owner holds a sign-in only through a binding that names it, the
-     * application and the sign-in's session id.
-     *
      * @return void
      */
     public function testOwnsASignInOnlyThroughABindingNamingItsApplicationAndSession(): void
@@ -139,8 +124,8 @@ final class ProofOwnerTest extends TestCase
     }
 
     /**
-     * The slot carries the type's length, so a separator inside the type or the
-     * key never makes two owners share one.
+     * The slot carries the type's length, so a separator inside the type or key
+     * cannot collide.
      *
      * @return void
      */

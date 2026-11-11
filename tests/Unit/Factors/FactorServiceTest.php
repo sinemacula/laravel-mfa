@@ -21,9 +21,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `FactorService`: the current identity's factors as summaries, read
- * on every call, and the configured factor model.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -33,8 +30,6 @@ use Tests\TestCase;
 final class FactorServiceTest extends TestCase
 {
     /**
-     * A guest has no factors, and finds none.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -46,10 +41,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * Every factor is listed as a summary with its status: pending ones and
-     * those enrolled through another application included, and one disabled at
-     * the failure ceiling saying so.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -78,8 +69,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * The preferred factor comes first, then the others by id.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -101,10 +90,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * One factor is found by its id; another person's, an unknown id and an id
-     * of any other shape are not, and an integer id finds nothing it does not
-     * name exactly.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -124,9 +109,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * The factors are read on every call, so nothing is kept from one read, or
-     * one request, to the next.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -143,9 +125,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * The shipped model is the factor model by default, and when the setting is
-     * null.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -160,9 +139,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * A configured model that extends `Model` and implements `EloquentFactor`
-     * is the factor model.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -175,8 +151,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * Misconfigured factor models and the message each is refused with.
-     *
      * @return iterable<string, array{mixed, string}>
      */
     public static function misconfiguredModels(): iterable
@@ -189,8 +163,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * A misconfigured model is refused with a message naming the problem.
-     *
      * @param  mixed  $configured
      * @param  string  $message
      * @return void
@@ -209,8 +181,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * Resolve the factor service.
-     *
      * @return \SineMacula\Laravel\Mfa\Factors\FactorService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -221,8 +191,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * Create a test user and authenticate as them.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function signIn(): TestUser
@@ -236,8 +204,6 @@ final class FactorServiceTest extends TestCase
     }
 
     /**
-     * Add a TOTP factor for the user.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  array<string, mixed>  $attributes
      * @return \SineMacula\Laravel\Mfa\Models\Factor

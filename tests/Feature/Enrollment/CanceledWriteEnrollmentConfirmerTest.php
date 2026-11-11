@@ -51,9 +51,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * A model event that cancels a write the enrolment needs fails it closed: the
- * failure propagates, the whole transaction rolls back, and nothing is reported
- * or issued for a change that was not stored.
+ * A cancelled write the enrolment needs fails closed: it propagates, rolls
+ * back, and nothing is reported or issued.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -97,8 +96,6 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -110,9 +107,8 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A cancelled save of the confirmed factor confirms nothing: the grant, the
-     * obligation and the TOTP step are as they were, no recovery codes are
-     * issued, and nothing is reported.
+     * The grant, obligation and TOTP step stay, and nothing is issued or
+     * reported.
      *
      * @return void
      *
@@ -130,8 +126,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A cancelled deletion of the row would leave a used grant usable, so it
-     * confirms nothing either.
+     * A cancelled row deletion would leave a used grant usable.
      *
      * @return void
      *
@@ -149,7 +144,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A cancelled count of a wrong code is not taken for a counted failure.
+     * It is not taken for a counted failure.
      *
      * @return void
      *
@@ -175,8 +170,6 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A cancelled save of the row starts nothing.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -198,8 +191,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A cancelled record of the first code's challenge rolls the start back:
-     * the code could never be confirmed.
+     * The code could never be confirmed.
      *
      * @return void
      *
@@ -223,8 +215,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A cancelled record of the new challenge a resend had to start rolls the
-     * resend back, once the first has ended.
+     * Once the first challenge has ended.
      *
      * @return void
      *
@@ -253,7 +244,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A cancelled deletion of a row with no factor left stops the restart.
+     * Of a row with no factor left.
      *
      * @return void
      *
@@ -279,7 +270,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A cancelled save stops a rename, which is never reported as made.
+     * It is never reported as made.
      *
      * @return void
      *
@@ -305,8 +296,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * An enrolment under way, for a person obliged to enrol, with nothing yet
-     * reported.
+     * For a person obliged to enrol, with nothing yet reported.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
@@ -323,7 +313,7 @@ final class CanceledWriteEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * Assert that confirming propagates the cancellation and changes nothing.
+     * Confirming propagates the cancellation and changes nothing.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart  $start

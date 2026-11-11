@@ -18,12 +18,8 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
- * Test user model used across the MFA test suites.
- *
- * Implements `MultiFactorAuthenticatable` and Laravel's standard
- * `Authenticatable` contract. Whether the user requires an additional
- * verification of its own sign-ins is controlled via the `mfa_enabled` boolean
- * column so individual tests can flip it without reaching into mocks or stubs.
+ * The suite's identity model; `mfa_enabled` sets whether its sign-ins need an
+ * additional verification.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -48,8 +44,7 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
     ];
 
     /**
-     * Require an additional verification of every sign-in while the
-     * `mfa_enabled` column is set, and nothing of the user's own otherwise.
+     * Additional verification of every sign-in while `mfa_enabled` is set.
      *
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      */
@@ -60,9 +55,8 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
     }
 
     /**
-     * Determine whether the user has any factor at all, whatever its status:
-     * looser than the trait's confirmed-only rule, so the fixture's existing
-     * flows read a freshly created factor as enabled.
+     * Any factor counts, whatever its status, unlike the trait's confirmed-only
+     * rule.
      *
      * @return bool
      */
@@ -73,8 +67,6 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
     }
 
     /**
-     * Return the MFA factor builder scoped to this user.
-     *
      * @formatter:off
      *
      * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
@@ -90,8 +82,6 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
     }
 
     /**
-     * Polymorphic `factors` relation.
-     *
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany<\SineMacula\Laravel\Mfa\Models\Factor, $this>
      */
     public function factors(): MorphMany
@@ -100,8 +90,6 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
     }
 
     /**
-     * The attributes that should be cast.
-     *
      * @return array<string, string>
      */
     #[\Override]
@@ -113,8 +101,7 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
     }
 
     /**
-     * Wrap the dynamic count() call so PHPStan does not flag it as a dynamic
-     * call to a static method.
+     * Stops PHPStan reading `count()` as a dynamic call to a static method.
      *
      * @formatter:off
      *
@@ -129,10 +116,7 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
     }
 
     /**
-     * Re-present the morph-relation builder under the intersection type
-     * required by the `MultiFactorAuthenticatable` contract. The shipped Factor
-     * model IS both an Eloquent Model and the Factor contract, so the cast is
-     * sound; this helper hides the generic-invariance gap from PHPStan.
+     * Narrows the relation's builder to the type the contract requires.
      *
      * @formatter:off
      *

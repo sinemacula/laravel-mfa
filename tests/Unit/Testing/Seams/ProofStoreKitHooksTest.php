@@ -16,8 +16,7 @@ use Tests\TestCase;
 
 /**
  * The `ProofStore` kit over a store backed by sign-ins it did not begin, each
- * holding its first factor already: the test arranges each sign-in and voids
- * the proofs the store's own way, through the kit's hooks.
+ * already holding its first factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,8 +35,6 @@ final class ProofStoreKitHooksTest extends TestCase
     private array $signIns = [];
 
     /**
-     * Set up the store.
-     *
      * @return void
      */
     #[\Override]
@@ -49,7 +46,7 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
-     * The kit begins only the sign-in the test arranged, once a check.
+     * Only that sign-in, once per check.
      *
      * @return void
      */
@@ -61,8 +58,6 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
-     * A store whose proofs outlive the void is still rejected.
-     *
      * @return void
      */
     public function testTheKitRejectsAVoidThatVoidsNothing(): void
@@ -75,8 +70,7 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
-     * A void is not checked on an arranged proof that never counted, even when
-     * the sign-in already held a proof of its own.
+     * Even when the sign-in already held a proof of its own.
      *
      * @return void
      */
@@ -98,8 +92,6 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
-     * The store under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
      */
     #[\Override]
@@ -109,8 +101,6 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -121,8 +111,6 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
-     * Another person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -133,8 +121,6 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
-     * The application.
-     *
      * @return string
      */
     #[\Override]
@@ -144,7 +130,7 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
-     * Arrange a sign-in in the store, as signing in through the layer would.
+     * As signing in through the layer would.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -160,9 +146,6 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
-     * Sign the identity in again, as the layer would, and make that sign-in
-     * current.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -179,8 +162,6 @@ final class ProofStoreKitHooksTest extends TestCase
     }
 
     /**
-     * Void the proofs the store's own way.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      */

@@ -9,11 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Testing\Seams\ActiveStateResolverContract;
 
 /**
- * The `ActiveStateResolver` contract kit: an active identity is active, and an
- * inactive one is not.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `ActiveStateResolverContract`.
+ * The `ActiveStateResolver` contract kit; each check delegates to
+ * `ActiveStateResolverContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -25,8 +22,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\ActiveStateResolverContract;
 trait ActiveStateResolverTests
 {
     /**
-     * An active identity is active.
-     *
      * @return void
      */
     public function testActiveStateResolverFindsAnActiveIdentityActive(): void
@@ -35,8 +30,6 @@ trait ActiveStateResolverTests
     }
 
     /**
-     * An inactive identity is not active.
-     *
      * @return void
      */
     public function testActiveStateResolverFindsAnInactiveIdentityInactive(): void
@@ -45,8 +38,6 @@ trait ActiveStateResolverTests
     }
 
     /**
-     * The resolver under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver
      */
     abstract protected function activeStateResolver(): ActiveStateResolver;

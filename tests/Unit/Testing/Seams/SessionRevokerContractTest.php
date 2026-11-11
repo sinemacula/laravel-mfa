@@ -25,10 +25,6 @@ use Tests\Fixtures\Seams\ForgettingSessionRevoker;
 use Tests\TestCase;
 
 /**
- * The `SessionRevoker` contract kit proves the default, which advances the
- * identity's verification generation, and rejects a revoker that revokes
- * nothing.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -60,8 +56,6 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a revoker that revokes nothing.
-     *
      * @return void
      */
     public function testRejectsARevokerThatRevokesNothing(): void
@@ -80,9 +74,6 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a revoker that revokes nothing when revoking every
-     * session.
-     *
      * @return void
      */
     public function testRejectsARevokerThatRevokesNothingOfAll(): void
@@ -98,8 +89,8 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a revoker that ends the other session outside the
-     * caller's transaction, so a rollback leaves it ended.
+     * Ending the other session outside the caller's transaction, so a rollback
+     * leaves it ended.
      *
      * @return void
      *
@@ -121,8 +112,7 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a revoker that spares the current session when told a
-     * factor was removed from another sign-in.
+     * When told a factor was removed from another sign-in.
      *
      * @return void
      */
@@ -145,8 +135,7 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a contract whose current session never counted, rather
-     * than passing a removal from another sign-in.
+     * Rather than passing a removal from another sign-in.
      *
      * @return void
      */
@@ -165,9 +154,6 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * The kit passes a revoker that refuses a sign-in that is not the
-     * identity's current one by throwing.
-     *
      * @return void
      */
     public function testPassesARevokerThatRefusesAnotherSignInByThrowing(): void
@@ -189,8 +175,7 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * A revoker that fails leaves the kit's change rolled back, and its failure
-     * propagates.
+     * Its failure propagates.
      *
      * @return void
      *
@@ -221,8 +206,7 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a contract whose other session never counted, rather than
-     * passing its revocation.
+     * Rather than passing its revocation.
      *
      * @return void
      */
@@ -244,8 +228,6 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\SessionRevoker
      */
     #[\Override]
@@ -255,8 +237,6 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * A person signed in on the application.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -272,8 +252,6 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * The factor the kit's removals name.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return string
      */
@@ -284,7 +262,7 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * Verify the identity on its current sign-in, and name it.
+     * Verifies the identity on its current sign-in first.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return string
@@ -302,8 +280,6 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * Whether the current sign-in's proofs still count.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
      */
@@ -314,8 +290,6 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * Verify the identity on its other device.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      */
@@ -330,8 +304,6 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * Whether the other device's proofs still count.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
      */
@@ -342,8 +314,6 @@ final class SessionRevokerContractTest extends TestCase
     }
 
     /**
-     * The application the identity's sessions are on.
-     *
      * @return string
      */
     #[\Override]

@@ -33,10 +33,8 @@ use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 
 /**
- * Arranges the enrolment tests over the verification ones: the `web`
- * application with TOTP and email enabled; a person enrolling their first
- * factor by proving the first one again, one with a factor and a recent
- * step-up, or one on a bootstrap session; and an enrolment under way.
+ * Arranges the enrolment tests on top of the verification arrangements, with
+ * TOTP and email enabled on `web`.
  *
  * @phpstan-require-extends \Tests\TestCase
  *
@@ -49,15 +47,15 @@ trait ArrangesEnrollment
 {
     use ArrangesVerification;
 
-    /** @var string The account name an authenticator app shows. */
+    /** @var string Account name an authenticator app shows. */
     protected const string ACCOUNT = 'person@example.test';
 
-    /** @var list<\SineMacula\Laravel\Mfa\Enums\PendingAction> What a pending credential allows on the bootstrap path. */
+    /** @var list<\SineMacula\Laravel\Mfa\Enums\PendingAction> */
     protected const array BOOTSTRAP_ACTIONS = [PendingAction::START_BOOTSTRAP_ENROLLMENT, PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT];
 
     /**
-     * A signed-in person with a first factor, who has just proved it again, so
-     * they may enrol their first additional factor.
+     * Has just proved the first factor again, so may enrol their first
+     * additional factor.
      *
      * @param  int  $secondsAgo
      * @return \Tests\Fixtures\Identities\TestUser
@@ -73,9 +71,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * A signed-in person with a confirmed factor and a step-up with it the
-     * given number of seconds ago.
-     *
      * @param  int  $secondsAgo
      * @param  array<string, mixed>  $attributes
      * @return \Tests\Fixtures\Identities\TestUser
@@ -92,8 +87,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * Record a step-up the person made with the factor.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @param  int  $secondsAgo
@@ -116,9 +109,8 @@ trait ArrangesEnrollment
     }
 
     /**
-     * A person on a pending session the store knows of, on an application that
-     * allows bootstrap for TOTP and email, whose pending session expires in the
-     * given number of minutes.
+     * A person on a pending session, on an application that allows bootstrap
+     * for TOTP and email.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
@@ -138,9 +130,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * A first factor proved by a code sent to the address given, on the
-     * session.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $session
      * @param  string  $address
@@ -163,8 +152,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * Start a TOTP enrolment, which must start.
-     *
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
      */
     protected function startedTotp(): EnrollmentStart
@@ -173,8 +160,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * Start an email enrolment, which must start.
-     *
      * @param  string  $address
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
      */
@@ -184,7 +169,7 @@ trait ArrangesEnrollment
     }
 
     /**
-     * Start the enrolment, which must start.
+     * Fails the test unless the enrolment starts.
      *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
@@ -199,8 +184,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * The grant of an enrolment that started.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart  $start
      * @return string
      */
@@ -212,8 +195,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * The pending factor of an enrolment that started, as stored.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart  $start
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
@@ -223,8 +204,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * The row of an enrolment that started.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart  $start
      * @return \SineMacula\Laravel\Mfa\Models\Enrollment
      */
@@ -234,9 +213,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * The code an authenticator app shows for a TOTP enrolment that started,
-     * read from the secret returned.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart  $start
      * @param  int  $steps
      * @return string
@@ -247,8 +223,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * A code the app does not show now.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart  $start
      * @return string
      */
@@ -258,8 +232,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * The short names of what was reported, oldest first.
-     *
      * @return list<string>
      */
     protected function reportedNames(): array
@@ -268,8 +240,6 @@ trait ArrangesEnrollment
     }
 
     /**
-     * Set the identity's obligation to enrol again.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return void
      */

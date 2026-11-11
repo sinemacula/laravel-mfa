@@ -5,12 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Attempts;
 
 /**
- * How an attempt ended: passed, failed (and counted), refused before it reached
- * the driver by the lockout it names (and counted nowhere), not found, when the
- * factor it names is not among the identity's factors as stored (and counted
- * nowhere either), or refused for any other reason, counted nowhere. A failure
- * that was counted names the lockout it caused, if counting it locked or
- * disabled what the next attempt would name.
+ * How an attempt ended. Only a driver failure is counted.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,8 +13,6 @@ namespace SineMacula\Laravel\Mfa\Attempts;
 final readonly class AttemptOutcome
 {
     /**
-     * Constructor.
-     *
      * @param  bool  $passed
      * @param  ?\SineMacula\Laravel\Mfa\Attempts\Lockout  $lockout
      * @param  bool  $found
@@ -31,22 +24,20 @@ final readonly class AttemptOutcome
         /** Whether the driver accepted the attempt. */
         public bool $passed,
 
-        /** The lockout that refused the attempt before the driver ran, if one did. */
+        /** Lockout that refused the attempt before the driver ran. */
         public ?Lockout $lockout = null,
 
-        /** Whether the factor the attempt names was found among the identity's stored factors. */
+        /** Whether the factor was among the identity's stored factors. */
         public bool $found = true,
 
-        /** Whether an attempt that did not pass was counted as a failure. */
+        /** Whether a failure was counted. */
         public bool $counted = true,
 
-        /** The strictest lockout that counting this failure applied, if it applied one. */
+        /** Strictest lockout this failure caused. */
         public ?Lockout $caused = null,
     ) {}
 
     /**
-     * An attempt the driver accepted.
-     *
      * @return self
      */
     public static function pass(): self
@@ -55,9 +46,6 @@ final readonly class AttemptOutcome
     }
 
     /**
-     * An attempt the driver refused, counted against every scope it charges,
-     * with the strictest lockout counting it applied, if any.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Attempts\Lockout  $caused
      * @return self
      */
@@ -67,8 +55,6 @@ final readonly class AttemptOutcome
     }
 
     /**
-     * An attempt refused by a lockout before the driver ran.
-     *
      * @param  \SineMacula\Laravel\Mfa\Attempts\Lockout  $lockout
      * @return self
      */
@@ -78,9 +64,7 @@ final readonly class AttemptOutcome
     }
 
     /**
-     * An attempt whose factor is not among the identity's factors as stored
-     * under the lock: removed by a concurrent change, or never the identity's.
-     * The driver is not called.
+     * The factor was removed concurrently or never the identity's.
      *
      * @return self
      */
@@ -90,9 +74,6 @@ final readonly class AttemptOutcome
     }
 
     /**
-     * An attempt refused for a reason other than a lockout or a missing factor,
-     * counted nowhere.
-     *
      * @return self
      */
     public static function uncounted(): self
@@ -101,8 +82,6 @@ final readonly class AttemptOutcome
     }
 
     /**
-     * Determine whether the driver refused the attempt, which was counted.
-     *
      * @return bool
      */
     public function isFailed(): bool
@@ -111,8 +90,6 @@ final readonly class AttemptOutcome
     }
 
     /**
-     * Determine whether the factor the attempt names was not found.
-     *
      * @return bool
      */
     public function isNotFound(): bool
@@ -121,8 +98,6 @@ final readonly class AttemptOutcome
     }
 
     /**
-     * Determine whether a lockout refused the attempt before the driver ran.
-     *
      * @return bool
      */
     public function isRefused(): bool
@@ -131,9 +106,6 @@ final readonly class AttemptOutcome
     }
 
     /**
-     * Determine whether counting the failure locked or disabled what the next
-     * attempt would name.
-     *
      * @return bool
      */
     public function causedLockout(): bool

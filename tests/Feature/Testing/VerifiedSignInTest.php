@@ -44,9 +44,7 @@ use Tests\Fixtures\Testing\RetainingProofStore;
 use Tests\TestCase;
 
 /**
- * Acting as an identity verified at a given time and level, through the real
- * `web` group and `mfa:` routes: what each level reaches, what the time does,
- * what is refused and leaves nothing changed, and what the fixture does not do.
+ * Acting as a verified identity through the real `web` group and `mfa:` routes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -70,8 +68,6 @@ final class VerifiedSignInTest extends TestCase
     private const string OTHER = 'admin';
 
     /**
-     * Freeze the clock, and bound the operation on the application.
-     *
      * @return void
      */
     #[\Override]
@@ -85,8 +81,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -98,8 +92,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Each level reaches the routes at or below it and is refused above it.
-     *
      * @return iterable<string, array{0: \SineMacula\Laravel\Mfa\Enums\AssuranceLevel, 1: int, 2: int}>
      */
     public static function levels(): iterable
@@ -109,8 +101,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Each level, through the real routes.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @param  int  $aal1
      * @param  int  $aal2
@@ -126,7 +116,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * It returns the test, so a request can follow, as `actingAs()` does.
+     * So a request can follow, as `actingAs()` does.
      *
      * @return void
      */
@@ -136,8 +126,8 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * It acts as the identity, on the guard it names or the default, with a
-     * model no longer counting as just created.
+     * On the guard it names or the default, with a model no longer counting as
+     * just created.
      *
      * @return void
      */
@@ -156,8 +146,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * AAL1 is an accepted further proof, not the password alone: an application
-     * that always asks for additional verification lets it through.
+     * AAL1 counts as a further proof beyond the password.
      *
      * @return void
      */
@@ -186,9 +175,8 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * The further proof of each level is what that level is made of, so a
-     * custom policy judges real evidence: TOTP at AAL2, and at AAL3 a passkey
-     * observing presence, verification, phishing resistance and hardware.
+     * TOTP at AAL2; at AAL3 a passkey observing presence, verification,
+     * phishing resistance and hardware.
      *
      * @return void
      */
@@ -218,8 +206,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * An old time fails an operation's freshness, and a recent one passes.
-     *
      * @return void
      */
     public function testTheTimeDecidesAnOperationsFreshness(): void
@@ -236,7 +222,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Any `DateTimeInterface` is taken as the time, and both proofs carry it.
+     * Any `DateTimeInterface` is taken as the time.
      *
      * @return void
      */
@@ -253,8 +239,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Left out, the time is now.
-     *
      * @return void
      */
     public function testTheTimeDefaultsToNow(): void
@@ -269,8 +253,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * The arguments that cannot be honoured.
-     *
      * @return iterable<string, array{0: \SineMacula\Laravel\Mfa\Enums\AssuranceLevel, 1: string, 2: string}>
      */
     public static function refusedArguments(): iterable
@@ -280,8 +262,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * An argument that cannot be honoured is refused with nothing changed: the
-     * guard, its default and the store are as they were.
+     * The guard, its default and the store are as they were.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @param  string  $at
@@ -326,8 +307,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Under the default policy, which caps at AAL2, AAL3 fails loudly naming
-     * all three facts.
+     * The default policy caps at AAL2.
      *
      * @return void
      */
@@ -340,8 +320,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A custom policy that rates the evidence AAL3 succeeds.
-     *
      * @return void
      */
     public function testAal3UnderACustomPolicySucceeds(): void
@@ -354,9 +332,8 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Asking for less than the evidence reaches fails rather than handing the
-     * test a stronger session than it asked for: exactly the level, not at
-     * least it.
+     * The helper arranges exactly the level asked for, never a stronger
+     * session.
      *
      * @return void
      */
@@ -378,8 +355,8 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A policy that rejects the further proof fails naming additional
-     * verification, though the level alone reads AAL1 from the password.
+     * It names additional verification, though the level alone reads AAL1 from
+     * the password.
      *
      * @return void
      */
@@ -394,8 +371,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * The acting survives a second request through the kernel.
-     *
      * @return void
      */
     public function testASecondRequestStillCounts(): void
@@ -407,9 +382,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Acting again replaces the first: a lower level is no longer the higher
-     * one.
-     *
      * @return void
      */
     public function testActingAgainReplacesTheFirst(): void
@@ -426,8 +398,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Two guards are kept apart: the proofs go where each names, and the last
-     * guard acted on is the default.
+     * The last guard acted on is the default.
      *
      * @return void
      */
@@ -453,8 +424,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Two applications are kept apart: the proofs go to the one named, leaving
-     * the other's alone, and it does not choose what the next request resolves.
+     * The application named does not choose what the next request resolves.
      *
      * @return void
      */
@@ -476,8 +446,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * An explicit application agreeing with what the request resolves passes.
-     *
      * @return void
      */
     public function testAnExplicitApplicationAgreeingWithTheResolverPasses(): void
@@ -493,8 +461,8 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Without an application named, a bound resolver's answer for the current
-     * request is where the proofs go, not the guard's name.
+     * Without an application named, the resolver's answer wins over the guard's
+     * name.
      *
      * @return void
      */
@@ -512,8 +480,8 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A store whose `begin()` is a no-op and knows no session is refused, for a
-     * test to arrange the session first.
+     * A store whose `begin()` is a no-op leaves the test to arrange the session
+     * first.
      *
      * @return void
      */
@@ -528,9 +496,8 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A bound recorder begins the sign-in and records its proofs, through a
-     * layer the store itself refuses proofs from, and the gate reads them back
-     * at the time given.
+     * Through a layer the store itself refuses proofs from; the gate reads them
+     * back at the time given.
      *
      * @return void
      */
@@ -561,8 +528,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A recorder may hold the sign-in pending until the further proof completes
-     * it, and is handed the time the proofs are made at.
+     * The recorder is handed the time the proofs are made at.
      *
      * @return void
      */
@@ -585,8 +551,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Without a recorder, a store whose sign-ins another layer writes cannot be
-     * arranged: it begins no sign-in of its own.
+     * Such a store begins no sign-in of its own.
      *
      * @return void
      */
@@ -600,8 +565,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A recorder naming a sign-in the store does not hold as current once its
-     * proofs are recorded is refused, before the proofs are evaluated.
+     * Refused before the proofs are evaluated.
      *
      * @return void
      */
@@ -612,8 +576,6 @@ final class VerifiedSignInTest extends TestCase
         $this->container()->instance(ProofStore::class, $layer);
         $this->container()->instance(VerifiedSignInRecorder::class, new class ($layer) implements VerifiedSignInRecorder {
             /**
-             * Constructor.
-             *
              * @param  \Tests\Fixtures\Seams\LayerWrittenProofStore  $layer
              */
             public function __construct(
@@ -623,8 +585,6 @@ final class VerifiedSignInTest extends TestCase
             ) {}
 
             /**
-             * Sign in through the layer, but name another sign-in.
-             *
              * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
              * @param  string  $application
              * @param  \Carbon\CarbonImmutable  $at
@@ -639,8 +599,6 @@ final class VerifiedSignInTest extends TestCase
             }
 
             /**
-             * Record the proof through the layer.
-             *
              * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
              * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
              * @return void
@@ -659,8 +617,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A recorder that keeps nothing fails the read-back, naming what was
-     * reached: the helper never trusts the recorder's word.
+     * The helper never trusts the recorder's word.
      *
      * @return void
      */
@@ -671,8 +628,6 @@ final class VerifiedSignInTest extends TestCase
         $this->container()->instance(ProofStore::class, $layer);
         $this->container()->instance(VerifiedSignInRecorder::class, new class ($layer) implements VerifiedSignInRecorder {
             /**
-             * Constructor.
-             *
              * @param  \Tests\Fixtures\Seams\LayerWrittenProofStore  $layer
              */
             public function __construct(
@@ -682,8 +637,6 @@ final class VerifiedSignInTest extends TestCase
             ) {}
 
             /**
-             * Sign in through the layer and make it current.
-             *
              * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
              * @param  string  $application
              * @param  \Carbon\CarbonImmutable  $at
@@ -700,8 +653,6 @@ final class VerifiedSignInTest extends TestCase
             }
 
             /**
-             * Keep nothing.
-             *
              * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
              * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
              * @return void
@@ -720,8 +671,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A first factor a store retains across `begin()` is kept, and the further
-     * proof follows it.
+     * The further proof follows it.
      *
      * @return void
      */
@@ -745,8 +695,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Further proofs a store retains are refused, since the time asked for
-     * could not be honoured, with nothing recorded after them.
+     * The time asked for could not be honoured; nothing is recorded after them.
      *
      * @return void
      */
@@ -772,8 +721,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A retained first factor later than the time asked for fails: the further
-     * proof would precede it and not count.
+     * The further proof would precede it and not count.
      *
      * @return void
      */
@@ -793,8 +741,8 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A declared `sms` first factor is not preserved, so it still reaches AAL2:
-     * the store's password proof is what the sign-in holds.
+     * The declared factor is not preserved; the store's password proof is what
+     * the sign-in holds.
      *
      * @return void
      */
@@ -808,8 +756,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A guard already holding this identity is left alone, so a context its own
-     * helper arranged stays; it becomes the default all the same.
+     * So a context its own helper arranged stays; it still becomes the default.
      *
      * @return void
      */
@@ -827,8 +774,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A guard holding someone else, or another class with the same key, is
-     * given the identity.
+     * Including another class with the same key.
      *
      * @return void
      */
@@ -856,8 +802,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * An empty guard is given the identity.
-     *
      * @return void
      */
     public function testAnEmptyGuardIsSet(): void
@@ -871,8 +815,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Advancing the identity's generation stops the proofs counting.
-     *
      * @return void
      */
     public function testAdvancingTheGenerationStopsTheProofsCounting(): void
@@ -889,8 +831,8 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * The proofs carry the identity's current generation, so an identity whose
-     * generation was advanced before can still be acted as.
+     * So an identity whose generation was advanced before can still be acted
+     * as.
      *
      * @return void
      */
@@ -910,7 +852,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * It is a fixture, not a sign-in: no `Login` and no MFA event, though
      * `Authenticated` still fires from `setUser()`.
      *
      * @return void
@@ -929,8 +870,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * It enrols no factor.
-     *
      * @return void
      */
     public function testItEnrollsNoFactor(): void
@@ -943,8 +882,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Define the routes the tests call.
-     *
      * @param  \Illuminate\Routing\Router  $router
      * @return void
      */
@@ -961,8 +898,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * Add a second session guard and its provider.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -978,8 +913,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * What a route answers when it is reached.
-     *
      * @return string
      */
     private static function reached(): string
@@ -988,8 +921,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -1000,8 +931,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A person of the second guard's provider.
-     *
      * @return \Tests\Fixtures\Identities\SecondaryUser
      */
     private function secondaryPerson(): SecondaryUser
@@ -1011,8 +940,6 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A recording guard, registered under the name given.
-     *
      * @param  string  $name
      * @return \Tests\Fixtures\Testing\RecordingGuard
      */
@@ -1028,8 +955,8 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * The proofs the bound store holds for the identity's current sign-in on
-     * the application, which the helper names afresh each time it acts.
+     * Read for the current sign-in, which the helper names afresh each time it
+     * acts.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -1044,7 +971,7 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
-     * A first factor that already rates AAL3 under the levelled policy.
+     * Rates AAL3 under the levelled policy.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof

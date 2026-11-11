@@ -8,28 +8,8 @@ use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
 
 /**
- * Factor change gate contract.
- *
- * Whether an active session may make a change to the identity's factors now:
- * enrolling its first additional factor, enrolling a further one, removing one,
- * or generating recovery codes. It is the one place that freshness is judged
- * for those changes, so an adapter that binds it to its authentication layer's
- * own gate replaces the package's judgement rather than adding a second one.
- *
- * It is asked inside the identity's factor state transaction, on the storage
- * connection, after the package's locks, with the factors as stored under them:
- * an implementation may lock its own rows there (an authentication layer's
- * session row, say), after the identity's state and factors. The change's own
- * rows are written after it returns, each reached only under the identity's
- * lock, so no other transaction holds one while waiting for that row. It is
- * never asked before the lock, nor when an enrolment is confirmed: a grant's
- * lifetime already ends with the authorisation that made it. A pending
- * session's bootstrap enrolment is not a change made here.
- *
- * The request carries the requirement the application configures for the
- * change's operation, which an implementation must hold the session to as well
- * as its own policy, the stricter applying; a first additional factor carries
- * none. The factor a removal names must never count towards its own removal.
+ * Judges freshness for a factor change under the identity's lock (lock your own
+ * rows after it); a factor never counts towards its own removal.
  *
  * @api
  *
@@ -39,15 +19,8 @@ use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
 interface FactorChangeGate
 {
     /**
-     * Authorise the change, and say until when the authorisation lasts.
-     *
-     * Returning means the change is allowed. For a change that is a grant
-     * (`FactorChange::isGrant()`), the instant returned is when the grant ends,
-     * and the package refuses the change when it is `null` or not in the
-     * future; for any other change it may be `null`. A refusal is an
-     * `OperationRefusedException` carrying the reason (`not_fresh` when the
-     * session is not fresh enough), never a return, so the change rolls back
-     * with it. Any other throwable propagates to the caller.
+     * Hold the session to the request's requirement too; a grant needs a future
+     * end, and a refusal throws so the change rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @return ?\Carbon\CarbonImmutable

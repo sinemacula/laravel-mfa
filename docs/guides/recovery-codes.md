@@ -139,14 +139,14 @@ It is `null` without a signed-in identity that can hold factors.
 
 ## When codes go
 
-- **Used.** A used code stays, marked with when it was used, and never redeems again.
-- **Replaced.** Generating a new set marks every code of the old one replaced; replaced codes never redeem.
-- **With the last factor.** Removing the identity's last confirmed factor (`Mfa::removeFactor()`) removes its set in the
+- Used: a used code stays, marked with when it was used, and never redeems again.
+- Replaced: generating a new set marks every code of the old one replaced; replaced codes never redeem.
+- With the last factor: removing the identity's last confirmed factor (`Mfa::removeFactor()`) removes its set in the
   same transaction and dispatches `RecoveryCodesRemoved`. A pending factor left behind does not keep the set; a
   confirmed one the failure ceiling disabled does.
-- **Pruned.** Used and replaced codes are deleted once they are older than `lifecycle.prune_after_days`, by `mfa:prune`
+- Pruned: used and replaced codes are deleted once they are older than `lifecycle.prune_after_days`, by `mfa:prune`
   (see [Pruning](lifecycle.md#pruning)).
-- **With a reset.** Resetting the identity removes its set (see [Factor lifecycle](lifecycle.md#resetting-an-identity)).
+- With a reset: resetting the identity removes its set (see [Factor lifecycle](lifecycle.md#resetting-an-identity)).
 
 ## Hashing cost
 

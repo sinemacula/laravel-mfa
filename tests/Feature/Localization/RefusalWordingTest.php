@@ -14,9 +14,8 @@ use Tests\Fixtures\Testing\ChooseLocale;
 use Tests\TestCase;
 
 /**
- * The route gate's refusal in the words of the locale it is raised in: on a
- * JSON answer, which carries the message; on Laravel's stock HTML page, which
- * does not; and never in the challenge header, which is for a developer.
+ * The route gate's refusal is worded in the raising locale, except in the
+ * challenge header, which is for a developer.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,14 +26,14 @@ use Tests\TestCase;
 #[CoversClass(ConsumerMessages::class)]
 final class RefusalWordingTest extends TestCase
 {
-    /** @var string The refusal in the shipped English. */
+    /** @var string Refusal in the shipped English. */
     private const string ENGLISH = 'Further authentication is required.';
 
-    /** @var string The refusal in French, in characters a header may not quote. */
+    /** @var string French refusal, with characters a header may not quote. */
     private const string FRENCH = 'Une "authentification" supplémentaire est requise.';
 
     /**
-     * Debug is off, as in production, and the refusal has a translation.
+     * Debug is off, as in production.
      *
      * @return void
      */
@@ -49,9 +48,6 @@ final class RefusalWordingTest extends TestCase
     }
 
     /**
-     * A JSON refusal in a locale a middleware chose through the kernel is in
-     * that locale's words, with no challenge header.
-     *
      * @return void
      */
     public function testAJsonRefusalIsInTheLocaleOfTheRequest(): void
@@ -66,8 +62,6 @@ final class RefusalWordingTest extends TestCase
     }
 
     /**
-     * Without a chosen locale the refusal is in the shipped English.
-     *
      * @return void
      */
     public function testAJsonRefusalInTheDefaultLocaleIsEnglish(): void
@@ -92,9 +86,7 @@ final class RefusalWordingTest extends TestCase
     }
 
     /**
-     * Laravel's stock HTML page says its own words and not the exception's, so
-     * the translation does not appear there: it is the JSON answer that carries
-     * it.
+     * Laravel's stock HTML page shows its own words, not the exception's.
      *
      * @return void
      */
@@ -111,9 +103,6 @@ final class RefusalWordingTest extends TestCase
     }
 
     /**
-     * The exception is worded in the locale when it is raised, so every raiser
-     * gets it.
-     *
      * @return void
      */
     public function testTheExceptionIsWordedWhenRaised(): void
@@ -129,8 +118,6 @@ final class RefusalWordingTest extends TestCase
     }
 
     /**
-     * Raising the refusal with no translator raises the refusal.
-     *
      * @return void
      */
     public function testRaisingItWithoutATranslatorStillRaisesIt(): void
@@ -147,9 +134,8 @@ final class RefusalWordingTest extends TestCase
     }
 
     /**
-     * The challenge header's description stays the shipped English, whatever
-     * the locale's wording or an application's override of `en`, and all of it
-     * is within RFC 6750's character set.
+     * Even an application's override of `en` stays out of the header, which
+     * must keep to RFC 6750's character set.
      *
      * @return void
      */
@@ -174,8 +160,8 @@ final class RefusalWordingTest extends TestCase
     }
 
     /**
-     * Define the routes the tests call: the gate, behind a middleware choosing
-     * the locale as an application's own would, or with no choice at all.
+     * The gate, behind a locale-choosing middleware as an application's own
+     * would be, or with none.
      *
      * @param  \Illuminate\Routing\Router  $router
      * @return void
@@ -189,8 +175,6 @@ final class RefusalWordingTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function person(): TestUser

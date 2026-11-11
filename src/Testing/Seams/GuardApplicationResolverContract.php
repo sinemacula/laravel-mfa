@@ -9,10 +9,9 @@ use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\GuardApplicationResolver;
 
 /**
- * What every `GuardApplicationResolver` must guarantee beyond what every
- * `ApplicationResolver` does, as an assertion: a request names one application
- * through a guard, by a name that is not blank, the same each time it is asked.
- * Different guards need not name different applications.
+ * What every `GuardApplicationResolver` must guarantee: a request names one
+ * non-blank application through a guard, the same each time. Different guards
+ * may name the same one.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,9 +26,6 @@ final class GuardApplicationResolverContract
     private function __construct() {}
 
     /**
-     * The request's application through the guard is named, and named the same
-     * way again.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\GuardApplicationResolver  $resolver
      * @param  \Illuminate\Http\Request  $request
      * @param  string  $guard

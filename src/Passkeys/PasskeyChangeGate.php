@@ -50,42 +50,12 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 
 /**
- * The gate every entry point that registers or removes a passkey calls before
- * it does, the authentication layer's included, in the same change: an event
- * reporting the change afterwards cannot stand in for it.
+ * The gate every entry point that registers or removes a passkey calls first,
+ * in the same change, since an event afterwards cannot stand in for it.
  *
- * Each call runs inside the caller's own transaction on the storage connection
- * and refuses with a `LogicException` without one. It acts only for the
- * request's validated caller, the identity and application it names, under the
- * identity's factor state lock, which joins the caller's transaction and is
- * held until it commits. A refusal is an `OperationRefusedException` carrying
- * the reason, so the caller's registration or removal rolls back with it; a
- * caller that catches the refusal and commits anyway breaks the contract. Every
- * event waits for the caller's commit, so a caller that rolls back after an
- * allowed call leaves no factor, association or event behind.
- *
- * - `registering()` associates a passkey with the identity as a factor when the
- *   application enables the type, confirmed by the registration ceremony's own
- *   evidence, with the fresh step-up, reauthentication or bootstrap exemption
- *   and the limits an enrolment needs, and recovery codes with the first
- *   additional factor. A confirmed factor ends a re-enrolment obligation. On a
- *   pending session its proof goes to the bound `PendingCompletion`; on an
- *   active one the requirement is evaluated again on the proofs the session
- *   holds, and the registration goes to the bound `SessionTransition` with any
- *   shortfall, whose answer the result carries; a refusal of either rolls the
- *   registration back. A credential associated already, with this identity or
- *   another, is refused.
- * - `removing()` removes the factor an associated credential is, on a sign-in
- *   the proof store knows (`not_fresh` without one), compared again under the
- *   lock (`not_found` when it changed), with the checks of every removal (see
- *   `Lifecycle\RemovalGuard`): an active identity; enrolled through the
- *   application acting, so another application's is refused as `not_found` and
- *   the caller's removal of the credential rolls back with it; the fresh
- *   step-up a removal needs (proved without that factor while another remains);
- *   and the last factor policy. Then the identity's other sessions are revoked.
- *
- * Stateless: the request, the configuration and the seams are read on every
- * call.
+ * Each call runs inside the caller's transaction on the storage connection,
+ * under the identity's factor state lock. A refusal must roll the caller's
+ * change back: catching it and committing anyway breaks the contract.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -94,12 +64,10 @@ use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
  */
 final readonly class PasskeyChangeGate
 {
-    /** @var string Why a call made outside a transaction is refused. */
+    /** @var string Refusal outside a transaction. */
     private const string NO_TRANSACTION = 'The passkey change gate runs only inside the caller\'s transaction on the storage connection.';
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
@@ -108,28 +76,26 @@ final readonly class PasskeyChangeGate
      */
     public function __construct(
 
-        /** The container the seams and the services are resolved from. */
+        /** Resolves the seams per call. */
         private Container $container,
 
-        /** The configuration the applications and models are read from. */
+        /** Read per call. */
         private Repository $config,
 
-        /** The resolver of the validated caller. */
+        /** Resolves the validated caller. */
         private CallerContextResolver $callers,
 
         /** The association records. */
         private PasskeyAssociations $associations,
 
-        /** The dispatcher of the association's events. */
+        /** Dispatches the association's events. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Associate the passkey being registered with the identity as a factor,
-     * before the caller stores it, and return the factor and any recovery
-     * codes; `null` when the application does not enable passkeys or the
-     * identity is not a person, so the registration goes on as a sign-in
-     * passkey only.
+     * Associate the passkey as a factor before the caller stores it. Null when
+     * the application does not enable passkeys or the identity is not a person,
+     * so it is a sign-in passkey only.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration  $registration
@@ -163,11 +129,8 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * Remove the factor the credential is associated as, before the caller
-     * removes the credential; nothing when it is associated with nobody.
-     * Returns what the bound `SessionRevoker` returned for the caller, such as
-     * an authentication layer's result carrying the pending session's new
-     * credential, or `null` with nothing to return.
+     * Remove the credential's factor before the caller removes the credential,
+     * returning what the bound `SessionRevoker` returned.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $credentialId
@@ -184,8 +147,8 @@ final readonly class PasskeyChangeGate
 
         $credentialId = CredentialId::canonical($credentialId);
 
-        // A plain read: the association is locked, and looked up again, only
-        // once the identity's factor state lock is held, in that order.
+        // Unlocked: the association is locked and re-read only once the factor
+        // state lock is held.
         if (!$this->associations->exists($credentialId)) {
             return null;
         }
@@ -195,8 +158,7 @@ final readonly class PasskeyChangeGate
         $application = $served->application;
         $binding     = $this->callers->binding($served, Purpose::STEP_UP);
 
-        // No sign-in means nothing a step-up could have been made on, or to
-        // compare under the lock, whatever a bound gate would answer.
+        // With no sign-in there is no step-up to check, whatever a gate says.
         if ($binding === null) {
             throw new OperationRefusedException(FailureReason::NOT_FRESH, 'Removing a factor needs a sign-in the proof store knows of.');
         }
@@ -209,13 +171,6 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * Under the lock: refuse a sign-in that changed, an inactive identity, a
-     * credential associated already and an enrolment the caller may not make
-     * now, then store the confirmed factor and its association, end any
-     * re-enrolment obligation, issue recovery codes with the identity's first
-     * additional factor, and hand a pending session's proof over or evaluate an
-     * active session's requirement again.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
@@ -243,8 +198,7 @@ final readonly class PasskeyChangeGate
 
         $this->container->make(OperationGuard::class)->identity($identity);
 
-        // Without a lock: the unique credential index refuses an association a
-        // concurrent registration commits after this read.
+        // Unlocked: the unique index catches a concurrent registration.
         OperationRefusedException::unless(
             !$this->associations->exists($registration->credentialId),
             FailureReason::CREDENTIAL_ASSOCIATED,
@@ -287,10 +241,7 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * Under the lock: resolve the caller again, refusing a sign-in that
-     * changed, then remove the identity's factor the credential is associated
-     * as, once every check of a removal holds; an association no factor of the
-     * identity's remains for is deleted on its own.
+     * An association with no remaining factor is deleted on its own.
      *
      * @formatter:off
      *
@@ -319,9 +270,8 @@ final readonly class PasskeyChangeGate
 
         if ($association === null) {
 
-            // The locking query names the owner, so another identity's
-            // association is not returned or acted on: only this unlocked read
-            // tells it apart from a credential nobody holds.
+            // Only this unlocked read tells another identity's credential apart
+            // from one nobody holds.
             OperationRefusedException::unless(
                 !$this->associations->exists($credentialId),
                 FailureReason::NOT_FOUND,
@@ -345,8 +295,6 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * Store the passkey factor, confirmed, enrolled through the application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $credentialId
@@ -374,9 +322,6 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * Refuse a registration bound to anything but the caller's own enrolment on
-     * its session, or one that observed no user presence.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration  $registration
      * @return void
@@ -399,9 +344,6 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * The caller served for the change, refused when it is nobody the change
-     * serves.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  ?\SineMacula\Laravel\Mfa\Enums\PendingAction  $action
      * @return \SineMacula\Laravel\Mfa\Context\Caller
@@ -419,8 +361,6 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * The application's settings.
-     *
      * @param  string  $application
      * @return \SineMacula\Laravel\Mfa\Applications\ApplicationSettings
      */
@@ -430,8 +370,6 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * A new instance of the configured factor model.
-     *
      * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
@@ -444,9 +382,6 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * The proof a registration makes of the factor it stores: its own evidence,
-     * bound to the enrolment.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyRegistration  $registration
      * @param  string  $factorId
@@ -470,9 +405,6 @@ final readonly class PasskeyChangeGate
     }
 
     /**
-     * The stored factor's id, throwing when a model event cancelled its save,
-     * so the passkey is not associated.
-     *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return string
      *

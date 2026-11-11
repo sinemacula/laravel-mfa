@@ -13,9 +13,8 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * A challenge gateway that admits whatever it is handed and counts the sends,
- * as an application's own gateway might, checking no admission itself: what it
- * sends is only what the package let through.
+ * Admits whatever it is handed and counts the sends, so what it sends is only
+ * what the package let through.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,12 +23,10 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  */
 final class CountingChallengeGateway implements ChallengeGateway
 {
-    /** @var int How many sends the gateway was asked for. */
+    /** @var int */
     public int $sends = 0;
 
     /**
-     * Send, counting it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -44,8 +41,6 @@ final class CountingChallengeGateway implements ChallengeGateway
     }
 
     /**
-     * Pass every answer.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding

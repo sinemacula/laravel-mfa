@@ -29,13 +29,6 @@ use Tests\TestCase;
 use Tests\Unit\Concerns\InteractsWithRecoveryCodes;
 
 /**
- * Tests for generating a recovery code set: the codes come back once, as
- * secrets, and are stored only as salted hashes made with the application's
- * hasher; a new set replaces the old one atomically, so there is never a moment
- * when both work or neither exists; and generation is refused unless the
- * application accepts recovery codes and the identity, a person who is active,
- * has a confirmed factor.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -47,9 +40,8 @@ final class RecoveryCodeGenerationTest extends TestCase
     use InteractsWithRecoveryCodes;
 
     /**
-     * A set of the configured size comes back as secrets, unformatted, drawn
-     * from the configured alphabet: a secret refuses to be encoded on its own,
-     * and the response helper reveals each one.
+     * Unformatted, from the configured alphabet; a secret refuses to be encoded
+     * on its own, and the response helper reveals each one.
      *
      * @return void
      *
@@ -79,8 +71,6 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * The configured count, length and alphabet govern the set.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -99,9 +89,8 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * Each code is stored only as a salted hash the application's hasher
-     * accepts, never in plaintext, under the first generation, usable; the
-     * identity's state row records the generation and its time.
+     * Never in plaintext, under the first generation; the state row records the
+     * generation and its time.
      *
      * @return void
      *
@@ -134,8 +123,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * The codes are hashed with the hashing driver the application configures,
-     * as its passwords are.
+     * As the application's passwords are.
      *
      * @return void
      *
@@ -163,9 +151,8 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * A new set replaces the old one: every earlier code, used or not, is
-     * marked replaced at the time of the new set, the generation advances, and
-     * the earlier codes no longer redeem while the new ones do.
+     * Every earlier code, used or not, is marked replaced at the new set's
+     * time, the generation advances, and only the new codes redeem.
      *
      * @return void
      *
@@ -197,8 +184,6 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * Another identity's set is left alone.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -217,7 +202,7 @@ final class RecoveryCodeGenerationTest extends TestCase
 
     /**
      * `RecoveryCodesGenerated` is dispatched once, after the commit, with the
-     * set's size, its generation and the actor, and never a code.
+     * size, generation and actor.
      *
      * @return void
      *
@@ -248,9 +233,8 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * A failure partway through the replacement rolls all of it back: the
-     * previous set still redeems, the generation is unchanged, no partial set
-     * remains and nothing is reported.
+     * The whole replacement rolls back: the previous set still redeems, the
+     * generation is unchanged and nothing is reported.
      *
      * @return void
      *
@@ -285,9 +269,8 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * A replacement whose code insert a model event cancels, without throwing,
-     * throws instead of committing a partial set: the previous set still
-     * redeems, the generation is unchanged and nothing is reported.
+     * A code insert cancelled by a model event throws rather than committing a
+     * partial set.
      *
      * @return void
      *
@@ -307,8 +290,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * A replacement whose state row save a model event cancels throws instead
-     * of committing a set its state row does not record.
+     * Throws rather than committing a set its state row does not record.
      *
      * @return void
      *
@@ -325,10 +307,8 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * Inside the replacement, the earlier codes are already replaced when the
-     * first new code is stored, and the new codes are stored under the next
-     * generation before it is recorded, so the set a redemption reads under the
-     * same lock is the old one or the new one, never both.
+     * New codes are stored under the next generation before it is recorded, so
+     * a redemption under the same lock sees one set, never both.
      *
      * @return void
      *
@@ -352,8 +332,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * Generation is refused, and nothing written, when the application does not
-     * accept recovery codes.
+     * Nothing is written.
      *
      * @return void
      *
@@ -371,8 +350,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * Generation is refused for an identity whose only factor is pending, and
-     * for one with none.
+     * An identity whose only factor is pending, and one with none.
      *
      * @return void
      *
@@ -390,9 +368,8 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * Generation checks the confirmed factor again under the lock, so an
-     * identity whose own answer counts a pending factor is still refused, and
-     * nothing is written.
+     * An identity whose own answer counts a pending factor is still refused,
+     * and nothing is written.
      *
      * @return void
      *
@@ -415,8 +392,6 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * A machine identity and an inactive one are refused.
-     *
      * @return void
      */
     public function testRefusedForAMachineOrInactiveIdentity(): void
@@ -429,8 +404,7 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * Recovery codes are not a factor: an identity holding a set but no
-     * confirmed factor is not set up.
+     * An identity holding a set but no confirmed factor is not set up.
      *
      * @return void
      *
@@ -451,10 +425,8 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * Assert a new set for the holder throws because a save of the given model
-     * was cancelled, and leaves the previous set in place: its codes stored and
-     * usable, the generation unchanged, nothing reported, and a code of it
-     * still redeeming.
+     * The previous set stays stored, usable and redeemable, the generation
+     * unchanged and nothing reported.
      *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
      * @param  list<string>  $previous
@@ -491,8 +463,6 @@ final class RecoveryCodeGenerationTest extends TestCase
     }
 
     /**
-     * Assert the operation is refused with the given reason.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  \Closure(): mixed  $operation
      * @return void

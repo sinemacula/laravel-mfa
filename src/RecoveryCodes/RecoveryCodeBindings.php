@@ -22,8 +22,6 @@ final class RecoveryCodeBindings
     private function __construct() {}
 
     /**
-     * Register the recovery code service.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

@@ -14,9 +14,8 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * A policy that answers as the default does, except that it rates a session
- * holding a hardware-bound, verified, phishing-resistant proof AAL3, as an
- * application whose authenticators it has vetted might.
+ * Answers as the default policy does, except that it rates a session holding a
+ * hardware-bound, verified, phishing-resistant proof AAL3.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,8 +25,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 final class LeveledCombinationPolicy implements CombinationPolicy
 {
     /**
-     * As the default answers.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $factor
      * @return bool
@@ -39,8 +36,6 @@ final class LeveledCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * As the default answers, at AAL3 when a proof observed all it takes.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation

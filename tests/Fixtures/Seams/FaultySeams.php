@@ -22,10 +22,7 @@ use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 
 /**
  * One faulty implementation of each of several seams, for proving the contract
- * kit rejects them: a revoker that revokes nothing, a transition that fails
- * with an `Error`, a gate that finds everything fresh, requirements that change
- * with every call, a resolver that names a blank application, and one that
- * finds everyone a person.
+ * kit rejects them.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,12 +31,10 @@ use SineMacula\Laravel\Mfa\Requirements\SessionChange;
  */
 final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityRequirement, SessionRevoker, SessionTransition, SubjectTypeResolver, TenantRequirement
 {
-    /** @var int How often a requirement has been asked. */
+    /** @var int */
     private int $asked = 0;
 
     /**
-     * A blank application.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return string
      */
@@ -50,8 +45,6 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     }
 
     /**
-     * Everything is fresh.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -64,7 +57,7 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     }
 
     /**
-     * A deadline already past, however fresh it says the session is.
+     * Already past, however fresh it says the session is.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
@@ -78,9 +71,6 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     }
 
     /**
-     * A requirement that asks for nothing, whatever the operation or the caller
-     * asks.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -93,8 +83,6 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     }
 
     /**
-     * A requirement that changes with every call.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  ?string  $tenant
@@ -107,8 +95,6 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     }
 
     /**
-     * Revoke nothing.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @param  string  $application
@@ -118,13 +104,10 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     #[\Override]
     public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $application, string $session): RemovalRevocation
     {
-        // A faulty revoker revokes nothing.
         return RemovalRevocation::othersEnded();
     }
 
     /**
-     * Revoke nothing.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      */
@@ -135,7 +118,7 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     }
 
     /**
-     * Fail with an error rather than a refusal.
+     * Fails with an error instead of a refusal.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\SessionChange  $change
      * @return ?object
@@ -149,8 +132,6 @@ final class FaultySeams implements ApplicationResolver, FreshnessGate, IdentityR
     }
 
     /**
-     * Everyone is a person.
-     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return bool
      */

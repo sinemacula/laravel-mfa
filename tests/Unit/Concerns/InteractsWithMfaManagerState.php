@@ -10,11 +10,8 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
- * Shared scaffolding for the `MfaManager` state-test family.
- *
- * The state suite is split into two subjects (lookups / lifecycle) to stay
- * under the max-methods-per-class threshold. This trait centralises the shared
- * helpers — manager resolution, factor seeding, and Mockery teardown.
+ * Shared by the `MfaManager` state tests, split to stay under the
+ * max-methods-per-class threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,8 +21,6 @@ use Tests\Fixtures\Identities\TestUser;
 trait InteractsWithMfaManagerState
 {
     /**
-     * Tear down Mockery expectations between test cases.
-     *
      * @return void
      */
     protected function tearDown(): void
@@ -38,8 +33,6 @@ trait InteractsWithMfaManagerState
     }
 
     /**
-     * Resolve the package's MFA manager instance from the container.
-     *
      * @return \SineMacula\Laravel\Mfa\MfaManager
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -53,8 +46,6 @@ trait InteractsWithMfaManagerState
     }
 
     /**
-     * Create a test user with a single backing TOTP factor.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */

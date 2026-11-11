@@ -12,8 +12,6 @@ use SineMacula\Laravel\Mfa\Database\MigrationCollisionGuard;
 use SineMacula\Laravel\Mfa\Exceptions\TableAlreadyExistsException;
 
 /**
- * Unit tests for the `MigrationCollisionGuard`.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +21,6 @@ use SineMacula\Laravel\Mfa\Exceptions\TableAlreadyExistsException;
 final class MigrationCollisionGuardTest extends TestCase
 {
     /**
-     * Test ensure not exists no-ops when the table does not exist.
-     *
      * @return void
      */
     public function testEnsureNotExistsNoOpsWhenTableDoesNotExist(): void
@@ -34,9 +30,6 @@ final class MigrationCollisionGuardTest extends TestCase
 
         $guard = new MigrationCollisionGuard($schema);
 
-        // Capture the public outcome as a tagged sentinel: the closure returns
-        // it only when the guard returns normally, so the assertion below
-        // proves the no-op rather than relying on implicit teardown semantics.
         $outcome = (static function () use ($guard): string {
 
             $guard->ensureNotExists('mfa_factors', 'factor.table');
@@ -48,8 +41,6 @@ final class MigrationCollisionGuardTest extends TestCase
     }
 
     /**
-     * Test ensure not exists throws when table exists.
-     *
      * @return void
      */
     public function testEnsureNotExistsThrowsWhenTableExists(): void
@@ -76,8 +67,6 @@ final class MigrationCollisionGuardTest extends TestCase
     }
 
     /**
-     * Test exception message falls back to default connection name.
-     *
      * @return void
      */
     public function testExceptionMessageFallsBackToDefaultConnectionName(): void

@@ -16,8 +16,6 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 abstract readonly class RecoveryCodeRedemptionEvent extends ContextEvent
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, int|string|null>  $context
      * @param  int  $remaining
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -37,8 +35,6 @@ abstract readonly class RecoveryCodeRedemptionEvent extends ContextEvent
     }
 
     /**
-     * What the action the event reports was for.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\Purpose
      */
     #[\Override]

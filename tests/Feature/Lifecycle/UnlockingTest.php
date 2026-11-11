@@ -20,9 +20,8 @@ use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\TestCase;
 
 /**
- * Unlocking an identity or one of its factors, for an actor: only temporary
- * lockouts lift, the durable counts stay, a factor disabled at the failure
- * ceiling stays disabled, and only a live lockout lifted is reported.
+ * Unlocking lifts only temporary lockouts; durable counts and a ceiling
+ * disabling stay, and only a live lockout lifted is reported.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,8 +36,6 @@ final class UnlockingTest extends TestCase
     use ArrangesLifecycle;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -50,8 +47,7 @@ final class UnlockingTest extends TestCase
     }
 
     /**
-     * A factor's live lockout lifts, naming the actor; its failures in a row
-     * and its being disabled stay.
+     * Its failures in a row and its being disabled stay.
      *
      * @return void
      *
@@ -81,9 +77,6 @@ final class UnlockingTest extends TestCase
     }
 
     /**
-     * An id that finds none of the identity's factors lifts and reports
-     * nothing, another person's lockout included.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -107,8 +100,8 @@ final class UnlockingTest extends TestCase
     }
 
     /**
-     * The identity's live lockout lifts, naming the actor, and needs no caller;
-     * its failures in a row stay. With none live nothing is reported.
+     * It needs no caller and its failures in a row stay; with none live nothing
+     * is reported.
      *
      * @return void
      *
@@ -137,8 +130,6 @@ final class UnlockingTest extends TestCase
     }
 
     /**
-     * A lockout already over clears without being reported as lifted.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -158,9 +149,6 @@ final class UnlockingTest extends TestCase
     }
 
     /**
-     * A model event that cancels the unlock's save throws rather than reporting
-     * a lockout lifted that stays in force.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -192,8 +180,6 @@ final class UnlockingTest extends TestCase
     }
 
     /**
-     * Lock the factor until an hour from now.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return void
      */
@@ -203,8 +189,6 @@ final class UnlockingTest extends TestCase
     }
 
     /**
-     * The identity's state row.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\IdentityState
      */

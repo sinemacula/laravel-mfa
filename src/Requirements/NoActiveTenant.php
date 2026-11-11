@@ -8,8 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
 /**
- * The default `ActiveTenantResolver`: without an adapter there is no validated
- * session context to name a tenant, so no session has one.
+ * The default `ActiveTenantResolver`: without an adapter no validated session
+ * context names a tenant.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -17,8 +17,6 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 final class NoActiveTenant implements ActiveTenantResolver
 {
     /**
-     * No tenant.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?string

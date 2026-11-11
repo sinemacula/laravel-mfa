@@ -16,14 +16,8 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 
 /**
- * Asks the bound `FactorChangeGate` to authorise a change, the one way every
- * flow does: inside the identity's factor state transaction, with the
- * requirement the application configures for the change's operation, refusing a
- * grant whose authorisation has no end or has ended already. The gate's refusal
- * is reported as the package's own, since refusing by throwing is how the
- * contract answers.
- *
- * Stateless: the gate is resolved on every call.
+ * Asks the bound `FactorChangeGate` to authorise a change inside the identity's
+ * factor state transaction, with the operation's configured requirement.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,24 +27,21 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 final readonly class FactorChanges
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Contracts\Config\Repository  $config
      */
     public function __construct(
 
-        /** The container the gate is resolved from on every call. */
+        /** Resolves the gate on every call. */
         private Container $container,
 
-        /** The configuration the operations' requirements are read from on every call. */
+        /** Read on every call. */
         private Repository $config,
     ) {}
 
     /**
-     * Authorise a change that is a grant from the sign-in, on the factors as
-     * stored under the lock, and say when the grant ends: refused when the gate
-     * gives it no end, or one that is not in the future.
+     * Authorise a grant and return when it ends, refusing one the gate gives no
+     * future end.
      *
      * @formatter:off
      *
@@ -84,8 +75,7 @@ final readonly class FactorChanges
     }
 
     /**
-     * Authorise a change that is not a grant from the sign-in, on the factors
-     * as stored under the lock.
+     * Authorise a change that is not a grant.
      *
      * @formatter:off
      *
@@ -112,8 +102,7 @@ final readonly class FactorChanges
     }
 
     /**
-     * The requirement the application configures for the change's operation, or
-     * `null` with none, or for a change with no operation.
+     * `null` with none configured, or for a change with no operation.
      *
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorChange  $change
@@ -129,12 +118,8 @@ final readonly class FactorChanges
     }
 
     /**
-     * Ask the bound gate, inside the identity's factor state transaction. A
-     * bound gate of an application's or an adapter's refuses by throwing, as
-     * the contract answers, so its refusal is reported as the package's own.
-     * The package's default marks its own refusals itself, so a refusal a seam
-     * it asks throws (the freshness gate's, say) propagates unmarked, as it
-     * would from anywhere else.
+     * A bound gate's refusal is reported as the package's own; the default
+     * marks its own, so a seam's refusal it passes on stays unmarked.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @return ?\Carbon\CarbonImmutable
@@ -175,8 +160,6 @@ final readonly class FactorChanges
     }
 
     /**
-     * Throw the refusal.
-     *
      * @param  \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException  $refusal
      * @return never
      *

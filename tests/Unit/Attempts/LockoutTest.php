@@ -12,9 +12,6 @@ use SineMacula\Laravel\Mfa\Attempts\Lockout;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 
 /**
- * Unit tests for `Lockout`: a lockout that ends, a factor disabled at the
- * failure ceiling, the strictest of several, and the detail each reports.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +21,7 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 final class LockoutTest extends TestCase
 {
     /**
-     * A lockout that ends carries its scope and end, and is not a disabled
-     * factor.
+     * It carries its scope and end, and is not a disabled factor.
      *
      * @return void
      */
@@ -40,7 +36,7 @@ final class LockoutTest extends TestCase
     }
 
     /**
-     * A lockout can end at a Unix time, read in the application's timezone.
+     * Read in the application's timezone.
      *
      * @return void
      */
@@ -56,8 +52,6 @@ final class LockoutTest extends TestCase
     }
 
     /**
-     * A factor disabled at the failure ceiling has no end.
-     *
      * @return void
      */
     public function testADisabledFactorHasNoEnd(): void
@@ -70,8 +64,7 @@ final class LockoutTest extends TestCase
     }
 
     /**
-     * An identity whose run of failures reached the failure ceiling has no end
-     * either.
+     * An identity whose run reached the failure ceiling has no end either.
      *
      * @return void
      */
@@ -85,8 +78,6 @@ final class LockoutTest extends TestCase
     }
 
     /**
-     * Each lockout and the detail it reports.
-     *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Attempts\Lockout, string}>
      */
     public static function details(): iterable
@@ -101,7 +92,7 @@ final class LockoutTest extends TestCase
     }
 
     /**
-     * Each lockout reports what is refused and why.
+     * What is refused and why.
      *
      * @param  \SineMacula\Laravel\Mfa\Attempts\Lockout  $lockout
      * @param  string  $detail
@@ -114,8 +105,6 @@ final class LockoutTest extends TestCase
     }
 
     /**
-     * The strictest of no lockout is none.
-     *
      * @return void
      */
     public function testTheStrictestOfNoneIsNone(): void
@@ -125,8 +114,7 @@ final class LockoutTest extends TestCase
     }
 
     /**
-     * The strictest of lockouts that end is the one that ends last, wherever it
-     * is given.
+     * Wherever it is given.
      *
      * @return void
      */

@@ -16,10 +16,6 @@ use Tests\Fixtures\Codes\RecordingCodeDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
 
 /**
- * Unit tests for `AbstractCodeDriver`: what a delivered-code driver states, its
- * refusal of every call that would send or accept a code bound to nothing, and
- * the destination guard in front of its transport.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -29,9 +25,6 @@ use Tests\Fixtures\Factors\InMemoryFactor;
 final class AbstractCodeDriverTest extends TestCase
 {
     /**
-     * A delivered code adds `otp` and keeps no secret to start an enrolment
-     * with.
-     *
      * @return void
      */
     public function testADeliveredCodeAddsOtpAndKeepsNoSecret(): void
@@ -43,7 +36,7 @@ final class AbstractCodeDriverTest extends TestCase
     }
 
     /**
-     * Rows of `[the call, the word naming what it would do]`.
+     * The call, and the word naming what it would do.
      *
      * @return iterable<string, array{\Closure(\Tests\Fixtures\Codes\RecordingCodeDriver): mixed, string}>
      */
@@ -59,8 +52,7 @@ final class AbstractCodeDriverTest extends TestCase
     }
 
     /**
-     * Checking or confirming a code with the factor alone is refused, and
-     * delivers nothing: a code is bound to more than its factor.
+     * A code is bound to more than its factor.
      *
      * @param  \Closure(\Tests\Fixtures\Codes\RecordingCodeDriver): mixed  $call
      * @param  string  $action
@@ -84,8 +76,6 @@ final class AbstractCodeDriverTest extends TestCase
     }
 
     /**
-     * The message reaches the transport as it was built.
-     *
      * @return void
      */
     public function testDeliveryHandsTheMessageToTheTransport(): void

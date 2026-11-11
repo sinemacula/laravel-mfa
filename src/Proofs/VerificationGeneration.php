@@ -13,18 +13,9 @@ use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 
 /**
- * An identity's verification generation: a durable counter on its row in the
- * identity states table, stamped on every proof the identity makes. Advancing
- * it invalidates every proof recorded under an earlier generation, on every
- * session at once, so the identity's other sessions must verify again; it is
- * how the package revokes sessions when no authentication layer is bound.
- *
- * An identity with no row is at generation 0. The generation is read from the
- * write connection, so a replica lagging behind an advance never lets an
- * invalidated proof count. Advancing runs on the storage connection; called
- * inside the identity's factor state transaction (see
- * `Support\FactorStateTransaction`), it joins it and commits or rolls back with
- * the change that advanced it.
+ * A durable counter stamped on every proof; advancing it invalidates every
+ * earlier proof. Read from the write connection so a lagging replica revives
+ * none.
  *
  * @api
  *
@@ -42,7 +33,7 @@ final class VerificationGeneration
     private function __construct() {}
 
     /**
-     * The identity's current verification generation.
+     * 0 for an identity with no row.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return int
@@ -59,15 +50,13 @@ final class VerificationGeneration
     }
 
     /**
-     * Advance the identity's verification generation, creating its row when it
-     * has none, and return the new generation. Every proof recorded under an
-     * earlier generation stops counting. An advance that changes no row is
-     * refused with a `LogicException`, as answering it would let those proofs
-     * count.
+     * Joins the identity's factor state transaction when called inside it, and
+     * throws when no row changed rather than let old proofs count.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return int
      *
+     * @throws \InvalidArgumentException
      * @throws \LogicException
      * @throws \Throwable
      */
@@ -93,8 +82,6 @@ final class VerificationGeneration
     }
 
     /**
-     * The storage connection, where the identity states table lives.
-     *
      * @return \Illuminate\Database\ConnectionInterface
      *
      * @throws \InvalidArgumentException

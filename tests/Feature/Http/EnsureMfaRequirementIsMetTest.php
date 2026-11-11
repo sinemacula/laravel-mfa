@@ -48,8 +48,7 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * The `mfa` route middleware through the HTTP kernel: what it asks for, whose
- * proofs it judges, who it refuses, and which routes it lifts for.
+ * The `mfa` route middleware through the HTTP kernel.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -64,33 +63,31 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
 {
     use ArrangesVerification;
 
-    /** @var string What the refusal says, in the shipped English. */
+    /** @var string Shipped English refusal message. */
     private const string REFUSAL = 'Further authentication is required.';
 
-    /** @var string A route that asks only for the composed requirement. */
+    /** @var string Route asking only for the composed requirement. */
     private const string BARE = 'gate/bare';
 
-    /** @var string A route that asks for AAL2. */
+    /** @var string Route asking for AAL2. */
     private const string LEVEL = 'gate/level';
 
-    /** @var string A route that asks for a configured operation's freshness. */
+    /** @var string Route asking for the operation's freshness. */
     private const string OPERATION = 'gate/operation';
 
-    /** @var string A route that asks for both. */
+    /** @var string Route asking for AAL2 and the operation. */
     private const string BOTH = 'gate/both';
 
-    /** @var string The operation the routes name. */
+    /** @var string */
     private const string CLOSE_BOOKS = 'billing.close_books';
 
-    /** @var array<string, array<string, ?string>> The serialised form of asking for AAL2 at any age. */
+    /** @var array<string, array<string, ?string>> AAL2 at any age, serialised. */
     private const array AAL2 = ['minimum_level' => ['level' => 'aal2', 'max_age' => null]];
 
-    /** @var array<string, array<string, ?int>> The serialised form of asking for an additional verification at any age. */
+    /** @var array<string, array<string, ?int>> Additional verification at any age, serialised. */
     private const array VERIFIED = ['additional_verification' => ['max_age' => null]];
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -102,8 +99,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * `never` adds nothing: a person with no further proof passes bare `mfa`.
-     *
      * @return void
      */
     public function testTheNeverModeAddsNothing(): void
@@ -116,8 +111,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * `enrolled` asks nothing of a person with no confirmed factor, so a shared
-     * route group does not lock out people using optional MFA.
+     * So a shared route group does not lock out people using optional MFA.
      *
      * @return void
      */
@@ -131,8 +125,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * `enrolled` asks a person with a confirmed factor to verify.
-     *
      * @return void
      */
     public function testTheEnrolledModeAsksAPersonWithAFactor(): void
@@ -154,8 +146,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * `always` asks a person with no factor too, and says they have none.
-     *
      * @return void
      */
     public function testTheAlwaysModeAsksAPersonWithNoFactor(): void
@@ -172,8 +162,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The identity's own requirement applies under `never`.
-     *
      * @return void
      */
     public function testAnIdentitysRequirementAppliesUnderNever(): void
@@ -188,8 +176,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * After a reset, the re-enrolment obligation is refused on every route that
-     * carries `mfa`, also under `never`.
+     * Refused on every `mfa` route, also under `never`.
      *
      * @return void
      */
@@ -207,8 +194,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The active tenant's requirement applies through the resolver.
-     *
      * @return void
      */
     public function testAnActiveTenantsRequirementApplies(): void
@@ -226,8 +211,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A password and a TOTP code make AAL2, so they pass the level.
-     *
      * @return void
      */
     public function testAPasswordAndTotpPassTheLevel(): void
@@ -240,8 +223,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A password and an email code are accepted without reaching AAL2, so they
-     * do not.
+     * An email code is accepted but does not reach AAL2.
      *
      * @return void
      */
@@ -255,8 +237,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Where a maximum age bounds the level, a fresh weaker proof never
-     * refreshes an old stronger one.
+     * Applies where a maximum age bounds the level.
      *
      * @return void
      */
@@ -276,9 +257,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A first-factor passkey that observed user verification is multi-factor on
-     * its own, so it needs no further proof for an additional verification or
-     * for the level.
+     * A passkey that observed user verification is multi-factor on its own.
      *
      * @return void
      */
@@ -295,7 +274,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A further proof alone is nothing without the first factor it follows.
+     * A further proof means nothing without the first factor it follows.
      *
      * @return void
      */
@@ -311,7 +290,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * More than one first factor cannot say which sign-in the proofs belong to.
+     * The proofs cannot be tied to one sign-in.
      *
      * @return void
      */
@@ -325,8 +304,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A proof dated after now does not count.
-     *
      * @return void
      */
     public function testAFutureDatedProofDoesNotCount(): void
@@ -339,8 +316,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Within the operation's maximum age a proof passes, and past it the
-     * exception names the operation and carries its requirement.
+     * Past the maximum age the exception names the operation.
      *
      * @return void
      */
@@ -364,9 +340,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * An operation with no requirement is not a misconfiguration: it is simply
-     * never fresh, and is answered with the exception rather than a server
-     * error.
+     * An operation with no requirement is never fresh, not misconfigured.
      *
      * @return void
      */
@@ -385,8 +359,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A bound gate that supplies an operation the local configuration does not
-     * name decides it.
+     * The gate decides an operation the local configuration does not name.
      *
      * @return void
      */
@@ -400,8 +373,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A gate that says not fresh refuses, though the proofs meet the
-     * requirement, and its own requirement goes on the exception.
+     * The gate's own requirement goes on the exception.
      *
      * @return void
      */
@@ -421,9 +393,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A gate with no requirement of its own leaves the composed one on the
-     * exception.
-     *
      * @return void
      */
     public function testAGateWithNoRequirementLeavesTheComposedOne(): void
@@ -437,8 +406,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A level and an operation together: a fresh proof that does not reach the
-     * level is refused, and the exception carries the strictest of them.
+     * The exception carries the stricter of the two.
      *
      * @return void
      */
@@ -459,8 +427,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The other way: the level met long ago does not make the operation fresh,
-     * and a proof that makes both passes.
+     * A proof that makes both then passes.
      *
      * @return void
      */
@@ -482,8 +449,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Separate `mfa` entries, as from a group and a route, each enforce their
-     * own.
+     * As from a group and a route.
      *
      * @return void
      */
@@ -501,8 +467,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Who the package does not serve.
-     *
      * @return iterable<string, array{0: \Closure(): ?\Illuminate\Contracts\Auth\Authenticatable, 1: bool}>
      */
     public static function unservedCallers(): iterable
@@ -513,9 +477,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Whoever the package does not serve is refused with nothing from the gate,
-     * under `never` too, since that setting controls the requirement and not
-     * who is served.
+     * `never` sets the requirement, not who is served, so it refuses these too.
      *
      * @param  \Closure(): ?\Illuminate\Contracts\Auth\Authenticatable  $caller
      * @param  bool  $hasConfirmedFactor
@@ -545,10 +507,8 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * An inactive identity is refused under `never`, and whatever an operation
-     * would ask is read for the exception, though no gate is judged. It holds
-     * no stored factor, so the refusal reports no confirmed factor, whatever
-     * its own `isMfaEnabled()` answers.
+     * Under `never` the operation is read but no gate judged. With no stored
+     * factor it reports none, whatever `isMfaEnabled()` answers.
      *
      * @return void
      */
@@ -568,9 +528,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The bound active state resolver, not the identity, decides who is
-     * inactive: under `never`, a person it finds inactive is refused with
-     * nothing from the gate, and an identity it finds active is let on.
+     * The bound active state resolver decides, not the identity.
      *
      * @return void
      */
@@ -594,8 +552,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A pending session is refused, carrying what it owes and any level the
-     * route asks; an operation is named but no gate is asked for it.
+     * It carries what it owes and any route level; no gate is asked.
      *
      * @return void
      */
@@ -621,8 +578,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A pending session that may not list factors is offered none, and its
-     * person's having no factor is reported as it is.
+     * Having no factor is still reported.
      *
      * @return void
      */
@@ -639,8 +595,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A request carrying a pending credential is never answered from the
-     * guard's user, also when that user has met everything.
+     * Also when the guard's user has met everything.
      *
      * @return void
      */
@@ -658,9 +613,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A pending credential that does not validate is not disguised as a
-     * refusal.
-     *
      * @return void
      */
     public function testAnInvalidPendingCredentialPropagates(): void
@@ -675,8 +627,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Each form of parameter the middleware refuses.
-     *
      * @return iterable<string, array{0: string}>
      */
     public static function malformedParameters(): iterable
@@ -699,8 +649,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Whatever is malformed is refused at once with the same exception, also on
-     * an exempt route, so a typo is loud.
+     * Refused at once, also on an exempt route, so a typo is loud.
      *
      * @param  string  $middleware
      * @return void
@@ -720,8 +669,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The same malformed parameters on an exempt route.
-     *
      * @param  string  $middleware
      * @return void
      */
@@ -740,8 +687,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Each form of parameter the middleware accepts.
-     *
      * @return iterable<string, array{0: string}>
      */
     public static function wellFormedParameters(): iterable
@@ -753,7 +698,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Well-formed parameters are accepted at every level, in either order.
+     * At every level, in either order.
      *
      * @param  string  $middleware
      * @return void
@@ -773,8 +718,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Routes the marker lifts the gate for, however it reached them.
-     *
      * @return iterable<string, array{0: string}>
      */
     public static function exemptRoutes(): iterable
@@ -788,8 +731,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The marker on the route lifts `mfa`, in any form, for a person who has
-     * proved nothing and for a guest.
+     * In any form, for a person who has proved nothing and for a guest.
      *
      * @param  string  $uri
      * @return void
@@ -807,8 +749,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A route that takes the marker away again is gated.
-     *
      * @return void
      */
     public function testTheMarkerTakenOffIsNotAnExemption(): void
@@ -821,8 +761,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The marker grants nothing on any other route.
-     *
      * @return void
      */
     public function testTheMarkerOnAnotherRouteGrantsNothing(): void
@@ -837,8 +775,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * With no matched route nothing is exempt, so the middleware does not
-     * belong in the global stack.
+     * So the middleware does not belong in the global stack.
      *
      * @return void
      */
@@ -850,8 +787,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * `['mfa', 'auth:api']` authenticates first, whichever order the route
-     * names them: the `api` identity is judged, not the default guard's.
+     * `['mfa', 'auth:api']` authenticates first in either order.
      *
      * @return void
      */
@@ -863,8 +799,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The same when the `api` identity is the one that falls short, though the
-     * default guard's has met everything.
+     * The default guard's identity has met everything.
      *
      * @return void
      */
@@ -876,8 +811,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The gate only reads: a shortfall is answered without any transition, so a
-     * GET never changes a session.
+     * A shortfall makes no transition, so a GET never changes a session.
      *
      * @return void
      */
@@ -895,9 +829,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * One resolved instance answers for whoever each request serves, so
-     * consecutive requests share no answer.
-     *
      * @return void
      */
     public function testOneInstanceSharesNoAnswerBetweenRequests(): void
@@ -943,8 +874,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The kernel's default rendering of a refusal is a 401 with no factor
-     * detail and no challenge header.
+     * It sends no challenge header either.
      *
      * @return void
      */
@@ -966,8 +896,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * A renderable an application may write gives the RFC 9470 answer, with its
-     * factors masked.
+     * An application renderable gives the RFC 9470 answer with factors masked.
      *
      * @return void
      */
@@ -988,8 +917,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Define the routes the tests call.
-     *
      * @param  \Illuminate\Routing\Router  $router
      * @return void
      */
@@ -1016,8 +943,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * What a route answers when it is reached.
-     *
      * @return string
      */
     private static function reached(): string
@@ -1026,8 +951,6 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * The refusal a request to the route is answered with.
-     *
      * @param  string  $uri
      * @return \SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException
      */
@@ -1041,7 +964,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Record the proofs on the person's sign-in.
+     * Records the proofs on the person's sign-in.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \Closure(\Tests\Fixtures\Requirements\SignInProofs): list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
@@ -1059,8 +982,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Ask nothing of a sign-in, and configure the operation the routes name to
-     * want a verification within five minutes.
+     * Asks nothing of a sign-in, and five-minute freshness for the operation.
      *
      * @return void
      */
@@ -1070,8 +992,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Put a person on each of two guards, the `web` default one having met AAL2
-     * unless it is the `api` one that has.
+     * The `web` user meets AAL2, or the `api` one does when `$apiProved`.
      *
      * @param  bool  $apiProved
      * @return void
@@ -1097,8 +1018,7 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
-     * Run the middleware directly, with no matched route, for a request the
-     * container serves.
+     * Runs the middleware with no matched route.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet  $instance
      * @return \Symfony\Component\HttpFoundation\Response

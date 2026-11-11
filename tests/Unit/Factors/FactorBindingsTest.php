@@ -10,8 +10,6 @@ use SineMacula\Laravel\Mfa\Factors\FactorService;
 use Tests\TestCase;
 
 /**
- * Tests for `FactorBindings`: the factor service is built afresh.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -21,8 +19,6 @@ use Tests\TestCase;
 final class FactorBindingsTest extends TestCase
 {
     /**
-     * The factor service is built on every resolution.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

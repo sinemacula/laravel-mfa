@@ -26,14 +26,8 @@ use Tests\Fixtures\Hardening\ServerErrorAnswered;
 use Tests\TestCase;
 
 /**
- * Every statement of every flow, failed in turn: the flow is seeded, run once
- * healthy to count its statements, then seeded again and run with the first
- * failing, the second, and so on. A database failure is never answered as a
- * wrong code, a missing factor or a refusal: it is thrown, or a server error
- * through the kernel. A transaction it happened in leaves no row changed and no
- * event reported, and nothing the flow was given stays in the failure. Each
- * statement fails again as a deadlock, which Laravel raises as a wrapper with
- * the message copied when the transaction it happened in is a nested one.
+ * Fails each statement of every flow in turn: a database failure is thrown or a
+ * server error, never a refusal, and its transaction leaves nothing behind.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,16 +40,13 @@ final class QueryFailureSweepTest extends TestCase
 {
     use FlowCatalog;
 
-    /** @var array<string, list<array<string, mixed>>> The package's tables when the outermost transaction began. */
+    /** @var array<string, list<array<string, mixed>>> Tables when the outermost transaction began. */
     private array $atBegin = [];
 
-    /** @var int How many events had been reported when the outermost transaction began. */
+    /** @var int Reports when the outermost transaction began. */
     private int $reportsAtBegin = 0;
 
     /**
-     * Arrange the flows, and take a copy of the tables as each outermost
-     * transaction begins.
-     *
      * @return void
      */
     #[\Override]
@@ -78,9 +69,8 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
-     * Stop copying the tables before the migrations roll back: PostgreSQL runs
-     * each migration in a transaction, and the copy taken as the next one began
-     * would read a table the last one had already dropped.
+     * PostgreSQL runs each migration in a transaction, so stop copying the
+     * tables before they are dropped.
      *
      * @return void
      */
@@ -93,8 +83,6 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
-     * Whichever statement of the flow fails, the failure reaches the caller.
-     *
      * @param  string  $flow
      * @return void
      */
@@ -105,9 +93,7 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
-     * Whichever statement of the flow deadlocks, the failure reaches the caller
-     * with nothing it was given, and as Laravel's wrapper in a nested
-     * transaction.
+     * Laravel raises a deadlock in a nested transaction as its own wrapper.
      *
      * @param  string  $flow
      * @return void
@@ -119,9 +105,6 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
-     * Keep arguments out of a rendered response, as production does, and have a
-     * server error logged nowhere.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -143,8 +126,7 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
-     * Seed the flow, run it healthy to count its statements, then fail each in
-     * turn, seeding it again first.
+     * Counts the healthy flow's statements, then reseeds and fails each one.
      *
      * @param  string  $flow
      * @param  bool  $deadlock
@@ -198,8 +180,6 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
-     * The failure the flow ended in, failing the test if it answered instead.
-     *
      * @param  \Closure(): bool  $act
      * @param  \Tests\Fixtures\Hardening\FailsTheNthQuery  $failer
      * @param  int  $statement
@@ -217,9 +197,6 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
-     * Assert no plaintext the flow was seeded with or handed stays in what can
-     * be read off the failure, whichever statement failed.
-     *
      * @param  \Throwable  $failure
      * @param  \Tests\Fixtures\Hardening\FailsTheNthQuery  $failer
      * @return void
@@ -247,9 +224,8 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
-     * Every row of the package's tables, read directly from the connection so
-     * no statement is counted. An address's slot is left out: it is taken
-     * outside the transaction, and handed back when the attempt fails.
+     * Reads the raw PDO so no statement is counted; address slots are left out
+     * as they live outside the transaction.
      *
      * @return array<string, list<array<string, mixed>>>
      */
@@ -279,8 +255,6 @@ final class QueryFailureSweepTest extends TestCase
     }
 
     /**
-     * The storage connection.
-     *
      * @return \Illuminate\Database\Connection
      */
     private function storage(): Connection

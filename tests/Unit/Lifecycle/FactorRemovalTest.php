@@ -28,11 +28,6 @@ use Tests\Fixtures\Seams\RecordingSessionTransition;
 use Tests\TestCase;
 
 /**
- * Tests for `FactorRemoval`, the removal every entry point shares: it runs only
- * inside the identity's factor state transaction, removes a factor by its id,
- * and takes the recovery code set with the last confirmed factor and with no
- * other, reporting its removal after the factor's, only when there was a set.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -44,8 +39,6 @@ final class FactorRemovalTest extends TestCase
     use ArrangesLifecycle;
 
     /**
-     * A removal outside a transaction is refused, and removes nothing.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -68,8 +61,6 @@ final class FactorRemovalTest extends TestCase
     }
 
     /**
-     * A factor with no id is not removed.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -88,10 +79,6 @@ final class FactorRemovalTest extends TestCase
     }
 
     /**
-     * Erasing deletes the factor and its association and stops its proofs
-     * counting, with none of the rest of a removal: another factor, the
-     * recovery codes and the other sessions are left alone.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -122,8 +109,6 @@ final class FactorRemovalTest extends TestCase
     }
 
     /**
-     * Removing the last confirmed factor deletes the set and reports both.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -144,9 +129,6 @@ final class FactorRemovalTest extends TestCase
     }
 
     /**
-     * Removing a factor while another confirmed one remains leaves the set, and
-     * reports only the factor.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -171,8 +153,6 @@ final class FactorRemovalTest extends TestCase
     }
 
     /**
-     * Removing the last factor with no set reports only the factor.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -191,10 +171,8 @@ final class FactorRemovalTest extends TestCase
     }
 
     /**
-     * Unless the revoker judged the session itself, the removal goes to the
-     * session transition, told the sign-in and the factor, and what it returns
-     * is the result's; a revoker that judged it is the only judge, and its
-     * answer is the result's.
+     * A revoker that judged the session is the only judge; otherwise the
+     * session transition is.
      *
      * @return void
      *
@@ -232,8 +210,6 @@ final class FactorRemovalTest extends TestCase
     }
 
     /**
-     * The removal under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

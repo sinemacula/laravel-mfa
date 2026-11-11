@@ -29,9 +29,8 @@ use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\TestCase;
 
 /**
- * Pruning: abandoned enrolments, expired codes and used or replaced recovery
- * codes past the retention, and throttle rows whose window has ended, in
- * limited deletes that leave whatever still matters.
+ * Pruning abandoned enrolments, expired codes, spent recovery codes and ended
+ * throttle rows, in limited deletes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -53,8 +52,6 @@ final class PruningTest extends TestCase
     private const int RETENTION = 30;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -68,9 +65,8 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * An enrolment past the retention goes with its pending factor, and is
-     * reported as expired with only what its row says; one within the retention
-     * stays.
+     * It is reported as expired with only what its row says; one within the
+     * retention stays.
      *
      * @return void
      *
@@ -112,9 +108,6 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * The expiry itself is exactly the retention's edge: an enrolment that
-     * expired exactly then stays until the next run.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -130,8 +123,7 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * An enrolment whose factor was confirmed or is gone goes on its own: a
-     * confirmed factor is never touched, and nothing is reported as expired.
+     * A confirmed factor is never touched, and nothing is reported as expired.
      *
      * @return void
      *
@@ -155,9 +147,8 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * What was read before the lock is read again under it: an enrolment
-     * confirmed or removed meanwhile, or no longer past the retention, is not
-     * pruned on the old reading.
+     * An enrolment confirmed, removed or no longer past the retention meanwhile
+     * is not pruned.
      *
      * @return void
      *
@@ -196,8 +187,7 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * A model event that cancels a discard rolls that enrolment back and
-     * propagates.
+     * That enrolment's discard rolls back.
      *
      * @return void
      *
@@ -226,8 +216,7 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * A delivered code past the retention goes; one within it stays, the send
-     * caps reading it.
+     * One within it stays, since the send caps read it.
      *
      * @return void
      *
@@ -247,8 +236,7 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * A recovery code used or replaced past the retention goes; a usable one,
-     * or one used within it, stays.
+     * A usable one, or one used within the retention, stays.
      *
      * @return void
      *
@@ -273,8 +261,8 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * A throttle row whose window has ended goes whatever the retention, at its
-     * very edge included; one still counting stays.
+     * Whatever the retention, at the window's very edge included; one still
+     * counting stays.
      *
      * @return void
      *
@@ -301,8 +289,7 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * A factor's deadline is not a throttle row: pruning leaves one that has
-     * passed where it is, inert until it is overwritten or cleared.
+     * One that has passed stays inert until it is overwritten or cleared.
      *
      * @return void
      *
@@ -319,7 +306,7 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * The retention is read from the configuration on every run.
+     * Read on every run.
      *
      * @return void
      *
@@ -339,8 +326,8 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * A delete statement removes at most a thousand rows and is repeated until
-     * nothing is left, each carrying the query's conditions.
+     * At most a thousand rows per statement, repeated until none are left, each
+     * with the query's conditions.
      *
      * @return void
      *
@@ -375,8 +362,6 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * The command is registered, prunes, and prints how many of each kind went.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -403,8 +388,8 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * The pruner can be handed to the scheduler by its class name, which calls
-     * it through the container.
+     * Handed to the scheduler by class name, which calls it through the
+     * container.
      *
      * @return void
      *
@@ -423,8 +408,6 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * A time the given number of days ago.
-     *
      * @param  int  $days
      * @return \Carbon\CarbonImmutable
      */
@@ -434,8 +417,6 @@ final class PruningTest extends TestCase
     }
 
     /**
-     * A delivered code of a factor of the user's, expiring as given.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \Carbon\CarbonImmutable  $expiresAt
      * @return \SineMacula\Laravel\Mfa\Models\Code

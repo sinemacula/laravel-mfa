@@ -22,10 +22,6 @@ use Tests\Fixtures\Passkeys\FakePasskeyGateway;
 use Tests\TestCase;
 
 /**
- * The `PasskeyGateway` contract kit proves the unavailable default and a
- * gateway that verifies only against its allowlist, and rejects one that lists
- * passkeys while unavailable or verifies an empty response.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -38,8 +34,8 @@ final class PasskeyGatewayContractTest extends TestCase
     use PasskeyGatewayTests;
 
     /**
-     * The default is unavailable, lists nothing, refuses to verify counting
-     * nothing, and refuses to start a ceremony.
+     * It lists nothing, refuses to verify counting nothing, and refuses to
+     * start a ceremony.
      *
      * @return void
      */
@@ -65,8 +61,7 @@ final class PasskeyGatewayContractTest extends TestCase
     }
 
     /**
-     * An available gateway that verifies only a non-empty response against a
-     * non-empty allowlist passes the kit.
+     * Only a non-empty response against a non-empty allowlist.
      *
      * @return void
      */
@@ -80,8 +75,7 @@ final class PasskeyGatewayContractTest extends TestCase
     }
 
     /**
-     * A gateway that refuses to verify at all passes the kit, as the default
-     * does, and so does one that says why it did not.
+     * One that refuses to verify at all passes, as the default does.
      *
      * @return void
      */
@@ -94,8 +88,6 @@ final class PasskeyGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit rejects an unavailable gateway that lists passkeys.
-     *
      * @return void
      */
     public function testRejectsAnUnavailableGatewayThatListsPasskeys(): void
@@ -106,8 +98,6 @@ final class PasskeyGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gateway that verifies against an empty allowlist.
-     *
      * @return void
      */
     public function testRejectsAGatewayThatVerifiesWithoutAnAllowlist(): void
@@ -120,8 +110,6 @@ final class PasskeyGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gateway that verifies an empty response.
-     *
      * @return void
      */
     public function testRejectsAGatewayThatVerifiesAnEmptyResponse(): void
@@ -134,8 +122,6 @@ final class PasskeyGatewayContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway
      */
     #[\Override]
@@ -145,8 +131,6 @@ final class PasskeyGatewayContractTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -156,8 +140,6 @@ final class PasskeyGatewayContractTest extends TestCase
     }
 
     /**
-     * A step-up binding.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
     #[\Override]
@@ -167,8 +149,6 @@ final class PasskeyGatewayContractTest extends TestCase
     }
 
     /**
-     * A fake gateway listing one passkey and verifying it.
-     *
      * @param  bool  $available
      * @return \Tests\Fixtures\Passkeys\FakePasskeyGateway
      */

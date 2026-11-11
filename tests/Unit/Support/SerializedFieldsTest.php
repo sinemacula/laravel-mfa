@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Enums\KeyProtection;
 use SineMacula\Laravel\Mfa\Support\SerializedFields;
 
 /**
- * Unit tests for `SerializedFields`, the typed reader the values use to read
- * their serialised form back.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,6 @@ use SineMacula\Laravel\Mfa\Support\SerializedFields;
 final class SerializedFieldsTest extends TestCase
 {
     /**
-     * Each reader returns a field of its type as it is.
-     *
      * @return void
      */
     public function testEachReaderReturnsAFieldOfItsType(): void
@@ -53,8 +48,6 @@ final class SerializedFieldsTest extends TestCase
     }
 
     /**
-     * A nullable reader returns null for a missing field or a null one.
-     *
      * @return void
      */
     public function testANullableReaderReturnsNullForAMissingOrNullField(): void
@@ -71,7 +64,7 @@ final class SerializedFieldsTest extends TestCase
     }
 
     /**
-     * Only the known fields pass, whether they are present or not.
+     * Whether they are present or not.
      *
      * @return void
      */
@@ -84,8 +77,6 @@ final class SerializedFieldsTest extends TestCase
     }
 
     /**
-     * Forms that hold a field the reader does not know.
-     *
      * @return iterable<string, array{array<array-key, mixed>, string}>
      */
     public static function provideUnknownFields(): iterable
@@ -97,8 +88,7 @@ final class SerializedFieldsTest extends TestCase
     }
 
     /**
-     * A field the reader does not know is refused, so a mistyped key is never
-     * read as a missing one.
+     * So a mistyped key is never read as a missing one.
      *
      * @param  array<array-key, mixed>  $data
      * @param  string  $message
@@ -114,8 +104,6 @@ final class SerializedFieldsTest extends TestCase
     }
 
     /**
-     * Fields that are not of the type read.
-     *
      * @return iterable<string, array{callable(\SineMacula\Laravel\Mfa\Support\SerializedFields): mixed, string}>
      */
     public static function provideMistypedFields(): iterable
@@ -159,8 +147,7 @@ final class SerializedFieldsTest extends TestCase
     }
 
     /**
-     * A field that is not of the type read is refused, naming the field and
-     * what it belongs to.
+     * The message names the field and what it belongs to.
      *
      * @param  callable(\SineMacula\Laravel\Mfa\Support\SerializedFields): mixed  $read
      * @param  string  $message

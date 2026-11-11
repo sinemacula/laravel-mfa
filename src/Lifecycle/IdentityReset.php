@@ -35,37 +35,12 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
  * Resets an identity that has lost its factors, for someone else acting with a
- * reason, as one change in its factor state transaction: every lockout lifted,
- * every factor, enrolment and recovery code removed, the re-enrolment
- * obligation recorded as stated, every proof invalidated and every session
- * revoked. Who may reset whom is the application's authorisation, and needs no
- * session, so it serves a console command or a queued job as well as a request;
- * an inactive identity can be reset, and a machine, which holds no factors,
- * cannot. It bypasses the last factor policy.
+ * reason. Bypasses the last factor policy and needs no session.
  *
- * The verification generation is advanced whatever the bound `SessionRevoker`
- * does, so every proof of an earlier one stops counting, the caller's own when
- * it resets itself; it only ever goes up, by however many steps. Without an
- * authentication layer the Laravel login itself goes on, and the identity's
- * next protected request finds no proof. Delivered code rows stay, since the
- * send caps read them; with the factor gone they verify nothing.
- *
- * A reset is the remedy for a factor whose stored state cannot be read: a
- * status the package does not know, or a deadline or disabled time that is not
- * a time. Every factor of the identity is removed under the lock, whatever its
- * state. Such a factor is never read for a lift, so its deadline goes with its
- * row, and no status or confirmation is invented for it: it is reported by no
- * event of its own, and `FactorsReset` counts it.
- *
- * A verification holding the lock first commits, and its proof is then
- * invalidated here; one that waits for the lock finds its factor gone. The
- * events come once the change commits: `LockoutLifted` for each live lockout,
- * then, in id order, `FactorRemoved` for a confirmed factor and
- * `EnrollmentAbandoned` for a pending one, `RecoveryCodesRemoved` when there
- * was a set, and `FactorsReset` last, with the count of factors removed whose
- * state could not be read.
- *
- * Stateless: the seams are resolved on every call.
+ * The verification generation advances whatever the bound `SessionRevoker`
+ * does, so every earlier proof stops counting. Delivered code rows stay for the
+ * send caps. A factor whose stored state cannot be read is still removed, with
+ * no event of its own; `FactorsReset` counts it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -75,8 +50,6 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 final readonly class IdentityReset
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptService  $attempts
@@ -87,31 +60,29 @@ final readonly class IdentityReset
      */
     public function __construct(
 
-        /** The container the seams are resolved from on every call. */
+        /** Seams are resolved on every call. */
         private Container $container,
 
-        /** The configuration the factor model is read from. */
+        /** Names the configured factor model. */
         private Repository $config,
 
-        /** The lockouts and failure counts. */
+        /** Lockouts and failure counts. */
         private AttemptService $attempts,
 
-        /** The removal of each factor's own records. */
+        /** Erases each factor's own records. */
         private FactorRemoval $removal,
 
-        /** The enrolments in progress. */
+        /** Enrolments in progress. */
         private PendingEnrollments $enrollments,
 
         /** The recovery code set. */
         private RecoveryCodeService $recoveryCodes,
 
-        /** The dispatcher of the reset's events. */
+        /** Dispatches the reset's events. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Reset the identity.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  string  $reason
@@ -157,20 +128,14 @@ final readonly class IdentityReset
     }
 
     /**
-     * Determine whether the factor's stored state can be read: the summary its
-     * events carry, its status and its deadline. A factor that cannot is still
-     * removed, but never read again.
+     * Whether the factor's summary, status and deadline can be read.
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return bool
      */
     private static function isReadable(EloquentFactor&Model $factor): bool
     {
-        // A value that cannot be read throws the trait's InvalidModelException,
-        // a datetime cast's InvalidFormatException or an enum cast's
-        // ValueError; static analysis traces neither of the last two through
-        // the model, nor the first through the summary, so the catches are
-        // marked.
+        // PHPStan cannot trace these through the model's casts.
         try {
             FactorSummary::fromFactor($factor);
             $factor->getLockedUntil();
@@ -185,9 +150,8 @@ final readonly class IdentityReset
     }
 
     /**
-     * Lift every lockout of the factors whose state can be read, then the
-     * identity's, and clear its run of failures. A factor whose state cannot be
-     * read is not read for a lift: its deadline goes with its row.
+     * Only readable factors are lifted; an unreadable one's deadline goes with
+     * its row.
      *
      * @formatter:off
      *
@@ -212,9 +176,7 @@ final readonly class IdentityReset
     }
 
     /**
-     * Remove every factor and enrolment of the identity's, reporting each
-     * factor whose state can be read by how far it got, and nothing for the
-     * others.
+     * Only readable factors are reported.
      *
      * @formatter:off
      *

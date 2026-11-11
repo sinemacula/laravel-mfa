@@ -14,9 +14,6 @@ use SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException;
 use Tests\Fixtures\Codes\CodeMessages;
 
 /**
- * Unit tests for the default senders: each sends nothing and throws, naming the
- * contract the application must bind.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -27,8 +24,6 @@ use Tests\Fixtures\Codes\CodeMessages;
 final class NullSendersTest extends TestCase
 {
     /**
-     * The default SMS sender refuses, naming `SmsSender`.
-     *
      * @return void
      */
     public function testTheSmsSenderRefusesNamingItsContract(): void
@@ -40,8 +35,6 @@ final class NullSendersTest extends TestCase
     }
 
     /**
-     * The default email sender refuses, naming `EmailSender`.
-     *
      * @return void
      */
     public function testTheEmailSenderRefusesNamingItsContract(): void

@@ -12,10 +12,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\TestCase;
 
 /**
- * Unit tests for `IdentityStateRow`: the owner's row in the identity states
- * table, matched on both owner columns, on the connection given or on the
- * storage connection.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -25,9 +21,6 @@ use Tests\TestCase;
 final class IdentityStateRowTest extends TestCase
 {
     /**
-     * The query names the identity states table and matches the owner's type
-     * and key.
-     *
      * @return void
      */
     public function testMatchesTheOwnersTypeAndKey(): void
@@ -43,9 +36,6 @@ final class IdentityStateRowTest extends TestCase
     }
 
     /**
-     * Locking creates the owner's row when it has none, and touches the row
-     * that is there without adding one, leaving every other owner's alone.
-     *
      * @return void
      */
     public function testLockingCreatesTheRowOnceAndTouchesIt(): void
@@ -80,9 +70,6 @@ final class IdentityStateRowTest extends TestCase
     }
 
     /**
-     * Without a connection the query runs on the storage connection; with one
-     * it runs on the one given.
-     *
      * @return void
      */
     public function testRunsOnTheStorageConnectionUnlessGivenOne(): void

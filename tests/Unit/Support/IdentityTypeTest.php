@@ -12,9 +12,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `IdentityType`: an Eloquent identity's type is its morph class, and
- * any other identity's its class name.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +21,7 @@ use Tests\TestCase;
 final class IdentityTypeTest extends TestCase
 {
     /**
-     * An Eloquent identity is recorded under its morph class, so a morph map is
-     * honoured.
+     * So a morph map is honoured.
      *
      * @return void
      */
@@ -43,8 +39,6 @@ final class IdentityTypeTest extends TestCase
     }
 
     /**
-     * Any other identity is recorded under its class name.
-     *
      * @return void
      */
     public function testAnyOtherIdentityIsItsClassName(): void

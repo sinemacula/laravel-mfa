@@ -23,11 +23,6 @@ use SineMacula\Laravel\Mfa\Requirements\ConfiguredRequirementPolicy;
 use Tests\TestCase;
 
 /**
- * Integration test for the service provider's container bindings.
- *
- * Asserts every contract the provider binds resolves to the shipped default,
- * and the middleware aliases are registered on the router.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -37,9 +32,6 @@ use Tests\TestCase;
 final class ServiceProviderBindingsTest extends TestCase
 {
     /**
-     * The `'mfa'` alias must resolve to the same `MfaManager` instance every
-     * time — the manager is registered as a singleton.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -54,10 +46,6 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `RequirementPolicy` contract must resolve
-     * to the shipped `ConfiguredRequirementPolicy`, which reads the
-     * application's configured mode.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -70,9 +58,6 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `FreshnessGate` contract must resolve to
-     * the shipped `ConfiguredFreshnessGate`, which reads the proof store.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -85,9 +70,6 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `ProofStore` contract must resolve to the
-     * session-backed default.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -100,9 +82,6 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * Without a consumer override the `SmsSender` and `EmailSender` contracts
-     * must resolve to the loud-failing null defaults.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -114,9 +93,6 @@ final class ServiceProviderBindingsTest extends TestCase
     }
 
     /**
-     * The provider must register the `'mfa'` and `'mfa.exempt'` middleware
-     * aliases against the router.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

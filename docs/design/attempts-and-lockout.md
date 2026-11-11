@@ -14,8 +14,8 @@ separate operations, and all are described here.
   own pending or active session made it, the identity's factor (or none, for a recovery code), the purpose, the
   request's address as resolved through the trusted proxies (`$request->ip()`) and the application. The caller checks
   the session and the factor's owner first: `VerificationService::verify()` finds a factor only among the current
-  identity's own, and answers any other id as `not_found` before anything is counted, so nobody is charged
-  for an attempt someone else made.
+  identity's own, and answers any other id as `not_found` before anything is counted, so nobody is charged for an
+  attempt someone else made.
 - Confirming an enrolment is not one of these attempts: it takes an IP address slot, and counts a wrong or replayed code
   against the enrolment's own cap, never the factor's or the identity's run (see [Enrolment](enrollment.md)). A live
   lockout of the identity still refuses it, a start and a resend.
@@ -116,9 +116,8 @@ separate operations, and all are described here.
   the factors as stored under the lock. The service reads the identity's state, finds the attempted factor among the
   locked ones, reads its lockout off that row, and refuses the attempt while a lockout applies.
 - Otherwise it runs the verification inside the transaction, so a driver's own change (a TOTP step) commits with the
-  count, and counts the
-  outcome on the locked rows: a success resets as above; a failure records the identity's window, in one
-  upsert, and its run, then the factor's failures in a row, its lockout or its disablement.
+  count, and counts the outcome on the locked rows: a success resets as above; a failure records the identity's window,
+  in one upsert, and its run, then the factor's failures in a row, its lockout or its disablement.
 - The identity's state row is read `FOR UPDATE`, a lock the transaction already holds, and the factors come from the
   transaction's own locking read, so a lockout of either committed while the attempt waited is never answered from an
   older snapshot. The rate windows are read with plain reads: a locking read of a missing key would take a gap lock on

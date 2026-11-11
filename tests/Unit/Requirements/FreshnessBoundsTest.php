@@ -11,10 +11,6 @@ use SineMacula\Laravel\Mfa\Requirements\FreshnessBounds;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * Tests for `FreshnessBounds`: a step-up's requirement gives every part a
- * maximum age of at most a day, and one that does not is refused naming the
- * subject and the first part at fault.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +20,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 final class FreshnessBoundsTest extends TestCase
 {
     /**
-     * A requirement whose every part is bounded, the empty one included, is
-     * returned as it is.
+     * The empty requirement included.
      *
      * @return void
      */
@@ -39,8 +34,7 @@ final class FreshnessBoundsTest extends TestCase
     }
 
     /**
-     * A part with no maximum age, or one longer than a day, is refused, named
-     * after the subject.
+     * No maximum age, or one longer than a day; the error names the subject.
      *
      * @return void
      */

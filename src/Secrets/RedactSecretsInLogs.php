@@ -8,19 +8,9 @@ use Illuminate\Log\Logger;
 use Monolog\Logger as Monolog;
 
 /**
- * A log channel tap that makes the `RedactSecrets` processor the last one the
- * channel's Monolog logger runs, so it sees everything the other processors
- * add, those listed in the channel's `processors` included. Monolog runs the
- * processor pushed last first, so the tap takes every processor off, pushes one
- * `RedactSecrets`, and pushes the others back in their order. A channel that
- * has the processor already, such as a stack built from tapped channels, keeps
- * one, moved to the end. A channel whose logger is not a Monolog logger is left
- * as it is.
- *
- * The package adds it to the `tap` list of every channel in `logging.channels`
- * when it boots, and applies it to every channel resolved before then, unless
- * `mfa.secrets.redact` is off; list it in a channel's `tap` yourself to cover a
- * channel configured later.
+ * Log channel tap that makes `RedactSecrets` the last processor to run, so it
+ * sees what the others add. Monolog runs the last-pushed processor first, so it
+ * is pushed before the rest. List it in `tap` for channels configured later.
  *
  * @api
  *
@@ -30,8 +20,6 @@ use Monolog\Logger as Monolog;
 final class RedactSecretsInLogs
 {
     /**
-     * Make the processor the last one the channel's logger runs.
-     *
      * @param  \Illuminate\Log\Logger  $logger
      * @return void
      */

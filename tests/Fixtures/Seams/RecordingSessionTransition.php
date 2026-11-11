@@ -8,8 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 
 /**
- * A session transition that records each change it is asked to judge the
- * session again after, and returns the completion it is given.
+ * Records each change it is asked to judge and returns the completion it is
+ * given.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,23 +18,19 @@ use SineMacula\Laravel\Mfa\Requirements\SessionChange;
  */
 final class RecordingSessionTransition implements SessionTransition
 {
-    /** @var list<\SineMacula\Laravel\Mfa\Requirements\SessionChange> Each change judged, in order. */
+    /** @var list<\SineMacula\Laravel\Mfa\Requirements\SessionChange> */
     public array $changes = [];
 
     /**
-     * Constructor.
-     *
      * @param  ?object  $completion
      */
     public function __construct(
 
-        /** What each judgement returns for the caller. */
+        /** Returned to the caller of each judgement. */
         private readonly ?object $completion = null,
     ) {}
 
     /**
-     * Record the change, and return the completion.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\SessionChange  $change
      * @return ?object
      */
@@ -47,7 +43,7 @@ final class RecordingSessionTransition implements SessionTransition
     }
 
     /**
-     * The changes judged that the package found the session short after.
+     * The changes after which the session fell short.
      *
      * @return list<\SineMacula\Laravel\Mfa\Requirements\SessionChange>
      */

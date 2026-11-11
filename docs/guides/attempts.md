@@ -50,10 +50,10 @@ disables the factor.
 
 Three things never reset a count or lift a lockout:
 
-- **Sending or resending a code.** Only a success does, so a resend endpoint is never a free unlock.
-- **A refused attempt.** It reaches no driver and is counted nowhere, so hammering a locked factor, identity or address
+- Sending or resending a code: only a success does, so a resend endpoint is never a free unlock.
+- A refused attempt: it reaches no driver and is counted nowhere, so hammering a locked factor, identity or address
   does not extend its lockout.
-- **A success of another factor.** It resets the counts of the factor proved and the identity's run, and enables the
+- A success of another factor: it resets the counts of the factor proved and the identity's run, and enables the
   identity's factors the failure ceiling disabled; it resets no other factor's count and lifts no lockout or throttle.
   A factor enabled this way keeps its failures in a row, so its next failure disables it again. An application claiming
   an assurance level needs more than this (see [Failure ceiling](compliance.md#failure-ceiling)).
@@ -61,9 +61,9 @@ Three things never reset a count or lift a lockout:
 ## Who is charged
 
 An attempt is charged to the identity whose own pending or active session made it, and only one of that identity's
-factors can be attempted: `Mfa::verify()` looks the factor up within the caller's identity, so another
-identity's is not found, before anything is counted. Nobody can
-lock an identity out with requests of their own. The IP address is charged whoever is signed in.
+factors can be attempted: `Mfa::verify()` looks the factor up within the caller's identity, so another identity's is not
+found, before anything is counted. Nobody can lock an identity out with requests of their own. The IP address is charged
+whoever is signed in.
 
 ## Parallel guesses
 

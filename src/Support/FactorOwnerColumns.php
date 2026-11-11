@@ -8,14 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 
 /**
- * The columns a factor model records its owner in: the owner's type and its
- * key.
- *
- * They are read from the owner relation of a blank instance of the factor's
- * class, never of the factor itself: on a stored factor, Eloquent builds the
- * relation from an instance of the stored owner's class, which an owner that is
- * not an Eloquent model (or whose class no longer exists) cannot be, and the
- * columns do not depend on it.
+ * A factor model's owner columns, read from a blank instance, since a stored
+ * factor's relation needs the owner's class, which may not be a model or exist.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,9 +24,6 @@ final class FactorOwnerColumns
     private function __construct() {}
 
     /**
-     * The owner's type column and key column of the factor's model, in that
-     * order.
-     *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return array{0: string, 1: string}
      */
@@ -44,9 +35,7 @@ final class FactorOwnerColumns
     }
 
     /**
-     * Whether the factor's owner columns hold exactly the owner's type and key:
-     * a database's collation may match another owner's too, differing only in
-     * case.
+     * Exact, as a collation may match another owner differing only in case.
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  string  $type

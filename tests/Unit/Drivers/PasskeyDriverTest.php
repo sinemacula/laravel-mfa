@@ -14,10 +14,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Factors\InMemoryFactor;
 
 /**
- * Unit tests for `PasskeyDriver`: a passkey travels on a passkey channel,
- * claims no `amr` value of its own, has no secret, and is never confirmed or
- * proved by a code.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -27,8 +23,6 @@ use Tests\Fixtures\Factors\InMemoryFactor;
 final class PasskeyDriverTest extends TestCase
 {
     /**
-     * The driver's answers.
-     *
      * @return void
      */
     public function testStatesItsChannelAndRefusesEveryCode(): void

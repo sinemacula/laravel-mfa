@@ -20,11 +20,6 @@ use Tests\TestCase;
 use Tests\Unit\Concerns\BuildsProofs;
 
 /**
- * Tests for `ProofService`: the current identity's proofs are read through the
- * bound store on the current application, and a proof is recorded bound to the
- * identity's current sign-in and verification generation, or not at all without
- * a sign-in.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -36,8 +31,6 @@ final class ProofServiceTest extends TestCase
     use BuildsProofs, RefreshDatabase;
 
     /**
-     * Tear down Mockery expectations between test cases.
-     *
      * @return void
      */
     #[\Override]
@@ -49,7 +42,7 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * A guest has no proofs, and the store is not asked.
+     * The store is not asked.
      *
      * @return void
      *
@@ -68,9 +61,6 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * The current identity's proofs are the store's, on the current
-     * application.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -92,8 +82,7 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * An identity with no sign-in on the application has no proofs, and the
-     * store is not asked for any.
+     * The store is not asked for any.
      *
      * @return void
      *
@@ -115,8 +104,7 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * A sign-in replaced between reading which one is current and reading its
-     * proofs lends its successor's proofs to neither read.
+     * Replaced between reading which sign-in is current and reading its proofs.
      *
      * @return void
      *
@@ -144,8 +132,7 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * Beginning a sign-in begins it on the application under a fresh id, and
-     * ending it forgets only that application's.
+     * Begun under a fresh id; ending it forgets only that application's.
      *
      * @return void
      *
@@ -172,8 +159,6 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * Forgetting a factor stops its proofs counting through the store.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -193,8 +178,6 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * Resolve the proof service from the container.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -205,8 +188,7 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * An additional factor proof of the user, made a minute ago on the sign-in
-     * of the `web` application.
+     * Made a minute ago on the `web` sign-in.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $session
@@ -226,8 +208,6 @@ final class ProofServiceTest extends TestCase
     }
 
     /**
-     * A test user, never saved.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function user(): TestUser

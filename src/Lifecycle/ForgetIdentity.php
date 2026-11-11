@@ -19,18 +19,9 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
- * Deletes everything the package holds for a deleted identity: its factors,
- * enrolments in progress, delivered codes, recovery codes, passkey associations
- * and factor state.
- *
- * The `HasFactors` trait calls it once an Eloquent identity's row is deleted;
- * an application whose identities are not Eloquent models calls
- * `Mfa::forgetIdentity()`, after deleting the identity. It runs in the
- * identity's factor state transaction (see `Support\FactorStateTransaction`),
- * so nothing is left half deleted and a change already holding the identity's
- * lock commits first and is deleted with the rest; called inside a transaction
- * on the storage connection, it joins it. The temporary throttles are left to
- * expire: they are keyed by a hash and hold nothing that names the identity.
+ * Deletes everything the package holds for a deleted identity, under its factor
+ * state lock so a change already holding it commits first and is deleted too.
+ * Throttles are left to expire: they are keyed by a hash and name no identity.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -40,19 +31,15 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
 final readonly class ForgetIdentity
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      */
     public function __construct(
 
-        /** The configuration the models are read from. */
+        /** Names the configured factor and recovery code models. */
         private Repository $config,
     ) {}
 
     /**
-     * Delete everything the package holds for the identity.
-     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return void
      *
@@ -65,7 +52,7 @@ final readonly class ForgetIdentity
 
         $type = IdentityType::of($identity);
 
-        /** @var int|string $key Refused by the transaction when it is anything else. */
+        /** @var int|string $key The transaction refuses any other type. */
         $key = $identity->getAuthIdentifier();
 
         FactorStateTransaction::forIdentity($identity, new $factorModel, static function () use ($factorModel, $recoveryCodeModel, $type, $key): void {
@@ -77,10 +64,8 @@ final readonly class ForgetIdentity
     }
 
     /**
-     * The model's records owned by the identity, found by its owner columns:
-     * those of its owner relation for a factor or recovery code model, which an
-     * application's own model may name differently, and the package's own
-     * otherwise.
+     * Records owned by the identity; an application's factor or recovery code
+     * model may name its owner columns differently, so its relation names them.
      *
      * @param  \Illuminate\Database\Eloquent\Model  $model
      * @param  string  $type

@@ -23,8 +23,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 final readonly class AcceptingChallengeGateway implements ChallengeGateway
 {
     /**
-     * A challenge id, with nothing sent.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -37,8 +35,6 @@ final readonly class AcceptingChallengeGateway implements ChallengeGateway
     }
 
     /**
-     * Accept the code, whatever it is.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding

@@ -10,10 +10,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeNormalizer;
 
 /**
- * Unit tests for `RecoveryCodeNormalizer`: ASCII case folded, ASCII whitespace
- * and hyphens removed, nothing else mapped, no check of the configured length
- * or alphabet, and input too long to be a code malformed.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +19,6 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeNormalizer;
 final class RecoveryCodeNormalizerTest extends TestCase
 {
     /**
-     * Inputs and what they normalise to.
-     *
      * @return iterable<string, array{string, string}>
      */
     public static function inputs(): iterable
@@ -43,8 +37,6 @@ final class RecoveryCodeNormalizerTest extends TestCase
     }
 
     /**
-     * Each input normalises as expected.
-     *
      * @param  string  $input
      * @param  string  $normalized
      * @return void
@@ -56,8 +48,8 @@ final class RecoveryCodeNormalizerTest extends TestCase
     }
 
     /**
-     * Input of up to 256 bytes is normalised, whatever it reduces to; longer
-     * input is malformed, even when it would reduce to a code.
+     * Even when it would reduce to a code; up to 256 bytes is normalised
+     * whatever it reduces to.
      *
      * @return void
      */
@@ -71,8 +63,7 @@ final class RecoveryCodeNormalizerTest extends TestCase
     }
 
     /**
-     * A normalised code of up to 64 characters, the longest a code can be, is
-     * kept; a longer one is malformed.
+     * 64 characters, the longest a code can be, is kept.
      *
      * @return void
      */

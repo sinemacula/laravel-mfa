@@ -11,16 +11,8 @@ use PhpBench\Attributes\Iterations;
 use PhpBench\Attributes\Revs;
 
 /**
- * A whole verification through `Mfa::verify()`, hit and miss, for a TOTP code,
- * a delivered code and a recovery code: the statements, the locks and the
- * evaluation that the database-free benches leave out, on the statements the
- * query budgets count for each branch, in an address's first window for a TOTP
- * or a recovery code and in the window its send began for a delivered code.
- *
- * The results are measurements on in-memory SQLite with bcrypt at its cheapest
- * cost, with the application booted and the path warmed outside the timing;
- * they are not the package's isolated overhead, and a real database and hashing
- * cost dominate them.
+ * Whole verifications on in-memory SQLite and the cheapest bcrypt cost; a real
+ * database and hashing cost dominate, so these are not isolated overhead.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,12 +22,10 @@ use PhpBench\Attributes\Revs;
 #[Revs(1)]
 final class VerificationBench
 {
-    /** @var ?\Benchmarks\Support\VerificationBenchHarness The branch arranged for the subject. */
+    /** @var ?\Benchmarks\Support\VerificationBenchHarness */
     private ?VerificationBenchHarness $harness = null;
 
     /**
-     * Arrange an accepted TOTP code.
-     *
      * @return void
      */
     public function arrangeTotpHit(): void
@@ -44,8 +34,6 @@ final class VerificationBench
     }
 
     /**
-     * Arrange a wrong TOTP code.
-     *
      * @return void
      */
     public function arrangeTotpMiss(): void
@@ -54,8 +42,6 @@ final class VerificationBench
     }
 
     /**
-     * Arrange an accepted delivered code.
-     *
      * @return void
      */
     public function arrangeCodeHit(): void
@@ -64,8 +50,6 @@ final class VerificationBench
     }
 
     /**
-     * Arrange a wrong delivered code.
-     *
      * @return void
      */
     public function arrangeCodeMiss(): void
@@ -74,8 +58,6 @@ final class VerificationBench
     }
 
     /**
-     * Arrange an accepted recovery code.
-     *
      * @return void
      */
     public function arrangeRecoveryCodeHit(): void
@@ -84,8 +66,6 @@ final class VerificationBench
     }
 
     /**
-     * Arrange a wrong recovery code.
-     *
      * @return void
      */
     public function arrangeRecoveryCodeMiss(): void
@@ -104,8 +84,6 @@ final class VerificationBench
     }
 
     /**
-     * Measure an accepted TOTP code.
-     *
      * @return void
      */
     #[BeforeMethods('arrangeTotpHit')]
@@ -115,8 +93,6 @@ final class VerificationBench
     }
 
     /**
-     * Measure a wrong TOTP code.
-     *
      * @return void
      */
     #[BeforeMethods('arrangeTotpMiss')]
@@ -126,8 +102,6 @@ final class VerificationBench
     }
 
     /**
-     * Measure an accepted delivered code.
-     *
      * @return void
      */
     #[BeforeMethods('arrangeCodeHit')]
@@ -137,8 +111,6 @@ final class VerificationBench
     }
 
     /**
-     * Measure a wrong delivered code.
-     *
      * @return void
      */
     #[BeforeMethods('arrangeCodeMiss')]
@@ -148,7 +120,7 @@ final class VerificationBench
     }
 
     /**
-     * Measure an accepted recovery code, which checks the whole set.
+     * Checks the whole set.
      *
      * @return void
      */
@@ -159,7 +131,7 @@ final class VerificationBench
     }
 
     /**
-     * Measure a wrong recovery code, which checks the whole set.
+     * Checks the whole set.
      *
      * @return void
      */
@@ -170,8 +142,6 @@ final class VerificationBench
     }
 
     /**
-     * The branch arranged for the subject.
-     *
      * @return \Benchmarks\Support\VerificationBenchHarness
      *
      * @throws \LogicException

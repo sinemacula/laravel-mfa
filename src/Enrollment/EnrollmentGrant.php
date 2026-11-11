@@ -7,9 +7,8 @@ namespace SineMacula\Laravel\Mfa\Enrollment;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * An enrolment grant: an opaque 256-bit random token, returned once as a secret
- * for the response, of which only the SHA-256 digest is stored. A token this
- * long needs no salt or key, as there is nothing to guess against.
+ * Opaque 256-bit enrolment grant; only its SHA-256 digest is stored, which
+ * needs no key at that length.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,17 +17,15 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
  */
 final class EnrollmentGrant
 {
-    /** @var int How many random bytes a grant is drawn from. */
+    /** @var int Grant length, in bytes. */
     private const int BYTES = 32;
 
     /**
-     * Disallow instantiation; utility container only.
+     * Disallow instantiation.
      */
     private function __construct() {}
 
     /**
-     * Draw a new grant.
-     *
      * @return \SineMacula\Laravel\Mfa\Secrets\RevealedSecret
      *
      * @throws \Random\RandomException
@@ -39,9 +36,6 @@ final class EnrollmentGrant
     }
 
     /**
-     * The digest a grant is stored and looked up under, as 64 hexadecimal
-     * characters.
-     *
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
      * @return string
      */

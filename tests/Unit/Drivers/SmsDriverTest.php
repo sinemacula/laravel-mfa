@@ -13,9 +13,6 @@ use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Factors\InMemoryFactor;
 
 /**
- * Unit tests for `SmsDriver`: its channel, and the message it delivers each
- * code in through the bound `SmsSender`.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -28,8 +25,6 @@ final class SmsDriverTest extends TestCase
     private const string PHONE = '+447700900123';
 
     /**
-     * An SMS factor travels by SMS and adds `sms`.
-     *
      * @return void
      */
     public function testTheDriverStatesItsChannel(): void
@@ -41,8 +36,7 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * A phone number loses its spaces, dashes and parentheses, and what is not
-     * in E.164 once they are gone is refused: no country code is assumed.
+     * No country code is assumed.
      *
      * @return void
      */
@@ -60,8 +54,6 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * The message goes to the SMS sender as it was built.
-     *
      * @return void
      */
     public function testTheMessageIsHandedToTheSender(): void
@@ -75,8 +67,6 @@ final class SmsDriverTest extends TestCase
     }
 
     /**
-     * An SMS factor.
-     *
      * @return \Tests\Fixtures\Factors\InMemoryFactor
      */
     private static function factor(): InMemoryFactor

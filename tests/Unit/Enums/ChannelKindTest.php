@@ -9,9 +9,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 
 /**
- * Unit tests for the `ChannelKind` enum: its stable values, which kinds name a
- * destination or credential, and which carry an enrolled factor.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -21,7 +18,7 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 final class ChannelKindTest extends TestCase
 {
     /**
-     * The channel kinds, in order, each case name with its stable value.
+     * Pinned so a rename fails.
      *
      * @return void
      */
@@ -39,8 +36,7 @@ final class ChannelKindTest extends TestCase
     }
 
     /**
-     * Every kind but a password and an unknown channel names a destination or a
-     * credential.
+     * Every kind but a password and an unknown channel.
      *
      * @return void
      */
@@ -58,8 +54,8 @@ final class ChannelKindTest extends TestCase
     }
 
     /**
-     * An enrolled factor travels on every kind but a password and an unknown
-     * channel, which belong to first factors only.
+     * Every kind but a password and an unknown channel, which belong to first
+     * factors only.
      *
      * @return void
      */

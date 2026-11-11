@@ -22,29 +22,9 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Requirements\FactorChanges;
 
 /**
- * Whether a caller may add a factor of a type now, asked under the identity's
- * factor state lock with its factors as stored there, and how long that answer
- * lasts.
- *
- * On an active session the application must enable the type, and the bound
- * `Contracts\FactorChangeGate` must authorise the change from the session's
- * sign-in: an identity with a confirmed factor adding a further one
- * (`mfa.add_factor`), by default on a fresh step-up, and one with none
- * enrolling its first additional factor (`mfa.add_first_additional_factor`), by
- * default on its first factor proved again through the bound `Reauthenticator`.
- * The grant lasts as long as the authorisation. A pending session is exempt
- * only on the bootstrap path, which lasts as long as it does: its credential
- * allows the action, the application enables bootstrap for the type, and the
- * identity has no confirmed factor. Then the application's limits apply to the
- * factors enrolled through it: confirmed ones of the type, and confirmed ones
- * in all.
- *
- * Confirming an enrolment asks `reconfirm()` under the lock instead: the limits
- * again, and what the grant's authority rested on. Freshness is not judged
- * again, since a later proof must not stand in for the one that authorised the
- * grant: its lifetime already ends with that one.
- *
- * A refusal throws an `OperationRefusedException` carrying the reason.
+ * Whether a caller may add a factor of a type, asked under the identity's
+ * factor lock. An active session goes through `Contracts\FactorChangeGate`; a
+ * pending session only through bootstrap. Refusals throw.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -54,28 +34,23 @@ use SineMacula\Laravel\Mfa\Requirements\FactorChanges;
 final readonly class EnrollmentAuthority
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      */
     public function __construct(
 
-        /** The container the seams are resolved from on every call. */
+        /** Resolves seams on every call. */
         private Container $container,
 
-        /** The configuration the applications are read from on every call. */
+        /** Read on every call. */
         private Repository $config,
 
-        /** The resolver of the caller's session. */
+        /** Caller resolver. */
         private CallerContextResolver $callers,
     ) {}
 
     /**
-     * Refuse unless the caller may add a factor of the type on the application
-     * now, and say what authorised it and until when.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -111,11 +86,8 @@ final readonly class EnrollmentAuthority
     }
 
     /**
-     * Refuse a factor beyond the application's limits on confirmed factors
-     * enrolled through it, of the type and in all, and refuse a grant whose
-     * authority no longer holds: a bootstrap grant while bootstrap no longer
-     * allows the type or the identity has a confirmed factor, and a
-     * reauthentication grant while it has one.
+     * Recheck at confirmation. Freshness is not judged again, so a later proof
+     * cannot stand in for the one that authorised the grant.
      *
      * @formatter:off
      *
@@ -148,9 +120,6 @@ final readonly class EnrollmentAuthority
     }
 
     /**
-     * Refuse a factor beyond the application's limits on confirmed factors
-     * enrolled through it: of the type, and in all.
-     *
      * @formatter:off
      *
      * @param  string  $application
@@ -178,8 +147,6 @@ final readonly class EnrollmentAuthority
     }
 
     /**
-     * The confirmed factors among those given.
-     *
      * @formatter:off
      *
      * @param  \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
@@ -193,9 +160,6 @@ final readonly class EnrollmentAuthority
     }
 
     /**
-     * Refuse a pending session unless it is on the bootstrap path for the type;
-     * the grant lasts as long as the pending session does.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $settings
      * @param  string  $type
@@ -220,10 +184,6 @@ final readonly class EnrollmentAuthority
     }
 
     /**
-     * Refuse an identity with a confirmed factor, which must verify rather than
-     * enrol whatever the application allows, then unless the application allows
-     * bootstrap for the type.
-     *
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $settings
      * @param  string  $type
      * @param  bool  $none
@@ -250,12 +210,6 @@ final readonly class EnrollmentAuthority
     }
 
     /**
-     * Refuse an active session a type the application does not enable, then
-     * authorise it through the bound factor change gate: as the identity's
-     * first additional factor, resting on its first factor proved again, or as
-     * a further one, resting on a step-up. The grant lasts as long as the
-     * gate's authorisation.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller

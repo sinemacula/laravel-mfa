@@ -79,8 +79,8 @@ a pending session nothing, and "not read" takes no account of one.
 | `requestAssertion($caller, $factorId, $purpose)` | `AssertionRequest`   | The caller | `mfa.verify`         |
 | `verify($caller, $submission, $purpose)`         | `VerificationResult` | The caller | `mfa.verify`         |
 
-A recovery code goes through `Mfa::verify($caller, Submission::recoveryCode($code))`, on the one verification path and purpose
-rule: there is no separate helper to redeem one.
+A recovery code goes through `Mfa::verify($caller, Submission::recoveryCode($code))`, on the one verification path and
+purpose rule: there is no separate helper to redeem one.
 
 ### Enrolment
 

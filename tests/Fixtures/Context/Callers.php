@@ -10,10 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * The caller of the request a test is serving, as an application's controller
- * builds it: `CallerContext::fromRequest()` over the request bound in the
- * container, so the guard the test signed in on and a pending session it put on
- * the request are read the way a real request's are.
+ * Callers built as an application's controller builds them, from the request
+ * bound in the container.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,9 +26,6 @@ final class Callers
     private function __construct() {}
 
     /**
-     * The caller of the request being served, through the guard named or the
-     * default one.
-     *
      * @param  ?string  $guard
      * @return \SineMacula\Laravel\Mfa\Context\CallerContext
      *
@@ -44,10 +39,8 @@ final class Callers
     }
 
     /**
-     * The caller an authentication layer builds for the identity on the
-     * application: the request's own, pending or active, when it is that
-     * identity on that application, and otherwise the identity on an active
-     * session there.
+     * The request's own caller when it is this identity on this application,
+     * otherwise the identity on an active session there.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

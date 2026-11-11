@@ -6,9 +6,7 @@ namespace SineMacula\Laravel\Mfa\Enums;
 
 /**
  * What a failed attempt is counted against, and so what a lockout or throttle
- * refuses: one factor, the identity across all its factors and recovery codes,
- * or the IP address the request came from. The values name the scope of each
- * row of the attempts table.
+ * refuses. The values are stored in the attempts table.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

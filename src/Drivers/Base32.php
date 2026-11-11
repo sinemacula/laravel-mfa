@@ -5,13 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Drivers;
 
 /**
- * Base32 (RFC 4648 §6) as authenticator apps exchange TOTP secrets: the
- * alphabet `A` to `Z` and `2` to `7`, written upper case and without padding,
- * which is what the `otpauth://` key URI format expects.
- *
- * Decoding accepts lower case and trailing `=` padding, so a secret written
- * either way reads the same, and refuses anything else, returning `null` rather
- * than guessing at what was meant.
+ * Base32 (RFC 4648 section 6), unpadded upper case as `otpauth://` URIs expect.
+ * Decoding also accepts lower case and `=` padding.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,7 +15,7 @@ namespace SineMacula\Laravel\Mfa\Drivers;
  */
 final class Base32
 {
-    /** @var string The 32 characters, in the order of the values they stand for. */
+    /** @var string The 32 characters, in value order. */
     public const string ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
     /**
@@ -29,8 +24,6 @@ final class Base32
     private function __construct() {}
 
     /**
-     * Encode the bytes, upper case and without padding.
-     *
      * @param  string  $bytes
      * @return string
      */
@@ -52,9 +45,8 @@ final class Base32
     }
 
     /**
-     * Decode the text, or return `null` when it holds a character outside the
-     * alphabet. Bits left over after the last whole byte are dropped, as RFC
-     * 4648 does.
+     * Null for a character outside the alphabet. Bits after the last whole byte
+     * are dropped, as RFC 4648 does.
      *
      * @param  string  $encoded
      * @return ?string

@@ -27,30 +27,11 @@ use SineMacula\Laravel\Mfa\Requirements\SessionJudgement;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 
 /**
- * Removes one of an identity's factors as one serialised change, inside the
- * identity's factor state transaction, once `RemovalGuard` has allowed it under
- * the same lock. Every entry point shares it, so an application's own removal
- * and a passkey's gate behave alike.
+ * Removes a factor inside the identity's factor state transaction. Every row
+ * changes before a session seam runs, and events go out only after.
  *
- * In order: the factor and its passkey association are deleted; every proof
- * made with it stops counting, the current session's at once; with the last
- * confirmed factor the recovery code set goes; the identity's other sessions
- * are revoked through the bound `SessionRevoker`, told the factor and the
- * sign-in the removal is made from; the current session's requirement is
- * evaluated again on the proofs it still holds, and the removal goes to the
- * bound `SessionTransition` with any shortfall, unless the revoker judged the
- * session again itself; with that security work done `FactorRemoved` is queued,
- * then the recovery code set's removal is reported after it. So every package
- * row has changed before a session seam runs, in the lock order every change
- * shares, and the default revoker's kept proofs are recorded again before any
- * listener runs.
- *
- * A failure rolls the caller's whole change back. The proofs already forgotten
- * on the current session stay forgotten, which leaves it to verify again; they
- * are never restored, as that could undo a later invalidation. Nothing is
- * promoted when the preferred factor goes: that is the person's choice to make.
- *
- * `erase()` is what a reset does for each factor, with none of the rest.
+ * Proofs forgotten on the current session stay forgotten on rollback, since
+ * restoring them could undo a later invalidation.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -60,8 +41,6 @@ use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 final readonly class FactorRemoval
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations  $associations
      * @param  \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService  $recoveryCodes
@@ -70,27 +49,24 @@ final readonly class FactorRemoval
      */
     public function __construct(
 
-        /** The container the seams are resolved from on every call. */
+        /** Seams are resolved on every call. */
         private Container $container,
 
-        /** The passkey association records. */
+        /** Passkey association records. */
         private PasskeyAssociations $associations,
 
-        /** The recovery codes removed with the last confirmed factor. */
+        /** Removed with the last confirmed factor. */
         private RecoveryCodeService $recoveryCodes,
 
-        /** The proofs the removed factor made, which stop counting. */
+        /** Proofs made with the factor stop counting. */
         private ProofService $proofs,
 
-        /** The dispatcher of the removal's event. */
+        /** Dispatches the removal's event. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Remove the factor, as stored under the identity's lock, from the
-     * identity, acting on the application from the sign-in, and say how it
-     * ended: with the requirement the session no longer meets, if any, and what
-     * the bound revoker, or else the bound transition, returned for the caller.
+     * The factor must be as stored under the identity's lock.
      *
      * @formatter:off
      *
@@ -128,8 +104,7 @@ final readonly class FactorRemoval
         $setRemoved = !$factors->contains(static fn (EloquentFactor&Model $other): bool => LockedFactors::idOf($other) !== $id && $other->isConfirmed())
             && $this->recoveryCodes->deleteSet($identity);
 
-        // What the current session still holds is read before the revocation,
-        // which hides every proof it does not record again once committed.
+        // Read first: the revocation hides proofs it does not record again.
         $kept = $this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $session);
 
         $revocation   = $this->container->make(SessionRevoker::class)->factorRemoved($identity, $id, $application, $session);
@@ -149,8 +124,7 @@ final readonly class FactorRemoval
     }
 
     /**
-     * Delete the factor and its passkey association, and stop every proof made
-     * with it counting.
+     * What a reset does for each factor, without the session work.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -173,8 +147,6 @@ final readonly class FactorRemoval
     }
 
     /**
-     * The factor's id, which a factor is removed by.
-     *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return string
      *

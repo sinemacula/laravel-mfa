@@ -9,9 +9,8 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 /**
- * The shipped factor model with its route binding lookup ordered by primary
- * key, so which of several rows holding one custom key is found first does not
- * depend on how a database happens to return them.
+ * Orders its route binding lookup by primary key, so which of several rows
+ * sharing a custom key is found first does not depend on the database.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,8 +20,6 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 final class OrderedRouteKeyFactor extends Factor
 {
     /**
-     * Retrieve the model for a bound value, lowest primary key first.
-     *
      * @param  mixed  $query
      * @param  mixed  $value
      * @param  ?string  $field

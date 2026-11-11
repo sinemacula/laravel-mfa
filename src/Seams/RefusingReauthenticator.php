@@ -8,11 +8,9 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 
 /**
- * The default `Reauthenticator`: without an authentication layer, or an
- * application's own binding, nothing can prove the first factor again, so no
- * reauthentication is ever made. Enrolling a first additional factor on an
- * active session, which needs one, fails closed until the application binds its
- * own.
+ * Default `Reauthenticator`: nothing can prove the first factor again, so a
+ * first enrolment on an active session fails closed until the application binds
+ * one.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,8 +18,6 @@ use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 final readonly class RefusingReauthenticator implements Reauthenticator
 {
     /**
-     * No proof, whoever asks.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return null

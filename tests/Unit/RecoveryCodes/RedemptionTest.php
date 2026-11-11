@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\RecoveryCodes\Redemption;
 
 /**
- * Unit tests for `Redemption`: what a passed, a failed and a refused redemption
- * carry, and the shapes each refuses.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\Redemption;
 final class RedemptionTest extends TestCase
 {
     /**
-     * A passed redemption is counted and carries the remaining count; nothing
-     * about a failure.
+     * Counted, with the remaining count and nothing about a failure.
      *
      * @return void
      */
@@ -41,8 +37,8 @@ final class RedemptionTest extends TestCase
     }
 
     /**
-     * A failed redemption is counted, carries its reason, detail and the
-     * remaining count when the set was read, and no time.
+     * Counted, with its reason, detail and the remaining count when the set was
+     * read, and no time.
      *
      * @return void
      */
@@ -60,8 +56,8 @@ final class RedemptionTest extends TestCase
     }
 
     /**
-     * A refused redemption is not counted and never read the set; a lockout
-     * carries the time it lifts, or none at the failure ceiling.
+     * Not counted and never read the set; a lockout carries the time it lifts,
+     * or none at the failure ceiling.
      *
      * @return void
      */
@@ -81,7 +77,7 @@ final class RedemptionTest extends TestCase
     }
 
     /**
-     * A blank detail is refused, failed or refused.
+     * Whether failed or refused.
      *
      * @return void
      */
@@ -99,8 +95,6 @@ final class RedemptionTest extends TestCase
     }
 
     /**
-     * Only a lockout carries a time, and a lockout is never counted.
-     *
      * @return void
      */
     public function testOnlyALockoutCarriesATimeAndIsNeverCounted(): void

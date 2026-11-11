@@ -10,9 +10,8 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * The association of one of an identity's passkeys with a factor: a passkey is
- * a factor only through such a record. The credential itself, and its
- * ceremonies, belong to the authentication layer.
+ * Makes one of an identity's passkeys a factor. The credential itself belongs
+ * to the authentication layer.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,7 +29,7 @@ final class PasskeyAssociation extends Model
 {
     use HasUlids;
 
-    /** @var list<string> The attributes that are mass assignable. */
+    /** @var list<string> */
     protected $fillable = [
         'factor_id',
         'authenticatable_type',
@@ -40,9 +39,7 @@ final class PasskeyAssociation extends Model
     ];
 
     /**
-     * Create the record on the table and connection the package configures (see
-     * `Database\TableNames` and `Database\StorageConnection`), read when it is
-     * built so a change in the configuration applies to the next one.
+     * Reads the table and connection per instance so config changes apply.
      *
      * @param  array<string, mixed>  $attributes
      *
@@ -58,8 +55,6 @@ final class PasskeyAssociation extends Model
     }
 
     /**
-     * Columns that receive a generated unique identifier on insert.
-     *
      * @return array<int, string>
      */
     #[\Override]
@@ -69,8 +64,6 @@ final class PasskeyAssociation extends Model
     }
 
     /**
-     * The attributes that should be cast.
-     *
      * @return array<string, string>
      */
     #[\Override]

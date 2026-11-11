@@ -5,8 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Factors;
 
 /**
- * The form a factor's label is kept in: trimmed, a blank one being none, and no
- * longer than its column.
+ * A factor's label, trimmed, blank as null, and no longer than its column.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -15,7 +14,7 @@ namespace SineMacula\Laravel\Mfa\Factors;
  */
 final class FactorLabel
 {
-    /** @var int How many characters a label may hold. */
+    /** @var int In characters. */
     public const int MAX_LENGTH = 255;
 
     /**
@@ -24,8 +23,7 @@ final class FactorLabel
     private function __construct() {}
 
     /**
-     * The label as it is kept, refusing one longer than a label may be: an
-     * application validates what a person types before it gets here.
+     * Throws on a long label: the application validates input before this.
      *
      * @param  ?string  $label
      * @return ?string

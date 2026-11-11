@@ -16,8 +16,6 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 final readonly class PreferredFactorChanged extends ContextEvent
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, int|string|null>  $context
      * @param  \SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $previous

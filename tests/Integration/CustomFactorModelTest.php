@@ -15,12 +15,8 @@ use Tests\Fixtures\Factors\CustomFactor;
 use Tests\TestCase;
 
 /**
- * `mfa.factor.model` configuration seam.
- *
- * Closes the documented configurable-factor-model contract: the package's
- * `factorModel()` accessor must honour `config('mfa.factor.model')` and reject
- * misconfiguration loudly rather than silently falling back to the shipped
- * default.
+ * `factorModel()` honours `mfa.factor.model` and refuses a misconfigured value
+ * instead of falling back to the shipped model.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,9 +29,7 @@ final class CustomFactorModelTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Resolve the manager while the configuration is still valid: resolving it
-     * checks the configuration, which would refuse a misconfigured model before
-     * the accessor under test could.
+     * Resolving the manager validates the config, so do it while still valid.
      *
      * @return void
      */
@@ -48,25 +42,17 @@ final class CustomFactorModelTest extends TestCase
     }
 
     /**
-     * With no config override, `Mfa::factorModel()` returns the shipped
-     * `Factor` model so consumers without a custom subclass keep the existing
-     * default behaviour.
-     *
      * @return void
      */
     public function testReturnsShippedFactorModelByDefault(): void
     {
-        // A null value (env var unset, key cleared) must fall back to the
-        // shipped model — matches a fresh install with no override.
+        // An unset env var or cleared key reads as null.
         config()->set('mfa.factor.model', null);
 
         self::assertSame(Factor::class, Mfa::factorModel());
     }
 
     /**
-     * Setting `mfa.factor.model` to a custom subclass implementing the
-     * `EloquentFactor` contract returns the configured class.
-     *
      * @return void
      */
     public function testReturnsConfiguredCustomFactorModel(): void
@@ -78,11 +64,6 @@ final class CustomFactorModelTest extends TestCase
     }
 
     /**
-     * The configured custom model must be returned as a class string compatible
-     * with `morphMany(Mfa::factorModel(), ...)` — i.e. an instance of the
-     * configured class actually implements the `EloquentFactor` contract the
-     * package writes through.
-     *
      * @return void
      */
     public function testConfiguredModelInstanceSatisfiesEloquentFactorContract(): void
@@ -97,8 +78,7 @@ final class CustomFactorModelTest extends TestCase
     }
 
     /**
-     * A non-string config value (number, array) must throw rather than silently
-     * flowing through to a `class_exists` call that would emit a soft warning.
+     * A non-string value must not reach `class_exists`, which only warns.
      *
      * @return void
      */
@@ -113,9 +93,6 @@ final class CustomFactorModelTest extends TestCase
     }
 
     /**
-     * An empty-string config value must throw — empty implies "intentionally
-     * cleared" but is never a valid model class.
-     *
      * @return void
      */
     public function testRejectsEmptyStringConfigValue(): void
@@ -129,9 +106,7 @@ final class CustomFactorModelTest extends TestCase
     }
 
     /**
-     * A class name that does not exist must throw with a message naming the
-     * missing class so the deployment-time misconfiguration is obvious in the
-     * resulting stack trace.
+     * The message names the missing class.
      *
      * @return void
      */
@@ -146,11 +121,6 @@ final class CustomFactorModelTest extends TestCase
     }
 
     /**
-     * A class that exists but does not implement `EloquentFactor` must throw —
-     * the contract is the seam consumers integrate against, and a class that
-     * does not satisfy it would crash at the first call site instead of at
-     * boot.
-     *
      * @return void
      */
     public function testRejectsClassThatDoesNotImplementEloquentFactor(): void

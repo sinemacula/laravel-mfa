@@ -14,10 +14,6 @@ use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use Tests\TestCase;
 
 /**
- * Unit tests for `ConfigurationBindings`: the configuration is checked once the
- * application has booted, unless the console command running is `mfa:check` or
- * a configuration maintenance command, and on demand.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -45,8 +41,6 @@ final class ConfigurationBindingsTest extends TestCase
     }
 
     /**
-     * Put the console arguments back.
-     *
      * @return void
      */
     #[\Override]
@@ -58,9 +52,6 @@ final class ConfigurationBindingsTest extends TestCase
     }
 
     /**
-     * Validating passes the shipped configuration and refuses a setting out of
-     * range, listing it.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -78,8 +69,6 @@ final class ConfigurationBindingsTest extends TestCase
     }
 
     /**
-     * Once the application has booted, a misconfiguration fails.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -95,8 +84,7 @@ final class ConfigurationBindingsTest extends TestCase
     }
 
     /**
-     * The console arguments of the commands the boot check is skipped for:
-     * `mfa:check`, behind any option, and the commands that list, describe,
+     * `mfa:check` behind any option, and the commands that list, describe,
      * discover, cache or clear configuration.
      *
      * @return iterable<string, array{list<string>}>
@@ -116,9 +104,8 @@ final class ConfigurationBindingsTest extends TestCase
     }
 
     /**
-     * While `mfa:check` or a configuration maintenance command runs, the boot
-     * check is skipped, so the command can report the problems itself, or a bad
-     * cached configuration can still be cleared.
+     * So the command can report the problems itself, or a bad cached
+     * configuration can be cleared.
      *
      * @param  list<string>  $argv
      * @return void
@@ -138,9 +125,8 @@ final class ConfigurationBindingsTest extends TestCase
     }
 
     /**
-     * The console arguments of commands the boot check runs for: any other
-     * command, one that only mentions a skipped command as an argument, and
-     * none at all.
+     * Including one that only mentions a skipped command as an argument, and
+     * none.
      *
      * @return iterable<string, array{list<string>}>
      */
@@ -153,8 +139,6 @@ final class ConfigurationBindingsTest extends TestCase
     }
 
     /**
-     * Any other console command runs the boot check.
-     *
      * @param  list<string>  $argv
      * @return void
      *
@@ -173,8 +157,6 @@ final class ConfigurationBindingsTest extends TestCase
     }
 
     /**
-     * Outside the console, the boot check runs whatever the arguments say.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

@@ -21,9 +21,7 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\TestCase;
 
 /**
- * Unit tests for `EventDispatcher`: events reach listeners only once the change
- * they report commits on the storage connection, never after a rollback, and
- * each carries the allowlisted context of the bound resolver.
+ * Events wait for the storage connection's commit and are dropped on rollback.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,8 +34,6 @@ final class EventDispatcherTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * With no transaction open, the event is dispatched at once.
-     *
      * @return void
      */
     public function testDispatchesAtOnceOutsideATransaction(): void
@@ -50,9 +46,6 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * Inside a transaction on the storage connection, the event waits for the
-     * commit.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -72,8 +65,6 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * A rollback dispatches nothing.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -97,8 +88,7 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * A transaction open on another connection neither delays nor drops the
-     * event, since the package's changes are not made in it.
+     * The package's changes are not made in it.
      *
      * @return void
      *
@@ -127,8 +117,6 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * Without a transactions manager, the event is dispatched at once.
-     *
      * @return void
      */
     public function testDispatchesAtOnceWithoutATransactionsManager(): void
@@ -144,9 +132,8 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * The context is the resolver's, cut down to the allowlist: a model or an
-     * array it returns by mistake is dropped, a key it does not know is `null`,
-     * and the application is the operation's, never the resolver's.
+     * A model or array the resolver returns is dropped, an unknown key is
+     * `null`, and the application is the operation's.
      *
      * @return void
      */
@@ -175,8 +162,7 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * The application an operation ran through names the application, over the
-     * resolver's, and none named is none.
+     * Over the resolver's; none named is none.
      *
      * @return void
      */
@@ -189,10 +175,8 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * The resolver is handed the subject: the identity, the application the
-     * operation ran through, the sign-in it was bound to and the client it was
-     * served to; with none of them given, a subject of which nothing is known
-     * but an unknown client.
+     * The identity, the application, the sign-in and the client; with none
+     * given, nothing is known but an unknown client.
      *
      * @return void
      *
@@ -207,8 +191,6 @@ final class EventDispatcherTest extends TestCase
 
         $this->container()->instance(EventContextResolver::class, new class ($seen) implements EventContextResolver {
             /**
-             * Constructor.
-             *
              * @param  \ArrayObject<int, mixed>  $seen
              */
             public function __construct(
@@ -218,8 +200,6 @@ final class EventDispatcherTest extends TestCase
             ) {}
 
             /**
-             * Record what the resolver was handed.
-             *
              * @param  \SineMacula\Laravel\Mfa\Events\EventSubject  $subject
              * @return array<string, int|string|null>
              */
@@ -244,8 +224,6 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * Without a client, the context knows no address.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -259,8 +237,6 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * Bind a resolver that answers the given values.
-     *
      * @param  array<string, mixed>  $values
      * @return void
      */
@@ -268,8 +244,6 @@ final class EventDispatcherTest extends TestCase
     {
         $this->container()->instance(EventContextResolver::class, new class ($values) implements EventContextResolver {
             /**
-             * Constructor.
-             *
              * @param  array<string, mixed>  $values
              */
             public function __construct(
@@ -294,8 +268,6 @@ final class EventDispatcherTest extends TestCase
     }
 
     /**
-     * Resolve the dispatcher.
-     *
      * @return \SineMacula\Laravel\Mfa\Events\EventDispatcher
      */
     private function dispatcher(): EventDispatcher

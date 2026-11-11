@@ -8,8 +8,7 @@ use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
 /**
- * The default `ActiveStateResolver`, which reads the identity contract: an
- * identity is active when its `isMfaActive()` says so.
+ * Reads `isMfaActive()` from the identity contract.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -17,8 +16,6 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 final readonly class IdentityContractActiveState implements ActiveStateResolver
 {
     /**
-     * Whether the identity is active.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
      */

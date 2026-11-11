@@ -9,8 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Guard;
 
 /**
- * Custom `Guard` fixture that hands back a non-Eloquent `GenericUser` —
- * exercises the manager's non-Eloquent authenticatable short-circuit.
+ * A guard that returns a non-Eloquent `GenericUser`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,8 +22,6 @@ final class GenericUserGuard implements Guard
     private readonly GenericUser $resolved;
 
     /**
-     * Build the fixture identity once at construction.
-     *
      * @return void
      */
     public function __construct()
@@ -33,8 +30,6 @@ final class GenericUserGuard implements Guard
     }
 
     /**
-     * Report that the fixture always has an authenticated identity.
-     *
      * @imperative
      *
      * @return bool
@@ -46,8 +41,6 @@ final class GenericUserGuard implements Guard
     }
 
     /**
-     * Report that the fixture is never a guest.
-     *
      * @imperative
      *
      * @return bool
@@ -59,8 +52,6 @@ final class GenericUserGuard implements Guard
     }
 
     /**
-     * Return the pre-built non-Eloquent identity.
-     *
      * @return \Illuminate\Auth\GenericUser
      */
     #[\Override]
@@ -70,8 +61,6 @@ final class GenericUserGuard implements Guard
     }
 
     /**
-     * Return the fixture identity's auth identifier.
-     *
      * @return int
      */
     #[\Override]
@@ -81,8 +70,6 @@ final class GenericUserGuard implements Guard
     }
 
     /**
-     * Accept any credentials — the fixture has a single pre-built identity.
-     *
      * @param  array<array-key, mixed>  $credentials
      * @return bool
      */
@@ -93,8 +80,6 @@ final class GenericUserGuard implements Guard
     }
 
     /**
-     * Report that the fixture always has a bound identity.
-     *
      * @return bool
      */
     #[\Override]
@@ -104,7 +89,7 @@ final class GenericUserGuard implements Guard
     }
 
     /**
-     * No-op — the fixture binds its identity at construction time.
+     * The identity is built at construction.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $user
      * @return self

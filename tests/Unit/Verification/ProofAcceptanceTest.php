@@ -22,10 +22,8 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `ProofAcceptance`: whether a new proof refreshes multifactor is
- * judged on the session's first factor with it alone, by when the evidence was
- * made, so neither another proof the session holds nor the first factor alone
- * makes a weaker proof look fresh.
+ * Freshness is judged on the first factor with the new proof alone, by when the
+ * evidence was made, so another held proof cannot make a weaker one look fresh.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,8 +44,6 @@ final class ProofAcceptanceTest extends TestCase
     private SignInProofs $proofs;
 
     /**
-     * Freeze the clock and arrange the identity.
-     *
      * @return void
      */
     #[\Override]
@@ -62,9 +58,6 @@ final class ProofAcceptanceTest extends TestCase
     }
 
     /**
-     * A proof completing the combination with the first factor refreshes
-     * multifactor.
-     *
      * @return void
      */
     public function testAProofCompletingTheCombinationRefreshesMultifactor(): void
@@ -73,8 +66,7 @@ final class ProofAcceptanceTest extends TestCase
     }
 
     /**
-     * A weaker proof after a first factor multifactor on its own refreshes
-     * nothing, though the session is multifactor.
+     * Though the session is multifactor.
      *
      * @return void
      */
@@ -87,9 +79,6 @@ final class ProofAcceptanceTest extends TestCase
     }
 
     /**
-     * A proof multifactor on its own refreshes multifactor, after a first
-     * factor that is too.
-     *
      * @return void
      */
     public function testAMultifactorProofRefreshesMultifactorAfterAMultifactorFirstFactor(): void
@@ -98,8 +87,7 @@ final class ProofAcceptanceTest extends TestCase
     }
 
     /**
-     * Another proof the session holds does not make a weaker one refresh
-     * multifactor, though the session is multifactor with it.
+     * Though the session is multifactor with it.
      *
      * @return void
      */
@@ -112,9 +100,8 @@ final class ProofAcceptanceTest extends TestCase
     }
 
     /**
-     * A first factor and a proof made at the same instant share their
-     * evidence's time, so the proof refreshes it; a different instant within
-     * the same second does not.
+     * Proofs at the same instant share their evidence's time; a different
+     * instant in the same second does not.
      *
      * @return void
      */
@@ -132,9 +119,6 @@ final class ProofAcceptanceTest extends TestCase
     }
 
     /**
-     * A requirement check that does not say when its multifactor evidence was
-     * made refreshes nothing.
-     *
      * @return void
      */
     public function testACheckThatDoesNotSayWhenRefreshesNothing(): void
@@ -158,8 +142,8 @@ final class ProofAcceptanceTest extends TestCase
     }
 
     /**
-     * Accept the proof in a pending session begun with the first factor and
-     * holding the other proofs.
+     * In a pending session begun with the first factor and holding the other
+     * proofs.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof

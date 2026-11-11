@@ -33,12 +33,6 @@ use Tests\Fixtures\Secrets\RecordedTrace;
 use Tests\TestCase;
 
 /**
- * Tests for `CodeService`: a code is stored and delivered in the identity's
- * factor state transaction and reported once committed; a refused send delivers
- * and reports nothing; a delivery that fails keeps nothing, and surfaces
- * scrubbed of the code and the destination; and only a stored factor owned by
- * the binding's identity has codes.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -57,9 +51,8 @@ final class CodeServiceTest extends TestCase
     private const string PHONE = '+447700900123';
 
     /**
-     * A code sent is delivered to the factor's destination, reported with its
-     * challenge and the factor's masked destination, and accepted once for its
-     * binding.
+     * Delivered to the factor's destination, reported with it masked, and
+     * accepted once.
      *
      * @return void
      *
@@ -83,8 +76,6 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A code sent inside a transaction that rolls back is not kept.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -103,8 +94,7 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A send refused for its cooldown delivers nothing, and says how long to
-     * wait.
+     * Refused for its cooldown, it delivers nothing and says how long to wait.
      *
      * @return void
      *
@@ -127,10 +117,8 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A delivery that throws keeps no code and spends no cooldown: the next
-     * send goes out at once. The failure surfaces as the package's own
-     * exception, naming the factor with its destination masked, with the
-     * driver's failure as the previous one.
+     * No cooldown is spent, and the failure names the factor with its
+     * destination masked.
      *
      * @return void
      *
@@ -160,9 +148,8 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * Rows of whether PHP records the arguments of each call in a trace, as a
-     * development configuration does, or ignores them, as a production one
-     * does.
+     * Whether PHP records call arguments in a trace, as in development, or not,
+     * as in production.
      *
      * @return iterable<string, array{bool}>
      */
@@ -173,10 +160,7 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A sender's failure that quotes the code and the phone number, in its
-     * message, a previous exception's message and its trace, surfaces as an
-     * exception naming neither, over the failure scrubbed of both, whether or
-     * not PHP recorded the arguments; nothing is kept.
+     * Covers the message, a previous exception and the trace; nothing is kept.
      *
      * @param  bool  $arguments
      * @return void
@@ -216,9 +200,8 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A send that waits for the locks is timed from when it holds them: its
-     * code's lifetime and its cooldown run from then, not from when it began
-     * waiting.
+     * The code's lifetime and cooldown run from taking the locks, not from when
+     * the send began waiting.
      *
      * @return void
      *
@@ -274,8 +257,6 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A factor that is not stored has no codes.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -302,9 +283,8 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * Rows of an owner key the factor may hold, and whether it names the
-     * binding's identity: a string or an integer does, anything else does not,
-     * even when it reads the same.
+     * A string or integer key names the identity; anything else does not, even
+     * when it reads the same.
      *
      * @return iterable<string, array{\Closure(\Tests\Fixtures\Identities\TestUser): mixed, bool}>
      */
@@ -316,9 +296,6 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A factor's owner key names the binding's identity only when it is a
-     * string or an integer that reads as the identity's key.
-     *
      * @param  \Closure(\Tests\Fixtures\Identities\TestUser): mixed  $key
      * @param  bool  $owned
      * @return void
@@ -344,8 +321,7 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * Rows of a key the stored factor may have, and whether a code can be bound
-     * to it: a non-empty string or an integer can, anything else cannot.
+     * A non-empty string or an integer key can be bound; anything else cannot.
      *
      * @return iterable<string, array{mixed, bool}>
      */
@@ -357,9 +333,6 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * Codes are bound only to a factor whose key is a non-empty string or an
-     * integer.
-     *
      * @param  mixed  $key
      * @param  bool  $bindable
      * @return void
@@ -383,8 +356,7 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A binding naming another identity than the factor's owner is refused
-     * before anything is sent or checked.
+     * Refused before anything is sent or checked.
      *
      * @return void
      *
@@ -416,9 +388,6 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A code is sent only to the identity its binding names, and nothing is
-     * sent otherwise.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -441,9 +410,8 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * The driver is handed the message the code service built: the binding's
-     * application and purpose, the factor as locked, the code and its expiry,
-     * and the identity the code is for.
+     * The binding's application and purpose, the locked factor, the code, its
+     * expiry and the identity.
      *
      * @return void
      *
@@ -468,8 +436,8 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A factor with no destination is refused, naming its type, before the
-     * driver is reached, as a failed delivery: nothing is kept.
+     * Refused as a failed delivery naming its type, before the driver is
+     * reached; nothing is kept.
      *
      * @return void
      *
@@ -496,10 +464,7 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A factor that fails while its message is built, quoting its destination
-     * in the message and a frame's arguments, surfaces scrubbed of it, whether
-     * or not PHP recorded the arguments, without reading the factor again;
-     * nothing is delivered and nothing is kept.
+     * Scrubbed without reading the factor again; nothing is delivered or kept.
      *
      * @param  bool  $arguments
      * @return void
@@ -534,8 +499,8 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * A user with a stored factor of the type (email, unless another is given),
-     * the clock stopped, and the engine drawing a known code.
+     * A user with a stored factor, the clock stopped and the engine drawing a
+     * known code.
      *
      * @param  string  $type
      * @param  string  $destination
@@ -563,8 +528,6 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * The code service.
-     *
      * @return \SineMacula\Laravel\Mfa\Codes\CodeService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -575,8 +538,6 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * The sign-in binding of the user's codes.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */

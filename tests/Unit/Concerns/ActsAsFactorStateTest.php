@@ -17,11 +17,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Unit tests for the parts of the `ActsAsFactor` trait that describe a factor
- * beyond its type and destination: its credential reference, TOTP parameters
- * and accepted step, status, preference, failures, the application it was
- * enrolled through, and when it was confirmed and last used.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -33,8 +28,6 @@ final class ActsAsFactorStateTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Clear the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -46,8 +39,6 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * Rows of a column-name accessor and the column it names.
-     *
      * @return iterable<string, array{\Closure(\SineMacula\Laravel\Mfa\Models\Factor): string, string}>
      */
     public static function columns(): iterable
@@ -68,8 +59,6 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * Each column-name accessor names its column.
-     *
      * @param  \Closure(\SineMacula\Laravel\Mfa\Models\Factor): string  $accessor
      * @param  string  $column
      * @return void
@@ -81,8 +70,6 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * A stored factor reads back every value it was stored with.
-     *
      * @return void
      */
     public function testReadsBackEveryStoredValue(): void
@@ -120,8 +107,7 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * A new factor is pending, not preferred, has not failed, and holds nothing
-     * else.
+     * Not preferred, not failed, and nothing else.
      *
      * @return void
      */
@@ -146,9 +132,8 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * A new factor with no status yet is pending, never usable; each value the
-     * package knows reads as itself, and a status cast to the enum reads as the
-     * enum.
+     * No status yet reads as pending; each known value reads as itself, and an
+     * enum-cast status as the enum.
      *
      * @return void
      */
@@ -169,8 +154,6 @@ final class ActsAsFactorStateTest extends TestCase
 
         $cast = new class extends Factor {
             /**
-             * Cast the status to the enum.
-             *
              * @return array<string, string>
              */
             #[\Override]
@@ -185,9 +168,8 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * A value of the wrong type reads as absent, in the columns no refusal
-     * reads: an uncast confirmation or last use time among them, as the trait
-     * casts only the deadline and the disabled time.
+     * In the columns no refusal reads; the trait casts only the deadline and
+     * the disabled time.
      *
      * @return void
      */
@@ -195,7 +177,7 @@ final class ActsAsFactorStateTest extends TestCase
     {
         $factor = new class extends Factor {
             /**
-             * Cast nothing, so the raw values are read as they are.
+             * Raw values are read as they are.
              *
              * @return array<string, string>
              */
@@ -224,8 +206,7 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * Statuses that are none the package knows, on a factor stored or not:
-     * nothing stored on a stored factor among them.
+     * Nothing stored on a stored factor among them.
      *
      * @return iterable<string, array{mixed, bool}>
      */
@@ -241,9 +222,8 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * A status that is none the package knows throws, naming the column, and
-     * never reads as pending: a factor that reads as not confirmed can let a
-     * weaker path through where a confirmed one would be held to more.
+     * Never read as pending: a factor read as not confirmed can let a weaker
+     * path through.
      *
      * @param  mixed  $status
      * @param  bool  $stored
@@ -265,9 +245,8 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * On a model that casts the status to the enum, a stored value the enum
-     * does not know throws Laravel's `ValueError` from the cast, before the
-     * trait sees it: it fails closed, though not as `InvalidModelException`.
+     * Laravel's cast throws before the trait sees it: it fails closed, though
+     * not as `InvalidModelException`.
      *
      * @return void
      */
@@ -284,7 +263,7 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * Confirming marks the factor confirmed at the given time, or now.
+     * At the given time, or now.
      *
      * @return void
      */
@@ -305,8 +284,6 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * A successful verification is the factor's last use too.
-     *
      * @return void
      */
     public function testAVerificationIsTheLastUse(): void
@@ -324,8 +301,6 @@ final class ActsAsFactorStateTest extends TestCase
     }
 
     /**
-     * Store a factor with the given attributes and read it back.
-     *
      * @param  array<string, mixed>  $attributes
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */

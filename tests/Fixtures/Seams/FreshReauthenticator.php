@@ -19,8 +19,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 
 /**
- * A reauthenticator that proves the password again, the given number of seconds
- * ago, on the identity's current sign-in, and counts how often it is asked.
+ * Proves the password again the given seconds ago on the current sign-in, and
+ * counts the calls.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,32 +29,27 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
  */
 final class FreshReauthenticator implements Reauthenticator
 {
-    /** @var int How often the reauthenticator has been asked. */
+    /** @var int */
     public int $asked = 0;
 
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  int  $secondsAgo
      * @param  ?string  $session
      */
     public function __construct(
 
-        /** The store the identity's current sign-in is read from. */
+        /** Read for the current sign-in. */
         private readonly ProofStore $store,
 
-        /** How long ago the reauthentication was made. */
+        /** How long ago the reauthentication was. */
         private readonly int $secondsAgo = 0,
 
-        /** The session the proof is bound to, or `null` for the current sign-in. */
+        /** `null` for the current sign-in. */
         private readonly ?string $session = null,
     ) {}
 
     /**
-     * A reauthentication with the password on the identity's sign-in, or none
-     * without one.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof

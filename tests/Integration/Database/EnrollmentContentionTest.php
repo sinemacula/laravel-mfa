@@ -31,11 +31,8 @@ use Tests\Integration\Database\Concerns\MigratesTheStorageConnection;
 use Tests\TestCase;
 
 /**
- * First confirmations that compete on separate connections to a SQLite file:
- * `storage`, the configured storage connection, and `observer`, standing in for
- * a concurrent request with no wait for locks. While one confirmation holds the
- * identity's lock the other cannot begin; once it commits, the other finds the
- * factor confirmed and is refused, so exactly one counts as first.
+ * Two first confirmations race on separate connections to one SQLite file;
+ * `observer` plays a concurrent request that never waits for a lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -47,12 +44,10 @@ final class EnrollmentContentionTest extends TestCase
 {
     use MigratesTheStorageConnection;
 
-    /** @var string The SQLite file the package's tables live in. */
+    /** @var string SQLite file holding the package's tables. */
     private string $database = '';
 
     /**
-     * Create the package's tables on the storage connection.
-     *
      * @return void
      */
     #[\Override]
@@ -64,8 +59,6 @@ final class EnrollmentContentionTest extends TestCase
     }
 
     /**
-     * Remove the SQLite file once the application is gone.
-     *
      * @return void
      */
     #[\Override]
@@ -81,8 +74,7 @@ final class EnrollmentContentionTest extends TestCase
     }
 
     /**
-     * Of two first confirmations, the second cannot start while the first holds
-     * the lock, and is refused after it; the codes are issued once.
+     * The second cannot start while the first holds the lock, then is refused.
      *
      * @return void
      *
@@ -137,9 +129,6 @@ final class EnrollmentContentionTest extends TestCase
     }
 
     /**
-     * Point the package's tables at a fresh SQLite file reached through two
-     * connections, neither of which waits for a lock, and enable the types.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -179,9 +168,6 @@ final class EnrollmentContentionTest extends TestCase
     }
 
     /**
-     * Assert a confirmation on the observer connection cannot take the
-     * identity's lock while one on the storage connection holds it.
-     *
      * @param  string  $grant
      * @return void
      */

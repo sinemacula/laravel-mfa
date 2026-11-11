@@ -32,9 +32,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * Every route counts an attempt exactly once and reports one failure, and the
- * request's address holds one slot around the whole verification, kept only by
- * a failure that was counted.
+ * Every route counts an attempt once and reports one failure; the address holds
+ * one slot for the whole verification, kept only by a counted failure.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -63,8 +62,6 @@ final class CountingVerificationServiceTest extends TestCase
     private const string IP = '203.0.113.9';
 
     /**
-     * Arrange the application and the request's address.
-     *
      * @return void
      */
     #[\Override]
@@ -77,8 +74,6 @@ final class CountingVerificationServiceTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -90,8 +85,7 @@ final class CountingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A wrong code for a factor counts once against the factor, the identity
-     * and the address, and reports once.
+     * Against the factor, the identity and the address.
      *
      * @return void
      */
@@ -109,8 +103,7 @@ final class CountingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A wrong code for a challenge counts once, through the gateway's report
-     * alone.
+     * Through the gateway's report alone.
      *
      * @return void
      */
@@ -132,7 +125,7 @@ final class CountingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A wrong recovery code counts once against the identity and the address.
+     * Against the identity and the address.
      *
      * @return void
      */
@@ -152,8 +145,7 @@ final class CountingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A pass gives the address's slot back, resets the factor's run and the
-     * identity's, and stamps the factor's last use.
+     * It also stamps the factor's last use.
      *
      * @return void
      */
@@ -170,8 +162,6 @@ final class CountingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A refusal under the lock gives the address's slot back.
-     *
      * @return void
      */
     public function testARefusalGivesTheSlotBack(): void
@@ -191,7 +181,7 @@ final class CountingVerificationServiceTest extends TestCase
     }
 
     /**
-     * An exception gives the address's slot back, and propagates.
+     * It propagates.
      *
      * @return void
      *
@@ -214,7 +204,7 @@ final class CountingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A send refused or sent holds no slot.
+     * Refused or sent.
      *
      * @return void
      */
@@ -231,8 +221,7 @@ final class CountingVerificationServiceTest extends TestCase
     }
 
     /**
-     * Sending a code to a type with none to send sends nothing, and holds no
-     * slot.
+     * Nothing is sent and no slot is held.
      *
      * @return void
      */
@@ -247,7 +236,7 @@ final class CountingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A lockout refuses a send with how long to wait, and resets nothing.
+     * It resets nothing.
      *
      * @return void
      */

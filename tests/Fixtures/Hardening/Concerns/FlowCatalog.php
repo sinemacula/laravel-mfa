@@ -47,14 +47,10 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FixedIdentityRequirement;
 
 /**
- * Every flow that reads or changes the package's state, by name, with its
- * success and refusal branches where it has both. A flow seeds what it needs
- * and returns an action, which answers whether the branch its name promises was
- * reached: a healthy run must answer `true`, so a sweep over a catalogue that
- * stopped reaching its branch fails rather than proving nothing.
- *
- * It covers the flows that exist now; add to it with each new one, as a
- * catalogue does not cover a future method by itself.
+ * Every flow that reads or changes the package's state, with its success and
+ * refusal branches. A flow seeds what it needs and returns an action that
+ * answers whether its branch was reached, so a sweep that stops reaching a
+ * branch fails instead of proving nothing. New flows must be added here.
  *
  * @phpstan-require-extends \Tests\TestCase
  *
@@ -67,21 +63,19 @@ trait FlowCatalog
 {
     use ArrangesEnrollment;
 
-    /** @var string The route carrying the gate. */
+    /** @var string */
     private const string GATE_ROUTE = 'hardening/gate';
 
-    /** @var string The route binding a factor. */
+    /** @var string */
     private const string BINDING_ROUTE = 'hardening/factors';
 
     /** @var string A credential another person holds. */
     private const string FOREIGN_CREDENTIAL = 'Y3JlZGVudGlhbC10d28';
 
-    /** @var list<string> Every plaintext value the flow seeded or was handed, to search failures for. */
+    /** @var list<string> Plaintext values a failure must not hold. */
     private array $flowSecrets = [];
 
     /**
-     * The names of every flow, for a data provider.
-     *
      * @return array<string, array{string}>
      */
     public static function flowNames(): array
@@ -111,8 +105,6 @@ trait FlowCatalog
     }
 
     /**
-     * Each flow's seeding callable, by name.
-     *
      * @return array<string, \Closure(): (\Closure(): bool)>
      */
     protected function flows(): array
@@ -121,8 +113,7 @@ trait FlowCatalog
     }
 
     /**
-     * Forget everything an earlier seed left in the application and the
-     * package's tables, cheaply, so a flow can be seeded again without
+     * Clears what an earlier seed left, so a flow can be seeded again without
      * rebuilding the application.
      *
      * @return void
@@ -156,8 +147,6 @@ trait FlowCatalog
     }
 
     /**
-     * Define the routes the flows through the kernel call.
-     *
      * @param  \Illuminate\Routing\Router  $router
      * @return void
      */
@@ -170,8 +159,6 @@ trait FlowCatalog
     }
 
     /**
-     * The flows that only read.
-     *
      * @return array<string, \Closure(): (\Closure(): bool)>
      */
     private function readingFlows(): array
@@ -197,8 +184,6 @@ trait FlowCatalog
     }
 
     /**
-     * The flows that verify and send.
-     *
      * @return array<string, \Closure(): (\Closure(): bool)>
      */
     private function verifyingFlows(): array
@@ -221,8 +206,6 @@ trait FlowCatalog
     }
 
     /**
-     * The flows that enrol.
-     *
      * @return array<string, \Closure(): (\Closure(): bool)>
      */
     private function enrollingFlows(): array
@@ -290,7 +273,7 @@ trait FlowCatalog
     }
 
     /**
-     * Note a plaintext value a failure must not hold, and return it.
+     * Notes a plaintext value a failure must not hold.
      *
      * @param  string  $value
      * @return string
@@ -303,8 +286,7 @@ trait FlowCatalog
     }
 
     /**
-     * Whether a request through the kernel answered with the status, a server
-     * error being thrown as the failure it stands for.
+     * Throws a server error as the failure it stands for.
      *
      * @param  \Illuminate\Testing\TestResponse<\Symfony\Component\HttpFoundation\Response>  $response
      * @param  int  $status
@@ -322,8 +304,8 @@ trait FlowCatalog
     }
 
     /**
-     * Run the callback in a transaction on the storage connection, as a caller
-     * of the gate or the counters does.
+     * Runs in a storage transaction, as a caller of the gate or the counters
+     * does.
      *
      * @template TReturn
      *
@@ -338,8 +320,6 @@ trait FlowCatalog
     }
 
     /**
-     * What a proof of the person's on the sign-in is bound to.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  string  $session
@@ -353,8 +333,6 @@ trait FlowCatalog
     }
 
     /**
-     * Someone other than the person flows act for.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function somebodyElse(): TestUser
@@ -403,8 +381,6 @@ trait FlowCatalog
     }
 
     /**
-     * The gate lets a person through who proved enough.
-     *
      * @return \Closure(): bool
      */
     private function gatePasses(): \Closure
@@ -415,8 +391,6 @@ trait FlowCatalog
     }
 
     /**
-     * The gate refuses a person who did not.
-     *
      * @return \Closure(): bool
      */
     private function gateRefuses(): \Closure
@@ -427,8 +401,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person lists their factors.
-     *
      * @return \Closure(): bool
      */
     private function listingFactors(): \Closure
@@ -439,8 +411,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person reads one of their factors.
-     *
      * @return \Closure(): bool
      */
     private function readingAFactor(): \Closure
@@ -463,8 +433,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person is offered their factors.
-     *
      * @return \Closure(): bool
      */
     private function offeringFactors(): \Closure
@@ -475,8 +443,6 @@ trait FlowCatalog
     }
 
     /**
-     * A route binds a factor of the person's.
-     *
      * @return \Closure(): bool
      */
     private function bindingARoute(): \Closure
@@ -501,8 +467,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person verifies a TOTP code.
-     *
      * @return \Closure(): bool
      */
     private function verifyingTotp(): \Closure
@@ -515,8 +479,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person verifies the wrong TOTP code.
-     *
      * @return \Closure(): bool
      */
     private function verifyingTotpWrongly(): \Closure
@@ -529,8 +491,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person verifies a code they were sent.
-     *
      * @return \Closure(): bool
      */
     private function verifyingEmail(): \Closure
@@ -545,8 +505,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person verifies the wrong code for a code they were sent.
-     *
      * @return \Closure(): bool
      */
     private function verifyingEmailWrongly(): \Closure
@@ -561,8 +519,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person verifies a recovery code.
-     *
      * @return \Closure(): bool
      */
     private function verifyingARecoveryCode(): \Closure
@@ -591,8 +547,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person verifies a passkey assertion.
-     *
      * @return \Closure(): bool
      */
     private function verifyingAPasskey(): \Closure
@@ -608,8 +562,6 @@ trait FlowCatalog
     }
 
     /**
-     * A passkey assertion that does not verify.
-     *
      * @return \Closure(): bool
      */
     private function verifyingARefusedPasskey(): \Closure
@@ -644,8 +596,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person is sent a code.
-     *
      * @return \Closure(): bool
      */
     private function sendingACode(): \Closure
@@ -668,8 +618,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person asks for a passkey assertion.
-     *
      * @return \Closure(): bool
      */
     private function requestingAnAssertion(): \Closure
@@ -700,8 +648,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person starts an enrolment.
-     *
      * @return \Closure(): bool
      */
     private function startingAnEnrollment(): \Closure
@@ -724,8 +670,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person confirms their enrolment.
-     *
      * @return \Closure(): bool
      */
     private function confirmingAnEnrollment(): \Closure
@@ -740,8 +684,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person confirms with the wrong code.
-     *
      * @return \Closure(): bool
      */
     private function confirmingAnEnrollmentWrongly(): \Closure
@@ -773,8 +715,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person is sent their enrolment's code again.
-     *
      * @return \Closure(): bool
      */
     private function resendingAnEnrollmentCode(): \Closure
@@ -789,8 +729,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person asks for it again too soon.
-     *
      * @return \Closure(): bool
      */
     private function resendingAnEnrollmentCodeTooSoon(): \Closure
@@ -803,8 +741,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person cancels their enrolment.
-     *
      * @return \Closure(): bool
      */
     private function cancelingAnEnrollment(): \Closure
@@ -817,8 +753,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person cancels an enrolment that does not exist.
-     *
      * @return \Closure(): bool
      */
     private function cancelingNoEnrollment(): \Closure
@@ -893,8 +827,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person renames a factor.
-     *
      * @return \Closure(): bool
      */
     private function renamingAFactor(): \Closure
@@ -917,8 +849,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person prefers a factor.
-     *
      * @return \Closure(): bool
      */
     private function preferringAFactor(): \Closure
@@ -1062,8 +992,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person generates their recovery codes.
-     *
      * @return \Closure(): bool
      */
     private function generatingRecoveryCodes(): \Closure
@@ -1086,8 +1014,6 @@ trait FlowCatalog
     }
 
     /**
-     * A person reads how many recovery codes they have left.
-     *
      * @return \Closure(): bool
      */
     private function readingRecoveryCodeStatus(): \Closure
@@ -1174,8 +1100,6 @@ trait FlowCatalog
     }
 
     /**
-     * A passkey is registered as a factor.
-     *
      * @return \Closure(): bool
      */
     private function registeringAPasskey(): \Closure
@@ -1256,8 +1180,6 @@ trait FlowCatalog
     }
 
     /**
-     * Whether the call was refused for the reason.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  \Closure(): mixed  $call
      * @return bool
@@ -1325,8 +1247,6 @@ trait FlowCatalog
     }
 
     /**
-     * The gateway sends a code.
-     *
      * @return \Closure(): bool
      */
     private function sendingThroughTheGateway(): \Closure
@@ -1340,8 +1260,6 @@ trait FlowCatalog
     }
 
     /**
-     * The gateway verifies a code it sent.
-     *
      * @return \Closure(): bool
      */
     private function verifyingThroughTheGateway(): \Closure
@@ -1359,8 +1277,6 @@ trait FlowCatalog
     }
 
     /**
-     * The gateway refuses the wrong code.
-     *
      * @return \Closure(): bool
      */
     private function verifyingThroughTheGatewayWrongly(): \Closure

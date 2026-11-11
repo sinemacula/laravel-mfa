@@ -14,9 +14,6 @@ use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 
 /**
- * Unit tests for `SessionChange`: it carries the change as made, and is made
- * only on a sign-in with a session id.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -26,8 +23,6 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 final class SessionChangeTest extends TestCase
 {
     /**
-     * The change carries what it is given.
-     *
      * @return void
      */
     public function testCarriesTheChange(): void
@@ -48,8 +43,6 @@ final class SessionChangeTest extends TestCase
     }
 
     /**
-     * A blank session id is refused.
-     *
      * @return void
      */
     public function testRefusesABlankSession(): void
@@ -61,8 +54,6 @@ final class SessionChangeTest extends TestCase
     }
 
     /**
-     * A confirmed TOTP factor.
-     *
      * @return \SineMacula\Laravel\Mfa\Factors\FactorSummary
      */
     private static function factor(): FactorSummary

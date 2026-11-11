@@ -21,14 +21,8 @@ use Tests\Fixtures\Factors\MyDriverFactor;
 use Tests\TestCase;
 
 /**
- * Integration test verifying the `Mfa::extend()` custom-driver registration
- * path.
- *
- * A custom driver registered via the Manager's `extend()` API must resolve to
- * the registered instance when requested by name, and its `verify()` and
- * `deliver()` surface must be exercised identically to built-in drivers. A
- * consumer's registration of a shipped driver's name wins however it is made:
- * through the facade, a container extender or a resolving callback on `mfa`.
+ * A consumer's driver registered under a shipped driver's name wins whether
+ * made through the facade, a container extender or a resolving callback.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -39,9 +33,6 @@ use Tests\TestCase;
 final class CustomDriverExtensionTest extends TestCase
 {
     /**
-     * Test a custom driver registered via Mfa::extend resolves to the
-     * registered instance.
-     *
      * @return void
      */
     public function testCustomDriverResolvesToRegisteredInstance(): void
@@ -54,8 +45,6 @@ final class CustomDriverExtensionTest extends TestCase
     }
 
     /**
-     * Test invoking a custom driver's verify increments its call counter.
-     *
      * @return void
      */
     public function testCustomDriverVerifyCallReachesRegisteredInstance(): void
@@ -70,13 +59,7 @@ final class CustomDriverExtensionTest extends TestCase
     }
 
     /**
-     * `Mfa::extend('totp', ...)` must override the built-in TOTP driver
-     * registered by `DriverBindings::extend()`. Pins the override invariant —
-     * both built-ins and consumer overrides go through the same `Mfa::extend()`
-     * registry, so a future Laravel `Manager` upgrade that changed
-     * override-precedence semantics would silently break consumer overrides
-     * without this guard. The driver was already resolved once when the
-     * override is made, and nothing needs clearing for it to win.
+     * The override wins even after the built-in driver has been resolved once.
      *
      * @return void
      */
@@ -86,8 +69,6 @@ final class CustomDriverExtensionTest extends TestCase
             use DescribesNoChannel;
 
             /**
-             * Always succeed so the caller can observe that the override fired.
-             *
              * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
              * @param  string  $code
              * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -96,14 +77,10 @@ final class CustomDriverExtensionTest extends TestCase
             #[\Override]
             public function verify(Factor $factor, #[\SensitiveParameter] string $code, ProofBinding $binding): CodeCheck
             {
-                // Marker driver — accept so the caller can observe that the
-                // override fired without setting up a factor.
                 return CodeCheck::ACCEPTED;
             }
         };
 
-        // Sanity-check: before the override the built-in TOTP driver resolves
-        // to the package's TotpDriver (not our marker).
         self::assertNotSame($marker, Mfa::driver('totp'));
 
         Mfa::extend('totp', static fn (): FactorDriver => $marker);
@@ -116,8 +93,7 @@ final class CustomDriverExtensionTest extends TestCase
     }
 
     /**
-     * A container extender on `mfa` that registers its own TOTP driver wins
-     * over the shipped one, which is registered before extenders run.
+     * The shipped drivers are registered before extenders run.
      *
      * @return void
      *
@@ -134,8 +110,7 @@ final class CustomDriverExtensionTest extends TestCase
     }
 
     /**
-     * A resolving callback on `mfa` that registers its own TOTP driver wins
-     * over the shipped one, which is registered before callbacks run.
+     * The shipped drivers are registered before resolving callbacks run.
      *
      * @return void
      *
@@ -154,8 +129,6 @@ final class CustomDriverExtensionTest extends TestCase
     }
 
     /**
-     * A resolving callback on `mfa` can already use the shipped drivers.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -175,8 +148,6 @@ final class CustomDriverExtensionTest extends TestCase
     }
 
     /**
-     * Resolve the package's MFA manager from the container.
-     *
      * @return \SineMacula\Laravel\Mfa\MfaManager
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

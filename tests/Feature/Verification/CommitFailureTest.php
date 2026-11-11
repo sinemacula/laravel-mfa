@@ -49,16 +49,9 @@ use Tests\Fixtures\Verification\TokenIssuingCompletion;
 use Tests\TestCase;
 
 /**
- * What a completion returns, its tokens and cookie included, can never reach a
- * response if the storage connection's commit fails: the failure reaches the
- * caller of the verification in its place, and nothing of the sign-in is left.
- *
- * The failure is raised by a listener on `TransactionCommitting`, as Laravel's
- * `transaction()` commits on the PDO directly. It leaves the PDO's transaction
- * open, as a commit the database refused might, so each test rolls that back
- * before it reads durable state, and pending writes are not taken for a
- * rollback. Each then retries, and what the failed commit left waiting must not
- * run alongside the retry.
+ * A failed storage commit reaches the caller in place of the completion. It is
+ * raised on `TransactionCommitting`, as `transaction()` commits on the PDO
+ * directly, and leaves the PDO's transaction open for the test to roll back.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -90,9 +83,7 @@ final class CommitFailureTest extends TestCase
     private false|string $ignoredArguments = false;
 
     /**
-     * Arrange the application, keep arguments in an exception's trace so they
-     * can be searched, bind the completion that issues tokens, and listen for
-     * commits on the storage connection.
+     * Keeps arguments in exception traces so they can be searched.
      *
      * @return void
      */
@@ -123,8 +114,6 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * Put the setting back.
-     *
      * @return void
      */
     #[\Override]
@@ -138,8 +127,8 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * A commit failing on a pending session's verification reaches the caller,
-     * with no result, and leaves the code unspent, no proof and no event.
+     * No result reaches it, the code stays unspent, and no proof or event is
+     * left.
      *
      * @return void
      */
@@ -168,8 +157,6 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * The same for a step-up on an active session.
-     *
      * @return void
      */
     public function testAStepUpNeverAnswers(): void
@@ -195,9 +182,8 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * The same for confirming an enrolment on a pending session: the factor
-     * stays pending, the codes it would have come with are not generated, and
-     * the grant and code still work.
+     * The factor stays pending, no recovery codes are generated, and the grant
+     * and code still work.
      *
      * @return void
      */
@@ -226,8 +212,7 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * The control: with no failure, the route answers with the token and the
-     * cookie, so their absence below means something.
+     * The control for the tests below.
      *
      * @return void
      */
@@ -241,8 +226,7 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * Through the kernel, a pending verification whose commit fails is a server
-     * error with neither the token nor the cookie.
+     * A server error, through the kernel.
      *
      * @return void
      */
@@ -252,8 +236,6 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * The same for a step-up.
-     *
      * @return void
      */
     public function testAFailedCommitOnAStepUpAnswersWithNeither(): void
@@ -268,8 +250,6 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * The same for confirming an enrolment through the kernel.
-     *
      * @return void
      */
     public function testAFailedCommitOnAConfirmationAnswersWithNeither(): void
@@ -290,10 +270,8 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * A removal whose commit fails is a server error: the factor stays, nothing
-     * is reported, and nothing the failed commit left waiting runs alongside
-     * the retry. The proofs it forgot on the session stay forgotten, which
-     * leaves the person to verify again.
+     * The factor stays and nothing is reported; the proofs it forgot stay
+     * forgotten, so the person verifies again.
      *
      * @return void
      */
@@ -317,9 +295,7 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * A passkey's association in a change whose own commit fails leaves no
-     * factor, no association and no report: the caller's commit is what they
-     * wait for.
+     * The caller's commit is what the association waits for.
      *
      * @return void
      *
@@ -346,8 +322,7 @@ final class CommitFailureTest extends TestCase
 
             self::fail('The commit failure must reach the caller.');
         } catch (CommitFailedException) {
-            // The transaction that failed is this test's own, so what it left
-            // on the PDO is for the test to end, not the package.
+            // The failed transaction is this test's to end, not the package's.
             DB::connection(StorageConnection::name())->getPdo()->rollBack();
         }
 
@@ -357,8 +332,7 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * A seam refusing after it began handing over returns a failed result, with
-     * nothing a caller could send.
+     * The seam refuses after it began handing over.
      *
      * @return void
      */
@@ -383,9 +357,8 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * Inside an application's own transaction on the storage connection our
-     * commit is a savepoint, so the result reaches its closure first; rolling
-     * that transaction back means the cookie is never queued.
+     * Inside an application's transaction our commit is a savepoint, so rolling
+     * the outer one back means the cookie is never queued.
      *
      * @return void
      *
@@ -411,8 +384,6 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * An outer commit is what queues the cookie.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -431,9 +402,8 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * Define the route the kernel tests call: it verifies, and answers with the
-     * token the completion returned, under the middleware that attaches queued
-     * cookies, including to an error response.
+     * The route verifies and answers with the completion's token, under the
+     * middleware that attaches queued cookies, even to errors.
      *
      * @param  \Illuminate\Routing\Router  $router
      * @return void
@@ -464,8 +434,7 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * A person on a pending session the store knows of, with a TOTP factor, and
-     * what they submit.
+     * A person on a pending session with a TOTP factor, and what they submit.
      *
      * @return array{factor: string, code: string}
      */
@@ -482,8 +451,6 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * The same, as a submission.
-     *
      * @return \SineMacula\Laravel\Mfa\Verification\Submission
      */
     private function arrangedPendingSubmission(): Submission
@@ -494,9 +461,7 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * Fail the next commit, make the call and assert the failure is what the
-     * caller receives, with no result anywhere in it, and roll the transaction
-     * the failure left open back.
+     * Fails the next commit and rolls back the transaction it leaves open.
      *
      * @param  \Closure(): (\SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation|\SineMacula\Laravel\Mfa\Verification\VerificationResult)  $call
      * @return void
@@ -518,8 +483,7 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * Fail the next commit of a request through the kernel, and assert the
-     * answer is a server error with neither the token nor the cookie.
+     * Fails the next commit of a request through the kernel.
      *
      * @param  array<string, string>  $input
      * @param  string  $route
@@ -545,8 +509,8 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * Search the failure, what it wraps and the arguments of every frame of
-     * their traces for anything that could carry the completion.
+     * Searches the failure, its previous ones and every frame's arguments for
+     * anything that could carry the completion.
      *
      * @param  \Throwable  $failure
      * @return void
@@ -572,8 +536,8 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * The failure left no transaction open on the PDO, so what is read next is
-     * durable state and not what the failed commit had pending.
+     * So what is read next is durable state, not what the failed commit had
+     * pending.
      *
      * @return void
      */
@@ -583,8 +547,6 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * What was reported as passed.
-     *
      * @return list<\SineMacula\Laravel\Mfa\Events\VerificationPassed>
      */
     private function passedReports(): array
@@ -593,8 +555,6 @@ final class CommitFailureTest extends TestCase
     }
 
     /**
-     * The cookie jar.
-     *
      * @return \Illuminate\Cookie\CookieJar
      */
     private function cookies(): CookieJar

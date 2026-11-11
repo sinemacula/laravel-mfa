@@ -9,12 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Testing\Seams\FirstFactorResolverContract;
 
 /**
- * The `FirstFactorResolver` contract kit: it answers nothing, or a first factor
- * of the identity on the application not dated in the future, and nothing for
- * an identity with no sign-in.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `FirstFactorResolverContract`.
+ * The `FirstFactorResolver` contract kit; each check delegates to
+ * `FirstFactorResolverContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -26,9 +22,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\FirstFactorResolverContract;
 trait FirstFactorResolverTests
 {
     /**
-     * A signed-in identity is answered nothing, or its own first factor on the
-     * application.
-     *
      * @return void
      */
     public function testFirstFactorResolverAnswersOnlyTheIdentitysFirstFactor(): void
@@ -37,8 +30,6 @@ trait FirstFactorResolverTests
     }
 
     /**
-     * An identity with no sign-in has no first factor.
-     *
      * @return void
      */
     public function testFirstFactorResolverAnswersNothingWithoutASignIn(): void
@@ -47,29 +38,21 @@ trait FirstFactorResolverTests
     }
 
     /**
-     * The resolver under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver
      */
     abstract protected function firstFactorResolver(): FirstFactorResolver;
 
     /**
-     * An identity signed in on the application.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     abstract protected function signedInIdentity(): MultiFactorAuthenticatable;
 
     /**
-     * An identity with no sign-in on the application.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     abstract protected function identityWithoutSignIn(): MultiFactorAuthenticatable;
 
     /**
-     * The application asked about.
-     *
      * @return string
      */
     abstract protected function firstFactorApplication(): string;

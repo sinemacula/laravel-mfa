@@ -30,24 +30,8 @@ use SineMacula\Laravel\Mfa\Passkeys\UnavailablePasskeyGateway;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeSettings;
 
 /**
- * Checks the whole configuration, and the bindings it needs, before anything
- * relies on it: every setting within its bounds, and every configured
- * application with a delivery binding for each code type it enables, a passkey
- * gateway when it enables passkeys, and a first factor it declares or a
- * `FirstFactorResolver` of its own reports.
- *
- * Every check runs, so one run finds every problem. They are grouped by
- * subject: `storage` (the connection, and a name of its own for every table),
- * `factor`, `identity_state`, one per capability block (`totp`, `codes`,
- * `recovery_codes`, `attempts`, `enrollment`, `passkeys`, `lifecycle`),
- * `applications`, and `applications.{name}` for each configured application. A
- * block that names a table or a model has them checked with it: a table name
- * must be a non-blank string, and a model must be one, on the storage
- * connection. The package runs it once the application has booted and again
- * when the `mfa` manager is resolved, throwing an
- * `InvalidConfigurationException` that lists every problem; `mfa:check` prints
- * them instead. It reads configuration and the container only, and opens no
- * database connection.
+ * Checks the whole configuration and the bindings it needs. Every check runs,
+ * so one run reports every problem. Opens no database connection.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -57,23 +41,19 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeSettings;
 final readonly class ConfigurationValidator
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Contracts\Config\Repository  $config
      */
     public function __construct(
 
-        /** The container the bindings are checked in. */
+        /** Where the bindings are checked. */
         private Container $container,
 
-        /** The configuration that is checked. */
+        /** What is checked. */
         private Repository $config,
     ) {}
 
     /**
-     * Every subject's problems, an empty list for a subject without one.
-     *
      * @return array<string, list<string>>
      */
     public function report(): array
@@ -90,8 +70,6 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Throw when any subject has a problem, listing every one.
-     *
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException
@@ -113,8 +91,6 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * The checks, by subject: each throws when it finds a problem.
-     *
      * @return array<string, list<\Closure(): mixed>>
      */
     private function checks(): array
@@ -161,10 +137,6 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Refuse a storage connection that is malformed or that
-     * `database.connections` does not configure; `null`, the default
-     * connection, always is.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -180,8 +152,6 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Refuse a model that lives on another connection than the storage one.
-     *
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
      * @param  string  $setting
      * @return void
@@ -194,8 +164,6 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Refuse a table name that is not a non-blank string.
-     *
      * @param  string  $block
      * @return void
      *
@@ -212,8 +180,7 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Refuse two of the package's tables configured with the same name, which
-     * the second migration would refuse to create.
+     * The second migration would refuse to create a shared table.
      *
      * @return void
      *
@@ -237,11 +204,8 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Refuse an application that enables a code type with nothing bound to
-     * deliver its codes: `sms` with the package's `NullSmsSender` still bound
-     * as the `SmsSender`, or `email` with its `NullEmailSender` still bound as
-     * the `EmailSender`; and one that enables either while no application key
-     * is set to hash its codes with.
+     * Refuse a code type with only the null sender bound, or with no `app.key`
+     * to hash its codes.
      *
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $application
      * @return void
@@ -272,11 +236,8 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Refuse an application that enables `passkey` while the package's
-     * `UnavailablePasskeyGateway` is still bound as the `PasskeyGateway`: this
-     * package runs no ceremonies of its own. A gateway of the application's
-     * that reports itself unavailable at run time is not refused here; the type
-     * is then never offered.
+     * A gateway that reports itself unavailable at run time is not refused; the
+     * type is then never offered.
      *
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $application
      * @return void
@@ -294,8 +255,6 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Refuse the package's `UnavailablePasskeyGateway`.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway  $gateway
      * @return void
      *
@@ -309,10 +268,8 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * Refuse an application that neither declares its first factor nor has a
-     * `FirstFactorResolver` of its own bound to report it: the default reads
-     * the declaration, so without one no further factor can be accepted after
-     * the sign-in and no level established.
+     * Without a declaration or a resolver of its own, no further factor can be
+     * accepted and no level established.
      *
      * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $application
      * @return void
@@ -332,8 +289,7 @@ final readonly class ConfigurationValidator
     }
 
     /**
-     * The problem a check finds, or `null` when it finds none. A binding the
-     * container cannot build is a problem of the subject that needs it.
+     * A binding the container cannot build is the subject's problem.
      *
      * @param  \Closure(): mixed  $check
      * @return ?string

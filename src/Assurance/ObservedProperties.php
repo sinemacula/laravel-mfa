@@ -9,14 +9,8 @@ use SineMacula\Laravel\Mfa\Enums\KeyProtection;
 use SineMacula\Laravel\Mfa\Support\SerializedFields;
 
 /**
- * The properties a proof actually observed: user presence, user verification,
- * backup eligibility, backup state, phishing resistance and key protection.
- *
- * `null` means the property was not observed, and nothing defaults to true:
- * levels, `amr` values and context keys are derived from what was observed,
- * never inferred from a factor's type or from configuration. A TOTP code
- * observes none of them; a passkey assertion reports what its authenticator
- * data showed.
+ * What a proof actually observed. `null` means not observed; nothing is
+ * inferred from a factor's type or configuration.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, bool|string|null>
  *
@@ -26,8 +20,6 @@ use SineMacula\Laravel\Mfa\Support\SerializedFields;
 final readonly class ObservedProperties implements \JsonSerializable, Arrayable
 {
     /**
-     * Constructor.
-     *
      * @param  ?bool  $userPresence
      * @param  ?bool  $userVerification
      * @param  ?bool  $backupEligibility
@@ -39,19 +31,19 @@ final readonly class ObservedProperties implements \JsonSerializable, Arrayable
      */
     public function __construct(
 
-        /** Whether the person was seen to be present (WebAuthn UP). */
+        /** WebAuthn UP. */
         public ?bool $userPresence = null,
 
-        /** Whether the person was verified by the authenticator (WebAuthn UV). */
+        /** WebAuthn UV. */
         public ?bool $userVerification = null,
 
-        /** Whether the credential may be backed up (WebAuthn BE). */
+        /** WebAuthn BE. */
         public ?bool $backupEligibility = null,
 
-        /** Whether the credential is backed up (WebAuthn BS). */
+        /** WebAuthn BS. */
         public ?bool $backupState = null,
 
-        /** Whether the proof resisted phishing, as a WebAuthn assertion bound to its origin does. */
+        /** True for an origin-bound WebAuthn assertion. */
         public ?bool $phishingResistance = null,
 
         /** How the credential's key was protected. */
@@ -63,8 +55,6 @@ final readonly class ObservedProperties implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The properties of a proof that observed nothing.
-     *
      * @return self
      */
     public static function none(): self
@@ -73,8 +63,7 @@ final readonly class ObservedProperties implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Read the properties back from their serialised form. A missing key reads
-     * as not observed, and an unknown one is refused.
+     * A missing key reads as not observed; an unknown key is refused.
      *
      * @param  array<array-key, mixed>  $data
      * @return self
@@ -98,8 +87,6 @@ final readonly class ObservedProperties implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The properties with snake_case keys, `null` for what was not observed.
-     *
      * @return array{user_presence: ?bool, user_verification: ?bool, backup_eligibility: ?bool, backup_state: ?bool, phishing_resistance: ?bool, key_protection: ?string}
      */
     #[\Override]
@@ -116,8 +103,6 @@ final readonly class ObservedProperties implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The properties as JSON serialises them: the same as `toArray()`.
-     *
      * @return array{user_presence: ?bool, user_verification: ?bool, backup_eligibility: ?bool, backup_state: ?bool, phishing_resistance: ?bool, key_protection: ?string}
      */
     #[\Override]

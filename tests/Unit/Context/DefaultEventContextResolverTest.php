@@ -16,10 +16,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Unit tests for `DefaultEventContextResolver`, the event context without an
- * authentication layer: the identity, the application and the request, never
- * the Laravel session's id.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -29,8 +25,6 @@ use Tests\TestCase;
 final class DefaultEventContextResolverTest extends TestCase
 {
     /**
-     * It is the resolver bound by default.
-     *
      * @return void
      */
     public function testItIsBoundByDefault(): void
@@ -39,9 +33,8 @@ final class DefaultEventContextResolverTest extends TestCase
     }
 
     /**
-     * The identity's type and id, and the client's address and user agent; no
-     * application, which the dispatcher names, and no principal, tenant or
-     * session, the sign-in being this package's own id and no session's.
+     * The dispatcher names the application, and the sign-in is this package's
+     * own id, not a session's.
      *
      * @return void
      */
@@ -63,8 +56,6 @@ final class DefaultEventContextResolverTest extends TestCase
     }
 
     /**
-     * An Eloquent identity is recorded by its morph class.
-     *
      * @return void
      */
     public function testAnEloquentIdentityIsRecordedByItsMorphClass(): void
@@ -79,8 +70,6 @@ final class DefaultEventContextResolverTest extends TestCase
     }
 
     /**
-     * Without an identity or a request, nothing is known.
-     *
      * @return void
      */
     public function testWithoutAnIdentityOrARequestNothingIsKnown(): void
@@ -89,8 +78,7 @@ final class DefaultEventContextResolverTest extends TestCase
     }
 
     /**
-     * The application is never read from a resolver: the dispatcher names the
-     * one the operation ran through.
+     * The dispatcher names the application the operation ran through.
      *
      * @return void
      *
@@ -108,8 +96,6 @@ final class DefaultEventContextResolverTest extends TestCase
     }
 
     /**
-     * Resolve the resolver.
-     *
      * @return \SineMacula\Laravel\Mfa\Context\DefaultEventContextResolver
      */
     private function resolver(): DefaultEventContextResolver

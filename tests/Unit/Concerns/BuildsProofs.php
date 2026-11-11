@@ -14,9 +14,6 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * Builds a valid additional-factor proof for the tests of the values that hold
- * one, with any argument overridden by name.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -25,8 +22,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 trait BuildsProofs
 {
     /**
-     * Build a TOTP proof made on a step-up, with the given arguments in place
-     * of the defaults.
+     * A TOTP step-up proof, with any constructor argument overridden by name.
      *
      * @param  array<string, mixed>  $overrides
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof

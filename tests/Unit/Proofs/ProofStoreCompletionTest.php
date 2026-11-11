@@ -31,10 +31,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * The default `PendingCompletion` and `StepUp`: they pass the contract kits,
- * record a proof in the store only once the storage connection commits, return
- * nothing, and never begin a sign-in.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -52,8 +48,6 @@ final class ProofStoreCompletionTest extends TestCase
     private TestUser $user;
 
     /**
-     * Sign a person in on the application, with a sign-in the store knows.
-     *
      * @return void
      */
     #[\Override]
@@ -73,8 +67,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -86,8 +78,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * The default binding of both seams is this one.
-     *
      * @return void
      */
     public function testIsTheDefaultOfBothSeams(): void
@@ -97,8 +87,8 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A step-up is recorded on the store and returns nothing; so is a sign-in
-     * completed alone on an active session.
+     * So is a sign-in completed alone on an active session; neither returns
+     * anything.
      *
      * @return void
      */
@@ -117,8 +107,7 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A pending session's proof is recorded when the store's sign-in is its
-     * own.
+     * When the store's sign-in is the pending session's own.
      *
      * @return void
      */
@@ -133,8 +122,7 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A proof handed over inside a transaction is kept only once it commits,
-     * and never when it rolls back.
+     * Never when the transaction rolls back.
      *
      * @return void
      */
@@ -163,7 +151,7 @@ final class ProofStoreCompletionTest extends TestCase
 
     /**
      * Without a person signed in, or for a purpose an active session cannot
-     * take, a step-up is refused as not accepted.
+     * take.
      *
      * @return void
      */
@@ -193,9 +181,8 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A pending session refuses a purpose other than a sign-in, and a result
-     * bound to another application or owner; and when the store is on another
-     * sign-in, the proof bound to the pending id.
+     * Another purpose than sign-in, another application or owner, and, when the
+     * store is on another sign-in, the proof bound to the pending id.
      *
      * @return void
      */
@@ -214,8 +201,7 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A caller with no pending session is refused, even with a proof the
-     * pending session would take, and nothing is recorded.
+     * Even with a proof the pending session would take; nothing is recorded.
      *
      * @return void
      */
@@ -231,8 +217,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * The completion under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\PendingCompletion
      */
     #[\Override]
@@ -242,8 +226,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A pending session of the person.
-     *
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
      */
     #[\Override]
@@ -261,8 +243,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A sign-in proof of the pending session, whose sign-in the store holds.
-     *
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      */
     #[\Override]
@@ -274,8 +254,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A result bound to another session.
-     *
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      */
     #[\Override]
@@ -285,8 +263,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * The step-up under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\StepUp
      */
     #[\Override]
@@ -296,8 +272,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A result bound to another session.
-     *
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      */
     #[\Override]
@@ -307,8 +281,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * The signed-in person, on an active session.
-     *
      * @return \SineMacula\Laravel\Mfa\Context\CallerContext
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -320,8 +292,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * The call is refused as not accepted.
-     *
      * @param  \Closure(): mixed  $call
      * @return void
      */
@@ -339,8 +309,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A TOTP proof of the person's, for the purpose, on the session.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  string  $session
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -353,8 +321,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * The proof under the binding given.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -365,8 +331,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * A verified result of the proof.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      */
@@ -376,9 +340,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * The proofs the store holds for the person's sign-in, in their stored
-     * form.
-     *
      * @param  string  $session
      * @return list<array<string, mixed>>
      */
@@ -388,8 +349,6 @@ final class ProofStoreCompletionTest extends TestCase
     }
 
     /**
-     * The bound proof store.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
      */
     private function store(): ProofStore

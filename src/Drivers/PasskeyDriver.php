@@ -11,15 +11,8 @@ use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * Passkey factor driver.
- *
- * A passkey is proved by a WebAuthn assertion, never by a code: its credential
- * and ceremonies are the bound `PasskeyGateway`'s, a factor exists only through
- * an association record, and its assertions are requested and verified by
- * `Passkeys\PasskeyAssertions`. The driver states the channel and refuses
- * everything a code would do. It claims no `amr` value of its own: presence,
- * user verification and the key's protection are read from what an assertion
- * observed.
+ * A passkey is proved by a WebAuthn assertion through
+ * `Passkeys\PasskeyAssertions`, so this driver refuses every code.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,8 +20,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 final class PasskeyDriver implements FactorDriver
 {
     /**
-     * A passkey credential.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
      */
     #[\Override]
@@ -38,7 +29,7 @@ final class PasskeyDriver implements FactorDriver
     }
 
     /**
-     * None: a passkey's `amr` values depend on what its assertion observed.
+     * None: they depend on what the assertion observed.
      *
      * @return list<string>
      */
@@ -49,7 +40,7 @@ final class PasskeyDriver implements FactorDriver
     }
 
     /**
-     * No secret: a passkey is registered by the authentication layer.
+     * The authentication layer registers a passkey.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return null
@@ -61,7 +52,7 @@ final class PasskeyDriver implements FactorDriver
     }
 
     /**
-     * Never: a code does not confirm a passkey; its registration does.
+     * Its registration confirms a passkey, never a code.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
@@ -75,7 +66,7 @@ final class PasskeyDriver implements FactorDriver
     }
 
     /**
-     * Never: a code does not prove a passkey; an assertion does.
+     * An assertion proves a passkey, never a code.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code

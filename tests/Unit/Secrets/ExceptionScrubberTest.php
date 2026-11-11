@@ -17,13 +17,6 @@ use Tests\Fixtures\Secrets\ForgedTrace;
 use Tests\Fixtures\Secrets\RecordedTrace;
 
 /**
- * Tests for `ExceptionScrubber`: every argument of a frame that touches the
- * package is redacted, every value the package passed on or a frame marked as
- * sensitive is redacted from every other frame, other frames keep the rest of
- * their arguments with the secrets in them redacted, code messages leave every
- * frame, the values collected and the values given leave the messages, and
- * every exception in the chain is scrubbed.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -45,8 +38,7 @@ final class ExceptionScrubberTest extends TestCase
     private const string VENDOR_FILE = '/app/vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php';
 
     /**
-     * Every argument of a call into one of the package's classes is redacted,
-     * and its string form shows none of them.
+     * Its string form shows none of them either.
      *
      * @return void
      */
@@ -63,8 +55,7 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * Every argument of a call made from one of the package's files is
-     * redacted, a call to a PHP function included.
+     * A call to a PHP function included.
      *
      * @return void
      */
@@ -81,9 +72,6 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * Arguments of a frame that does not touch the package are kept, apart from
-     * the secrets in them.
-     *
      * @return void
      */
     public function testKeepsTheArgumentsOfOtherFramesApartFromTheirSecrets(): void
@@ -104,8 +92,8 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A file beside the package's source directory, whose path only starts like
-     * it, is not the package's.
+     * A path that only starts like the package's source directory is not the
+     * package's.
      *
      * @return void
      */
@@ -123,9 +111,8 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A frame without arguments, as PHP records with
-     * `zend.exception_ignore_args` on, or with arguments that are not a list,
-     * is kept as it is.
+     * As PHP records with `zend.exception_ignore_args` on, or with arguments
+     * that are not a list.
      *
      * @return void
      */
@@ -144,8 +131,7 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A chain whose previous exceptions loop back is scrubbed once each, and
-     * the walk ends.
+     * Each exception is scrubbed once, and the walk ends.
      *
      * @return void
      */
@@ -163,7 +149,7 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * Every previous exception in the chain is scrubbed too, an error included.
+     * An error included.
      *
      * @return void
      */
@@ -184,8 +170,7 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A value passed into the package is redacted from every other frame that
-     * recorded it, in a nested argument too, as a facade's frame records it.
+     * In a nested argument too, as a facade's frame records it.
      *
      * @return void
      */
@@ -205,8 +190,8 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A string containing a value the package passed on is redacted whole when
-     * the value is six characters or more, and kept when it is shorter.
+     * Redacted whole when the value is six characters or more, and kept when it
+     * is shorter.
      *
      * @return void
      */
@@ -223,8 +208,7 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A value any frame marks as sensitive is redacted from every other frame,
-     * when PHP records the trace for real.
+     * When PHP records the trace for real.
      *
      * @return void
      */
@@ -249,9 +233,6 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * The plaintext of a secret value in one frame is redacted from every other
-     * frame.
-     *
      * @return void
      */
     public function testRedactsThePlaintextOfASecretValueFromEveryFrame(): void
@@ -268,9 +249,6 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A value passed on in one exception of the chain is redacted from the
-     * others.
-     *
      * @return void
      */
     public function testRedactsAValuePassedOnAcrossTheChain(): void
@@ -289,8 +267,8 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * Empty strings and redaction markers the package passed on are not treated
-     * as values to redact elsewhere.
+     * Empty strings and redaction markers the package passed on are not values
+     * to redact elsewhere.
      *
      * @return void
      */
@@ -307,8 +285,7 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * Values nested deeper than the walk reaches are not collected, and the
-     * walk ends on a recursive argument.
+     * The walk also ends on a recursive argument.
      *
      * @return void
      */
@@ -328,8 +305,8 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A provisioning URI in the message of the exception and of a previous one
-     * is redacted, and a message without one is kept.
+     * In the exception's message and a previous one's; a message without one is
+     * kept.
      *
      * @return void
      */
@@ -348,10 +325,8 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A value a frame of the chain recorded as sensitive, after a frame without
-     * arguments too, is redacted from the message of every exception in the
-     * chain, each occurrence replaced, and a message that is a shorter value is
-     * redacted whole.
+     * A value recorded as sensitive is replaced at each occurrence in every
+     * message, and a message that is a shorter value goes whole.
      *
      * @return void
      */
@@ -379,9 +354,8 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * Rows of whether PHP records the arguments of each call in a trace, as a
-     * development configuration does, or ignores them, as a production one
-     * does.
+     * Whether PHP records call arguments in a trace, as in development, or not,
+     * as in production.
      *
      * @return iterable<string, array{bool}>
      */
@@ -392,9 +366,8 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * The values given to the scrub are redacted from every message and frame
-     * of the chain, whatever their length, whether or not PHP recorded the
-     * arguments; empty and missing values are ignored.
+     * From every message and frame, whatever their length; empty and missing
+     * values are ignored.
      *
      * @param  bool  $arguments
      * @return void
@@ -420,9 +393,8 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A code message in another frame, or a queued job sending one, nested in
-     * an argument too, is redacted, and its code and recipient are redacted
-     * from every other frame and every message, whatever their length.
+     * Nested or queued too; its code and recipient leave every other frame and
+     * message, whatever their length.
      *
      * @return void
      */
@@ -445,9 +417,8 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * The sensitive values given are redacted from every message of the chain,
-     * each as its kind is: a known value whatever its length, a collected one
-     * only from six characters.
+     * A known value whatever its length, a collected one only from six
+     * characters.
      *
      * @return void
      */
@@ -462,8 +433,6 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * The values a chain recorded are read without scrubbing anything.
-     *
      * @return void
      */
     public function testReadsTheSensitiveValuesWithoutScrubbing(): void
@@ -480,8 +449,6 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * Scrubbing twice changes nothing more.
-     *
      * @return void
      */
     public function testScrubbingIsIdempotent(): void
@@ -500,8 +467,6 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * A trace frame.
-     *
      * @param  string  $file
      * @param  ?string  $class
      * @param  string  $function
@@ -516,8 +481,6 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * The value, nested in as many lists.
-     *
      * @param  string  $value
      * @param  int  $levels
      * @return array<int, mixed>
@@ -534,8 +497,6 @@ final class ExceptionScrubberTest extends TestCase
     }
 
     /**
-     * The arguments recorded in a frame of the exception's trace.
-     *
      * @param  \Throwable  $throwable
      * @param  int  $frame
      * @return mixed

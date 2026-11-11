@@ -11,13 +11,8 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
- * Non-Eloquent identity fixture.
- *
- * Implements `MultiFactorAuthenticatable` without extending
- * `Illuminate\Database\Eloquent\Model`, used to exercise the FQCN-fallback
- * branch of `Support\IdentityType::of()` that the proof store and recovery
- * codes rely on — that path only fires for identities the morph map cannot
- * resolve through `getMorphClass()`.
+ * An identity that is not an Eloquent model, so its type falls back to the
+ * class name where the morph map cannot name it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,12 +22,6 @@ use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 final class NonEloquentIdentity implements MultiFactorAuthenticatable
 {
     /**
-     * Constructor.
-     *
-     * The configurable `$identifier` lets a single fixture exercise both the
-     * normal scalar branch and the unsupported-shape branch of what reads the
-     * identity's key.
-     *
      * @param  mixed  $identifier
      * @param  bool  $mfaEnabled
      * @param  bool  $person
@@ -42,25 +31,23 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
      */
     public function __construct(
 
-        /** Auth identifier reported by the fixture. */
+        /** Any shape, to reach the unsupported-identifier branches. */
         private readonly mixed $identifier = 'plain-1',
 
-        /** Whether the fixture reports MFA as enabled. */
+        /** @var bool */
         private readonly bool $mfaEnabled = false,
 
-        /** Whether the fixture is a person, who may hold factors. */
+        /** Whether it is a person, who may hold factors. */
         private readonly bool $person = true,
 
-        /** Whether the fixture is active. */
+        /** @var bool */
         private readonly bool $active = true,
 
-        /** What the fixture requires of its own sign-ins. */
+        /** What it requires of its own sign-ins. */
         private readonly ?Requirement $requirement = null,
     ) {}
 
     /**
-     * Report whether the fixture is a person.
-     *
      * @return bool
      */
     #[\Override]
@@ -70,8 +57,6 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Report whether the fixture is active.
-     *
      * @return bool
      */
     #[\Override]
@@ -81,8 +66,6 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Report what the fixture requires of its own sign-ins.
-     *
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      */
     #[\Override]
@@ -92,8 +75,6 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Return the fixture's seeded auth identifier.
-     *
      * @return mixed
      */
     #[\Override]
@@ -103,8 +84,6 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Return the conventional auth-identifier column name.
-     *
      * @return string
      */
     #[\Override]
@@ -114,8 +93,6 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Return a placeholder password — the fixture does not authenticate.
-     *
      * @return string
      */
     #[\Override]
@@ -125,8 +102,6 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Return the conventional password column name.
-     *
      * @return string
      */
     #[\Override]
@@ -136,8 +111,6 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Return an empty remember token — the fixture has no persistent session.
-     *
      * @return string
      */
     #[\Override]
@@ -147,10 +120,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * The upstream `Authenticatable` contract declares this parameter untyped
-     * (its signature `setRememberToken($value)` accepts any value); the
-     * implementation widens to `mixed` so the LSP rule stays satisfied without
-     * losing the static-analysis type signal.
+     * Typed `mixed` because the contract leaves the parameter untyped.
      *
      * @param  mixed  $value
      * @return void
@@ -158,13 +128,11 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     #[\Override]
     public function setRememberToken(mixed $value): void
     {
-        // no-op — fixture does not persist remember tokens.
+        // Remember tokens are not kept.
         unset($value);
     }
 
     /**
-     * Return the conventional remember-token column name.
-     *
      * @return string
      */
     #[\Override]
@@ -174,9 +142,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Always reports the configured value — non-Eloquent identities in these
-     * tests have no real factor store, so the boolean is held directly and
-     * nothing touches a builder.
+     * Held directly, since there is no factor store behind it.
      *
      * @return bool
      */
@@ -187,10 +153,6 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Return a builder against the shipped Factor model — the manager only
-     * invokes this when `isMfaEnabled()` is true, which the default fixture
-     * configuration avoids.
-     *
      * @formatter:off
      *
      * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
@@ -207,8 +169,7 @@ final class NonEloquentIdentity implements MultiFactorAuthenticatable
     }
 
     /**
-     * Re-present the morph-relation builder under the intersection type
-     * required by the `MultiFactorAuthenticatable` contract.
+     * Narrows the builder to the type the contract requires.
      *
      * @formatter:off
      *

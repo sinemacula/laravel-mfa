@@ -15,8 +15,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
- * MultiFactorAuthenticatable whose `getAuthIdentifier()` returns an object
- * rather than a scalar, used to prove that a non-scalar auth identifier is
+ * An identity whose `getAuthIdentifier()` returns an object, which must be
  * refused wherever it would name a record or a lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -40,9 +39,6 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
     ];
 
     /**
-     * Return a non-scalar auth identifier, which nothing may key a record or a
-     * lock by.
-     *
      * @return mixed
      */
     #[\Override]
@@ -52,8 +48,6 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
     }
 
     /**
-     * Does not have any factors for the purposes of these tests.
-     *
      * @return bool
      */
     #[\Override]
@@ -63,8 +57,6 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
     }
 
     /**
-     * Return an empty factor builder (no factors expected).
-     *
      * @formatter:off
      *
      * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
@@ -78,8 +70,6 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
     }
 
     /**
-     * Polymorphic `factors` relation.
-     *
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany<\SineMacula\Laravel\Mfa\Models\Factor, $this>
      */
     public function factors(): MorphMany
@@ -88,8 +78,7 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
     }
 
     /**
-     * Re-present the morph-relation builder under the intersection type
-     * required by the `MultiFactorAuthenticatable` contract.
+     * Narrows the relation's builder to the type the contract requires.
      *
      * @formatter:off
      *

@@ -8,11 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException;
 
 /**
- * The email sender the package binds until the application binds its own: it
- * sends nothing and throws, so a code is never dropped silently. The package
- * refuses to boot with an application that enables `email` while it is bound.
- * `MailEmailSender` delivers through Laravel's mailer for an application that
- * binds it.
+ * Default email sender: throws so a code is never dropped silently. Boot fails
+ * when `email` is enabled while it is bound.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,8 +19,6 @@ use SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException;
 final readonly class NullEmailSender implements EmailSender
 {
     /**
-     * Refuse to send, naming the contract to bind.
-     *
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      *

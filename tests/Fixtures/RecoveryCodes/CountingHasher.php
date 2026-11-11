@@ -7,15 +7,9 @@ namespace Tests\Fixtures\RecoveryCodes;
 use Illuminate\Contracts\Hashing\Hasher;
 
 /**
- * A hasher that counts its checks and records what each was given, so a test
- * can prove how much work a redemption did.
- *
- * Given a hasher, it hands every call on to it; without one, it hashes by
- * prefixing the value, which is enough for a test that only compares. A hook,
- * when set, runs before the check it is set for (the first by default), once: a
- * test stands a concurrent request in there, which then runs while the
- * redemption it interrupts has read the set and is part-way through checking
- * it.
+ * Records every check, so a test can prove how much work a redemption did.
+ * Without an inner hasher it hashes by prefixing. A hook set with `before()`
+ * runs once, so a concurrent request can interrupt a redemption mid-check.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,32 +18,28 @@ use Illuminate\Contracts\Hashing\Hasher;
  */
 final class CountingHasher implements Hasher
 {
-    /** @var string What the fake hashing prefixes a value with. */
+    /** @var string */
     public const string PREFIX = 'counted:';
 
-    /** @var list<string> The value each check was given, in order. */
+    /** @var list<string> */
     public array $checked = [];
 
-    /** @var ?\Closure(): void Run once, before the check it is set for. */
+    /** @var ?\Closure(): void */
     private ?\Closure $hook = null;
 
-    /** @var int The check, counting from one, the hook runs before. */
+    /** @var int Counted from one. */
     private int $hookAt = 1;
 
     /**
-     * Constructor.
-     *
      * @param  ?\Illuminate\Contracts\Hashing\Hasher  $inner
      */
     public function __construct(
 
-        /** The hasher every call is handed to, or null to hash by prefixing. */
+        /** `null` hashes by prefixing. */
         private readonly ?Hasher $inner = null,
     ) {}
 
     /**
-     * Run the hook once, before the given check.
-     *
      * @param  \Closure(): void  $hook
      * @param  int  $at
      * @return void
@@ -61,8 +51,6 @@ final class CountingHasher implements Hasher
     }
 
     /**
-     * How many checks were made.
-     *
      * @return int
      */
     public function checks(): int
@@ -71,8 +59,6 @@ final class CountingHasher implements Hasher
     }
 
     /**
-     * Get information about the given hashed value.
-     *
      * @param  string  $hashedValue
      * @return array<string, mixed>
      */
@@ -83,8 +69,6 @@ final class CountingHasher implements Hasher
     }
 
     /**
-     * Hash the given value.
-     *
      * @param  string  $value
      * @param  array<mixed>  $options
      * @return string
@@ -96,9 +80,6 @@ final class CountingHasher implements Hasher
     }
 
     /**
-     * Count and record the check, run the hook when it is due, and check the
-     * value against the hash.
-     *
      * @param  string  $value
      * @param  string  $hashedValue
      * @param  array<mixed>  $options
@@ -123,8 +104,6 @@ final class CountingHasher implements Hasher
     }
 
     /**
-     * Whether the hash needs rehashing: never.
-     *
      * @param  string  $hashedValue
      * @param  array<mixed>  $options
      * @return bool

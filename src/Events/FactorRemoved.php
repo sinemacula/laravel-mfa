@@ -7,8 +7,7 @@ namespace SineMacula\Laravel\Mfa\Events;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
- * Dispatched when a factor is removed from the identity, by the identity or by
- * someone else.
+ * Dispatched when a factor is removed, by the identity or by someone else.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -16,8 +15,6 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 final readonly class FactorRemoved extends ContextEvent
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, int|string|null>  $context
      * @param  \SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor

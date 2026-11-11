@@ -24,21 +24,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * The ceremony checks of a passkey factor, through the bound `PasskeyGateway`,
- * one factor and one credential per ceremony, for `Verification` to run.
- *
- * A ceremony is allowed exactly the credential associated with the factor, and
- * only when the factor is a confirmed passkey of the identity's, of a type the
- * application enables, its association names the same owner and credential, the
- * gateway still lists the credential among the identity's registered passkeys,
- * and the combination policy accepts it after the session's first factor, so
- * the passkey that started a sign-in is never its second factor. No ceremony is
- * ever started with an empty or wider allowlist: a credential that fails any of
- * these is refused with an `OperationRefusedException`.
- *
- * An assertion the gateway verifies for another credential than the one allowed
- * fails as an invalid code. Nothing here counts an attempt or records a proof:
- * the verification flow does both, holding the identity's factor state lock.
+ * Passkey ceremonies for `Verification`, each allowing exactly one credential:
+ * never an empty or wider allowlist. Attempts and proofs are recorded by the
+ * caller.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -47,22 +35,20 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  */
 final readonly class PasskeyAssertions
 {
-    /** @var string The factor type passkeys are associated as. */
+    /** @var string The factor type of a passkey. */
     public const string TYPE = 'passkey';
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Context\SessionFirstFactor  $firstFactors
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations  $associations
      */
     public function __construct(
 
-        /** The container the gateway and the policy are resolved from. */
+        /** Resolves the gateway and the combination policy per call. */
         private Container $container,
 
-        /** The reader of the session's first factor. */
+        /** Reads the session's first factor. */
         private SessionFirstFactor $firstFactors,
 
         /** The association records. */
@@ -70,9 +56,6 @@ final readonly class PasskeyAssertions
     ) {}
 
     /**
-     * The options of an assertion request for the identity's passkey factor,
-     * bound as the binding says.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -88,9 +71,8 @@ final readonly class PasskeyAssertions
     }
 
     /**
-     * Check the factor again as stored under the lock, ask the gateway to
-     * verify the response against its one credential, and return what it
-     * observed when it verified that credential, or why it did not.
+     * Checks the factor again under the lock. An assertion for another
+     * credential fails as an invalid code.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -120,9 +102,8 @@ final readonly class PasskeyAssertions
     }
 
     /**
-     * Whether the factor could take part in a ceremony at all: passkeys are
-     * available, its association matches, and the gateway still lists its
-     * credential.
+     * Whether passkeys are available, the association matches and the gateway
+     * still lists the credential.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -139,10 +120,8 @@ final readonly class PasskeyAssertions
     }
 
     /**
-     * The one credential a ceremony for the factor may allow, refusing a factor
-     * that is not a confirmed passkey of an enabled type, one whose association
-     * does not match it, a credential the gateway no longer lists, and one the
-     * combination policy does not accept after the session's first factor.
+     * The one credential a ceremony may allow. The combination policy check
+     * keeps the passkey that started a sign-in from being its second factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -180,9 +159,6 @@ final readonly class PasskeyAssertions
     }
 
     /**
-     * Whether the factor is a passkey whose association names the identity and
-     * the factor's credential.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return bool
@@ -199,9 +175,6 @@ final readonly class PasskeyAssertions
     }
 
     /**
-     * Refuse a factor that is pending, disabled at the failure ceiling, or of a
-     * type the application does not enable.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return void
@@ -220,8 +193,7 @@ final readonly class PasskeyAssertions
     }
 
     /**
-     * The identity's registered passkeys the gateway lists, in their canonical
-     * form only: an id in any other encoding is left out.
+     * Canonical ids only; any other encoding is left out.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return list<string>
@@ -234,8 +206,6 @@ final readonly class PasskeyAssertions
     }
 
     /**
-     * The bound passkey gateway.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

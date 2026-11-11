@@ -12,11 +12,8 @@ use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
- * Evaluates an active session's requirement again on the proofs it holds after
- * a change to the identity's factors, and hands the change, with any shortfall,
- * to the bound `SessionTransition`, as part of that change.
- *
- * Stateless: the seams are resolved on every call.
+ * Evaluates an active session's requirement again after a factor change and
+ * hands any shortfall to the bound `SessionTransition`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,21 +23,17 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 final readonly class SessionReevaluation
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the seams are resolved from on every call. */
+        /** Seams are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * After the change to the factor, evaluate the session's requirement again
-     * on the proofs given and hand the change, with the requirement it does not
-     * meet or `null`, to the bound session transition, whether the session
-     * meets it or not.
+     * The transition is called whether or not the session still meets its
+     * requirement.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -69,8 +62,8 @@ final readonly class SessionReevaluation
     }
 
     /**
-     * The requirement the session does not meet on the proofs given, whole and
-     * not what is left of it, or `null` when it meets it, changing nothing.
+     * The whole requirement the proofs do not meet, or `null` when they meet
+     * it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

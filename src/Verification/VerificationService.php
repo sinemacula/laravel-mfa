@@ -42,33 +42,9 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * The one way a person verifies: a code for one of their factors, a code
- * answering a challenge, a recovery code or a passkey's assertion, with one
- * result and one reason for every failure.
- *
- * The caller and what it is bound to (the owner, the application, the sign-in
- * and the purpose) are captured once and threaded through the check and the
- * proof. An IP address slot is taken, then the identity's factor state lock.
- * Under the lock the caller and the binding are resolved again and compared, so
- * a sign-in that ended or changed in the meantime is refused, counting and
- * reporting nothing; the submission is admitted, then checked and counted along
- * its one route (see `SubmissionRoutes`). A failure ends there, so its count
- * commits. A success makes the proof, stamped with the verification generation
- * read under the lock, which must itself be accepted after the session's first
- * factor; the whole requirement is evaluated again with it; the result goes to
- * `PendingCompletion` or `StepUp` as the last write of the transaction, so
- * their refusal rolls back the code's use and the count (see
- * `ProofAcceptance`).
- *
- * A failure is a result, carrying a reason a caller may be told, with one
- * `VerificationFailed` once the transaction has ended, except where the request
- * serves nobody at all. A success dispatches `VerificationPassed`, and for a
- * recovery code `RecoveryCodeUsed` and `RecoveryCodesLow`, once it commits,
- * after the default seams' proof reaches the store. Any exception but a refusal
- * made inside the transaction propagates, one a listener throws after the
- * commit included: what committed is never reported as failed.
- *
- * Stateless: the seams are resolved on every call.
+ * The one way a person verifies. The caller and binding are resolved again
+ * under the identity's lock, so a sign-in that changed meanwhile counts and
+ * reports nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -78,8 +54,6 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 final readonly class VerificationService
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      * @param  \SineMacula\Laravel\Mfa\Factors\OperationGuard  $guard
@@ -89,29 +63,28 @@ final readonly class VerificationService
      */
     public function __construct(
 
-        /** The container the seams and the configuration are resolved from. */
+        /** Seams and configuration are resolved on every call. */
         private Container $container,
 
-        /** The resolver of who the request serves. */
+        /** Resolves who the request serves. */
         private CallerContextResolver $callers,
 
-        /** The guard every operation on a factor starts with. */
+        /** Starts every operation on a factor. */
         private OperationGuard $guard,
 
-        /** The throttle on the request's IP address. */
+        /** Throttles the request's IP address. */
         private AttemptService $attempts,
 
-        /** The routes a submission is checked along. */
+        /** Checks a submission along its route. */
         private SubmissionRoutes $routes,
 
-        /** The dispatcher of the verification events. */
+        /** Dispatches the verification events. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Verify the submission for the purpose given: for a pending session,
-     * completing its sign-in; for an active one, stepping up unless `sign_in`
-     * is asked for. See `PurposeRule`.
+     * A failure is a result with one `VerificationFailed`; anything thrown
+     * after commit propagates, never reported as failed.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
@@ -148,8 +121,7 @@ final readonly class VerificationService
     }
 
     /**
-     * Find the submission's factor and its driver, refuse one that may not be
-     * used or that takes another kind of submission, and make the attempt.
+     * Refuse a factor that may not be used or takes another kind of submission.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -178,9 +150,6 @@ final readonly class VerificationService
     }
 
     /**
-     * Make the attempt holding a slot of the IP address's window and the
-     * identity's lock, and report how it failed if it did.
-     *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -211,11 +180,8 @@ final readonly class VerificationService
     }
 
     /**
-     * How the attempt settled, holding a slot of the IP address's window and,
-     * once it has one, the identity's lock. A refusal carried out of the
-     * transaction has rolled back what the attempt did; one the address's
-     * throttle made ran nothing. Anything thrown once the transaction committed
-     * propagates.
+     * A refusal carried out of the transaction has rolled back what the attempt
+     * did; anything thrown after commit propagates.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -256,10 +222,8 @@ final readonly class VerificationService
     }
 
     /**
-     * Open the identity's factor state transaction and settle the attempt in
-     * it. What a success returns commits with it, and what a failure counted
-     * commits too, since it returns; a refusal thrown inside it rolls
-     * everything back and is carried out, marked as made before the commit.
+     * A counted failure returns and so commits; a refusal thrown inside rolls
+     * back and is carried out.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
@@ -302,8 +266,8 @@ final readonly class VerificationService
     }
 
     /**
-     * Under the lock: admit the factor as stored, check and count the
-     * submission, and on a pass stamp the factor's last use and complete.
+     * Under the lock: admit, check and count, then on a pass stamp the factor's
+     * last use and complete.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -348,9 +312,6 @@ final readonly class VerificationService
     }
 
     /**
-     * Under the lock: admit the recovery code, redeem it, and on a pass
-     * complete.
-     *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -379,10 +340,7 @@ final readonly class VerificationService
     }
 
     /**
-     * Under the lock: refuse a proof that is not itself accepted after the
-     * session's first factor, whatever an older proof shows; evaluate the whole
-     * requirement again with it; hand the result to the seam; and queue the
-     * events, so a rollback discards them.
+     * Events are queued under the lock, so a rollback discards them.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
@@ -403,9 +361,6 @@ final readonly class VerificationService
     }
 
     /**
-     * Evaluate and hand over a proof the route made, refusing one the
-     * combination policy does not accept; see `complete()`.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @param  \SineMacula\Laravel\Mfa\Verification\CheckOutcome  $check
@@ -436,9 +391,7 @@ final readonly class VerificationService
     }
 
     /**
-     * Report a refusal made before any factor or attempt, naming the sign-in
-     * the verification was bound to when the binding was captured, or else the
-     * pending session's.
+     * Report a refusal made before any factor or attempt.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $application
@@ -461,9 +414,7 @@ final readonly class VerificationService
     }
 
     /**
-     * Report a failed attempt, once, and answer it: with the challenge a check
-     * reported before a seam refused, or the one the submission named, and only
-     * with the factor it was named for.
+     * Name a challenge only with the factor it was named for.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -499,8 +450,7 @@ final readonly class VerificationService
     }
 
     /**
-     * What the address's throttle makes of how the attempt settled: only a
-     * failure that was counted keeps its slot.
+     * Only a counted failure keeps its throttle slot.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\CheckOutcome|\SineMacula\Laravel\Mfa\Verification\VerificationResult  $settled
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome
@@ -515,8 +465,6 @@ final readonly class VerificationService
     }
 
     /**
-     * What a check that passed observed.
-     *
      * @param  \SineMacula\Laravel\Mfa\Verification\CheckOutcome  $check
      * @return \SineMacula\Laravel\Mfa\Assurance\ObservedProperties
      *

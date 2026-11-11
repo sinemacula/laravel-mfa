@@ -34,18 +34,8 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * The one way a factor is enrolled: started, then confirmed with a first valid
- * code (see `EnrollmentStarter` and `EnrollmentConfirmer`); its code sent again
- * meanwhile, or the enrolment cancelled. A passkey is the exception: it becomes
- * a factor through its association, which the passkey change gate makes from
- * its registration.
- *
- * Refusals are results with a reason, since `not_fresh` is an ordinary path; a
- * request serving nobody answers `not_found`. Storage failures and delivery
- * exceptions propagate, with their rollback, and a pending credential that does
- * not validate still throws through the bound resolver.
- *
- * Stateless: the seams and the configuration are read on every call.
+ * Enrols every factor type except passkeys, which the passkey change gate
+ * associates. Refusals are results, since `not_fresh` is an ordinary path.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -55,8 +45,6 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 final readonly class EnrollmentService
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
@@ -68,34 +56,32 @@ final readonly class EnrollmentService
      */
     public function __construct(
 
-        /** The container the seams are resolved from. */
+        /** Resolves seams. */
         private Container $container,
 
-        /** The configuration the factor model is read from. */
+        /** Configuration. */
         private Repository $config,
 
-        /** The resolver of who the request serves. */
+        /** Caller resolver. */
         private CallerContextResolver $callers,
 
-        /** The throttle on the address. */
+        /** IP throttle. */
         private AttemptService $attempts,
 
-        /** The enrolments in progress. */
+        /** Enrolments in progress. */
         private PendingEnrollments $enrollments,
 
-        /** The start of an enrolment. */
+        /** Starts enrolments. */
         private EnrollmentStarter $starter,
 
-        /** The confirmation of an enrolment. */
+        /** Confirms enrolments. */
         private EnrollmentConfirmer $confirmer,
 
-        /** The dispatcher of the events. */
+        /** Event dispatcher. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Start an enrolment for the person the request serves.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
@@ -108,8 +94,6 @@ final readonly class EnrollmentService
     }
 
     /**
-     * Confirm the enrolment the grant holds with the code.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
      * @param  string  $code
@@ -123,8 +107,8 @@ final readonly class EnrollmentService
     }
 
     /**
-     * Send the enrolment's code again, through the delivered-code cooldown and
-     * caps. Nothing is renewed: not the grant's expiry and not its attempts.
+     * Subject to the send cooldown and caps; renews neither the grant's expiry
+     * nor its attempts.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
@@ -161,10 +145,8 @@ final readonly class EnrollmentService
     }
 
     /**
-     * Cancel the enrolment the grant holds, deleting its pending factor:
-     * `false` for a grant that is not the caller's, or for a caller that is no
-     * longer the one served once the identity is locked. It needs no step-up,
-     * and works during a lockout, since it only gives something up.
+     * Delete the pending factor. Needs no step-up and works during a lockout,
+     * since it only gives something up.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
@@ -211,9 +193,6 @@ final readonly class EnrollmentService
     }
 
     /**
-     * Under the lock: refuse a sign-in that changed and a grant that is not the
-     * caller's, then send the code again.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
@@ -237,10 +216,6 @@ final readonly class EnrollmentService
     }
 
     /**
-     * Admit the pending factor, which reads the grant's expiry, its generation,
-     * the type and the lockout again, send the code, and record the challenge
-     * once it has gone. A type that delivers no codes has none to send.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment

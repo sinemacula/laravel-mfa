@@ -14,8 +14,6 @@ namespace SineMacula\Laravel\Mfa\Events;
 final readonly class RecoveryCodesGenerated extends ContextEvent
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, int|string|null>  $context
      * @param  int  $count
      * @param  int  $generation

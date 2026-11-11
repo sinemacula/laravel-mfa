@@ -22,10 +22,6 @@ use Tests\Fixtures\Hardening\LockMarkingSqliteGrammar;
 use Tests\TestCase;
 
 /**
- * An association matches a passkey factor only when it belongs to the factor,
- * by its identifier as a string, to the factor's owner, and names the factor's
- * own credential.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -44,9 +40,6 @@ final class PasskeyAssociationsTest extends TestCase
     private const string CREDENTIAL = 'Y3JlZGVudGlhbC0x';
 
     /**
-     * A factor's own association matches it, whether its identifier is a string
-     * or an integer.
-     *
      * @return void
      */
     public function testTheFactorsOwnAssociationMatches(): void
@@ -56,9 +49,6 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * Another factor's association does not match, even with the same owner and
-     * credential.
-     *
      * @return void
      */
     public function testAnotherFactorsAssociationDoesNotMatch(): void
@@ -67,8 +57,8 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * A factor with no usable identifier matches nothing, even an association
-     * whose factor is the empty string its identifier would cast to.
+     * Not even an association whose factor is the empty string the identifier
+     * would cast to.
      *
      * @return void
      */
@@ -78,8 +68,6 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * No association, another owner or another credential matches nothing.
-     *
      * @return void
      */
     public function testNoAssociationOrAnotherOwnerOrCredentialMatchesNothing(): void
@@ -91,10 +79,6 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * The owner's association of the credential is found; nobody's, or another
-     * owner's, is not, and a row whose digest matches but whose id differs is
-     * not either.
-     *
      * @return void
      */
     public function testAnOwnedCredentialIsOnlyTheOwnersOwn(): void
@@ -114,9 +98,6 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * Two owners who differ only in case stay apart on a database whose
-     * collation compares them as equal.
-     *
      * @return void
      */
     public function testAnOwnedCredentialIsComparedExactly(): void
@@ -147,9 +128,6 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * A unique index refusing an association of a credential someone holds is
-     * the conflict it looks like, and leaves the transaction it ran in usable.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -177,8 +155,7 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * The credential is looked up again with a locking read, as a plain read in
-     * a MySQL transaction reads its snapshot, which can miss the row that was
+     * A plain read in a MySQL transaction reads its snapshot and can miss a row
      * committed after it.
      *
      * @return void
@@ -211,9 +188,8 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * Any other unique violation is a database error, not a domain conflict:
-     * the factor is associated already, with another credential, so the
-     * credential itself is found nowhere.
+     * The factor already holds another credential, so the credential itself is
+     * found nowhere.
      *
      * @return void
      */
@@ -227,9 +203,7 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * A deadlock on the insert leaves a nested transaction as Laravel's
-     * wrapper, which copied the query's message, with no credential id anywhere
-     * in what can be read off it.
+     * Laravel's nested transaction wrapper copies the query's message.
      *
      * @return void
      *
@@ -254,9 +228,8 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * Once masked, the deadlock is still one to the transactions around it, so
-     * each level hands it on rather than rolling back to a savepoint a MySQL
-     * deadlock has discarded, and the application's own retry runs.
+     * Each level hands it on rather than rolling back to a savepoint a MySQL
+     * deadlock has discarded.
      *
      * @return void
      *
@@ -281,8 +254,6 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * A model event cancelling the save is told apart from a conflict.
-     *
      * @return void
      */
     public function testACanceledSaveIsThrown(): void
@@ -295,8 +266,7 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * Fail the given number of inserts from now, as a driver reporting a
-     * deadlock does, quoting what each bound.
+     * As a driver reporting a deadlock does, quoting what each bound.
      *
      * @param  int  $failures
      * @return void
@@ -327,8 +297,7 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * Assert no message, binding or driver text in the failure's chain holds
-     * the credential id.
+     * No message, binding or driver text in the chain holds the credential id.
      *
      * @param  \Throwable  $failure
      * @return void
@@ -352,8 +321,6 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * A passkey factor with the identifier and credential given.
-     *
      * @param  mixed  $identifier
      * @param  string  $credential
      * @return \SineMacula\Laravel\Mfa\Contracts\Factor
@@ -369,8 +336,6 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * The owner the associations are made for.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofOwner
      */
     private function owner(): ProofOwner
@@ -379,7 +344,7 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
-     * An unsaved association of the factor given with the owner's credential.
+     * Unsaved, with the owner's credential.
      *
      * @param  string  $factorId
      * @return \SineMacula\Laravel\Mfa\Models\PasskeyAssociation

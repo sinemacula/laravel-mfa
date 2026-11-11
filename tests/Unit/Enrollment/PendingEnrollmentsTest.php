@@ -15,10 +15,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * An enrolment is bound to exactly the owner it was started for, through its
- * application: an identity sharing its type or its key, but not both, is not
- * that owner.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -28,9 +24,8 @@ use Tests\TestCase;
 final class PendingEnrollmentsTest extends TestCase
 {
     /**
-     * An enrolment is bound to its own owner's binding only: not to another
-     * identity of the same type, the same key of another type, or another
-     * application.
+     * Not to the same type with another key, the same key with another type, or
+     * another application.
      *
      * @return void
      *

@@ -23,8 +23,7 @@ final class SeamAssert
     private function __construct() {}
 
     /**
-     * The call refuses by throwing a `RuntimeException`, never by returning or
-     * by throwing anything else.
+     * The call throws a `RuntimeException` and nothing else, never returns.
      *
      * @param  \Closure(): mixed  $call
      * @param  string  $message
@@ -44,9 +43,8 @@ final class SeamAssert
     }
 
     /**
-     * The call refuses by throwing an `OperationRefusedException`, the one
-     * refusal the verification flow rolls back and answers as a failure, never
-     * by returning or by throwing anything else.
+     * Only `OperationRefusedException`, as the verification flow rolls back and
+     * answers that one alone as a failure.
      *
      * @param  \Closure(): mixed  $call
      * @param  string  $message
@@ -66,8 +64,7 @@ final class SeamAssert
     }
 
     /**
-     * The values are integers, strings or `null`, never a model, an array or
-     * any other object.
+     * Each value is an int, string or `null`.
      *
      * @param  array<array-key, mixed>  $values
      * @param  string  $message

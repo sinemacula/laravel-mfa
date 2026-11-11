@@ -9,19 +9,9 @@ use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
 use Symfony\Component\Console\Input\ArgvInput;
 
 /**
- * Runs the configuration check once the application has booted, and from the
- * `mfa` manager's factory when it is resolved (see `ConfigurationValidator`),
- * so a misconfiguration fails before a person's first verification rather than
- * at it.
- *
- * The boot check waits until every service provider has booted, so a binding an
- * application makes in its own provider's `boot()` (an SMS sender, a first
- * factor resolver) counts. It is skipped while `mfa:check` runs, which reports
- * the same problems instead of failing on them, and while one of the console
- * commands that list, describe, discover, cache or clear configuration runs, so
- * a misconfiguration (a cached one included) can still be inspected and
- * cleared. Those commands never resolve the `mfa` manager, whose factory checks
- * the configuration whatever is running.
+ * Checks the configuration after boot, so bindings made in a provider's
+ * `boot()` count. Skipped for `mfa:check` and configuration maintenance
+ * commands, so a broken configuration can still be inspected and cleared.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,7 +20,7 @@ use Symfony\Component\Console\Input\ArgvInput;
  */
 final class ConfigurationBindings
 {
-    /** @var list<string> The console commands the boot check is skipped for. */
+    /** @var list<string> */
     private const array UNCHECKED_COMMANDS = [
         CheckConfigurationCommand::NAME,
         'config:cache',
@@ -48,9 +38,6 @@ final class ConfigurationBindings
     private function __construct() {}
 
     /**
-     * Check the configuration once the application has booted, unless
-     * `mfa:check` or a configuration maintenance command is running.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */
@@ -67,8 +54,6 @@ final class ConfigurationBindings
     }
 
     /**
-     * Check the configuration now.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      *
@@ -81,9 +66,7 @@ final class ConfigurationBindings
     }
 
     /**
-     * Whether the console command running is one the boot check is skipped for,
-     * found as the console finds it: the first argument that is not an option,
-     * so `artisan -v mfa:check` is `mfa:check` too.
+     * The first non-option argument, so `artisan -v mfa:check` matches too.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return bool

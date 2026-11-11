@@ -9,11 +9,7 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\FactorChange;
 
 /**
- * One change the bound `Contracts\FactorChangeGate` is asked to authorise: the
- * identity and the application it acts on, the sign-in it is made from (the
- * session id its proofs are bound to), the change, the factor a removal names,
- * the requirement the application configures for the change's operation, and
- * the identity's factors as stored under its lock.
+ * One change `Contracts\FactorChangeGate` is asked to authorise.
  *
  * @api
  *
@@ -23,8 +19,6 @@ use SineMacula\Laravel\Mfa\Enums\FactorChange;
 final readonly class FactorChangeRequest
 {
     /**
-     * Constructor.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -47,7 +41,7 @@ final readonly class FactorChangeRequest
         /** The application acting. */
         public string $application,
 
-        /** The sign-in the change is made from: the session id its proofs are bound to. */
+        /** The session id the sign-in's proofs are bound to. */
         public string $session,
 
         /** The change. */
@@ -56,10 +50,10 @@ final readonly class FactorChangeRequest
         /** The identity's factors, as stored under its lock. */
         public Collection $factors,
 
-        /** The factor a removal names, and `null` for every other change. */
+        /** The factor a removal names, `null` for any other change. */
         public ?string $factorId = null,
 
-        /** The requirement the application configures for the change's operation, if any. */
+        /** The requirement configured for the change's operation, if any. */
         public ?Requirement $requirement = null,
     ) {
         if (trim($session) === '') {

@@ -12,20 +12,8 @@ use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\MfaManager;
 
 /**
- * Registers the driver resolver, and builds the shipped TOTP, email, SMS and
- * passkey drivers.
- *
- * The service provider's `mfa` factory registers the drivers against the
- * manager through the standard `extend()` API, so they are indistinguishable
- * from a consumer's own: a consumer replaces one by calling
- * `Mfa::extend('totp', ...)` from their own service provider, or from a
- * container extender or resolving callback on `mfa`, since the manager builds
- * from the most recent registration. Each factory captures nothing: it reads
- * from the container it is handed, the application current when the driver is
- * built, only the settings its driver needs: the TOTP settings from `mfa.totp`
- * and the application's `totp_window`, and the message class from `mfa.codes`,
- * with the application's bound sender. The code's length and lifetime belong to
- * the code service, not the drivers.
+ * Registers the shipped drivers through `extend()`, so a consumer replaces one
+ * with `Mfa::extend()` like any other. Factories capture nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -40,8 +28,6 @@ final class DriverBindings
     private function __construct() {}
 
     /**
-     * Register the driver resolver.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */
@@ -51,17 +37,13 @@ final class DriverBindings
     }
 
     /**
-     * Register the shipped TOTP, email, SMS and passkey drivers against the
-     * manager.
-     *
      * @param  \SineMacula\Laravel\Mfa\MfaManager  $manager
      * @return void
      */
     public static function extend(MfaManager $manager): void
     {
-        // Laravel's `Manager::extend()` rebinds each closure to the manager, so
-        // the factories are named by class rather than through `self::`, which
-        // would then resolve to `MfaManager`.
+        // `Manager::extend()` rebinds each closure to the manager, where
+        // `self::` would mean `MfaManager`.
         $manager->extend('totp', fn (Container $app): TotpDriver => DriverBindings::totp($app->make(Repository::class)));
         $manager->extend('email', fn (Container $app): EmailDriver => DriverBindings::email($app));
         $manager->extend('sms', fn (Container $app): SmsDriver => DriverBindings::sms($app));
@@ -69,9 +51,6 @@ final class DriverBindings
     }
 
     /**
-     * Build the TOTP driver over the settings in `mfa.totp`, which it reads on
-     * every call.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
      */
@@ -81,8 +60,6 @@ final class DriverBindings
     }
 
     /**
-     * Build the email driver with the bound `EmailSender`.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $app
      * @return \SineMacula\Laravel\Mfa\Drivers\EmailDriver
      *
@@ -94,8 +71,6 @@ final class DriverBindings
     }
 
     /**
-     * Build the SMS driver with the bound `SmsSender`.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $app
      * @return \SineMacula\Laravel\Mfa\Drivers\SmsDriver
      *

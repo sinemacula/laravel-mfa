@@ -13,9 +13,6 @@ use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Factors\InMemoryFactor;
 
 /**
- * Unit tests for `EmailDriver`: its channel, and the code message it hands the
- * bound `EmailSender`.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -28,8 +25,6 @@ final class EmailDriverTest extends TestCase
     private const string ADDRESS = 'ada@example.test';
 
     /**
-     * An email factor travels by email and adds `otp`.
-     *
      * @return void
      */
     public function testTheDriverStatesItsChannel(): void
@@ -41,9 +36,6 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * An address is trimmed and put in lower case, and what is not one is
-     * refused.
-     *
      * @return void
      */
     public function testAnAddressIsNormalized(): void
@@ -57,8 +49,6 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * The message goes to the email sender as it was built.
-     *
      * @return void
      */
     public function testTheMessageIsHandedToTheSender(): void
@@ -72,8 +62,6 @@ final class EmailDriverTest extends TestCase
     }
 
     /**
-     * An email factor.
-     *
      * @return \Tests\Fixtures\Factors\InMemoryFactor
      */
     private static function factor(): InMemoryFactor

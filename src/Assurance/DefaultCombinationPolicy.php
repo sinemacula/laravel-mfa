@@ -14,55 +14,34 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * The package's combination policy, classifying combinations as NIST SP
- * 800-63B-4 does from what the proofs observed.
+ * Classifies combinations as NIST SP 800-63B-4 does, from what the proofs
+ * observed.
  *
- * A factor is independent of the first factor unless it shares its channel: the
- * same kind with the same destination or credential, or the same kind where
- * either names none, since independence cannot then be shown. Email addresses
- * are compared without regard to case. A first factor whose channel is unknown
- * accepts no factor.
+ * A factor of the first factor's channel kind is independent only when both
+ * name a reference and they differ. Exactly one first factor on a known channel
+ * is required; proofs bound elsewhere, made before it or dated in the future
+ * count for nothing. A part is met when one combination provides it within its
+ * maximum age.
  *
- * A session's proofs are evaluated as the combinations they form: the first
- * factor, and each reauthentication with it, on its own; and the first factor
- * followed by each further proof it accepts. Only a proof made between the
- * first factor and the current time counts. The session is accepted as an
- * additional verification when any further proof is accepted, is multifactor
- * when any combination is, reaches the highest level any combination supports,
- * and is restricted when every combination at that level relies on a restricted
- * authenticator. A requirement part is met when one combination provides it on
- * evidence within the part's maximum age: a fresh further proof refreshes what
- * it completes or gives on its own, never what an old first factor gives on its
- * own, and a fresh first factor never stands in for an additional factor. When
- * every part is met, the evaluation says when the first part bounded by a
- * maximum age stops being met.
- *
- * The proofs must hold exactly one first factor, on a known channel: without
- * one, or with more, nothing is accepted and no level is established. A proof
- * bound to another identity or application than the first factor counts for
- * nothing. The level never reaches AAL3, and an external provider's first
- * factor adds no level of its own, so the further proof's level applies; an
- * application that trusts its provider's reported methods rebinds the policy.
+ * An external provider's first factor adds no level; an application that trusts
+ * its provider's reported methods rebinds the policy.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final class DefaultCombinationPolicy implements CombinationPolicy
 {
-    /** @var list<\SineMacula\Laravel\Mfa\Enums\ProofKind> The kinds of proof a first factor's channel can be read from. */
+    /** @var list<\SineMacula\Laravel\Mfa\Enums\ProofKind> Kinds a first factor's channel can be read from. */
     private const array FIRST_FACTOR_KINDS = [ProofKind::FIRST_FACTOR, ProofKind::FIRST_FACTOR_REAUTHENTICATION];
 
-    /** @var string The `amr` value of multifactor authentication. */
+    /** @var string */
     private const string AMR_MULTIFACTOR = 'mfa';
 
-    /** @var string The `amr` value of an accepted additional verification that is not multifactor. */
+    /** @var string An accepted additional verification that is not multifactor. */
     private const string AMR_MULTIPLE_CHANNEL = 'mca';
 
     /**
-     * Whether a factor on the given channel may serve as the further factor
-     * after the first factor: the first factor is a first-factor proof on a
-     * known channel, the factor's channel can carry a factor, and the two do
-     * not share a channel.
+     * Whether a factor on the given channel may follow the first factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $factor
@@ -81,8 +60,6 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Evaluate the session's proofs against a requirement.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation
@@ -115,9 +92,8 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Whether a first factor's channel and a factor's channel are the same: the
-     * same kind, with the same destination or credential, or with either naming
-     * none.
+     * Same kind, with the same reference or either naming none, since
+     * independence then cannot be shown.
      *
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $first
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $factor
@@ -141,9 +117,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * A channel's destination or credential in the form two channels of its
-     * kind are compared in: an email address without regard to case, anything
-     * else exactly as given.
+     * Email addresses compare case-insensitively.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
      * @param  string  $reference
@@ -155,8 +129,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * The session's one first factor on a known channel, or `null` when there
-     * is none, more than one, or its channel is unknown.
+     * `null` when there is none, more than one, or its channel is unknown.
      *
      * @param  array<array-key, \SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
@@ -173,8 +146,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * The combinations the session's proofs form after the first factor, from
-     * the proofs bound alike and made between it and the given time.
+     * Only proofs bound alike and made between the first factor and now count.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  array<array-key, \SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
@@ -200,11 +172,8 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * The combination a proof forms after the first factor: a first-factor
-     * proof on its own, or a further proof the policy accepts after the first
-     * factor; `null` for a reauthentication on an unknown channel or a further
-     * proof that shares the first factor's channel. A recovery code has no
-     * channel to share.
+     * `null` for a reauthentication on an unknown channel or a further proof
+     * the policy does not accept. A recovery code has no channel to share.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
@@ -223,8 +192,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Whether a proof is bound to the same identity and application as the
-     * first factor.
+     * Same identity and application as the first factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
@@ -241,9 +209,8 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Whether a proof was made no earlier than the first factor and no later
-     * than the given time: one made before it is left from an earlier sign-in,
-     * and one dated after the current time cannot be trusted.
+     * An earlier proof is left from a previous sign-in, and a future-dated one
+     * cannot be trusted.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
@@ -256,8 +223,6 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Whether the given answer holds for any of the combinations.
-     *
      * @param  list<\SineMacula\Laravel\Mfa\Assurance\Combination>  $combinations
      * @param  \Closure(\SineMacula\Laravel\Mfa\Assurance\Combination): bool  $answer
      * @return bool
@@ -274,9 +239,6 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * The highest level any combination supports, or unclassified when none
-     * supports one.
-     *
      * @param  list<\SineMacula\Laravel\Mfa\Assurance\Combination>  $combinations
      * @return \SineMacula\Laravel\Mfa\Enums\AssuranceLevel
      */
@@ -296,8 +258,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Whether the level relies on a restricted authenticator: it is a level,
-     * and every combination that reaches it is restricted.
+     * Every combination reaching the level is restricted.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @param  list<\SineMacula\Laravel\Mfa\Assurance\Combination>  $combinations
@@ -319,9 +280,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * The `amr` values of every combination, each once in the order first
-     * reported, then `mfa` for multifactor authentication or `mca` for an
-     * accepted additional verification that is not.
+     * Each value once in first-reported order, then `mfa` or `mca`.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Assurance\Combination>  $combinations
      * @param  bool  $accepted
@@ -348,8 +307,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * The parts of the requirement the combinations meet, and those they do
-     * not, each in the requirement's order.
+     * Met and unmet parts, each in the requirement's order.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  list<\SineMacula\Laravel\Mfa\Assurance\Combination>  $combinations
@@ -375,8 +333,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Whether one combination provides the part on evidence within the part's
-     * maximum age.
+     * One combination provides the part within its maximum age.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Enums\RequirementPart  $part
@@ -399,9 +356,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * When the freshest evidence that the combinations are multifactor was
-     * made: the latest of each multifactor combination's evidence, or `null`
-     * when none is multifactor.
+     * The freshest multifactor evidence, or `null` when none is multifactor.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Assurance\Combination>  $combinations
      * @return ?\Carbon\CarbonImmutable
@@ -424,9 +379,7 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * When the combinations stop meeting a requirement they meet now: the
-     * earliest of the times each part bounded by a maximum age stops being met,
-     * or `null` when none is bounded.
+     * The earliest age-bounded part's lapse, or `null` when none is bounded.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  list<\SineMacula\Laravel\Mfa\Assurance\Combination>  $combinations
@@ -451,8 +404,8 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * When a part stops being met: the latest time any combination providing it
-     * holds it until.
+     * The latest time any providing combination holds the part, `$maxAge` in
+     * seconds.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Enums\RequirementPart  $part
@@ -479,10 +432,6 @@ final class DefaultCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * Whether a combination provides a part: an additional verification by
-     * being accepted or multifactor, multifactor authentication, the minimum
-     * level, or phishing resistance.
-     *
      * @param  \SineMacula\Laravel\Mfa\Assurance\Combination  $combination
      * @param  \SineMacula\Laravel\Mfa\Enums\RequirementPart  $part
      * @param  ?\SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $minimumLevel

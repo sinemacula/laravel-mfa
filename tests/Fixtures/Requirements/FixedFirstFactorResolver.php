@@ -9,8 +9,7 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * A first factor resolver that reports the same proof, or none, whoever asks,
- * and counts how often it is asked.
+ * Reports the same proof, or none, whoever asks, and counts the calls.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,23 +18,19 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  */
 final class FixedFirstFactorResolver implements FirstFactorResolver
 {
-    /** @var int How often the resolver has been asked. */
+    /** @var int */
     public int $asked = 0;
 
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      */
     public function __construct(
 
-        /** The proof reported, or `null` for none. */
+        /** `null` for none. */
         private readonly ?Proof $firstFactor,
     ) {}
 
     /**
-     * Report the fixed proof.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof

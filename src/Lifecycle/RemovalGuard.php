@@ -18,26 +18,8 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Requirements\FactorChanges;
 
 /**
- * What every removal of a factor checks, whichever entry point it comes
- * through, on the identity's factor state as the caller holds it:
- *
- * 1. the identity is active (`identity_inactive`);
- * 2. the factor is the identity's and was enrolled through the application
- *    acting, since an application never deletes a factor enrolled through
- *    another (`not_found`);
- * 3. it is confirmed; a pending one is cancelled or expires (`not_confirmed`);
- * 4. under the lock, the bound `Contracts\FactorChangeGate` authorises the
- *    removal from the session's sign-in (`mfa.remove_factor`): by default, the
- *    session is fresh for removing a factor, and while the identity has another
- *    confirmed factor, fresh on proofs made without this one, so a step-up with
- *    the factor being removed never authorises its own removal (`not_fresh`). A
- *    person whose other factor cannot be proved is reset by
- *    someone else; the rule does not relax for them;
- * 5. the bound `LastFactorPolicy` allows it (`last_factor`).
- *
- * A refusal is an `OperationRefusedException` carrying the reason.
- *
- * Stateless: the seams are resolved on every call.
+ * The checks every factor removal makes, whatever its entry point. By default a
+ * step-up with the factor being removed never authorises its own removal.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -47,20 +29,17 @@ use SineMacula\Laravel\Mfa\Requirements\FactorChanges;
 final readonly class RemovalGuard
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the seams are resolved from on every call. */
+        /** Seams are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * Refuse removing the factor unless all of it holds, and return the factor.
-     * Without a sign-in the bound factor change gate is not asked: that is the
-     * check made before the lock, which the one under it repeats with it.
+     * Without a session the factor change gate is skipped: that is the check
+     * before the lock, which the one under it repeats with the session.
      *
      * @formatter:off
      *

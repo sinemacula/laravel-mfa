@@ -8,8 +8,7 @@ use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
 /**
- * A faulty active state resolver, for proving the contract kit rejects it: one
- * that gives the same answer for everyone, active or not.
+ * Gives the same answer for everyone, for proving the contract kit rejects it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,8 +18,6 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 final readonly class FixedActiveState implements ActiveStateResolver
 {
     /**
-     * Constructor.
-     *
      * @param  bool  $active
      */
     public function __construct(
@@ -30,8 +27,6 @@ final readonly class FixedActiveState implements ActiveStateResolver
     ) {}
 
     /**
-     * Whether the identity is active: the same answer for everyone.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
      */

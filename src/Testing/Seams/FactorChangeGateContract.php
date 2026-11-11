@@ -11,14 +11,10 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
 
 /**
- * What every `FactorChangeGate` must guarantee, as assertions: a change from a
- * session fresh enough for it is allowed, and a grant it allows ends in the
- * future; a change from a session that is not is refused by throwing an
- * `OperationRefusedException`, never by returning; a factor never authorises
- * its own removal; and the requirement the application configures binds it.
- *
- * Each assertion takes the request as the test arranged it: what makes a
- * session fresh or not is the implementation's.
+ * What every `FactorChangeGate` must guarantee: a fresh change is allowed with
+ * a future grant, a stale one throws `OperationRefusedException`, a factor
+ * never authorises its own removal, and the configured requirement binds. The
+ * test arranges what makes a session fresh.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,8 +29,7 @@ final class FactorChangeGateContract
     private function __construct() {}
 
     /**
-     * A change from a session fresh enough for it is allowed, and a grant ends
-     * in the future.
+     * The grant must end in the future.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorChangeGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $fresh
@@ -53,9 +48,6 @@ final class FactorChangeGateContract
     }
 
     /**
-     * A change from a session that is not fresh enough for it is refused by
-     * throwing an `OperationRefusedException`.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorChangeGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $stale
      * @param  string  $message
@@ -78,9 +70,8 @@ final class FactorChangeGateContract
     }
 
     /**
-     * A removal from a session whose only step-up was made with the factor
-     * being removed, while the identity has another confirmed factor, is
-     * refused.
+     * `$removal`'s only step-up used the factor being removed, and the identity
+     * has another confirmed factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorChangeGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $removal
@@ -92,8 +83,8 @@ final class FactorChangeGateContract
     }
 
     /**
-     * A change from a session fresh by the gate's own policy, but not by the
-     * requirement the request carries, is refused.
+     * `$stricter` is fresh by the gate's own policy but not by the requirement
+     * it carries.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorChangeGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $stricter

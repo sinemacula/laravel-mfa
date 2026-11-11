@@ -20,10 +20,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `BeginSignInOnLogin`: Laravel's `Login` event begins a new sign-in,
- * named by a fresh random id, on the application its guard acts for, for an
- * identity that can hold factors, and leaves every other identity alone.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -33,8 +29,6 @@ use Tests\TestCase;
 final class BeginSignInOnLoginTest extends TestCase
 {
     /**
-     * Tear down Mockery expectations between test cases.
-     *
      * @return void
      */
     #[\Override]
@@ -46,7 +40,7 @@ final class BeginSignInOnLoginTest extends TestCase
     }
 
     /**
-     * Every sign-in begins under a fresh lowercase ULID.
+     * A fresh lowercase ULID.
      *
      * @return void
      *
@@ -73,8 +67,7 @@ final class BeginSignInOnLoginTest extends TestCase
     }
 
     /**
-     * The sign-in begins on the application the event's guard acts for, and
-     * leaves the identity's sign-in on another alone.
+     * The identity's sign-in on another application is left alone.
      *
      * @return void
      *
@@ -94,9 +87,7 @@ final class BeginSignInOnLoginTest extends TestCase
     }
 
     /**
-     * With a guard application resolver bound, the sign-in begins on the
-     * application it names through the event's guard, not the one it names
-     * without it.
+     * Not the one the resolver names without the guard.
      *
      * @return void
      *
@@ -116,8 +107,6 @@ final class BeginSignInOnLoginTest extends TestCase
     }
 
     /**
-     * An identity that cannot hold factors begins no sign-in.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -137,8 +126,7 @@ final class BeginSignInOnLoginTest extends TestCase
     }
 
     /**
-     * An identity whose key cannot name a record signs in without a sign-in of
-     * its own rather than failing.
+     * It signs in without a sign-in of its own rather than failing.
      *
      * @return void
      *
@@ -159,8 +147,6 @@ final class BeginSignInOnLoginTest extends TestCase
     }
 
     /**
-     * Bind the store the listener's proof service reaches.
-     *
      * @template TStore of \SineMacula\Laravel\Mfa\Contracts\ProofStore
      *
      * @param  TStore  $store
@@ -174,8 +160,6 @@ final class BeginSignInOnLoginTest extends TestCase
     }
 
     /**
-     * The listener under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\BeginSignInOnLogin
      */
     private function listener(): BeginSignInOnLogin
@@ -184,8 +168,6 @@ final class BeginSignInOnLoginTest extends TestCase
     }
 
     /**
-     * A test user, never saved.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function user(): TestUser

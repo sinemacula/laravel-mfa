@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Chooses the request's locale, as an application's own middleware would.
+ * Middleware that sets the request's locale.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,8 +18,6 @@ use Symfony\Component\HttpFoundation\Response;
 final class ChooseLocale
 {
     /**
-     * Set the locale and carry on.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Closure(\Illuminate\Http\Request): \Symfony\Component\HttpFoundation\Response  $next
      * @param  string  $locale

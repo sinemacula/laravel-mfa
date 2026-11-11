@@ -27,9 +27,6 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use Tests\TestCase;
 
 /**
- * Tests for `RequirementBindings`: the requirement service is built afresh, and
- * each requirement seam is bound to its default, built afresh.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -39,8 +36,6 @@ use Tests\TestCase;
 final class RequirementBindingsTest extends TestCase
 {
     /**
-     * The requirement service is built on every resolution.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -53,8 +48,6 @@ final class RequirementBindingsTest extends TestCase
     }
 
     /**
-     * Rows of a requirement seam and its default.
-     *
      * @return iterable<string, array{class-string, class-string}>
      */
     public static function seams(): iterable
@@ -70,8 +63,6 @@ final class RequirementBindingsTest extends TestCase
     }
 
     /**
-     * Each seam is bound to its default, and built afresh.
-     *
      * @param  class-string  $seam
      * @param  class-string  $default
      * @return void

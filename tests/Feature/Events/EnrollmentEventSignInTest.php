@@ -34,11 +34,8 @@ use Tests\Fixtures\Seams\RecordingEventContextResolver;
 use Tests\TestCase;
 
 /**
- * Every event of a bootstrap enrolment names the pending session's sign-in it
- * was bound to, not the sign-in the proof store holds for the identity: its
- * start, a code resent, its confirmation with the recovery codes issued with
- * the first factor, its expiry, a failure, and its abandonment, whether by the
- * cap or by a cancel.
+ * Every bootstrap enrolment event names the pending sign-in, not the one the
+ * proof store holds.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -56,8 +53,6 @@ final class EnrollmentEventSignInTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application and bind the recording resolver.
-     *
      * @return void
      */
     #[\Override]
@@ -71,8 +66,6 @@ final class EnrollmentEventSignInTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -84,9 +77,6 @@ final class EnrollmentEventSignInTest extends TestCase
     }
 
     /**
-     * A bootstrap enrolment's start and confirmation, and the recovery codes
-     * issued with the first factor, name the pending session's sign-in.
-     *
      * @return void
      */
     public function testABootstrapEnrollmentNamesThePendingSignIn(): void
@@ -106,9 +96,6 @@ final class EnrollmentEventSignInTest extends TestCase
     }
 
     /**
-     * A bootstrap enrolment that expired names the pending session's sign-in,
-     * on the expiry and on the failure it reports.
-     *
      * @return void
      */
     public function testAnExpiredBootstrapEnrollmentNamesThePendingSignIn(): void
@@ -126,9 +113,6 @@ final class EnrollmentEventSignInTest extends TestCase
     }
 
     /**
-     * A wrong code on a bootstrap enrolment names the pending session's sign-in
-     * on its failure and on the abandonment the cap brings.
-     *
      * @return void
      */
     public function testAnAbandonedBootstrapEnrollmentNamesThePendingSignIn(): void
@@ -145,9 +129,6 @@ final class EnrollmentEventSignInTest extends TestCase
     }
 
     /**
-     * A code resent for a bootstrap enrolment, and its cancel, name the pending
-     * session's sign-in.
-     *
      * @return void
      */
     public function testAResentCodeAndACancelNameThePendingSignIn(): void
@@ -165,9 +146,7 @@ final class EnrollmentEventSignInTest extends TestCase
     }
 
     /**
-     * A person on a bootstrap session, whose active sign-in is the one the
-     * proof store holds, with a completion that takes a proof bound to the
-     * pending session without asking the store.
+     * The completion takes the pending-bound proof without asking the store.
      *
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -185,8 +164,6 @@ final class EnrollmentEventSignInTest extends TestCase
     }
 
     /**
-     * The identity's current sign-in, as the proof store holds it.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return ?string
      */
@@ -196,7 +173,7 @@ final class EnrollmentEventSignInTest extends TestCase
     }
 
     /**
-     * The sign-ins the events of the class reported name, in order.
+     * Sign-ins named by the reported events of the class, in order.
      *
      * @param  class-string<\SineMacula\Laravel\Mfa\Contracts\MfaEvent>  $class
      * @return list<int|string|null>

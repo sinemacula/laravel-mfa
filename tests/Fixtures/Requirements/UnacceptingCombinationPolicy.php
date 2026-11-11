@@ -12,9 +12,8 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * A combination policy that answers as the default does, except that a proof
- * naming the given factor adds nothing to any evaluation, though the factor's
- * channel may follow the first factor.
+ * Answers as the default policy does, except that proofs of the given factor
+ * count for nothing in an evaluation.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,8 +23,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 final readonly class UnacceptingCombinationPolicy implements CombinationPolicy
 {
     /**
-     * Constructor.
-     *
      * @param  string  $reference
      */
     public function __construct(
@@ -35,8 +32,6 @@ final readonly class UnacceptingCombinationPolicy implements CombinationPolicy
     ) {}
 
     /**
-     * As the default answers.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $factor
      * @return bool
@@ -48,8 +43,6 @@ final readonly class UnacceptingCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * As the default answers, without the factor's proofs.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation

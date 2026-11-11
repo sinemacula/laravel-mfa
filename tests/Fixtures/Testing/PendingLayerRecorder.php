@@ -12,10 +12,8 @@ use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
 use Tests\Fixtures\Seams\LayerWrittenProofStore;
 
 /**
- * A verified sign-in recorder for a layer that holds a sign-in pending until it
- * is verified: it signs the identity in without making the sign-in current,
- * records each proof through the layer, and completes the sign-in with the
- * further proof. It keeps the time it was told the sign-in began at.
+ * Records through a layer that holds a sign-in pending until the further proof
+ * completes it, keeping the time the sign-in began.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,23 +22,19 @@ use Tests\Fixtures\Seams\LayerWrittenProofStore;
  */
 final class PendingLayerRecorder implements VerifiedSignInRecorder
 {
-    /** @var ?\Carbon\CarbonImmutable The time the sign-in was begun at. */
+    /** @var ?\Carbon\CarbonImmutable */
     public ?CarbonImmutable $startedAt = null;
 
     /**
-     * Constructor.
-     *
      * @param  \Tests\Fixtures\Seams\LayerWrittenProofStore  $layer
      */
     public function __construct(
 
-        /** The store whose layer writes the sign-ins and proofs. */
+        /** Its layer writes the sign-ins and proofs. */
         private readonly LayerWrittenProofStore $layer,
     ) {}
 
     /**
-     * Sign the identity in through the layer, pending, and keep the time.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  \Carbon\CarbonImmutable  $at
@@ -55,10 +49,6 @@ final class PendingLayerRecorder implements VerifiedSignInRecorder
     }
 
     /**
-     * Record the evidence through the layer, against a factor the identity
-     * holds when the proof names one, completing the pending sign-in with the
-     * further proof.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void

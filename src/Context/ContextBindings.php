@@ -10,14 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 
 /**
- * Registers the defaults of the seams that say who a request is for: no pending
- * sessions (`NoPendingSessionResolver`), and a person and an active state read
- * from the identity contract (`IdentityContractSubjectType` and
- * `IdentityContractActiveState`). An adapter over an authentication layer
- * rebinds any of them in its own service provider.
- *
- * No default keeps state between calls, and each is built when it is asked for,
- * on the application serving at the time.
+ * Binds the default seams that say who a request is for, each only if an
+ * authentication adapter has not bound its own.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -32,9 +26,6 @@ final class ContextBindings
     private function __construct() {}
 
     /**
-     * Register the default pending session, subject type and active state
-     * resolvers.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

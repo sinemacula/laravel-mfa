@@ -8,16 +8,8 @@ use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * How a recovery code redemption ended: passed, with how many codes remain;
- * failed, counted against the identity as an attempt; or refused before any
- * attempt was made, counted nowhere.
- *
- * A failure carries the reason a caller may be told and a detail for events and
- * logs only, never the submitted code. A lockout carries the time it lifts, or
- * none when the identity's run of failures has reached the failure ceiling,
- * which only a success or a reset clears; no other failure carries a time.
- * `remaining` is how many codes were unused when the set was read, and is
- * `null` when the set was never read.
+ * A recovery code redemption that passed, failed as a counted attempt, or was
+ * refused before any attempt; the detail never holds the submitted code.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,8 +19,6 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final readonly class Redemption
 {
     /**
-     * Constructor.
-     *
      * @param  bool  $passed
      * @param  bool  $counted
      * @param  ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
@@ -41,25 +31,23 @@ final readonly class Redemption
         /** Whether a code was redeemed. */
         public bool $passed,
 
-        /** Whether the redemption was counted as an attempt. */
+        /** Whether it counted as an attempt. */
         public bool $counted,
 
-        /** Why the redemption failed, when it did. */
+        /** Null when passed. */
         public ?FailureReason $reason = null,
 
-        /** What happened in detail, for events and logs only, when it failed. */
+        /** For events and logs only. */
         public ?string $detail = null,
 
-        /** When the lockout lifts, for `locked` only, and never at the failure ceiling. */
+        /** For `locked` only; null at the failure ceiling, which only a success or reset clears. */
         public ?CarbonImmutable $lockedUntil = null,
 
-        /** How many codes were unused when the set was read, or null when it was not. */
+        /** Unused codes when the set was read; null when it was not read. */
         public ?int $remaining = null,
     ) {}
 
     /**
-     * A redemption that used a code, leaving the given number unused.
-     *
      * @param  int  $remaining
      * @return self
      */
@@ -69,8 +57,6 @@ final readonly class Redemption
     }
 
     /**
-     * A redemption counted as a failed attempt.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @param  ?int  $remaining
@@ -90,8 +76,7 @@ final readonly class Redemption
     }
 
     /**
-     * A redemption refused before any attempt was made, counted nowhere; a
-     * lockout with the time it lifts, if it lifts on its own.
+     * Refused before any attempt was made, so not counted.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
@@ -112,8 +97,6 @@ final readonly class Redemption
     }
 
     /**
-     * Refuse a blank detail.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @return void

@@ -8,13 +8,8 @@ use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 
 /**
- * Why an attempt is refused before it reaches the driver: a factor locked by
- * its failures in a row, the identity locked by its failures within the window,
- * or the IP address throttled by its own, each until a time; or, with no time
- * to end at, a factor disabled at the failure ceiling, which only proving
- * another factor, rebinding it or a reset enables again, or an identity whose
- * run of failures reached the ceiling, which refuses every attempt that names
- * no factor of its own until a success or a reset clears the run.
+ * Why an attempt is refused before it reaches the driver. With no end time it
+ * is a failure-ceiling hold that only a success, rebind or reset clears.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,23 +17,19 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 final readonly class Lockout
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
      * @param  ?\Carbon\CarbonImmutable  $until
      */
     private function __construct(
 
-        /** What is locked: the factor, the identity or the IP address. */
+        /** What is locked. */
         public AttemptScope $scope,
 
-        /** When the lockout ends, or null for a factor or an identity at the failure ceiling. */
+        /** Null at the failure ceiling. */
         public ?CarbonImmutable $until,
     ) {}
 
     /**
-     * A lockout of the scope that ends at the given time.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
      * @param  \Carbon\CarbonImmutable  $until
      * @return self
@@ -49,8 +40,7 @@ final readonly class Lockout
     }
 
     /**
-     * A lockout of the scope that ends at the given Unix time, read in the
-     * application's timezone.
+     * Read in the application's timezone.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
      * @param  int  $timestamp
@@ -62,9 +52,6 @@ final readonly class Lockout
     }
 
     /**
-     * A factor disabled at the failure ceiling, or, given the identity scope,
-     * an identity whose run of failures reached it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
      * @return self
      */
@@ -74,8 +61,7 @@ final readonly class Lockout
     }
 
     /**
-     * The strictest of the lockouts given: one at the failure ceiling first,
-     * otherwise the lockout that ends last, or `null` when none is given.
+     * A failure-ceiling hold wins; otherwise the one that ends last.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Attempts\Lockout  ...$lockouts
      * @return ?self
@@ -105,9 +91,6 @@ final readonly class Lockout
     }
 
     /**
-     * Determine whether this is a factor or an identity at the failure ceiling,
-     * rather than a lockout that ends on its own.
-     *
      * @return bool
      */
     public function isDisabled(): bool
@@ -116,7 +99,7 @@ final readonly class Lockout
     }
 
     /**
-     * What is refused and why, for events and logs only.
+     * For events and logs only.
      *
      * @return string
      */

@@ -31,19 +31,8 @@ use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
 /**
- * Two first confirmations racing, on MySQL and PostgreSQL.
- *
- * The package's tables live on the default connection, which a second
- * connection to the same database, `observer`, stands in for a concurrent
- * request on, with a lock timeout of a second. While one confirmation holds the
- * identity's factor state lock, a parallel one cannot read what it would decide
- * on: it waits for the lock and times out. Once the first has committed, the
- * parallel one finds a confirmed factor, so it is refused: exactly one counts
- * as first, and recovery codes are issued once.
- *
- * SQLite serialises every writer on the whole file, so these tests run on the
- * server databases only; `EnrollmentContentionTest` proves the same on a shared
- * SQLite file, and the feature tests on one connection.
+ * Racing enrolments on MySQL and PostgreSQL, with `observer` as a concurrent
+ * request; `EnrollmentContentionTest` covers SQLite.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -55,8 +44,6 @@ use Tests\TestCase;
 final class EnrollmentRaceTest extends TestCase
 {
     /**
-     * Skip on SQLite, and give the observer a lock timeout of a second.
-     *
      * @return void
      */
     #[\Override]
@@ -74,9 +61,7 @@ final class EnrollmentRaceTest extends TestCase
     }
 
     /**
-     * Of two first confirmations of two pending factors, the second waits for
-     * the first to commit, then is refused: one counts as first, and the codes
-     * are issued once.
+     * The second waits for the first to commit, then is refused.
      *
      * @return void
      *
@@ -127,10 +112,6 @@ final class EnrollmentRaceTest extends TestCase
     }
 
     /**
-     * While a start holds the identity's lock, a parallel start waits for it; it
-     * then discards what the first made, so one pending factor of the type is
-     * left.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -164,9 +145,6 @@ final class EnrollmentRaceTest extends TestCase
     }
 
     /**
-     * Add the observer, a second connection to the test database, enable the
-     * types and hash cheaply.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -193,8 +171,6 @@ final class EnrollmentRaceTest extends TestCase
     }
 
     /**
-     * The code the factor's authenticator app shows now.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart  $start
      * @return string
      */
@@ -204,8 +180,6 @@ final class EnrollmentRaceTest extends TestCase
     }
 
     /**
-     * Run the callback with the package's tables reached through the observer.
-     *
      * @template TReturn
      *
      * @param  \Closure(): TReturn  $callback
@@ -225,8 +199,6 @@ final class EnrollmentRaceTest extends TestCase
     }
 
     /**
-     * Sign a person in, with a first factor and just proved again.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

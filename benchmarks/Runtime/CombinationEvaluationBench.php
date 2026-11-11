@@ -18,10 +18,8 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Assurance\SessionProofs;
 
 /**
- * `DefaultCombinationPolicy::evaluate()` with no database, over the proof sets
- * it decides on: a first factor and one proof, a long session, a channel the
- * first factor shares, an empty and a full requirement, and proofs either side
- * of a maximum age. Every case proves its decision at set-up.
+ * `DefaultCombinationPolicy::evaluate()` with no database; each case proves its
+ * decision at set-up.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,7 +28,7 @@ use Tests\Fixtures\Assurance\SessionProofs;
 #[BeforeMethods('arrange')]
 final class CombinationEvaluationBench
 {
-    /** @var int The maximum age of the cases that have one, in seconds. */
+    /** @var int Maximum age in seconds, for the cases that have one. */
     private const int MAX_AGE = 300;
 
     /** @var \SineMacula\Laravel\Mfa\Assurance\DefaultCombinationPolicy */
@@ -43,8 +41,6 @@ final class CombinationEvaluationBench
     private array $proofs = [];
 
     /**
-     * Build the policy, with nothing asked until a case is arranged.
-     *
      * @return void
      */
     public function __construct()
@@ -54,8 +50,6 @@ final class CombinationEvaluationBench
     }
 
     /**
-     * The cases, by name.
-     *
      * @return iterable<string, array{case: string}>
      */
     public function provideCases(): iterable
@@ -83,8 +77,6 @@ final class CombinationEvaluationBench
     }
 
     /**
-     * Release the clock.
-     *
      * @return void
      */
     public function releaseClock(): void
@@ -93,8 +85,6 @@ final class CombinationEvaluationBench
     }
 
     /**
-     * Measure evaluating the case's proofs against its requirement.
-     *
      * @return void
      */
     #[Iterations(3)]
@@ -106,7 +96,7 @@ final class CombinationEvaluationBench
     }
 
     /**
-     * Each case's requirement, its proofs and whether they meet it.
+     * Requirement, proofs and whether they meet it, by case.
      *
      * @return array<string, array{\SineMacula\Laravel\Mfa\Requirements\Requirement, list<\SineMacula\Laravel\Mfa\Proofs\Proof>, bool}>
      */

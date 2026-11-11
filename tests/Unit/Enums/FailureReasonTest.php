@@ -9,9 +9,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * Unit tests for the `FailureReason` enum: the values listeners and
- * applications count and word, pinned so a rename fails.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -21,7 +18,7 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final class FailureReasonTest extends TestCase
 {
     /**
-     * The failure reasons, in order, each case name with its stable value.
+     * Pinned so a rename fails.
      *
      * @return void
      */

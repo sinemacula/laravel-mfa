@@ -16,11 +16,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * Builds the proofs of one sign-in for the requirement and freshness tests: the
- * first factors a sign-in starts with, reauthentications with the first factor,
- * and the further factors that follow, each made a given number of seconds
- * before now and bound to the identity, the application and the sign-in this
- * builder names.
+ * Builds the proofs of one sign-in, each made a given number of seconds ago and
+ * bound to the identity, application and sign-in this builder names.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,15 +26,13 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  */
 final readonly class SignInProofs
 {
-    /** @var string The application a sign-in is on unless told otherwise. */
+    /** @var string */
     public const string APPLICATION = 'web';
 
-    /** @var string The session id a sign-in is named by unless told otherwise. */
+    /** @var string */
     public const string SESSION = 'sign-in-1';
 
     /**
-     * Constructor.
-     *
      * @param  string  $identityType
      * @param  string  $identityKey
      * @param  string  $application
@@ -46,25 +41,23 @@ final readonly class SignInProofs
      */
     public function __construct(
 
-        /** The identity's type. */
+        /** @var string */
         public string $identityType = 'user',
 
-        /** The identity's key. */
+        /** @var string */
         public string $identityKey = '42',
 
-        /** The application the sign-in is on. */
+        /** @var string */
         public string $application = self::APPLICATION,
 
-        /** The session id the sign-in is named by. */
+        /** @var string */
         public string $sessionId = self::SESSION,
 
-        /** The verification generation the proofs are made under. */
+        /** @var int */
         public int $generation = 0,
     ) {}
 
     /**
-     * The proofs of the identity's sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return self
      *
@@ -78,8 +71,6 @@ final readonly class SignInProofs
     }
 
     /**
-     * The same identity's proofs on another application.
-     *
      * @param  string  $application
      * @return self
      */
@@ -89,8 +80,6 @@ final readonly class SignInProofs
     }
 
     /**
-     * The same identity's proofs in another sign-in.
-     *
      * @param  string  $sessionId
      * @return self
      */
@@ -100,8 +89,6 @@ final readonly class SignInProofs
     }
 
     /**
-     * Another identity's proofs on the same application and sign-in.
-     *
      * @param  string  $identityKey
      * @return self
      */
@@ -111,8 +98,6 @@ final readonly class SignInProofs
     }
 
     /**
-     * The same proofs made under another verification generation.
-     *
      * @param  int  $generation
      * @return self
      */
@@ -122,8 +107,6 @@ final readonly class SignInProofs
     }
 
     /**
-     * A password first factor.
-     *
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
@@ -133,8 +116,6 @@ final readonly class SignInProofs
     }
 
     /**
-     * A passkey first factor, with or without observed user verification.
-     *
      * @param  bool  $userVerification
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -145,8 +126,6 @@ final readonly class SignInProofs
     }
 
     /**
-     * An external provider's first factor.
-     *
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
@@ -156,8 +135,6 @@ final readonly class SignInProofs
     }
 
     /**
-     * A reauthentication with a password.
-     *
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
@@ -167,9 +144,7 @@ final readonly class SignInProofs
     }
 
     /**
-     * A reauthentication with an external provider, as an adapter records the
-     * provider's own reauthentication: on the provider's channel, observing
-     * nothing.
+     * On the provider's channel, observing nothing, as an adapter records it.
      *
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -182,7 +157,7 @@ final readonly class SignInProofs
     }
 
     /**
-     * A reauthentication with a passkey that observed user verification.
+     * Observes user verification.
      *
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -193,8 +168,6 @@ final readonly class SignInProofs
     }
 
     /**
-     * A TOTP factor's proof.
-     *
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
@@ -206,8 +179,7 @@ final readonly class SignInProofs
     }
 
     /**
-     * A passkey factor's proof, an additional factor of its own credential,
-     * multifactor on its own when user verification was observed.
+     * Multifactor on its own when user verification was observed.
      *
      * @param  bool  $userVerification
      * @param  int  $secondsAgo
@@ -221,8 +193,7 @@ final readonly class SignInProofs
     }
 
     /**
-     * An email code factor's proof, accepted after a password without being
-     * multifactor.
+     * Accepted after a password without being multifactor.
      *
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -233,9 +204,6 @@ final readonly class SignInProofs
     }
 
     /**
-     * What a passkey assertion observed: presence and phishing resistance, and
-     * user verification as given.
-     *
      * @param  bool  $userVerification
      * @return \SineMacula\Laravel\Mfa\Assurance\ObservedProperties
      */
@@ -245,8 +213,7 @@ final readonly class SignInProofs
     }
 
     /**
-     * A proof of the given kind, bound to this sign-in for the purpose its kind
-     * carries, or for sign-in.
+     * Bound to this sign-in for the purpose its kind carries, or for sign-in.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\ProofKind  $kind
      * @param  string  $method

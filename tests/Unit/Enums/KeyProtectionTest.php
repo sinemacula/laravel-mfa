@@ -9,8 +9,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enums\KeyProtection;
 
 /**
- * Unit tests for the `KeyProtection` enum, pinned so a rename fails.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -20,7 +18,7 @@ use SineMacula\Laravel\Mfa\Enums\KeyProtection;
 final class KeyProtectionTest extends TestCase
 {
     /**
-     * The key protections, in order, each case name with its stable value.
+     * Pinned so a rename fails.
      *
      * @return void
      */

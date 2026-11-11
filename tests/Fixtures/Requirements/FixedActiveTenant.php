@@ -8,8 +8,7 @@ use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
 /**
- * An active tenant resolver with a fixed answer, as an adapter reading a
- * session's validated context would give.
+ * An active tenant resolver with a fixed answer.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,8 +18,6 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 final readonly class FixedActiveTenant implements ActiveTenantResolver
 {
     /**
-     * Constructor.
-     *
      * @param  ?string  $tenant
      */
     public function __construct(
@@ -30,8 +27,6 @@ final readonly class FixedActiveTenant implements ActiveTenantResolver
     ) {}
 
     /**
-     * The fixed tenant.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?string

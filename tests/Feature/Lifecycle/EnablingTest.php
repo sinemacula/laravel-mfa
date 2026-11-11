@@ -19,9 +19,8 @@ use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\TestCase;
 
 /**
- * Enabling a factor the failure ceiling disabled, for an actor: only the
- * disabling goes, its failures in a row and any lockout stay, and only a factor
- * that was disabled is enabled and reported.
+ * Enabling a factor the failure ceiling disabled clears only the disabling;
+ * failures in a row and any lockout stay.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,8 +35,6 @@ final class EnablingTest extends TestCase
     use ArrangesLifecycle;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -49,9 +46,7 @@ final class EnablingTest extends TestCase
     }
 
     /**
-     * A disabled factor is enabled, naming the actor and reporting it as it
-     * stands once enabled; its failures in a row, its lockout and the
-     * identity's run stay.
+     * Its failures in a row, its lockout and the identity's run stay.
      *
      * @return void
      *
@@ -83,9 +78,6 @@ final class EnablingTest extends TestCase
     }
 
     /**
-     * A factor that is not disabled is enabled again by nothing, and nothing is
-     * reported, a second call included.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -108,9 +100,6 @@ final class EnablingTest extends TestCase
     }
 
     /**
-     * An id that finds none of the identity's factors enables and reports
-     * nothing, another person's disabled factor included.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -135,9 +124,6 @@ final class EnablingTest extends TestCase
     }
 
     /**
-     * A model event that cancels the factor's save throws rather than reporting
-     * a factor enabled that stays disabled.
-     *
      * @return void
      *
      * @throws \Throwable

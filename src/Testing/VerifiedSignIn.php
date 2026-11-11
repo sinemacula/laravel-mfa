@@ -31,25 +31,13 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
 
 /**
- * Arranges what `Concerns\InteractsWithMfa::actingAsVerified()` promises: an
- * identity acting on a guard with a sign-in the proof store holds, whose proofs
- * were made at a given time and evaluate at exactly a given level.
+ * Arranges `actingAsVerified()`: a sign-in whose proofs were made at a given
+ * time and evaluate at exactly a given level, read back as the route gate reads
+ * them. References are synthetic, as nothing checks them against factor rows.
  *
- * The sign-in is begun and its proofs recorded through the bound
- * `Testing\Contracts\VerifiedSignInRecorder`, by default the proof store
- * itself, and read back through the store. The arguments are checked before
- * anything changes. The proofs carry synthetic references, since nothing judges
- * a reference against factor rows when they are read. There is one table of
- * further proofs and no branch on a level: the bound combination policy judges
- * the evidence, and the outcome is read back through the same
- * `SessionFirstFactor::proofs()` and `RequirementCheck` the route gate uses.
- *
- * It has to be exactly the level because this builds a fixture: at least the
- * level would let a test asking for AAL1 pass a route it meant to fail. It asks
- * for additional verification as well, because the level alone reads AAL1 from
- * the password when the further proof was rejected.
- *
- * Stateless: everything is resolved on every call.
+ * Exactly, because at least would let a test asking for AAL1 pass a route it
+ * meant to fail. Additional verification is required too, since a rejected
+ * further proof still reads AAL1 from the password.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -71,19 +59,15 @@ final readonly class VerifiedSignIn
     private const string PASSKEY_REFERENCE = 'verified-passkey-factor';
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the guard, the store and the check are resolved from. */
+        /** Everything is resolved per call, so this holds no state. */
         private Container $container,
     ) {}
 
     /**
-     * Act as the identity, verified at the time and level.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @param  ?\DateTimeInterface  $at
@@ -132,8 +116,7 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * The time the proofs are made at, refusing a level no proof can be made at
-     * and a time that has not come.
+     * Refuses the unclassified level and a time in the future.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @param  ?\DateTimeInterface  $at
@@ -163,9 +146,8 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * Refuse a sign-in the store does not name as the identity's current one
-     * once its proofs are recorded: the recorder may hold it pending until the
-     * further proof completes it, but never switch to another.
+     * The recorder may hold the sign-in pending until the further proof, but
+     * never switch to another.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -184,10 +166,8 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * Whether the store already holds a first factor, which is kept, refusing
-     * one holding anything further, since the time asked for could not be
-     * honoured. The shipped store has just cleared; this bites a store whose
-     * `begin()` does nothing.
+     * Refuses a store already holding further proofs, as the time asked for
+     * could not be honoured; only a store whose `begin()` does nothing can.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -213,8 +193,6 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * The further proof of a level, on the evidence that level is made of.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @param  \Carbon\CarbonImmutable  $provedAt
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -247,8 +225,6 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * What a proof of the sign-in is bound to.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $session
@@ -264,8 +240,7 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * Whether the guard already holds this identity, by its class and its auth
-     * identifier.
+     * Compared by class and auth identifier.
      *
      * @param  \Illuminate\Contracts\Auth\Guard  $guard
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -283,8 +258,6 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * The bound recorder, or the default one over the store.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @return \SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder
      *
@@ -298,9 +271,8 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * Make the guard the default, acting as the identity: a guard already
-     * holding it is not given it again, so a context arranged by the guard's
-     * own helper stays.
+     * A guard already holding the identity keeps the context its own helper
+     * arranged.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?string  $guard
@@ -329,8 +301,7 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * Evaluate the sign-in's proofs as the gate reads them, against the level
-     * and additional verification.
+     * Reads the proofs as the route gate does.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -351,7 +322,7 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * Refuse a sign-in that fell short of the level or went past it.
+     * Refuses a level short of or past the one asked for.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @param  \SineMacula\Laravel\Mfa\Assurance\Evaluation  $evaluation

@@ -41,8 +41,8 @@ proof's level applies, unless you rebind the policy to trust what the provider r
 ## Factor types
 
 Enable, in each application's `types`, only what the level you claim can use. The default classification is in
-[Classification](assurance.md#classification), and it is worth reading whichever first factor you use, as the second
-factor alone does not decide the level:
+[Classification](assurance.md#classification). Read it whichever first factor you use, as the second factor alone does
+not decide the level:
 
 - After a password, TOTP and a passkey reach AAL2 (2.2.1: two separate factors). SMS reaches AAL2 marked restricted. An
   email code is accepted but is not multifactor, and the session stays at AAL1 from the password.
@@ -81,9 +81,8 @@ passkeys unavailable, and the configuration check refuses an application that en
 Offering the option does not in general require anyone to use it. The exception is federal: agencies must require
 phishing-resistant authentication of staff, contractors and partners accessing federal information systems (2.2.2).
 Where you do require it, ask for the part: `Requirement::none()->withPhishingResistance()`, from an identity, a tenant
-or an operation. A combination is
-phishing-resistant only when a proof observed it, as `ObservedProperties::$phishingResistance` records, never because of
-its type.
+or an operation. A combination is phishing-resistant only when a proof observed it, as
+`ObservedProperties::$phishingResistance` records, never because of its type.
 
 A syncable passkey's key is inherently exportable, so it is usable at AAL2 or below (3.2.13). What its assertion
 observed is on the proof's properties, `backupEligibility` and `backupState` among them.
@@ -99,9 +98,9 @@ gateway that reports `keyProtection` from that evidence.
 
 Three things are easy to run together, and only the first is the package's:
 
-- **The level** of the authenticators, which the package reports.
-- **The session's lifetime**, which the guard or an authentication layer enforces.
-- **Reauthentication**, a person showing they are present again, which your application requires.
+- The level of the authenticators, which the package reports.
+- The session's lifetime, which the guard or an authentication layer enforces.
+- Reauthentication, a person showing they are present again, which your application requires.
 
 The limits, with reauthentication resetting both timeouts and either expiring ending the session (5.2):
 
@@ -154,18 +153,18 @@ the identity's factors enables a factor the ceiling disabled, with nothing bound
 
 To claim a level, your application takes this on:
 
-- **Record it.** From `FactorDisabled`, record `$event->factor->id` as needing to be bound again. The factor's own
+- Record it: from `FactorDisabled`, record `$event->factor->id` as needing to be bound again. The factor's own
   disabled state does not last, so your record decides.
-- **Refuse it.** While the record stands, your routes leave the factor out of what they offer and refuse to send for or
+- Refuse it: while the record stands, your routes leave the factor out of what they offer and refuse to send for or
   verify it. The package does not know of your record, so nothing else stops it.
-- **Bind it again.** The person authenticates at the level [binding a factor](#binding-a-factor) asks for, enrols a
+- Bind it again: the person authenticates at the level [binding a factor](#binding-a-factor) asks for, enrols a
   replacement and removes the disabled factor (see [Replacing a factor](enrollment.md#replacing-a-factor)). Then clear
   the record.
-- **Recover when they cannot.** A person who cannot reach that level goes through account recovery (3.2.2, 4.2; see
+- Recover when they cannot: a person who cannot reach that level goes through account recovery (3.2.2, 4.2; see
   [Recovery codes](#recovery-codes)), not another binding.
-- **Hold resets to the session's level.** `Attempts\AttemptService::enableFactor()` clears a factor's count, so call it
+- Hold resets to the session's level: `Attempts\AttemptService::enableFactor()` clears a factor's count, so call it
   only from a session whose level reaches the factor's, and only with the record cleared.
-- **Enabling is not rebinding.** `Mfa::enableFactor()` keeps the factor's count, so it grants no fresh run of guesses,
+- Enabling is not rebinding: `Mfa::enableFactor()` keeps the factor's count, so it grants no fresh run of guesses,
   but it does not stand for the binding these sections ask for: keep your record of the owed rebinding authoritative,
   and enable a factor only once it is cleared.
 
@@ -179,18 +178,18 @@ requirement off.
 To bind a new authenticator, the person authenticates at the lower of the account's highest available level and the
 level the new authenticator will be used at, and is notified through something independent of the transaction (4.1.2.1).
 
-- **The level.** `mfa.add_factor` asks by default for an additional verification within 900 seconds, which is not a
+- The level: `mfa.add_factor` asks by default for an additional verification within 900 seconds, which is not a
   level: an email code meets it. Where an account can reach AAL2, set it in the application's `freshness` block
   (`'mfa.add_factor' => ['minimum_level' => ['level' => 'aal2', 'max_age' => 900]]`), and the same for
   `mfa.remove_factor` and `mfa.generate_recovery_codes`. The application block applies to every identity, so an
   application with accounts that can reach only AAL1 binds a `Contracts\FreshnessGate` that decides by account.
-- **The first factor.** With no factor yet, the first one is authorised by the first factor proved again through a bound
+- The first factor: with no factor yet, the first one is authorised by the first factor proved again through a bound
   `Contracts\Reauthenticator`, whose default refuses (see [What authorises a
   start](enrollment.md#what-authorises-a-start)). The bootstrap path is off by default, and anyone holding the first
   factor can take it.
-- **The route.** A cookie-authenticated route that binds a factor needs CSRF protection (see
+- The route: a cookie-authenticated route that binds a factor needs CSRF protection (see
   [CSRF protection](middleware.md#csrf-protection)).
-- **The notice.** The package sends none. Notify the person on a channel they already had from `EnrollmentStarted`,
+- The notice: the package sends none. Notify the person on a channel they already had from `EnrollmentStarted`,
   `FactorConfirmed`, `PasskeyAssociated`, `BootstrapEnrollmentCompleted` and `FactorRemoved` (see [Events](events.md)).
 
 ## Recovery codes
@@ -206,7 +205,7 @@ one issued, and recovery notifies the person (4.2). The default code of 13 chara
 which meets the first of these, but only part of it is the package's to do:
 
 - Keep the code at 64 bits. If you change `recovery_codes.length` or `recovery_codes.alphabet`,
-  `length × log2(alphabet size)` must still reach 64, as the configuration check enforces only 40 bits (13 decimal
+  `length * log2(alphabet size)` must still reach 64, as the configuration check enforces only 40 bits (13 decimal
   digits pass it at about 43).
 - Issue the replacement. The package marks a used code used and issues none in its place. `Mfa::generateRecoveryCodes()`
   replaces the whole set, and only on a session fresh enough for it, so prompt for it from `RecoveryCodeUsed` and

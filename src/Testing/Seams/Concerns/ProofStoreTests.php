@@ -10,27 +10,13 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Testing\Seams\ProofStoreContract;
 
 /**
- * The `ProofStore` contract kit: a proof of another sign-in, identity or
- * application is refused, the proofs read for a sign-in are the current
- * sign-in's only, a sign-in's proofs go with it, a proof made before the
- * identity's proofs are voided stops counting, and forgetting a factor stops
- * its proofs counting.
+ * The `ProofStore` contract kit; each check delegates to `ProofStoreContract`.
+ * The defaults suit a store that keeps its own sign-ins and proofs and honours
+ * the verification generation; a store over an authentication layer overrides
+ * the protected hooks to act through that layer.
  *
- * A test case proves its implementation by using this trait and implementing
- * the hooks, among them `otherProofStoreIdentity()`, a second identity whose
- * proof the identity must not be able to record; each check delegates to
- * `ProofStoreContract`. A store backed by an authentication layer's sessions
- * also overrides `proofStoreSignIn()`, to sign the identity in for real,
- * `replaceProofStoreSignIn()`, to sign it in again, and
- * `voidProofStoreProofs()`, to void its proofs the way that layer does. A store
- * whose proofs and sign-ins that layer alone writes overrides
- * `arrangeProofStoreProof()`, to record each proof the checks need through the
- * layer, `endProofStoreSignIn()`, to sign the identity out through it, and
- * `proofStoreFactor()`, to name a factor the identity holds. The defaults suit
- * a store that keeps its own sign-ins and proofs and honours the verification
- * generation. The checks arrange a password first factor on top of whatever the
- * sign-in already holds: an adapter that cannot record one makes its override
- * record an equivalent proof, never skip it.
+ * The checks add a password first factor to whatever the sign-in holds; an
+ * adapter that cannot record one records an equivalent proof, never skips it.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -42,8 +28,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\ProofStoreContract;
 trait ProofStoreTests
 {
     /**
-     * A proof bound to another sign-in is refused, and changes nothing.
-     *
      * @return void
      */
     public function testProofStoreRefusesAProofOfAnotherSignIn(): void
@@ -56,9 +40,6 @@ trait ProofStoreTests
     }
 
     /**
-     * A proof of another identity's sign-in, recorded for the identity, is
-     * refused, and changes neither identity's sign-in.
-     *
      * @return void
      */
     public function testProofStoreRefusesAProofOfAnotherIdentity(): void
@@ -80,8 +61,6 @@ trait ProofStoreTests
     }
 
     /**
-     * A proof bound to another application is refused, and changes nothing.
-     *
      * @return void
      */
     public function testProofStoreRefusesAProofOfAnotherApplication(): void
@@ -94,9 +73,6 @@ trait ProofStoreTests
     }
 
     /**
-     * The proofs read for a sign-in are that sign-in's only, before and after
-     * it is replaced.
-     *
      * @return void
      */
     public function testProofStoreReadsOnlyTheNamedSignIn(): void
@@ -116,8 +92,6 @@ trait ProofStoreTests
     }
 
     /**
-     * Forgetting a sign-in forgets its proofs.
-     *
      * @return void
      */
     public function testProofStoreForgetsASignInsProofsWithIt(): void
@@ -137,8 +111,6 @@ trait ProofStoreTests
     }
 
     /**
-     * A proof made before the identity's proofs are voided stops counting.
-     *
      * @return void
      */
     public function testProofStoreStopsCountingVoidedProofs(): void
@@ -158,8 +130,6 @@ trait ProofStoreTests
     }
 
     /**
-     * Forgetting a factor stops its proofs counting, and only its.
-     *
      * @return void
      */
     public function testProofStoreStopsCountingAForgottenFactor(): void
@@ -179,9 +149,8 @@ trait ProofStoreTests
     }
 
     /**
-     * The sign-in each check begins for the identity on the application, asked
-     * once a check: a store backed by real sessions signs the identity in here
-     * and returns the session's id.
+     * Asked once per check; a store backed by real sessions signs in here and
+     * returns the session's id.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -193,9 +162,8 @@ trait ProofStoreTests
     }
 
     /**
-     * Void every proof the identity has made, the way the store's proofs stop
-     * counting on a reset: by default, by advancing its verification
-     * generation.
+     * Void the identity's proofs as a reset does; by default, by advancing its
+     * verification generation.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
@@ -208,9 +176,8 @@ trait ProofStoreTests
     }
 
     /**
-     * Put the proof in the sign-in, as a check needs it counted: by default, by
-     * recording it through the store. A store whose proofs another layer
-     * records has that layer record the same proof.
+     * Records through the store by default; override to record the same proof
+     * through the layer that keeps them.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -230,9 +197,7 @@ trait ProofStoreTests
     }
 
     /**
-     * End the identity's sign-in on the application, as signing out does: by
-     * default, by forgetting it through the store. A store whose sign-ins
-     * another layer ends signs the identity out through that layer.
+     * Sign out; forgets through the store by default.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -245,10 +210,8 @@ trait ProofStoreTests
     }
 
     /**
-     * Replace the identity's sign-in on the application with a new one, as
-     * signing in again does, and return the new sign-in's id: by default, by
-     * beginning one through the store. A store whose sign-ins another layer
-     * begins signs the identity in again through that layer.
+     * Sign in again and return the new sign-in's id; begins through the store
+     * by default.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -264,8 +227,7 @@ trait ProofStoreTests
     }
 
     /**
-     * The factor the further proof names, asked once for the factor check: by
-     * default `ProofStoreContract::FACTOR`. A store that counts a proof only
+     * By default `ProofStoreContract::FACTOR`. A store that counts a proof only
      * while the identity holds its factor enrols one here and returns its id.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -277,38 +239,28 @@ trait ProofStoreTests
     }
 
     /**
-     * The proof store under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
      */
     abstract protected function proofStore(): ProofStore;
 
     /**
-     * An identity the store keeps proofs for.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     abstract protected function proofStoreIdentity(): MultiFactorAuthenticatable;
 
     /**
-     * Another identity the store keeps proofs for, of the same kind, with no
-     * sign-in of its own until a check begins one.
+     * Of the same kind, with no sign-in until a check begins one.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     abstract protected function otherProofStoreIdentity(): MultiFactorAuthenticatable;
 
     /**
-     * The application its sign-ins are on.
-     *
      * @return string
      */
     abstract protected function proofStoreApplication(): string;
 
     /**
-     * Put each proof a check needs in the sign-in it is bound to, through
-     * `arrangeProofStoreProof()`.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

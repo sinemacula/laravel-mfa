@@ -27,9 +27,6 @@ use Tests\Fixtures\Seams\ScriptedChallengeGateway;
 use Tests\TestCase;
 
 /**
- * The `ChallengeGateway` contract kit proves the package's own codes, and
- * rejects a gateway that accepts every code.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -51,8 +48,6 @@ final class ChallengeGatewayContractTest extends TestCase
     private FakeEmailSender $mailbox;
 
     /**
-     * Sign a person in with an email factor.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -66,8 +61,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gateway that accepts a wrong code.
-     *
      * @return void
      */
     public function testRejectsAGatewayThatAcceptsAnyCode(): void
@@ -84,8 +77,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gateway whose code answers another purpose.
-     *
      * @return void
      */
     public function testRejectsAGatewayThatIgnoresThePurpose(): void
@@ -98,8 +89,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gateway whose code answers nothing.
-     *
      * @return void
      */
     public function testRejectsAGatewayThatRefusesEveryCode(): void
@@ -112,8 +101,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gateway whose code answers twice.
-     *
      * @return void
      */
     public function testRejectsAGatewayThatConsumesNothing(): void
@@ -124,8 +111,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * Rows of a code sent.
-     *
      * @return iterable<string, array{string}>
      */
     public static function sentCodes(): iterable
@@ -135,8 +120,7 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit tries a wrong code of the sent code's length, so it rejects a
-     * gateway that checks only a code's format.
+     * The kit's wrong code has the sent code's length.
      *
      * @param  string  $sent
      * @return void
@@ -154,8 +138,7 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * A gateway whose code is all zeros passes: the kit's wrong code is never
-     * the one sent.
+     * The kit's wrong code is never the one sent.
      *
      * @return void
      */
@@ -169,8 +152,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gateway that does not count a wrong code.
-     *
      * @return void
      */
     public function testRejectsAGatewayThatCountsNothing(): void
@@ -183,8 +164,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gateway that answers for a challenge it does not know.
-     *
      * @return void
      */
     public function testRejectsAGatewayThatAnswersAnUnknownChallenge(): void
@@ -195,8 +174,7 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gateway that sends nothing for a factor that may be
-     * challenged.
+     * For a factor that may be challenged.
      *
      * @return void
      */
@@ -210,8 +188,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -223,8 +199,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The person's email factor.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\Factor
      */
     #[\Override]
@@ -234,8 +208,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The person's sign-in binding.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
     #[\Override]
@@ -245,8 +217,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The code last emailed.
-     *
      * @param  string  $challengeId
      * @return string
      */
@@ -257,8 +227,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The caller of the request, the person the binding names.
-     *
      * @return \SineMacula\Laravel\Mfa\Context\CallerContext
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -270,8 +238,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * What a scripted gateway answers.
-     *
      * @param  bool  $passes
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome
      */
@@ -281,8 +247,6 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The code a scripted or accepting gateway takes as sent.
-     *
      * @param  string  $challenge
      * @return string
      */

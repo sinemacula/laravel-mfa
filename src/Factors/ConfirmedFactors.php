@@ -13,15 +13,10 @@ use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Whether a factor is confirmed as a fact: its stored status is exactly
- * `confirmed`, compared in PHP, never in SQL, where a collation may ignore case
- * or padding. A status that is anything else, one none the package knows
- * included, is no confirmed factor, and nothing here throws on it.
+ * Whether a stored status is exactly `confirmed`, compared in PHP since a SQL
+ * collation may ignore case or padding. An unknown status is not confirmed.
  *
- * This is the fact a recovery code is admitted on and the authentication
- * context reports. Whether an identity is held to MFA is a different and
- * conservative question, answered by `isMfaEnabled()`, which counts every
- * factor that is not pending.
+ * `isMfaEnabled()` answers the more conservative question of being held to MFA.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,8 +31,6 @@ final class ConfirmedFactors
     private function __construct() {}
 
     /**
-     * Determine whether the factor's stored status is exactly `confirmed`.
-     *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return bool
      */
@@ -47,8 +40,6 @@ final class ConfirmedFactors
     }
 
     /**
-     * Determine whether any of the factors is confirmed.
-     *
      * @param  iterable<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $factors
      * @return bool
      */
@@ -65,10 +56,6 @@ final class ConfirmedFactors
     }
 
     /**
-     * Determine whether the identity holds a confirmed factor of the configured
-     * model, read from the write connection and matched to the identity exactly
-     * (see `FactorStateTransaction::snapshot()`).
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return bool

@@ -21,10 +21,6 @@ use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
 /**
- * The `Reauthenticator` contract kit proves the refusing default and a
- * reauthenticator that proves the first factor again now, and rejects one that
- * answers an old proof.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -37,8 +33,6 @@ final class ReauthenticatorContractTest extends TestCase
     use ReauthenticatorTests;
 
     /**
-     * The default refuses whoever asks.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -49,8 +43,6 @@ final class ReauthenticatorContractTest extends TestCase
     }
 
     /**
-     * A reauthenticator that has just proved the first factor passes the kit.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -63,8 +55,6 @@ final class ReauthenticatorContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a reauthentication made long ago.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -79,8 +69,8 @@ final class ReauthenticatorContractTest extends TestCase
     }
 
     /**
-     * Rows of a reauthentication the kit must reject: of another kind, of
-     * another identity, on another application, and dated in the future.
+     * Of another kind, of another identity, on another application, and dated
+     * in the future.
      *
      * @return iterable<string, array{\Closure(\Tests\Fixtures\Requirements\SignInProofs): \SineMacula\Laravel\Mfa\Proofs\Proof}>
      */
@@ -93,9 +83,6 @@ final class ReauthenticatorContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a reauthenticator that answers anything but the
-     * identity's own reauthentication on the application, made by now.
-     *
      * @param  \Closure(\Tests\Fixtures\Requirements\SignInProofs): \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
      *
@@ -112,8 +99,6 @@ final class ReauthenticatorContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\Reauthenticator
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -125,8 +110,6 @@ final class ReauthenticatorContractTest extends TestCase
     }
 
     /**
-     * A person signed in on the application.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -143,8 +126,6 @@ final class ReauthenticatorContractTest extends TestCase
     }
 
     /**
-     * The application.
-     *
      * @return string
      */
     #[\Override]

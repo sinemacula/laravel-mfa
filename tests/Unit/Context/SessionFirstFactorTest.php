@@ -27,10 +27,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `SessionFirstFactor`: a session's first factor comes from the
- * pending session, the proof store, or a trusted answer of the bound resolver,
- * and from nowhere else.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -40,9 +36,6 @@ use Tests\TestCase;
 final class SessionFirstFactorTest extends TestCase
 {
     /**
-     * The latest first factor the store records for the sign-in is the
-     * session's, and the resolver is not asked.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -66,9 +59,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * Without one in the store, the resolver's first factor counts when it is
-     * trusted, and is put ahead of the recorded proofs.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -90,9 +80,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * A resolved first factor of another sign-in, a future one, or one of an
-     * earlier generation is not trusted.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -111,8 +98,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * Without a sign-in there is no first factor and no proof.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -129,9 +114,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * A binding of the current sign-in has its first factor; one of another
-     * session or another identity has none.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -156,9 +138,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * A binding of the request's pending session has the pending session's
-     * first factor.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -183,8 +162,8 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * A pending session's first factor counts only under the identity's current
-     * verification generation and when not dated in the future.
+     * Only under the identity's current verification generation and when not
+     * dated in the future.
      *
      * @return void
      *
@@ -225,9 +204,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * A request carrying a pending session is never answered from the same
-     * identity's active sign-in, on its application or another.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -251,9 +227,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * The proofs read for a sign-in that has since been replaced are none,
-     * though its successor holds proofs of its own.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -273,9 +246,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * The resolver's first factor is put ahead of a sign-in's proofs only when
-     * it is bound to the sign-in named.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -294,9 +264,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * A resolver still answering the first factor of a sign-in since replaced
-     * lends it nothing: the sign-in named is no longer current.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -317,9 +284,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * A binding of a sign-in that has since been replaced has no first factor,
-     * though the replacement records one.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -339,7 +303,7 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * Sign a person in, with a sign-in the proof store knows.
+     * With a sign-in the proof store knows.
      *
      * @return \Tests\Fixtures\Identities\TestUser
      *
@@ -357,8 +321,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * The bound proof store.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -369,8 +331,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * The reader under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Context\SessionFirstFactor
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -381,8 +341,6 @@ final class SessionFirstFactorTest extends TestCase
     }
 
     /**
-     * The pending session the request being served carries, if any.
-     *
      * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

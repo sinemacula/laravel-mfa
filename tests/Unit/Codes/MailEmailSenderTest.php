@@ -24,11 +24,6 @@ use Tests\Fixtures\Codes\CustomMfaCodeMessage;
 use Tests\Fixtures\Testing\ExplicitLocaleCodeMessage;
 
 /**
- * Unit tests for `MailEmailSender`: the code goes to the message's address in
- * the configured message class, with the minutes it has left and the locale it
- * was sent in, through the mail manager's default mailer, which is looked up
- * only to send.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -43,8 +38,6 @@ final class MailEmailSenderTest extends TestCase
     private const string ADDRESS = 'ada@example.test';
 
     /**
-     * Put the clock back.
-     *
      * @return void
      */
     #[\Override]
@@ -56,7 +49,7 @@ final class MailEmailSenderTest extends TestCase
     }
 
     /**
-     * Building the sender looks up no mailer, so it builds no mail transport.
+     * So it builds no mail transport.
      *
      * @return void
      */
@@ -70,9 +63,6 @@ final class MailEmailSenderTest extends TestCase
     }
 
     /**
-     * The code goes to the message's address in the shipped message, through
-     * the default mailer, once.
-     *
      * @return void
      */
     public function testTheCodeIsSentToTheAddressInTheShippedMessage(): void
@@ -84,8 +74,6 @@ final class MailEmailSenderTest extends TestCase
     }
 
     /**
-     * A configured message class is the one sent.
-     *
      * @return void
      */
     public function testAConfiguredMessageClassIsSent(): void
@@ -96,9 +84,6 @@ final class MailEmailSenderTest extends TestCase
     }
 
     /**
-     * A configured class that is not a code message is refused, and nothing is
-     * sent.
-     *
      * @return void
      */
     public function testAConfiguredClassThatIsNoCodeMessageIsRefused(): void
@@ -127,7 +112,7 @@ final class MailEmailSenderTest extends TestCase
     }
 
     /**
-     * The message states the whole minutes, at least one, the code has left.
+     * Whole minutes, at least one.
      *
      * @param  int  $seconds
      * @param  int  $minutes
@@ -146,8 +131,7 @@ final class MailEmailSenderTest extends TestCase
     }
 
     /**
-     * The message carries the current locale, so a queue worker renders it as
-     * it was sent.
+     * So a queue worker renders it as it was sent.
      *
      * @return void
      */
@@ -157,8 +141,6 @@ final class MailEmailSenderTest extends TestCase
     }
 
     /**
-     * A message that chose its own locale keeps it.
-     *
      * @return void
      */
     public function testAMessagesOwnLocaleIsKept(): void
@@ -167,8 +149,6 @@ final class MailEmailSenderTest extends TestCase
     }
 
     /**
-     * The message of the class given, sent while the current locale is French.
-     *
      * @param  class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>  $mailable
      * @return \SineMacula\Laravel\Mfa\Codes\MfaCodeMessage
      */
@@ -189,8 +169,8 @@ final class MailEmailSenderTest extends TestCase
     }
 
     /**
-     * Send the message through a sender over a mailer that expects one message
-     * to the address, and return the message it was handed.
+     * Through a mailer that expects one message to the address; returns the
+     * message it was handed.
      *
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @param  ?string  $mailable
@@ -224,8 +204,6 @@ final class MailEmailSenderTest extends TestCase
     }
 
     /**
-     * Configuration naming the message class, or none.
-     *
      * @param  ?string  $mailable
      * @return \Illuminate\Config\Repository
      */

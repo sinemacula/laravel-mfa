@@ -8,12 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Testing\Seams\PasskeyChangeGateContract;
 
 /**
- * The passkey change gate wiring kit: a registration path calls the gate inside
- * its own change, so a registration the gate refuses keeps nothing; and its
- * calls into the gate refuse a call outside a transaction.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `PasskeyChangeGateContract`.
+ * The passkey change gate wiring kit for a registration path; each check
+ * delegates to `PasskeyChangeGateContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -25,9 +21,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\PasskeyChangeGateContract;
 trait PasskeyChangeGateTests
 {
     /**
-     * A registration the gate refuses keeps no credential and associates
-     * nothing.
-     *
      * @return void
      */
     public function testPasskeyChangeGateRollsBackARefusedRegistration(): void
@@ -36,8 +29,6 @@ trait PasskeyChangeGateTests
     }
 
     /**
-     * The path's calls into the gate refuse a call outside a transaction.
-     *
      * @return void
      */
     public function testPasskeyChangeGateNeedsTheCallersTransaction(): void
@@ -60,15 +51,13 @@ trait PasskeyChangeGateTests
     abstract protected function gatedIdentity(): MultiFactorAuthenticatable;
 
     /**
-     * The application it registers them on.
-     *
      * @return string
      */
     abstract protected function gatedApplication(): string;
 
     /**
-     * Register a passkey with the credential id through the path under test,
-     * which calls the gate inside its own change.
+     * Register through the path under test, which calls the gate inside its own
+     * transaction.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $credentialId
@@ -77,8 +66,6 @@ trait PasskeyChangeGateTests
     abstract protected function registerPasskey(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] string $credentialId): mixed;
 
     /**
-     * Whether the path kept the credential.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $credentialId
      * @return bool
@@ -86,12 +73,9 @@ trait PasskeyChangeGateTests
     abstract protected function isPasskeyStored(MultiFactorAuthenticatable $identity, #[\SensitiveParameter] string $credentialId): bool;
 
     /**
-     * Call the gate's `registering()` through the adapter under test, for the
-     * identity on the application, with the credential id.
-     *
-     * Call the adapter's own call into the gate, not the registration path
-     * around it, which may rightly open a transaction: never inside a
-     * transaction of the hook's own, and letting every exception through.
+     * Make the adapter's own `registering()` call, not the path around it,
+     * which may open a transaction; open none here and let every exception
+     * through.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -101,12 +85,7 @@ trait PasskeyChangeGateTests
     abstract protected function gateRegistering(MultiFactorAuthenticatable $identity, string $application, #[\SensitiveParameter] string $credentialId): mixed;
 
     /**
-     * Call the gate's `removing()` through the adapter under test, for the
-     * identity on the application, with the credential id.
-     *
-     * Call the adapter's own call into the gate, not the removal path around
-     * it, which may rightly open a transaction: never inside a transaction of
-     * the hook's own, and letting every exception through.
+     * As `gateRegistering()`, for the adapter's own `removing()` call.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

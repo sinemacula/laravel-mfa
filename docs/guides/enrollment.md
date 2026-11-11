@@ -113,9 +113,9 @@ A grant is bound to the identity, the application, the sign-in that started it, 
 authorised it, and is single use. Anything that does not match answers `not_found`, so a person learns nothing of a
 grant that is not theirs. A bootstrap grant works only on a pending session, and any other only on an active one.
 
-**It lives no longer than what authorised it.** Its expiry is the earlier of `mfa.enrollment.ttl_minutes` and the moment
-the step-up or reauthentication stops being fresh, or the pending session expires. The expiry is taken once and never
-written again: not by a resend, not by a failed attempt, and not by a later proof. No freshness is judged at
+A grant lives no longer than what authorised it. Its expiry is the earlier of `mfa.enrollment.ttl_minutes` and the
+moment the step-up or reauthentication stops being fresh, or the pending session expires. The expiry is taken once and
+never written again: not by a resend, not by a failed attempt, and not by a later proof. No freshness is judged at
 confirmation, because a later step-up must not revive an expired grant. A step-up 800 seconds old against a 900-second
 requirement leaves 100 seconds, however long the lifetime is configured.
 

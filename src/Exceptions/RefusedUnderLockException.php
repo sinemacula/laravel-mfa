@@ -5,16 +5,9 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Exceptions;
 
 /**
- * Refused under lock exception.
- *
- * Carries an `OperationRefusedException` out of the identity's factor state
- * transaction, so what the transaction did rolls back and the entry point turns
- * the refusal into a failed result. A refusal thrown after the commit, by a
- * listener of an event the transaction queued, is not one of these, so it
- * propagates: what committed stays committed and is never reported as failed.
- *
- * It also carries the challenge a check reported before the refusal, which the
- * failure's event names.
+ * Carries a refusal out of the factor state transaction so it rolls back. A
+ * refusal from a listener after commit is not wrapped, so it is never reported
+ * as a failed result.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,8 +17,6 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
 final class RefusedUnderLockException extends \RuntimeException
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException  $refusal
      * @param  ?string  $challengeId
      */
@@ -34,16 +25,13 @@ final class RefusedUnderLockException extends \RuntimeException
         /** The refusal, with the reason a caller may be told. */
         public readonly OperationRefusedException $refusal,
 
-        /** The challenge a check reported before the refusal, when one did. */
+        /** For the failure event, when a check reported one before the refusal. */
         public readonly ?string $challengeId = null,
     ) {
         parent::__construct('The operation was refused under the identity\'s lock.', 0, $refusal);
     }
 
     /**
-     * Run the work, which is inside the transaction, carrying out any refusal
-     * it throws.
-     *
      * @template TReturn
      *
      * @param  \Closure(): TReturn  $work

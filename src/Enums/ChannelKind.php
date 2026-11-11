@@ -5,9 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Enums;
 
 /**
- * Where a proof travels or lives. Two factors that share a channel, a kind and
- * the same destination or credential, are not independent, and a first factor
- * whose channel is unknown establishes no independence and no level.
+ * Where a proof travels or lives. Factors sharing a channel are not
+ * independent, and an unknown first-factor channel establishes no level.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,9 +35,7 @@ enum ChannelKind: string
     case UNKNOWN = 'unknown';
 
     /**
-     * Whether a channel of this kind may name its destination or credential: a
-     * phone number, an email address, a factor, a credential or a provider. A
-     * password and an unknown channel name nothing.
+     * Whether the channel may name its destination or credential.
      *
      * @return bool
      */
@@ -52,10 +49,7 @@ enum ChannelKind: string
     }
 
     /**
-     * Whether an enrolled factor's proof may travel on a channel of this kind.
-     * A password and an unknown channel belong to first factors only: every
-     * factor has a real channel, and an unknown one establishes no
-     * independence.
+     * A password and an unknown channel belong to first factors only.
      *
      * @return bool
      */

@@ -5,8 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Secrets;
 
 /**
- * An exception whose context, as Laravel's exception handler logs it, carries a
- * secret and a code.
+ * An exception whose logged context carries a secret and a code.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -16,24 +15,22 @@ namespace Tests\Fixtures\Secrets;
 final class SecretCarryingException extends \RuntimeException
 {
     /**
-     * Constructor.
-     *
      * @param  string  $secret
      * @param  string  $deliveredCode
      */
     public function __construct(
 
-        /** The secret the context carries. */
+        /** @var string */
         private readonly string $secret,
 
-        /** The code the context carries. */
+        /** @var string */
         private readonly string $deliveredCode,
     ) {
         parent::__construct('Verification failed.');
     }
 
     /**
-     * The context Laravel's exception handler logs with the exception.
+     * Logged by Laravel's exception handler with the exception.
      *
      * @return array<string, string>
      */

@@ -7,11 +7,8 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use Illuminate\Contracts\Auth\Authenticatable;
 
 /**
- * Subject type resolver contract.
- *
- * Whether an identity is a person. Only a person's identity can hold factors: a
- * machine (an API client or a service account) has no interactive sign-in, and
- * every operation refuses it.
+ * Whether an identity is a person; only a person can hold factors, so every
+ * operation refuses a machine.
  *
  * @api
  *
@@ -21,8 +18,6 @@ use Illuminate\Contracts\Auth\Authenticatable;
 interface SubjectTypeResolver
 {
     /**
-     * Whether the identity is a person.
-     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return bool
      */

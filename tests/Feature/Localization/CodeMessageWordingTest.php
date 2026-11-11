@@ -35,9 +35,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * The email and the SMS a code is sent in, in the words of the locale it is
- * sent from, through the kernel and through a queue, with the code reaching
- * neither the translator nor any markup a translation could write.
+ * Code emails and texts are worded in the sending locale, and the code never
+ * reaches the translator or translated markup.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -52,10 +51,10 @@ final class CodeMessageWordingTest extends TestCase
 {
     use ArrangesVerification;
 
-    /** @var string The phone number the SMS factor delivers to. */
+    /** @var string SMS factor destination. */
     private const string PHONE = '+447700900123';
 
-    /** @var array<string, string> The lines in French. */
+    /** @var array<string, string> French lines. */
     private const array FRENCH = [
         'messages.sms_code'      => 'Votre code par SMS : :code',
         'messages.email_subject' => 'Votre code de vérification',
@@ -64,16 +63,13 @@ final class CodeMessageWordingTest extends TestCase
         'messages.email_ignore'  => 'Si vous n\'avez rien demandé, ignorez ce message.',
     ];
 
-    /** @var \Tests\Fixtures\Codes\WordingSmsSender The SMS sender, wording each code as the package does. */
+    /** @var \Tests\Fixtures\Codes\WordingSmsSender Words each code as the package does. */
     private WordingSmsSender $texts;
 
-    /** @var \Illuminate\Support\Testing\Fakes\MailFake The mail the package's mail sender sent. */
+    /** @var \Illuminate\Support\Testing\Fakes\MailFake Mail sent by the package's mail sender. */
     private MailFake $outbox;
 
     /**
-     * Arrange the application, with every code type, a mailbox, a phone and the
-     * lines in French.
-     *
      * @return void
      */
     #[\Override]
@@ -95,8 +91,6 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -108,9 +102,8 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * A code sent through the kernel in a locale a middleware chose reaches the
-     * sender with the message's locale captured, and renders in it: the subject
-     * and the whole body, after the request has put its locale back.
+     * The message renders in the captured locale after the request has put its
+     * own back.
      *
      * @return void
      */
@@ -135,9 +128,7 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * Delivered through Laravel's mailer, the message's subject and body are in
-     * the locale it was sent in, as Laravel enters that locale before it builds
-     * them, and the current locale is put back.
+     * Laravel enters the message's locale before building the subject and body.
      *
      * @return void
      */
@@ -168,8 +159,7 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * An SMS sent through the kernel is rendered when it is sent, in the
-     * request's locale, with the code in it.
+     * The SMS is rendered when it is sent.
      *
      * @return void
      */
@@ -183,8 +173,7 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * An untranslated locale with a non-English fallback sends the shipped
-     * English on both channels.
+     * A non-English fallback with no translation still sends the English.
      *
      * @return void
      */
@@ -208,8 +197,6 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * The lines that lose the code.
-     *
      * @return iterable<string, array{string}>
      */
     public static function linesLosingTheCode(): iterable
@@ -220,8 +207,7 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * A line that would lose the code delivers the English with the code in it,
-     * on both channels: a usable message rather than none, or one with no code.
+     * A usable message beats none, or one with no code.
      *
      * @param  string  $line
      * @return void
@@ -245,8 +231,6 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * Every placeholder in a line gets the code.
-     *
      * @return void
      */
     public function testEveryPlaceholderGetsTheCode(): void
@@ -262,8 +246,7 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * The code never reaches the translator, in its arguments or replacements,
-     * on either channel.
+     * Neither in its arguments nor its replacements, on either channel.
      *
      * @return void
      */
@@ -295,8 +278,7 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * A translator cannot inject markup: the whole line is escaped, the code's
-     * own characters too, and only the package's tag surrounds the code.
+     * Only the package's tag may wrap the code.
      *
      * @return void
      */
@@ -330,8 +312,6 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * The expiry is a real plural.
-     *
      * @return void
      */
     public function testTheExpiryIsARealPlural(): void
@@ -341,8 +321,6 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * A subclass that chose a locale keeps it over the current one.
-     *
      * @return void
      */
     public function testAnExplicitMessageLocaleWins(): void
@@ -363,8 +341,7 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * The application's default locale is captured too, so a queue worker in
-     * another locale renders the message as it was sent.
+     * A queue worker in another locale must render the message as it was sent.
      *
      * @return void
      */
@@ -378,8 +355,7 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * With no translator there is no locale to capture, and the message still
-     * goes out, in the shipped English.
+     * With no translator the message goes out in the shipped English.
      *
      * @return void
      */
@@ -402,9 +378,7 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * The payload a queue stores holds the message encrypted, it comes back on
-     * the worker in the locale it was sent in, and the worker's own locale is
-     * put back after it renders.
+     * The worker's own locale is put back after rendering.
      *
      * @return void
      *
@@ -456,8 +430,8 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * Define the route the tests call: a send, behind a middleware choosing the
-     * locale as an application's own would.
+     * A send, behind a locale-choosing middleware as an application's own would
+     * be.
      *
      * @param  \Illuminate\Routing\Router  $router
      * @return void
@@ -470,8 +444,6 @@ final class CodeMessageWordingTest extends TestCase
     }
 
     /**
-     * The code message last sent to the address.
-     *
      * @return \SineMacula\Laravel\Mfa\Codes\MfaCodeMessage
      */
     private function lastMessage(): MfaCodeMessage

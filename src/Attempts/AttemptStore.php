@@ -17,17 +17,9 @@ use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 
 /**
- * The statements behind the temporary throttles, on the storage connection and
- * always on its write PDO. Every change to a count is one statement that the
- * database applies atomically, so concurrent attempts on any number of servers
- * can never read a count, add to it, and write it back over each other: a slot
- * taken from a window that has room is the only way an attempt gets through a
- * full one's limit.
- *
- * Each row is keyed by `AttemptKeys`, counts `hits` and ends its window at
- * `window_ends_at`. A row whose window has ended counts nothing, and the next
- * attempt starts a new window with it; a row is never needed once its window
- * has ended, so pruning may delete it.
+ * Throttle window statements on the storage write connection. Each count change
+ * is one atomic statement, so concurrent servers never lose an update. A row
+ * whose window has ended counts nothing and may be pruned.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,16 +29,9 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 final readonly class AttemptStore
 {
     /**
-     * Take one slot of the row's window, unless the window is full: a row whose
-     * window has ended starts the window that ends at `$end` with this attempt,
-     * and a missing row is created with it. Returns the end of the window the
-     * slot was taken from, as stored; when the window is full, the Unix time it
-     * ends instead.
-     *
-     * A live row whose window does not end at `$end` was started under a
-     * different window length, or by a server whose clock is ahead: its own
-     * window is kept and counted in, so a change of configuration neither
-     * forgives earlier attempts nor loses track of the window a slot came from.
+     * Returns the stored window end the slot came from, or the Unix time a full
+     * window ends. A live window with another end (changed config or clock
+     * skew) is kept, so earlier attempts are not forgiven.
      *
      * @param  string  $key
      * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
@@ -67,17 +52,9 @@ final readonly class AttemptStore
     }
 
     /**
-     * Count one failure in the row's window, however many it already has: a
-     * missing row is created with it, and a row whose window has ended starts
-     * the window that ends at `$end` with it.
-     *
-     * It is one upsert, so it never runs an update that finds no row: inside a
-     * transaction on MySQL, such an update holds a gap lock until the commit,
-     * and two transactions recording their first failure under different keys
-     * in the same gap would then deadlock on each other's insert. The count is
-     * assigned before the window, as in `writeCount()`. The times are written
-     * into the update as literals, which is safe as the store formats them
-     * itself.
+     * Count one failure regardless of the limit. A single upsert, because on
+     * MySQL an update that finds no row takes a gap lock that can deadlock two
+     * first failures. Inlined times are safe as the store formats them.
      *
      * @param  string  $key
      * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
@@ -109,9 +86,7 @@ final readonly class AttemptStore
     }
 
     /**
-     * Give back one slot taken from the window that ends at `$window`, as
-     * `take()` returned it; a row that has moved on to a later window, or holds
-     * no attempt, is left alone.
+     * A row that has moved on to a later window is left alone.
      *
      * @param  string  $key
      * @param  string  $window
@@ -129,8 +104,6 @@ final readonly class AttemptStore
     }
 
     /**
-     * Delete the row, ending its window at once.
-     *
      * @param  string  $key
      * @return void
      *
@@ -142,9 +115,7 @@ final readonly class AttemptStore
     }
 
     /**
-     * Delete the rows whose window has ended, and return how many. The end is
-     * part of each delete, so a row a concurrent attempt has just started a new
-     * window on stays.
+     * Delete ended windows; a row a concurrent attempt just restarted stays.
      *
      * @param  int  $now
      * @return int
@@ -157,9 +128,6 @@ final readonly class AttemptStore
     }
 
     /**
-     * Read the rows, by key, as the number of attempts in their window and the
-     * Unix time it ends, from the write PDO.
-     *
      * @param  list<string>  $keys
      * @return array<string, array{hits: int, ends: int}>
      *
@@ -182,12 +150,8 @@ final readonly class AttemptStore
     }
 
     /**
-     * Read the row the statements could not take a slot from, and take one from
-     * its stored window when that is live, does not end at the computed end,
-     * and has room. Returns that window as stored, or the Unix time the attempt
-     * may be made again: the stored window's end, and never earlier than a
-     * second from now (a row that ended or went in the meantime is worth one
-     * more try).
+     * Take from a live stored window with a different end. Returns that window,
+     * or the Unix time to retry, at least a second from now.
      *
      * @param  string  $key
      * @param  int  $max
@@ -214,9 +178,6 @@ final readonly class AttemptStore
     }
 
     /**
-     * Add one attempt to the row's stored window, in one statement, while that
-     * window is still the one stored and has room. Returns whether it did.
-     *
      * @param  string  $key
      * @param  string  $window
      * @param  int  $max
@@ -238,14 +199,8 @@ final readonly class AttemptStore
     }
 
     /**
-     * Add one attempt to an existing row in one statement: the row's window
-     * restarts when it has ended, and only a window that ends at `$end` and has
-     * room is counted in (any other live window is left untouched). Returns
-     * whether the row was changed.
-     *
-     * The count is assigned before the window: MySQL evaluates the assignments
-     * of an UPDATE from left to right, so the count's condition must read the
-     * window before it is moved.
+     * Hits are assigned before the window because MySQL evaluates UPDATE
+     * assignments left to right.
      *
      * @param  string  $key
      * @param  int  $now
@@ -274,9 +229,6 @@ final readonly class AttemptStore
     }
 
     /**
-     * Create the row with this attempt, unless another request created it
-     * first. Returns whether this call created it.
-     *
      * @param  string  $key
      * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
      * @param  int  $end
@@ -297,8 +249,6 @@ final readonly class AttemptStore
     }
 
     /**
-     * A query on the attempts table, on the storage connection.
-     *
      * @return \Illuminate\Database\Query\Builder
      *
      * @throws \InvalidArgumentException
@@ -309,8 +259,6 @@ final readonly class AttemptStore
     }
 
     /**
-     * The storage connection.
-     *
      * @return \Illuminate\Database\Connection
      *
      * @throws \InvalidArgumentException
@@ -321,8 +269,7 @@ final readonly class AttemptStore
     }
 
     /**
-     * Format a Unix time as the storage connection stores times, in the
-     * application's timezone.
+     * In the application's timezone.
      *
      * @param  int  $timestamp
      * @return string
@@ -336,8 +283,6 @@ final readonly class AttemptStore
     }
 
     /**
-     * A stored count as an integer.
-     *
      * @param  mixed  $value
      * @return int
      */
@@ -347,8 +292,7 @@ final readonly class AttemptStore
     }
 
     /**
-     * A stored time, read in the application's timezone, as a Unix time; the
-     * epoch for anything that is not a time, so it counts as ended.
+     * Anything that is not a time reads as the epoch, so it counts as ended.
      *
      * @param  mixed  $value
      * @return int

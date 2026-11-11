@@ -11,10 +11,6 @@ use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Verification\Dumps;
 
 /**
- * Unit tests for `Submission`: each named constructor holds what its route
- * needs, and no way of showing one but its own properties shows a code or a
- * response.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -27,8 +23,6 @@ final class SubmissionTest extends TestCase
     private const string CODE = '123456';
 
     /**
-     * Each kind holds what its route needs, and nothing else.
-     *
      * @return void
      */
     public function testEachKindHoldsWhatItsRouteNeeds(): void
@@ -63,8 +57,6 @@ final class SubmissionTest extends TestCase
     }
 
     /**
-     * A dump shows neither a code nor a response.
-     *
      * @return void
      */
     public function testADumpLeavesOutTheSecrets(): void
@@ -84,8 +76,7 @@ final class SubmissionTest extends TestCase
     }
 
     /**
-     * No way of dumping one shows a code or a response, Laravel's dump helpers
-     * and an array cast included.
+     * Laravel's dump helpers and an array cast included.
      *
      * @return void
      */
@@ -102,8 +93,6 @@ final class SubmissionTest extends TestCase
     }
 
     /**
-     * JSON shows neither a code nor a response.
-     *
      * @return void
      */
     public function testJsonLeavesOutTheSecrets(): void
@@ -114,8 +103,6 @@ final class SubmissionTest extends TestCase
     }
 
     /**
-     * A submission is never serialised.
-     *
      * @return void
      */
     public function testSerializingIsRefused(): void
@@ -127,8 +114,6 @@ final class SubmissionTest extends TestCase
     }
 
     /**
-     * A submission is never read back.
-     *
      * @return void
      */
     public function testUnserializingIsRefused(): void

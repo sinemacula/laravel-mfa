@@ -62,9 +62,9 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * A success goes to the pending completion or the step-up as the last write of
- * the transaction, so their refusal undoes the code's use and the count on
- * every route, and the whole requirement is evaluated again after each proof.
+ * A success goes to the completion or step-up as the transaction's last write,
+ * so their refusal undoes the code's use and count; the requirement is
+ * evaluated again after each proof.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -91,8 +91,6 @@ final class CompletionVerificationServiceTest extends TestCase
     use ArrangesVerification;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -104,8 +102,6 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -117,8 +113,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * The default seams record the proof in the store, so the middleware's read
-     * of the proofs passes with no write by the verification itself.
+     * So the middleware's read passes with no write by the verification itself.
      *
      * @return void
      */
@@ -139,8 +134,6 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * The routes a submission can take.
-     *
      * @return iterable<string, array{0: string}>
      */
     public static function routes(): iterable
@@ -154,8 +147,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A seam's refusal rolls back the check on every route, and answers with
-     * the seam's reason.
+     * It answers with the seam's reason.
      *
      * @param  string  $route
      * @return void
@@ -191,8 +183,6 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A seam's refusal of a code leaves the code usable afterwards.
-     *
      * @return void
      */
     public function testACodeARefusalRolledBackStillAnswers(): void
@@ -213,7 +203,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * Any exception from a seam but a refusal propagates, and rolls back too.
+     * It rolls back too.
      *
      * @return void
      *
@@ -239,8 +229,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A store that refuses the proof at commit is never turned into an ordinary
-     * refusal: it propagates, with the code spent.
+     * It is never turned into an ordinary refusal.
      *
      * @return void
      *
@@ -263,8 +252,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * What the seam returns reaches the caller, and a still-pending completion
-     * is a success.
+     * A still-pending completion is a success.
      *
      * @return void
      */
@@ -289,9 +277,8 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * The pending session's completion is handed the caller: its pending
-     * session, and the client the verification was served to, with the facts a
-     * same-site check reads.
+     * With its pending session and client, and the facts a same-site check
+     * reads.
      *
      * @return void
      */
@@ -349,8 +336,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A pending session's earlier proofs count towards its requirement, and the
-     * new proof is handed over even when it still falls short.
+     * The new proof is handed over even when it still falls short.
      *
      * @return void
      */
@@ -371,8 +357,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A pending session's further proofs of another generation or dated in the
-     * future do not count.
+     * Proofs of another generation or dated in the future do not count.
      *
      * @return void
      */
@@ -401,9 +386,8 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A pending session's first factor made before the verification generation
-     * advanced proves nothing: every route refuses it before spending anything,
-     * whatever a resolver of the application's own still reports.
+     * Every route refuses it before spending anything, whatever the
+     * application's resolver reports.
      *
      * @param  string  $route
      * @return void
@@ -437,8 +421,6 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A pending session's first factor dated in the future proves nothing.
-     *
      * @return void
      */
     public function testAPendingFirstFactorDatedInTheFutureIsRefused(): void
@@ -457,9 +439,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A listener's refusal after the commit is not the verification's: it
-     * propagates, what committed stays, and no failure is reported for an
-     * attempt that succeeded.
+     * It propagates, what committed stays, and no failure is reported.
      *
      * @param  string  $route
      * @return void
@@ -495,8 +475,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A refusal after a passkey verified keeps the challenge the gateway
-     * reported, for the failure's event, and still rolls back.
+     * Kept for the failure's event; the refusal still rolls back.
      *
      * @return void
      */
@@ -518,7 +497,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A failed assertion reports no challenge, as the gateway names none.
+     * The gateway names none.
      *
      * @return void
      */
@@ -534,8 +513,7 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A proof not itself accepted after the first factor is refused and rolled
-     * back, even when an older proof makes the session's answer accepted.
+     * Even when the older proof makes the session's answer accepted.
      *
      * @return void
      */
@@ -556,8 +534,8 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * The result's `amr` is this proof's alone, with no `mfa`, including one a
-     * driver supplies, and the evaluation's own values stay separate.
+     * It is this proof's alone, including one a driver supplies; the
+     * evaluation's own values stay separate.
      *
      * @return void
      */
@@ -578,8 +556,6 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A custom driver's replay is reported as one.
-     *
      * @return void
      */
     public function testACustomDriversReplayIsReported(): void
@@ -634,8 +610,8 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A recovery code's proof is of its own kind, on no channel and naming no
-     * factor, and the factor's last use is stamped only by the factor's route.
+     * On no channel and naming no factor; only the factor's route stamps the
+     * factor's last use.
      *
      * @return void
      */
@@ -664,8 +640,8 @@ final class CompletionVerificationServiceTest extends TestCase
     }
 
     /**
-     * A seam an adapter binds replaces the store: nothing is recorded there,
-     * and the proof it is handed is the one the caller gets.
+     * Nothing is recorded there, and the proof it is handed is the one the
+     * caller gets.
      *
      * @return void
      */

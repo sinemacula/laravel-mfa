@@ -12,26 +12,8 @@ use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
 use SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException;
 
 /**
- * The default `SessionRevoker`: without an authentication layer there are no
- * sessions to end, so the identity's verification generation is advanced
- * instead (see `VerificationGeneration`), and every proof recorded under an
- * earlier one stops counting, on every device and every application at once.
- * The Laravel sessions themselves go on; the other sessions must verify again.
- *
- * Revoking every session advances the generation, and nothing else. A factor's
- * removal reads the counting proofs of the sign-in it was made from, other than
- * the factor's own, when the store still names that sign-in as current,
- * advances the generation, and once the change commits records those proofs
- * again on the same sign-in, stamped with exactly the generation this call
- * advanced to, so a later revocation in the same change still wins. They are
- * recorded again only while the store still names that sign-in; a refusal is
- * dropped, which leaves the current session to verify again. Advancing joins
- * the open factor state transaction, so a change that rolls back advances
- * nothing and records nothing again. It leaves the current session for the
- * package to judge again.
- *
- * Stateless: the store and the application are resolved on every call, and the
- * work left for the commit holds only what this call read.
+ * The default `SessionRevoker`: with no sessions of its own to end, it advances
+ * the verification generation so every earlier proof stops counting.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -39,21 +21,17 @@ use SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException;
 final readonly class GenerationSessionRevoker implements SessionRevoker
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the store and the proof service are resolved from. */
+        /** Resolves the store on every call. */
         private Container $container,
     ) {}
 
     /**
-     * Stop every proof of the identity counting, but the current sign-in's own,
-     * and leave the current session for the package to judge again. The
-     * factor's own proofs on the current sign-in are forgotten by the removal
-     * before this is called.
+     * Keep the current sign-in's other proofs by recording them again under the
+     * new generation once the change commits.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
@@ -81,9 +59,6 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
     }
 
     /**
-     * Stop every proof of the identity counting, the current sign-in's
-     * included.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      *
@@ -96,9 +71,8 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
     }
 
     /**
-     * Once the change commits, record the proofs again on the sign-in, stamped
-     * with the generation, while the store still names that sign-in; a refusal
-     * is dropped, which leaves the session to verify again.
+     * Only while the store still names the sign-in, so a later revocation in
+     * the same change still wins.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -125,14 +99,12 @@ final readonly class GenerationSessionRevoker implements SessionRevoker
                     $store->record($identity, $proof->withGeneration($generation));
                 }
             } catch (ProofRefusedException) {
-                // Fail closed: the current session verifies again.
+                // The current session verifies again.
             }
         });
     }
 
     /**
-     * The proofs that were not made with the factor.
-     *
      * @param  string  $factorId
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @return array<int, \SineMacula\Laravel\Mfa\Proofs\Proof>

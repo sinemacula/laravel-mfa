@@ -9,9 +9,7 @@ use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversNothing;
 
 /**
- * What a budget itself promises: it counts reads and writes exactly, only while
- * the path runs, and refuses a statement that is neither. It runs the base
- * class and none of the package's source, so it covers nothing.
+ * Tests the budget itself, so it covers none of the package's source.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,8 +20,6 @@ use PHPUnit\Framework\Attributes\CoversNothing;
 final class QueryBudgetContractTest extends PerformanceContractTestCase
 {
     /**
-     * A select is a read, and an insert, an update and a delete are writes.
-     *
      * @return void
      */
     public function testReadsAndWritesAreCountedApart(): void
@@ -41,8 +37,6 @@ final class QueryBudgetContractTest extends PerformanceContractTestCase
     }
 
     /**
-     * A statement before or after the path is no part of its budget.
-     *
      * @return void
      */
     public function testOnlyThePathIsCounted(): void
@@ -57,8 +51,6 @@ final class QueryBudgetContractTest extends PerformanceContractTestCase
     }
 
     /**
-     * A count other than the budget fails, and names every statement made.
-     *
      * @return void
      */
     public function testAnotherCountFailsAndListsTheStatements(): void
@@ -70,8 +62,6 @@ final class QueryBudgetContractTest extends PerformanceContractTestCase
     }
 
     /**
-     * A statement that is neither a read nor a write fails whatever the counts.
-     *
      * @return void
      */
     public function testAStatementNobodyClassifiedFails(): void

@@ -25,10 +25,8 @@ use Tests\Fixtures\Identities\FactorHolder;
 use Tests\TestCase;
 
 /**
- * What a confirmation promises holds at the gate: on an `enrolled` application
- * an active person's first factor, confirmed through a real enrolment, leaves
- * the session short, and under the default transition the next request through
- * `mfa` is refused until they verify with the new factor.
+ * On an `enrolled` application a confirmed first factor gates the session until
+ * the person verifies with it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -42,16 +40,13 @@ final class EnrolledFactorGateTest extends TestCase
 {
     use ArrangesEnrollment;
 
-    /** @var string A route carrying the gate. */
+    /** @var string Route behind `mfa`. */
     private const string GATED = 'gate/account';
 
-    /** @var array<string, array<string, null>> The serialised form of asking for an additional verification at any age. */
+    /** @var array<string, array<string, null>> Additional verification at any age, serialised. */
     private const array VERIFIED = ['additional_verification' => ['max_age' => null]];
 
     /**
-     * Arrange the application, which asks a verification of whoever has a
-     * factor.
-     *
      * @return void
      */
     #[\Override]
@@ -64,9 +59,6 @@ final class EnrolledFactorGateTest extends TestCase
     }
 
     /**
-     * The person passes with no factor, is gated once a first factor is
-     * confirmed, and passes again on verifying with that factor.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -99,9 +91,8 @@ final class EnrolledFactorGateTest extends TestCase
     }
 
     /**
-     * A person whose only factor's stored status is none the package knows is
-     * still held to MFA, by the trait's own rule, not read as having no factor
-     * and let on: the gate refuses the request, and the route is never reached.
+     * An unknown stored status still counts as a factor, so the request fails
+     * rather than passing as factorless.
      *
      * @return void
      *
@@ -133,8 +124,6 @@ final class EnrolledFactorGateTest extends TestCase
     }
 
     /**
-     * Define the route the test calls.
-     *
      * @param  \Illuminate\Routing\Router  $router
      * @return void
      */

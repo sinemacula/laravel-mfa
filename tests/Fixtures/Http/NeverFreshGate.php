@@ -10,8 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * A freshness gate an adapter might bind that finds no session fresh, whatever
- * its proofs show, and holds it to a requirement of its own.
+ * Finds no session fresh, whatever its proofs show, and holds it to a
+ * requirement of its own.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,19 +21,15 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 final readonly class NeverFreshGate implements FreshnessGate
 {
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      */
     public function __construct(
 
-        /** The requirement the gate holds a session to, or `null` for none. */
+        /** `null` for none. */
         private ?Requirement $requirement = null,
     ) {}
 
     /**
-     * Never fresh.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -46,8 +42,6 @@ final readonly class NeverFreshGate implements FreshnessGate
     }
 
     /**
-     * No deadline.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -60,8 +54,6 @@ final readonly class NeverFreshGate implements FreshnessGate
     }
 
     /**
-     * The fixed requirement.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement

@@ -14,17 +14,8 @@ use SineMacula\Laravel\Mfa\Exceptions\TableAlreadyExistsException;
 use Tests\TestCase;
 
 /**
- * Engine-agnostic migration smoke test.
- *
- * Asserts that every table the package ships exists with every expected column
- * and index, and the safe defaults, after the package migrations run
- * end-to-end. Catches engine-specific schema bugs that would otherwise ship
- * behind a green badge — e.g. a column type MySQL accepts but PostgreSQL
- * rejects, or an index name that collides with a reserved identifier on one
- * engine.
- *
- * The "database-tests" CI matrix runs this against MySQL and PostgreSQL (with
- * `DB_CONNECTION` exported); local runs hit in-memory SQLite by default.
+ * Schema checks run against MySQL and PostgreSQL in CI to catch engine-specific
+ * schema bugs; local runs use in-memory SQLite.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,8 +28,6 @@ final class MigrationSmokeTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Rows of each table the package creates and every column it must have.
-     *
      * @return iterable<string, array{string, list<string>}>
      */
     public static function tables(): iterable
@@ -71,9 +60,6 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * Every table exists with every column the package reads or writes: the
-     * schema contract the rest of the suite assumes.
-     *
      * @param  string  $table
      * @param  list<string>  $columns
      * @return void
@@ -86,8 +72,7 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * A delivered code lives in the codes table, as a keyed hash, so the
-     * factors table has no column to hold one or its expiry.
+     * A delivered code lives in the codes table as a keyed hash.
      *
      * @return void
      */
@@ -98,8 +83,6 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * Rows of a table and the columns of each unique index it must have.
-     *
      * @return iterable<string, array{string, list<string>}>
      */
     public static function uniqueIndexes(): iterable
@@ -112,8 +95,6 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * The unique indexes the package relies on exist on every engine.
-     *
      * @param  string  $table
      * @param  list<string>  $columns
      * @return void
@@ -130,8 +111,7 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * A new factor is pending, not preferred and has not failed, by the table's
-     * own defaults; so are a new identity state's counts.
+     * Column defaults give a pending, unpreferred factor and zeroed counts.
      *
      * @return void
      */
@@ -151,8 +131,7 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * Every table's name is its setting's, and a table that already exists is
-     * named in the refusal by that setting.
+     * A table that already exists is refused with its setting's name.
      *
      * @return void
      */
@@ -186,10 +165,7 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * The polymorphic lookup path (`Mfa::factors(Callers::current())`) reads
-     * `WHERE
-     * authenticatable_type = ? AND authenticatable_id = ?` on every request.
-     * The index that backs that query must exist, regardless of engine.
+     * Every factor read filters on the owner's type and identifier.
      *
      * @return void
      */
@@ -216,8 +192,7 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * The identity states table holds one row per owner: the unique index the
-     * factor state lock inserts or updates against must exist on every engine.
+     * The factor state lock upserts against this unique index.
      *
      * @return void
      */
@@ -242,8 +217,7 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * A long configured identity states table name still gives an owner index
-     * name every engine accepts: cut short and hashed, the same on every run.
+     * The index name is truncated and hashed to fit every engine's limit.
      *
      * @return void
      */

@@ -21,11 +21,6 @@ use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 
 /**
- * Tests for `DriverBindings`: the driver resolver is built afresh, the TOTP,
- * email and SMS drivers are registered against the manager, and each factory
- * reads its slice of config with the documented defaults and delivers through
- * the bound sender.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -35,8 +30,6 @@ use Tests\TestCase;
 final class DriverBindingsTest extends TestCase
 {
     /**
-     * The driver resolver is built on every resolution.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -49,8 +42,6 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * The resolved manager has the TOTP, email, SMS and passkey drivers.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -67,8 +58,6 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * The drivers registered against a manager read the application's config.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -99,9 +88,6 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * The TOTP factory builds a driver over the settings in `mfa.totp`, with
-     * their defaults when none is set, read as they change.
-     *
      * @return void
      */
     public function testTotpFactoryReadsTheTotpSettings(): void
@@ -120,9 +106,6 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * The email factory builds a driver that delivers through the bound email
-     * sender.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -138,9 +121,6 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * The SMS factory builds a driver that delivers through the bound SMS
-     * sender.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -156,8 +136,6 @@ final class DriverBindingsTest extends TestCase
     }
 
     /**
-     * Return the application as the foundation contract.
-     *
      * @return \Illuminate\Contracts\Foundation\Application
      */
     private function app(): Application

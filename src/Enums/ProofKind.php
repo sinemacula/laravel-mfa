@@ -5,9 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Enums;
 
 /**
- * What a proof is, so a session's proofs are kept apart by kind: the first
- * factor at sign-in, a reauthentication with the first factor, an additional
- * factor, or a recovery code.
+ * What a proof is, so a session's proofs are kept apart by kind.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,9 +25,7 @@ enum ProofKind: string
     case RECOVERY_CODE = 'recovery_code';
 
     /**
-     * The purpose a proof of this kind must carry, or `null` when it may serve
-     * any: a first factor is proved at sign-in, and a reauthentication with it
-     * carries the reauthenticate purpose.
+     * Null when a proof of this kind may serve any purpose.
      *
      * @return ?\SineMacula\Laravel\Mfa\Enums\Purpose
      */
@@ -43,8 +39,7 @@ enum ProofKind: string
     }
 
     /**
-     * Whether a proof of this kind travels on a channel. A recovery code is not
-     * a factor and has none.
+     * A recovery code is not a factor and has no channel.
      *
      * @return bool
      */

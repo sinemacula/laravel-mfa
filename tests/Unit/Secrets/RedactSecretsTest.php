@@ -18,10 +18,6 @@ use Tests\Fixtures\Secrets\ForgedTrace;
 use Tests\Fixtures\Secrets\RecordedTrace;
 
 /**
- * Tests for the `RedactSecrets` Monolog processor: the message, the context and
- * the extra data of a record are redacted, the message of the sensitive values
- * the context and the extra data hold too, and nothing else changes.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -34,8 +30,6 @@ final class RedactSecretsTest extends TestCase
     private const string SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
 
     /**
-     * The message, the context and the extra data are redacted.
-     *
      * @return void
      */
     public function testRedactsTheRecord(): void
@@ -52,9 +46,8 @@ final class RedactSecretsTest extends TestCase
     }
 
     /**
-     * A message copied from an exception before it was scrubbed loses the
-     * values the exception's trace recorded, which are collected before the
-     * exception in the context is scrubbed.
+     * The trace's values are collected before the exception in the context is
+     * scrubbed.
      *
      * @return void
      */
@@ -71,9 +64,8 @@ final class RedactSecretsTest extends TestCase
     }
 
     /**
-     * The message loses the values the context and the extra data hold under a
-     * key naming a secret, a code or a destination, marked as sensitive, or in
-     * a code message, whose code is redacted whatever its length.
+     * Values under a sensitive key, marked sensitive, or in a code message,
+     * whose code goes whatever its length.
      *
      * @return void
      */
@@ -91,8 +83,8 @@ final class RedactSecretsTest extends TestCase
     }
 
     /**
-     * A logged exception, recorded without arguments, and every previous one
-     * lose the values the record holds from their messages.
+     * Recorded without arguments, it and every previous one lose the values the
+     * record holds.
      *
      * @return void
      */
@@ -112,9 +104,6 @@ final class RedactSecretsTest extends TestCase
     }
 
     /**
-     * Payloads holding a code under a key naming one: a plain object, a
-     * collection and a `JsonSerializable`.
-     *
      * @return iterable<string, array{object, string}>
      */
     public static function objectPayloads(): iterable
@@ -124,8 +113,6 @@ final class RedactSecretsTest extends TestCase
 
         $json = new class implements \JsonSerializable {
             /**
-             * The payload's JSON form.
-             *
              * @return array<string, string>
              */
             #[\Override]
@@ -139,9 +126,6 @@ final class RedactSecretsTest extends TestCase
     }
 
     /**
-     * A code an object in the context holds leaves the message as it leaves the
-     * object's logged form.
-     *
      * @param  object  $payload
      * @param  string  $class
      * @return void
@@ -156,9 +140,8 @@ final class RedactSecretsTest extends TestCase
     }
 
     /**
-     * An object under a key naming a secret is redacted whole without any of
-     * its methods being called, so one whose logged form throws does not fail
-     * the log.
+     * Redacted whole without calling its methods, so one whose logged form
+     * throws does not fail the log.
      *
      * @return void
      */
@@ -166,8 +149,6 @@ final class RedactSecretsTest extends TestCase
     {
         $throwing = new class implements \JsonSerializable, \Stringable {
             /**
-             * Refuse to give a JSON form.
-             *
              * @return never
              *
              * @throws \LogicException
@@ -179,8 +160,6 @@ final class RedactSecretsTest extends TestCase
             }
 
             /**
-             * Refuse to give a string form.
-             *
              * @return string
              *
              * @throws \LogicException
@@ -194,8 +173,6 @@ final class RedactSecretsTest extends TestCase
 
         $collection = new class extends Collection {
             /**
-             * Refuse to give an array form.
-             *
              * @return never
              *
              * @throws \LogicException
@@ -219,8 +196,6 @@ final class RedactSecretsTest extends TestCase
     }
 
     /**
-     * The channel, level and time of the record are kept.
-     *
      * @return void
      */
     public function testKeepsTheRestOfTheRecord(): void
@@ -236,8 +211,6 @@ final class RedactSecretsTest extends TestCase
     }
 
     /**
-     * A log record.
-     *
      * @param  string  $message
      * @param  array<array-key, mixed>  $context
      * @param  array<array-key, mixed>  $extra

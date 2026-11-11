@@ -11,9 +11,6 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\TestCase;
 
 /**
- * Unit tests for `FactorOwnerColumns`: a factor's owner columns, read without
- * building its owner.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,6 @@ use Tests\TestCase;
 final class FactorOwnerColumnsTest extends TestCase
 {
     /**
-     * A blank factor names its owner's type column and key column.
-     *
      * @return void
      */
     public function testNamesTheOwnerColumnsOfABlankFactor(): void
@@ -33,8 +28,7 @@ final class FactorOwnerColumnsTest extends TestCase
     }
 
     /**
-     * A factor owned by an identity that is not an Eloquent model names the
-     * same columns, and its owner is never built or loaded.
+     * The owner here is not an Eloquent model.
      *
      * @return void
      */

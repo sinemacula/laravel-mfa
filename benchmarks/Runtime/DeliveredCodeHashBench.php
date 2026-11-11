@@ -13,28 +13,23 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * Hot-path benchmarks for the keyed hashing of delivered codes: what a send and
- * a check compute besides their statements, the same for the email and SMS
- * drivers.
+ * Keyed hashing of delivered codes, shared by the email and SMS drivers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final class DeliveredCodeHashBench
 {
-    /** @var string The code hashed. */
+    /** @var string */
     private const string CODE = '123456';
 
-    /** @var \SineMacula\Laravel\Mfa\Codes\CodeKeys The keys, over a fixed application key. */
+    /** @var \SineMacula\Laravel\Mfa\Codes\CodeKeys */
     private CodeKeys $keys;
 
-    /** @var \SineMacula\Laravel\Mfa\Proofs\ProofBinding The binding every code is hashed for. */
+    /** @var \SineMacula\Laravel\Mfa\Proofs\ProofBinding */
     private ProofBinding $binding;
 
     /**
-     * Build the keys and the binding the benches reuse across iterations, and
-     * prove a hash follows the code it is given and a digest the session.
-     *
      * @return void
      *
      * @throws \LogicException
@@ -51,8 +46,6 @@ final class DeliveredCodeHashBench
     }
 
     /**
-     * Measure the cost of hashing a code for its challenge and binding.
-     *
      * @return void
      */
     #[Iterations(3)]
@@ -63,8 +56,6 @@ final class DeliveredCodeHashBench
     }
 
     /**
-     * Measure the cost of the session digest a challenge is looked up by.
-     *
      * @return void
      */
     #[Iterations(3)]
@@ -75,8 +66,6 @@ final class DeliveredCodeHashBench
     }
 
     /**
-     * The code's hash, for one challenge and binding.
-     *
      * @param  string  $code
      * @return string
      */

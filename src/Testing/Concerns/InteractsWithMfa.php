@@ -22,20 +22,14 @@ use SineMacula\Laravel\Mfa\Testing\VerifiedSignIn;
 trait InteractsWithMfa
 {
     /**
-     * Act as the identity with a sign-in the proof store holds, verified at the
-     * time and exactly the level given, for the guard and application given or
-     * the default ones, replacing any earlier sign-in there.
+     * Act as the identity with a sign-in verified at `$at` and exactly
+     * `$level`, replacing any earlier sign-in for the guard and application.
      *
-     * This is a fixture for gating routes, not a statement that the
-     * application's sign-in can reach the level. It dispatches no `Login` and
-     * no MFA event, enrols no factor through the default recorder (see
-     * `Testing\Contracts\VerifiedSignInRecorder`), and bypasses no inactivity
-     * check, re-enrolment obligation or stricter requirement, and it needs the
-     * package's migrations for the identity's verification generation.
-     *
-     * The application chooses where the proofs go, not what the next request
-     * resolves. A guard with a context of its own is arranged by its own helper
-     * first: a guard already holding the identity is left as it is.
+     * A fixture for gating routes: it dispatches no event, enrols no factor
+     * through the default recorder, bypasses no inactivity, re-enrolment or
+     * stricter requirement check, and needs the package's migrations.
+     * `$application` picks where the proofs go, not what the next request
+     * resolves. A guard already holding the identity is left as it is.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level

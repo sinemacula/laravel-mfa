@@ -23,22 +23,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 
 /**
- * The enrolments in progress: one row per pending factor, holding what its
- * grant is bound to. Every read locks the row from the write connection, once
- * the identity's factor state lock is held, so the lock order stays the
- * identity's state, its factors, the enrolment, then the owner's challenge.
- *
- * A row is matched exactly in PHP, since a database's collation may not compare
- * as exactly: the owner, the application, a keyed digest of the sign-in, and
- * what authorised it against who is asking, as a bootstrap grant serves only a
- * pending session and any other grant only an active one. A grant is live only
- * while its stored expiry is still ahead and the identity's verification
- * generation has not moved since it started.
- *
- * A model event that cancels a write this flow needs throws, so the transaction
- * it is part of rolls back rather than reporting what was not stored.
- *
- * Stateless: the key is read from the configuration on every call.
+ * Enrolment rows, one per pending factor. Reads lock from the write connection
+ * after the identity's factor lock, and rows are matched again in PHP because a
+ * database collation may compare loosely.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -47,12 +34,10 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
  */
 final readonly class PendingEnrollments
 {
-    /** @var \SineMacula\Laravel\Mfa\Codes\CodeKeys The keyed digest of a sign-in. */
+    /** @var \SineMacula\Laravel\Mfa\Codes\CodeKeys */
     private CodeKeys $keys;
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      */
     public function __construct(Repository $config)
@@ -61,8 +46,6 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * Record the enrolment of the pending factor under the binding.
-     *
      * @param  string  $factorId
      * @param  string  $grantHash
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -94,9 +77,7 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * The enrolment the grant holds and its pending factor, as stored under the
-     * lock, when it is bound to who is asking; `null` for any other grant, so
-     * none of them can be told apart.
+     * `null` for any grant not bound to the caller, so none can be told apart.
      *
      * @formatter:off
      *
@@ -128,8 +109,6 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * The enrolment of the pending factor, as stored under the lock.
-     *
      * @param  string  $factorId
      * @return ?\SineMacula\Laravel\Mfa\Models\Enrollment
      */
@@ -139,10 +118,6 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * The owner's enrolments through the application, as stored under the lock,
-     * matched exactly: a database's collation may let another owner's through,
-     * and the caller is about to delete some of them.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @param  string  $application
      * @return \Illuminate\Database\Eloquent\Collection<int, \SineMacula\Laravel\Mfa\Models\Enrollment>
@@ -155,10 +130,6 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * Every one of the owner's enrolments, through any application, as stored
-     * under the lock, matched exactly and in a stable order, for a change that
-     * ends them all.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @return \Illuminate\Database\Eloquent\Collection<int, \SineMacula\Laravel\Mfa\Models\Enrollment>
      */
@@ -172,8 +143,8 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * Whether the enrolment is bound to the binding's identity, application and
-     * sign-in, and its authority serves who is asking.
+     * A bootstrap grant serves only a pending session; any other only an active
+     * one.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -193,8 +164,8 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * Whether the enrolment's grant is live: its expiry is ahead and the
-     * identity's verification generation has not moved since it started.
+     * Live until expiry, and only while the verification generation is
+     * unchanged.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -209,9 +180,7 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * Delete the enrolment and its pending factor. Delivered code rows stay,
-     * since the caps on sending read them, so starting again cannot reset those
-     * caps.
+     * Code rows stay so starting again cannot reset the send caps.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -229,8 +198,6 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * Delete the enrolment alone, which ends its grant.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @return void
      *
@@ -244,8 +211,6 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * Record the challenge the enrolment's latest code went out under.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @param  string  $challengeId
      * @return void
@@ -260,7 +225,7 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * Count one attempt against the enrolment's own cap, and answer the count.
+     * Returns the new count.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @return int
@@ -279,8 +244,6 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * Whether the enrolment is, exactly, the owner's through the application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @param  string  $type
      * @param  string  $key
@@ -295,8 +258,6 @@ final readonly class PendingEnrollments
     }
 
     /**
-     * The query, locking what it reads from the write connection.
-     *
      * @param  \Illuminate\Database\Eloquent\Builder<\SineMacula\Laravel\Mfa\Models\Enrollment>  $query
      * @return \Illuminate\Database\Eloquent\Builder<\SineMacula\Laravel\Mfa\Models\Enrollment>
      */

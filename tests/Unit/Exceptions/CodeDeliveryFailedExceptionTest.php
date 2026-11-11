@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
- * Unit tests for `CodeDeliveryFailedException`: a runtime failure naming the
- * factor's type and masked destination, over the delivery's own failure.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,8 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 final class CodeDeliveryFailedExceptionTest extends TestCase
 {
     /**
-     * The exception names the factor's type and masked destination, carries the
-     * summary, and keeps the delivery's failure as its previous one.
+     * It carries the summary and keeps the delivery's failure as the previous
+     * exception.
      *
      * @return void
      */
@@ -42,8 +39,6 @@ final class CodeDeliveryFailedExceptionTest extends TestCase
     }
 
     /**
-     * A factor without a destination is named by its type alone.
-     *
      * @return void
      */
     public function testAFactorWithoutADestinationIsNamedByItsType(): void
@@ -54,8 +49,6 @@ final class CodeDeliveryFailedExceptionTest extends TestCase
     }
 
     /**
-     * A summary of an SMS factor with the masked destination.
-     *
      * @param  ?string  $maskedDestination
      * @return \SineMacula\Laravel\Mfa\Factors\FactorSummary
      */

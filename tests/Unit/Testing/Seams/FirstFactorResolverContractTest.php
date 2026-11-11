@@ -20,10 +20,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * The `FirstFactorResolver` contract kit proves the declared first factor, and
- * rejects a resolver that answers another identity's first factor or one for an
- * identity with no sign-in.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -36,8 +32,6 @@ final class FirstFactorResolverContractTest extends TestCase
     use FirstFactorResolverTests;
 
     /**
-     * Declare a password first factor on the application.
-     *
      * @return void
      */
     #[\Override]
@@ -49,8 +43,6 @@ final class FirstFactorResolverContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that answers another identity's first factor.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -65,8 +57,6 @@ final class FirstFactorResolverContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that answers for an identity with no sign-in.
-     *
      * @return void
      */
     public function testRejectsAFirstFactorWithoutASignIn(): void
@@ -79,8 +69,7 @@ final class FirstFactorResolverContractTest extends TestCase
     }
 
     /**
-     * Rows of a first factor the kit must reject: of another kind, on another
-     * application, and dated in the future.
+     * Of another kind, on another application, and dated in the future.
      *
      * @return iterable<string, array{\Closure(\Tests\Fixtures\Requirements\SignInProofs): \SineMacula\Laravel\Mfa\Proofs\Proof}>
      */
@@ -92,9 +81,6 @@ final class FirstFactorResolverContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that answers anything but the identity's own
-     * first factor on the application, made by now.
-     *
      * @param  \Closure(\Tests\Fixtures\Requirements\SignInProofs): \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void
      *
@@ -112,8 +98,6 @@ final class FirstFactorResolverContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -125,8 +109,6 @@ final class FirstFactorResolverContractTest extends TestCase
     }
 
     /**
-     * A person signed in on the application.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -143,8 +125,6 @@ final class FirstFactorResolverContractTest extends TestCase
     }
 
     /**
-     * A person with no sign-in.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -155,8 +135,6 @@ final class FirstFactorResolverContractTest extends TestCase
     }
 
     /**
-     * The application.
-     *
      * @return string
      */
     #[\Override]

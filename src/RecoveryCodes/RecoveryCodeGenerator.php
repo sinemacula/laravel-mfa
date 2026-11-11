@@ -7,16 +7,8 @@ namespace SineMacula\Laravel\Mfa\RecoveryCodes;
 use Random\RandomException;
 
 /**
- * Draws the codes of a recovery code set.
- *
- * Each character is drawn from the alphabet with `random_int()`, PHP's
- * cryptographically secure generator, which samples uniformly without modulo
- * bias, and a code is upper-cased as it is drawn, the form its hash is made
- * from and a submitted code is normalised to (see `RecoveryCodeNormalizer`). A
- * code already in the set is drawn again, so the set's codes are distinct. The
- * settings (see `RecoveryCodeSettings`) give every code at least 40 bits, so a
- * second draw is all but never needed; a source of randomness that keeps
- * repeating itself is refused rather than drawn from for ever.
+ * Draws distinct, upper-cased codes with `random_int()`, a CSPRNG without
+ * modulo bias; a source that keeps repeating itself is refused, not looped on.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,17 +17,14 @@ use Random\RandomException;
  */
 final readonly class RecoveryCodeGenerator
 {
-    /** @var int How many draws each code of a set may take before the source of randomness is refused. */
+    /** @var int Draws allowed per code before the source of randomness is refused. */
     public const int DRAWS_PER_CODE = 100;
 
-    /** @var \Closure(int, int): int The source of randomness: `random_int(...)` by default. */
+    /** @var \Closure(int, int): int Defaults to `random_int(...)`. */
     private \Closure $randomInt;
 
     /**
-     * Constructor.
-     *
-     * `$randomInt` is the source of randomness, `random_int(...)` when none is
-     * given; tests substitute a deterministic one to drive known draws.
+     * Tests pass a deterministic `$randomInt` to drive known draws.
      *
      * @param  ?callable(int, int): int  $randomInt
      */
@@ -45,9 +34,6 @@ final readonly class RecoveryCodeGenerator
     }
 
     /**
-     * Draw a set of distinct codes, each of the given length from the given
-     * alphabet, upper-cased, in the order they were drawn.
-     *
      * @param  int  $count
      * @param  int  $length
      * @param  string  $alphabet
@@ -79,8 +65,6 @@ final readonly class RecoveryCodeGenerator
     }
 
     /**
-     * Draw one code of the given length from the alphabet.
-     *
      * @param  int  $length
      * @param  string  $alphabet
      * @return string

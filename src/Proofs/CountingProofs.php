@@ -8,11 +8,8 @@ use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
 /**
- * Which of a sign-in's proofs still count, by the rules every read of them
- * applies: bound to the identity, the application and the sign-in, made in the
- * identity's current verification generation, and not dated in the future. What
- * counts is returned oldest first, and proofs made at the same instant keep the
- * order they were given in.
+ * The proofs that still count: bound to the identity, application and sign-in,
+ * of the current generation and not dated in the future.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,8 +24,8 @@ final class CountingProofs
     private function __construct() {}
 
     /**
-     * The proofs given that count for the identity's sign-in on the
-     * application, oldest first.
+     * Oldest first, keeping the given order for proofs made at the same
+     * instant.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

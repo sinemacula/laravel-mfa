@@ -28,23 +28,12 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Removes the signed-in person's factors, and lifts an identity's lockouts for
- * someone acting on it.
+ * Removes the signed-in person's factors, and lifts or enables an identity's
+ * factors for someone acting on it.
  *
- * A removal serves active sessions only. It is decided twice by the same checks
- * (see `RemovalGuard`): on the factors as they stand, taking no lock, so what
- * is refused anyway waits for nothing; then in the identity's factor state
- * transaction on the factors as stored under its lock, with the caller resolved
- * again and compared, so two removals cannot each see the other factor and a
- * sign-in that changed meanwhile is not acted on. Only those checks become a
- * refusal, carried out of the transaction so it rolls back: whatever the change
- * itself throws propagates, a revoker's or a transition's included, as does
- * anything a listener throws once it has committed.
- *
- * Unlocking resolves the factor under the identity's lock, and lifts temporary
- * lockouts only: failures in a row stay, and a factor disabled at the failure
- * ceiling stays disabled until another factor is proved, it is rebound or the
- * identity is reset.
+ * A removal is checked without a lock, so a certain refusal waits for nothing,
+ * then again under the lock with the caller re-resolved, so two removals cannot
+ * each rely on the other's factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -54,8 +43,6 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 final readonly class LifecycleService
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      * @param  \SineMacula\Laravel\Mfa\Lifecycle\RemovalGuard  $guard
@@ -65,10 +52,10 @@ final readonly class LifecycleService
      */
     public function __construct(
 
-        /** The configuration the factor model is read from. */
+        /** Names the configured factor model. */
         private Repository $config,
 
-        /** The resolver of who the request serves. */
+        /** Resolves who the request serves. */
         private CallerContextResolver $callers,
 
         /** The checks every removal makes. */
@@ -77,17 +64,14 @@ final readonly class LifecycleService
         /** The removal every entry point shares. */
         private FactorRemoval $removal,
 
-        /** The lockouts. */
+        /** Lockouts. */
         private AttemptService $attempts,
 
-        /** The dispatcher of the enabling event. */
+        /** Dispatches the enabling event. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Remove the signed-in person's factor enrolled through the current
-     * application, or say why not.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
      * @return \SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult
@@ -102,9 +86,7 @@ final readonly class LifecycleService
     }
 
     /**
-     * Lift the factor's temporary lockout, as an action the actor took. `false`
-     * for an id that finds none of the identity's factors, reporting nothing,
-     * and when no live lockout was lifted.
+     * `false` for an unknown factor id or when no live lockout was lifted.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  mixed  $factorId
@@ -127,11 +109,8 @@ final readonly class LifecycleService
     }
 
     /**
-     * Enable the identity's factor the failure ceiling disabled, as an action
-     * the actor took: `true` when a disabled factor was enabled, `false` for an
-     * id that finds none of the identity's factors, or one not disabled,
-     * reporting nothing. Only `disabled_at` is cleared: the factor's failures
-     * in a row and any lockout stay, so its next failure disables it again.
+     * Clears only `disabled_at`: failures in a row and any lockout stay, so the
+     * next failure disables it again.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  mixed  $factorId
@@ -163,9 +142,8 @@ final readonly class LifecycleService
     }
 
     /**
-     * Lift the identity's temporary lockout, as an action the actor took.
-     * `false` when no live lockout was lifted, though its count within the
-     * window may still have been cleared.
+     * `false` when no live lockout was lifted, though the window's count may
+     * still have been cleared.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
@@ -182,10 +160,8 @@ final readonly class LifecycleService
     }
 
     /**
-     * Check the caller's removal on the factors as they stand, and make it
-     * under the lock when nothing refuses it. Without a sign-in there is
-     * nothing a step-up could have been made on, or to compare under the lock,
-     * whatever a bound gate answered.
+     * Without a sign-in there is nothing a step-up could have been made on, so
+     * it is refused whatever a bound gate answered.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  mixed  $factorId
@@ -217,9 +193,6 @@ final readonly class LifecycleService
     }
 
     /**
-     * Why the removal is refused on the factors given, taking no lock, or
-     * `null` when nothing refuses it.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -242,9 +215,8 @@ final readonly class LifecycleService
     }
 
     /**
-     * Under the lock: resolve the caller again and check the removal again on
-     * the factors as stored, carrying out only those refusals, then make the
-     * change.
+     * Only the guard's refusals are carried out of the transaction; anything
+     * else the change throws propagates.
      *
      * @formatter:off
      *
@@ -277,8 +249,6 @@ final readonly class LifecycleService
     }
 
     /**
-     * A new instance of the configured factor model.
-     *
      * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException

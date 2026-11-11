@@ -22,11 +22,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * The `PendingSessionResolver` contract kit proves the default, which knows no
- * pending sessions, and a resolver that refuses a credential that does not
- * validate; it rejects one that finds a pending session in every request, and
- * one that answers none for a credential it should refuse.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -40,8 +35,6 @@ final class PendingSessionResolverContractTest extends TestCase
     use PendingSessionResolverTests;
 
     /**
-     * A resolver that refuses an invalid credential passes the kit.
-     *
      * @return void
      */
     public function testAcceptsAResolverThatRefusesAnInvalidCredential(): void
@@ -50,9 +43,6 @@ final class PendingSessionResolverContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that finds a pending session in a request that
-     * carries no credential.
-     *
      * @return void
      */
     public function testRejectsAPendingSessionWithoutACredential(): void
@@ -74,9 +64,6 @@ final class PendingSessionResolverContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that answers none for a credential that does
-     * not validate.
-     *
      * @return void
      */
     public function testRejectsAResolverThatAnswersAnInvalidCredential(): void
@@ -87,9 +74,6 @@ final class PendingSessionResolverContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver with no pending credentials that answers a
-     * pending session all the same.
-     *
      * @return void
      */
     public function testRejectsAResolverWithoutCredentialsThatAnswersOne(): void
@@ -111,8 +95,6 @@ final class PendingSessionResolverContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -124,8 +106,6 @@ final class PendingSessionResolverContractTest extends TestCase
     }
 
     /**
-     * A request with no pending credential.
-     *
      * @return \Illuminate\Http\Request
      */
     #[\Override]
@@ -135,7 +115,7 @@ final class PendingSessionResolverContractTest extends TestCase
     }
 
     /**
-     * None: the default knows no pending credentials.
+     * The default knows no pending credentials.
      *
      * @return null
      */

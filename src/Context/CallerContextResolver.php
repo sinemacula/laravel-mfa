@@ -15,20 +15,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * Resolves who an action serves from its `CallerContext`: the one place a
- * pending session's allowed actions are checked. No request is read.
- *
- * A pending session is served only when the action names an action the pending
- * credential allows; otherwise nothing is served, and no other identity is used
- * in its place. An action that names no action serves active sessions only.
- * Either way, only a person is served: the bound `SubjectTypeResolver` decides.
- *
- * Under the identity's lock, `still()` checks the caller again: a pending
- * session through the bound `PendingSessionResolver`'s `revalidate()`, and an
- * active one through the proof store's current sign-in, with the binding the
- * action captured either way.
- *
- * Stateless: the seams are resolved on every call.
+ * The one place a pending session's allowed actions are checked. A refused
+ * pending session is never served as another identity, and only a person is
+ * served.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,21 +27,16 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 final readonly class CallerContextResolver
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the seams are resolved from. */
+        /** Seams are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * The caller an action that needs the given pending action serves, or
-     * `null` when it serves nobody: a pending session that does not allow the
-     * action (or any pending session, when no action is named), nobody, or an
-     * identity that is not a person.
+     * With no action named, only an active session is served.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  ?\SineMacula\Laravel\Mfa\Enums\PendingAction  $action
@@ -72,11 +56,8 @@ final readonly class CallerContextResolver
     }
 
     /**
-     * The caller a bound factor route parameter is held to: a pending session
-     * whose credential allows one of the actions that name an existing factor,
-     * otherwise an identity on an active session. A pending session allowing
-     * none of them is served nothing. It says whose factors bind, not that the
-     * route may run: each action asks for its own.
+     * Whose factors a route parameter binds to, not whether the route may run;
+     * each action checks its own.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return ?\SineMacula\Laravel\Mfa\Context\Caller
@@ -95,8 +76,6 @@ final readonly class CallerContextResolver
     }
 
     /**
-     * The application the caller is served on.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @return string
      */
@@ -106,11 +85,8 @@ final readonly class CallerContextResolver
     }
 
     /**
-     * What a challenge or ceremony the caller takes part in is bound to: the
-     * caller, its application, its session and the purpose. The session is the
-     * pending session's, or the identity's current sign-in on the application
-     * the proof store knows of; `null` without one, so nothing is bound to a
-     * session no proof could be recorded on.
+     * `null` without a pending session or current sign-in, so nothing is bound
+     * to a session no proof could be recorded on.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -134,12 +110,8 @@ final readonly class CallerContextResolver
     }
 
     /**
-     * The caller as it stands now, when it is still the one the binding was
-     * captured for, or `null` when anything differs. A pending session is read
-     * again through the bound resolver's `revalidate()`, and must still allow
-     * the action and be a person's; the caller then served is the pending
-     * session as it stands now. An active caller must still be a person, and
-     * the proof store's current sign-in must still be the binding's.
+     * The caller as it stands now under the identity's lock, or `null` when it
+     * no longer matches the captured binding.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  ?\SineMacula\Laravel\Mfa\Enums\PendingAction  $action
@@ -160,9 +132,6 @@ final readonly class CallerContextResolver
     }
 
     /**
-     * The pending session read again, when it still stands and allows the
-     * action.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  ?\SineMacula\Laravel\Mfa\Enums\PendingAction  $action
      * @param  \SineMacula\Laravel\Mfa\Context\ClientContext  $client
@@ -178,8 +147,6 @@ final readonly class CallerContextResolver
     }
 
     /**
-     * The pending session's identity, when it is a person.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return ?\SineMacula\Laravel\Mfa\Context\Caller
@@ -192,8 +159,6 @@ final readonly class CallerContextResolver
     }
 
     /**
-     * The context's identity on its active session, when it is a person.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return ?\SineMacula\Laravel\Mfa\Context\Caller
      *
@@ -207,9 +172,6 @@ final readonly class CallerContextResolver
     }
 
     /**
-     * Whether the pending credential allows an action that names an existing
-     * factor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return bool
      */
@@ -221,8 +183,6 @@ final readonly class CallerContextResolver
     }
 
     /**
-     * Whether the bound resolver says the identity is a person.
-     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return bool
      *

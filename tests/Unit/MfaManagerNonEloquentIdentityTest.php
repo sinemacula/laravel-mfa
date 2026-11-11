@@ -18,15 +18,8 @@ use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 
 /**
- * Coverage for the FQCN-fallback paths behind the manager.
- *
- * `Support\IdentityType::of()`, which the proof store and recovery code
- * generation all use, branches on whether the identity is a `Model` — Eloquent
- * identities use `getMorphClass()`, non-Eloquent identities fall back to a
- * strict FQCN comparison. The shipped test identities (`TestUser`,
- * `SecondaryUser`, `NonScalarIdentifierUser`) are all Eloquent, so a dedicated
- * non-Eloquent fixture is needed to drive the FQCN branches and keep coverage
- * at 100%.
+ * Drives the class-name fallback of `IdentityType::of()`, since the shipped
+ * test identities are all Eloquent.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,8 +30,6 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 {
     /**
-     * Tear down Mockery expectations between test cases.
-     *
      * @return void
      */
     #[\Override]
@@ -52,8 +43,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * Listing factors must complete without throwing for a non-Eloquent
-     * identity, and finds only what is stored under its class name and key.
+     * Finds only what is stored under its class name and key.
      *
      * @return void
      */
@@ -79,8 +69,8 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity whose key cannot name a record is refused rather than
-     * collapsing distinct identities onto one record, before any driver runs.
+     * Refused before any driver runs, rather than collapsing distinct
+     * identities onto one record.
      *
      * @return void
      *
@@ -98,9 +88,7 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * `generateRecoveryCodes()` must accept a non-Eloquent identity and store
-     * the new set with the identity's FQCN as the owner type, exercising the
-     * FQCN fallback inside the replacement.
+     * The new set is stored under the identity's class name.
      *
      * @return void
      *
@@ -128,8 +116,6 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 
         self::assertCount(2, $this->container()->make(RecoveryCodeService::class)->generate($identity, 'web'));
 
-        // Stored rows must carry the identity's FQCN as the owner type, proving
-        // the `: $identity::class` fallback fired.
         self::assertSame(
             2,
             RecoveryCode::query()
@@ -140,8 +126,6 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolve the package's MFA manager from the container.
-     *
      * @return \SineMacula\Laravel\Mfa\MfaManager
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

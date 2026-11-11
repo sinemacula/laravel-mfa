@@ -26,30 +26,13 @@ use SineMacula\Laravel\Mfa\Requirements\FactorChanges;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * Issues a new recovery code set to the person the request serves, only on a
- * session the bound `Contracts\FactorChangeGate` authorises for
- * `mfa.generate_recovery_codes` (by default, one fresh enough for it) that also
- * reaches the level the application sets for issuing them.
+ * Issues a new recovery code set on a session the `Contracts\FactorChangeGate`
+ * authorises and that reaches the application's level for issuing them.
  *
- * A pending session is served nothing here, and neither is a request that
- * serves nobody: both are `not_found`. The session is captured when the call
- * begins, and checked before the codes are drawn and again under the identity's
- * lock, so what was proved and the sign-in it was proved on still hold when the
- * old set is replaced; a refusal leaves the old set intact. The gate is asked
- * under the lock only. A session that has changed, one the gate refuses and one
- * below the level are all refused as `not_fresh`, since the remedy is the same
- * stronger step-up.
- *
- * Only the package's own refusals become a refused result, the gate's among
- * them, since refusing by throwing is how it answers. Any other exception of a
- * seam propagates, and the event is reported outside the conversion, so a
- * listener's failure is never read as a refusal of a set that committed.
- *
- * With an identity's first additional factor a set is issued as part of the
- * change that confirms it, not through that gate: the factor's own confirmation
- * proof is what shows the session would reach the level.
- *
- * Stateless: the request and the seams are resolved on every call.
+ * The session is rechecked under the identity's lock so a refusal leaves the
+ * old set intact; every refusal is `not_fresh` because the remedy is the same
+ * step-up. The event is reported outside the refusal conversion so a listener's
+ * failure is never read as a refusal of a committed set.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -59,8 +42,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 final readonly class RecoveryCodeIssuance
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      * @param  \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService  $codes
@@ -68,22 +49,21 @@ final readonly class RecoveryCodeIssuance
      */
     public function __construct(
 
-        /** The container the configuration and the seams are resolved from. */
+        /** Seams and configuration are resolved per call. */
         private Container $container,
 
-        /** The resolver of who the request serves. */
+        /** Resolves who the request serves. */
         private CallerContextResolver $callers,
 
-        /** The set's generator. */
+        /** Generates the set. */
         private RecoveryCodeService $codes,
 
-        /** The reader of the session's proofs. */
+        /** Reads the session's proofs. */
         private SessionFirstFactor $firstFactors,
     ) {}
 
     /**
-     * Generate a new set for the person the request serves, and answer with its
-     * codes, once, as secrets for the response, or the reason it was refused.
+     * A pending session or a request serving nobody is refused as `not_found`.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration
@@ -113,12 +93,9 @@ final readonly class RecoveryCodeIssuance
     }
 
     /**
-     * Generate a set with the identity's first additional factor, inside the
-     * change that confirms it, and return its codes, once, as secrets for the
-     * response: none when the application does not accept recovery codes, the
-     * session's first factor is not known, or that first factor followed by the
-     * confirmation's own proof does not reach the application's level. The
-     * set's event carries the client the change was made from.
+     * Issue a set inside the change confirming the first additional factor,
+     * bypassing the gate since the confirmation proof shows the level; empty
+     * when the application or level does not allow one.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -147,7 +124,7 @@ final readonly class RecoveryCodeIssuance
     }
 
     /**
-     * The refused answer of a refusal the package made; a seam's is thrown on.
+     * Rethrow a seam's refusal; only the package's own become a refused result.
      *
      * @param  \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException  $refusal
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration
@@ -160,10 +137,7 @@ final readonly class RecoveryCodeIssuance
     }
 
     /**
-     * Refuse issuing on a session that is no longer the one captured, that the
-     * bound factor change gate does not authorise under the lock, or that does
-     * not reach the level. Before the lock, with no factors, the gate is not
-     * asked.
+     * The gate is asked only under the lock, when factors are given.
      *
      * @formatter:off
      *

@@ -23,43 +23,16 @@ use SineMacula\Laravel\Mfa\Requirements\StepUpRefusal;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The route gate: `mfa` lets a request on only when the session the request
- * serves meets its whole requirement, read from the proofs it holds.
+ * The `mfa` route gate: lets a request on only when its session's proofs meet
+ * the whole composed requirement. `level=<level>` adds a minimum level and
+ * `operation=<name>` an operation's freshness; any other parameter throws, even
+ * on an exempt route.
  *
- * Bare `mfa` enforces the composed requirement and adds nothing to it, so what
- * `never` and `enrolled` ask nothing of passes, while an identity's part, a
- * tenant's part and a re-enrolment obligation still apply. `mfa:level=aal2`
- * adds a level. `mfa:operation=name` adds the operation's freshness, judged
- * only by the bound `FreshnessGate`; a level has no maximum age, so freshness
- * for a route goes through a named operation. Both may be given together, and
- * separate entries from a group and a route each enforce their own.
- *
- * It refuses, with `InsufficientAuthenticationException`, whoever does not meet
- * it and everyone the package does not serve, also under `never`, since that
- * setting controls the requirement and not who is served: a pending session,
- * which is never answered from the guard's user, a guest, an identity that is
- * not MFA-capable, a machine and an inactive identity. A pending credential
- * that does not validate makes its resolver throw, and that is not disguised as
- * a refusal. A route `ExemptFromMfa` marks is not gated.
- *
- * Parameters are checked first, also on an exempt route, so a typo is loud:
- * each is `key=value`, the keys `level` and `operation`, each once, and
- * anything else is an `InvalidArgumentException`. An operation with no
- * requirement is not a misconfiguration, and is simply never fresh.
- *
- * It only reads. A shortfall is answered and no session changes, so a GET never
- * revokes a credential and a stale operation is a step-up rather than a
- * demotion of the sign-in; a change that causes a shortfall hands it to
- * `SessionTransition` itself (see `Requirements\SessionReevaluation`).
- *
- * It belongs on routes and needs its authentication first, which the package's
- * middleware priority sees to; with no matched route nothing is exempt, so it
- * does not belong in the global stack. Whatever selects the application or the
- * active tenant must run before it too, as a tenant of `null` adds no part, and
- * since it runs before route bindings are substituted, a resolver must not rely
- * on bound route models.
- *
- * Stateless: the seams are resolved on every call.
+ * Pending sessions, guests, identities that are not MFA-capable, machines and
+ * inactive identities are refused, also under `never`. It only reads, so a
+ * shortfall changes no session. It belongs on routes, after authentication and
+ * whatever selects the application or tenant; route bindings are not yet
+ * substituted when it runs.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -73,20 +46,15 @@ final readonly class EnsureMfaRequirementIsMet
     private const string OPERATION = 'operation';
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the seams and the router are resolved from. */
+        /** Seams are resolved per call, so the gate holds no state. */
         private Container $container,
     ) {}
 
     /**
-     * Let the request on when the session it serves meets the requirement, or
-     * when its route is exempt.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Closure(\Illuminate\Http\Request): \Symfony\Component\HttpFoundation\Response  $next
      * @param  string  ...$parameters
@@ -118,8 +86,6 @@ final readonly class EnsureMfaRequirementIsMet
     }
 
     /**
-     * Let a caller the package serves on when it meets the requirement.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Closure(\Illuminate\Http\Request): \Symfony\Component\HttpFoundation\Response  $next
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -148,9 +114,6 @@ final readonly class EnsureMfaRequirementIsMet
     }
 
     /**
-     * Whether the caller is active, its proofs meet the requirement and the
-     * bound gate finds it fresh for the operation, if one is named.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
@@ -175,10 +138,8 @@ final readonly class EnsureMfaRequirementIsMet
     }
 
     /**
-     * Whether the route's resolved middleware holds the exempt marker: read
-     * from the route, not the request, so the order the two run in does not
-     * matter and a request cannot claim it. With no matched route nothing is
-     * exempt.
+     * Read from the route, not the request, so middleware order does not matter
+     * and a request cannot claim it.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return bool
@@ -194,8 +155,6 @@ final readonly class EnsureMfaRequirementIsMet
     }
 
     /**
-     * The refusal of the request (see `Requirements\StepUpRefusal`).
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  ?string  $operation
@@ -211,8 +170,6 @@ final readonly class EnsureMfaRequirementIsMet
     }
 
     /**
-     * The level part and the operation the parameters ask for.
-     *
      * @param  array<array-key, string>  $parameters
      * @return array{\SineMacula\Laravel\Mfa\Requirements\Requirement, ?string}
      *
@@ -236,8 +193,7 @@ final readonly class EnsureMfaRequirementIsMet
     }
 
     /**
-     * The key and value of one parameter, refusing anything but one known key
-     * and one value, which `levelPart()` and `operationName()` go on to check.
+     * Refuses anything but one known key and one value.
      *
      * @param  string  $parameter
      * @return array{string, string}
@@ -256,8 +212,6 @@ final readonly class EnsureMfaRequirementIsMet
     }
 
     /**
-     * The requirement the level asks for: nothing when none is named.
-     *
      * @param  ?string  $level
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
      *
@@ -275,8 +229,6 @@ final readonly class EnsureMfaRequirementIsMet
     }
 
     /**
-     * The operation's name, refusing one not in the form a name takes.
-     *
      * @param  ?string  $operation
      * @return ?string
      *

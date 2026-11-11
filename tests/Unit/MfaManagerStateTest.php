@@ -16,13 +16,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Unit\Concerns\InteractsWithMfaManagerState;
 
 /**
- * Unit tests for `MfaManager` lookup-style state queries.
- *
- * Covers `getDefaultDriver()`, `requirement()`, `factors()` and `factor()`. The
- * lifecycle-mutation surface lives in a dedicated sibling file
- * (`MfaManagerLifecycleTest`) so each subject stays under the project's
- * max-methods-per-class threshold without losing its cohesive grouping.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -34,8 +27,6 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     use InteractsWithMfaManagerState;
 
     /**
-     * The shipped default driver should be `'totp'`.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -48,9 +39,6 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Without an identity in the guard, the sign-in requirement asks for
-     * nothing.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -61,9 +49,6 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity that does not implement `MultiFactorAuthenticatable` is
-     * required to prove nothing.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -78,8 +63,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity that requires an additional factor of its own sign-ins is
-     * required one, whatever the application's setting.
+     * Whatever the application's setting.
      *
      * @return void
      *
@@ -98,9 +82,6 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * When the identity requires nothing of its own but its application always
-     * requires an additional factor, the requirement still asks for one.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -123,9 +104,6 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * When neither the identity nor the application requires anything, the
-     * requirement is empty.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -143,9 +121,8 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * The requirement of an identity whose auth identifier is non-scalar is
-     * refused rather than answered as empty, so the `mfa` middleware fails
-     * closed for it, even on an application that never requires a factor.
+     * Refused rather than answered as empty, so the `mfa` middleware fails
+     * closed even where no factor is required.
      *
      * @return void
      *
@@ -166,8 +143,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * Without an identity nothing is listed and nothing is found, rather than
-     * throwing.
+     * Rather than throwing.
      *
      * @return void
      *
@@ -180,8 +156,6 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity with no factor rows lists none.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -199,8 +173,7 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * The factors are read on every call, so a factor removed since the last
-     * call is gone at once and nothing is kept from one request to the next.
+     * So a removed factor is gone at once and nothing carries between requests.
      *
      * @return void
      *
@@ -225,9 +198,6 @@ final class MfaManagerStateTest extends MfaManagerTestCase
     }
 
     /**
-     * An identity whose auth identifier is neither a string nor an integer
-     * holds no factor, and listing them does not throw.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

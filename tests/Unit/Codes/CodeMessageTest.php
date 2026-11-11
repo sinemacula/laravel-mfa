@@ -16,9 +16,6 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Verification\Dumps;
 
 /**
- * Unit tests for `CodeMessage`: what it carries, and that no dump of it shows
- * the code, the destination or the recipient.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -37,9 +34,6 @@ final class CodeMessageTest extends TestCase
     private const string RECIPIENT = 'recipient-key-7731';
 
     /**
-     * The message carries what it was built with, the destination and the
-     * recipient read through their accessors.
-     *
      * @return void
      */
     public function testTheMessageCarriesWhatItWasBuiltWith(): void
@@ -60,9 +54,6 @@ final class CodeMessageTest extends TestCase
     }
 
     /**
-     * No way of dumping the message shows the code, the destination or the
-     * recipient.
-     *
      * @return void
      */
     public function testNoDumpShowsTheCodeTheDestinationOrTheRecipient(): void
@@ -81,8 +72,6 @@ final class CodeMessageTest extends TestCase
     }
 
     /**
-     * A message to the recipient, for an enrolment.
-     *
      * @param  \Tests\Fixtures\Identities\NonEloquentIdentity  $recipient
      * @param  \SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  \Carbon\CarbonImmutable  $expiresAt

@@ -15,44 +15,33 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeMatcher;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeNormalizer;
 
 /**
- * Recovery codes with no database: drawing a set, and the comparison a
- * redemption makes against a full, a partly used and an empty set, whichever
- * code matches and when none does.
- *
- * A redemption checks every unused code, so its time follows the unused count
- * and not the position of the match; these timings are measurements to show
- * that, not assertions. The matrix uses bcrypt at its cheapest cost and a few
- * cases repeat at the framework's default cost, where the hashing is what a
- * redemption spends; the figures scale with the application's own hashing cost.
- * The statements a redemption makes belong to the query budgets. Every case
- * proves at set-up the exact code `find()` returns.
+ * A redemption checks every unused code, so its time follows the unused count,
+ * not the match position; a few cases repeat at the default bcrypt cost.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final class RecoveryCodeBench
 {
-    /** @var string The shipped alphabet. */
+    /** @var string Shipped alphabet. */
     private const string ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
-    /** @var int The default size of a set. */
+    /** @var int Default set size. */
     private const int SET_SIZE = 10;
 
-    /** @var string A code submitted that matches none of the set. */
+    /** @var string Matches none of the set. */
     private const string MISS = 'ZZZZ-ZZZZ-ZZZZ';
 
-    /** @var \Illuminate\Hashing\BcryptHasher The hasher of the subject measured. */
+    /** @var \Illuminate\Hashing\BcryptHasher */
     private BcryptHasher $hasher;
 
-    /** @var list<string> The unused codes' hashes. */
+    /** @var list<string> Unused codes' hashes. */
     private array $hashes = [];
 
-    /** @var string The code submitted, as a person might type it. */
+    /** @var string As a person might type it. */
     private string $submitted = '';
 
     /**
-     * Start at the cheapest cost, until a case arranges its own hasher.
-     *
      * @return void
      */
     public function __construct()
@@ -61,8 +50,7 @@ final class RecoveryCodeBench
     }
 
     /**
-     * The sets compared against at the cheapest cost, by how many codes are
-     * unused, and the index of the code submitted, `null` for a miss.
+     * Unused count and the submitted index, `null` for a miss.
      *
      * @return iterable<string, array{unused: int, index: ?int}>
      */
@@ -78,8 +66,7 @@ final class RecoveryCodeBench
     }
 
     /**
-     * The sets compared against at the framework's default cost: enough to show
-     * the cost follows the unused count and not the position.
+     * Enough to show the cost follows the unused count, not the position.
      *
      * @return iterable<string, array{unused: int, index: ?int}>
      */
@@ -92,8 +79,6 @@ final class RecoveryCodeBench
     }
 
     /**
-     * Draw and hash a set at the cheapest cost and prove the case.
-     *
      * @param  array{unused: int, index: ?int}  $params
      * @return void
      *
@@ -106,8 +91,6 @@ final class RecoveryCodeBench
     }
 
     /**
-     * Draw and hash a set at the framework's default cost and prove the case.
-     *
      * @param  array{unused: int, index: ?int}  $params
      * @return void
      *
@@ -120,9 +103,6 @@ final class RecoveryCodeBench
     }
 
     /**
-     * Measure the comparison of a submitted code, normalised, against the
-     * unused codes of a set.
-     *
      * @return void
      */
     #[BeforeMethods('arrange')]
@@ -135,8 +115,7 @@ final class RecoveryCodeBench
     }
 
     /**
-     * Measure the same comparison at the framework's default cost, once in each
-     * iteration, as each check is as slow as checking a password.
+     * One revolution, as each check costs as much as a password check.
      *
      * @return void
      */
@@ -150,8 +129,6 @@ final class RecoveryCodeBench
     }
 
     /**
-     * Measure drawing a set of the default size.
-     *
      * @return void
      *
      * @throws \Random\RandomException
@@ -164,8 +141,7 @@ final class RecoveryCodeBench
     }
 
     /**
-     * Draw the case's set, hash its unused codes and prove the index `find()`
-     * returns, and that a miss is none of the codes drawn.
+     * Hash the unused codes and prove the index `find()` returns.
      *
      * @param  \Illuminate\Hashing\BcryptHasher  $hasher
      * @param  array{unused: int, index: ?int}  $params

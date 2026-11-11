@@ -36,10 +36,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `ChallengeCounters`, the calls a challenge owner makes into this
- * package's counts inside its own transaction: what is admitted and why not,
- * and how an outcome is counted.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -58,8 +54,6 @@ final class ChallengeCountersTest extends TestCase
     private Factor $factor;
 
     /**
-     * Sign a person in with an email factor.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -71,14 +65,11 @@ final class ChallengeCountersTest extends TestCase
 
         [$this->user, $this->factor] = $this->arrangeEmailChallenges();
 
-        // Build the manager while the configuration is whole, as the
-        // application would at boot, so a test may change it afterwards.
+        // Built at boot with the configuration whole, so a test may change it.
         $this->container()->make('mfa');
     }
 
     /**
-     * Both calls refuse outside a transaction.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -104,7 +95,7 @@ final class ChallengeCountersTest extends TestCase
 
     /**
      * A confirmed factor of an enabled type, accepted after the session's first
-     * factor and not locked, is admitted.
+     * factor and not locked.
      *
      * @return void
      *
@@ -116,8 +107,7 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * A factor that keeps no state of its own is looked up among the identity's
-     * stored factors, and refused as not found when it is none of them.
+     * Refused as not found when it is none of them.
      *
      * @return void
      *
@@ -132,8 +122,7 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * A stored factor of a model of its own is locked through that model, by
-     * the owner columns it names, not through the configured one.
+     * By the owner columns it names, not through the configured model.
      *
      * @return void
      *
@@ -152,8 +141,6 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * What is refused, and why, before or under the lock.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -190,8 +177,6 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * A machine and an inactive identity are refused.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -214,9 +199,7 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * The bound active state resolver, not the identity, decides who is
-     * inactive: an identity it finds inactive is refused, and one it finds
-     * active is not, whatever each says of itself.
+     * Whatever each identity says of itself.
      *
      * @return void
      *
@@ -235,8 +218,7 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * A factor disabled at the failure ceiling and an identity locked out are
-     * refused as locked, with when the lockout ends.
+     * With when the lockout ends.
      *
      * @return void
      *
@@ -267,8 +249,8 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * A failure is counted against the factor and the identity, and a success
-     * resets the factor's failures in a row.
+     * A failure counts against the factor and identity; a success resets the
+     * factor's failures in a row.
      *
      * @return void
      *
@@ -292,8 +274,6 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * An outcome reported in a change that rolls back counts nothing.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -310,9 +290,8 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * Competing failures cannot overrun the identity's cap: the failure that
-     * locks it names the lockout it caused, a further outcome is refused and
-     * counted nowhere, and the lockout is reported once the change commits.
+     * The locking failure names its lockout, a further outcome is refused and
+     * uncounted, and the lockout is reported on commit.
      *
      * @return void
      *
@@ -344,8 +323,6 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * A report bound to another identity is refused.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -361,7 +338,7 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * Ask whether the factor may be challenged, in a transaction.
+     * Ask in a transaction whether the factor may be challenged.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -377,8 +354,6 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * The factor's failures in a row, as stored.
-     *
      * @return int
      */
     private function failures(): int
@@ -387,8 +362,6 @@ final class ChallengeCountersTest extends TestCase
     }
 
     /**
-     * The counters under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeCounters
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

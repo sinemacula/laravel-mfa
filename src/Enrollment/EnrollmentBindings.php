@@ -17,13 +17,11 @@ use Illuminate\Contracts\Foundation\Application;
 final class EnrollmentBindings
 {
     /**
-     * Disallow instantiation; utility container only.
+     * Disallow instantiation.
      */
     private function __construct() {}
 
     /**
-     * Register the enrolment service with the container.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

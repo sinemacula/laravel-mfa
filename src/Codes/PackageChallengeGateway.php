@@ -23,31 +23,9 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * The default `ChallengeGateway`: the package's own delivered codes (see
- * `CodeService`), owned exactly as an authentication layer must own its
- * challenges.
- *
- * Each call opens a transaction on the storage connection and asks
- * `Attempts\ChallengeCounters::isUsable()` first, so a locked or disabled
- * factor, a locked identity, a pending factor, a type the application does not
- * enable and a factor the combination policy does not accept after the
- * session's first factor are refused before anything is sent or checked.
- * Sending then issues and delivers a code bound as the binding says; verifying
- * checks the code against the named challenge, consuming it when it matches,
- * and reports the outcome through the counters in the same transaction. A
- * delivery is never reported. The caller is served only when the request's
- * pending session allows sending or verifying (or, for a binding whose purpose
- * is `enrollment`, starting or confirming a bootstrap enrolment, whatever else
- * it allows), or it has no pending session and its signed-in person is served,
- * and only for a binding that is exactly the caller's own (see
- * `Context\CallerContextResolver::binding()`): its identity, its application,
- * its session (the pending session's, or the current sign-in's) and the
- * binding's purpose. A binding of another application or session of the same
- * identity is refused, so a pending credential never reaches an active sign-in
- * elsewhere.
- *
- * Stateless: the request, the driver and the connection are resolved on every
- * call.
+ * Default `ChallengeGateway` over the package's delivered codes. A binding must
+ * match the caller's own exactly, so a pending credential never reaches a
+ * sign-in in another application or session.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -55,8 +33,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 final readonly class PackageChallengeGateway implements ChallengeGateway
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      * @param  \SineMacula\Laravel\Mfa\Attempts\ChallengeCounters  $counters
@@ -64,23 +40,20 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
      */
     public function __construct(
 
-        /** The container the drivers are resolved from. */
+        /** Resolves drivers. */
         private Container $container,
 
-        /** The resolver of who the request serves. */
+        /** Caller resolver. */
         private CallerContextResolver $callers,
 
-        /** The counts every challenge is admitted and reported through. */
+        /** Admits and records every challenge. */
         private ChallengeCounters $counters,
 
-        /** The package's own delivered codes. */
+        /** Delivered codes. */
         private CodeService $codes,
     ) {}
 
     /**
-     * Send a code for the factor, bound as the binding says: the challenge's id
-     * and when the code stops working, or why none was sent.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -108,9 +81,8 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     }
 
     /**
-     * Whether the code answers the challenge, consuming it when it does, with
-     * the outcome counted against the factor and the identity. A challenge that
-     * may not go ahead is refused without checking the code, counting nothing.
+     * A challenge that is not admitted is refused without checking the code or
+     * counting.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -149,8 +121,7 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     }
 
     /**
-     * The caller served for the action, when the binding is the caller's own:
-     * the same identity, application, session and purpose.
+     * The caller, when the binding matches its own exactly.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Enums\PendingAction  $action
@@ -173,9 +144,6 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     }
 
     /**
-     * The pending action a call under the binding needs: the enrolling one for
-     * a binding whose purpose is `enrollment`, the other for any other.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \SineMacula\Laravel\Mfa\Enums\PendingAction  $action
      * @param  \SineMacula\Laravel\Mfa\Enums\PendingAction  $enrolling
@@ -187,8 +155,6 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     }
 
     /**
-     * The driver of the factor's type, which must deliver codes.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return \SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver
      *
@@ -201,8 +167,6 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
     }
 
     /**
-     * The driver, which must deliver codes.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
      * @param  string  $type
      * @return \SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver

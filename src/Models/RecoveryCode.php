@@ -12,14 +12,8 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * Default shipped recovery code model.
- *
- * One code of an identity's recovery code set, stored as a salted hash, bound
- * to the identity through the `authenticatable()` relation. ULID primary key,
- * kept on the storage connection with the package's other tables. An
- * application may replace it through `mfa.recovery_codes.model` with a
- * subclass, or with its own Eloquent model implementing the `RecoveryCode`
- * contract (the `ActsAsRecoveryCode` trait does).
+ * The shipped recovery code model, stored as a salted hash and replaceable
+ * through `mfa.recovery_codes.model`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,7 +32,7 @@ class RecoveryCode extends Model implements RecoveryCodeContract
 {
     use ActsAsRecoveryCode, HasUlids;
 
-    /** @var list<string> The attributes that are mass assignable. */
+    /** @var list<string> */
     protected $fillable = [
         'authenticatable_type',
         'authenticatable_id',
@@ -48,16 +42,13 @@ class RecoveryCode extends Model implements RecoveryCodeContract
         'replaced_at',
     ];
 
-    /** @var list<string> The attributes that should be hidden for serialisation. */
+    /** @var list<string> */
     protected $hidden = [
         'code_hash',
     ];
 
     /**
-     * Create the code on the configured table and, unless the class names a
-     * connection of its own, the storage connection (see `Database\TableNames`
-     * and `Database\StorageConnection`), read when it is built so a change in
-     * the configuration applies to the next one.
+     * Reads the table and connection per instance so config changes apply.
      *
      * @param  array<string, mixed>  $attributes
      *
@@ -73,8 +64,6 @@ class RecoveryCode extends Model implements RecoveryCodeContract
     }
 
     /**
-     * Columns that receive a generated unique identifier on insert.
-     *
      * @return array<int, string>
      */
     #[\Override]
@@ -84,8 +73,6 @@ class RecoveryCode extends Model implements RecoveryCodeContract
     }
 
     /**
-     * The attributes that should be cast.
-     *
      * @return array<string, string>
      */
     #[\Override]

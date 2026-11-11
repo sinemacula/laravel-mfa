@@ -35,20 +35,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * What comes before a verification of a factor that needs a challenge: sending
- * a delivered factor's code, and asking for a passkey's assertion, each bound
- * to the caller's identity, application, sign-in and purpose as the
- * verification that follows will be.
- *
- * Sending takes the shape a verification does: the caller and the binding are
- * captured, an IP address slot is taken, and under the identity's factor state
- * lock they are resolved again, so a sign-in that changed sends nothing. The
- * factor as stored there is admitted, and the bound `ChallengeGateway` sends
- * the code; `CodeSent` is dispatched once it commits, whichever gateway sent
- * it. A refusal is the result's reason: nothing is reported, since no attempt
- * was made, and sending resets no count and lifts no lockout.
- *
- * Stateless: the seams are resolved on every call.
+ * Sends a delivered factor's code or asks for a passkey assertion, bound as the
+ * verification that follows; sending resets no count.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -58,8 +46,6 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 final readonly class ChallengeRequests
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      * @param  \SineMacula\Laravel\Mfa\Factors\OperationGuard  $guard
@@ -68,26 +54,25 @@ final readonly class ChallengeRequests
      */
     public function __construct(
 
-        /** The container the seams are resolved from. */
+        /** Seams are resolved on every call. */
         private Container $container,
 
-        /** The resolver of who the request serves. */
+        /** Resolves who the request serves. */
         private CallerContextResolver $callers,
 
-        /** The guard every operation on a factor starts with. */
+        /** Starts every operation on a factor. */
         private OperationGuard $guard,
 
-        /** The throttle on the request's IP address. */
+        /** Throttles the request's IP address. */
         private AttemptService $attempts,
 
-        /** The dispatcher of `CodeSent`. */
+        /** Dispatches `CodeSent`. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Send a code for the caller's delivered factor. Refused as `not_found`
-     * when the request serves nobody or the identity has no sign-in, and when
-     * the factor is missing, another's, or delivers no codes.
+     * A refusal is the result's reason; nothing is reported, since no attempt
+     * was made.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
@@ -130,10 +115,8 @@ final readonly class ChallengeRequests
     }
 
     /**
-     * The options of an assertion request for the caller's passkey factor, or
-     * the reason there are none: `not_found` when the request serves nobody for
-     * verifying. Only the package's own refusals are answered as a reason: a
-     * seam's exception propagates.
+     * Only the package's own refusals become a reason; a seam's exception
+     * propagates.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
@@ -159,10 +142,6 @@ final readonly class ChallengeRequests
     }
 
     /**
-     * The options of the assertion request, refusing a purpose a ceremony is
-     * not made for, a caller with no sign-in to bind it to and a factor the
-     * caller may not use.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  mixed  $factorId
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -187,8 +166,7 @@ final readonly class ChallengeRequests
     }
 
     /**
-     * Send the code holding a slot of the IP address's window and the
-     * identity's lock.
+     * Hold a slot of the IP address's window and the identity's lock.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -227,8 +205,8 @@ final readonly class ChallengeRequests
     }
 
     /**
-     * Under the lock: refuse a sign-in that changed and a factor no longer
-     * stored, admit the factor, send the code and queue `CodeSent`.
+     * Resolve the caller again so a changed sign-in sends nothing; `CodeSent`
+     * dispatches on commit, whichever gateway sent.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $served
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding

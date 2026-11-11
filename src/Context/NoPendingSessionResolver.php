@@ -8,9 +8,8 @@ use Illuminate\Http\Request;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 
 /**
- * The default `PendingSessionResolver`: without an authentication layer there
- * are no pending sessions, so no request carries one. Every helper then serves
- * the identity the guard signed in, and only on an active session.
+ * Without an authentication layer there are no pending sessions, so every
+ * helper serves the guard's identity on an active session.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,8 +17,6 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 final readonly class NoPendingSessionResolver implements PendingSessionResolver
 {
     /**
-     * No pending session: no request carries one.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return null
      */
@@ -30,8 +27,6 @@ final readonly class NoPendingSessionResolver implements PendingSessionResolver
     }
 
     /**
-     * No pending session stands: none was ever served.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return null
      */

@@ -7,12 +7,8 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * Provisioning driver contract.
- *
- * A factor driver whose enrolment secret is shown to the person as a URI an
- * authenticator app reads from a QR code. Starting an enrolment of such a type
- * needs the account name the app shows, and returns the URI with the secret,
- * once.
+ * A factor driver whose enrolment secret is shown as a URI an authenticator app
+ * reads from a QR code.
  *
  * @api
  *
@@ -22,8 +18,7 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 interface ProvisioningDriver extends FactorDriver
 {
     /**
-     * The provisioning URI of the factor and its secret, itself a secret, since
-     * it holds the secret.
+     * The provisioning URI, itself a secret since it holds the secret.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $issuer

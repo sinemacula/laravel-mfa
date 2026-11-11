@@ -11,16 +11,10 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 
 /**
- * What every `SessionRevoker` must guarantee, as assertions: a factor's
- * removal, or revoking every session, stops another session counting; a
- * factor's removal never spares a session other than the sign-in it was made
- * from; and a revocation inside a change that rolls back leaves another session
- * counting.
- *
- * What "counting" means is the implementation's: the closures given verify
- * another session of the identity and say whether it still counts. A revoker
- * that ends sessions passes; so does one that only stops their proofs counting,
- * as the package's default does.
+ * What every `SessionRevoker` must guarantee: a factor's removal or revoking
+ * all stops another session counting, a removal spares only the sign-in it was
+ * made from, and a rolled-back revocation changes nothing. The closures define
+ * "counting", so ending sessions and voiding their proofs both pass.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,8 +29,7 @@ final class SessionRevokerContract
     private function __construct() {}
 
     /**
-     * A factor's removal from the identity's current sign-in stops another
-     * session counting, and answers what it did.
+     * The revoker must also answer what it did.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SessionRevoker  $revoker
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -64,9 +57,8 @@ final class SessionRevokerContract
     }
 
     /**
-     * A factor's removal named as made from a sign-in that is not the
-     * identity's current one never spares the current session: the revoker
-     * throws, or the current session stops counting with the others.
+     * The revoker throws, or the current session stops counting with the
+     * others.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SessionRevoker  $revoker
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -96,8 +88,6 @@ final class SessionRevokerContract
     }
 
     /**
-     * Revoking every session stops another session counting.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SessionRevoker  $revoker
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): void  $verifyOther
@@ -118,9 +108,6 @@ final class SessionRevokerContract
     }
 
     /**
-     * A revocation inside a change on the storage connection that rolls back
-     * leaves another session counting.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SessionRevoker  $revoker
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): void  $verifyOther
@@ -157,8 +144,6 @@ final class SessionRevokerContract
     }
 
     /**
-     * Verify another session of the identity, and check that it counts.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): void  $verifyOther
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable): bool  $otherCounts

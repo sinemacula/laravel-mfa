@@ -21,11 +21,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `ForgetSignInOnLogout`: Laravel's `Logout` and
- * `CurrentDeviceLogout` events forget the identity's sign-in on the application
- * their guard acts for, leave its sign-in on another alone, and leave an
- * identity that holds none alone.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -35,8 +30,6 @@ use Tests\TestCase;
 final class ForgetSignInOnLogoutTest extends TestCase
 {
     /**
-     * Tear down Mockery expectations between test cases.
-     *
      * @return void
      */
     #[\Override]
@@ -48,8 +41,7 @@ final class ForgetSignInOnLogoutTest extends TestCase
     }
 
     /**
-     * Signing out forgets the identity's sign-in on the guard's application and
-     * leaves its sign-in on another alone.
+     * The identity's sign-in on another application is left alone.
      *
      * @return void
      *
@@ -70,9 +62,7 @@ final class ForgetSignInOnLogoutTest extends TestCase
     }
 
     /**
-     * With a guard application resolver bound, the sign-in ends on the
-     * application it names through the event's guard, and the one it names
-     * without it is left alone.
+     * The application the resolver names without the guard is left alone.
      *
      * @return void
      *
@@ -95,8 +85,6 @@ final class ForgetSignInOnLogoutTest extends TestCase
     }
 
     /**
-     * Signing out of the current device forgets the identity's sign-in too.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -114,8 +102,6 @@ final class ForgetSignInOnLogoutTest extends TestCase
     }
 
     /**
-     * An identity that cannot hold factors forgets nothing.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -135,7 +121,7 @@ final class ForgetSignInOnLogoutTest extends TestCase
     }
 
     /**
-     * An identity whose key cannot name a record signs out without failing.
+     * It signs out without failing.
      *
      * @return void
      *
@@ -156,8 +142,6 @@ final class ForgetSignInOnLogoutTest extends TestCase
     }
 
     /**
-     * Bind the store the listener's proof service reaches.
-     *
      * @template TStore of \SineMacula\Laravel\Mfa\Contracts\ProofStore
      *
      * @param  TStore  $store
@@ -171,8 +155,6 @@ final class ForgetSignInOnLogoutTest extends TestCase
     }
 
     /**
-     * The listener under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\ForgetSignInOnLogout
      */
     private function listener(): ForgetSignInOnLogout
@@ -181,8 +163,6 @@ final class ForgetSignInOnLogoutTest extends TestCase
     }
 
     /**
-     * A test user, never saved.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function user(): TestUser

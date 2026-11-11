@@ -10,16 +10,8 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 use SineMacula\Laravel\Mfa\Support\SerializedFields;
 
 /**
- * What a session must have proved, from the application, a tenant, the identity
- * or an operation: any of an additional verification, multifactor
- * authentication, a minimum assurance level and phishing resistance, each with
- * an optional maximum age in seconds for the proof that satisfies it.
- *
- * Built from `none()` by asking for each part. `strictest()` composes several
- * requirements into one a session meets only when it meets each of them. The
- * serialised form names each part asked for, so a requirement can be stored,
- * configured or carried on an exception, and a mistyped part or field is
- * refused rather than dropped.
+ * What a session must have proved, each part with an optional maximum age in
+ * seconds; serialised parts and fields are strictly checked.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, array<string, int|string|null>>
  *
@@ -29,23 +21,19 @@ use SineMacula\Laravel\Mfa\Support\SerializedFields;
 final readonly class Requirement implements \JsonSerializable, Arrayable
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, ?int>  $maxAges
      * @param  ?\SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $minimumLevel
      */
     private function __construct(
 
-        /** The parts asked for, keyed by value, each with its maximum age in seconds or `null` for any age. */
+        /** Maximum age in seconds per part asked for, `null` for any age. */
         private array $maxAges,
 
-        /** The lowest level that meets the requirement, or `null` when it asks for none. */
+        /** `null` when no minimum level is asked for. */
         public ?AssuranceLevel $minimumLevel,
     ) {}
 
     /**
-     * The requirement that asks for nothing.
-     *
      * @return self
      */
     public static function none(): self
@@ -54,10 +42,8 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The strictest of the given requirements: every part any of them asks for,
-     * the highest minimum level, and for each part the shortest maximum age any
-     * of them sets. A session that meets it meets each of them, so the same
-     * parts always compose to the same answer, in any order.
+     * Every part any asks for, the highest minimum level and the shortest
+     * maximum age, so the result is the same in any order.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  ...$parts
      * @return self
@@ -79,10 +65,7 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Read a requirement back from its serialised form: each part asked for,
-     * keyed by its value, with an optional `max_age` and, for the minimum
-     * level, its `level`. An unknown part, or an unknown field within a part,
-     * is refused, so a mistyped one never drops a maximum age.
+     * An unknown part or field is refused, so a typo never drops a maximum age.
      *
      * @param  array<array-key, mixed>  $data
      * @return self
@@ -109,8 +92,8 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The requirement with an additional verification asked for: an accepted
-     * combination, or a first factor that is a multi-factor authenticator.
+     * An accepted combination, or a first factor that is a multi-factor
+     * authenticator.
      *
      * @param  ?int  $maxAge
      * @return self
@@ -123,8 +106,6 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The requirement with multifactor authentication asked for.
-     *
      * @param  ?int  $maxAge
      * @return self
      *
@@ -136,8 +117,7 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The requirement with a minimum assurance level asked for, in place of any
-     * it asked before.
+     * Replaces any minimum level asked before.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @param  ?int  $maxAge
@@ -155,8 +135,6 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The requirement with phishing resistance asked for.
-     *
      * @param  ?int  $maxAge
      * @return self
      *
@@ -168,8 +146,6 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Whether the requirement asks for the given part.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\RequirementPart  $part
      * @return bool
      */
@@ -179,8 +155,7 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The maximum age in seconds of the proof that satisfies the given part, or
-     * `null` when any age will do or the part is not asked for.
+     * In seconds, or `null` when any age will do or the part is not asked for.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\RequirementPart  $part
      * @return ?int
@@ -191,7 +166,7 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The parts the requirement asks for, in a fixed order.
+     * In a fixed order.
      *
      * @return list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>
      */
@@ -201,8 +176,6 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Whether the requirement asks for nothing.
-     *
      * @return bool
      */
     public function isEmpty(): bool
@@ -211,8 +184,8 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The parts asked for, keyed by value in a fixed order, each with its
-     * maximum age and, for the minimum level, the level.
+     * Keyed by part in a fixed order, each with its maximum age and, for the
+     * minimum level, the level.
      *
      * @return array<string, array<string, int|string|null>>
      */
@@ -231,8 +204,6 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The requirement as JSON serialises it: the same as `toArray()`.
-     *
      * @return array<string, array<string, int|string|null>>
      */
     #[\Override]
@@ -242,8 +213,6 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The requirement with the given part asked for, with its maximum age.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\RequirementPart  $part
      * @param  ?int  $maxAge
      * @return self
@@ -260,9 +229,6 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The fields the serialised form of a part may hold: its maximum age and,
-     * for the minimum level, the level.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\RequirementPart  $part
      * @return list<string>
      */
@@ -272,7 +238,7 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The higher of two minimum levels, where `null` asks for none.
+     * `null` asks for no level.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $current
      * @param  ?\SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $candidate
@@ -288,7 +254,7 @@ final readonly class Requirement implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The stricter of two maximum ages: the shorter, where `null` allows any.
+     * `null` allows any age.
      *
      * @param  ?int  $current
      * @param  ?int  $candidate

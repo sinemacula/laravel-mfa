@@ -13,10 +13,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 
 /**
- * What every `Reauthenticator` must guarantee, as an assertion: it answers
- * nothing, or a reauthentication with the first factor that it has just made,
- * bound to the identity and the application. A refusing default meets it; it is
- * not required to make a proof.
+ * What every `Reauthenticator` must guarantee: it answers nothing, or a first
+ * factor reauthentication it just made for the identity and application.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -31,8 +29,7 @@ final class ReauthenticatorContract
     private function __construct() {}
 
     /**
-     * The answer is `null`, or a first factor reauthentication of the identity
-     * on the application, made within the last five minutes and not after now.
+     * Made within the last five minutes and not after now.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Reauthenticator  $reauthenticator
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity

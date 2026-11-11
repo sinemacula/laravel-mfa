@@ -12,9 +12,8 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * A combination policy that answers as the default does, without saying when an
- * evaluation stops meeting its requirement, as one written before that was
- * asked would.
+ * Answers as the default policy does, without saying when an evaluation stops
+ * meeting its requirement.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,8 +23,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 final class UndatedCombinationPolicy implements CombinationPolicy
 {
     /**
-     * As the default answers.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $factor
      * @return bool
@@ -37,8 +34,6 @@ final class UndatedCombinationPolicy implements CombinationPolicy
     }
 
     /**
-     * As the default answers, without the time.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation

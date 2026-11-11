@@ -12,8 +12,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * An application's own type provisioned as TOTP is, under a type of its own: it
- * starts with a fixed secret and accepts one fixed code.
+ * A type of the application's own, provisioned as TOTP is, with a fixed secret
+ * and one accepted code.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,18 +22,16 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
  */
 final class HardwareAppDriver implements ProvisioningDriver
 {
-    /** @var string The type this driver is registered under. */
+    /** @var string */
     public const string TYPE = 'hardware_app';
 
-    /** @var string The secret every enrolment starts with. */
+    /** @var string */
     public const string SECRET = 'hardware-secret';
 
-    /** @var string The one code it accepts. */
+    /** @var string */
     public const string CODE = '246810';
 
     /**
-     * The channel of an authenticator app.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
      */
     #[\Override]
@@ -43,8 +41,6 @@ final class HardwareAppDriver implements ProvisioningDriver
     }
 
     /**
-     * No `amr` values of its own.
-     *
      * @return list<string>
      */
     #[\Override]
@@ -54,8 +50,6 @@ final class HardwareAppDriver implements ProvisioningDriver
     }
 
     /**
-     * Start with the fixed secret.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return \SineMacula\Laravel\Mfa\Secrets\RevealedSecret
      */
@@ -66,8 +60,6 @@ final class HardwareAppDriver implements ProvisioningDriver
     }
 
     /**
-     * A URI naming the issuer, the account name and the secret.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $issuer
      * @param  string  $accountName
@@ -81,8 +73,6 @@ final class HardwareAppDriver implements ProvisioningDriver
     }
 
     /**
-     * Confirmed as it is verified.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -95,8 +85,6 @@ final class HardwareAppDriver implements ProvisioningDriver
     }
 
     /**
-     * Accept the one code.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding

@@ -11,12 +11,10 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 
 /**
- * What every `SessionTransition` must guarantee, as an assertion: judging a
- * session again after each change to its factors, whether or not the package
- * finds it short, either returns, meaning the change was handled, or refuses by
- * throwing a `RuntimeException`, so the change it is part of rolls back; it
- * never fails in any other way. What it returns is the layer's own, so the kit
- * does not look into it.
+ * What every `SessionTransition` must guarantee: after each factor change,
+ * short or not, it returns or throws a `RuntimeException` so the change rolls
+ * back, and fails no other way. The return value is the layer's own and not
+ * checked.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -31,9 +29,8 @@ final class SessionTransitionContract
     private function __construct() {}
 
     /**
-     * Each change, with a shortfall and without, returns or refuses by throwing
-     * a `RuntimeException`. Each is arranged afresh, so no earlier one leaves a
-     * later one only a session already ended to judge.
+     * `$arrange` runs per change so an earlier one cannot leave a later one
+     * only an ended session to judge.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SessionTransition  $transition
      * @param  \Closure(\SineMacula\Laravel\Mfa\Enums\FactorChangeMade): \SineMacula\Laravel\Mfa\Requirements\SessionChange  $arrange
@@ -51,8 +48,6 @@ final class SessionTransitionContract
     }
 
     /**
-     * The one change returns, or refuses by throwing a `RuntimeException`.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SessionTransition  $transition
      * @param  \SineMacula\Laravel\Mfa\Requirements\SessionChange  $change
      * @return void

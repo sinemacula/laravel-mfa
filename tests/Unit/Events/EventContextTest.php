@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Events\EventContext;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 
 /**
- * Unit tests for `EventContext`, the allowlist every event's context is cut
- * down to, and `Actor`, who took an action by type and id.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,7 +21,7 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 final class EventContextTest extends TestCase
 {
     /**
-     * The context's keys, in order, so a renamed key fails.
+     * Pinned in order, so a renamed key fails.
      *
      * @return void
      */
@@ -44,8 +41,8 @@ final class EventContextTest extends TestCase
     }
 
     /**
-     * Integers and strings are kept, anything else becomes `null`, every key is
-     * present, and keys outside the allowlist are dropped.
+     * Anything else becomes `null`, every key is present, and unknown keys are
+     * dropped.
      *
      * @return void
      */
@@ -75,9 +72,6 @@ final class EventContextTest extends TestCase
     }
 
     /**
-     * An identifier is a string when it is an integer or a string, and `null`
-     * otherwise.
-     *
      * @return void
      */
     public function testAScalarKeyIsAString(): void
@@ -89,7 +83,7 @@ final class EventContextTest extends TestCase
     }
 
     /**
-     * An actor is recorded by its type and id, and encodes as both.
+     * Encoded as both.
      *
      * @return void
      */
@@ -103,8 +97,7 @@ final class EventContextTest extends TestCase
     }
 
     /**
-     * An actor whose identifier is of another shape is recorded with an empty
-     * id rather than failing the change it reports.
+     * Rather than failing the change it reports.
      *
      * @return void
      */

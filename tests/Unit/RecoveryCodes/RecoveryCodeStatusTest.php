@@ -10,9 +10,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus;
 
 /**
- * Unit tests for `RecoveryCodeStatus`: what it carries, and that a set exists
- * exactly when it has a time, whatever remains of it.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,7 +19,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus;
 final class RecoveryCodeStatusTest extends TestCase
 {
     /**
-     * A set with a time exists, used up or not; one without does not.
+     * Used up or not.
      *
      * @return void
      */

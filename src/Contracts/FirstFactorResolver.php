@@ -7,14 +7,8 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * First factor resolver contract.
- *
- * Reads the proof of the first factor that started the identity's current
- * session: its method, its channel (kind and destination or credential), the
- * properties it observed and its time. It answers only from a trusted source
- * (the session's record, or the application's declaration); `null` means the
- * first factor is unknown, so no combination is accepted and no level is
- * established.
+ * Reads the proof of the first factor that started the identity's session, from
+ * a trusted source only.
  *
  * @api
  *
@@ -24,8 +18,8 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 interface FirstFactorResolver
 {
     /**
-     * The first factor's proof on the identity's current session, or `null`
-     * when it is unknown or untrusted.
+     * The first factor's proof, or `null` when it is unknown or untrusted, so
+     * no combination is accepted.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

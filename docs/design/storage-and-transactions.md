@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note describes where the package's tables live, why they share one connection, and the one transaction and lock
+This note records where the package's tables live, why they share one connection, and the one transaction and lock
 order every change that depends on an identity's whole factor state runs in, so two such changes for one identity
 cannot interleave.
 

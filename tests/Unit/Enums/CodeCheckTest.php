@@ -10,9 +10,6 @@ use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * Unit tests for `CodeCheck`: the outcomes, the failure reason each answers
- * with, and the internal detail each records.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,8 +19,6 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final class CodeCheckTest extends TestCase
 {
     /**
-     * The outcomes are pinned, so a rename fails.
-     *
      * @return void
      */
     public function testTheOutcomesArePinned(): void
@@ -35,9 +30,8 @@ final class CodeCheckTest extends TestCase
     }
 
     /**
-     * An accepted code is no failure; a wrong one is an invalid code, a used
-     * one replayed, a known challenge with no live code to compare is expired,
-     * and a challenge that is absent or another's is not found.
+     * Accepted is no failure, wrong is invalid, used is replayed, no live code
+     * is expired, and absent or another's is not found.
      *
      * @return void
      */
@@ -53,8 +47,6 @@ final class CodeCheckTest extends TestCase
     }
 
     /**
-     * Each outcome records a detail of its own.
-     *
      * @return void
      */
     public function testEachOutcomeRecordsItsDetail(): void

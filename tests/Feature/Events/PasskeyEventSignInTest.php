@@ -30,9 +30,8 @@ use Tests\Fixtures\Seams\RecordingEventContextResolver;
 use Tests\TestCase;
 
 /**
- * A passkey registered as a pending session's bootstrap enrolment names the
- * pending session's sign-in the registration was bound to, on every event it
- * reports, not the sign-in the proof store holds for the identity.
+ * A bootstrap passkey registration's events name the pending sign-in, not the
+ * one the proof store holds.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,16 +45,13 @@ final class PasskeyEventSignInTest extends TestCase
 {
     use ArrangesPasskeys;
 
-    /** @var string The session id of the pending session. */
+    /** @var string Pending session id. */
     private const string PENDING = 'pending-1';
 
-    /** @var list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent> What was reported, oldest first. */
+    /** @var list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent> Reported events, oldest first. */
     private array $reported = [];
 
     /**
-     * Make recovery codes quick to hash, bind the recording resolver and listen
-     * for every event.
-     *
      * @return void
      */
     #[\Override]
@@ -73,10 +69,6 @@ final class PasskeyEventSignInTest extends TestCase
     }
 
     /**
-     * A bootstrap registration names the pending session's sign-in on the
-     * confirmation, the association and the recovery codes issued with the
-     * first factor.
-     *
      * @return void
      *
      * @throws \Throwable

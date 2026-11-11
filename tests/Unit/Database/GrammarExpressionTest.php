@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Database\GrammarExpression;
 use Tests\TestCase;
 
 /**
- * Unit tests for `GrammarExpression`: SQL written by the grammar that compiles
- * the statement holding it.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,6 @@ use Tests\TestCase;
 final class GrammarExpressionTest extends TestCase
 {
     /**
-     * The expression is what its writer gives for the grammar it is handed.
-     *
      * @return void
      */
     public function testTheValueIsWrittenWithTheGrammarGiven(): void
@@ -36,9 +31,6 @@ final class GrammarExpressionTest extends TestCase
     }
 
     /**
-     * A query compiles the expression with its own grammar, wrapping what it
-     * names as the grammar does.
-     *
      * @return void
      */
     public function testAQueryCompilesTheExpressionWithItsGrammar(): void

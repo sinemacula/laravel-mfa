@@ -7,8 +7,8 @@ namespace Tests\Fixtures\Factors;
 use SineMacula\Laravel\Mfa\Concerns\ResolvesFactorRouteBinding;
 
 /**
- * A factor model that binds through the caller over a base model's own route
- * binding, so the base's lookup is shown to be the one that runs.
+ * Binds through the caller over a base model's own route binding, to show the
+ * base's lookup is the one that runs.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

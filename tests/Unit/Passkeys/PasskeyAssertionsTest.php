@@ -41,12 +41,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `PasskeyAssertions`: a ceremony for a passkey factor is allowed
- * exactly its associated credential, only while the gateway lists it, the
- * factor is usable and the combination policy accepts it after the session's
- * first factor; a verified assertion naming another credential fails, and a
- * failed one counts against the factor.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -60,7 +54,7 @@ final class PasskeyAssertionsTest extends TestCase
 {
     use ArrangesPasskeys;
 
-    /** @var \Tests\Fixtures\Passkeys\FakePasskeyGateway The gateway. */
+    /** @var \Tests\Fixtures\Passkeys\FakePasskeyGateway */
     private FakePasskeyGateway $gateway;
 
     /** @var \Tests\Fixtures\Identities\TestUser The person signed in. */
@@ -87,9 +81,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * An assertion is requested with exactly the factor's credential, bound to
-     * the person's sign-in.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -105,9 +96,7 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A credential the gateway no longer lists, one not associated, and one
-     * whose association names another credential are refused, so no ceremony
-     * ever starts with an empty or wider allowlist.
+     * So no ceremony starts with an empty or wider allowlist.
      *
      * @return void
      *
@@ -132,9 +121,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A factor of another type than passkey is not taken as one, even holding
-     * an association of a credential the gateway lists.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -148,9 +134,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A credential the gateway lists in a form that is not canonical is not
-     * taken as registered, though the factor names it in that same form.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -167,9 +150,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * The passkey that started the sign-in is never its second factor, nor is
-     * any passkey after a first factor that names no credential.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -186,9 +166,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A pending or disabled factor, and one of a type the application does not
-     * enable, are refused.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -211,10 +188,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * The options of a factor found earlier are still held to its state: a
-     * pending one and one of a type the application no longer enables are
-     * refused, as the package's own refusals.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -235,9 +208,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A verified assertion of the factor's credential is returned with what it
-     * observed.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -256,9 +226,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * An assertion the gateway verifies for another credential fails as an
-     * invalid code, and why the gateway did not verify one is passed on.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -277,9 +244,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A pending session that does not allow verifying is refused as not found;
-     * one that does is served its own identity's factor, on its own session.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -300,8 +264,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A purpose a ceremony is not made for is refused.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -313,8 +275,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * Without a sign-in to bind the ceremony to, it is refused.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -327,8 +287,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * Nobody served is refused as not found.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -344,9 +302,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * The guard's own reasons are answers: a factor that is not the identity's,
-     * and an inactive identity.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -366,8 +321,7 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A gateway's own refusal stays an exception, wherever it is asked: it is
-     * the seam's to report, and is never read as the package deciding.
+     * It is the seam's to report, never read as the package deciding.
      *
      * @return void
      *
@@ -381,8 +335,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A gateway that fails with anything else propagates too.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -398,8 +350,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A combination policy's own refusal stays an exception too.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -412,9 +362,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * A subject type resolver that throws propagates, and one that answers no
-     * is a refusal.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -436,8 +383,7 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * Asking for the factor's options is refused for the reason, by the
-     * package.
+     * Refused by the package, for the reason.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -458,7 +404,7 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * Requesting an assertion throws a seam's refusal, unmarked.
+     * A seam's refusal reaches the caller unmarked.
      *
      * @param  ?\Throwable  $expected
      * @return void
@@ -481,8 +427,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * Record that the person signed in with the passkey given.
-     *
      * @param  string  $credential
      * @return void
      *
@@ -505,7 +449,7 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * Make every request carry a pending session of the person's allowing the
+     * Every request carries a pending session of the person's, allowing the
      * actions.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
@@ -521,8 +465,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * The requests under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Verification\ChallengeRequests
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -533,8 +475,6 @@ final class PasskeyAssertionsTest extends TestCase
     }
 
     /**
-     * The assertions under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

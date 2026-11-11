@@ -20,22 +20,8 @@ use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
- * The one guard every operation on an identity's factors starts with, so each
- * refuses the same things in the same order with the same reasons:
- *
- * 1. a machine identity, which cannot hold factors (`machine_identity`), as
- *    the bound `SubjectTypeResolver` decides;
- * 2. an inactive identity (`identity_inactive`);
- * 3. a factor that is not the identity's (`not_found`): its id is only ever
- *    looked up within the identity, so another person's factor id finds
- *    nothing, exactly as an id that does not exist;
- * 4. a pending factor where the operation needs a confirmed one
- *    (`not_confirmed`);
- * 5. a factor whose type the application does not enable (`type_not_enabled`).
- *
- * A refusal throws an `OperationRefusedException` carrying the reason. The
- * factor is read from the write connection, as everything that decides
- * verification is.
+ * The guard every operation on an identity's factors starts with, so each
+ * refuses the same things in the same order with the same reasons.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -45,23 +31,19 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
 final readonly class OperationGuard
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The configuration the factor model and applications are read from. */
+        /** Read per call. */
         private Repository $config,
 
-        /** The container the subject type resolver is read from. */
+        /** Resolves the seams per call. */
         private Container $container,
     ) {}
 
     /**
-     * Refuse an identity that may not hold factors or is inactive.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      *
@@ -80,10 +62,7 @@ final readonly class OperationGuard
     }
 
     /**
-     * Refuse the identity as `identity()` does, then return its factor with the
-     * given id, refusing one it does not own, a pending one unless the
-     * operation takes pending factors, and one whose type the application does
-     * not enable.
+     * Another person's factor id is `not_found`, as one that does not exist.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  mixed  $factorId
@@ -111,10 +90,8 @@ final readonly class OperationGuard
     }
 
     /**
-     * The identity's factor with the given id, looked up within the identity
-     * only, or `null`. An id that is neither a string nor an integer finds
-     * nothing. A database's collation may match an owner or an id differing
-     * only in case, so the row found must hold exactly what was asked for.
+     * Read from the write connection and matched exactly, as a collation may
+     * match an owner or id differing only in case.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  mixed  $factorId
@@ -148,7 +125,7 @@ final readonly class OperationGuard
             return null;
         }
 
-        /** @var int|string $stored A row found by its key has one of these. */
+        /** @var int|string $stored */
         $stored = $factor->getKey();
 
         return (string) $stored === (string) $factorId ? $factor : null;

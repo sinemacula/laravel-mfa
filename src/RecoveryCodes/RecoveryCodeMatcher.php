@@ -7,15 +7,8 @@ namespace SineMacula\Laravel\Mfa\RecoveryCodes;
 use Illuminate\Contracts\Hashing\Hasher;
 
 /**
- * Finds which of a set's unused codes a submitted code is, with the same work
- * whichever matches and whether one does.
- *
- * The normalised code is checked with the hasher against every hash given: a
- * match never ends the loop, and the first is remembered only once its check
- * has returned, so a set of N codes always costs N checks. A malformed code
- * (`null`, see `RecoveryCodeNormalizer`) is checked the same way, against a
- * placeholder no stored code can be, and matches nothing. The work grows with
- * the number of unused codes, never with which one matched.
+ * Finds which unused code a submitted code matches, always checking every hash
+ * so the timing reveals neither which code matched nor whether one did.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,7 +17,7 @@ use Illuminate\Contracts\Hashing\Hasher;
  */
 final class RecoveryCodeMatcher
 {
-    /** @var string What a malformed code is checked as: never a stored code, which is upper-case without hyphens. */
+    /** @var string Checked in place of a malformed code; no stored code is lower-case or hyphenated. */
     public const string PLACEHOLDER = 'malformed-recovery-code';
 
     /**
@@ -33,9 +26,6 @@ final class RecoveryCodeMatcher
     private function __construct() {}
 
     /**
-     * The key of the first hash the normalised code matches, or `null` when it
-     * matches none or is malformed.
-     *
      * @param  \Illuminate\Contracts\Hashing\Hasher  $hasher
      * @param  array<int, string>  $hashes
      * @param  ?string  $normalized

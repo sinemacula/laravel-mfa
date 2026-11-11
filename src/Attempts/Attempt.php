@@ -10,14 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 
 /**
- * One attempt to prove a factor or a recovery code, and what it is counted
- * against: the factor and the identity. The IP address is reserved around the
- * whole verification (see `AttemptService::throttled()`).
- *
- * The identity is the one whose own pending or active session made the attempt,
- * as the caller validated it, and it is charged for the attempt: an attempt
- * made without such a session is never built, so nobody can lock an identity
- * out with requests of their own. The factor must be one of the identity's own.
+ * One attempt to prove a factor or recovery code. Only built from the
+ * identity's own validated session, so nobody else can lock an identity out.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,8 +19,6 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 final readonly class Attempt
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -35,19 +27,19 @@ final readonly class Attempt
      */
     public function __construct(
 
-        /** The identity whose own session made the attempt, charged for it. */
+        /** Identity charged for the attempt. */
         public MultiFactorAuthenticatable $identity,
 
-        /** The identity's factor the attempt was made against, or null for a recovery code. */
+        /** Null for a recovery code. */
         public ?Factor $factor,
 
-        /** What the attempt was for. */
+        /** Purpose. */
         public Purpose $purpose,
 
-        /** The application the attempt was made through, named in the events' context. */
+        /** Application key, for event context. */
         public ?string $application = null,
 
-        /** The client the attempt was made through, when it is known. */
+        /** Client, when known. */
         public ?ClientContext $client = null,
     ) {}
 }

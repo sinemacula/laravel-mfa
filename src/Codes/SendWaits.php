@@ -12,10 +12,8 @@ use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * The waits the caps on sends impose before a code may be issued, read from the
- * codes table's write PDO: the caps on codes sent to a destination and to an
- * identity within the send window, and the cooldown a restarted enrolment waits
- * out.
+ * Waits imposed by the send caps and enrolment restart cooldown, read from the
+ * write connection.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,20 +23,17 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 final readonly class SendWaits
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeSettings  $settings
      */
     public function __construct(
 
-        /** The code settings the caps and the cooldown are read from. */
+        /** Code settings. */
         private CodeSettings $settings,
     ) {}
 
     /**
-     * The seconds until the factor's destination and the identity are both
-     * under their caps on codes sent within the send window, across every
-     * session; zero or less when they are now.
+     * Seconds until both the destination and identity caps allow a send, across
+     * sessions; zero or less means now.
      *
      * @param  string  $target
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -70,10 +65,8 @@ final readonly class SendWaits
     }
 
     /**
-     * The seconds until a new enrolment challenge may send to the destination:
-     * until the cooldown since the last enrolment code to it has passed, whose
-     * factor a restart has discarded. Zero or less means now, as it is for any
-     * other purpose, whose new challenge has no code before it to wait out.
+     * Seconds until a restarted enrolment may send to the destination again;
+     * zero or less means now. Other purposes never wait.
      *
      * @param  string  $target
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -98,10 +91,8 @@ final readonly class SendWaits
     }
 
     /**
-     * The seconds until fewer than the limit of the rows' sends are within the
-     * window: until the send that must leave it for one more to fit has left, a
-     * window after it was made. Each send leaves the window on its own, and one
-     * already outside it gives no wait. Zero or less means now.
+     * Seconds until the sends in the window drop below the limit; zero or less
+     * means now.
      *
      * @param  \Illuminate\Database\Eloquent\Collection<int, \SineMacula\Laravel\Mfa\Models\Code>  $rows
      * @param  int  $limit

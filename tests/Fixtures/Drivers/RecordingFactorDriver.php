@@ -12,8 +12,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Drivers\Concerns\DescribesNoChannel;
 
 /**
- * Custom `FactorDriver` fixture that records verify calls and accepts
- * `'correct'` as the only valid code.
+ * Counts verify calls, accepts `correct` and reports `replayed` as a replay.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,13 +23,10 @@ final class RecordingFactorDriver implements FactorDriver
 {
     use DescribesNoChannel;
 
-    /** @var int Verify call counter for the test assertions. */
+    /** @var int */
     public int $verifyCalls = 0;
 
     /**
-     * Record the verify call and report success only when the submitted code is
-     * the magic string `'correct'`, and a replay for `'replayed'`.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -49,9 +45,6 @@ final class RecordingFactorDriver implements FactorDriver
     }
 
     /**
-     * Report an additional factor on an authenticator's channel with an `mfa`
-     * value the result must leave out.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
      */
     #[\Override]
@@ -61,7 +54,7 @@ final class RecordingFactorDriver implements FactorDriver
     }
 
     /**
-     * The `amr` values the driver claims, `mfa` among them.
+     * Includes `mfa`, which the result must leave out.
      *
      * @return list<string>
      */

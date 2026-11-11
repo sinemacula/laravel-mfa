@@ -20,10 +20,8 @@ use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
- * A queued job that sets its own identity when it names one, and only then,
- * with the sign-in event or without it, optionally renames a factor, sends it a
- * code or verifies it, and notes what the package answered, whether anything
- * was written, or fails when told to.
+ * A queued job that may act for a person and notes what the package answered
+ * and whether anything was written.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,8 +33,6 @@ final class ActsForAPersonJob implements ShouldQueue
     use Dispatchable, Queueable;
 
     /**
-     * Constructor.
-     *
      * @param  string  $name
      * @param  ?int  $person
      * @param  ?string  $renames
@@ -69,13 +65,11 @@ final class ActsForAPersonJob implements ShouldQueue
         /** The code it verifies that factor with. */
         public ?string $code = null,
 
-        /** Whether setting its identity fires `Login`, which begins a sign-in. */
+        /** Whether setting its identity fires `Login`, beginning a sign-in. */
         public bool $signsIn = true,
     ) {}
 
     /**
-     * Run the job.
-     *
      * @param  \Tests\Integration\Process\Fixtures\JobObservations  $observations
      * @param  \Illuminate\Contracts\Events\Dispatcher  $events
      * @return void
@@ -104,8 +98,6 @@ final class ActsForAPersonJob implements ShouldQueue
     }
 
     /**
-     * Set the job's identity when it names one.
-     *
      * @param  \Illuminate\Contracts\Events\Dispatcher  $events
      * @return void
      */
@@ -127,8 +119,6 @@ final class ActsForAPersonJob implements ShouldQueue
     }
 
     /**
-     * Do what the job was told to.
-     *
      * @return void
      */
     private function act(): void
@@ -149,8 +139,7 @@ final class ActsForAPersonJob implements ShouldQueue
     }
 
     /**
-     * What the package's tables the job could write hold, in a form that can be
-     * compared.
+     * Snapshot of the tables the job could write.
      *
      * @return string
      *

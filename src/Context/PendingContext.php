@@ -15,34 +15,22 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
- * A pending session, a sign-in still owing a requirement, as resolved from a
- * pending credential the authentication layer has validated: the identity, the
- * application, the session's public id, the first factor's proof, the
- * outstanding requirement, the actions the credential allows, when the pending
- * session expires, and the further proofs the session already holds.
+ * A sign-in still owing a requirement, resolved from a pending credential the
+ * authentication layer validated. Every proof must be bound to this identity,
+ * application and session.
  *
- * The rules between the parts are checked on construction: the first factor's
- * proof is a first factor made at sign-in, bound to this identity, application
- * and session, each further proof is bound to them too and is no first factor,
- * and the actions are pending actions, each named once. A helper serves a
- * pending session only an action it `allows()`.
- *
- * It carries the pending credential the caller presented, when the resolver
- * that read it keeps it, so a layer revalidating the session or completing it
- * has it as a value: held as a `\SensitiveParameterValue`, read through
- * `credential()`, and shown by no dump.
+ * The credential is kept for a layer that revalidates or completes the session,
+ * and hidden from dumps.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final readonly class PendingContext
 {
-    /** @var \SensitiveParameterValue The pending credential the caller presented, hidden from dumps. */
+    /** @var \SensitiveParameterValue Hidden from dumps. */
     private \SensitiveParameterValue $credential;
 
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $sessionId
@@ -63,10 +51,10 @@ final readonly class PendingContext
         /** The application the session is for. */
         public string $application,
 
-        /** The pending session's public id. */
+        /** Public id. */
         public string $sessionId,
 
-        /** The proof of the first factor that started the sign-in. */
+        /** The proof that started the sign-in. */
         public Proof $firstFactor,
 
         /** What the session still owes. */
@@ -75,13 +63,13 @@ final readonly class PendingContext
         /** The actions the pending credential allows. */
         public array $actions,
 
-        /** When the pending session expires: a bootstrap enrolment grant lives no longer. */
+        /** A bootstrap enrolment grant lives no longer than this. */
         public CarbonImmutable $expiresAt,
 
-        /** The further proofs the session already holds, oldest first. */
+        /** Further proofs, oldest first. */
         public array $proofs = [],
 
-        // The pending credential the caller presented, when it is kept.
+        // The pending credential, when the resolver keeps it.
         #[\SensitiveParameter]
         ?string $credential = null,
     ) {
@@ -101,9 +89,6 @@ final readonly class PendingContext
     }
 
     /**
-     * The pending credential the caller presented, or `null` when the resolver
-     * kept none.
-     *
      * @return ?string
      */
     public function credential(): ?string
@@ -113,8 +98,6 @@ final readonly class PendingContext
     }
 
     /**
-     * Whether the pending credential allows the action.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\PendingAction  $action
      * @return bool
      */
@@ -124,9 +107,6 @@ final readonly class PendingContext
     }
 
     /**
-     * Refuse a first factor's proof that is not a first factor, or is bound to
-     * another identity, application or session.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -143,9 +123,6 @@ final readonly class PendingContext
     }
 
     /**
-     * Refuse a further proof that is not a proof, is a first factor, or is
-     * bound to another identity, application or session.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -165,9 +142,6 @@ final readonly class PendingContext
     }
 
     /**
-     * Whether the binding names this session's identity, application and
-     * session.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return bool
      */
@@ -183,8 +157,6 @@ final readonly class PendingContext
     }
 
     /**
-     * Refuse actions that are not a list of pending actions, each named once.
-     *
      * @param  array<array-key, mixed>  $actions
      * @return void
      *

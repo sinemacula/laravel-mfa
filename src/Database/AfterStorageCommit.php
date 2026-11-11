@@ -10,10 +10,8 @@ use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Runs work that reports or follows a change to the package's tables once that
- * change has committed on the storage connection: at once when no transaction
- * is open there, when the open transaction commits otherwise, and never when it
- * rolls back.
+ * Runs work once the storage connection's open transaction commits, at once
+ * when none is open, and never on rollback.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,9 +26,6 @@ final class AfterStorageCommit
     private function __construct() {}
 
     /**
-     * Run the callback once the storage connection's open transaction, if any,
-     * commits.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Closure(): mixed  $callback
      * @return void
@@ -53,11 +48,8 @@ final class AfterStorageCommit
     }
 
     /**
-     * Forget the work a transaction left when its outermost commit failed, with
-     * no transaction still open on the storage connection. Laravel 12 keeps
-     * that work when a commit fails and runs it on the connection's next
-     * commit, so what was waiting for a change that never committed would
-     * happen anyway. With nothing open, nothing it forgets can still commit.
+     * Forget work left by a failed outermost commit, which Laravel 12 would
+     * otherwise run on the connection's next commit.
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @return void
@@ -75,9 +67,6 @@ final class AfterStorageCommit
     }
 
     /**
-     * The innermost transaction open on the storage connection whose commit
-     * runs callbacks, or `null` when there is none.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @return ?\Illuminate\Database\DatabaseTransactionRecord
      *
@@ -94,8 +83,7 @@ final class AfterStorageCommit
     }
 
     /**
-     * The transactions manager, read when it is needed since the testing traits
-     * swap their own in, or `null` when there is none.
+     * Read when needed, since the testing traits swap their own in.
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @return ?\Illuminate\Database\DatabaseTransactionsManager

@@ -9,22 +9,11 @@ use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * One way a session's proofs can satisfy a requirement: a first-factor proof on
- * its own, or the first factor followed by one further proof the policy
- * accepted after it.
+ * A first-factor proof alone, or followed by one further accepted proof. Never
+ * AAL3: hardware-bound keys cannot be seen without attestation.
  *
- * A combination supports AAL2 when it holds a multi-factor authenticator, or
- * something known with something had; AAL1 when it holds anything that can
- * establish a level; and no level otherwise. It never supports AAL3, which
- * needs hardware-bound keys that cannot be seen without attestation. It is
- * restricted when it relies on a restricted authenticator, which a multi-factor
- * authenticator makes unnecessary.
- *
- * Its time is that of the proof that completes it, and an answer is as fresh as
- * the evidence it rests on: a further proof refreshes what the combination
- * gives only with it, or what the further proof gives on its own, but never
- * what the first factor gives on its own, so a fresh weaker proof does not
- * refresh an old stronger one.
+ * An answer is as fresh as its evidence, so a fresh weaker further proof never
+ * refreshes what the first factor gives on its own.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,8 +23,6 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 final readonly class Combination
 {
     /**
-     * Constructor.
-     *
      * @param  bool  $accepted
      * @param  non-empty-list<\SineMacula\Laravel\Mfa\Assurance\Authenticator>  $authenticators
      * @param  \Carbon\CarbonImmutable  $provedAt
@@ -43,23 +30,20 @@ final readonly class Combination
      */
     private function __construct(
 
-        /** Whether the combination is an accepted additional verification. */
+        /** An accepted additional verification. */
         public bool $accepted,
 
-        /** The authenticators the combination relies on. */
+        /** The authenticators relied on. */
         private array $authenticators,
 
-        /** When the proof that completes the combination was made. */
+        /** When the completing proof was made. */
         public CarbonImmutable $provedAt,
 
-        /** The first factor and the further proof, each on its own, when a further proof completes the combination. */
+        /** The first factor and further proof, each alone, when there is a further proof. */
         private ?array $proofsAlone = null,
     ) {}
 
     /**
-     * The combination of a first-factor proof on its own, which is not an
-     * additional verification.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return self
      */
@@ -69,9 +53,6 @@ final readonly class Combination
     }
 
     /**
-     * The combination of the first factor followed by a further proof the
-     * policy accepted after it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return self
@@ -85,8 +66,7 @@ final readonly class Combination
     }
 
     /**
-     * Whether the combination is multifactor authentication: a multi-factor
-     * authenticator, or something known with something had.
+     * A multi-factor authenticator, or something known with something had.
      *
      * @return bool
      */
@@ -101,8 +81,6 @@ final readonly class Combination
     }
 
     /**
-     * The level the combination supports.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\AssuranceLevel
      */
     public function level(): AssuranceLevel
@@ -121,8 +99,7 @@ final readonly class Combination
     }
 
     /**
-     * Whether the combination relies on a restricted authenticator: it holds
-     * one, and no multi-factor authenticator carries the level without it.
+     * Holds a restricted authenticator and no multi-factor one.
      *
      * @return bool
      */
@@ -133,8 +110,6 @@ final readonly class Combination
     }
 
     /**
-     * Whether a proof of the combination was observed to resist phishing.
-     *
      * @return bool
      */
     public function isPhishingResistant(): bool
@@ -143,7 +118,7 @@ final readonly class Combination
     }
 
     /**
-     * The `amr` values of the combination's proofs, the first factor's first.
+     * The first factor's values first.
      *
      * @return list<string>
      */
@@ -159,9 +134,8 @@ final readonly class Combination
     }
 
     /**
-     * Whether the given answer holds for the combination on evidence no older
-     * than the given maximum age in seconds at the given time, where `null`
-     * allows any age.
+     * Whether the answer holds on evidence no older than `$maxAge` seconds;
+     * `null` allows any age.
      *
      * @param  \Closure(self): bool  $answer
      * @param  ?int  $maxAge
@@ -178,9 +152,8 @@ final readonly class Combination
     }
 
     /**
-     * The last instant the given answer holds for the combination under the
-     * given maximum age in seconds, or `null` when the combination does not
-     * give it at all.
+     * The last instant the answer holds under `$maxAge` seconds, or `null` when
+     * it never does.
      *
      * @param  \Closure(self): bool  $answer
      * @param  int  $maxAge
@@ -192,10 +165,7 @@ final readonly class Combination
     }
 
     /**
-     * When the evidence for the given answer was made, or `null` when the
-     * combination does not give it: the first factor's time when the first
-     * factor gives it on its own and the further proof does not, and otherwise
-     * the time of the proof that completes the combination.
+     * When the evidence for the answer was made, or `null` when it fails.
      *
      * @param  \Closure(self): bool  $answer
      * @return ?\Carbon\CarbonImmutable
@@ -206,9 +176,8 @@ final readonly class Combination
     }
 
     /**
-     * When the evidence for the given answer was made: the first factor's time
-     * when it gives the answer on its own and the further proof does not, and
-     * otherwise the time of the proof that completes the combination.
+     * The first factor's time when only it gives the answer, else the
+     * completing proof's.
      *
      * @param  \Closure(self): bool  $answer
      * @return \Carbon\CarbonImmutable
@@ -225,8 +194,6 @@ final readonly class Combination
     }
 
     /**
-     * Whether the combination holds a multi-factor authenticator.
-     *
      * @return bool
      */
     private function hasMultiFactorAuthenticator(): bool
@@ -235,9 +202,6 @@ final readonly class Combination
     }
 
     /**
-     * Whether the given answer holds for any of the combination's
-     * authenticators.
-     *
      * @param  \Closure(\SineMacula\Laravel\Mfa\Assurance\Authenticator): bool  $answer
      * @return bool
      */

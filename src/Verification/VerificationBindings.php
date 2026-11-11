@@ -7,8 +7,8 @@ namespace SineMacula\Laravel\Mfa\Verification;
 use Illuminate\Contracts\Foundation\Application;
 
 /**
- * Registers the verification service. Its collaborators keep nothing between
- * calls, so the container builds them as it needs them.
+ * Registers the verification service; its collaborators are stateless, so the
+ * container builds them as needed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,8 +23,6 @@ final class VerificationBindings
     private function __construct() {}
 
     /**
-     * Register the verification service with the container.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

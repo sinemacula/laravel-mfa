@@ -5,10 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Enums;
 
 /**
- * What a pending session may do towards completing its sign-in. A helper that
- * serves a pending session checks the action it needs is allowed before it
- * returns anything; `laravel-authentication` adopts these exact values as its
- * pending actions.
+ * What a pending session may do towards completing its sign-in.
+ * `laravel-authentication` uses these exact values as its pending actions.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

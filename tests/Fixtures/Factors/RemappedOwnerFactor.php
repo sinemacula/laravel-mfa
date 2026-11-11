@@ -8,10 +8,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 /**
- * A factor model whose owner relation names its own columns, `owner_type` and
- * `owner_id`, as an application's own model may, so the package is shown to
- * find an identity's factors by the relation rather than by the shipped column
- * names.
+ * Maps its owner relation to `owner_type` and `owner_id`, to show factors are
+ * found through the relation instead of the shipped column names.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,8 +19,6 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 final class RemappedOwnerFactor extends Factor
 {
     /**
-     * The owning identity, through the remapped owner columns.
-     *
      * @formatter:off
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphTo<\Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model>

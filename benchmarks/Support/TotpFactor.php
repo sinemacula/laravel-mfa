@@ -8,12 +8,8 @@ use Benchmarks\Support\Concerns\ReportsUsableFactorDefaults;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 
 /**
- * Non-persisting TOTP `Factor` for the TOTP driver benchmarks: a secret and the
- * default parameters (SHA-1, 6 digits, 30 seconds), and nothing else.
- *
- * It implements only the `Factor` read surface, so it has nowhere to record an
- * accepted time step and the driver accepts no code for it; every verification
- * still computes and compares the whole window, which is the cost measured.
+ * Read-only TOTP factor: with nowhere to record a step the driver accepts no
+ * code, but still computes the whole window, which is the cost measured.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,20 +19,16 @@ final readonly class TotpFactor implements Factor
     use ReportsUsableFactorDefaults;
 
     /**
-     * Build the factor over a Base32 secret.
-     *
      * @param  string  $secret
      * @return void
      */
     public function __construct(
 
-        /** The shared secret, in Base32. */
+        /** Base32 shared secret. */
         #[\SensitiveParameter] private string $secret,
     ) {}
 
     /**
-     * The HMAC algorithm: SHA-1.
-     *
      * @return string
      */
     #[\Override]
@@ -46,8 +38,6 @@ final readonly class TotpFactor implements Factor
     }
 
     /**
-     * The number of digits: 6.
-     *
      * @return int
      */
     #[\Override]
@@ -57,8 +47,6 @@ final readonly class TotpFactor implements Factor
     }
 
     /**
-     * The period: 30 seconds.
-     *
      * @return int
      */
     #[\Override]
@@ -68,8 +56,6 @@ final readonly class TotpFactor implements Factor
     }
 
     /**
-     * A fixed identifier.
-     *
      * @return mixed
      */
     #[\Override]
@@ -79,8 +65,6 @@ final readonly class TotpFactor implements Factor
     }
 
     /**
-     * The TOTP type.
-     *
      * @return string
      */
     #[\Override]
@@ -90,8 +74,6 @@ final readonly class TotpFactor implements Factor
     }
 
     /**
-     * No label.
-     *
      * @return ?string
      */
     #[\Override]
@@ -101,8 +83,6 @@ final readonly class TotpFactor implements Factor
     }
 
     /**
-     * No destination.
-     *
      * @return ?string
      */
     #[\Override]
@@ -112,8 +92,6 @@ final readonly class TotpFactor implements Factor
     }
 
     /**
-     * The shared secret.
-     *
      * @return string
      */
     #[\Override]

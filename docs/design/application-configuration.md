@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note describes how the package's configuration is shaped and read: one block per application for what that
+This note records how the package's configuration is shaped and read: one block per application for what that
 application accepts and offers, one block per capability for what is the same everywhere, each read through a settings
 class that checks it as it reads it, and the check of the whole configuration, with the bindings it needs, that runs
 before anything relies on it.
@@ -25,8 +25,8 @@ before anything relies on it.
 - Every setting is read through one class that owns its block: `Applications\ApplicationSettings` (with
   `Applications\ApplicationBlock` reading the raw block), `Drivers\TotpSettings`, `Codes\CodeSettings`,
   `RecoveryCodes\RecoveryCodeSettings`, `Attempts\AttemptSettings`, `Enrollment\EnrollmentSettings` and
-  `Lifecycle\LifecycleSettings`. Each reads the configuration on every call and holds nothing
-  between calls, so no request's settings outlive it in a long-running process, and a change applies at once.
+  `Lifecycle\LifecycleSettings`. Each reads the configuration on every call and holds nothing between calls, so no
+  request's settings outlive it in a long-running process, and a change applies at once.
 - A setting is checked as it is read. A number is an integer, or the digit string `env()` returns for one, within its
   bounds (`Config\IntegerSetting`); anything else, and anything out of bounds, fails closed with an
   `InvalidArgumentException` naming the key and the bounds. Nothing is clamped, and nothing malformed falls back to a
@@ -40,11 +40,10 @@ before anything relies on it.
   folded, spaces and hyphens removed). The measure is the length times the bits of each alphabet character, which
   holds because the alphabet repeats no character once case is folded: a repeated one would be drawn more often, and
   the codes would carry less than the measure says. Every default sits inside its bounds.
-- A key missing from an application block, or set to `null`, takes the production-safe default: no type enabled,
-  `never` required, no recovery codes, no bootstrap. An application with no block takes them all, so a name nobody
-  configured enables nothing. A key an application block, or one of its nested blocks,
-  does not know is refused rather than ignored, and so is an `mfa.applications` that is not an array, by every reader
-  rather than only by the check.
+- A key missing from an application block, or set to `null`, takes the production-safe default: no type enabled, `never`
+  required, no recovery codes, no bootstrap. An application with no block takes them all, so a name nobody configured
+  enables nothing. A key an application block, or one of its nested blocks, does not know is refused rather than
+  ignored, and so is an `mfa.applications` that is not an array, by every reader rather than only by the check.
 - An application declares the first factor its guard uses (a method and a channel kind other than `unknown`), or a
   `Contracts\FirstFactorResolver` is bound to report it. A configured application with neither is a misconfiguration:
   an unknown first factor accepts no further factor and establishes no level.

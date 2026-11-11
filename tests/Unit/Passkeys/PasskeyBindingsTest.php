@@ -16,10 +16,6 @@ use Tests\Fixtures\Passkeys\FakePasskeyGateway;
 use Tests\TestCase;
 
 /**
- * Tests for `PasskeyBindings`: passkeys are unavailable by default, an
- * application may bind its own gateway, and the change gate, the assertions and
- * the association records are built afresh.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -29,9 +25,6 @@ use Tests\TestCase;
 final class PasskeyBindingsTest extends TestCase
 {
     /**
-     * The gateway defaults to the unavailable one, built afresh, and a binding
-     * of the application's own replaces it.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -49,8 +42,6 @@ final class PasskeyBindingsTest extends TestCase
     }
 
     /**
-     * Rows of a service the bindings build afresh.
-     *
      * @return iterable<string, array{class-string}>
      */
     public static function services(): iterable
@@ -61,8 +52,6 @@ final class PasskeyBindingsTest extends TestCase
     }
 
     /**
-     * Each service is built afresh.
-     *
      * @param  class-string  $service
      * @return void
      *

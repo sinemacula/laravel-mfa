@@ -7,25 +7,8 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * Proof store contract.
- *
- * Keeps the proofs a session has made, keyed by the identity, the application
- * and the sign-in instance, with the identity's verification generation, so
- * freshness, levels and requirements are evaluated against the session's
- * records rather than one time and a list of `amr` values.
- *
- * A sign-in instance is named by the session id every proof made in it is bound
- * to: it begins when the identity signs in to an application, and a proof bound
- * to any other session is never kept. An identity's sign-ins on different
- * applications are separate: beginning or forgetting one leaves the others
- * alone. The default keeps the records in the Laravel session;
- * a stateless guard rebinds the contract, keyed by an id that names one
- * sign-in, not merely a device.
- *
- * It fails closed: no record, a proof in the future, one made under an older
- * verification generation, or one of another identity, application or sign-in
- * is not returned, and a proof made with a factor that was later removed stops
- * counting once it is forgotten.
+ * Keeps a session's proofs per identity, application and sign-in, failing
+ * closed: a future, foreign or older-generation proof is never returned.
  *
  * @api
  *
@@ -35,9 +18,8 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 interface ProofStore
 {
     /**
-     * Begin a new sign-in for the identity on the application, named by the
-     * session id its proofs will be bound to, forgetting every proof of the
-     * sign-in before it on that application.
+     * Begin a sign-in named by the session id its proofs bind to, forgetting
+     * the previous sign-in's proofs on that application.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -50,13 +32,8 @@ interface ProofStore
     public function begin(MultiFactorAuthenticatable $identity, string $application, string $sessionId): void;
 
     /**
-     * The session id of the identity's current sign-in on the application, the
-     * one a proof must be bound to for the store to keep it, or `null` when the
-     * identity has no sign-in there the store knows of.
-     *
-     * This is the one question of which sign-in is current. A caller asks it
-     * once and names the answer to `proofs()`, so the sign-in it reads is the
-     * one it asked about.
+     * The session id a proof must be bound to, or `null` when the store knows
+     * no sign-in; ask once and pass it to `proofs()`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -67,12 +44,8 @@ interface ProofStore
     public function currentSession(MultiFactorAuthenticatable $identity, string $application): ?string;
 
     /**
-     * Record the identity's proof for the sign-in it is bound to.
-     *
-     * A proof that is not bound to the identity, or not to the identity's
-     * current sign-in on its application, is refused by throwing, never kept,
-     * so a caller recording it inside a transaction rolls that change back with
-     * it, and a refused proof changes nothing.
+     * Throw for a proof not bound to the identity's current sign-in, so a
+     * surrounding transaction rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
@@ -84,11 +57,8 @@ interface ProofStore
     public function record(MultiFactorAuthenticatable $identity, Proof $proof): void;
 
     /**
-     * The proofs of the identity's sign-in on the application the session names
-     * that still count, oldest first, with proofs made at the same instant in
-     * the order they were recorded: none unless that sign-in is the identity's
-     * current one there, so a sign-in replaced since the caller named it yields
-     * nothing.
+     * Proofs that still count, oldest first in recorded order, and none unless
+     * the session is still the current sign-in.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -100,8 +70,8 @@ interface ProofStore
     public function proofs(MultiFactorAuthenticatable $identity, string $application, string $sessionId): array;
 
     /**
-     * Stop counting every proof the identity made with the factor, on the
-     * current session as on any other the store can reach.
+     * Stop counting every proof made with the factor, on any session the store
+     * can reach.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
@@ -112,16 +82,8 @@ interface ProofStore
     public function forgetFactor(MultiFactorAuthenticatable $identity, string $factorId): void;
 
     /**
-     * Forget the identity's current sign-in on the application and every proof
-     * of it, as on sign-out, so another identity on a reused session inherits
-     * nothing, leaving its sign-ins on other applications alone.
-     *
-     * A store backed by another layer's sign-ins may do nothing here only when
-     * that layer has already ended, or unbound, the sign-in before this is
-     * called, on every path that calls it (the sign-out listener and
-     * `Proofs\GuardHooks::signedOut()` alike): `currentSession()` then answers
-     * `null` and `proofs()` nothing for it, and the identity's sign-ins on
-     * other applications are left alone.
+     * Forget the sign-in and its proofs on the application, as on sign-out; a
+     * no-op is allowed only when another layer has already ended it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

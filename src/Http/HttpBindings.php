@@ -14,12 +14,9 @@ use SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet;
 use SineMacula\Laravel\Mfa\Http\Middleware\ExemptFromMfa;
 
 /**
- * Registers the default `SessionTransition`, which leaves a session left short
- * to the `mfa` middleware (`MiddlewareSessionTransition`), and the package's
- * middleware under short aliases, so consumers can reference them as `'mfa'`
- * and `'mfa.exempt'` in their route files without importing class names. The
- * gate is placed straight after authentication in the middleware priority, so
- * `['mfa', 'auth:api']` judges the identity `auth:api` selects.
+ * Registers the default `SessionTransition` and the `mfa` and `mfa.exempt`
+ * aliases. The gate runs straight after authentication in the middleware
+ * priority, so `['mfa', 'auth:api']` judges the identity `auth:api` selects.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,8 +31,6 @@ final class HttpBindings
     private function __construct() {}
 
     /**
-     * Register the default session transition.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */
@@ -45,10 +40,8 @@ final class HttpBindings
     }
 
     /**
-     * Register the middleware aliases with the router, and place the gate after
-     * authentication in the HTTP kernel's priority: now if the kernel is
-     * resolved already, as it is before an application boots, otherwise when it
-     * is.
+     * Prioritises the gate now if the kernel is already resolved, as it is
+     * before an application boots, otherwise once it is.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
@@ -73,9 +66,6 @@ final class HttpBindings
     }
 
     /**
-     * Place the gate after authentication in the priority of a kernel that has
-     * one.
-     *
      * @param  mixed  $kernel
      * @return void
      */

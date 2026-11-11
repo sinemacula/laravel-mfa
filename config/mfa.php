@@ -13,20 +13,14 @@ return [
     | Applications
     |---------------------------------------------------------------------------
     |
-    | Each application's settings, keyed by its name: the guard's name, unless
-    | an application resolver says otherwise. Factors, recovery codes and
-    | attempt state belong to the identity and are the same in every
-    | application; an application only chooses what it accepts and offers.
+    | Each application's settings, keyed by name (the guard's name unless an
+    | application resolver says otherwise). Factors belong to the identity; an
+    | application only chooses what it accepts and offers.
     |
-    | An application enables no factor type and requires no factor until it
-    | says so, and one that is not listed here enables nothing. Every
-    | configured application declares the first factor its guard signs people
-    | in with, unless a first factor resolver of its own is bound; one that
-    | enables `passkey` needs a passkey gateway bound. Every key is checked
-    | when the package boots. `freshness` maps each operation's name to the
-    | seconds within which an additional verification must have been made, or
-    | to a requirement whose every part has a `max_age`. See the configuration
-    | guide for every key, its default and its bounds:
+    | An unlisted application enables nothing. Each must declare its
+    | `first_factor` unless a first factor resolver is bound. `freshness` maps
+    | an operation to seconds or to a requirement whose every part has a
+    | `max_age`. See the configuration guide for defaults and bounds:
     |
     | 'web' => [
     |     'types'          => ['totp'],
@@ -51,13 +45,8 @@ return [
     | Storage
     |---------------------------------------------------------------------------
     |
-    | The database connection every package table lives on, `null` for the
-    | default connection. The shipped models read and write it, the shipped
-    | migrations create their tables on it, and every change that depends on an
-    | identity's whole factor state runs its transaction on it, so a configured
-    | model on another connection is refused when the package boots. Changing
-    | it moves no table: it is deployment configuration, fixed for the life of
-    | a process.
+    | The connection every package table lives on, `null` for the default.
+    | Changing it moves no table, and it must stay fixed for a process's life.
     |
     */
 
@@ -70,11 +59,8 @@ return [
     | Factor model
     |---------------------------------------------------------------------------
     |
-    | The factor model and its table. The model must extend Eloquent's model
-    | and implement the package's `EloquentFactor` contract; the shipped one
-    | uses a ULID primary key and a polymorphic owner relation, and may be
-    | subclassed or replaced. Every table the package creates is named in its
-    | block and defaults to a name prefixed `mfa_`; no two may share one.
+    | The factor model, an Eloquent model implementing `EloquentFactor`, and
+    | its table. No two package tables may share a name.
     |
     */
 
@@ -88,12 +74,8 @@ return [
     | Identity state
     |---------------------------------------------------------------------------
     |
-    | The table holding one row per identity that owns factors: its
-    | verification generation, re-enrolment obligation, failures across every
-    | factor and recovery code set generation. Every change that depends on
-    | the identity's whole factor state locks its row first, then the
-    | identity's factors, so two such changes for one identity run one after
-    | the other.
+    | The table holding one row of factor state per identity, also used as its
+    | lock.
     |
     */
 
@@ -106,10 +88,9 @@ return [
     | TOTP
     |---------------------------------------------------------------------------
     |
-    | The algorithm (sha1, sha256 or sha512), digits (6 to 8) and period (15 to
-    | 120 seconds) new enrolments use, and the window (0 to 3 steps either side
-    | of the current one) of an application that sets no window of its own, and
-    | the issuer an authenticator app shows, the application's name without one.
+    | New enrolments' algorithm (sha1, sha256 or sha512), digits (6 to 8) and
+    | period (15 to 120 seconds); the default window (0 to 3 steps either side);
+    | and the issuer an authenticator app shows (`app.name` when unset).
     |
     */
 
@@ -126,16 +107,12 @@ return [
     | Delivered codes
     |---------------------------------------------------------------------------
     |
-    | Codes sent by SMS or email: their digits (6 to 10), lifetime (1 to 10
-    | minutes), how many attempts one challenge allows (1 to 10), how long a
-    | challenge's resends may run from its first code (the lifetime to 60
-    | minutes), the cooldown before a resend (up to the lifetime), the caps on
-    | how many one factor's destination and one identity are sent within the
-    | send window, across every session, the email message class
-    | (`MfaCodeMessage` or a subclass), and the table the codes are stored in,
-    | as keyed hashes. An application that enables `sms` or `email` must bind an
-    | `SmsSender` or `EmailSender` to deliver them. The wording of both messages
-    | is translated, not configured: see the localisation guide.
+    | Codes sent by SMS or email: digits (6 to 10), lifetime (1 to 10 minutes),
+    | attempts per challenge (1 to 10), how long resends may run (the lifetime
+    | to 60 minutes), the resend cooldown (up to the lifetime), per-destination
+    | and per-identity send caps within the send window, and the email message
+    | class. Enabling `sms` or `email` needs a bound `SmsSender` or
+    | `EmailSender`. Wording is translated: see the localisation guide.
     |
     */
 
@@ -157,15 +134,10 @@ return [
     | Recovery codes
     |---------------------------------------------------------------------------
     |
-    | How many codes a set holds (1 to 50), each code's length (1 to 64) and
-    | alphabet (no character repeated, ignoring case), which together must
-    | give at least 40 bits of entropy once a code is normalised (case folded,
-    | spaces and hyphens removed), and how few unused codes count as running
-    | low (0 to the set's size). The model and its table: the model must
-    | extend Eloquent's model and implement the package's `RecoveryCode`
-    | contract, and may subclass or replace the shipped one. A redemption
-    | that leaves the set at or below the low count reports it, so the
-    | application can prompt for a new set.
+    | The model (implementing `RecoveryCode`) and table; codes per set (1 to
+    | 50); each code's length (1 to 64) and alphabet (no repeats, ignoring
+    | case), together giving at least 40 bits of entropy; and the unused count
+    | (0 to the set's size) at which `RecoveryCodesLow` is dispatched.
     |
     */
 
@@ -183,14 +155,10 @@ return [
     | Attempts
     |---------------------------------------------------------------------------
     |
-    | How many failed attempts in a row lock a factor (1 to 20), how many
-    | across an identity (1 to 100) and from one IP address (1 to 10000) within
-    | the window (60 to 86400 seconds) lock or throttle them, how long a
-    | lockout lasts (60 to 86400 seconds), and how many consecutive failures
-    | disable a factor (1 to 100), and the table the temporary throttles are
-    | counted in. Only a success resets a factor's failures in a row, so once
-    | they reach the limit each further failure locks it again; sending a code
-    | resets nothing.
+    | Failures in a row that lock a factor (1 to 20); failures per identity (1
+    | to 100) and per IP (1 to 10000) within the window (60 to 86400 seconds);
+    | lockout length (60 to 86400 seconds); and consecutive failures that
+    | disable a factor (1 to 100). Only a success resets a factor's failures.
     |
     */
 
@@ -209,10 +177,9 @@ return [
     | Enrolment
     |---------------------------------------------------------------------------
     |
-    | How long a pending factor can be confirmed after its enrolment starts (1
-    | to 60 minutes), which the freshness that authorised it may shorten; how
-    | many wrong codes abandon it (1 to 10); and the table each enrolment in
-    | progress is held in.
+    | How long a pending factor may be confirmed (1 to 60 minutes, shortened
+    | by the freshness that authorised it) and how many wrong codes abandon it
+    | (1 to 10).
     |
     */
 
@@ -227,8 +194,8 @@ return [
     | Passkeys
     |---------------------------------------------------------------------------
     |
-    | The table recording which passkeys are associated with an identity as
-    | factors. The credentials themselves belong to the authentication layer.
+    | The table associating passkeys with factors. The credentials belong to
+    | the authentication layer.
     |
     */
 
@@ -255,10 +222,8 @@ return [
     | Secrets
     |---------------------------------------------------------------------------
     |
-    | Whether the package redacts secrets, codes and full destinations from
-    | every configured log channel and from the messages and traces of the
-    | exceptions the exception handler reports. Only a value that reads as
-    | false turns it off; anything else leaves it on.
+    | Whether secrets, codes and full destinations are redacted from logs and
+    | reported exceptions. Only a value that reads as false turns it off.
     |
     */
 

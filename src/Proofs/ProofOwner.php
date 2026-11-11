@@ -9,9 +9,8 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
- * The identity a proof belongs to, as a proof's binding names it: its type (the
- * morph class of an Eloquent identity, its class name otherwise) and its key as
- * a string. Two identity types sharing a key are two owners.
+ * The identity a proof binding names, by type and key; two identity types
+ * sharing a key are two owners.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,14 +20,12 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
 final readonly class ProofOwner
 {
     /**
-     * Constructor.
-     *
      * @param  string  $type
      * @param  string  $key
      */
     public function __construct(
 
-        /** The identity's type. */
+        /** Morph class of an Eloquent identity, class name otherwise. */
         public string $type,
 
         /** The identity's key, as a string. */
@@ -36,9 +33,8 @@ final readonly class ProofOwner
     ) {}
 
     /**
-     * The owner an identity is recorded as. A key that is neither a non-empty
-     * string nor an integer is refused rather than collapsing distinct
-     * identities onto one record.
+     * A key that is not a non-empty string or an integer is refused, rather
+     * than collapsing identities onto one record.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return self
@@ -57,8 +53,6 @@ final readonly class ProofOwner
     }
 
     /**
-     * The owner a proof's binding names.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return self
      */
@@ -68,8 +62,6 @@ final readonly class ProofOwner
     }
 
     /**
-     * Whether the binding names this owner.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return bool
      */
@@ -79,9 +71,6 @@ final readonly class ProofOwner
     }
 
     /**
-     * Whether the binding names this owner in the given sign-in on the given
-     * application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $application
      * @param  string  $session
@@ -93,9 +82,8 @@ final readonly class ProofOwner
     }
 
     /**
-     * The owner as one string no other owner shares: the type's length, the
-     * type and the key, so a separator inside either cannot make two owners
-     * meet.
+     * Prefixed with the type's length, so a separator inside either part cannot
+     * make two owners meet.
      *
      * @return string
      */

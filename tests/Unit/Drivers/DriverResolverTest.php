@@ -12,10 +12,6 @@ use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\TestCase;
 
 /**
- * Tests for `DriverResolver`: drivers come from the manager passed in, a driver
- * that is not a `FactorDriver` is refused, and a factor is only run through its
- * own driver.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -25,9 +21,6 @@ use Tests\TestCase;
 final class DriverResolverTest extends TestCase
 {
     /**
-     * The resolver returns the manager's driver for the name, including one a
-     * consumer registered.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -44,8 +37,8 @@ final class DriverResolverTest extends TestCase
     }
 
     /**
-     * Each registry answers with its own driver, so a manager built apart from
-     * the `mfa` singleton is not answered from the singleton's registry.
+     * A manager built apart from the `mfa` singleton is not answered from the
+     * singleton's registry.
      *
      * @return void
      *
@@ -63,9 +56,6 @@ final class DriverResolverTest extends TestCase
     }
 
     /**
-     * A registered driver that is not a `FactorDriver` is returned as it is by
-     * `driver()` and refused by `resolve()`.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -85,8 +75,6 @@ final class DriverResolverTest extends TestCase
     }
 
     /**
-     * Resolve the driver resolver.
-     *
      * @return \SineMacula\Laravel\Mfa\Drivers\DriverResolver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -97,8 +85,6 @@ final class DriverResolverTest extends TestCase
     }
 
     /**
-     * Resolve the package's MFA manager.
-     *
      * @return \SineMacula\Laravel\Mfa\MfaManager
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

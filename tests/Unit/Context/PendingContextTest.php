@@ -23,9 +23,6 @@ use Tests\Fixtures\Verification\Dumps;
 use Tests\Unit\Concerns\BuildsProofs;
 
 /**
- * Unit tests for `PendingContext`: what it holds, the actions it allows, and
- * the contradictions it refuses.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -37,8 +34,6 @@ final class PendingContextTest extends TestCase
     use BuildsProofs;
 
     /**
-     * The context holds its parts and allows exactly the listed actions.
-     *
      * @return void
      */
     public function testHoldsItsPartsAndAllowsOnlyTheListedActions(): void
@@ -71,9 +66,6 @@ final class PendingContextTest extends TestCase
     }
 
     /**
-     * A session's further proofs are held as they came, and it holds none
-     * unless given.
-     *
      * @return void
      */
     public function testHoldsItsFurtherProofs(): void
@@ -85,8 +77,6 @@ final class PendingContextTest extends TestCase
     }
 
     /**
-     * A context that allows nothing is valid, and allows nothing.
-     *
      * @return void
      */
     public function testAllowsNothingWithoutActions(): void
@@ -99,8 +89,6 @@ final class PendingContextTest extends TestCase
     }
 
     /**
-     * An identity with an integer key matches a binding of its string form.
-     *
      * @return void
      */
     public function testMatchesAnIntegerKeyByItsStringForm(): void
@@ -111,8 +99,6 @@ final class PendingContextTest extends TestCase
     }
 
     /**
-     * Contradictory contexts and the message each is refused with.
-     *
      * @return iterable<string, array{array<string, mixed>, string}>
      */
     public static function contradictions(): iterable
@@ -146,8 +132,6 @@ final class PendingContextTest extends TestCase
     }
 
     /**
-     * A contradictory context is refused.
-     *
      * @param  array<string, mixed>  $overrides
      * @param  string  $message
      * @return void
@@ -162,9 +146,6 @@ final class PendingContextTest extends TestCase
     }
 
     /**
-     * The credential the caller presented is kept, read back through
-     * `credential()`, and shown by no dump; without one it is `null`.
-     *
      * @return void
      */
     public function testKeepsThePresentedCredentialOutOfEveryDump(): void
@@ -180,8 +161,7 @@ final class PendingContextTest extends TestCase
     }
 
     /**
-     * Build a pending context for the fixture identity, with any argument
-     * overridden by name.
+     * For the fixture identity, with any argument overridden by name.
      *
      * @param  array<string, mixed>  $overrides
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
@@ -201,8 +181,7 @@ final class PendingContextTest extends TestCase
     }
 
     /**
-     * A password first factor bound to the fixture identity's sign-in, with any
-     * part of the binding overridden by name.
+     * A password first factor bound to the fixture identity's sign-in.
      *
      * @param  array<string, string>  $binding
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -222,8 +201,7 @@ final class PendingContextTest extends TestCase
     }
 
     /**
-     * A binding to the fixture identity's session, with any part overridden by
-     * name.
+     * To the fixture identity's session, with any part overridden by name.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  array<string, string>  $overrides

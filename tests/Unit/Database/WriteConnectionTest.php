@@ -12,9 +12,6 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\TestCase;
 
 /**
- * Unit tests for `WriteConnection`: the query it is handed is routed to the
- * write connection and handed back.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +21,6 @@ use Tests\TestCase;
 final class WriteConnectionTest extends TestCase
 {
     /**
-     * A query builder is routed to the write connection and returned as it is.
-     *
      * @return void
      */
     public function testRoutesAQueryBuilderToTheWriteConnection(): void
@@ -38,9 +33,6 @@ final class WriteConnectionTest extends TestCase
     }
 
     /**
-     * An Eloquent builder is routed to the write connection through its
-     * underlying query and returned as it is.
-     *
      * @return void
      */
     public function testRoutesAnEloquentBuilderToTheWriteConnection(): void
@@ -52,9 +44,6 @@ final class WriteConnectionTest extends TestCase
     }
 
     /**
-     * The callback runs with reads on the model's connection routed to the
-     * writer, gets its answer back, and the earlier mode is put back.
-     *
      * @return void
      */
     public function testDuringRoutesReadsAndRestoresTheMode(): void
@@ -75,9 +64,6 @@ final class WriteConnectionTest extends TestCase
     }
 
     /**
-     * Nested inside itself, and on a connection already routed by whoever else,
-     * the outer mode is what comes back.
-     *
      * @return void
      */
     public function testDuringKeepsAnEarlierMode(): void
@@ -103,9 +89,6 @@ final class WriteConnectionTest extends TestCase
     }
 
     /**
-     * The earlier mode comes back after the callback throws, and the exception
-     * is passed on.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -128,8 +111,6 @@ final class WriteConnectionTest extends TestCase
     }
 
     /**
-     * Whether the connection routes reads to the writer.
-     *
      * @param  \Illuminate\Database\Connection  $connection
      * @return bool
      */

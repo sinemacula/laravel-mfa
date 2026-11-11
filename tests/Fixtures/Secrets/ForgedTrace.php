@@ -7,12 +7,8 @@ namespace Tests\Fixtures\Secrets;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * Gives an exception a trace of the test's choosing.
- *
- * Whether PHP records arguments in a trace depends on
- * `zend.exception_ignore_args`, which differs between development and
- * production configurations, so tests of trace scrubbing set the frames they
- * scrub rather than rely on what PHP recorded.
+ * Gives an exception a trace of the test's choosing, since whether PHP records
+ * arguments depends on `zend.exception_ignore_args`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,8 +23,6 @@ final class ForgedTrace
     private function __construct() {}
 
     /**
-     * The exception, with its trace replaced by the frames.
-     *
      * @template TThrowable of \Throwable
      *
      * @param  TThrowable  $throwable
@@ -45,8 +39,7 @@ final class ForgedTrace
     }
 
     /**
-     * The path of a file inside the package's source directory, as PHP loaded
-     * the package's classes from it.
+     * A path inside the package's source directory, as PHP loaded it.
      *
      * @param  string  $relative
      * @return string

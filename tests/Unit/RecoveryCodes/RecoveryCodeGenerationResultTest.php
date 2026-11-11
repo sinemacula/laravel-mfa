@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * Tests for `RecoveryCodeGeneration`: generated with its codes, or refused with
- * its reason, told apart by the reason and never by an empty payload.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,6 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 final class RecoveryCodeGenerationResultTest extends TestCase
 {
     /**
-     * A generated set holds its codes, and no reason.
-     *
      * @return void
      */
     public function testGeneratedHoldsTheCodes(): void
@@ -38,8 +33,6 @@ final class RecoveryCodeGenerationResultTest extends TestCase
     }
 
     /**
-     * A refused set holds its reason, and no codes.
-     *
      * @return void
      */
     public function testRefusedHoldsTheReason(): void

@@ -10,9 +10,8 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
- * What every `StepUp` must guarantee, as assertions: a result whose binding
- * does not validate against the active session, and a failed result, are
- * refused by throwing an `OperationRefusedException`, never by returning.
+ * What every `StepUp` must guarantee: a failed result, or one not bound to the
+ * active session, throws an `OperationRefusedException`, never returns.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,8 +26,7 @@ final class StepUpContract
     private function __construct() {}
 
     /**
-     * A result bound to another session, identity, application or purpose than
-     * the active session's is refused by throwing.
+     * Another session, identity, application or purpose than the active one's.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\StepUp  $stepUp
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
@@ -41,8 +39,6 @@ final class StepUpContract
     }
 
     /**
-     * A failed result is refused by throwing.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\StepUp  $stepUp
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return void

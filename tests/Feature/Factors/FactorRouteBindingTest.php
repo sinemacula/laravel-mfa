@@ -27,10 +27,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * An implicitly bound factor through real routes: the access credential's
- * identity, or a pending credential's when the request carries one that allows
- * an action naming an existing factor; nobody else's factor, and nothing for a
- * credential that does not validate.
+ * Implicit factor binding through real routes binds only the caller's own
+ * factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -45,8 +43,6 @@ final class FactorRouteBindingTest extends TestCase
     use ArrangesVerification;
 
     /**
-     * Arrange the application, and the routes an application would declare.
-     *
      * @return void
      */
     #[\Override]
@@ -76,8 +72,6 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * Behind `auth`, the signed-in person's factor binds.
-     *
      * @return void
      */
     public function testTheAccessCredentialBindsItsOwnFactor(): void
@@ -88,8 +82,6 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * Another person's factor is the `404` of a factor that does not exist.
-     *
      * @return void
      */
     public function testAnotherPersonsFactorIsNotFound(): void
@@ -103,9 +95,6 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * Nobody signed in is stopped by `auth` before the binding, and with no
-     * `auth` on the route the binding itself finds nothing.
-     *
      * @return void
      */
     public function testAnUnauthenticatedRequestBindsNothing(): void
@@ -117,9 +106,6 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A malformed id is the `404` it would be for the caller's own, not an
-     * error.
-     *
      * @return void
      */
     public function testAMalformedIdIsNotFound(): void
@@ -130,8 +116,6 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A custom key in the route still binds, within the caller.
-     *
      * @return void
      */
     public function testACustomKeyInTheRouteBinds(): void
@@ -144,9 +128,6 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * Rows of the actions a pending credential allows and whether its person's
-     * factor binds.
-     *
      * @return iterable<string, array{list<\SineMacula\Laravel\Mfa\Enums\PendingAction>, bool}>
      */
     public static function pendingActions(): iterable
@@ -159,9 +140,8 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A pending session binds its own person's factor only when its credential
-     * allows an action that names an existing factor, and the guard's user
-     * never stands in.
+     * Only actions naming an existing factor bind, and the guard's user never
+     * stands in.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
      * @param  bool  $binds
@@ -183,8 +163,7 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A credential that does not validate is the resolver's to report: it is
-     * never read as a miss.
+     * An invalid credential is the resolver's to report, never a miss.
      *
      * @return void
      */
@@ -198,9 +177,7 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * The binding is an ownership rule, not permission to run the route: a
-     * list-only credential binds on a verify URL, and the verification it runs
-     * is refused.
+     * Binding checks ownership only; the verification itself is still refused.
      *
      * @return void
      */
@@ -219,8 +196,8 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A scoped child binding is its parent's own lookup, which never reaches
-     * the trait: the route must scope its parent to the caller itself.
+     * A scoped child binding never reaches the trait, so the route must scope
+     * its parent to the caller.
      *
      * @return void
      */
@@ -239,8 +216,7 @@ final class FactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A helper takes a factor's id: a bound model passed to one finds nothing,
-     * and its identifier is what finds the factor.
+     * Helpers take a factor's id, not the model.
      *
      * @return void
      */

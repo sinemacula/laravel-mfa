@@ -10,12 +10,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Testing\Seams\PasskeyGatewayContract;
 
 /**
- * The `PasskeyGateway` contract kit: an unavailable gateway lists no passkeys,
- * nothing verifies against an empty allowlist, and an empty response never
- * verifies.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `PasskeyGatewayContract`.
+ * The `PasskeyGateway` contract kit; each check delegates to
+ * `PasskeyGatewayContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -27,8 +23,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\PasskeyGatewayContract;
 trait PasskeyGatewayTests
 {
     /**
-     * An unavailable gateway lists no passkeys.
-     *
      * @return void
      */
     public function testPasskeyGatewayListsNothingWhenUnavailable(): void
@@ -37,8 +31,6 @@ trait PasskeyGatewayTests
     }
 
     /**
-     * Nothing verifies against an empty allowlist.
-     *
      * @return void
      */
     public function testPasskeyGatewayVerifiesNothingWithoutAnAllowedCredential(): void
@@ -47,8 +39,6 @@ trait PasskeyGatewayTests
     }
 
     /**
-     * An empty response never verifies.
-     *
      * @return void
      */
     public function testPasskeyGatewayNeverVerifiesAnEmptyResponse(): void
@@ -57,8 +47,6 @@ trait PasskeyGatewayTests
     }
 
     /**
-     * The gateway under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway
      */
     abstract protected function passkeyGateway(): PasskeyGateway;
@@ -71,8 +59,6 @@ trait PasskeyGatewayTests
     abstract protected function passkeyIdentity(): MultiFactorAuthenticatable;
 
     /**
-     * What an assertion is bound to.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
     abstract protected function passkeyBinding(): ProofBinding;

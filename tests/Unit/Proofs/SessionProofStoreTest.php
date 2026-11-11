@@ -29,10 +29,8 @@ use Tests\TestCase;
 use Tests\Unit\Concerns\BuildsProofs;
 
 /**
- * Tests for `SessionProofStore`: sign-ins begin and end per identity and
- * application, proofs are recorded only for their identity's current sign-in on
- * their application, and every read fails closed on a proof of another
- * identity, application, sign-in or generation, or one made in the future.
+ * Every read fails closed on a proof of another identity, application, sign-in
+ * or generation, or one made in the future.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -57,8 +55,6 @@ final class SessionProofStoreTest extends TestCase
     private Store $session;
 
     /**
-     * Start every test with an empty session and a frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -72,7 +68,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * An identity with no sign-in has no current session and no proofs.
+     * No current session either.
      *
      * @return void
      */
@@ -85,8 +81,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Beginning a sign-in names the session the identity's proofs are bound to.
-     *
      * @return void
      */
     public function testBeginNamesTheCurrentSession(): void
@@ -100,8 +94,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A sign-in is never named by a blank session id.
-     *
      * @return void
      */
     public function testBeginRefusesABlankSessionId(): void
@@ -113,8 +105,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A proof bound to the identity's current sign-in is recorded and read back
-     * whole.
+     * Read back whole.
      *
      * @return void
      */
@@ -130,8 +121,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A proof bound to another sign-in of the identity is refused.
-     *
      * @return void
      */
     public function testRefusesAProofOfAnotherSignIn(): void
@@ -147,8 +136,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A proof bound to another identity, though it names the identity's current
-     * sign-in, is refused and changes nothing.
+     * Even when it names the identity's current sign-in; nothing changes.
      *
      * @return void
      */
@@ -174,8 +162,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * The proofs read for a session that is not the identity's current sign-in
-     * are none, though the current one holds proofs.
+     * Even though the current one holds proofs.
      *
      * @return void
      */
@@ -195,8 +182,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A proof of an identity with no sign-in is refused.
-     *
      * @return void
      */
     public function testRefusesAProofWithoutASignIn(): void
@@ -207,8 +192,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A proof on an application the identity has not signed in to is refused,
-     * even when it names the session id of its sign-in on another.
+     * Even when it names the session id of the identity's sign-in on another.
      *
      * @return void
      */
@@ -224,8 +208,8 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * An identity's sign-ins on two applications are kept apart: each holds its
-     * own proofs, and beginning or forgetting one leaves the other alone.
+     * Each holds its own proofs; beginning or forgetting one leaves the other
+     * alone.
      *
      * @return void
      */
@@ -260,8 +244,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Beginning a new sign-in forgets every proof of the one before, even under
-     * the same session id.
+     * Even under the same session id.
      *
      * @return void
      */
@@ -277,10 +260,8 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * The ways a recorded proof fails to count for the identity's sign-in on
-     * the application: a time after now, a generation the identity has not
-     * reached. An older generation is covered by the generation bump below, and
-     * another application by the planted proof further down.
+     * A future time or an unreached generation; an older generation and another
+     * application are covered by later tests.
      *
      * @return iterable<string, array{0: array<string, mixed>}>
      */
@@ -291,8 +272,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A recorded proof that does not count for the identity's sign-in on the
-     * application is left out, while one that does is returned.
+     * One that does count is still returned.
      *
      * @param  array<string, mixed>  $overrides
      * @return void
@@ -311,8 +291,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A proof made exactly now counts.
-     *
      * @return void
      */
     public function testAProofMadeNowCounts(): void
@@ -327,9 +305,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Advancing the identity's verification generation stops every proof of its
-     * current sign-in made before counting, while one made under the new
-     * generation counts.
+     * A proof made under the new generation counts.
      *
      * @return void
      *
@@ -352,8 +328,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Another identity, whose type differs but whose key is the same, holds its
-     * own sign-in and sees none of the first one's proofs.
+     * It holds its own sign-in.
      *
      * @return void
      */
@@ -373,9 +348,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A proof of another identity planted in the identity's record is never
-     * returned for it.
-     *
      * @return void
      */
     public function testFailsClosedOnAProofOfAnotherIdentityInItsRecord(): void
@@ -388,9 +360,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A proof of another application planted in the identity's record on the
-     * application is never returned for it.
-     *
      * @return void
      */
     public function testFailsClosedOnAProofOfAnotherApplicationInItsRecord(): void
@@ -403,8 +372,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A stored entry that cannot be read back as a proof is skipped, and the
-     * others still count.
+     * The others still count.
      *
      * @return void
      */
@@ -418,8 +386,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A session holding something other than records is read as no sign-in.
-     *
      * @return void
      */
     public function testReadsMalformedSessionDataAsNoSignIn(): void
@@ -449,8 +415,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A record held as an object is read as no sign-in, though the object
-     * offers the record's session and proofs by key.
+     * Even though the object offers the record's session and proofs by key.
      *
      * @return void
      */
@@ -475,8 +440,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * The proofs are returned oldest first, whatever order they were recorded
-     * in.
+     * Whatever order they were recorded in.
      *
      * @return void
      */
@@ -494,9 +458,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Proofs made at the same instant come back in the order they were
-     * recorded.
-     *
      * @return void
      */
     public function testReturnsProofsOfOneInstantInTheOrderRecorded(): void
@@ -514,8 +475,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Forgetting a factor stops its proofs counting and keeps the others and
-     * the sign-in.
+     * The other proofs and the sign-in are kept.
      *
      * @return void
      */
@@ -534,9 +494,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Forgetting a factor stops its proofs counting on every application the
-     * identity has signed in to.
-     *
      * @return void
      */
     public function testForgetFactorReachesEveryApplication(): void
@@ -555,8 +512,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Forgetting a factor skips a stored record that is not one, and leaves it
-     * as it was.
+     * The malformed record is left as it was.
      *
      * @return void
      */
@@ -577,8 +533,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Forgetting a factor of an identity with no sign-in begins none.
-     *
      * @return void
      */
     public function testForgetFactorWithoutASignInBeginsNone(): void
@@ -592,9 +546,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Forgetting the identity ends its sign-in and leaves other identities'
-     * alone.
-     *
      * @return void
      */
     public function testForgetEndsTheSignInAndLeavesOthersAlone(): void
@@ -616,8 +567,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A sign-in keeps at most `LIMIT` proofs, forgetting the earliest recorded
-     * but never the latest first factor.
+     * The earliest recorded goes first, but never the latest first factor.
      *
      * @return void
      */
@@ -644,9 +594,8 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * First factors recorded past the limit never push the sign-in over it nor
-     * crowd out an additional proof: the earliest are forgotten and the latest
-     * is kept.
+     * The earliest are forgotten and the latest kept, without crowding out an
+     * additional proof.
      *
      * @return void
      */
@@ -677,8 +626,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Once a sign-in is full, every further additional proof forgets the
-     * earliest other than the first factor, so the latest proofs are kept.
+     * Each forgets the earliest proof other than the first factor.
      *
      * @return void
      */
@@ -703,9 +651,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A record already past the limit is brought back within it on the next
-     * proof, forgetting the earliest entries but keeping the first factor
-     * wherever it sits.
+     * On the next proof, keeping the first factor wherever it sits.
      *
      * @return void
      */
@@ -734,8 +680,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * An identity whose key cannot name a record is refused rather than sharing
-     * one.
+     * Refused rather than sharing one.
      *
      * @return void
      */
@@ -747,8 +692,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Build the store over the test's session.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\SessionProofStore
      */
     private function store(): SessionProofStore
@@ -757,8 +700,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A test user with the given key, never saved.
-     *
      * @param  int  $id
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -772,8 +713,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * An additional factor proof of the identity on the application, bound to
-     * its sign-in at generation 0 a minute ago, with any part overridden.
+     * Bound to the identity's sign-in at generation 0, made a minute ago.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  array<string, mixed>  $overrides
@@ -799,8 +739,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * A first factor proof of the identity, made with the method at sign-in ten
-     * minutes ago.
+     * Made at sign-in ten minutes ago.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $method
@@ -822,8 +761,7 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * Store the given entries directly as the test user's record for its
-     * sign-in on the application.
+     * Writes the entries directly as the user's record on the application.
      *
      * @param  list<mixed>  $entries
      * @return void
@@ -836,8 +774,6 @@ final class SessionProofStoreTest extends TestCase
     }
 
     /**
-     * The proofs in their serialised form, for comparison.
-     *
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @return list<array<string, mixed>>
      */

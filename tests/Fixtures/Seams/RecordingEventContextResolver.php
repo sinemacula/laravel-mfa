@@ -10,10 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 use SineMacula\Laravel\Mfa\Events\EventSubject;
 
 /**
- * An event context resolver that records every subject it is handed and answers
- * as the default does, with the sign-in named as the session, so a test can see
- * which sign-in each event was resolved for, from the subjects or from the
- * event itself.
+ * Records every subject and answers as the default does with the sign-in as the
+ * session, so a test can see which sign-in each event was resolved for.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,13 +20,10 @@ use SineMacula\Laravel\Mfa\Events\EventSubject;
  */
 final class RecordingEventContextResolver implements EventContextResolver
 {
-    /** @var list<\SineMacula\Laravel\Mfa\Events\EventSubject> The subjects handed, in order. */
+    /** @var list<\SineMacula\Laravel\Mfa\Events\EventSubject> */
     public array $subjects = [];
 
     /**
-     * Record the subject and answer as the default does, naming the subject's
-     * sign-in as the session.
-     *
      * @param  \SineMacula\Laravel\Mfa\Events\EventSubject  $subject
      * @return array<string, int|string|null>
      */
@@ -41,8 +36,6 @@ final class RecordingEventContextResolver implements EventContextResolver
     }
 
     /**
-     * The sign-ins the subjects named, in order.
-     *
      * @return list<?string>
      */
     public function signIns(): array
@@ -51,8 +44,7 @@ final class RecordingEventContextResolver implements EventContextResolver
     }
 
     /**
-     * The sign-ins named by the events of the class given, in order, as this
-     * resolver put them in each event's context.
+     * The sign-ins this resolver put in the context of each event of the class.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent>  $events
      * @param  class-string<\SineMacula\Laravel\Mfa\Contracts\MfaEvent>  $class

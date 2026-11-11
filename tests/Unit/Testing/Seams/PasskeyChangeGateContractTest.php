@@ -30,10 +30,6 @@ use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
 /**
- * The passkey change gate wiring kit proves a registration path that calls the
- * gate inside its own transaction, and rejects one that swallows the gate's
- * refusal and keeps its credential.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -55,9 +51,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     private ?string $ownTransaction = null;
 
     /**
-     * Enable passkeys, sign a person in, and let them prove their password
-     * again.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -75,9 +68,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that swallows the gate's refusal and keeps its
-     * credential.
-     *
      * @return void
      */
     public function testRejectsAPathThatSwallowsTheRefusal(): void
@@ -98,8 +88,7 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that swallows the gate's refusal, even one that
-     * then keeps nothing.
+     * Even one that then keeps nothing.
      *
      * @return void
      */
@@ -121,9 +110,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that keeps the credential outside its own
-     * transaction before the gate refuses.
-     *
      * @return void
      */
     public function testRejectsAPathThatKeepsTheCredentialOutsideItsTransaction(): void
@@ -140,8 +126,7 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that associates the credential itself, outside the
-     * gate, before the gate refuses.
+     * It associates the credential itself before the gate refuses.
      *
      * @return void
      */
@@ -167,9 +152,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that opens a transaction of its own around the
-     * gate's `registering()`.
-     *
      * @return void
      */
     public function testRejectsARegistrationCallInATransactionOfItsOwn(): void
@@ -183,8 +165,7 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that opens a transaction of its own around the
-     * gate's `removing()`, though its registration call is sound.
+     * Even though its registration call is sound.
      *
      * @return void
      */
@@ -199,8 +180,7 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that swallows the gate's refusal of a call outside
-     * a transaction.
+     * A call made outside a transaction.
      *
      * @return void
      */
@@ -215,8 +195,7 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit refuses to make the check inside a transaction, where a sound
-     * path's calls would not be refused.
+     * Inside one, a sound path's calls would not be refused.
      *
      * @return void
      *
@@ -239,8 +218,7 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit's test hands the contract the test case's own registration hook,
-     * so one that swallows the gate's refusal fails it.
+     * So a hook that swallows the gate's refusal fails it.
      *
      * @return void
      */
@@ -255,8 +233,7 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The kit's test hands the contract the test case's own removal hook, so
-     * one that swallows the gate's refusal fails it.
+     * So a hook that swallows the gate's refusal fails it.
      *
      * @return void
      */
@@ -271,8 +248,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -282,8 +257,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The application.
-     *
      * @return string
      */
     #[\Override]
@@ -293,8 +266,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * Register the credential through the stand-in registrar.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $credentialId
      * @return mixed
@@ -310,8 +281,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * Whether the stand-in registrar kept the credential.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $credentialId
      * @return bool
@@ -323,9 +292,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * Call the gate's `registering()` as an adapter would, broken as the test
-     * says.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $credentialId
@@ -343,9 +309,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * Call the gate's `removing()` as an adapter would, broken as the test
-     * says.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $credentialId
@@ -360,8 +323,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * A registration of the credential for the identity on the application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $credentialId
@@ -379,9 +340,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The gate's `registering()` for the person on the application, as the
-     * adapter's call.
-     *
      * @return \Closure(string): mixed
      */
     private function registeringCall(): \Closure
@@ -390,9 +348,6 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * The gate's `removing()` for the person on the application, as the
-     * adapter's call.
-     *
      * @return \Closure(string): mixed
      */
     private function removalCall(): \Closure
@@ -401,8 +356,8 @@ final class PasskeyChangeGateContractTest extends TestCase
     }
 
     /**
-     * Make the hook's call as the test says: in a transaction of its own, with
-     * a `LogicException` swallowed, or as it is.
+     * In a transaction of its own, with a `LogicException` swallowed, or as it
+     * is.
      *
      * @param  string  $hook
      * @param  \Closure(): mixed  $call

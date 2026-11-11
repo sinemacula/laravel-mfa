@@ -18,9 +18,8 @@ use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use Tests\TestCase;
 
 /**
- * Feature tests for `mfa:check`: it lists every subject without a problem as OK
- * and every problem with its subject, exits `1` when there is one and `0` when
- * there is none, and opens no database connection.
+ * `mfa:check` reports per subject, fails on any problem and opens no database
+ * connection.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,15 +29,14 @@ use Tests\TestCase;
 #[CoversClass(CheckConfigurationCommand::class)]
 final class CheckConfigurationCommandTest extends TestCase
 {
-    /** @var list<string> The package-wide subjects, in the order they are reported. */
+    /** @var list<string> Package-wide subjects in report order. */
     private const array SUBJECTS = ['storage', 'factor', 'identity_state', 'totp', 'codes', 'recovery_codes', 'attempts', 'enrollment', 'lifecycle', 'applications'];
 
-    /** @var array<array-key, mixed> The console arguments before the test. */
+    /** @var array<array-key, mixed> Console arguments before the test. */
     private array $argv = [];
 
     /**
-     * Keep the console arguments, which a test changes before the application
-     * boots.
+     * A test changes the console arguments before the application boots.
      *
      * @return void
      */
@@ -53,8 +51,6 @@ final class CheckConfigurationCommandTest extends TestCase
     }
 
     /**
-     * Put the console arguments back.
-     *
      * @return void
      */
     #[\Override]
@@ -66,8 +62,6 @@ final class CheckConfigurationCommandTest extends TestCase
     }
 
     /**
-     * The command is registered under its name.
-     *
      * @return void
      */
     public function testTheCommandIsRegistered(): void
@@ -76,8 +70,7 @@ final class CheckConfigurationCommandTest extends TestCase
     }
 
     /**
-     * The shipped configuration passes, each subject reported as OK, without a
-     * database query.
+     * Each subject is OK and no query runs.
      *
      * @return void
      */
@@ -103,9 +96,6 @@ final class CheckConfigurationCommandTest extends TestCase
     }
 
     /**
-     * Each problem is listed with its subject, every other subject is OK, and
-     * the command fails.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -139,9 +129,7 @@ final class CheckConfigurationCommandTest extends TestCase
     }
 
     /**
-     * A factor model that is not one, configured before the package boots, does
-     * not stop the command from booting: it reports the model under its subject
-     * and fails.
+     * A broken factor model set before boot must not stop the command booting.
      *
      * @return void
      */
@@ -159,8 +147,6 @@ final class CheckConfigurationCommandTest extends TestCase
     }
 
     /**
-     * A configured application without a problem is reported as OK.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -182,8 +168,7 @@ final class CheckConfigurationCommandTest extends TestCase
     }
 
     /**
-     * Boot as `mfa:check` with a factor model that is not one, as a deployment
-     * would.
+     * Boot as `mfa:check` with a non-model factor class, as a deployment would.
      *
      * @param  \Illuminate\Foundation\Application  $app
      * @return void

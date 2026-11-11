@@ -13,9 +13,6 @@ use Symfony\Component\VarDumper\Cloner\VarCloner;
 use Symfony\Component\VarDumper\Dumper\CliDumper;
 
 /**
- * Tests for `RevealedSecret`: the plaintext leaves only through `reveal()`, and
- * every other way out refuses or shows a marker.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -28,8 +25,6 @@ final class RevealedSecretTest extends TestCase
     private const string SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
 
     /**
-     * Revealing gives the plaintext.
-     *
      * @return void
      */
     public function testRevealGivesThePlaintext(): void
@@ -38,8 +33,6 @@ final class RevealedSecretTest extends TestCase
     }
 
     /**
-     * Casting to a string refuses.
-     *
      * @return void
      */
     public function testRefusesToCastToAString(): void
@@ -53,8 +46,6 @@ final class RevealedSecretTest extends TestCase
     }
 
     /**
-     * Encoding as JSON refuses.
-     *
      * @return void
      */
     public function testRefusesToEncodeAsJson(): void
@@ -68,8 +59,7 @@ final class RevealedSecretTest extends TestCase
     }
 
     /**
-     * A JSON response built around the secret refuses, so it never reaches a
-     * body sent without `no-store`.
+     * So it never reaches a body sent without `no-store`.
      *
      * @return void
      */
@@ -85,7 +75,7 @@ final class RevealedSecretTest extends TestCase
     }
 
     /**
-     * Serialising refuses, alone or inside another value.
+     * Alone or inside another value.
      *
      * @return void
      */
@@ -100,8 +90,6 @@ final class RevealedSecretTest extends TestCase
     }
 
     /**
-     * Unserialising a stored payload refuses.
-     *
      * @return void
      */
     public function testRefusesToUnserialize(): void
@@ -115,8 +103,6 @@ final class RevealedSecretTest extends TestCase
     }
 
     /**
-     * `print_r` shows no plaintext.
-     *
      * @return void
      */
     public function testPrintRShowsNoPlaintext(): void
@@ -128,8 +114,6 @@ final class RevealedSecretTest extends TestCase
     }
 
     /**
-     * `var_dump` shows no plaintext.
-     *
      * @return void
      */
     public function testVarDumpShowsNoPlaintext(): void
@@ -145,8 +129,6 @@ final class RevealedSecretTest extends TestCase
     }
 
     /**
-     * `var_export` shows no plaintext.
-     *
      * @return void
      */
     public function testVarExportShowsNoPlaintext(): void
@@ -157,7 +139,7 @@ final class RevealedSecretTest extends TestCase
     }
 
     /**
-     * Symfony's VarDumper, behind Laravel's dump helpers, shows no plaintext.
+     * Behind Laravel's dump helpers.
      *
      * @return void
      */
@@ -170,8 +152,6 @@ final class RevealedSecretTest extends TestCase
     }
 
     /**
-     * The debug information is the marker alone.
-     *
      * @return void
      */
     public function testDebugInfoIsTheMarker(): void

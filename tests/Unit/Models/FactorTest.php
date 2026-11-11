@@ -16,8 +16,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Integration-leaning unit tests for the shipped `Factor` Eloquent model.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -32,8 +30,6 @@ final class FactorTest extends TestCase
     private const string TEST_USER_EMAIL = 'alice@example.com';
 
     /**
-     * Test implements eloquent factor contract.
-     *
      * @return void
      */
     public function testImplementsEloquentFactorContract(): void
@@ -42,8 +38,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test default table name is mfa factors.
-     *
      * @return void
      */
     public function testDefaultTableNameIsMfaFactors(): void
@@ -54,20 +48,15 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test table name falls back to default when config facade is not
-     * bootstrapped.
-     *
      * @return void
      */
     public function testTableNameFallsBackToDefaultWhenConfigFacadeIsNotBootstrapped(): void
     {
-        // Swap out the bound Facade application so `Config::string(...)`
-        // throws, exercising the defensive fallback in
+        // Make `Config::string()` throw to reach the fallback in
         // `resolveConfiguredTable`.
         $previous = Facade::getFacadeApplication();
 
-        // Tear-down accepts null even though the upstream stub claims non-null
-        // is required.
+        // The upstream stub claims non-null, but tear-down accepts null.
         // @phpstan-ignore argument.type
         Facade::setFacadeApplication(null);
         Facade::clearResolvedInstance('config');
@@ -82,8 +71,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test table name resolves from config.
-     *
      * @return void
      */
     public function testTableNameResolvesFromConfig(): void
@@ -96,8 +83,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test table name falls back to default when config is empty.
-     *
      * @return void
      */
     public function testTableNameFallsBackToDefaultWhenConfigIsEmpty(): void
@@ -110,9 +95,7 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * The model lives on the storage connection, named even when it is the
-     * default one: the default one when none is configured, the configured one
-     * otherwise.
+     * Named even when it is the default one.
      *
      * @return void
      */
@@ -128,8 +111,8 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * A subclass that names a connection of its own keeps it, so a model off
-     * the storage connection is refused rather than silently moved.
+     * So a model off the storage connection is refused rather than silently
+     * moved.
      *
      * @return void
      */
@@ -143,8 +126,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test unique ids returns id column.
-     *
      * @return void
      */
     public function testUniqueIdsReturnsIdColumn(): void
@@ -153,8 +134,7 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Every mass-assignable attribute without a richer cast is cast to a
-     * string, so a read never hands back the driver's native type.
+     * So a read never hands back the driver's native type.
      *
      * @return void
      */
@@ -168,8 +148,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test generates ulid primary key on save.
-     *
      * @return void
      */
     public function testGeneratesUlidPrimaryKeyOnSave(): void
@@ -189,8 +167,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test authenticatable morph to relation.
-     *
      * @return void
      */
     public function testAuthenticatableMorphToRelation(): void
@@ -216,8 +192,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test secret round-trips through encryption when read back.
-     *
      * @return void
      */
     public function testSecretRoundTripsThroughEncryption(): void
@@ -230,8 +204,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test raw secret column is not stored as plaintext.
-     *
      * @return void
      */
     public function testRawSecretColumnIsNotStoredAsPlaintext(): void
@@ -252,9 +224,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * A new factor is pending, not preferred, and has not failed, before it is
-     * stored.
-     *
      * @return void
      */
     public function testANewFactorIsPendingNotPreferredAndHasNotFailed(): void
@@ -263,8 +232,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Every column is mass assignable but the key and the timestamps.
-     *
      * @return void
      */
     public function testEveryColumnButTheKeyAndTimestampsIsFillable(): void
@@ -293,8 +260,7 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Test the secret is hidden from serialisation, as are the full destination
-     * and the credential reference.
+     * The full destination and the credential reference are hidden too.
      *
      * @return void
      */
@@ -321,8 +287,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Return the test user's key as a string for morph-to wiring.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return string
      */
@@ -335,8 +299,6 @@ final class FactorTest extends TestCase
     }
 
     /**
-     * Persist a TOTP factor carrying the given plaintext secret.
-     *
      * @param  string  $secret
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */

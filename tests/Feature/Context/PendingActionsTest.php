@@ -32,9 +32,8 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Every helper that returns summaries, sends a code or reveals a secret serves
- * a pending session only the action it needs, as the pending session's own
- * identity, and never the guard's user in its place.
+ * A pending session gets only the actions it allows, as its own identity and
+ * never as the guard's user.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -49,23 +48,19 @@ use Tests\TestCase;
 #[CoversClass(LifecycleService::class)]
 final class PendingActionsTest extends TestCase
 {
-    /** @var \Tests\Fixtures\Identities\TestUser The person signing in on the pending session. */
+    /** @var \Tests\Fixtures\Identities\TestUser Person signing in on the pending session. */
     private TestUser $pending;
 
-    /** @var \SineMacula\Laravel\Mfa\Models\Factor The pending person's email factor. */
+    /** @var \SineMacula\Laravel\Mfa\Models\Factor Pending person's email factor. */
     private Factor $factor;
 
-    /** @var \SineMacula\Laravel\Mfa\Models\Factor The guard's user's email factor. */
+    /** @var \SineMacula\Laravel\Mfa\Models\Factor Guard's user's email factor. */
     private Factor $guardedFactor;
 
     /** @var \SineMacula\Laravel\Mfa\Testing\FakeEmailSender The codes sent. */
     private FakeEmailSender $mailbox;
 
     /**
-     * Enable email codes and recovery codes, sign one person in through the
-     * guard, and give another, signing in on a pending session, an email
-     * factor.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -101,8 +96,7 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * A pending session that allows none of what the helpers need gets nothing
-     * from any of them, and the guard's user is not served instead.
+     * The guard's user is not served in the pending person's place.
      *
      * @return void
      *
@@ -127,9 +121,6 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * Without a pending session the guard's user is served, by the same helpers
-     * a pending session gets nothing from.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -142,9 +133,6 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * Listing factors on a pending session that allows it lists the pending
-     * person's, not the guard's user's.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -160,9 +148,6 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * A code is sent to the pending person's factor and verified on the pending
-     * session that allows both.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -184,8 +169,7 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * Sending is not verifying: a pending session that allows only sending
-     * cannot verify the code it was sent.
+     * A session allowed only to send cannot verify the code it was sent.
      *
      * @return void
      *
@@ -206,9 +190,6 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * A pending credential that does not validate is refused by every helper,
-     * never answered as the guard's user.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -223,9 +204,8 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * A caller whose pending credential is revoked once it was read is refused
-     * under the identity's lock: the code it was sent is not spent, and answers
-     * once the credential stands again.
+     * The refused code is not spent and verifies once the credential stands
+     * again.
      *
      * @return void
      *
@@ -250,9 +230,6 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * The credential the caller presented is what the resolver is asked to read
-     * again under the lock.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -271,9 +248,6 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * Make every request carry the pending person's pending session, allowing
-     * the actions.
-     *
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
      * @return void
      */
@@ -287,8 +261,6 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * A confirmed email factor of the person's.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $address
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -307,8 +279,6 @@ final class PendingActionsTest extends TestCase
     }
 
     /**
-     * The manager.
-     *
      * @return \SineMacula\Laravel\Mfa\MfaManager
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

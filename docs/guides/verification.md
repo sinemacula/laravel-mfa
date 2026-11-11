@@ -27,9 +27,9 @@ if ($result->isFailed()) {
 }
 ```
 
-Only stored factors verify, named by their id, looked up within the caller's identity: a factor that does not
-exist and one that belongs to someone else get the same answer and the same report. The driver is the one registered for
-the factor's type.
+Only stored factors verify, named by their id, looked up within the caller's identity: a factor that does not exist and
+one that belongs to someone else get the same answer and the same report. The driver is the one registered for the
+factor's type.
 
 ## Who is served
 
@@ -38,9 +38,8 @@ or built from plain values (see [The caller](helpers.md#the-caller)). A caller h
 `fromRequest()` takes from the bound `Contracts\PendingSessionResolver`, is served as that session's identity when its
 credential allows the action (`mfa.list_factors`, `mfa.send_code`, `mfa.verify`); any other caller as its identity, when
 it is a person. A pending session that does not allow the action is served nothing, and the guard's user is never
-served in its place. A pending session's first factor must be of the identity's current
-verification generation and not dated in the future: one that is not is refused as `not_accepted` before anything is
-checked or spent.
+served in its place. A pending session's first factor must be of the identity's current verification generation and
+not dated in the future: one that is not is refused as `not_accepted` before anything is checked or spent.
 
 ## What a code is bound to
 
@@ -57,12 +56,11 @@ that no longer stands is refused as `not_found` too.
 
 ### Before the sign-in exists
 
-- **With an authentication layer**, a code binds to the pending session's public id, which survives its activation, so a
+- With an authentication layer, a code binds to the pending session's public id, which survives its activation, so a
   code sent while pending can still answer the same sign-in. A `sign_in` code never answers a `step_up`.
-- **Alone**, the default resolver has no pending sessions, and Laravel's `Login` event, or
-  `Proofs\GuardHooks::signedIn()`, begins the sign-in before anything resolves a caller. A code before a sign-in cannot
-  exist.
-- **With your own `PendingSessionResolver` and no authentication layer**, begin the store's sign-in under the pending id
+- Alone, the default resolver has no pending sessions, and Laravel's `Login` event, or `Proofs\GuardHooks::signedIn()`,
+  begins the sign-in before anything resolves a caller. A code before a sign-in cannot exist.
+- With your own `PendingSessionResolver` and no authentication layer, begin the store's sign-in under the pending id
   with `GuardHooks::signedIn()` and a first factor bound to it. The default `PendingCompletion` refuses a proof when the
   store's current sign-in is not the pending id, and never begins one itself. A later `Auth::login()` begins a fresh
   sign-in and forgets the proofs, so use the hooks there too.
@@ -191,9 +189,9 @@ An adapter over an authentication layer binds its own and returns what the calle
 ```php
 final readonly class AuthenticationStepUp implements StepUp
 {
-    public function stepUp(VerificationResult $result): ?object
+    public function stepUp(CallerContext $caller, VerificationResult $result): ?object
     {
-        return $this->sessions->stepUp($this->translate($result)); // tokens, opaque to the package
+        return $this->sessions->stepUp($this->translate($caller, $result)); // tokens, opaque to the package
     }
 }
 ```
@@ -217,11 +215,11 @@ A verification's result only exists once the transaction has committed, so what 
 and cookie in it, never reaches a response if the commit fails: the failure reaches the caller of `Mfa::verify()` in its
 place, the code is unspent, and no proof or event is left. Confirming an enrolment works the same way.
 
-Two boundaries are worth knowing. If you wrap `Mfa::verify()` in your own transaction on the storage connection, our
-commit is a savepoint and the result reaches your closure first. Returning a response from that closure is safe, as
-`transaction()` must finish before it escapes, but do not emit the response or publish the completion inside it. And a
-listener that throws after a real commit is a different case: the session did change and the result is lost, which is an
-honest server error. See [the route gate design note](../design/route-gate.md).
+If you wrap `Mfa::verify()` in your own transaction on the storage connection, the package's commit is a savepoint and
+the result reaches your closure first. Returning a response from that closure is safe, as `transaction()` must finish
+before it escapes, but do not emit the response or publish the completion inside it. A listener that throws after a real
+commit is a different case: the session did change and the result is lost, which is an honest server error. See [the
+route gate design note](../design/route-gate.md).
 
 ## Counting
 

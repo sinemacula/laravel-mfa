@@ -103,8 +103,7 @@ final class MfaAuditMapper implements EventMapper
 AuditLog::map(MfaEvent::class, MfaAuditMapper::class);
 ```
 
-This is the mapping that package has agreed, ahead of its first release, so check the namespaces against its own
-documentation once it is released.
+`laravel-audit-log` is not yet released, so check these namespaces against its documentation.
 
 The context is read through `Contracts\EventContextResolver`, handed an `Events\EventSubject`: the identity, the
 application the operation ran through, the sign-in it was bound to, and the client it was served to. The sign-in is this

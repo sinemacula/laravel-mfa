@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note describes every table the package creates, the model each is read and written through, which models an
+This note records every table the package creates, the model each is read and written through, which models an
 application may replace, the identity contract and its trait, and the one guard every operation on an identity's
 factors starts with.
 
@@ -18,9 +18,8 @@ factors starts with.
   `totp_algorithm`, `totp_digits` and `totp_period` stored with the factor, `last_accepted_step`, `status` (`pending`
   until confirmed, by the table's default and the model's), `preferred`, the durable `consecutive_failures` and
   `disabled_at` of the failure ceiling, `locked_until`, when its temporary lockout ends, the `application` it was
-  enrolled through, `confirmed_at` and `last_used_at`.
-  A delivered code is never on the factor: it lives in `mfa_codes`. A successful verification is recorded as a proof
-  on the session (see the proof store note), not on the factor.
+  enrolled through, `confirmed_at` and `last_used_at`. A delivered code is never on the factor: it lives in `mfa_codes`.
+  A successful verification is recorded as a proof on the session (see the proof store note), not on the factor.
 - `mfa_identity_states`, one row per owner and the lock of every serialised change: `verification_generation`,
   `reenrollment_required`, the identity's `consecutive_failures` and `locked_until`, and `recovery_codes_generation`
   and `recovery_codes_generated_at`.
@@ -58,8 +57,8 @@ factors starts with.
   (`canHoldFactors()`, people only), whether it is active (`isMfaActive()`) and what it requires of its own sign-ins
   (`requiresAdditionalFactor()`, a `Requirements\Requirement` or `null`). `Concerns\HasFactors` answers a person,
   active, requiring nothing, gives the factors of the configured model by the owner columns of its `authenticatable`
-  relation, counts only a confirmed one as enabled (read from the write connection), and forgets the identity on the
-  model's `deleted` event, once its row is gone, unless the delete was soft.
+  relation, counts any factor whose status is not exactly `pending` as enabled (read from the write connection), and
+  forgets the identity on the model's `deleted` event, once its row is gone, unless the delete was soft.
 - `Lifecycle\ForgetIdentity` deletes the identity's codes, enrolments, passkey associations, recovery codes, factors and
   state row in its factor state transaction, by the owner columns of each model (a replaced factor or recovery code
   model's own relation columns). The attempt throttles are left to expire. `Mfa::forgetIdentity()` is its one-call

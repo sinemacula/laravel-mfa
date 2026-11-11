@@ -28,47 +28,10 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
- * Counts failed attempts, applies and lifts lockouts, and disables a factor at
- * the failure ceiling.
- *
- * An attempt is counted against three scopes:
- *
- * - the factor, durably: its failures in a row (`consecutive_failures` on the
- *   factor's row), reset only by a success of that factor. From the factor
- *   limit on, each failure locks the factor for the lockout period (the
- *   factor's locked-until column, in the same save); at the failure ceiling it
- *   is disabled until another factor is proved, it is rebound or the identity
- *   is reset;
- * - the identity, across all its factors and recovery codes: its failures
- *   within the window (a throttle row) lock it for the lockout period when they
- *   reach the identity limit (`locked_until` on its state row), and its durable
- *   run of failures (`consecutive_failures` on its state row) is reset only by
- *   a success or a reset. From the failure ceiling on, a failure disables the
- *   factor it was made against, and an attempt that names no factor of its own
- *   (a recovery code, a factor that keeps no state) is refused;
- * - the IP address, within the window, refused until the window ends once it
- *   reaches the IP limit.
- *
- * The identity's lockout, the factor's lockout and whether it is disabled are
- * read, the driver is called and the outcome is counted in one factor state
- * transaction, holding the identity's state lock (see
- * `FactorStateTransaction`), so parallel guesses for one identity are counted
- * one after the other and cannot overrun a cap. The verification is handed the
- * factor as stored under that lock, and an attempt on a factor that is not
- * among the identity's stored factors is answered as not found without calling
- * it. The IP address's slot is taken around the whole verification, by
- * `throttled()`, in one statement and outside any transaction the package
- * opens, and given back unless the attempt fails, so parallel guesses from one
- * address cannot overrun its cap either. A refused attempt is counted nowhere
- * and so extends nothing; a success lifts no lockout and resets no other
- * factor's count, and sending a code resets nothing.
- *
- * Events are dispatched once the transaction has committed, so a listener that
- * throws cannot undo what was counted.
- *
- * `lockout()`, `liftLockout()`, `enableFactor()` and `resetIdentityFailures()`
- * are the operations an application builds unlocking, rebinding and resetting
- * on; `attempt()` is made by the package's own verification paths.
+ * Counts failures per factor, identity and IP address, applies lockouts and
+ * disables a factor at the failure ceiling. Lockout checks, verification and
+ * counting share one identity lock so parallel guesses cannot overrun a cap.
+ * Events fire after commit so a throwing listener cannot undo a count.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -78,8 +41,6 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
 final readonly class AttemptService
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptStore  $store
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptKeys  $keys
@@ -88,33 +49,25 @@ final readonly class AttemptService
      */
     public function __construct(
 
-        /** Configuration the attempt settings and the factor model are read from on every call. */
+        /** Read on every call. */
         private Repository $config,
 
-        /** The throttle rows. */
+        /** Throttle rows. */
         private AttemptStore $store,
 
-        /** The keys the throttle rows are stored under. */
+        /** Throttle row keys. */
         private AttemptKeys $keys,
 
-        /** The throttle on the IP address an attempt came from. */
+        /** IP throttle. */
         private IpThrottle $ipThrottle,
 
-        /** The dispatcher of the lockout and failure ceiling events. */
+        /** Lockout and failure ceiling events. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Make the attempt: refuse it while a lockout applies, otherwise run the
-     * verification and count its outcome, all under the identity's factor state
-     * lock.
-     *
-     * The verification runs inside the transaction and is handed the factor as
-     * stored under the lock (the attempt's own factor when it keeps no state,
-     * `null` for a recovery code), so it checks against the stored factor, not
-     * what the caller read before, and whatever it writes (a TOTP step, a
-     * delivered code used up, the factor's last use) commits with the count. A
-     * verification that throws counts nothing.
+     * The verification gets the factor as locked, so its writes commit with the
+     * count; one that throws counts nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Attempts\Attempt  $attempt
      * @param  \Closure(?\SineMacula\Laravel\Mfa\Contracts\Factor): bool  $verify
@@ -152,13 +105,8 @@ final readonly class AttemptService
     }
 
     /**
-     * Run a verification holding a slot of the IP address's window: refused by
-     * the address's throttle before it runs when the window is full, otherwise
-     * given back unless the verification failed and was counted; anything
-     * thrown gives it back too. It is taken outside any transaction the package
-     * opens, so the slot survives a rollback of what the verification did, and
-     * nothing else counts the address. An attempt made outside a request has no
-     * address, and is not throttled.
+     * Hold an IP slot around the verification, outside any package transaction
+     * so it survives a rollback; given back unless it failed.
      *
      * @param  ?string  $ip
      * @param  \Closure(): \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome  $verification
@@ -195,13 +143,8 @@ final readonly class AttemptService
     }
 
     /**
-     * The lockout an attempt by the identity, against the factor and from the
-     * IP address, would be refused by now, or `null` when none applies: with no
-     * factor, or one that keeps no state, that includes the identity's run at
-     * the failure ceiling. It reads the write connection but takes no lock, so
-     * it is advisory: it answers for this moment only, and inside a transaction
-     * of the caller's may answer from that transaction's older snapshot.
-     * `attempt()` reads it again under the lock.
+     * Advisory: reads without a lock, so a caller's transaction may see an
+     * older snapshot. `attempt()` reads again under the lock.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -229,11 +172,7 @@ final readonly class AttemptService
     }
 
     /**
-     * Under the identity's factor state lock: the lockout an attempt against
-     * the factor as stored there would be refused by now, or `null` when none
-     * applies. The identity's row is read with a locking read, as `attempt()`
-     * reads it, and the IP address is not considered: it is the read a caller
-     * holding the lock makes before it sends or checks a challenge of its own.
+     * For a caller holding the factor state lock; ignores the IP address.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
@@ -252,16 +191,9 @@ final readonly class AttemptService
     }
 
     /**
-     * Lift the factor's lockout, or the identity's when no factor is given,
-     * before it ends, as an action taken by the actor or by the identity
-     * itself. The factor's failures in a row, and the identity's run, are
-     * kept, since only a success resets them, so the next failure locks again;
-     * a factor disabled at the failure ceiling stays disabled (see
-     * `enableFactor()`). A factor that is not among the identity's stored
-     * factors lifts nothing. Returns whether a live lockout was lifted, and
-     * reports it when one was: `false` does not mean nothing changed, since
-     * lifting the identity's clears its throttle window even with no lockout
-     * live. A model event that cancels the save throws.
+     * Lift the factor's lockout, or the identity's when no factor is given.
+     * Failure counts are kept, so the next failure locks again. `false` can
+     * still mean the identity's throttle window was cleared.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -309,10 +241,8 @@ final readonly class AttemptService
     }
 
     /**
-     * Enable a factor the failure ceiling disabled, with its failures in a row
-     * cleared: the step a rebind or a reset takes. A lockout of the factor is
-     * left as it is (see `liftLockout()`). Returns whether the factor was
-     * disabled.
+     * Enable a factor the failure ceiling disabled and clear its failures; a
+     * lockout is left in place. Returns whether it was disabled.
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return bool
@@ -331,20 +261,18 @@ final readonly class AttemptService
                 return false;
             }
 
-            $this->enable($locked);
+            $locked->setAttribute($locked->getDisabledAtName(), null);
+            $locked->setAttribute($locked->getConsecutiveFailuresName(), 0);
+
+            $locked->persist();
 
             return true;
         });
     }
 
     /**
-     * Reset the identity's run of failures across its factors and recovery
-     * codes: the step a reset of the identity takes, after which an attempt
-     * that names no factor of its own is no longer refused at the failure
-     * ceiling. No lockout is lifted, no factor is enabled and no factor's own
-     * failures in a row are reset. Returns whether there was a run to reset; a
-     * model event that cancels the save throws, so it is never reported as
-     * reset.
+     * Reset the identity's run of failures; lockouts and factor counts are
+     * untouched. Returns whether there was a run to reset.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
@@ -375,12 +303,7 @@ final readonly class AttemptService
     }
 
     /**
-     * Under the lock: answer an attempt on a factor that is not among the
-     * identity's stored factors as not found, refuse the attempt while a
-     * lockout applies, otherwise run the verification on the factor as stored
-     * and count its outcome, a failure with the lockout counting it caused. The
-     * events to dispatch once the transaction has committed are added to
-     * `$events`.
+     * Events to dispatch after commit are appended to `$events`.
      *
      * @formatter:off
      *
@@ -429,17 +352,13 @@ final readonly class AttemptService
             $this->countFactorFailure($attempt, $factor, $settings, $now, $run >= $settings->failureCeiling(), $events);
         }
 
-        // No lockout held before the failure was counted, so whatever holds now
-        // is the one counting it caused, judged as the next attempt would be.
+        // Nothing held before counting, so anything held now was caused by it
         return AttemptOutcome::fail(HeldLockouts::strictest($state, $factor, $settings, $now));
     }
 
     /**
-     * Count a success: the factor's failures in a row and the identity's run
-     * are reset, and the identity's other factors the failure ceiling disabled
-     * are enabled, since the person has proved another factor, with their
-     * failures in a row kept. No lockout is lifted and no other factor's count
-     * is reset.
+     * Proving one factor re-enables the identity's other disabled factors,
+     * keeping their failure counts. No lockout is lifted.
      *
      * @formatter:off
      *
@@ -485,9 +404,7 @@ final readonly class AttemptService
     }
 
     /**
-     * Count a failure against the identity: its durable run, and its count
-     * within the window, which locks it for the lockout period from the
-     * identity limit on. Returns the run, counting this failure.
+     * Returns the identity's run including this failure.
      *
      * @param  \SineMacula\Laravel\Mfa\Attempts\Attempt  $attempt
      * @param  array{0: string, 1: string}  $subject
@@ -532,11 +449,6 @@ final readonly class AttemptService
     }
 
     /**
-     * Count a failure against the factor: its failures in a row, which disable
-     * it at the failure ceiling, as does a failure that brings the identity's
-     * run to it, and otherwise lock it for the lockout period from the factor
-     * limit on.
-     *
      * @param  \SineMacula\Laravel\Mfa\Attempts\Attempt  $attempt
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptSettings  $settings
@@ -589,23 +501,7 @@ final readonly class AttemptService
     }
 
     /**
-     * Enable a factor the failure ceiling disabled, with its failures in a row
-     * cleared.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
-     * @return void
-     */
-    private function enable(EloquentFactor&Model $factor): void
-    {
-        $factor->setAttribute($factor->getDisabledAtName(), null);
-        $factor->setAttribute($factor->getConsecutiveFailuresName(), 0);
-
-        $factor->persist();
-    }
-
-    /**
-     * Clear the factor's deadline, one that has passed included. Returns
-     * whether it was live.
+     * Clears an expired deadline too. Returns whether it was live.
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return bool
@@ -629,7 +525,7 @@ final readonly class AttemptService
     }
 
     /**
-     * Clear the identity's lockout. Returns whether it was live.
+     * Returns whether the lockout was live.
      *
      * @param  array{0: string, 1: string}  $subject
      * @return bool
@@ -655,8 +551,7 @@ final readonly class AttemptService
     }
 
     /**
-     * Save the identity's state, and throw when a model event cancels the save,
-     * so a change that needed it rolls back rather than leaving it in place.
+     * Throw when a model event cancels the save so the transaction rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\IdentityState  $state
      * @param  string  $what
@@ -672,11 +567,8 @@ final readonly class AttemptService
     }
 
     /**
-     * The identity's state row, read from the write connection, or `null` when
-     * it has none yet. Under the factor state lock it is read with a locking
-     * read, which this transaction already holds: on MySQL a plain read could
-     * be answered from a snapshot an enclosing transaction took before the lock
-     * was granted, and miss a lockout committed in the meantime.
+     * Under the lock, read with `FOR UPDATE`: on MySQL a plain read may come
+     * from an older snapshot and miss a lockout committed meanwhile.
      *
      * @param  array{0: string, 1: string}  $subject
      * @param  bool  $locked
@@ -692,9 +584,6 @@ final readonly class AttemptService
     }
 
     /**
-     * The factor as stored, read from the write connection, or `null` when it
-     * keeps no state of its own or is gone.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null
      */
@@ -709,9 +598,6 @@ final readonly class AttemptService
     }
 
     /**
-     * The factor model the transaction locks the identity's factors through:
-     * the factor's own when it is one, otherwise the configured model.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
      *
@@ -729,8 +615,6 @@ final readonly class AttemptService
     }
 
     /**
-     * The identity's owner type and key, as its rows are stored under.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return array{0: string, 1: string}
      *

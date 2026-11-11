@@ -60,30 +60,29 @@ moment when both work or neither exists, and what a redemption leaves behind.
   only `replaceSet()`, where a refusal `OperationRefusedException::byPackage()` marked becomes the answer and any other
   is thrown on, rolling back, and reports outside the wrapping: a listener's exception, marked or not, is never read as
   a refusal of a set that committed, and an application's outer transaction still defers the event to its own commit.
-- Redemption (`Mfa::verify($caller, Submission::recoveryCode(...))`, then `RecoveryCodeService::admission()` and `redeem()`,
-  under the identity's lock the verification holds): an inactive identity, an application that does not accept recovery
-  codes, no confirmed factor as stored and an unknown first factor are refused before any hash is checked. A confirmed
-  factor is one whose status is exactly `confirmed`, compared in PHP among the identity's locked factors
-  (`Factors\ConfirmedFactors`): a collation that ignores case or padding, MySQL's default, must not let a status such
-  as `CONFIRMED` admit a code. The attempt
-  then goes through `Attempts\AttemptService`, charged to the identity: the usable codes of the current generation are
-  read with a locking read and all checked, and a match is marked used by `UPDATE ... SET used_at WHERE id AND used_at
-  IS NULL AND replaced_at IS NULL`, which must change one row. `redeem()` records no proof and reports nothing, so the
-  verification can roll the code's use back. It makes the `recovery_code` proof (method `recovery_code`, no channel, no
-  reference, the purpose given, the verification generation read under the lock) and hands it to the completion seam,
-  then queues `VerificationPassed`, and `RecoveryCodeService::reportRedeemed()` queues `RecoveryCodeUsed` with the
-  remaining count and, when `low_count` is above 0 and the remaining count is at or below it, `RecoveryCodesLow`, in
-  that order.
+- Redemption (`Mfa::verify($caller, Submission::recoveryCode(...))`, then `RecoveryCodeService::admission()` and
+  `redeem()`, under the identity's lock the verification holds): an inactive identity, an application that does not
+  accept recovery codes, no confirmed factor as stored and an unknown first factor are refused before any hash is
+  checked. A confirmed factor is one whose status is exactly `confirmed`, compared in PHP among the identity's locked
+  factors (`Factors\ConfirmedFactors`): a collation that ignores case or padding, MySQL's default, must not let a status
+  such as `CONFIRMED` admit a code. The attempt then goes through `Attempts\AttemptService`, charged to the identity:
+  the usable codes of the current generation are read with a locking read and all checked, and a match is marked used by
+  `UPDATE ... SET used_at WHERE id AND used_at IS NULL AND replaced_at IS NULL`, which must change one row. `redeem()`
+  records no proof and reports nothing, so the verification can roll the code's use back. It makes the `recovery_code`
+  proof (method `recovery_code`, no channel, no reference, the purpose given, the verification generation read under the
+  lock) and hands it to the completion seam, then queues `VerificationPassed`, and
+  `RecoveryCodeService::reportRedeemed()` queues `RecoveryCodeUsed` with the remaining count and, when `low_count` is
+  above 0 and the remaining count is at or below it, `RecoveryCodesLow`, in that order.
 - Status (`RecoveryCodeService::status()`, `Mfa::recoveryCodeStatus()`, which reads the caller through
   `statusOfCaller()`): one statement on the write connection, the state row left-joined to the usable codes of its
   current generation, gives the remaining count, the generation and the time, so the count and the generation are always
   of the same set. No lock is taken.
 - Removal (`RecoveryCodeService::removeSet()`, or `deleteSet()` and `reportSetRemoved()` for a removal with more to do
-  before it reports): inside the transaction that removes the identity's last confirmed
-  factor, every code row is deleted and the set's time cleared; the generation is kept. `RecoveryCodesRemoved` is
-  queued when there was a set, used up or not, or any code row. `Lifecycle\FactorRemoval::remove()` deletes the
-  factor as stored under the lock and calls it when none of the factors left there is confirmed: a pending factor does
-  not keep the set, a confirmed one the failure ceiling disabled does. `Lifecycle\IdentityReset` calls it as well.
+  before it reports): inside the transaction that removes the identity's last confirmed factor, every code row is
+  deleted and the set's time cleared; the generation is kept. `RecoveryCodesRemoved` is queued when there was a set,
+  used up or not, or any code row. `Lifecycle\FactorRemoval::remove()` deletes the factor as stored under the lock and
+  calls it when none of the factors left there is confirmed: a pending factor does not keep the set, a confirmed one the
+  failure ceiling disabled does. `Lifecycle\IdentityReset` calls it as well.
 - Pruning (`RecoveryCodeService::prune($before)`): deletes the codes used, or replaced, before the time given, never a
   usable code, and leaves the state row as it is.
 
@@ -92,8 +91,8 @@ moment when both work or neither exists, and what a redemption leaves behind.
 - Generation is refused with `OperationRefusedException`: `machine_identity`, `identity_inactive`, `type_not_enabled`
   when the application does not accept recovery codes, and `no_factor` without a confirmed factor, before the lock or
   under it. A failure partway through the replacement, a save a model event cancels included (it throws
-  `WriteCanceledException`), rolls all of it back: the previous set is untouched and still
-  redeems, the generation is unchanged and nothing is reported.
+  `WriteCanceledException`), rolls all of it back: the previous set is untouched and still redeems, the generation is
+  unchanged and nothing is reported.
 - With an identity's first additional factor, `RecoveryCodeIssuance::withFirstFactor()` generates a set in the change
   that confirms it, when the application accepts them and the session's known first factor followed by the
   confirmation's own proof reaches the level, without the freshness gate. `RecoveryCodesGenerated` is dispatched from

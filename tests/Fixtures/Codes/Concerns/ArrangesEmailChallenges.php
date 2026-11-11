@@ -15,9 +15,8 @@ use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
- * Arranges delivered code challenges: the `web` application with email codes
- * and a declared password first factor, a fake email sender, and a signed-in
- * person with a sign-in the proof store knows and a confirmed email factor.
+ * Arranges email code challenges for a signed-in person with a confirmed email
+ * factor.
  *
  * @phpstan-require-extends \Tests\TestCase
  *
@@ -28,19 +27,16 @@ use Tests\Fixtures\Identities\TestUser;
  */
 trait ArrangesEmailChallenges
 {
-    /** @var string The application the challenges are on. */
+    /** @var string */
     protected const string CHALLENGE_APPLICATION = 'web';
 
-    /** @var string The session id of the person's sign-in. */
+    /** @var string */
     protected const string CHALLENGE_SESSION = 'sign-in-1';
 
-    /** @var string The person's email address. */
+    /** @var string */
     protected const string ADDRESS = 'challenged@example.test';
 
     /**
-     * Configure the application and the fake sender, and sign a person in with
-     * a confirmed email factor; return the person, their factor and the fake.
-     *
      * @return array{\Tests\Fixtures\Identities\TestUser, \SineMacula\Laravel\Mfa\Models\Factor, \SineMacula\Laravel\Mfa\Testing\FakeEmailSender}
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -76,8 +72,6 @@ trait ArrangesEmailChallenges
     }
 
     /**
-     * What the person's challenges are bound to on their sign-in.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
@@ -90,8 +84,6 @@ trait ArrangesEmailChallenges
     }
 
     /**
-     * The code last emailed to the person.
-     *
      * @param  \SineMacula\Laravel\Mfa\Testing\FakeEmailSender  $mailbox
      * @return string
      */

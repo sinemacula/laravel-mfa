@@ -53,8 +53,8 @@ use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\TestCase;
 
 /**
- * The events of each path of an enrolment come in order once it commits, for
- * the application it ran through, and none are left after a rollback.
+ * Each enrolment path's events come in order once it commits, for the
+ * application it ran through, and none after a rollback.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -98,8 +98,6 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -111,7 +109,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A TOTP start reports it started, and an email one the code it sent.
+     * An email start reports the code it sent.
      *
      * @return void
      */
@@ -137,8 +135,8 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * Starting again discards what it replaces first; expired ones of other
-     * types go too, and another application's stay.
+     * What it replaces goes first; expired ones of other types go too, another
+     * application's stay.
      *
      * @return void
      */
@@ -166,8 +164,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * Another application's pending factors stay, expired or not, and a
-     * factor's row with nothing left of its factor goes quietly.
+     * Expired or not; a row with nothing left of its factor goes quietly.
      *
      * @return void
      */
@@ -196,7 +193,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A wrong code reports one failure, and the cap adds the abandonment.
+     * The cap adds the abandonment.
      *
      * @return void
      */
@@ -225,7 +222,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * An expired grant reports it expired, then the failure.
+     * Expired, then the failure.
      *
      * @return void
      */
@@ -249,8 +246,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A success on an active session reports the pass, the confirmation and the
-     * codes generated.
+     * The pass, the confirmation and the codes generated.
      *
      * @return void
      */
@@ -273,8 +269,7 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * Every event of a success, the codes generated with the first factor
-     * included, carries the caller's client.
+     * Including the codes generated with the first factor.
      *
      * @return void
      */
@@ -298,8 +293,6 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A success on the bootstrap path reports its own event as well.
-     *
      * @return void
      */
     public function testABootstrapSuccessReportsItsOwnEvent(): void
@@ -316,8 +309,6 @@ final class EventSequenceEnrollmentServiceTest extends TestCase
     }
 
     /**
-     * A later factor reports no codes.
-     *
      * @return void
      */
     public function testALaterFactorReportsNoCodes(): void

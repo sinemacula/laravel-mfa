@@ -47,9 +47,9 @@ use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
 use Tests\TestCase;
 
 /**
- * An enrolment has an attempt cap of its own: a wrong or replayed code counts
- * against it and at the cap abandons the pending factor, and neither touches
- * the failure counts of the factor or the identity.
+ * An enrolment's own attempt cap: wrong or replayed codes count against it and
+ * abandon the pending factor at the cap, leaving factor and identity failure
+ * counts alone.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -93,8 +93,6 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -106,8 +104,8 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A wrong code counts on the row, keeps the address's slot, charges neither
-     * the factor nor the identity, and leaves the enrolment open.
+     * It keeps the address's slot, charges neither the factor nor the identity,
+     * and leaves the enrolment open.
      *
      * @return void
      */
@@ -127,8 +125,6 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A replayed code counts too.
-     *
      * @return void
      */
     public function testAReplayedCodeCounts(): void
@@ -146,8 +142,7 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * At the cap the factor and row are gone, the event says so, and it commits;
-     * below the cap neither is.
+     * The event says so and it commits; below the cap neither goes.
      *
      * @return void
      */
@@ -175,8 +170,6 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * The default cap is five, and a resend does not reset the count.
-     *
      * @return void
      */
     public function testTheDefaultCapIsFiveAndCountsSurviveAResend(): void
@@ -200,8 +193,7 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * A model event that cancels deleting the pending factor keeps the
-     * enrolment, and the failure propagates.
+     * The enrolment is kept.
      *
      * @return void
      *
@@ -229,8 +221,7 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
     }
 
     /**
-     * The address's throttle refuses a confirmation, reported once, counting
-     * nothing.
+     * Reported once, counting nothing.
      *
      * @return void
      */

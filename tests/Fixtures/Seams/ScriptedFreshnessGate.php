@@ -10,9 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * A freshness gate that answers every operation as it is told, whether fresh
- * and until when, each answer on its own, so a gate whose answers disagree can
- * be given to the contract kit.
+ * Answers whether fresh and until when independently, so the contract kit can
+ * be given a gate whose answers disagree.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,8 +21,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 final readonly class ScriptedFreshnessGate implements FreshnessGate
 {
     /**
-     * Constructor.
-     *
      * @param  bool  $fresh
      * @param  ?\Carbon\CarbonImmutable  $until
      */
@@ -32,13 +29,11 @@ final readonly class ScriptedFreshnessGate implements FreshnessGate
         /** Whether every operation is fresh. */
         private bool $fresh,
 
-        /** The deadline of every operation, or `null` for none. */
+        /** `null` for none. */
         private ?CarbonImmutable $until,
     ) {}
 
     /**
-     * Fresh as told.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -51,8 +46,6 @@ final readonly class ScriptedFreshnessGate implements FreshnessGate
     }
 
     /**
-     * The deadline as told.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -65,8 +58,6 @@ final readonly class ScriptedFreshnessGate implements FreshnessGate
     }
 
     /**
-     * No requirement of its own.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement

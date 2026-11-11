@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note documents how a factor is enrolled: what authorises a start, how long the grant lives and why that is fixed
+This note records how a factor is enrolled: what authorises a start, how long the grant lives and why that is fixed
 once, what the grant is bound to, what a confirmation checks again inside its transaction, and what a confirmation does
 for the session. The API is in [Enrolment](../guides/enrollment.md).
 
@@ -100,7 +100,7 @@ for the session. The API is in [Enrolment](../guides/enrollment.md).
   recovery codes all roll back. Returning a refusal alone would not roll any of it back.
 - A sending cap throws `CodeNotSentException` out of the start's transaction, so nothing is left, with `retryAfter` kept
   for the answer. A code already sent cannot be recalled: a later failure of the transaction leaves a delivered code
-  nothing can confirm, and nothing retries the transaction automatically.
+  nothing can confirm, and nothing retries the transaction.
 - A `reauthentication` grant is refused once a confirmed factor exists, which is stricter than the bootstrap condition
   alone requires: that grant's authority was having no factor. So of two concurrent first confirmations, one succeeds
   and counts as first and the other is refused, on both paths.

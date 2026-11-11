@@ -12,9 +12,6 @@ use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 
 /**
- * Unit tests for the `Evaluation` value: construction, validation of its `amr`
- * values and requirement parts, and serialisation.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +21,6 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 final class EvaluationTest extends TestCase
 {
     /**
-     * An evaluation keeps each answer separately.
-     *
      * @return void
      */
     public function testAnEvaluationKeepsEachAnswer(): void
@@ -53,8 +48,7 @@ final class EvaluationTest extends TestCase
     }
 
     /**
-     * An evaluation with no unmet part meets the requirement, including an
-     * empty one.
+     * Including an empty one.
      *
      * @return void
      */
@@ -67,8 +61,6 @@ final class EvaluationTest extends TestCase
     }
 
     /**
-     * Evaluations whose `amr` values or parts are inconsistent.
-     *
      * @return iterable<string, array{list<string>, list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>, list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>, string}>
      */
     public static function provideInvalidEvaluations(): iterable
@@ -92,8 +84,7 @@ final class EvaluationTest extends TestCase
     }
 
     /**
-     * An evaluation that repeats an `amr` value or a part, or both meets and
-     * misses a part, is refused.
+     * A repeated `amr` value or part, or a part both met and unmet.
      *
      * @param  list<string>  $amr
      * @param  list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>  $met
@@ -111,9 +102,8 @@ final class EvaluationTest extends TestCase
     }
 
     /**
-     * A part is met only when the combination provides it: an additional
-     * verification by a multifactor first factor alone, and a level that is
-     * classified.
+     * An additional verification by a multifactor first factor alone, and a
+     * level that is classified.
      *
      * @return void
      */
@@ -130,9 +120,6 @@ final class EvaluationTest extends TestCase
     }
 
     /**
-     * Evaluations whose answers rule out a part they report met, or a reserved
-     * `amr` value they report.
-     *
      * @return iterable<string, array{bool, bool, \SineMacula\Laravel\Mfa\Enums\AssuranceLevel, bool, list<string>, list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>, string}>
      */
     public static function provideContradictoryEvaluations(): iterable
@@ -168,8 +155,7 @@ final class EvaluationTest extends TestCase
     }
 
     /**
-     * An evaluation that reports a part met, or a reserved `amr` value, which
-     * its own answers rule out is refused.
+     * A part met or a reserved `amr` value that its own answers rule out.
      *
      * @param  bool  $accepted
      * @param  bool  $multifactor
@@ -197,8 +183,7 @@ final class EvaluationTest extends TestCase
     }
 
     /**
-     * The serialised form uses snake_case keys and the values of the level and
-     * the parts.
+     * Snake_case keys and the values of the level and the parts.
      *
      * @return void
      */

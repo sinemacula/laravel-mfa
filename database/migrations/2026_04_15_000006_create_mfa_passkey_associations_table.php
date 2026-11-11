@@ -11,9 +11,8 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * Create the MFA passkey associations table: which of an identity's passkeys
- * are associated with it as factors. A passkey is a factor only through such a
- * record; the credential itself is the authentication layer's.
+ * Associates an identity's passkeys with factors. The credential itself is the
+ * authentication layer's.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,8 +20,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 
 return new class extends Migration {
     /**
-     * Run the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -38,22 +35,14 @@ return new class extends Migration {
         $schema->create($table, static function (Blueprint $blueprint) use ($table): void {
             $blueprint->ulid('id')->primary();
 
-            // The factor the passkey is associated as: one association per
-            // factor.
             $blueprint->string('factor_id');
             $blueprint->unique('factor_id', IndexName::for($table, '_factor_unique'));
 
-            // Plain string polymorphic columns, as on the factors table, so any
-            // key type fits.
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
 
-            // A credential id reaches 1023 bytes, beyond what MySQL indexes as
-            // text, so it is found by the SHA-256 hex digest of its canonical
-            // unpadded base64url form and kept in full beside it. A credential
-            // is associated at most once, with one identity: the unique index
-            // refuses a second association whoever makes it, and is what a
-            // lookup by credential reads, so it locks one row, not the table.
+            // Looked up by digest, as a 1023-byte id is beyond what MySQL
+            // indexes. The unique index allows one association per credential.
             $blueprint->char('credential_id_hash', 64);
             $blueprint->text('credential_id');
             $blueprint->unique('credential_id_hash', IndexName::for($table, '_credential_unique'));
@@ -64,8 +53,6 @@ return new class extends Migration {
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -76,9 +63,6 @@ return new class extends Migration {
     }
 
     /**
-     * The connection the package's tables live on (see `StorageConnection`),
-     * the one the package reads and writes the table on.
-     *
      * @return ?string
      *
      * @throws \InvalidArgumentException

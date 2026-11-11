@@ -21,11 +21,8 @@ use Tests\Fixtures\Seams\FlawedProofStore;
 use Tests\TestCase;
 
 /**
- * Tests for `GenerationSessionRevoker`, which revokes by advancing the
- * identity's verification generation: the other sessions' proofs stop counting,
- * the current sign-in's are recorded again under exactly the generation
- * advanced to once the change commits, and a change that rolls back revokes
- * nothing.
+ * Revokes by advancing the generation, then records the current sign-in's
+ * proofs again once the change commits.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -70,9 +67,8 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * A factor's removal stops the other device's proofs counting, and the
-     * current sign-in keeps its own, under the generation advanced to, leaving
-     * the current session for the package to judge again.
+     * The other device's proofs stop counting; the current session is left for
+     * the package to judge again.
      *
      * @return void
      *
@@ -93,8 +89,7 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * Revoking every session stops every proof counting, the current sign-in's
-     * included.
+     * The current sign-in's included.
      *
      * @return void
      *
@@ -110,8 +105,7 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * A revocation in a change that rolls back revokes nothing and records
-     * nothing again.
+     * Nothing is recorded again either.
      *
      * @return void
      *
@@ -131,9 +125,8 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * A reset after a factor's removal in the same change wins: the current
-     * sign-in's proofs are recorded again under the generation the first
-     * revocation advanced to, which the reset left behind.
+     * The proofs are recorded again under the generation the first revocation
+     * advanced to, which the reset left behind.
      *
      * @return void
      *
@@ -151,9 +144,6 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * A sign-in replaced before the change commits is not given the proofs of
-     * the one before.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -170,9 +160,7 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * A sign-in replaced before the change commits is not given the proofs of
-     * the one before, even by a store that would record a proof bound to
-     * another sign-in.
+     * Even by a store that would record a proof bound to another sign-in.
      *
      * @return void
      *
@@ -198,8 +186,7 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * Two removals in one change leave the current sign-in to verify again: the
-     * second finds nothing counting to keep.
+     * The second finds nothing counting to keep.
      *
      * @return void
      *
@@ -216,8 +203,6 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * Without a sign-in nothing is recorded again.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -233,8 +218,6 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * The proofs made with the removed factor are not kept.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -247,9 +230,6 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * A removal named as made from a sign-in that is not the current one keeps
-     * nothing of the current one.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -263,8 +243,7 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * The proofs kept are read for the sign-in the removal names, once it is
-     * the current one, not for whichever the store answers afterwards.
+     * Once it is current, not whichever sign-in the store answers afterwards.
      *
      * @return void
      *
@@ -285,8 +264,7 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * Remove a factor the current sign-in's proofs were not made with, from the
-     * current sign-in.
+     * A factor the current sign-in's proofs were not made with.
      *
      * @return \SineMacula\Laravel\Mfa\Proofs\RemovalRevocation
      *
@@ -298,7 +276,7 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * The methods of the current sign-in's proofs that count, oldest first.
+     * Methods of the current sign-in's counting proofs, oldest first.
      *
      * @return list<string>
      *
@@ -310,8 +288,6 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * The bound proof store.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -322,8 +298,6 @@ final class GenerationSessionRevokerTest extends TestCase
     }
 
     /**
-     * The revoker under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\GenerationSessionRevoker
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

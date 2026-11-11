@@ -18,8 +18,6 @@ use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 final readonly class SpySessionTransition implements SessionTransition
 {
     /**
-     * Constructor.
-     *
      * @param  \Tests\Fixtures\Hardening\LockOrderRecorder  $recorder
      */
     public function __construct(
@@ -29,8 +27,6 @@ final readonly class SpySessionTransition implements SessionTransition
     ) {}
 
     /**
-     * Note the call.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\SessionChange  $change
      * @return null
      */

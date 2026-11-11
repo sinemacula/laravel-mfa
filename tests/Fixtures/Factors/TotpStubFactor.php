@@ -5,10 +5,8 @@ declare(strict_types = 1);
 namespace Tests\Fixtures\Factors;
 
 /**
- * TOTP factor fixture holding its secret, parameters and last accepted time
- * step in memory: it records a step as the shipped model does, only when it is
- * later than the last one, so the driver's single-use rule can be exercised
- * without a database.
+ * An in-memory TOTP factor that records a time step only when it is later than
+ * the last one, as the shipped model does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -17,12 +15,10 @@ namespace Tests\Fixtures\Factors;
  */
 final class TotpStubFactor extends AbstractEloquentFactorStub
 {
-    /** @var ?int The last time step a code was accepted for. */
+    /** @var ?int */
     private ?int $lastAcceptedStep = null;
 
     /**
-     * Capture the secret and parameters.
-     *
      * @param  ?string  $secret
      * @param  ?string  $algorithm
      * @param  ?int  $digits
@@ -31,23 +27,21 @@ final class TotpStubFactor extends AbstractEloquentFactorStub
      */
     public function __construct(
 
-        /** Stored TOTP shared secret, in Base32. */
+        /** Base32. */
         #[\SensitiveParameter]
         private readonly ?string $secret,
 
-        /** The HMAC algorithm the factor was enrolled with. */
+        /** @var ?string */
         private readonly ?string $algorithm = 'sha1',
 
-        /** The number of digits in the factor's codes. */
+        /** @var ?int */
         private readonly ?int $digits = 6,
 
-        /** The period of the factor's time steps, in seconds. */
+        /** In seconds. */
         private readonly ?int $period = 30,
     ) {}
 
     /**
-     * Return the fixture's fixed factor identifier.
-     *
      * @return mixed
      */
     #[\Override]
@@ -57,8 +51,6 @@ final class TotpStubFactor extends AbstractEloquentFactorStub
     }
 
     /**
-     * Return the TOTP driver name.
-     *
      * @return string
      */
     #[\Override]
@@ -68,8 +60,6 @@ final class TotpStubFactor extends AbstractEloquentFactorStub
     }
 
     /**
-     * Return the seeded TOTP secret.
-     *
      * @return ?string
      */
     #[\Override]
@@ -79,8 +69,6 @@ final class TotpStubFactor extends AbstractEloquentFactorStub
     }
 
     /**
-     * Return the seeded HMAC algorithm.
-     *
      * @return ?string
      */
     #[\Override]
@@ -90,8 +78,6 @@ final class TotpStubFactor extends AbstractEloquentFactorStub
     }
 
     /**
-     * Return the seeded number of digits.
-     *
      * @return ?int
      */
     #[\Override]
@@ -101,8 +87,6 @@ final class TotpStubFactor extends AbstractEloquentFactorStub
     }
 
     /**
-     * Return the seeded period.
-     *
      * @return ?int
      */
     #[\Override]
@@ -112,8 +96,6 @@ final class TotpStubFactor extends AbstractEloquentFactorStub
     }
 
     /**
-     * Return the last time step a code was accepted for.
-     *
      * @return ?int
      */
     #[\Override]
@@ -123,8 +105,6 @@ final class TotpStubFactor extends AbstractEloquentFactorStub
     }
 
     /**
-     * Record the step when it is later than the last one accepted.
-     *
      * @param  int  $step
      * @return bool
      */

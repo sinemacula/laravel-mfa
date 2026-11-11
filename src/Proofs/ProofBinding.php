@@ -9,10 +9,8 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Support\SerializedFields;
 
 /**
- * What a proof is bound to: the identity (its type and key), the application,
- * the session it was made in and the purpose it was made for. A proof counts
- * only for its own binding, so one made for another identity, application,
- * session or purpose satisfies nothing.
+ * What a proof is bound to; it counts only for its own identity, application,
+ * session and purpose.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, string>
  *
@@ -22,8 +20,6 @@ use SineMacula\Laravel\Mfa\Support\SerializedFields;
 final readonly class ProofBinding implements \JsonSerializable, Arrayable
 {
     /**
-     * Constructor.
-     *
      * @param  string  $identityType
      * @param  string  $identityKey
      * @param  string  $application
@@ -34,7 +30,7 @@ final readonly class ProofBinding implements \JsonSerializable, Arrayable
      */
     public function __construct(
 
-        /** The identity's type, such as its morph class. */
+        /** Such as the identity's morph class. */
         public string $identityType,
 
         /** The identity's key, as a string. */
@@ -43,7 +39,7 @@ final readonly class ProofBinding implements \JsonSerializable, Arrayable
         /** The application the proof was made on. */
         public string $application,
 
-        /** The session, pending or active, the proof was made in. */
+        /** The pending or active session the proof was made in. */
         public string $sessionId,
 
         /** What the proof was made for. */
@@ -56,8 +52,6 @@ final readonly class ProofBinding implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Read a binding back from its serialised form.
-     *
      * @param  array<array-key, mixed>  $data
      * @return self
      *
@@ -79,8 +73,6 @@ final readonly class ProofBinding implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The binding with snake_case keys.
-     *
      * @return array{identity_type: string, identity_key: string, application: string, session_id: string, purpose: string}
      */
     #[\Override]
@@ -96,8 +88,6 @@ final readonly class ProofBinding implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The binding as JSON serialises it: the same as `toArray()`.
-     *
      * @return array{identity_type: string, identity_key: string, application: string, session_id: string, purpose: string}
      */
     #[\Override]
@@ -107,8 +97,6 @@ final readonly class ProofBinding implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Refuse a blank part of the binding.
-     *
      * @param  string  $value
      * @param  string  $part
      * @return void

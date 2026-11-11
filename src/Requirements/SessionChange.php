@@ -9,15 +9,8 @@ use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
- * One change to an identity's factors made on an active session, which the
- * bound `Contracts\SessionTransition` judges the session again after: the
- * identity and the application acting, the sign-in the change was made on (the
- * session id its proofs are bound to), what was done, the factor it was done
- * to, and the package's own assessment of the session, the requirement it no
- * longer meets on the proofs it holds, or `null` when it meets it.
- *
- * The assessment is information, not a verdict: a layer that judges the session
- * by rules of its own judges it whatever the assessment says.
+ * A factor change made on an active session, for `Contracts\SessionTransition`
+ * to judge; the package's assessment is information, not a verdict.
  *
  * @api
  *
@@ -27,8 +20,6 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 final readonly class SessionChange
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $session
@@ -46,16 +37,16 @@ final readonly class SessionChange
         /** The application acting. */
         public string $application,
 
-        /** The sign-in the change was made on: the session id its proofs are bound to. */
+        /** The session id the sign-in's proofs are bound to. */
         public string $session,
 
         /** What was done. */
         public FactorChangeMade $change,
 
-        /** The factor it was done to, as it stood once done. */
+        /** The factor as it stood once changed. */
         public FactorSummary $factor,
 
-        /** The requirement the session no longer meets on the proofs it holds, whole, or `null` when it meets it. */
+        /** The requirement the session no longer meets on its proofs, or `null`. */
         public ?Requirement $outstanding,
     ) {
         if (trim($session) === '') {

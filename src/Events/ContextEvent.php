@@ -8,11 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 
 /**
- * Base of the package's events: each carries its context, who and what it is
- * about, as scalar values (see `EventContext`), what it was for (see
- * `purpose()`), and what happened in fields of its own. No event carries a
- * model, a secret, a code, a provisioning URI or a full destination, so a
- * queued listener can serialise any of them safely.
+ * Base of the package's events. None carries a model, secret, code,
+ * provisioning URI or full destination, so a queued listener can serialise it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,8 +17,6 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 abstract readonly class ContextEvent implements MfaEvent
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, int|string|null>  $context
      */
     public function __construct(
@@ -31,8 +26,6 @@ abstract readonly class ContextEvent implements MfaEvent
     ) {}
 
     /**
-     * Who and what the event is about.
-     *
      * @return array<string, int|string|null>
      */
     #[\Override]
@@ -42,8 +35,7 @@ abstract readonly class ContextEvent implements MfaEvent
     }
 
     /**
-     * What the action the event reports was for: nothing by default, for a
-     * change made outside any verification.
+     * Null for a change made outside any verification.
      *
      * @return ?\SineMacula\Laravel\Mfa\Enums\Purpose
      */

@@ -25,9 +25,7 @@ use Tests\TestCase;
 
 /**
  * A code is sent only when the counters admit the factor under the identity's
- * lock, whatever the bound challenge gateway checks itself: a locked factor,
- * and an identity found inactive once the lock is held, are refused before the
- * gateway is asked to send anything.
+ * lock, whatever the bound gateway checks itself.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -44,7 +42,7 @@ final class ChallengeRequestsUnderLockTest extends TestCase
     private CountingChallengeGateway $gateway;
 
     /**
-     * Arrange verification with a gateway that checks no admission of its own.
+     * With a gateway that checks no admission of its own.
      *
      * @return void
      */
@@ -61,8 +59,6 @@ final class ChallengeRequestsUnderLockTest extends TestCase
     }
 
     /**
-     * Reset the time.
-     *
      * @return void
      */
     #[\Override]
@@ -74,8 +70,7 @@ final class ChallengeRequestsUnderLockTest extends TestCase
     }
 
     /**
-     * A locked factor is refused as locked, and the gateway is never asked to
-     * send it a code.
+     * The gateway is never asked to send it a code.
      *
      * @return void
      */
@@ -91,9 +86,8 @@ final class ChallengeRequestsUnderLockTest extends TestCase
     }
 
     /**
-     * The caller is the identity the action was given: a guard signing in
-     * someone else while the lock is awaited changes nothing about who the code
-     * is sent to, since no request or guard is read under the lock.
+     * No request or guard is read under the lock, so a guard signing in someone
+     * else meanwhile changes nothing.
      *
      * @return void
      *

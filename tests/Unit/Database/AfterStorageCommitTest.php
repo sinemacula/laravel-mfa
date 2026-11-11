@@ -10,11 +10,6 @@ use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
 use Tests\TestCase;
 
 /**
- * Work that follows a change to the package's tables runs once the change has
- * committed on the storage connection: at once with no transaction open there,
- * at the commit otherwise, never on a rollback, and without waiting for a
- * transaction on another connection.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -27,8 +22,6 @@ final class AfterStorageCommitTest extends TestCase
     private int $runs = 0;
 
     /**
-     * With no transaction open, the work runs at once.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -41,8 +34,6 @@ final class AfterStorageCommitTest extends TestCase
     }
 
     /**
-     * Inside a transaction, the work waits for the outermost commit.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -66,8 +57,6 @@ final class AfterStorageCommitTest extends TestCase
     }
 
     /**
-     * A transaction that rolls back never runs the work.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -86,8 +75,6 @@ final class AfterStorageCommitTest extends TestCase
     }
 
     /**
-     * A transaction open on another connection does not hold the work back.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -110,8 +97,6 @@ final class AfterStorageCommitTest extends TestCase
     }
 
     /**
-     * Count a run of the work.
-     *
      * @return void
      */
     private function work(): void

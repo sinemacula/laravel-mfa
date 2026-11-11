@@ -7,9 +7,8 @@ namespace SineMacula\Laravel\Mfa\Testing\Seams;
 use PHPUnit\Framework\Assert;
 
 /**
- * What every requirement seam (`IdentityRequirement`, `TenantRequirement`) must
- * guarantee, as an assertion: it keeps no state between calls, so the same
- * question answers the same requirement whatever was asked in between.
+ * What every `IdentityRequirement` and `TenantRequirement` must guarantee: the
+ * same question answers the same requirement whatever was asked in between.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,8 +23,7 @@ final class RequirementSeamContract
     private function __construct() {}
 
     /**
-     * The first question answers the same requirement when asked again at once,
-     * and after the second is asked.
+     * `$ask` must answer the same again at once and after `$askAnother`.
      *
      * @param  \Closure(): \SineMacula\Laravel\Mfa\Requirements\Requirement  $ask
      * @param  \Closure(): \SineMacula\Laravel\Mfa\Requirements\Requirement  $askAnother

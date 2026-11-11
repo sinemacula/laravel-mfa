@@ -9,18 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 
 /**
- * Public-safe projection of a `Factor` for events, exception payloads and the
- * list of factors a person chooses from.
- *
- * Carries only what an application needs to show a factor: its id, type, label,
- * a masked destination, its status, whether it is preferred, when it was last
- * used, and whether the failure ceiling has disabled it. Never the factor
- * model, its secret, a code, its credential reference or the full destination,
- * so it is safe in a queued listener's payload and in a log.
- *
- * That a factor is not disabled does not mean it is offered: what the
- * application accepts, the combination policy and a passkey's availability
- * decide that too (see `Verification\FactorOffers`).
+ * A projection of a `Factor` safe for events, logs and responses: never the
+ * model, its secret, a code, its credential reference or full destination.
  *
  * @api
  *
@@ -30,8 +20,6 @@ use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 final readonly class FactorSummary implements \JsonSerializable
 {
     /**
-     * Constructor.
-     *
      * @param  string  $id
      * @param  string  $type
      * @param  ?string  $label
@@ -43,35 +31,32 @@ final readonly class FactorSummary implements \JsonSerializable
      */
     public function __construct(
 
-        /** Factor identifier (a ULID on the shipped model). */
+        /** A ULID on the shipped model. */
         public string $id,
 
-        /** The factor's type (`totp`, `email`, `sms`, `passkey` or an application's own). */
+        /** `totp`, `email`, `sms`, `passkey` or an application's own. */
         public string $type,
 
-        /** The label the person chose, if any. */
+        /** Chosen by the person. */
         public ?string $label,
 
-        /** The destination of an SMS or email factor, masked; null otherwise. */
+        /** An SMS or email factor's destination, masked. */
         public ?string $maskedDestination,
 
-        /** Where the factor is in its enrolment. */
+        /** Enrolment status. */
         public FactorStatus $status,
 
-        /** Whether the factor is the identity's preferred one. */
+        /** Whether it is the identity's preferred factor. */
         public bool $preferred,
 
-        /** When the factor was last used to verify. */
+        /** Last successful verification. */
         public ?CarbonInterface $lastUsedAt,
 
-        /** Whether the failure ceiling has disabled the factor. */
+        /** Disabled by the failure ceiling. Not disabled does not mean offered. */
         public bool $disabled = false,
     ) {}
 
     /**
-     * Build a summary from a factor, masking its destination. A status or a
-     * disabled time the factor cannot read throws, as its contract requires.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return self
      *
@@ -98,9 +83,6 @@ final readonly class FactorSummary implements \JsonSerializable
     }
 
     /**
-     * Render the summary as a plain associative array for JSON serialisation,
-     * with `last_used_at` as ISO 8601 (or `null`).
-     *
      * @return array<string, mixed>
      */
     #[\Override]
@@ -119,13 +101,6 @@ final readonly class FactorSummary implements \JsonSerializable
     }
 
     /**
-     * Mask a delivery destination for safe public surfacing.
-     *
-     * Emails: keep the domain, mask the local-part except its leading two
-     * characters (or one if the local-part is a single character). Phone
-     * numbers and any other opaque shape: keep the last four characters, mask
-     * the rest; inputs of four characters or fewer are fully masked.
-     *
      * @param  ?string  $destination
      * @return ?string
      */
@@ -141,9 +116,7 @@ final readonly class FactorSummary implements \JsonSerializable
     }
 
     /**
-     * Mask an email address: keep the domain intact, mask the local-part except
-     * for the leading two characters (or one if the local-part is a single
-     * character).
+     * Keeps the domain and up to two leading characters of the local part.
      *
      * @param  string  $destination
      * @return string
@@ -160,9 +133,7 @@ final readonly class FactorSummary implements \JsonSerializable
     }
 
     /**
-     * Mask a phone number / opaque destination: keep the last four characters,
-     * mask everything before them. If the input is four or fewer characters,
-     * mask all of it.
+     * Keeps the last four characters, or none of a destination that short.
      *
      * @param  string  $destination
      * @return string

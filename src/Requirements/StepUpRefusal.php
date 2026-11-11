@@ -13,18 +13,8 @@ use SineMacula\Laravel\Mfa\Factors\ConfirmedFactors;
 use SineMacula\Laravel\Mfa\Verification\FactorOffers;
 
 /**
- * Builds the refusal that asks a caller to step up: the requirement as given,
- * the factors offered to the caller, the operation it is labelled with, and
- * whether the identity has a confirmed factor.
- *
- * The requirement is taken as the deciding site composed it; nothing is added
- * here, and the operation only labels the refusal, adding no freshness. The
- * identity whose factors are reported is the pending session's, whatever it is,
- * as the gate reports it, or otherwise the person signed in; any other caller
- * serving nobody, or naming an identity that is not a person, has no confirmed
- * factor.
- *
- * Stateless: the seams are resolved on every call.
+ * Builds the refusal asking a caller to step up; the requirement is taken as
+ * the deciding site composed it, and the operation only labels it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,19 +24,15 @@ use SineMacula\Laravel\Mfa\Verification\FactorOffers;
 final readonly class StepUpRefusal
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the offers, the resolver and the configuration are resolved from. */
+        /** Seams are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * The refusal asking the caller to meet the requirement.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  ?string  $operation
@@ -64,9 +50,8 @@ final readonly class StepUpRefusal
     }
 
     /**
-     * Whether the identity the caller is served as has a factor whose stored
-     * status is exactly `confirmed` (see `Factors\ConfirmedFactors`): the
-     * pending session's identity, or the person signed in.
+     * Whether the pending session's identity, or the person signed in, holds a
+     * factor stored as exactly `confirmed`.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return bool

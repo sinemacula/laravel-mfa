@@ -33,13 +33,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `ConfiguredFreshnessGate`: a session is fresh for an operation only
- * when its recorded proofs meet the stricter of the application's configured
- * requirement and the caller's. An operation with neither is never fresh, nor
- * is a session with no record; a fresh weaker proof never refreshes an old
- * stronger one, a fresh first factor never stands in for an additional factor,
- * and refreshing the session renews nothing.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -58,8 +51,6 @@ final class ConfiguredFreshnessGateTest extends TestCase
     private const int TWO_HOURS = 7200;
 
     /**
-     * Fix the time the tests start at.
-     *
      * @return void
      */
     #[\Override]
@@ -71,8 +62,6 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * Release the fixed time.
-     *
      * @return void
      */
     #[\Override]
@@ -84,9 +73,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * An operation that neither the package nor the application names, asked
-     * about with no requirement of the caller's, is never fresh, however fresh
-     * the session's proofs.
+     * Asked with no caller requirement, however fresh the proofs.
      *
      * @return void
      *
@@ -102,8 +89,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * A pending session is fresh for no operation, and the guard's user is not
-     * asked about in its place.
+     * The guard's user is not judged in its place.
      *
      * @return void
      *
@@ -132,8 +118,6 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * The identities the package does not serve.
-     *
      * @return iterable<string, array{0: bool, 1: bool}>
      */
     public static function identitiesNotServed(): iterable
@@ -143,8 +127,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * Neither a machine nor an inactive identity is fresh for any operation,
-     * whatever proofs the store holds.
+     * Neither a machine nor an inactive identity, whatever proofs the store
+     * holds.
      *
      * @param  bool  $person
      * @param  bool  $active
@@ -170,9 +154,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * The bound active state resolver, not the identity, decides who is
-     * inactive: a person it finds inactive is never fresh, whatever proofs the
-     * store holds, and an identity it finds active is judged by its proofs.
+     * The resolver decides, not the identity; one it finds active is judged by
+     * its proofs.
      *
      * @return void
      *
@@ -203,8 +186,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * A name that is not an operation's is never fresh, whatever the caller
-     * asks, and never throws, even for an unbounded caller's requirement.
+     * Never throws, even for an unbounded caller requirement.
      *
      * @return void
      *
@@ -223,8 +205,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * The package's own operations ask for an additional verification within
-     * fifteen minutes unless the application sets them.
+     * An additional verification within fifteen minutes, unless the application
+     * configures them.
      *
      * @return void
      *
@@ -246,9 +228,6 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * The stricter of the configured requirement and the caller's applies,
-     * whichever of the two is stricter.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -270,8 +249,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * A caller's requirement adds parts of its own: a level asked for by the
-     * caller must be met as well as the configured additional verification.
+     * A level the caller asks for must be met as well as the configured
+     * additional verification.
      *
      * @return void
      *
@@ -286,10 +265,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * A fresh weaker proof never refreshes an old stronger one: an old TOTP
-     * code after a password reached AAL2, and a fresh email code or password
-     * reauthentication does not bring it back, though the reauthentication is
-     * fresh for the AAL1 it reaches on its own.
+     * An old TOTP code reached AAL2; a fresh email code or reauthentication
+     * does not restore it, though the reauthentication is fresh for AAL1.
      *
      * @return void
      *
@@ -311,9 +288,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * A fresh first factor never stands in for an additional factor: neither a
-     * sign-in made now nor a reauthentication made now is fresh for an
-     * operation that asks for an additional verification.
+     * Neither a sign-in nor a reauthentication made now meets an additional
+     * verification.
      *
      * @return void
      *
@@ -331,9 +307,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * Refreshing or regenerating the Laravel session renews nothing: only the
-     * proofs' own times count, so the session stops being fresh once they are
-     * older than the requirement allows.
+     * Only the proofs' own times count.
      *
      * @return void
      *
@@ -360,8 +334,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * A session with no record is not fresh: no identity, no sign-in the store
-     * knows of, or a sign-in with no proofs.
+     * No identity, no sign-in the store knows of, or a sign-in with no proofs.
      *
      * @return void
      *
@@ -383,9 +356,6 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * A caller's requirement with a part that carries no maximum age is
-     * refused.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -398,8 +368,7 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * Without a first factor in the store, the one a bound resolver reports for
-     * the current sign-in counts; it is not asked when the store holds one.
+     * The resolver is not asked when the store holds one.
      *
      * @return void
      *
@@ -424,9 +393,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * A resolved first factor is judged together with every proof the store
-     * holds, not only the oldest, so a fresh factor recorded after a stale one
-     * still counts.
+     * Not only the oldest, so a fresh factor recorded after a stale one still
+     * counts.
      *
      * @return void
      *
@@ -442,9 +410,6 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * Rows of a first factor a resolver reports that may not count for the
-     * current sign-in, as the sign-in's proofs would make it.
-     *
      * @return iterable<string, array{\Closure(\Tests\Fixtures\Requirements\SignInProofs): ?\SineMacula\Laravel\Mfa\Proofs\Proof}>
      */
     public static function untrustedFirstFactors(): iterable
@@ -459,10 +424,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * A first factor a resolver reports counts for nothing unless it is a first
-     * factor of the identity on the application, bound to the current sign-in,
-     * made under the current generation and not after now: the combination
-     * policy is handed no proof at all.
+     * It must be the identity's first factor on the application, bound to the
+     * current sign-in, made under the current generation and not after now.
      *
      * @param  \Closure(\Tests\Fixtures\Requirements\SignInProofs): ?\SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @return void
@@ -483,9 +446,6 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * Without a sign-in the store knows of, a resolver's first factor counts
-     * for nothing.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -503,8 +463,6 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * The gate is the default the container binds.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -515,8 +473,8 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * Sign the user in, a new one unless given, beginning a sign-in on the
-     * default application and recording the proofs it made.
+     * A new user unless given; begins a sign-in on the default application and
+     * records its proofs.
      *
      * @param  \Closure(\Tests\Fixtures\Requirements\SignInProofs): list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @param  ?\Tests\Fixtures\Identities\TestUser  $user
@@ -542,8 +500,6 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * Move the fixed time on by the given number of seconds.
-     *
      * @param  int  $seconds
      * @return void
      */
@@ -553,8 +509,6 @@ final class ConfiguredFreshnessGateTest extends TestCase
     }
 
     /**
-     * Resolve the gate under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

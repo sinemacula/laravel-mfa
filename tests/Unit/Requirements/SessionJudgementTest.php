@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Requirements\SessionJudgement;
 use Tests\Fixtures\Verification\Dumps;
 
 /**
- * Unit tests for `SessionJudgement`: the package's assessment and what the
- * transition returned, the latter hidden from every dump.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,9 +20,6 @@ use Tests\Fixtures\Verification\Dumps;
 final class SessionJudgementTest extends TestCase
 {
     /**
-     * The judgement carries the assessment, and returns the completion as
-     * given.
-     *
      * @return void
      */
     public function testCarriesTheAssessmentAndTheCompletion(): void
@@ -40,8 +34,6 @@ final class SessionJudgementTest extends TestCase
     }
 
     /**
-     * No way of dumping it shows the completion.
-     *
      * @return void
      */
     public function testNoDumpShowsTheCompletion(): void

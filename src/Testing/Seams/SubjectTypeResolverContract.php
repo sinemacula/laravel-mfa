@@ -9,8 +9,8 @@ use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 
 /**
- * What every `SubjectTypeResolver` must guarantee, as assertions: a person is a
- * person, and a machine is not.
+ * What every `SubjectTypeResolver` must guarantee: a person is a person, and a
+ * machine is not.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,8 +25,6 @@ final class SubjectTypeResolverContract
     private function __construct() {}
 
     /**
-     * A person's identity is a person.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver  $resolver
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $person
      * @return void
@@ -37,8 +35,6 @@ final class SubjectTypeResolverContract
     }
 
     /**
-     * A machine's identity is not a person.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver  $resolver
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $machine
      * @return void

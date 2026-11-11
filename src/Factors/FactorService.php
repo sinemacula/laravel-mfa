@@ -24,11 +24,8 @@ use SineMacula\Laravel\Mfa\Events\PreferredFactorChanged;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Lists and gets the identity's factors as summaries and resolves the
- * configured factor model, and changes what a person says about a factor: its
- * label and whether it is the preferred one. Neither changes what the factor
- * proves, so neither needs a step-up; both serve active sessions only, under
- * the identity's factor state lock, and are reported once they commit.
+ * Lists factors and changes their label and preference. Neither change alters
+ * what a factor proves, so neither needs a step-up.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,27 +35,17 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 final readonly class FactorService
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the configuration is read from. */
+        /** Resolves the configuration and seams per call. */
         private Container $container,
     ) {}
 
     /**
-     * The factors of the identity the request serves for listing them (see
-     * `Context\CallerContextResolver`), as summaries: a pending session's when
-     * its credential allows listing them, otherwise the signed-in person's, and
-     * none when it serves nobody. The preferred one comes first, then by id.
-     *
-     * Every factor is listed, pending ones and those enrolled through another
-     * application included, since no application hides another's. The factors
-     * are read from the write connection (see `Database\WriteConnection`), as
-     * they decide verification and lockout, matched to the owner exactly, and
-     * on every call, so nothing is kept from one request to the next.
+     * Every factor of the identity, pending and other applications' included,
+     * preferred first, then by id.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
@@ -76,10 +63,7 @@ final readonly class FactorService
     }
 
     /**
-     * One factor of the identity the request serves for listing them, as a
-     * summary; `null` when it serves nobody, and for an id that is not one of
-     * its factors, so another person's cannot be told from one that does not
-     * exist.
+     * Null for another person's factor, as for one that does not exist.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
@@ -95,9 +79,8 @@ final readonly class FactorService
     }
 
     /**
-     * Give a factor enrolled through the current application a new label: the
-     * label is what that application shows, so another application's factor is
-     * `not_found`, as one that is not the person's is.
+     * The label is what the enrolling application shows, so another
+     * application's factor is `not_found`.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
@@ -124,11 +107,8 @@ final readonly class FactorService
     }
 
     /**
-     * Make a confirmed factor, of a type the current application enables, the
-     * identity's preferred one, which is offered first. The flag is the
-     * identity's choice, kept on its factors' rows, so any other factor holding
-     * it gives it up, through whichever application it was enrolled. Choosing
-     * the factor already preferred changes nothing and reports nothing.
+     * The flag is the identity's choice across applications, so any other
+     * factor holding it gives it up.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  mixed  $factorId
@@ -152,11 +132,6 @@ final readonly class FactorService
     }
 
     /**
-     * Resolve the configured factor model class (see
-     * `Database\ConfiguredModels`): the shipped `Factor` model unless
-     * `mfa.factor.model` names another, which must extend Eloquent's model and
-     * implement `EloquentFactor`.
-     *
      * @return class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
@@ -167,9 +142,6 @@ final readonly class FactorService
     }
 
     /**
-     * The person a change is made for: one who is not served is `not_found`,
-     * and an inactive one is refused.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return \SineMacula\Laravel\Mfa\Context\Caller|\SineMacula\Laravel\Mfa\Factors\FactorChange
      *
@@ -188,9 +160,6 @@ final readonly class FactorService
     }
 
     /**
-     * Under the lock: refuse a factor that is not there or was enrolled through
-     * another application, and give it the label.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
      * @param  ?string  $label
@@ -220,9 +189,6 @@ final readonly class FactorService
     }
 
     /**
-     * Under the lock: refuse a factor that is not there, not confirmed, or of a
-     * type the application does not enable, then make it the preferred one.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -251,9 +217,6 @@ final readonly class FactorService
     }
 
     /**
-     * Move the flag to the factor from whichever held it, and report the
-     * change.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -286,9 +249,6 @@ final readonly class FactorService
     }
 
     /**
-     * The stored factors of the identity the request serves for listing them,
-     * and none when it serves nobody.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context

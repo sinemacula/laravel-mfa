@@ -16,10 +16,6 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * The authenticator app a test stands in for: the published vectors at a frozen
- * time, the real driver accepting what it shows, and the refusal of a factor it
- * cannot read, which never shows the factor's secret.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -31,8 +27,6 @@ final class AuthenticatorAppTest extends TestCase
     use ArrangesVerification;
 
     /**
-     * Arrange the verification the real driver is tested through.
-     *
      * @return void
      */
     #[\Override]
@@ -44,8 +38,6 @@ final class AuthenticatorAppTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -57,10 +49,9 @@ final class AuthenticatorAppTest extends TestCase
     }
 
     /**
-     * The codes of RFC 6238 Appendix B and RFC 4226 Appendix D for the shipped
-     * key, by the time and the steps away from it, written out here so they
-     * hold independently of the code being tested. The 8-digit values are the
-     * RFC's; their last six digits are the same counter's 6-digit code.
+     * RFC 6238 Appendix B and RFC 4226 Appendix D codes, written out so they
+     * hold independently of the code under test. The last six digits of each
+     * 8-digit code are the 6-digit one.
      *
      * @return iterable<string, array{0: int, 1: int, 2: string}>
      */
@@ -74,9 +65,6 @@ final class AuthenticatorAppTest extends TestCase
     }
 
     /**
-     * The code shown at a frozen time is the published one, and steps move it
-     * by the factor's period.
-     *
      * @param  int  $time
      * @param  int  $steps
      * @param  string  $code
@@ -91,8 +79,8 @@ final class AuthenticatorAppTest extends TestCase
     }
 
     /**
-     * The factor's own parameters are read: eight digits give the RFC's eight
-     * digits, and a longer period gives another step.
+     * Eight digits give the RFC's eight digits, and a longer period gives
+     * another step.
      *
      * @return void
      */
@@ -105,8 +93,7 @@ final class AuthenticatorAppTest extends TestCase
     }
 
     /**
-     * The real driver accepts the code at a frozen time, and accepts it once:
-     * the same code replays, so a test moves the clock or passes steps for
+     * The same code replays, so a test moves the clock or passes steps for
      * another.
      *
      * @return void
@@ -129,8 +116,6 @@ final class AuthenticatorAppTest extends TestCase
     }
 
     /**
-     * What no code can be made for, none of whose refusals show the secret.
-     *
      * @return iterable<string, array{0: array<string, mixed>, 1: string}>
      */
     public static function unreadableFactors(): iterable
@@ -146,8 +131,7 @@ final class AuthenticatorAppTest extends TestCase
     }
 
     /**
-     * A factor no code can be made for is refused, saying why, without its
-     * secret.
+     * The refusal says why without showing the secret.
      *
      * @param  array<string, mixed>  $attributes
      * @param  string  $reason

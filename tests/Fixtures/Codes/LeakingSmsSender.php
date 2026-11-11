@@ -9,11 +9,8 @@ use SineMacula\Laravel\Mfa\Codes\SmsCodeText;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 
 /**
- * An SMS sender for tests whose gateway refuses every message, quoting the
- * phone number and the message, code included, in the exception it throws and
- * in a previous one, as a careless gateway client would. It hands both to a
- * helper of its own that marks neither as sensitive, so PHP records them in
- * that frame's arguments.
+ * Refuses every message, quoting the number and code in its exceptions and in
+ * an unmarked helper's arguments, as a careless gateway client would.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,8 +20,6 @@ use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 final class LeakingSmsSender implements SmsSender
 {
     /**
-     * Refuse to send, quoting the phone number and the message.
-     *
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      *
@@ -37,8 +32,6 @@ final class LeakingSmsSender implements SmsSender
     }
 
     /**
-     * Post the message to the gateway, which refuses it.
-     *
      * @param  string  $to
      * @param  string  $body
      * @return void

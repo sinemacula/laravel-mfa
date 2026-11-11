@@ -16,10 +16,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * Unit tests for `PasskeyRegistration`, the passkey an authentication layer
- * hands the change gate, and `PasskeyAssociationResult`, what associating it
- * made.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -30,8 +26,6 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 final class PasskeyRegistrationTest extends TestCase
 {
     /**
-     * A registration keeps its credential, what it observed and its binding.
-     *
      * @return void
      */
     public function testKeepsItsParts(): void
@@ -46,8 +40,6 @@ final class PasskeyRegistrationTest extends TestCase
     }
 
     /**
-     * A credential id that is not canonical is refused.
-     *
      * @return void
      */
     public function testRefusesANonCanonicalCredentialId(): void
@@ -58,8 +50,6 @@ final class PasskeyRegistrationTest extends TestCase
     }
 
     /**
-     * A registration bound for anything but enrolment is refused.
-     *
      * @return void
      */
     public function testRefusesABindingForAnotherPurpose(): void
@@ -71,8 +61,6 @@ final class PasskeyRegistrationTest extends TestCase
     }
 
     /**
-     * A result keeps its factor and its recovery codes, none by default.
-     *
      * @return void
      */
     public function testAResultKeepsItsFactorAndCodes(): void
@@ -86,7 +74,7 @@ final class PasskeyRegistrationTest extends TestCase
     }
 
     /**
-     * A binding of a person on the web application for the purpose.
+     * A person on the web application.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding

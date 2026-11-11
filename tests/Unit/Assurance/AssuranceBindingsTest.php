@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use Tests\TestCase;
 
 /**
- * Tests for `AssuranceBindings`: the default combination policy is bound and
- * built afresh.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,6 @@ use Tests\TestCase;
 final class AssuranceBindingsTest extends TestCase
 {
     /**
-     * The default combination policy is bound, and is built afresh.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

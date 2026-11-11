@@ -10,11 +10,7 @@ use SineMacula\Laravel\Mfa\Testing\Seams\StepUpContract;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
- * The `StepUp` contract kit: a result bound elsewhere, and a failed result, are
- * refused by throwing.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `StepUpContract`.
+ * The `StepUp` contract kit; each check delegates to `StepUpContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -26,9 +22,6 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 trait StepUpTests
 {
     /**
-     * A result bound to another session, identity, application or purpose is
-     * refused.
-     *
      * @return void
      */
     public function testStepUpRefusesAResultOfAnotherBinding(): void
@@ -37,8 +30,6 @@ trait StepUpTests
     }
 
     /**
-     * A failed result is refused.
-     *
      * @return void
      */
     public function testStepUpRefusesAFailedResult(): void
@@ -47,16 +38,13 @@ trait StepUpTests
     }
 
     /**
-     * The caller the step-up is handed: one on an active session, whose own
-     * result would be accepted.
+     * A caller on an active session, whose own result would be accepted.
      *
      * @return \SineMacula\Laravel\Mfa\Context\CallerContext
      */
     abstract protected function stepUpCaller(): CallerContext;
 
     /**
-     * The step-up under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\StepUp
      */
     abstract protected function stepUp(): StepUp;

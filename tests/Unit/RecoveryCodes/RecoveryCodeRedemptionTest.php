@@ -43,13 +43,6 @@ use Tests\TestCase;
 use Tests\Unit\Concerns\InteractsWithRecoveryCodes;
 
 /**
- * Tests for redeeming a recovery code: one attempt, and one event, against the
- * identity's whole unused set, with the same work whichever code matches and
- * whether one does; the submitted code normalised for case, spaces and hyphens;
- * a code used once only, also by two redemptions racing for it; the refusals
- * made before any attempt; the lockouts and counts of the attempt service; and
- * the events a redemption leaves.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -62,8 +55,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     use InteractsWithRecoveryCodes;
 
     /**
-     * A code redeems once: it is marked used and the remaining count falls; the
-     * same code then fails. The service records no proof of its own.
+     * The same code then fails. The service records no proof of its own.
      *
      * @return void
      *
@@ -92,8 +84,6 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * Ways a person may type a code.
-     *
      * @return iterable<string, array{\Closure(string): string}>
      */
     public static function typings(): iterable
@@ -105,8 +95,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A code typed in lower case, grouped with hyphens or spaces, or broken
-     * over lines redeems.
+     * Lower case, grouped with hyphens or spaces, or broken over lines.
      *
      * @param  \Closure(string): string  $typed
      * @return void
@@ -123,9 +112,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * Every redemption checks every unused code of the set, whichever code
-     * matches, when none does and when the code is malformed: the work grows
-     * with the unused count only.
+     * Every unused code is checked, including when none matches or the code is
+     * malformed; the work grows with the unused count only.
      *
      * @return void
      *
@@ -161,8 +149,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A malformed code is never rejected early: it is one counted attempt that
-     * checks the placeholder against the whole set, and matches nothing.
+     * Never rejected early: one counted attempt that checks the placeholder
+     * against the whole set.
      *
      * @return void
      *
@@ -186,8 +174,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * Without a set, or with every code used, a redemption is one counted
-     * attempt that checks nothing.
+     * Without a set, or with every code used, it is still one counted attempt.
      *
      * @return void
      *
@@ -208,8 +195,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A code of an earlier generation never redeems, even while it is marked
-     * neither used nor replaced.
+     * Even while it is marked neither used nor replaced.
      *
      * @return void
      *
@@ -236,9 +222,6 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A failure is counted against the identity, and a success resets its run
-     * of failures.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -259,8 +242,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A failure is charged to the request's IP address too, so a further
-     * attempt from it past its limit is refused.
+     * A further attempt from the request's IP address past its limit is
+     * refused.
      *
      * @return void
      *
@@ -284,8 +267,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * While the identity is locked out, a redemption is refused with the time
-     * the lockout lifts, without checking a code or counting anything.
+     * Refused with the time the lockout lifts, without checking a code or
+     * counting anything.
      *
      * @return void
      *
@@ -316,8 +299,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * An identity whose run of failures reached the failure ceiling is refused
-     * as locked, with no time the lockout lifts.
+     * Refused as locked, with no time the lockout lifts.
      *
      * @return void
      *
@@ -340,8 +322,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A recovery code cannot confirm an enrolment: refused before the attempt,
-     * so the code is not spent and nothing is counted.
+     * A recovery code cannot confirm an enrolment; the code is not spent and
+     * nothing is counted.
      *
      * @return void
      *
@@ -359,8 +341,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * An application that does not accept recovery codes refuses them before
-     * the attempt.
+     * Before the attempt.
      *
      * @return void
      *
@@ -377,7 +358,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * An identity without a confirmed factor is refused before the attempt.
+     * Before the attempt.
      *
      * @return void
      *
@@ -394,8 +375,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * Stored statuses that are not exactly `confirmed`, each beside the
-     * collation that would match it to `confirmed`.
+     * Each status beside a collation that would match it to `confirmed`.
      *
      * @return iterable<string, array{string, string}>
      */
@@ -406,14 +386,9 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A valid code is refused when the only factor's stored status is not
-     * exactly `confirmed`, even where the column's collation matches it to
-     * `confirmed`, so the check is shown to be made in PHP. SQLite is given a
-     * case or a padding insensitive collation, and the test first asserts that
-     * SQL does match the stored status to `confirmed` under it. On MySQL, whose
-     * default collation ignores case but not trailing spaces, and PostgreSQL,
-     * which ignores neither, the column keeps its own collation, so there only
-     * the refusal is checked.
+     * Proves the check is made in PHP. Only SQLite is given the collation;
+     * MySQL and PostgreSQL keep the column's own, so there only the refusal is
+     * checked.
      *
      * @param  string  $status
      * @param  string  $collation
@@ -445,8 +420,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * An identity with no sign-in is served nothing, so a single-use code is
-     * never spent for no proof.
+     * So a single-use code is never spent for no proof.
      *
      * @return void
      *
@@ -464,8 +438,6 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A machine identity and an inactive one are not admitted.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -480,10 +452,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A success dispatches, once the use commits and in this order,
-     * `VerificationPassed`, `RecoveryCodeUsed` with the remaining count and, at
-     * or below the low count, `RecoveryCodesLow`: at the threshold, below it
-     * and at zero.
+     * After the commit, in order: `VerificationPassed`, `RecoveryCodeUsed` with
+     * the remaining count and, at or below the low count, `RecoveryCodesLow`.
      *
      * @return void
      *
@@ -512,8 +482,6 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * With a low count of 0, no redemption reports a low set.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -535,8 +503,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * The events carry the type, the purpose and the application, never the
-     * code; a failure is one `VerificationFailed` and nothing else.
+     * A failure is one `VerificationFailed` and nothing else.
      *
      * @return void
      *
@@ -570,8 +537,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A redemption inside a transaction on the storage connection that rolls
-     * back leaves the code unused and reports nothing.
+     * The code stays unused.
      *
      * @return void
      *
@@ -600,9 +566,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * Of two redemptions of one code, only one passes: one that read the set
-     * before the other used the code finds, when it marks the code used, that
-     * it no longer is unused.
+     * The one that read the set first finds the code no longer unused when it
+     * marks it used.
      *
      * @return void
      *
@@ -629,8 +594,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A redemption that read the old set before a replacement ran finds its
-     * code replaced and fails; the new set redeems.
+     * It fails; the new set redeems.
      *
      * @return void
      *
@@ -654,8 +618,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A redemption whose identity's last confirmed factor goes while it waits
-     * for the lock is refused, checking and counting nothing.
+     * The last confirmed factor goes while it waits for the lock; it checks and
+     * counts nothing.
      *
      * @return void
      *
@@ -678,8 +642,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A redemption whose identity's sign-in ends while it waits for the lock is
-     * refused as not found, checking and counting nothing, spending no code and
+     * Refused as not found, checking and counting nothing, spending no code and
      * reporting nothing.
      *
      * @return void
@@ -705,10 +668,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * A redemption whose identity's sign-in ends while the code is being
-     * checked has no first factor left to be accepted after: it is refused, so
-     * the code's use rolls back and nothing is counted, rather than pass
-     * without a proof.
+     * With no first factor left to accept, the code's use rolls back rather
+     * than passing without a proof.
      *
      * @return void
      *
@@ -734,8 +695,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * Assert a redemption is refused before any attempt with the given reason:
-     * nothing counted or checked, no code spent, and one `VerificationFailed`.
+     * Nothing counted or checked, no code spent, and one `VerificationFailed`.
      *
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
@@ -767,7 +727,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * Submit the recovery code through the package's one way of verifying.
+     * Through the package's one way of verifying.
      *
      * @param  string  $code
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -781,8 +741,6 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * What a redemption by the identity is bound to.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
@@ -795,7 +753,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * Count the hasher's checks from now on, handing each to the real hasher.
+     * Each check is handed on to the real hasher.
      *
      * @return \Tests\Fixtures\RecoveryCodes\CountingHasher
      *
@@ -811,8 +769,7 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * Record the redemption events as they are dispatched: `passed`,
-     * `used:{remaining}` and `low:{remaining}`.
+     * As `passed`, `used:{remaining}` and `low:{remaining}`.
      *
      * @return \ArrayObject<int, string>
      */
@@ -841,9 +798,8 @@ final class RecoveryCodeRedemptionTest extends TestCase
     }
 
     /**
-     * Run the callback once, just after the identity's state lock is taken:
-     * inside the lock, before the attempt's verification runs, as a change that
-     * committed while the redemption waited for the lock.
+     * Runs inside the lock before verification, as a change that committed
+     * while the redemption waited.
      *
      * @param  \Closure(): void  $callback
      * @return void

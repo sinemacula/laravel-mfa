@@ -7,9 +7,8 @@ namespace SineMacula\Laravel\Mfa\Database;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Refuses work that must run inside a caller's transaction on the storage
- * connection when none is open: a lock taken outside one is released at once,
- * so the change it guards could be overrun.
+ * Refuses work outside a transaction on the storage connection, where a lock
+ * would be released at once.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,9 +23,6 @@ final class OpenTransaction
     private function __construct() {}
 
     /**
-     * Throw a `LogicException` with the message when no transaction is open on
-     * the storage connection.
-     *
      * @param  string  $message
      * @return void
      *

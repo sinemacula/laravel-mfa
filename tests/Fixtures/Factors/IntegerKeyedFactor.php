@@ -7,12 +7,8 @@ namespace Tests\Fixtures\Factors;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 /**
- * Factor subclass stored under an auto-incrementing integer key.
- *
- * Stands in for an application's own factor model that does not use the shipped
- * model's ULIDs, so its factors are named by integers. Its table is the one
- * `mfa.factor.table` names, `test_integer_keyed_factors` in the tests that use
- * it.
+ * A factor model keyed by an auto-incrementing integer instead of a ULID, on
+ * `test_integer_keyed_factors`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,7 +18,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 final class IntegerKeyedFactor extends Factor
 {
     /**
-     * Generate no unique identifiers: the database assigns the key.
+     * The database assigns the key.
      *
      * @return array<int, string>
      */

@@ -66,12 +66,8 @@ use Tests\Fixtures\Seams\RecordingSessionTransition;
 use Tests\TestCase;
 
 /**
- * A person removes a factor enrolled through the application they are on: with
- * a fresh step-up, made with another factor where one remains; refused while it
- * is the last factor a requirement needs, asked before the change and again
- * under the lock; revoking the other sessions; invalidating the factor's proofs
- * on this session too; evaluating this session's requirement again; and
- * reported once it has committed.
+ * Removing a factor needs a fresh step-up made with another factor where one
+ * remains, and passes the last-factor policy before and under the lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -90,8 +86,6 @@ final class RemovingFactorTest extends TestCase
     use ArrangesLifecycle;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -103,8 +97,6 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A request that serves nobody removes nothing.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -120,8 +112,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A pending session removes nothing, even one that may list factors, and
-     * the guard's user is not served in its place.
+     * Even one that may list factors; the guard's user is not served in its
+     * place.
      *
      * @return void
      *
@@ -151,7 +143,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * An inactive identity is refused before anything else is looked at.
+     * Before anything else is looked at.
      *
      * @return void
      *
@@ -165,9 +157,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * The bound active state resolver, not the identity, decides who is
-     * inactive: a fresh person it finds inactive is refused and keeps the
-     * factor, and an identity it finds active is looked at further.
+     * The resolver, not the identity, decides who is inactive.
      *
      * @return void
      *
@@ -191,8 +181,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * An id that finds nothing, another person's factor and an id of any other
-     * shape get the same answer, whether or not the session is fresh.
+     * No match, another person's factor and an id of another shape answer
+     * alike, fresh or not.
      *
      * @return void
      *
@@ -216,8 +206,6 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * An application never deletes a factor enrolled through another.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -236,7 +224,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A pending factor is refused: its enrolment is cancelled or expires.
+     * Its enrolment is cancelled or expires instead.
      *
      * @return void
      *
@@ -253,8 +241,6 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * Removing a factor needs a fresh step-up.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -271,9 +257,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * While another confirmed factor remains, even one that is disabled or that
-     * this application does not enable, a step-up made only with the one being
-     * removed does not authorise its removal; one made with the other does.
+     * The other counts even when disabled or not enabled by this application.
      *
      * @return void
      *
@@ -298,9 +282,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * Another factor whose stored status is none the package knows is not read
-     * as pending, which would let the factor being removed prove its own
-     * removal: the removal throws, and the factor stays.
+     * Reading it as pending would let the removed factor prove its own removal,
+     * so the removal throws.
      *
      * @return void
      *
@@ -329,8 +312,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * With no other confirmed factor, a pending one not counting, the step-up
-     * may be made with the one being removed.
+     * A pending factor does not count as another.
      *
      * @return void
      *
@@ -354,9 +336,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A stricter requirement a bound gate holds the session to must be met
-     * without the factor being removed too: the package's own setting is met by
-     * the other factor's older proof, but the gate's only by the removed one's.
+     * The package's setting is met by the other factor's older proof, the
+     * gate's only by the removed one's.
      *
      * @return void
      *
@@ -381,8 +362,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A gate with no requirement to judge by refuses a removal while another
-     * factor remains, and has nothing to judge when none does.
+     * It refuses while another factor remains and has nothing to judge when
+     * none does.
      *
      * @return void
      *
@@ -404,8 +385,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A recovery code's proof has no reference, so it counts as made without
-     * the factor being removed, where the requirement accepts it.
+     * Its proof has no reference, so it counts as made without the removed
+     * factor.
      *
      * @return void
      *
@@ -433,8 +414,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * With a gate that finds the session fresh but no sign-in the store knows
-     * of, there is nothing to compare under the lock, so nothing is removed.
+     * With no sign-in the store knows of there is nothing to compare under the
+     * lock.
      *
      * @return void
      *
@@ -455,8 +436,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * The last factor a requirement needs stays, whichever application requires
-     * it.
+     * Whichever application requires it.
      *
      * @return void
      *
@@ -476,8 +456,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * The policy is asked before the lock and again under it; a refusal the
-     * second time keeps the factor, and is the same answer.
+     * A refusal the second time keeps the factor and gives the same answer.
      *
      * @return void
      *
@@ -499,8 +478,6 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A policy that refuses before the lock is asked once.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -519,10 +496,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * Two removals on the last two factors cannot both pass: when the other
-     * factor goes between the first ask and the lock, the default policy, asked
-     * again under the lock, finds this one is the last. The overlapping
-     * database race is proved in `LifecycleRaceTest`.
+     * The default policy, asked again under the lock, finds this one is the
+     * last; the database race is in `LifecycleRaceTest`.
      *
      * @return void
      *
@@ -552,8 +527,6 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A factor gone by the time the lock is held is not found.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -577,8 +550,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A sign-in that changed before the lock was held is not acted on: the
-     * caller is resolved again under it, as verification does.
+     * The caller is resolved again under the lock, as verification does.
      *
      * @return void
      *
@@ -601,8 +573,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * The other sessions stop counting; this one keeps its other proofs, the
-     * removed factor's gone, and they are back before any listener runs.
+     * This session keeps its other proofs, and all of it holds before any
+     * listener runs.
      *
      * @return void
      *
@@ -634,7 +606,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * The revoker is asked for the other sessions only, inside the change.
+     * Asked for the other sessions only, inside the change.
      *
      * @return void
      *
@@ -660,8 +632,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * The bound factor change gate is asked once, under the lock, with the
-     * factor and the sign-in, and its refusal is the removal's.
+     * Asked once, with the factor and the sign-in; its refusal is the
+     * removal's.
      *
      * @return void
      *
@@ -690,9 +662,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A revoker that judges the current session itself is handed no second
-     * judgement: the shortfall is reported, not handed to the transition, and
-     * what the revoker returns reaches the caller.
+     * The shortfall is reported, not handed to the transition, and the
+     * revoker's result reaches the caller.
      *
      * @return void
      *
@@ -723,10 +694,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A revocation that fails rolls the removal back and is not a refusal, even
-     * one that throws a refusal. The factor's proofs stay forgotten on this
-     * session, which fails closed: restoring them could undo a later
-     * invalidation.
+     * It is not a refusal, even when it throws one. The proofs stay forgotten,
+     * failing closed: restoring them could undo a later invalidation.
      *
      * @return void
      *
@@ -759,8 +728,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A removal that leaves the session short hands the whole requirement to
-     * the session transition and says what is outstanding.
+     * The whole requirement goes to the session transition with what is
+     * outstanding.
      *
      * @return void
      *
@@ -798,9 +767,6 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A removal that leaves the session meeting its requirement goes to the
-     * session transition all the same, with nothing outstanding.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -826,9 +792,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A sign-in replaced once the removal has checked it lends the removal none
-     * of its proofs: the session the factor was removed on is judged on what it
-     * still holds, which is nothing, not on what replaced it.
+     * The session is judged on what it still holds, which is nothing, not on
+     * what replaced it.
      *
      * @return void
      *
@@ -860,8 +825,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * The active tenant's requirement is part of what the session is evaluated
-     * against again, through the authoritative seam; with no tenant it is not.
+     * Through the authoritative seam; with no tenant it is not.
      *
      * @return void
      *
@@ -894,8 +858,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A session transition that cannot gate the session rolls the removal back,
-     * and its refusal propagates rather than reading as a refused removal.
+     * Its refusal propagates rather than reading as a refused removal.
      *
      * @return void
      *
@@ -928,8 +891,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * Removing a factor while another confirmed one remains keeps the recovery
-     * codes, and reports the removal alone.
+     * Only the removal is reported.
      *
      * @return void
      *
@@ -950,9 +912,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * The last confirmed factor takes the recovery codes with it, a pending
-     * factor not counting, and the removal is reported before the codes' end,
-     * with no actor since the identity acted itself.
+     * A pending factor does not count; the removal is reported before the
+     * codes' end, with no actor.
      *
      * @return void
      *
@@ -977,8 +938,6 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * With no recovery code set, its removal is not reported.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -995,8 +954,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A factor disabled at the failure ceiling, or of a type no longer enabled,
-     * may still be removed by the application that enrolled it.
+     * Disabled at the failure ceiling, or of a type no longer enabled, by the
+     * application that enrolled it.
      *
      * @return void
      *
@@ -1018,8 +977,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * Nothing is promoted when the preferred factor goes: removing it leaves
-     * none preferred, and reports no change of preference.
+     * Removing it leaves none preferred and reports no change of preference.
      *
      * @return void
      *
@@ -1041,9 +999,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * Nothing is reported until the removal commits, and a refusal a listener
-     * throws after it is not reported as a refused removal: what committed
-     * stays committed.
+     * Nothing is reported until the commit; what committed stays committed.
      *
      * @return void
      *
@@ -1071,9 +1027,6 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * An outer transaction that rolls back takes the removal and its events
-     * with it.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -1101,8 +1054,7 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * A model event that cancels the deletion rolls the removal back, and it is
-     * no refusal.
+     * It is no refusal.
      *
      * @return void
      *
@@ -1144,8 +1096,8 @@ final class RemovingFactorTest extends TestCase
     }
 
     /**
-     * Replace the person's sign-in with one that verified with a password and
-     * an authenticator app, as signing in again elsewhere would.
+     * As signing in again elsewhere would, with a password and an authenticator
+     * app.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return void

@@ -12,11 +12,8 @@ use Illuminate\Log\Logger;
 use Illuminate\Routing\Router;
 
 /**
- * Wires the handling of secrets into the application when the package boots:
- * the `mfa.no-store` middleware alias, and, unless `mfa.secrets.redact` is off,
- * the `RedactSecretsInLogs` tap on every configured log channel and every
- * channel resolved already, and the scrubbing of every exception the exception
- * handler reports.
+ * Registers the `mfa.no-store` alias and, unless `mfa.secrets.redact` is off,
+ * redaction of log channels and reported exceptions.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -31,9 +28,6 @@ final class SecretBindings
     private function __construct() {}
 
     /**
-     * Alias the middleware and, while redaction is on, redact secrets from logs
-     * and reported exceptions.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $app
      * @return void
      *
@@ -58,8 +52,7 @@ final class SecretBindings
     }
 
     /**
-     * Add the redacting tap to every configured log channel that does not list
-     * it yet. A channel whose `tap` is not a list is left as it is.
+     * A channel whose `tap` is not a list is left as it is.
      *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return void
@@ -92,8 +85,7 @@ final class SecretBindings
     }
 
     /**
-     * Apply the redacting tap to every channel the log manager resolved before
-     * the package booted, which it keeps and never taps again.
+     * Channels resolved before boot are never tapped again by the log manager.
      *
      * @param  \Illuminate\Contracts\Container\Container  $app
      * @return void
@@ -119,9 +111,6 @@ final class SecretBindings
     }
 
     /**
-     * Scrub every exception the exception handler reports before it is logged,
-     * whether the handler is built already or later.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $app
      * @return void
      *
@@ -141,8 +130,6 @@ final class SecretBindings
     }
 
     /**
-     * Have the handler scrub every exception it reports, when it is Laravel's.
-     *
      * @param  mixed  $handler
      * @return void
      */

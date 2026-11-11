@@ -16,12 +16,8 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
 /**
- * A second `MultiFactorAuthenticatable` Eloquent model used to assert that the
- * package's polymorphic factor relation works against more than one identity
- * class within the same application.
- *
- * Mirrors `TestUser` but lives on its own table so polymorphic factor lookup
- * must scope by `authenticatable_type` correctly.
+ * `TestUser` on its own table, so factor lookup must scope by
+ * `authenticatable_type`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,8 +42,7 @@ final class SecondaryUser extends Model implements Authenticatable, MultiFactorA
     ];
 
     /**
-     * Require an additional verification of every sign-in while the
-     * `mfa_enabled` column is set, and nothing of the user's own otherwise.
+     * Additional verification of every sign-in while `mfa_enabled` is set.
      *
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
      */
@@ -58,8 +53,6 @@ final class SecondaryUser extends Model implements Authenticatable, MultiFactorA
     }
 
     /**
-     * Report whether the identity has at least one persisted factor.
-     *
      * @return bool
      */
     #[\Override]
@@ -69,9 +62,6 @@ final class SecondaryUser extends Model implements Authenticatable, MultiFactorA
     }
 
     /**
-     * Return the identity's factor builder narrowed to the package intersection
-     * type required by `MultiFactorAuthenticatable`.
-     *
      * @formatter:off
      *
      * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
@@ -85,8 +75,6 @@ final class SecondaryUser extends Model implements Authenticatable, MultiFactorA
     }
 
     /**
-     * Define the polymorphic relation to the shipped Factor model.
-     *
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany<\SineMacula\Laravel\Mfa\Models\Factor, $this>
      */
     public function factors(): MorphMany
@@ -95,8 +83,6 @@ final class SecondaryUser extends Model implements Authenticatable, MultiFactorA
     }
 
     /**
-     * The attributes that should be cast.
-     *
      * @return array<string, string>
      */
     #[\Override]
@@ -108,8 +94,7 @@ final class SecondaryUser extends Model implements Authenticatable, MultiFactorA
     }
 
     /**
-     * Wrap the dynamic count() call so PHPStan does not flag it as a dynamic
-     * call to a static method.
+     * Stops PHPStan reading `count()` as a dynamic call to a static method.
      *
      * @formatter:off
      *
@@ -124,8 +109,7 @@ final class SecondaryUser extends Model implements Authenticatable, MultiFactorA
     }
 
     /**
-     * Re-present the morph-relation builder under the intersection type
-     * required by the `MultiFactorAuthenticatable` contract.
+     * Narrows the relation's builder to the type the contract requires.
      *
      * @formatter:off
      *

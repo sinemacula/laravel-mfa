@@ -15,9 +15,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Unit tests for the `ActsAsRecoveryCode` trait: a recovery code's owner, hash,
- * generation, use and replacement, and the column names it reads them from.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -29,8 +26,6 @@ final class ActsAsRecoveryCodeTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Clear the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -42,8 +37,6 @@ final class ActsAsRecoveryCodeTest extends TestCase
     }
 
     /**
-     * The shipped model implements the contract, with the trait's column names.
-     *
      * @return void
      */
     public function testNamesItsColumns(): void
@@ -58,8 +51,7 @@ final class ActsAsRecoveryCodeTest extends TestCase
     }
 
     /**
-     * A stored code reads back its owner, hash and generation, and is usable
-     * until it is used or replaced.
+     * Owner, hash and generation, usable until used or replaced.
      *
      * @return void
      */
@@ -86,7 +78,7 @@ final class ActsAsRecoveryCodeTest extends TestCase
     }
 
     /**
-     * Using a code, at the given time or now, or replacing its set, ends it.
+     * Using it, at the given time or now, or replacing its set.
      *
      * @return void
      */
@@ -114,15 +106,13 @@ final class ActsAsRecoveryCodeTest extends TestCase
     }
 
     /**
-     * A value of the wrong type reads as absent.
-     *
      * @return void
      */
     public function testAValueOfTheWrongTypeReadsAsAbsent(): void
     {
         $code = new class extends RecoveryCode {
             /**
-             * Cast nothing, so the raw values are read as they are.
+             * Raw values are read as they are.
              *
              * @return array<string, string>
              */

@@ -13,10 +13,6 @@ use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use Tests\Fixtures\Assurance\SessionProofs;
 
 /**
- * Tests for `Combination`: the level, multifactor answer and restriction of a
- * first factor alone or followed by a further proof, its `amr` values, and
- * whether an answer it gives rests on evidence within a maximum age.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -27,8 +23,8 @@ use Tests\Fixtures\Assurance\SessionProofs;
 final class CombinationTest extends TestCase
 {
     /**
-     * Rows of a combination, then whether it is accepted, multifactor,
-     * restricted and phishing-resistant, and its level.
+     * Combination, then accepted, multifactor, restricted, phishing-resistant
+     * and level.
      *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Assurance\Combination, bool, bool, bool, bool, \SineMacula\Laravel\Mfa\Enums\AssuranceLevel}>
      */
@@ -60,7 +56,7 @@ final class CombinationTest extends TestCase
     }
 
     /**
-     * A combination's answers come from the authenticators it relies on.
+     * From the authenticators it relies on.
      *
      * @param  \SineMacula\Laravel\Mfa\Assurance\Combination  $combination
      * @param  bool  $accepted
@@ -87,8 +83,8 @@ final class CombinationTest extends TestCase
     }
 
     /**
-     * A combination's `amr` values are its first factor's, then its further
-     * proof's, and its time is the further proof's.
+     * `amr` values are the first factor's then the further proof's; the time is
+     * the further proof's.
      *
      * @return void
      */
@@ -102,9 +98,6 @@ final class CombinationTest extends TestCase
     }
 
     /**
-     * Rows of a proof's age, a maximum age, and whether an answer it gives
-     * holds within it.
-     *
      * @return iterable<string, array{int, ?int, bool}>
      */
     public static function provideAges(): iterable
@@ -116,8 +109,7 @@ final class CombinationTest extends TestCase
     }
 
     /**
-     * An answer holds within a maximum age when the proof it rests on is no
-     * older than it.
+     * When the proof it rests on is no older than it.
      *
      * @param  int  $secondsAgo
      * @param  ?int  $maxAge
@@ -134,8 +126,6 @@ final class CombinationTest extends TestCase
     }
 
     /**
-     * An answer that does not hold is not within any maximum age.
-     *
      * @return void
      */
     public function testAnAnswerThatDoesNotHoldIsWithinNone(): void
@@ -146,9 +136,8 @@ final class CombinationTest extends TestCase
     }
 
     /**
-     * Rows of a combination completed by a fresh proof after a first factor
-     * made two hours ago, an answer, and whether it holds within fifteen
-     * minutes.
+     * First factor two hours ago, a fresh further proof, an answer, and whether
+     * it holds within fifteen minutes.
      *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Assurance\Combination, \Closure(\SineMacula\Laravel\Mfa\Assurance\Combination): bool, bool}>
      */
@@ -171,8 +160,8 @@ final class CombinationTest extends TestCase
     }
 
     /**
-     * An answer the first factor gives on its own, and the further proof does
-     * not, rests on the first factor, which the further proof does not refresh.
+     * An answer the first factor gives alone rests on it, and the further proof
+     * does not refresh it.
      *
      * @param  \SineMacula\Laravel\Mfa\Assurance\Combination  $combination
      * @param  \Closure(\SineMacula\Laravel\Mfa\Assurance\Combination): bool  $answer

@@ -8,18 +8,11 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Exception\RequestExceptionInterface;
 
 /**
- * The client an action is served to, as plain values: its IP address and user
- * agent, and the facts a same-site check reads (the request's `Origin`, its
- * scheme and host, and the names of the headers it carries). The IP address is
- * what the IP throttle charges an attempt to and what events carry; any of them
- * may be unknown, as outside a request.
+ * The client an action is served to; any part may be unknown outside a request.
+ * Only the IP address and user agent reach events.
  *
- * `fromRequest()` is the one place it is read from a request, through the
- * request's own `ip()`, so the application's trusted proxies apply. The facts
- * are cleaned as an authentication layer's own client context cleans them (an
- * origin of up to 512 printable characters, header names that are HTTP tokens),
- * so the two answer a same-site check alike, and are otherwise kept for the
- * seam that judges them; only the IP address and the user agent reach events.
+ * Values are cleaned as an authentication layer's client context cleans them,
+ * so both answer a same-site check alike.
  *
  * @api
  *
@@ -28,30 +21,28 @@ use Symfony\Component\HttpFoundation\Exception\RequestExceptionInterface;
  */
 final readonly class ClientContext
 {
-    /** @var string What an origin, or a scheme and host, must be to be kept: 1 to 512 printable ASCII characters, no spaces. */
+    /** @var string 1 to 512 printable ASCII characters, no spaces. */
     private const string ORIGIN_PATTERN = '/^[\x21-\x7E]{1,512}$/D';
 
-    /** @var string What a header's name must be, once normalised, to be kept: an HTTP token. */
+    /** @var string An HTTP token, once normalised. */
     private const string TOKEN_PATTERN = '/^[!#$%&\'*+.^`|~0-9a-z-]+$/D';
 
-    /** @var ?string The client's IP address, when it is known. */
+    /** @var ?string Through the application's trusted proxies. */
     public ?string $ip;
 
-    /** @var ?string The client's user agent, when it is known. */
+    /** @var ?string The client's user agent, when known. */
     public ?string $userAgent;
 
-    /** @var ?string The request's `Origin` header, as it was sent, when it was and is well formed. */
+    /** @var ?string The `Origin` header as sent, when well formed. */
     public ?string $origin;
 
-    /** @var ?string The request's scheme and host, such as `https://example.test`, when it has a host. */
+    /** @var ?string Such as `https://example.test`. */
     public ?string $schemeAndHost;
 
-    /** @var list<string> The names of the request's headers whose first value is not empty, lower-cased with underscores read as hyphens; never their values. */
+    /** @var list<string> Normalised names of headers with a value; never the values. */
     public array $nonEmptyHeaders;
 
     /**
-     * Constructor.
-     *
      * @param  ?string  $ip
      * @param  ?string  $userAgent
      * @param  ?string  $origin
@@ -68,8 +59,6 @@ final readonly class ClientContext
     }
 
     /**
-     * A client of which nothing is known.
-     *
      * @return self
      */
     public static function unknown(): self
@@ -78,10 +67,6 @@ final readonly class ClientContext
     }
 
     /**
-     * The client of the request: its IP address, through the trusted proxies,
-     * its user agent, its `Origin` header, its scheme and host, and the names
-     * of the headers it carries a value in.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return self
      */
@@ -91,9 +76,7 @@ final readonly class ClientContext
     }
 
     /**
-     * Determine whether the request carried a value in the named header,
-     * compared as the names are kept: without case, underscores read as
-     * hyphens.
+     * Compared without case, with underscores read as hyphens.
      *
      * @param  string  $name
      * @return bool
@@ -104,9 +87,6 @@ final readonly class ClientContext
     }
 
     /**
-     * An origin, or a scheme and host, kept only when it is 1 to 512 printable
-     * ASCII characters with no spaces; anything else is not known.
-     *
      * @param  ?string  $origin
      * @return ?string
      */
@@ -116,8 +96,7 @@ final readonly class ClientContext
     }
 
     /**
-     * The header names as they are kept: normalised, each an HTTP token, once
-     * each, in the order given.
+     * Normalised HTTP tokens, deduplicated, in the order given.
      *
      * @param  array<array-key, string>  $names
      * @return list<string>
@@ -130,8 +109,7 @@ final readonly class ClientContext
     }
 
     /**
-     * A header's name as it is kept: lower-cased, with underscores read as
-     * hyphens, as the request's own header bag keys it.
+     * Keyed as the request's own header bag keys it.
      *
      * @param  string  $name
      * @return string
@@ -142,9 +120,8 @@ final readonly class ClientContext
     }
 
     /**
-     * The request's scheme and host, or `null` when it has no host or one the
-     * request refuses as untrusted or malformed. It is read off a copy, so a
-     * refusal does not change what the request answers afterwards.
+     * `null` for a missing, untrusted or malformed host. Read off a copy so a
+     * refusal leaves the request's later answers unchanged.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return ?string
@@ -161,8 +138,7 @@ final readonly class ClientContext
     }
 
     /**
-     * The names of the request's headers whose first value is neither missing
-     * nor empty; `0` counts as a value.
+     * Headers whose first value is set and not empty; `0` counts as a value.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return list<string>

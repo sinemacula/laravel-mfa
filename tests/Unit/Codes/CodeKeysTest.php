@@ -13,10 +13,6 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * Unit tests for `CodeKeys`: a code's hash is keyed and bound to every part of
- * its challenge and binding, the session is stored as a keyed digest, and both
- * need the application key.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -32,8 +28,7 @@ final class CodeKeysTest extends TestCase
     private const string CODE = '123456';
 
     /**
-     * A code's hash is 64 hexadecimal characters, the same each time, and
-     * neither the code nor its plain hash.
+     * The same each time, and never the code or its plain hash.
      *
      * @return void
      */
@@ -48,8 +43,7 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
-     * What a code was sent to is a keyed digest of the owner and the
-     * destination, or the factor when it holds none, of its own derivation.
+     * Keyed on the owner and the destination, or the factor when it holds none.
      *
      * @return void
      */
@@ -67,10 +61,7 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
-     * The digests are pinned: a code's hash is the HMAC of its labelled,
-     * NUL-joined parts, and a session's the HMAC of its id, each under its own
-     * key derived from the application key. A change to either would make every
-     * code outstanding stop matching, so it fails here first.
+     * A change to either digest would stop every outstanding code matching.
      *
      * @return void
      */
@@ -85,8 +76,6 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
-     * Rows of a hash computed with one part changed.
-     *
      * @return iterable<string, array{\Closure(\SineMacula\Laravel\Mfa\Codes\CodeKeys): string}>
      */
     public static function changedParts(): iterable
@@ -103,8 +92,7 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
-     * Changing any one part of the challenge, the binding or the code changes
-     * the hash, so a code matches nothing it was not issued for.
+     * A code matches nothing it was not issued for.
      *
      * @param  \Closure(\SineMacula\Laravel\Mfa\Codes\CodeKeys): string  $hash
      * @return void
@@ -116,8 +104,7 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
-     * A session is stored as a keyed digest of its id, never the id, and the
-     * digest is not the code key's.
+     * Never the id, and under a key apart from the code hash's.
      *
      * @return void
      */
@@ -133,8 +120,6 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
-     * Rows of an application key that is not set.
-     *
      * @return iterable<string, array{mixed}>
      */
     public static function missingKeys(): iterable
@@ -145,8 +130,6 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
-     * Without an application key nothing is hashed, and the check says so.
-     *
      * @param  mixed  $key
      * @return void
      */
@@ -175,8 +158,6 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
-     * A set application key validates.
-     *
      * @return void
      */
     public function testASetApplicationKeyValidates(): void
@@ -187,8 +168,6 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
-     * The keys over an application key.
-     *
      * @param  string  $key
      * @return \SineMacula\Laravel\Mfa\Codes\CodeKeys
      */
@@ -198,8 +177,6 @@ final class CodeKeysTest extends TestCase
     }
 
     /**
-     * A binding, with any part changed.
-     *
      * @param  string  $type
      * @param  string  $key
      * @param  string  $application

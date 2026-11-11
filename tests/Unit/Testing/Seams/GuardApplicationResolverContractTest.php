@@ -14,10 +14,6 @@ use Tests\Fixtures\Context\GuardPortalResolver;
 use Tests\TestCase;
 
 /**
- * The contract kit of the guard application resolver: it proves a resolver that
- * names a portal for each guard, and rejects one that names a blank application
- * through a guard or a new one each time it is asked.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -29,17 +25,12 @@ final class GuardApplicationResolverContractTest extends TestCase
     use GuardApplicationResolverTests;
 
     /**
-     * The kit rejects a resolver that names a blank application through a
-     * guard.
-     *
      * @return void
      */
     public function testRejectsAResolverThatNamesABlankApplicationThroughAGuard(): void
     {
         $resolver = new class implements GuardApplicationResolver {
             /**
-             * The application of the request.
-             *
              * @param  \Illuminate\Http\Request  $request
              * @return string
              */
@@ -50,8 +41,6 @@ final class GuardApplicationResolverContractTest extends TestCase
             }
 
             /**
-             * A blank application through any guard.
-             *
              * @param  \Illuminate\Http\Request  $request
              * @param  string  $guard
              * @return string
@@ -70,8 +59,7 @@ final class GuardApplicationResolverContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that names a new application through a guard
-     * each time it is asked about the same request.
+     * Asked about the same request through a guard.
      *
      * @return void
      */
@@ -82,8 +70,6 @@ final class GuardApplicationResolverContractTest extends TestCase
             private int $asked = 0;
 
             /**
-             * The application of the request.
-             *
              * @param  \Illuminate\Http\Request  $request
              * @return string
              */
@@ -94,8 +80,6 @@ final class GuardApplicationResolverContractTest extends TestCase
             }
 
             /**
-             * A new application through the guard each time.
-             *
              * @param  \Illuminate\Http\Request  $request
              * @param  string  $guard
              * @return string
@@ -114,8 +98,6 @@ final class GuardApplicationResolverContractTest extends TestCase
     }
 
     /**
-     * A resolver that names a portal for each guard.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\GuardApplicationResolver
      */
     #[\Override]
@@ -125,8 +107,6 @@ final class GuardApplicationResolverContractTest extends TestCase
     }
 
     /**
-     * A request.
-     *
      * @return \Illuminate\Http\Request
      */
     #[\Override]
@@ -136,8 +116,6 @@ final class GuardApplicationResolverContractTest extends TestCase
     }
 
     /**
-     * A guard other than the default.
-     *
      * @return string
      */
     #[\Override]

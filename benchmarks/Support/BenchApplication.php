@@ -17,25 +17,19 @@ use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
- * The application the whole-path benchmarks run on, built as the query budgets'
- * is rather than by hand, as the default seams need the session guard, the
- * session store and the auth stack, and a hand-built container would drift from
- * what the budgets run: the package's provider, in-memory SQLite with the
- * package's and the test identities' tables, an array session, and bcrypt at
- * its cheapest cost, so a recovery code's hashing does not swamp the rest.
- *
- * The clock is the process's own, frozen before the set-up and released after
- * the timing, so a code never crosses a time step and no window ends.
+ * Built like the query budgets' application, since the default seams need the
+ * full auth stack; bcrypt is at its cheapest so hashing does not swamp the
+ * rest.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final class BenchApplication
 {
-    /** @var string The application the benchmarks verify on. */
+    /** @var string */
     public const string APPLICATION = 'web';
 
-    /** @var string The time the benchmarks run at. */
+    /** @var string Frozen so no code crosses a time step. */
     private const string NOW = '2026-11-01 12:00:00';
 
     /**
@@ -44,8 +38,7 @@ final class BenchApplication
     private function __construct() {}
 
     /**
-     * Build and migrate the application, with the requirement mode given; the
-     * default is the one the query budgets run in.
+     * The default requirement mode is the one the query budgets run in.
      *
      * @param  string  $requirement
      * @return \Illuminate\Contracts\Foundation\Application
@@ -81,8 +74,6 @@ final class BenchApplication
     }
 
     /**
-     * Freeze both clocks.
-     *
      * @return void
      */
     public static function freezeClock(): void
@@ -92,8 +83,6 @@ final class BenchApplication
     }
 
     /**
-     * Release both clocks.
-     *
      * @return void
      */
     public static function releaseClock(): void
@@ -103,8 +92,7 @@ final class BenchApplication
     }
 
     /**
-     * A new person, signed in through the guard from the address given, with a
-     * sign-in of their own that the proof store knows.
+     * Signed in from the given address, with a sign-in the proof store knows.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  string  $email
@@ -125,8 +113,6 @@ final class BenchApplication
     }
 
     /**
-     * A confirmed TOTP factor of the person's.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
@@ -136,7 +122,7 @@ final class BenchApplication
     }
 
     /**
-     * A confirmed email factor of the person's, delivering to their address.
+     * Delivers to the person's address.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -147,8 +133,6 @@ final class BenchApplication
     }
 
     /**
-     * A confirmed factor of the person's with the attributes given.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  array<string, mixed>  $attributes
      * @return \SineMacula\Laravel\Mfa\Models\Factor

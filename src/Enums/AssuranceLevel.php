@@ -27,8 +27,7 @@ enum AssuranceLevel: string
     case UNCLASSIFIED = 'unclassified';
 
     /**
-     * Whether this level meets the given minimum: a level meets every level at
-     * or below it, and unclassified meets none.
+     * Unclassified meets no level.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $minimum
      * @return bool
@@ -39,8 +38,6 @@ enum AssuranceLevel: string
     }
 
     /**
-     * The level's place on the scale, unclassified lowest.
-     *
      * @return int
      */
     private function rank(): int

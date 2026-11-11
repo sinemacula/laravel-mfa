@@ -44,11 +44,11 @@ the provider or another capability.
   nothing written or dispatched. The caller is trusted input, and `Context\CallerContextResolver` decides whether it is
   served: a person, and a pending session only for the actions it allows.
 - A factor runs through the driver of its type, resolved by `Drivers\DriverResolver` from the `mfa` manager the
-  container holds. Recovery codes are not a factor and have no driver. A factor
-  is only looked up within the caller's identity (`Factors\OperationGuard`).
-- No service keeps request state: the reads (`factors()`, `factor()`, `proofs()`) go to the identity, the
-  database or the bound proof store on every call, and no service is kept between resolutions, so none carries one
-  caller's identity or factors into the next (see [Long-Running Processes](long-running-processes.md)).
+  container holds. Recovery codes are not a factor and have no driver. A factor is only looked up within the caller's
+  identity (`Factors\OperationGuard`).
+- No service keeps request state: the reads (`factors()`, `factor()`, `proofs()`) go to the identity, the database or
+  the bound proof store on every call, and no service is kept between resolutions, so none carries one caller's identity
+  or factors into the next (see [Long-Running Processes](long-running-processes.md)).
 - Each capability registers its container wiring in its own `*Bindings` class, which the provider calls: the
   capability's service and the defaults for the seams it owns, each with `bind()`. The capabilities that ship drivers
   also build them, and the provider's `mfa` factory registers them against the manager through the same `extend()` API a
@@ -61,17 +61,16 @@ the provider or another capability.
   concerns, contracts, storage and enums; the seam defaults only its contracts and enums. Exceptions and events carry
   summaries, never models: exceptions name only enums, the support helpers, `Factors\FactorSummary`, `Codes\SendResult`
   and `Requirements\Requirement`, and events only the context, contracts, storage, enums, support helpers and
-  `Factors\FactorSummary`. The assurance vocabulary names none of the capabilities that use it, and storage, the
-  support helpers and secrets name no capability but `Proofs\ProofOwner` and the code messages, `Codes\CodeMessage`
-  and `Codes\MfaCodeMessage`. Contracts name no
-  model, capability service, seam default or composition root. Only the manager names a flow service (enrolment,
-  factors, lifecycle, verification); only the provider names the HTTP layer, a `*Bindings` class, or, with the
-  configuration bindings, the console; only the provider, the facade and the driver bindings name the manager; nothing
-  names the provider or the facade; and only the testing helpers name the testing helpers. Only
-  `Events\EventDispatcher` reaches Laravel's event dispatcher (its contract, its class, its facade, its container key,
-  the `Dispatchable` trait or the `event()` helper), apart from `Proofs\ProofBindings`, which only registers the sign-in
-  listeners on it. The test reads tokens, not a parse, so a class named in a string, or unqualified within its own
-  namespace, is not seen: it is a backstop for the rules, not a proof of them.
+  `Factors\FactorSummary`. The assurance vocabulary names none of the capabilities that use it, and storage, the support
+  helpers and secrets name no capability but `Proofs\ProofOwner` and the code messages, `Codes\CodeMessage` and
+  `Codes\MfaCodeMessage`. Contracts name no model, capability service, seam default or composition root. Only the
+  manager names a flow service (enrolment, factors, lifecycle, verification); only the provider names the HTTP layer, a
+  `*Bindings` class, or, with the configuration bindings, the console; only the provider, the facade and the driver
+  bindings name the manager; nothing names the provider or the facade; and only the testing helpers name the testing
+  helpers. Only `Events\EventDispatcher` reaches Laravel's event dispatcher (its contract, its class, its facade, its
+  container key, the `Dispatchable` trait or the `event()` helper), apart from `Proofs\ProofBindings`, which only
+  registers the sign-in listeners on it. The test reads tokens, not a parse, so a class named in a string, or
+  unqualified within its own namespace, is not seen: it is a backstop for the rules, not a proof of them.
 - The public surface is unchanged by the layout: the manager's and the facade's method names, the configuration keys,
   the events and the middleware aliases are the same whichever service answers them.
 
@@ -85,8 +84,8 @@ the provider or another capability.
   (`Config\ConfigurationBindings`), which also refuses a configured model off the storage connection.
 - The `mfa` factory builds the manager, then `DriverBindings::extend()` registers the TOTP, email, SMS and passkey
   drivers, each built from the settings of its capability's block (`mfa.totp`, `mfa.codes`), before the container
-  applies any extender or resolving callback.
-  The factory first checks the whole configuration (see the application configuration note).
+  applies any extender or resolving callback. The factory first checks the whole configuration (see the application
+  configuration note).
 - A call such as `Mfa::verify($caller, Submission::factor($id, $code))` reaches `MfaManager::verify()`, which hands it to
   `Verification\VerificationService::verify()`. The service resolves who the request serves, guards the factor, checks
   and counts the code under the identity's lock, hands the result to the completion seam and queues the events (see

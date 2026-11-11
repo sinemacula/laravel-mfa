@@ -23,12 +23,6 @@ use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
 /**
- * Tests for `ConfiguredFactorChangeGate`: a further factor, a removal and new
- * recovery codes rest on a step-up fresh for their operation, a removal on one
- * made without the factor while another confirmed factor remains, and a first
- * additional factor on the first factor proved again on the sign-in within five
- * minutes. Its refusals are the package's `not_fresh`.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -40,8 +34,6 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     use ArrangesFactorChanges;
 
     /**
-     * Fix the time to a whole second.
-     *
      * @return void
      */
     #[\Override]
@@ -53,8 +45,6 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     }
 
     /**
-     * Release the fixed time.
-     *
      * @return void
      */
     #[\Override]
@@ -66,9 +56,9 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     }
 
     /**
-     * A grant lasts as long as its freshness: a further factor as long as the
-     * step-up is fresh for `mfa.add_factor`, a first one five minutes from the
-     * reauthentication; the other changes answer no end.
+     * A further factor lasts while the `mfa.add_factor` step-up is fresh, a
+     * first one five minutes from the reauthentication; the other changes have
+     * no end.
      *
      * @return void
      */
@@ -85,8 +75,7 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     }
 
     /**
-     * A stale session is refused every change, as the package's `not_fresh`, a
-     * removal of the only factor included.
+     * Refused as `not_fresh`, a removal of the only factor included.
      *
      * @return void
      */
@@ -103,9 +92,7 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     }
 
     /**
-     * A step-up made with the factor authorises its removal while no other
-     * confirmed factor remains, a pending one included; with another confirmed
-     * factor it does not.
+     * A pending factor does not count as another.
      *
      * @return void
      */
@@ -122,9 +109,7 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     }
 
     /**
-     * While another confirmed factor remains, a freshness gate with no
-     * requirement to judge the removal by refuses it, fresh as it says the
-     * session is.
+     * However fresh it says the session is.
      *
      * @return void
      */
@@ -138,8 +123,8 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     }
 
     /**
-     * A first additional factor is refused a reauthentication of another
-     * sign-in, one dated in the future, and one older than five minutes.
+     * A reauthentication of another sign-in, one dated in the future, or one
+     * older than five minutes.
      *
      * @return void
      */
@@ -156,8 +141,7 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     }
 
     /**
-     * A person who stepped up just now with a TOTP code, after a password an
-     * hour ago.
+     * Stepped up just now with a TOTP code, after a password an hour ago.
      *
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -167,8 +151,6 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     }
 
     /**
-     * Ask the gate under test.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @return ?\Carbon\CarbonImmutable
      *
@@ -180,7 +162,7 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     }
 
     /**
-     * The gate refuses the request as the package's `not_fresh`.
+     * Refused as the package's `not_fresh`.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @return void

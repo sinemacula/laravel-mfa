@@ -42,7 +42,7 @@ return [
 ];
 ```
 
-To start from the English, publish it; this is optional:
+To start from the English, publish it:
 
 ```bash
 php artisan vendor:publish --tag=mfa-lang

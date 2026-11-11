@@ -30,13 +30,8 @@ use Tests\Integration\Process\Fixtures\JobObservations;
 use Tests\TestCase;
 
 /**
- * One worker's loop over queued jobs for different people, with the guards and
- * the session cleared before each through `Queue::before()`, as the operations
- * guide documents: the package owns neither, and Laravel's worker clears
- * neither between jobs. Each job sees only what its own identity holds, a job
- * that sets none sees and writes nothing, a proof does not outlive the job that
- * made it, a job failing changes nothing for the next, and a fake sender
- * installed at boot survives the scope reset the worker runs between jobs.
+ * One worker runs jobs for different people, clearing the guards and session in
+ * `Queue::before()` as the operations guide documents; Laravel clears neither.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -48,16 +43,13 @@ use Tests\TestCase;
 #[CoversClass(FactorService::class)]
 final class QueueWorkerStateTest extends TestCase
 {
-    /** @var string The address the email factor delivers to. */
+    /** @var string Alice's email factor destination. */
     private const string ADDRESS = 'alice@example.test';
 
-    /** @var bool Whether the session is cleared before each job, as the guide documents. */
+    /** @var bool Whether the session is cleared before each job. */
     private bool $clearsTheSession = true;
 
     /**
-     * Create the queue's table, bind what the jobs write to and clear the
-     * guards and the session before each job, as the guide documents.
-     *
      * @return void
      */
     #[\Override]
@@ -94,8 +86,6 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * Drop the queue's table.
-     *
      * @return void
      */
     #[\Override]
@@ -107,8 +97,6 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * Each job sees only its own identity's state, whatever ran before it.
-     *
      * @return void
      */
     public function testEachJobSeesOnlyItsOwnIdentitysState(): void
@@ -158,9 +146,7 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * A proof one job makes is gone for the next, for the same person or
-     * another, with no sign-in event to forget it: the session is cleared
-     * before each job.
+     * No sign-in event forgets the proof; clearing the session does.
      *
      * @return void
      */
@@ -170,10 +156,7 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * Without the session cleared, the default proof store's records live on in
-     * the worker's session, which is why the guide clears it: the next job for
-     * the same person reads what the last one proved, and another person's job
-     * still reads nothing.
+     * Why the guide clears the session: the person's next job reads the proof.
      *
      * @return void
      */
@@ -185,8 +168,7 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * A sender installed when the worker boots survives the scope reset between
-     * jobs, so a code never goes to the fail-closed default instead.
+     * A code never falls through to the fail-closed default sender.
      *
      * @return void
      */
@@ -209,9 +191,6 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * Declare the application, guards and queue the worker runs under, with a
-     * fake sender installed as an application's provider would at boot.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -245,8 +224,7 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * How many proofs each job saw: one that signs in and verifies, then one
-     * for the same person and one for another, each setting its identity alone.
+     * Proofs seen by a verifying job, then the same person's and another's job.
      *
      * @return list<int>
      */
@@ -270,9 +248,8 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * Run the queue through one worker's loop until it is empty. The worker has
-     * no memory limit: the suite's own process may already use more than a
-     * worker's default, which would stop the loop before the first job.
+     * No memory limit: the suite may already exceed a worker's default and stop
+     * the loop before the first job.
      *
      * @return void
      */
@@ -289,8 +266,7 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * Run the callback, then restore the signal handlers a worker's loop
-     * installs, so the test process still stops on an interrupt.
+     * Restores the worker's signal handlers so Ctrl-C still stops the test.
      *
      * @param  \Closure(): mixed  $callback
      * @return mixed
@@ -317,8 +293,6 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * What each job saw.
-     *
      * @return list<array{job: string, identity: mixed, factors: list<string>, proofs: int, changed: bool}>
      */
     private function seen(): array
@@ -327,8 +301,6 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -339,8 +311,6 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * A confirmed factor of the person's, enrolled through the application.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $person
      * @param  array<string, mixed>  $attributes
      * @return \SineMacula\Laravel\Mfa\Models\Factor

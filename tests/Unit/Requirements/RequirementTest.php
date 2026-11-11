@@ -12,9 +12,6 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * Unit tests for the `Requirement` value: what each part asks, validation,
- * composition by `strictest()` and serialisation.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +21,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 final class RequirementTest extends TestCase
 {
     /**
-     * The empty requirement asks for nothing.
-     *
      * @return void
      */
     public function testTheEmptyRequirementAsksForNothing(): void
@@ -43,8 +38,7 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * Each part is asked for with its own maximum age, and the others are left
-     * as they were.
+     * The other parts are left as they were.
      *
      * @return void
      */
@@ -67,8 +61,6 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * Asking for a part leaves the requirement it was asked of unchanged.
-     *
      * @return void
      */
     public function testARequirementIsImmutable(): void
@@ -84,8 +76,6 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * Asking for a part again replaces what it asked.
-     *
      * @return void
      */
     public function testAskingForAPartAgainReplacesIt(): void
@@ -102,8 +92,6 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * Maximum ages below one second.
-     *
      * @return iterable<string, array{int}>
      */
     public static function provideAgesBelowOneSecond(): iterable
@@ -113,7 +101,7 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * A maximum age is at least one second, whichever part it is for.
+     * Whichever part it is for.
      *
      * @param  int  $maxAge
      * @return void
@@ -139,8 +127,6 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * A maximum age of one second is the shortest allowed.
-     *
      * @return void
      */
     public function testAMaximumAgeOfOneSecondIsAccepted(): void
@@ -149,8 +135,6 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * Unclassified is no level to ask for.
-     *
      * @return void
      */
     public function testTheUnclassifiedLevelIsRefused(): void
@@ -162,8 +146,6 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * Compositions and the strictest requirement each gives.
-     *
      * @return iterable<string, array{list<\SineMacula\Laravel\Mfa\Requirements\Requirement>, \SineMacula\Laravel\Mfa\Requirements\Requirement}>
      */
     public static function provideCompositions(): iterable
@@ -201,8 +183,8 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * The strictest of several requirements asks every part any of them asks,
-     * the highest level, and each part's shortest maximum age.
+     * Every part any of them asks, the highest level, and each part's shortest
+     * maximum age.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Requirements\Requirement>  $parts
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $expected
@@ -218,8 +200,8 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * A shorter maximum age set first is kept when a longer one, or none,
-     * follows, and a level asked first is kept when a lower one follows.
+     * A shorter maximum age set first survives a longer one or none, and a
+     * level survives a lower one.
      *
      * @return void
      */
@@ -235,8 +217,8 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * The serialised form names each part asked for, in a fixed order, with its
-     * maximum age and, for a level, the level.
+     * Each part asked for, in a fixed order, with its maximum age and, for a
+     * level, the level.
      *
      * @return void
      */
@@ -259,8 +241,7 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * A requirement read back from its serialised form, or from its JSON,
-     * equals the original, and a part without a maximum age may leave it out.
+     * From the array or JSON; a part without a maximum age may leave it out.
      *
      * @return void
      */
@@ -278,8 +259,6 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * Serialised forms that are not a requirement.
-     *
      * @return iterable<string, array{array<string, mixed>, string}>
      */
     public static function provideMalformedRequirements(): iterable
@@ -309,8 +288,7 @@ final class RequirementTest extends TestCase
     }
 
     /**
-     * A serialised form that is not a requirement is refused, so a mistyped
-     * part never weakens it.
+     * So a mistyped part never weakens it.
      *
      * @param  array<string, mixed>  $data
      * @param  string  $message

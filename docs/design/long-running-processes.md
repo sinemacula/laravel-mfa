@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This note describes how the package stays correct when one application serves many requests (Laravel Octane) or runs
-many jobs (a queue worker): what the container keeps, how the listeners reach the request at hand, what is proven, and
-what is not.
+This note records how the package stays correct when one application serves many requests (Laravel Octane) or runs many
+jobs (a queue worker): what the container keeps, how the listeners reach the request at hand, what is proven, and what
+is not.
 
 ## Invariants
 

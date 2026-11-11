@@ -2,15 +2,15 @@
 
 ## Purpose
 
-This note describes the catalogue of events the package's flows dispatch, what each carries, how the context every
+This note records the catalogue of events the package's flows dispatch, what each carries, how the context every
 event carries is built, and why every event is dispatched only after the change it reports commits.
 
 ## Invariants
 
 - Every event is a final readonly class in `Events` extending `Events\ContextEvent`, which implements
   `Contracts\MfaEvent`, so one listener takes them all; the enrolment events extend it through `Events\EnrollmentEvent`,
-  and the two recovery code redemption events through `Events\RecoveryCodeRedemptionEvent`.
-  The catalogue is listed in [Events](../guides/events.md); its class and field names are stable.
+  and the two recovery code redemption events through `Events\RecoveryCodeRedemptionEvent`. The catalogue is listed in
+  [Events](../guides/events.md); its class and field names are stable.
 - Every event says what it was for through `MfaEvent::purpose()`: an `Enums\Purpose` field where it varies (codes sent,
   verification, the failure ceiling, lockouts, recovery code use and a low set), `enrollment` for the enrolment events,
   and `null` for a change made outside any verification (renames, preferred factor, removal, reset, lifted lockouts,
@@ -69,8 +69,8 @@ event carries is built, and why every event is dispatched only after the change 
 
 - A change that rolls back dispatches none of its events.
 - A resolver that returns a model, an array or a key outside the allowlist has it dropped, never passed on.
-- Without a request (a queue job or a console command), the resolver is handed none, and the request's keys are
-  `null`.
+- Without a request (a queue job or a console command), a caller built with no `ClientContext` hands the resolver an
+  unknown client, and `ip` and `user_agent` are `null`.
 
 ## Implementation Anchors
 

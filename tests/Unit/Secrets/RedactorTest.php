@@ -21,9 +21,6 @@ use Tests\Fixtures\Secrets\ForgedTrace;
 use Tests\Fixtures\Secrets\RefusesToBeLogged;
 
 /**
- * Tests for `Redactor`: secrets, codes and full destinations are redacted by
- * value and by key, at any depth, and nothing else is touched.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -36,8 +33,7 @@ final class RedactorTest extends TestCase
     public const string SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
 
     /**
-     * Keys naming secrets, codes and destinations, spelt as code and logs spell
-     * them.
+     * Spelt as code and logs spell them.
      *
      * @return iterable<string, array{string}>
      */
@@ -70,8 +66,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A value under a key naming a secret, a code or a destination is redacted,
-     * whatever it is.
+     * Whatever the value is.
      *
      * @param  string  $key
      * @return void
@@ -84,8 +79,6 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * Keys that name no secret.
-     *
      * @return iterable<string, array{string}>
      */
     public static function ordinaryKeys(): iterable
@@ -101,7 +94,7 @@ final class RedactorTest extends TestCase
 
     /**
      * A key that only contains a sensitive word, or names something else, is
-     * kept with its value.
+     * kept.
      *
      * @param  string  $key
      * @return void
@@ -113,7 +106,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * Secrets are redacted at any depth, and the shape of the values is kept.
+     * The shape of the values is kept.
      *
      * @return void
      */
@@ -126,8 +119,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A secret value is redacted under any key, and so is a sensitive parameter
-     * value.
+     * A sensitive parameter value too.
      *
      * @return void
      */
@@ -144,8 +136,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A provisioning URI is redacted wherever it appears in a string, in any
-     * case, and the rest of the string is kept.
+     * In any case, and the rest of the string is kept.
      *
      * @return void
      */
@@ -158,8 +149,6 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A string with no provisioning URI is kept as it is.
-     *
      * @return void
      */
     public function testKeepsAStringWithoutAProvisioningUri(): void
@@ -168,8 +157,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * Scalars are kept as they are, and a list's numeric keys are never read as
-     * names.
+     * A list's numeric keys are never read as names.
      *
      * @return void
      */
@@ -179,8 +167,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A plain object in a log's values becomes its public properties, keyed by
-     * its class, with the secrets in them redacted.
+     * Keyed by its class.
      *
      * @return void
      */
@@ -195,8 +182,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A collection becomes its array form, so a secret value in it is redacted
-     * rather than refusing to be encoded.
+     * So a secret value in it is redacted rather than refusing to be encoded.
      *
      * @return void
      */
@@ -208,8 +194,8 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * An object that encodes itself as JSON becomes its JSON form, and a string
-     * object its string form, each with the secrets in it redacted.
+     * A JSON object becomes its JSON form and a string object its string form,
+     * each redacted.
      *
      * @return void
      */
@@ -217,8 +203,6 @@ final class RedactorTest extends TestCase
     {
         $json = new class implements \JsonSerializable {
             /**
-             * The JSON form.
-             *
              * @return array<string, string>
              */
             #[\Override]
@@ -230,8 +214,6 @@ final class RedactorTest extends TestCase
 
         $string = new class implements \Stringable {
             /**
-             * The string form.
-             *
              * @return string
              */
             #[\Override]
@@ -246,9 +228,8 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * An object that throws rather than give its array, JSON or string form, an
-     * error included, is logged as its class alone, and what it holds is not read another way;
-     * the values beside it are still normalised.
+     * Errors included; what it holds is not read another way, and the values
+     * beside it are still normalised.
      *
      * @return void
      */
@@ -256,8 +237,6 @@ final class RedactorTest extends TestCase
     {
         $arrayable = new class implements Arrayable {
             /**
-             * Refuse the array form.
-             *
              * @return array<string, string>
              *
              * @throws \LogicException
@@ -271,8 +250,7 @@ final class RedactorTest extends TestCase
 
         $string = new class implements \Stringable {
             /**
-             * Fail to give the string form, with an error rather than an
-             * exception.
+             * With an error rather than an exception.
              *
              * @return string
              *
@@ -305,8 +283,6 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * Dates and enums are kept as they are.
-     *
      * @return void
      */
     public function testKeepsDatesAndEnums(): void
@@ -317,8 +293,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * Arrays and objects deeper than the walk reaches are truncated, so a
-     * recursive value ends, and a string at that depth is still redacted.
+     * So a recursive value ends; a string at that depth is still redacted.
      *
      * @return void
      */
@@ -348,8 +323,6 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * Only the first thousand entries of an array are kept.
-     *
      * @return void
      */
     public function testKeepsTheFirstThousandEntries(): void
@@ -363,8 +336,8 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A trace's arguments are bounded as logged values are: as deep as the walk
-     * reaches and no deeper, and to their first thousand entries.
+     * As deep as the walk reaches and no deeper, and to their first thousand
+     * entries.
      *
      * @return void
      */
@@ -382,8 +355,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * An object deeper than the walk reaches is normalised to the marker alone,
-     * while one at the deepest level is still named, holding it.
+     * One at the deepest level is still named, holding the marker.
      *
      * @return void
      */
@@ -411,9 +383,8 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A trace's arguments keep their objects, and lose every string that is a
-     * value collected, or contains one of six characters or more, and every
-     * string containing a value known to be sensitive, whatever its length.
+     * Objects are kept; a collected value goes when equal or from six
+     * characters, a known one whatever its length.
      *
      * @return void
      */
@@ -432,10 +403,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A code message (one handed to a sender, an email carrying a code, or a
-     * queued job sending one) is redacted from a trace's arguments and from a
-     * log's values, nested in an array too; a job sending another message is
-     * kept in a trace.
+     * Nested too; a job sending another message is kept in a trace.
      *
      * @return void
      */
@@ -454,9 +422,8 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * Normalising turns each object into its logged form, keyed by its class,
-     * and keeps secret values, code messages, exceptions, dates and enums, and
-     * scalars, as they are, bounded as the redaction is.
+     * Secret values, code messages, exceptions, dates, enums and scalars are
+     * kept as they are.
      *
      * @return void
      */
@@ -485,8 +452,8 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * An object nested in an object takes two levels of the bound, its own and
-     * its form's, so the fifth one down still keeps what it holds.
+     * Its own level and its form's, so the fifth one down still keeps what it
+     * holds.
      *
      * @return void
      */
@@ -504,8 +471,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * Values already normalised are redacted as they are, and a logged
-     * exception among them is scrubbed of the values given.
+     * A logged exception among them is scrubbed of the values given.
      *
      * @return void
      */
@@ -524,9 +490,8 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A logged exception is scrubbed of the sensitive values given too, while
-     * the strings beside it are kept, and a log's own strings are not matched
-     * against them.
+     * The strings beside it are kept, and a log's own strings are not matched
+     * against the values.
      *
      * @return void
      */
@@ -542,8 +507,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A message loses every occurrence of the sensitive values in it, and every
-     * provisioning URI.
+     * Every provisioning URI too.
      *
      * @return void
      */
@@ -558,7 +522,7 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * A log's values normalised and redacted, as a log record's are.
+     * Normalised and redacted, as a log record's values are.
      *
      * @param  array<array-key, mixed>  $values
      * @param  ?\SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $sensitive
@@ -570,8 +534,6 @@ final class RedactorTest extends TestCase
     }
 
     /**
-     * The value, nested in as many lists.
-     *
      * @param  mixed  $value
      * @param  int  $levels
      * @return array<int, mixed>

@@ -10,9 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 
 /**
- * A faulty revoker: it forgets the other session's sign-in at once, outside the
- * caller's transaction, so a revocation that rolls back still ends it; or,
- * given a failure, throws it instead.
+ * Forgets the other session's sign-in at once, outside the caller's
+ * transaction, so a revocation that rolls back still ends it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,27 +21,23 @@ use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 final readonly class ForgettingSessionRevoker implements SessionRevoker
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $otherSession
      * @param  string  $application
      * @param  ?\LogicException  $failure
      */
     public function __construct(
 
-        /** The store of the other session. */
+        /** The other session's store. */
         private ProofStore $otherSession,
 
-        /** The application the other session is signed in on. */
+        /** The other session's application. */
         private string $application,
 
-        /** The failure to throw instead of revoking, if any. */
+        /** Thrown instead of revoking. */
         private ?\LogicException $failure = null,
     ) {}
 
     /**
-     * Forget the other session's sign-in at once, or throw the failure.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @param  string  $application
@@ -60,8 +55,6 @@ final readonly class ForgettingSessionRevoker implements SessionRevoker
     }
 
     /**
-     * Forget the other session's sign-in at once, or throw the failure.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      *

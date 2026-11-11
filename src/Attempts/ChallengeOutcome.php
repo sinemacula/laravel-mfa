@@ -8,14 +8,8 @@ use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * How checking a code against a challenge ended, as whoever owns the challenge
- * reports it: passed; failed for the reason, which the owner has counted
- * through `ChallengeCounters::report()`; or refused for the reason before any
- * code was checked, which counted nothing, with when a lockout refusing it
- * ends, if it ends at a set time.
- *
- * The detail is for events and logs only: what the caller is told is the
- * reason.
+ * How a challenge check ended, as reported by the challenge's owner. A refusal
+ * means no code was checked and nothing was counted.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,8 +19,6 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final readonly class ChallengeOutcome
 {
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @param  bool  $counted
@@ -34,22 +26,20 @@ final readonly class ChallengeOutcome
      */
     private function __construct(
 
-        /** Why the code was not accepted, or `null` when it was. */
+        /** Null when passed; the only part the caller is told. */
         public ?FailureReason $reason,
 
-        /** What happened in detail, for events and logs only. */
+        /** For events and logs only. */
         public string $detail,
 
-        /** Whether the outcome was counted against the factor and the identity. */
+        /** Whether the factor and identity counters recorded it. */
         public bool $counted,
 
-        /** When the lockout refusing the challenge ends, when it ends at a set time. */
+        /** Lockout end, when refused by one that ends at a set time. */
         public ?CarbonImmutable $lockedUntil = null,
     ) {}
 
     /**
-     * The code answered the challenge, which it used up.
-     *
      * @return self
      */
     public static function passed(): self
@@ -58,7 +48,7 @@ final readonly class ChallengeOutcome
     }
 
     /**
-     * The code did not answer the challenge, and that was counted.
+     * The owner has counted the failure through `ChallengeCounters::report()`.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
@@ -70,8 +60,6 @@ final readonly class ChallengeOutcome
     }
 
     /**
-     * No code was checked, and nothing was counted.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @param  ?\Carbon\CarbonImmutable  $lockedUntil
@@ -83,8 +71,6 @@ final readonly class ChallengeOutcome
     }
 
     /**
-     * Whether the code answered the challenge.
-     *
      * @return bool
      */
     public function hasPassed(): bool

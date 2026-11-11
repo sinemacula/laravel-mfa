@@ -9,9 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 
 /**
- * A session revoker that notes each call and then runs what it wraps, if
- * anything, noting it once more when it wraps something, so what a default seam
- * of the package's own writes stays apart from what happens after it.
+ * Runs the revoker it wraps, if any, then notes the call, so the default seam's
+ * writes stay apart from what happens after them.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,8 +20,6 @@ use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 final readonly class SpySessionRevoker implements SessionRevoker
 {
     /**
-     * Constructor.
-     *
      * @param  \Tests\Fixtures\Hardening\LockOrderRecorder  $recorder
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\SessionRevoker  $wrapped
      * @param  ?\Closure(): void  $onFactorRemoved
@@ -32,16 +29,14 @@ final readonly class SpySessionRevoker implements SessionRevoker
         /** The log the calls go to. */
         private LockOrderRecorder $recorder,
 
-        /** The revoker the calls are passed to, if any. */
+        /** Passed each call. */
         private ?SessionRevoker $wrapped = null,
 
-        /** What else happens as the identity's other sessions are revoked for a factor's removal. */
+        /** Runs first on a factor's removal. */
         private ?\Closure $onFactorRemoved = null,
     ) {}
 
     /**
-     * Note the call and pass it on.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @param  string  $application
@@ -69,8 +64,6 @@ final readonly class SpySessionRevoker implements SessionRevoker
     }
 
     /**
-     * Note the call and pass it on.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      */

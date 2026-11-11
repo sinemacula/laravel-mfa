@@ -7,11 +7,8 @@ namespace SineMacula\Laravel\Mfa\Applications;
 use Illuminate\Contracts\Config\Repository;
 
 /**
- * Reads one application's raw block from `mfa.applications.{name}` for
- * `ApplicationSettings`, on every call: the block and its nested blocks, each
- * refused when it is not an array or holds a key it does not know, its
- * `enabled` flags, its lists of factor type names, and the full key of each
- * setting for the messages that name it.
+ * Reads one application's raw block from `mfa.applications.{name}` on every
+ * call, refusing anything malformed or unknown.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,7 +17,7 @@ use Illuminate\Contracts\Config\Repository;
  */
 final readonly class ApplicationBlock
 {
-    /** @var array<string, list<string>|null> The keys an application block may hold, and the keys each nested block may hold. */
+    /** @var array<string, list<string>|null> Known keys, and each nested block's known keys. */
     private const array KEYS = [
         'types'          => null,
         'requirement'    => null,
@@ -33,24 +30,20 @@ final readonly class ApplicationBlock
     ];
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  string  $name
      */
     public function __construct(
 
-        /** Configuration the block is read from on every call. */
+        /** Read on every call. */
         private Repository $config,
 
-        /** The application's name: its key in `mfa.applications`. */
+        /** Its key in `mfa.applications`. */
         private string $name,
     ) {}
 
     /**
-     * The application's block, refusing one that is not an array or holds a key
-     * the block does not know, and refusing `mfa.applications` when it is not
-     * an array; an application with no block has every default.
+     * An application with no block has every default.
      *
      * @return array<array-key, mixed>
      *
@@ -80,9 +73,6 @@ final readonly class ApplicationBlock
     }
 
     /**
-     * A nested block of the application's settings, refusing one that is not an
-     * array or holds a key it does not know.
-     *
      * @param  string  $name
      * @return array<array-key, mixed>
      *
@@ -106,8 +96,7 @@ final readonly class ApplicationBlock
     }
 
     /**
-     * Whether the `enabled` flag of a nested block is on, `false` when it is
-     * not set.
+     * Off when not set.
      *
      * @param  string  $name
      * @return bool
@@ -126,9 +115,6 @@ final readonly class ApplicationBlock
     }
 
     /**
-     * The value as a list of distinct factor type names, refusing anything else
-     * under the setting's key.
-     *
      * @param  string  $name
      * @param  mixed  $value
      * @return list<string>
@@ -152,8 +138,6 @@ final readonly class ApplicationBlock
     }
 
     /**
-     * The full key of a setting of the application, or of its block.
-     *
      * @param  ?string  $setting
      * @return string
      */

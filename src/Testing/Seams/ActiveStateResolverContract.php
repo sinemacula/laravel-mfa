@@ -9,8 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
 /**
- * What every `ActiveStateResolver` must guarantee, as assertions: an active
- * identity is active, and an inactive one is not.
+ * What every `ActiveStateResolver` must guarantee: an active identity is
+ * active, and an inactive one is not.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,8 +25,6 @@ final class ActiveStateResolverContract
     private function __construct() {}
 
     /**
-     * An active identity is active.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver  $resolver
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $active
      * @return void
@@ -37,8 +35,6 @@ final class ActiveStateResolverContract
     }
 
     /**
-     * An inactive identity is not active.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver  $resolver
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $inactive
      * @return void

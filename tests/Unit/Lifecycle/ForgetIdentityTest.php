@@ -29,11 +29,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Unit tests for `ForgetIdentity`, which deletes everything the package holds
- * for an identity being deleted, and the `HasFactors` trait's deleting hook
- * that calls it: the identity's factors, enrolments, codes, recovery codes,
- * passkey associations and factor state go, and another identity's stay.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -45,9 +40,6 @@ final class ForgetIdentityTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Forgetting an identity deletes its records in every table and leaves
-     * another identity's.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -67,8 +59,6 @@ final class ForgetIdentityTest extends TestCase
     }
 
     /**
-     * Deleting an Eloquent identity that uses the trait forgets it.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -85,9 +75,6 @@ final class ForgetIdentityTest extends TestCase
     }
 
     /**
-     * Deleting a model that uses the trait but is not an identity forgets
-     * nothing.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -109,9 +96,6 @@ final class ForgetIdentityTest extends TestCase
     }
 
     /**
-     * An identity that is not an Eloquent model is forgotten by its class name
-     * and key.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -128,9 +112,6 @@ final class ForgetIdentityTest extends TestCase
     }
 
     /**
-     * The factors of an application's own model are found by the owner columns
-     * its relation names, and only the identity's are deleted.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -164,8 +145,6 @@ final class ForgetIdentityTest extends TestCase
     }
 
     /**
-     * An integer key is matched as the string the owner columns store.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -182,7 +161,7 @@ final class ForgetIdentityTest extends TestCase
     }
 
     /**
-     * Give the identity one record in every table.
+     * One record in every table.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return void
@@ -226,8 +205,6 @@ final class ForgetIdentityTest extends TestCase
     }
 
     /**
-     * How many records the identity has in each table.
-     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return array<string, int>
      */
@@ -260,8 +237,6 @@ final class ForgetIdentityTest extends TestCase
     }
 
     /**
-     * The identity's owner columns.
-     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return array{authenticatable_type: string, authenticatable_id: string}
      */
@@ -274,8 +249,6 @@ final class ForgetIdentityTest extends TestCase
     }
 
     /**
-     * Create a test user.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */

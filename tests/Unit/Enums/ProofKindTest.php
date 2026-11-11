@@ -10,9 +10,6 @@ use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 
 /**
- * Unit tests for the `ProofKind` enum: its stable values, and the purpose a
- * kind of proof must carry.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,7 +19,7 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 final class ProofKindTest extends TestCase
 {
     /**
-     * The proof kinds, in order, each case name with its stable value.
+     * Pinned so a rename fails.
      *
      * @return void
      */
@@ -37,8 +34,8 @@ final class ProofKindTest extends TestCase
     }
 
     /**
-     * A first factor is proved at sign-in and a reauthentication with it
-     * carries the reauthenticate purpose; the others may serve any purpose.
+     * A first factor is proved at sign-in and reauthenticates with that
+     * purpose; the others serve any.
      *
      * @return void
      */
@@ -51,8 +48,6 @@ final class ProofKindTest extends TestCase
     }
 
     /**
-     * Only a recovery code is proved without a channel.
-     *
      * @return void
      */
     public function testOnlyARecoveryCodeHasNoChannel(): void

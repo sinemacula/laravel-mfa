@@ -15,58 +15,42 @@ use SineMacula\Laravel\Mfa\Requirements\FreshnessBounds;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * One application's settings in `mfa.applications.{name}`: what it accepts and
- * offers of the factors, recovery codes and attempt state an identity holds in
- * every application. Factors are stored once per identity; an application only
- * chooses the factor types it enables, when it requires one, whether it accepts
- * recovery codes, whether a pending session may enrol its first factor, its
- * limits on enrolments made through it, its TOTP window, the requirement each
- * operation's step-up must meet, and the first factor its guard uses.
+ * One application's settings in `mfa.applications.{name}`, read on every call.
+ * Factors are stored once per identity; an application chooses what it accepts.
  *
- * Every setting is read from the configuration on every call, so a change
- * applies at once and nothing is cached between requests. A key missing from
- * the block takes the production-safe default: no type enabled, no factor
- * required, no recovery codes and no bootstrap. An application with no block at
- * all takes every default, so a name nobody configured enables nothing. A
- * malformed value, or a key the block does not know, fails closed with an
- * `InvalidArgumentException` naming the key; the package checks every
- * configured application when it boots and `mfa:check` reports it.
+ * A missing key takes the safe default, so an unconfigured name enables
+ * nothing, and a malformed value fails closed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final readonly class ApplicationSettings
 {
-    /** @var string The key holding every application's block. */
+    /** @var string */
     public const string APPLICATIONS = 'mfa.applications';
 
-    /** @var int The maximum age, in seconds, of the additional verification each of the package's own operations asks for when the application sets nothing. */
+    /** @var int Default step-up age for the package's own operations, in seconds. */
     public const int FRESHNESS_SECONDS = 900;
 
-    /** @var \SineMacula\Laravel\Mfa\Applications\ApplicationBlock The application's block, read on every call. */
+    /** @var \SineMacula\Laravel\Mfa\Applications\ApplicationBlock Read on every call. */
     private ApplicationBlock $block;
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  string  $name
      */
     public function __construct(
 
-        /** Configuration the settings are read from on every call. */
+        /** Read on every call. */
         private Repository $config,
 
-        // The application's name: its key in `mfa.applications`.
+        // Its key in `mfa.applications`.
         string $name,
     ) {
         $this->block = new ApplicationBlock($config, $name);
     }
 
     /**
-     * The names of the configured applications, in the order they are
-     * configured.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return list<string>
      *
@@ -95,8 +79,6 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * The factor types the application enables, none unless listed.
-     *
      * @return list<string>
      *
      * @throws \InvalidArgumentException
@@ -107,8 +89,6 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * Whether the application enables the factor type.
-     *
      * @param  string  $type
      * @return bool
      *
@@ -120,8 +100,7 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * When the application requires an additional factor: `never` (the
-     * default), `enrolled` or `always`.
+     * Defaults to `never`.
      *
      * @return \SineMacula\Laravel\Mfa\Enums\RequirementMode
      *
@@ -140,8 +119,6 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * Whether the application accepts recovery codes, off by default.
-     *
      * @return bool
      *
      * @throws \InvalidArgumentException
@@ -152,8 +129,7 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * The assurance level a session needs before it may be issued recovery
-     * codes: `aal2` by default, or `aal1` or `aal3`.
+     * The level a session needs to be issued recovery codes; `aal2` by default.
      *
      * @return \SineMacula\Laravel\Mfa\Enums\AssuranceLevel
      *
@@ -172,8 +148,7 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * Whether a pending session with no factor may enrol its first one, off by
-     * default.
+     * Whether a pending session with no factor may enrol its first one.
      *
      * @return bool
      *
@@ -185,8 +160,7 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * The factor types a pending session may enrol as its first one: types the
-     * application enables, at least one when bootstrap is on.
+     * Enabled types only, and at least one when bootstrap is on.
      *
      * @return list<string>
      *
@@ -211,9 +185,7 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * How many confirmed factors of one type an identity may enrol through the
-     * application, from 1 to the total limit; 5 by default, or the total limit
-     * when that is lower.
+     * Defaults to 5, or the total limit when lower.
      *
      * @return int
      *
@@ -227,9 +199,6 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * How many confirmed factors an identity may enrol through the application
-     * in total, 1 to 50; 10 by default.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -240,9 +209,6 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * How many enrolments an identity may have pending through the application
-     * at once, 1 to 10; 2 by default.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -253,8 +219,7 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * How many TOTP time steps either side of the current one the application
-     * accepts, 0 to 3; `mfa.totp.window` when it sets none.
+     * Falls back to `mfa.totp.window`.
      *
      * @return int
      *
@@ -270,16 +235,8 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * The requirement each operation's step-up must meet: the package's own
-     * operations ask for an additional verification within `FRESHNESS_SECONDS`
-     * unless the application sets them, and any operation of the application's
-     * own it names has the requirement it sets. An entry is either a number of
-     * seconds, 1 to 86400, for an additional verification within that age, or a
-     * serialised requirement (see `Requirement::fromArray()`) asking for at
-     * least one part, each with a `max_age` of 1 to 86400 seconds. An entry
-     * replaces the package's default for its operation whole. Names are the
-     * block's keys, read whole, never as a dotted path, and must be in the form
-     * an operation's name takes (see `Operation::isName()`).
+     * Each operation's step-up requirement. An entry replaces the default
+     * whole; names are read as keys, never as dotted paths.
      *
      * @return array<string, \SineMacula\Laravel\Mfa\Requirements\Requirement>
      *
@@ -310,8 +267,7 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * The requirement the operation's step-up must meet, or `null` when neither
-     * the package nor the application names it.
+     * Null when neither the package nor the application names the operation.
      *
      * @param  string  $operation
      * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
@@ -324,9 +280,6 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * The first factor the application declares its guard uses, or `null` when
-     * it declares none.
-     *
      * @return ?\SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactor
      *
      * @throws \InvalidArgumentException
@@ -351,8 +304,6 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * Read every setting, failing closed on the first that is malformed.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -371,9 +322,8 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * One entry of the `freshness` block as a requirement: seconds for an
-     * additional verification within that age, or a serialised requirement
-     * asking for at least one part, every part within a day.
+     * Seconds for an additional verification within that age, or a serialised
+     * requirement with at least one part, each within a day.
      *
      * @param  string  $key
      * @param  mixed  $entry
@@ -401,8 +351,6 @@ final readonly class ApplicationSettings
     }
 
     /**
-     * A limit from the `limits` block, from 1 to its greatest value.
-     *
      * @param  string  $name
      * @param  int  $default
      * @param  int  $most

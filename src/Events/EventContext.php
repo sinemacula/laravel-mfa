@@ -5,15 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Events;
 
 /**
- * The shape of every event's context: who and what the event is about, as an
- * allowlist of scalar values. Every key is present, `null` when it is not
- * known: the identity's type and id, the principal's type and id, the active
- * tenant's id, the application, the session's id, and the request's IP address
- * and user agent.
- *
- * A context resolver an application binds may return anything; what reaches an
- * event is cut down to these keys and to integers and strings, so a model, an
- * array or an object it returns by mistake never travels in a payload.
+ * The allowlist of every event's context. A bound resolver may return anything,
+ * so values are cut to these keys and to integers and strings.
  *
  * @api
  *
@@ -22,7 +15,7 @@ namespace SineMacula\Laravel\Mfa\Events;
  */
 final class EventContext
 {
-    /** @var list<string> The keys of every event's context, in order. */
+    /** @var list<string> */
     public const array KEYS = [
         'identity_type',
         'identity_id',
@@ -41,9 +34,6 @@ final class EventContext
     private function __construct() {}
 
     /**
-     * Cut the values down to the context's keys, each an integer, a string or
-     * `null`; a key that is missing, or holds anything else, is `null`.
-     *
      * @param  array<array-key, mixed>  $values
      * @return array<string, int|string|null>
      */
@@ -61,9 +51,6 @@ final class EventContext
     }
 
     /**
-     * An identifier as a string: an integer or a string as one, anything else
-     * `null`.
-     *
      * @param  mixed  $key
      * @return ?string
      */

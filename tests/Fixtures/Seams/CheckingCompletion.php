@@ -12,9 +12,8 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
- * A pending completion and step-up that accept a successful result bound to the
- * session they expect, and refuse anything else by throwing; or, when it does
- * not check, a faulty one that accepts every result.
+ * Accepts only a result bound to the expected session, or every result when it
+ * does not check.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,34 +22,30 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
  */
 final class CheckingCompletion implements PendingCompletion, StepUp
 {
-    /** @var list<\SineMacula\Laravel\Mfa\Verification\VerificationResult> The results accepted. */
+    /** @var list<\SineMacula\Laravel\Mfa\Verification\VerificationResult> */
     public array $accepted = [];
 
-    /** @var list<\SineMacula\Laravel\Mfa\Context\CallerContext> The callers each result was handed with. */
+    /** @var list<\SineMacula\Laravel\Mfa\Context\CallerContext> The callers each completion was handed. */
     public array $callers = [];
 
     /**
-     * Constructor.
-     *
      * @param  string  $session
      * @param  bool  $checks
      * @param  ?object  $completion
      */
     public function __construct(
 
-        /** The session an active session's result must be bound to. */
+        /** The session a step-up result must be bound to. */
         private readonly string $session,
 
         /** Whether results are checked at all. */
         private readonly bool $checks = true,
 
-        /** What a result that is accepted returns. */
+        /** Returned for an accepted result. */
         private readonly ?object $completion = null,
     ) {}
 
     /**
-     * Accept a successful result bound to the pending session.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object
@@ -66,8 +61,6 @@ final class CheckingCompletion implements PendingCompletion, StepUp
     }
 
     /**
-     * Accept a successful result bound to the active session.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return ?object
@@ -81,9 +74,6 @@ final class CheckingCompletion implements PendingCompletion, StepUp
     }
 
     /**
-     * Accept the result, refusing one that failed or is bound to another
-     * session when results are checked.
-     *
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @param  string  $session
      * @return ?object

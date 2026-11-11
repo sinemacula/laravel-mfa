@@ -9,12 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Testing\Seams\PendingSessionResolverContract;
 
 /**
- * The `PendingSessionResolver` contract kit: a request with no pending
- * credential has no pending session, and one whose credential does not validate
- * is refused by throwing.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `PendingSessionResolverContract`.
+ * The `PendingSessionResolver` contract kit; each check delegates to
+ * `PendingSessionResolverContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -26,8 +22,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\PendingSessionResolverContract;
 trait PendingSessionResolverTests
 {
     /**
-     * A request with no pending credential has no pending session.
-     *
      * @return void
      */
     public function testPendingSessionResolverFindsNoneWithoutACredential(): void
@@ -36,9 +30,6 @@ trait PendingSessionResolverTests
     }
 
     /**
-     * A request whose pending credential does not validate is refused by
-     * throwing.
-     *
      * @return void
      */
     public function testPendingSessionResolverRefusesAnInvalidCredential(): void
@@ -47,22 +38,17 @@ trait PendingSessionResolverTests
     }
 
     /**
-     * The resolver under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver
      */
     abstract protected function pendingSessionResolver(): PendingSessionResolver;
 
     /**
-     * A request that carries no pending credential.
-     *
      * @return \Illuminate\Http\Request
      */
     abstract protected function requestWithoutPendingCredential(): Request;
 
     /**
-     * A request carrying a pending credential that does not validate, or `null`
-     * for a resolver with no pending credentials at all.
+     * An invalid pending credential, or `null` for a resolver that has none.
      *
      * @return ?\Illuminate\Http\Request
      */

@@ -10,15 +10,8 @@ use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * An identity's re-enrolment obligation: the durable flag a reset leaves on its
- * row in the identity states table, which obliges it to enrol again before a
- * sign-in completes and ends when a factor is confirmed. While it is set, every
- * application requires an additional verification of the identity's sign-ins,
- * whatever its own setting.
- *
- * The flag is read from the write connection, so a replica lagging behind a
- * reset never lets a sign-in skip it. An identity with no row has no
- * obligation.
+ * The flag a reset leaves, requiring an additional verification at sign-in
+ * until a factor is confirmed; read from the write connection.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,7 +20,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  */
 final class ReenrollmentObligation
 {
-    /** @var string The column holding the obligation. */
+    /** @var string Column on the identity states table. */
     private const string COLUMN = 'reenrollment_required';
 
     /**
@@ -36,8 +29,6 @@ final class ReenrollmentObligation
     private function __construct() {}
 
     /**
-     * Whether the identity is obliged to enrol again.
-     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return bool
      *
@@ -52,10 +43,8 @@ final class ReenrollmentObligation
     }
 
     /**
-     * Record whether the identity is obliged to enrol again, as a reset states:
-     * `false` clears an obligation an earlier reset left. Called inside the
-     * identity's factor state transaction, whose lock holds the row, it commits
-     * or rolls back with the reset.
+     * Called under the identity's factor state lock, so it commits or rolls
+     * back with the reset.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @param  bool  $required
@@ -70,9 +59,8 @@ final class ReenrollmentObligation
     }
 
     /**
-     * End the identity's obligation, as confirming a factor does. Called inside
-     * the identity's factor state transaction, it commits or rolls back with
-     * the confirmation.
+     * Called under the identity's factor state lock, so it commits or rolls
+     * back with the confirmation.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return void

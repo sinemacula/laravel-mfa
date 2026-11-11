@@ -13,20 +13,11 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * Default shipped Factor Eloquent model.
+ * The shipped factor model, replaceable through `mfa.factor.model`. Route
+ * binding finds only the caller's own factors.
  *
- * Polymorphic factor record bound to an authenticatable identity via the
- * `authenticatable()` morphTo relation. ULID primary key. Kept on the storage
- * connection with the package's other tables. Swappable via
- * `config('mfa.factor.model')` / `mfa.factor.table` as the package's default
- * Eloquent adapter. Subclasses MUST continue satisfying the `Factor`
- * persistence boundary. An implicit route binding of it finds only the caller's
- * own factors (see `Concerns\ResolvesFactorRouteBinding`).
- *
- * The class-level suppression is for one method: the model-behaviour rule
- * reports a trait's public methods at the class that imports them, and its list
- * of framework hooks does not include Eloquent's trait initialiser,
- * `initializeActsAsFactor()`, which only sets casts.
+ * The suppression is for the trait initialiser `initializeActsAsFactor()`,
+ * which the model-behaviour rule does not know as a framework hook.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -60,7 +51,7 @@ class Factor extends Model implements EloquentFactor
 {
     use ActsAsFactor, HasUlids, ResolvesFactorRouteBinding;
 
-    /** @var list<string> The attributes that are mass assignable. */
+    /** @var list<string> */
     protected $fillable = [
         'authenticatable_type',
         'authenticatable_id',
@@ -83,14 +74,14 @@ class Factor extends Model implements EloquentFactor
         'last_used_at',
     ];
 
-    /** @var list<string> The attributes that should be hidden for serialisation. */
+    /** @var list<string> */
     protected $hidden = [
         'secret',
         'destination',
         'credential_reference',
     ];
 
-    /** @var array<string, mixed> The attributes' values before anything is set: a new factor is pending, not preferred and has not failed. */
+    /** @var array<string, mixed> */
     protected $attributes = [
         'status'               => 'pending',
         'preferred'            => false,
@@ -98,16 +89,7 @@ class Factor extends Model implements EloquentFactor
     ];
 
     /**
-     * Create a new Factor bound to the package-configured table name and,
-     * unless the class names a connection of its own, the storage connection
-     * (see `Database\StorageConnection`). Reads both lazily on each
-     * instantiation so runtime config swaps (tests, tenancy) take effect
-     * immediately. They have to be applied here, before Eloquent reads them, so
-     * this is construction rather than model behaviour.
-     *
-     * The connection is always named, the default one included: Eloquent gives
-     * a related model that names none its parent's connection, so an identity
-     * on another connection would otherwise read and write its factors there.
+     * Reads the table and connection per instance so config changes apply.
      *
      * @param  array<string, mixed>  $attributes
      *
@@ -123,8 +105,6 @@ class Factor extends Model implements EloquentFactor
     }
 
     /**
-     * Columns that receive a generated unique identifier on insert.
-     *
      * @return array<int, string>
      */
     #[\Override]
@@ -134,8 +114,6 @@ class Factor extends Model implements EloquentFactor
     }
 
     /**
-     * The attributes that should be cast.
-     *
      * @return array<string, string>
      */
     #[\Override]

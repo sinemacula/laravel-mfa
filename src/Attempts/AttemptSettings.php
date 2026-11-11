@@ -8,12 +8,7 @@ use Illuminate\Contracts\Config\Repository;
 use SineMacula\Laravel\Mfa\Config\IntegerSetting;
 
 /**
- * The attempt settings in `mfa.attempts`, read on every call and validated as
- * they are read: the caps on failed attempts per factor, per identity and per
- * IP address, the window the identity and IP caps count over, how long a
- * lockout lasts, and the failure ceiling at which a factor is disabled. A value
- * outside its bounds fails closed with an `InvalidArgumentException` naming the
- * key; the package checks them when it boots and `mfa:check` reports them.
+ * The `mfa.attempts` settings, read and bounds-checked on every call.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,10 +17,10 @@ use SineMacula\Laravel\Mfa\Config\IntegerSetting;
  */
 final readonly class AttemptSettings
 {
-    /** @var string Prefix of every attempt setting's key. */
+    /** @var string */
     private const string PREFIX = 'mfa.attempts.';
 
-    /** @var array<string, array{0: int, 1: int, 2: int}> Default, least and greatest value of each setting. */
+    /** @var array<string, array{0: int, 1: int, 2: int}> Default, minimum and maximum per setting. */
     private const array NUMBERS = [
         'factor_limit'    => [5, 1, 20],
         'identity_limit'  => [20, 1, 100],
@@ -36,19 +31,15 @@ final readonly class AttemptSettings
     ];
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      */
     public function __construct(
 
-        /** Configuration the settings are read from on every call. */
+        /** Read on every call. */
         private Repository $config,
     ) {}
 
     /**
-     * How many failed attempts in a row lock a factor, 1 to 20.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -59,8 +50,7 @@ final readonly class AttemptSettings
     }
 
     /**
-     * How many failed attempts across an identity's factors and recovery codes
-     * within the window lock the identity, 1 to 100.
+     * Failures across the identity's factors and recovery codes in the window.
      *
      * @return int
      *
@@ -72,9 +62,6 @@ final readonly class AttemptSettings
     }
 
     /**
-     * How many failed attempts from one IP address within the window throttle
-     * it, 1 to 10000.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -85,8 +72,6 @@ final readonly class AttemptSettings
     }
 
     /**
-     * The window the identity and IP caps count over, in seconds, 60 to 86400.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -97,8 +82,6 @@ final readonly class AttemptSettings
     }
 
     /**
-     * How long a lockout lasts, in seconds, 60 to 86400.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -109,9 +92,8 @@ final readonly class AttemptSettings
     }
 
     /**
-     * How many consecutive failures disable a factor until the person proves
-     * another, it is rebound or the identity is reset, 1 to 100 (the most NIST
-     * SP 800-63B-4 allows).
+     * Consecutive failures that disable a factor; capped at 100 per NIST SP
+     * 800-63B-4.
      *
      * @return int
      *
@@ -123,8 +105,6 @@ final readonly class AttemptSettings
     }
 
     /**
-     * Read every setting, failing closed on the first that is out of bounds.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -137,8 +117,6 @@ final readonly class AttemptSettings
     }
 
     /**
-     * Read a setting from its least to its greatest value.
-     *
      * @param  string  $key
      * @return int
      *

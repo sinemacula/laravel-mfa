@@ -5,11 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Requirements;
 
 /**
- * The bounds of a requirement a step-up is checked against: every part it asks
- * for carries a maximum age, of at most a day. An operation's configured
- * requirement and a caller's requirement are both held to them, so whatever
- * judges the step-up, the package's own gate or one an authentication layer's
- * adapter binds, is always given a bounded age to judge.
+ * Holds a step-up's requirement to a maximum age of at most a day on every
+ * part, so any gate judging it has a bounded age.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,7 +15,7 @@ namespace SineMacula\Laravel\Mfa\Requirements;
  */
 final class FreshnessBounds
 {
-    /** @var int The longest maximum age a step-up's requirement may give a part, in seconds. */
+    /** @var int Longest maximum age a part may carry, in seconds. */
     public const int MOST_SECONDS = 86400;
 
     /**
@@ -27,9 +24,7 @@ final class FreshnessBounds
     private function __construct() {}
 
     /**
-     * Return the requirement, refusing one with a part that carries no maximum
-     * age or one longer than a day. A requirement's maximum ages are at least a
-     * second already.
+     * Refuse a part with no maximum age or one longer than a day.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  string  $subject

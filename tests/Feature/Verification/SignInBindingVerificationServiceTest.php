@@ -38,10 +38,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * One captured binding (the owner, the application, the sign-in and the
- * purpose) runs through a code's issue, its check and the proof, so a code
- * answers only the sign-in it was sent in, whatever the Laravel session, and a
- * sign-in that changes under a verification spends and reports nothing.
+ * One captured binding of owner, application, sign-in and purpose runs from a
+ * code's issue to its proof, so a code answers only the sign-in it was sent in.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -67,8 +65,6 @@ final class SignInBindingVerificationServiceTest extends TestCase
     use ArrangesVerification;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -80,8 +76,6 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -93,8 +87,7 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A code sent in sign-in A, on one Laravel session, answers nothing once B
-     * has begun on that same session, and B's own code works.
+     * On the same Laravel session, B's own code works.
      *
      * @return void
      */
@@ -121,8 +114,8 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A store that switches sign-in between capture and lock refuses the
-     * verification as not found, counting, spending and reporting nothing.
+     * The store switches sign-in between capture and lock; nothing is counted,
+     * spent or reported.
      *
      * @return void
      */
@@ -144,7 +137,7 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A store that switches sign-in between capture and lock sends nothing.
+     * The store switches sign-in between capture and lock.
      *
      * @return void
      */
@@ -164,8 +157,7 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A guard that fires no event and calls no hook leaves no sign-in, so
-     * nothing is sent or verified for it.
+     * A guard that fires no event and calls no hook leaves no sign-in.
      *
      * @return void
      */
@@ -187,8 +179,7 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A pending session's code and proof carry its public id, with no sign-in
-     * in any other session of the Laravel session.
+     * With no sign-in in any other session of the Laravel session.
      *
      * @return void
      */
@@ -209,8 +200,7 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * The pending id survives activation, so a code sent while pending answers
-     * for the same sign-in and purpose once it is active.
+     * The pending id survives activation.
      *
      * @return void
      */
@@ -233,7 +223,7 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A code for a sign-in never answers a step-up, and the reverse.
+     * A sign-in code never answers a step-up, and the reverse.
      *
      * @return void
      */
@@ -256,8 +246,6 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * The routes a submission can take.
-     *
      * @return iterable<string, array{0: string}>
      */
     public static function routes(): iterable
@@ -271,8 +259,8 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A proof names the identity, the application, the session and the purpose,
-     * on each route, and the store's own sign-in is the one named.
+     * The identity, application, session and purpose, on each route; the
+     * store's own sign-in is the one named.
      *
      * @param  string  $route
      * @return void
@@ -291,8 +279,8 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * The default pending completion refuses a result when the store's current
-     * sign-in is not the pending id, and everything rolls back.
+     * When the store's current sign-in is not the pending id; everything rolls
+     * back.
      *
      * @return void
      */
@@ -312,8 +300,7 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A pending session that does not allow the action serves nothing, and the
-     * guard's user is not served in its place.
+     * The guard's user is not served in its place.
      *
      * @return void
      */
@@ -333,8 +320,7 @@ final class SignInBindingVerificationServiceTest extends TestCase
     }
 
     /**
-     * A pending credential the bound resolver cannot validate is reported by
-     * the resolver throwing, which is not caught, and nothing is counted.
+     * The resolver's exception is not caught, and nothing is counted.
      *
      * @return void
      */

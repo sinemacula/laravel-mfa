@@ -21,24 +21,9 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * The default `LastFactorPolicy`: required MFA cannot be turned off by the
- * person it applies to.
- *
- * While the bound `IdentityRequirement` requires something of the identity, or
- * any configured application always requires a factor, a factor may be removed
- * only when another remains that some configured application accepts:
- * confirmed, not disabled at the failure ceiling, of a type an application
- * enables, and, for a passkey, with an association that matches it (see
- * `Passkeys\PasskeyAssociations`). "Last" means the last acceptable one, not
- * the last row, so a pending factor, a disabled one, one of a type no
- * application enables, or a passkey that is unusable for want of its
- * association does not keep the identity covered; and an identity's only factor
- * stays even when it is itself unusable. Without such a requirement any factor
- * may be removed. It knows nothing of tenants; an adapter rebinds it to consult
- * a tenant's policy as well.
- *
- * It decides on the factors the caller gives it and takes no lock, so it can be
- * asked before the identity's lock is held and again under it.
+ * While a factor is required, refuses removing the last one some application
+ * accepts, so required MFA cannot be turned off by the person it applies to.
+ * Takes no lock, so it can be asked before the identity's lock and under it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,27 +31,23 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 final readonly class RequiredFactorPolicy implements LastFactorPolicy
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations  $associations
      */
     public function __construct(
 
-        /** The configuration the applications are read from on every call. */
+        /** Read on every call so a changed application applies. */
         private Repository $config,
 
-        /** The container the identity's requirement is resolved from on every call. */
+        /** The identity requirement is resolved on every call. */
         private Container $container,
 
-        /** The association records a passkey factor is usable only with. */
+        /** A passkey factor is usable only with its association. */
         private PasskeyAssociations $associations,
     ) {}
 
     /**
-     * Whether the factor may be removed, on the factors given.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -96,10 +77,6 @@ final readonly class RequiredFactorPolicy implements LastFactorPolicy
     }
 
     /**
-     * Whether the factor keeps a required factor covered: confirmed, not
-     * disabled at the failure ceiling, of a type some application enables, and,
-     * for a passkey, still associated with the owner.
-     *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  list<string>  $types
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
@@ -119,8 +96,8 @@ final readonly class RequiredFactorPolicy implements LastFactorPolicy
     }
 
     /**
-     * Whether a factor is required of the identity: by the bound identity
-     * requirement, or by any configured application that always requires one.
+     * Required by the bound identity requirement or any application that always
+     * requires a factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -145,8 +122,6 @@ final readonly class RequiredFactorPolicy implements LastFactorPolicy
     }
 
     /**
-     * Every factor type any configured application enables.
-     *
      * @return list<string>
      *
      * @throws \InvalidArgumentException

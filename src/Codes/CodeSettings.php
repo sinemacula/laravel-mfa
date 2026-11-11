@@ -8,13 +8,7 @@ use Illuminate\Contracts\Config\Repository;
 use SineMacula\Laravel\Mfa\Config\IntegerSetting;
 
 /**
- * The delivered code settings in `mfa.codes`, read on every call and validated
- * as they are read: the length and lifetime of a code sent by SMS or email, how
- * many attempts one challenge allows and how long its resends may run, the
- * cooldown before another code may be sent, the caps on how many are sent and
- * the email message class. A value outside its bounds fails closed with an
- * `InvalidArgumentException` naming the key; the package checks them when it
- * boots and `mfa:check` reports them.
+ * The `mfa.codes` settings, read and bounds-checked on every call.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,19 +17,19 @@ use SineMacula\Laravel\Mfa\Config\IntegerSetting;
  */
 final readonly class CodeSettings
 {
-    /** @var string Prefix of every code setting's key. */
+    /** @var string */
     private const string PREFIX = 'mfa.codes.';
 
-    /** @var int The resend cooldown when none is configured, in seconds; its greatest is the code lifetime. */
+    /** @var int Default resend cooldown, in seconds. */
     private const int RESEND_COOLDOWN_SECONDS = 60;
 
-    /** @var int The challenge lifetime when none is configured, in minutes; its least is the code lifetime. */
+    /** @var int Default challenge lifetime, in minutes. */
     private const int CHALLENGE_TTL_MINUTES = 30;
 
-    /** @var int The greatest challenge lifetime, in minutes. */
+    /** @var int Maximum challenge lifetime, in minutes. */
     private const int MAX_CHALLENGE_TTL_MINUTES = 60;
 
-    /** @var array<string, array{0: int, 1: int, 2: int}> Default, least and greatest value of each other numeric setting. */
+    /** @var array<string, array{0: int, 1: int, 2: int}> Default, minimum and maximum per setting. */
     private const array NUMBERS = [
         'length'              => [6, 6, 10],
         'ttl_minutes'         => [10, 1, 10],
@@ -46,19 +40,15 @@ final readonly class CodeSettings
     ];
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      */
     public function __construct(
 
-        /** Configuration the settings are read from on every call. */
+        /** Read on every call. */
         private Repository $config,
     ) {}
 
     /**
-     * The number of digits in a code, 6 to 10.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -69,8 +59,6 @@ final readonly class CodeSettings
     }
 
     /**
-     * How long a code works after it is sent, in minutes, 1 to 10.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -81,8 +69,7 @@ final readonly class CodeSettings
     }
 
     /**
-     * How many codes may be checked against one challenge, 1 to 10. A resend
-     * keeps the count, so a new code never brings new attempts.
+     * Attempts per challenge; a resend keeps the count.
      *
      * @return int
      *
@@ -94,9 +81,8 @@ final readonly class CodeSettings
     }
 
     /**
-     * How long a challenge lasts from its first code, in minutes, from the code
-     * lifetime to 60: a resend sends a new code for the same challenge, which
-     * never works past this.
+     * Challenge lifetime from its first code, in minutes; resent codes never
+     * outlive it.
      *
      * @return int
      *
@@ -108,8 +94,7 @@ final readonly class CodeSettings
     }
 
     /**
-     * How long after a code is sent another may be sent for the same challenge,
-     * in seconds, from 0 to the code lifetime.
+     * Seconds before a challenge may resend.
      *
      * @return int
      *
@@ -121,8 +106,6 @@ final readonly class CodeSettings
     }
 
     /**
-     * How many codes one factor may be sent within the send window, 1 to 50.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -133,8 +116,7 @@ final readonly class CodeSettings
     }
 
     /**
-     * How many codes one identity may be sent within the send window, across
-     * its factors and sessions, 1 to 100.
+     * Sends per identity in the window, across its factors and sessions.
      *
      * @return int
      *
@@ -146,8 +128,6 @@ final readonly class CodeSettings
     }
 
     /**
-     * The window the send limits count over, in minutes, 1 to 1440.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -158,9 +138,6 @@ final readonly class CodeSettings
     }
 
     /**
-     * The class of the email message carrying a code: `MfaCodeMessage` or a
-     * subclass of it.
-     *
      * @return class-string<\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage>
      *
      * @throws \InvalidArgumentException
@@ -177,8 +154,6 @@ final readonly class CodeSettings
     }
 
     /**
-     * Read every setting, failing closed on the first that is out of bounds.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -196,8 +171,6 @@ final readonly class CodeSettings
     }
 
     /**
-     * Read a numeric setting from its least to its greatest value.
-     *
      * @param  string  $key
      * @return int
      *

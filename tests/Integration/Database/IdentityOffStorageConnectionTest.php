@@ -22,14 +22,8 @@ use Tests\Fixtures\Identities\OtherConnectionUser;
 use Tests\TestCase;
 
 /**
- * An identity on a connection other than the storage connection.
- *
- * With `mfa.storage.connection` left unset, the package's tables live on the
- * default connection while the identity lives on `identities`. Eloquent gives a
- * related model that names no connection its parent's, so the factor model
- * names the storage connection itself: the identity's factors are read and
- * written on the default connection, and a recovery code generated for it
- * redeems once, in a factor state transaction the storage connection accepts.
+ * An identity on another connection: Eloquent gives a related model its
+ * parent's connection unless it names one, so the factor model names storage's.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -42,8 +36,6 @@ final class IdentityOffStorageConnectionTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Create the identity's table on its own connection.
-     *
      * @return void
      */
     #[\Override]
@@ -62,9 +54,6 @@ final class IdentityOffStorageConnectionTest extends TestCase
     }
 
     /**
-     * The identity's factor relation reads the factors on the storage
-     * connection, not on the identity's own.
-     *
      * @return void
      */
     public function testTheIdentitysFactorsLiveOnTheStorageConnection(): void
@@ -77,9 +66,6 @@ final class IdentityOffStorageConnectionTest extends TestCase
     }
 
     /**
-     * A recovery code generated for the identity is stored on the storage
-     * connection and redeems exactly once.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -102,8 +88,6 @@ final class IdentityOffStorageConnectionTest extends TestCase
     }
 
     /**
-     * Add the identities connection, leaving the storage connection unset.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -135,8 +119,6 @@ final class IdentityOffStorageConnectionTest extends TestCase
     }
 
     /**
-     * Sign in as a fresh MFA-enabled identity on the identities connection.
-     *
      * @return \Tests\Fixtures\Identities\OtherConnectionUser
      */
     private function loginUser(): OtherConnectionUser

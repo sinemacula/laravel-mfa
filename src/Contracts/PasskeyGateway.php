@@ -9,16 +9,10 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * Passkey gateway contract.
- *
- * The WebAuthn side of passkeys used as a factor: listing the identity's
- * registered passkeys, and requesting and verifying an assertion restricted to
- * the credentials this package has associated with the identity as factors.
- * Verification checks a challenge bound to the session, the application and the
- * purpose, the relying party and origin of the application, the signature, that
- * the credential belongs to the identity, and the sign counter (a synced
- * passkey reporting zero is not refused), and returns what was observed, never
- * what was requested.
+ * The WebAuthn side of passkeys as a factor. Verification checks the bound
+ * challenge, relying party, origin, signature, credential owner and sign
+ * counter (a synced passkey's zero is not refused), and returns what it
+ * observed.
  *
  * @api
  *
@@ -28,24 +22,21 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 interface PasskeyGateway
 {
     /**
-     * Whether passkeys can be used at all; when they cannot, the passkey type
-     * is never offered.
+     * When `false`, the passkey type is never offered.
      *
      * @return bool
      */
     public function isAvailable(): bool;
 
     /**
-     * The credential ids of the identity's registered passkeys.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return list<string>
      */
     public function credentialIds(MultiFactorAuthenticatable $identity): array;
 
     /**
-     * The options of an assertion request for the identity, bound as the
-     * binding says and limited to the given credentials, for the client.
+     * Assertion request options bound as the binding says and limited to the
+     * credentials.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -55,12 +46,8 @@ interface PasskeyGateway
     public function requestAssertion(MultiFactorAuthenticatable $identity, ProofBinding $binding, #[\SensitiveParameter] array $credentialIds): array;
 
     /**
-     * Verify the client's response to an assertion request, limited to the
-     * given credentials, and return what it observed, or why it does not
-     * verify, which is counted as a failed attempt: `invalid_code` for an
-     * assertion that does not hold, `expired` for a ceremony that has ended and
-     * `replayed` for one already answered. A gateway that cannot verify at all
-     * refuses by throwing an `OperationRefusedException`, which counts nothing.
+     * A failure (`invalid_code`, `expired`, `replayed`) counts as an attempt; a
+     * gateway that cannot verify at all throws, which counts nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding

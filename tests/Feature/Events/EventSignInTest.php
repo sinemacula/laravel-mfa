@@ -35,11 +35,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * The event context resolver is handed the sign-in an operation was bound to,
- * where the operation captured one: a pending session's, and the active sign-in
- * a verification is bound to, even once the proof store has moved on to another
- * sign-in. A change that captures no sign-in, and an operator's action, name
- * none.
+ * Events name the sign-in an operation was bound to, even once the proof store
+ * has moved on; operations that capture none name none.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -56,15 +53,13 @@ final class EventSignInTest extends TestCase
 {
     use ArrangesVerification;
 
-    /** @var string The sign-in the proof store moves on to. */
+    /** @var string Sign-in the proof store moves on to. */
     private const string LATER = 'sign-in-b';
 
-    /** @var \Tests\Fixtures\Seams\RecordingEventContextResolver The resolver that records what it is handed. */
+    /** @var \Tests\Fixtures\Seams\RecordingEventContextResolver Records what it is handed. */
     private RecordingEventContextResolver $resolver;
 
     /**
-     * Arrange the application and bind the recording resolver.
-     *
      * @return void
      */
     #[\Override]
@@ -80,8 +75,6 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -93,10 +86,6 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * A verification on a pending session names the pending session's sign-in,
-     * when it succeeds and when it fails, and not the sign-in the proof store
-     * holds for the identity.
-     *
      * @return void
      */
     public function testAPendingVerificationNamesThePendingSignIn(): void
@@ -113,9 +102,6 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * A verification on an active session names the sign-in its proof is bound
-     * to.
-     *
      * @return void
      */
     public function testAnActiveVerificationNamesItsSignIn(): void
@@ -128,9 +114,6 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * A code sent on a pending session names the pending session's sign-in, not
-     * the one the proof store holds.
-     *
      * @return void
      */
     public function testACodeSentOnAPendingSessionNamesThePendingSignIn(): void
@@ -144,9 +127,7 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * A factor refused once the verification is bound to the active sign-in
-     * names that sign-in, though the proof store has moved on by the time the
-     * refusal is reported.
+     * The proof store has moved on by the time the refusal is reported.
      *
      * @return void
      */
@@ -166,9 +147,6 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * A recovery code redeemed on a pending session names the pending session's
-     * sign-in, not the one the proof store holds.
-     *
      * @return void
      */
     public function testARecoveryCodeRedeemedOnAPendingSessionNamesThePendingSignIn(): void
@@ -185,9 +163,6 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * Recovery codes generated for an active caller name the sign-in the
-     * generation is bound to.
-     *
      * @return void
      */
     public function testRecoveryCodesGeneratedForAnActiveCallerNameItsSignIn(): void
@@ -205,8 +180,7 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * A rename and a change of the preferred factor capture no sign-in, so they
-     * name none, though the caller is on an active one.
+     * Neither captures a sign-in, though the caller is on an active one.
      *
      * @return void
      */
@@ -222,8 +196,6 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * An operator's unlock names no sign-in.
-     *
      * @return void
      */
     public function testAnOperatorsActionNamesNoSignIn(): void
@@ -240,9 +212,7 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * A person on a pending session, whose active sign-in is the one the proof
-     * store holds, with a completion that takes a proof bound to the pending
-     * session without asking the store.
+     * The completion takes the pending-bound proof without asking the store.
      *
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -258,8 +228,6 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * The identity's current sign-in, as the proof store holds it.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return ?string
      */
@@ -269,7 +237,7 @@ final class EventSignInTest extends TestCase
     }
 
     /**
-     * The sign-ins the events of the class reported name, in order.
+     * Sign-ins named by the reported events of the class, in order.
      *
      * @param  class-string<\SineMacula\Laravel\Mfa\Contracts\MfaEvent>  $class
      * @return list<int|string|null>

@@ -7,12 +7,8 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * Tenant requirement contract.
- *
- * What the active tenant's authentication policy requires of the session, as
- * this package's requirement. The tenant is an opaque id: which tenant requires
- * what is the application's policy, and this package never sees the tenant
- * tree. An empty requirement adds nothing to the others.
+ * What the active tenant's policy requires of the session; the tenant is an
+ * opaque id and an empty requirement adds nothing.
  *
  * @api
  *
@@ -22,8 +18,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 interface TenantRequirement
 {
     /**
-     * The requirement of the identity's active tenant on the application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $tenant

@@ -11,8 +11,7 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * Create the MFA codes table: the codes sent by SMS or email, stored as a keyed
- * hash bound to their factor, purpose, application and session.
+ * Codes sent by SMS or email, stored as keyed hashes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,8 +19,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 
 return new class extends Migration {
     /**
-     * Run the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -37,38 +34,28 @@ return new class extends Migration {
         $schema->create($table, static function (Blueprint $blueprint) use ($table): void {
             $blueprint->ulid('id')->primary();
 
-            // The factor the code was sent for.
             $blueprint->string('factor_id');
 
-            // Plain string polymorphic columns, as on the factors table, so any
-            // key type fits, and so an identity's codes are found without its
-            // factors.
+            // So an identity's codes are found without its factors.
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
             $blueprint->index(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_index'));
 
-            // What the code is bound to: it is accepted only for the same
-            // factor, purpose, application and session. The session is stored
-            // as a keyed digest of its id, never the id itself.
+            // The session is a keyed digest, never the id.
             $blueprint->string('purpose', 32);
             $blueprint->string('application');
             $blueprint->string('session_id')->nullable();
             $blueprint->index(['factor_id', 'purpose', 'session_id'], IndexName::for($table, '_binding_index'));
 
-            // What the code was sent to, as a keyed digest of the owner and the
-            // factor's destination, which the send caps count by: it outlives
-            // the factor, so a restarted enrolment's sends stay counted.
+            // Outlives the factor, so a restarted enrolment's sends stay
+            // counted.
             $blueprint->char('destination_hash', 64);
             $blueprint->index(['destination_hash', 'sent_at'], IndexName::for($table, '_destination_index'));
 
-            // HMAC-SHA256 hex digest of the code and its binding, keyed from
-            // the application key, never the code.
+            // Keyed from `app.key`, never the code.
             $blueprint->char('code_hash', 64);
 
-            // The attempts made against the code, how many times it was sent,
-            // when last and when each time (a JSON list of Unix times, which
-            // the send caps count), when it expires (indexed for pruning) and
-            // when it was used.
+            // `sent_times` is a JSON list of Unix times the send caps count.
             $blueprint->unsignedInteger('attempts')->default(0);
             $blueprint->unsignedInteger('sends')->default(1);
             $blueprint->timestamp('sent_at');
@@ -81,8 +68,6 @@ return new class extends Migration {
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -93,9 +78,6 @@ return new class extends Migration {
     }
 
     /**
-     * The connection the package's tables live on (see `StorageConnection`),
-     * the one the package reads and writes the table on.
-     *
      * @return ?string
      *
      * @throws \InvalidArgumentException

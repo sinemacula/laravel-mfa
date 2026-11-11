@@ -10,11 +10,8 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * An identity's factor state as a whole: its verification generation, its
- * re-enrolment obligation, its consecutive failures across every factor and the
- * lockout they applied, and its recovery code set's generation and time. Its
- * row is also the lock every change to that state takes first (see
- * `Support\FactorStateTransaction`).
+ * An identity's factor state as a whole. Its row is the lock every change to
+ * that state takes first.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,7 +32,7 @@ final class IdentityState extends Model
 {
     use HasUlids;
 
-    /** @var list<string> The attributes that are mass assignable. */
+    /** @var list<string> */
     protected $fillable = [
         'authenticatable_type',
         'authenticatable_id',
@@ -48,9 +45,7 @@ final class IdentityState extends Model
     ];
 
     /**
-     * Create the record on the table and connection the package configures (see
-     * `Database\TableNames` and `Database\StorageConnection`), read when it is
-     * built so a change in the configuration applies to the next one.
+     * Reads the table and connection per instance so config changes apply.
      *
      * @param  array<string, mixed>  $attributes
      *
@@ -66,8 +61,6 @@ final class IdentityState extends Model
     }
 
     /**
-     * Columns that receive a generated unique identifier on insert.
-     *
      * @return array<int, string>
      */
     #[\Override]
@@ -77,8 +70,6 @@ final class IdentityState extends Model
     }
 
     /**
-     * The attributes that should be cast.
-     *
      * @return array<string, string>
      */
     #[\Override]

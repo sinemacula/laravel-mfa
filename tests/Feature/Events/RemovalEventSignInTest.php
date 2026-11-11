@@ -22,9 +22,8 @@ use Tests\Fixtures\Seams\RecordingEventContextResolver;
 use Tests\TestCase;
 
 /**
- * A factor's removal names the sign-in it was made from, and so does the end of
- * the recovery code set that goes with the last confirmed factor: the sign-in
- * the removal is given, not the one the proof store holds for the identity.
+ * Removal events name the sign-in the removal is given, not the one the proof
+ * store holds.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -42,8 +41,6 @@ final class RemovalEventSignInTest extends TestCase
     private const string ELSEWHERE = 'sign-in-elsewhere';
 
     /**
-     * Arrange the application and bind the recording resolver.
-     *
      * @return void
      */
     #[\Override]
@@ -57,10 +54,6 @@ final class RemovalEventSignInTest extends TestCase
     }
 
     /**
-     * Removing the last confirmed factor names the sign-in the removal is
-     * given, on the factor's removal and on its recovery code set's, though the
-     * proof store holds another.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -82,9 +75,6 @@ final class RemovalEventSignInTest extends TestCase
     }
 
     /**
-     * A person removing their last confirmed factor names the sign-in the
-     * removal is bound to, on both events.
-     *
      * @return void
      *
      * @throws \Throwable

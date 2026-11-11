@@ -17,10 +17,8 @@ use Tests\Fixtures\Exceptions\CommitFailedException;
 use Tests\TestCase;
 
 /**
- * A transaction on the storage connection commits or ends with the work waiting
- * for it: when its commit fails that work is forgotten, not run on the
- * connection's next commit, under a transactions manager that keeps it unless
- * told otherwise, as Laravel 12's does.
+ * Laravel 12's transactions manager keeps a failed commit's callbacks unless
+ * told to forget them.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -51,9 +49,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * The callback runs in a transaction on the storage connection, what it
-     * returns comes back, and the work waiting for it runs at the commit.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -75,8 +70,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * The transaction is the storage connection's, not the default's.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -91,9 +84,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * What the failed commit left waiting never runs on the next commit, and
-     * the failure itself reaches the caller.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -110,9 +100,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * With what the failed commit left forgotten, the next work finds nothing
-     * open and runs at once, rather than waiting on a transaction long over.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -129,9 +116,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * A failure in the callback rolls back and reaches the caller as it was
-     * thrown.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -154,9 +138,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * With no transactions manager to read, work runs at once and a failure
-     * still reaches the caller as it was thrown.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -177,9 +158,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * A failure inside an application's own transaction leaves that transaction
-     * open and its work still waiting for its commit.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -207,10 +185,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * The connection serves a next transaction after a failed commit, without
-     * anything rolling back what that commit left, and what it had pending is
-     * gone.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -242,9 +216,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * A connection that cannot be rolled back after a failed commit is dropped,
-     * to be opened afresh, and the caller still receives the commit's failure.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -276,8 +247,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * A failure on the storage connection forgets nothing of another's.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -301,8 +270,7 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * Assert the failure of a commit on the storage connection with work
-     * waiting for it reaches the caller, and leaves no transaction open on the
+     * The failure reaches the caller and no transaction is left open on the
      * PDO.
      *
      * @return void
@@ -325,8 +293,8 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * Fail the next commit: the listener throws just before the PDO commits, as
-     * Laravel's `transaction()` commits on the PDO directly.
+     * Laravel's `transaction()` commits on the PDO directly, so the listener
+     * throws just before.
      *
      * @return void
      */
@@ -346,8 +314,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * Put the package's tables on a connection other than the default.
-     *
      * @return void
      */
     private function useAnotherStorageConnection(): void
@@ -371,8 +337,6 @@ final class StorageTransactionTest extends TestCase
     }
 
     /**
-     * Count a run of the work.
-     *
      * @return void
      */
     private function work(): void

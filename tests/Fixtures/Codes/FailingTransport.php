@@ -13,9 +13,8 @@ use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\RawMessage;
 
 /**
- * A mail transport for tests that refuses every message, quoting its recipients
- * in the exception and its rendered body in a previous one, as a relay that
- * echoes what it rejected would.
+ * Refuses every message, quoting its recipients and rendered body in the
+ * exceptions, as a relay that echoes what it rejected would.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,8 +24,6 @@ use Symfony\Component\Mime\RawMessage;
 final class FailingTransport implements TransportInterface
 {
     /**
-     * The transport's name.
-     *
      * @return string
      */
     #[\Override]
@@ -36,8 +33,6 @@ final class FailingTransport implements TransportInterface
     }
 
     /**
-     * Refuse the message.
-     *
      * @param  \Symfony\Component\Mime\RawMessage  $message
      * @param  ?\Symfony\Component\Mailer\Envelope  $envelope
      * @return ?\Symfony\Component\Mailer\SentMessage

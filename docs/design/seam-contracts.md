@@ -3,9 +3,8 @@
 ## Purpose
 
 This note lists the contracts the package declares for the seams between it, an authentication layer and the
-application: what each answers, what a fail-closed answer is, the default bound for each, what the authentication
-layer provides for each, and the calls it makes back into this package. They are declared together, ahead of the flows
-that call them, so the flows can be built against one fixed set. Each public name of `laravel-authentication` a seam
+application: what each answers, what a fail-closed answer is, the default bound for each, what the authentication layer
+provides for each, and the calls it makes back into this package. Each public name of `laravel-authentication` a seam
 meets is in [Seams with an authentication layer](../guides/extending.md#seams-with-an-authentication-layer).
 
 ## Invariants
@@ -65,11 +64,10 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
 - The requirement seams are bound since `Mfa::requirement()`, `Mfa::isFresh()` and the `mfa` middleware call them:
   `RequirementPolicy` to `Requirements\ConfiguredRequirementPolicy`, `IdentityRequirement` to
   `Requirements\IdentityContractRequirement`, `ActiveTenantResolver` to `Requirements\NoActiveTenant`,
-  `TenantRequirement` to `Requirements\NoTenantRequirement`,
-  `RequirementCheck` to `Requirements\ProofRequirementCheck` and `FreshnessGate` to
-  `Requirements\ConfiguredFreshnessGate` (see [Requirements and Freshness](requirements-and-freshness.md)). A
-  `FreshnessGate` bound in its place is handed this package's own setting for the operation as part of the caller's
-  requirement, and must apply the stricter of that and its own.
+  `TenantRequirement` to `Requirements\NoTenantRequirement`, `RequirementCheck` to `Requirements\ProofRequirementCheck`
+  and `FreshnessGate` to `Requirements\ConfiguredFreshnessGate` (see [Requirements and
+  Freshness](requirements-and-freshness.md)). A `FreshnessGate` bound in its place is handed this package's own setting
+  for the operation as part of the caller's requirement, and must apply the stricter of that and its own.
 - `PendingSessionResolver` is bound to `Context\NoPendingSessionResolver`: no request carries a pending session. A
   resolver answers `null` only for a request that carries no pending credential, and throws for one that does not
   validate.
@@ -169,8 +167,8 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
 | `SmsSender`              | Delivers a code by SMS, given its neutral details as a `Codes\CodeMessage`   | The gateway its own codes are sent through         |
 | `EmailSender`            | Delivers a code by email, given its neutral details as a `Codes\CodeMessage` | The gateway its own codes are sent through         |
 
-The reverse calls are the critical enforcement points, made by the authentication layer into this package inside its
-own transaction on the storage connection:
+The authentication layer makes these calls into this package inside its own transaction on the storage connection, and
+they are where the package's rules hold on that layer's own paths:
 
 | Call                                                  | Made                                                                                  |
 |-------------------------------------------------------|---------------------------------------------------------------------------------------|
@@ -199,18 +197,17 @@ exception that rolls the caller's change back with it.
   `CallerContext::fromRequest()` is the one place a caller is read from one, through
   `PendingSessionResolver::fromRequest()` and then the guard. The caller is trusted input, never authentication.
   `Context\CallerContextResolver` decides whether it is served: a pending session only for the `PendingAction` the
-  helper needs, as its own identity, and otherwise the identity it names; only a person either way. Under the
-  identity's lock, `CallerContextResolver::still()` asks `PendingSessionResolver::revalidate()` for a pending session,
-  or the proof store for an active one's sign-in, and compares the binding; a pending session that no longer stands is
-  refused. A resolver that must read the credential again keeps it on the `PendingContext`, as `credential()`, which is
-  held as a `\SensitiveParameterValue` so no dump shows it. The seams handed the caller are `ChallengeGateway`,
-  `StepUp` and `FreshnessGate`; `ChallengeCounters` and `PasskeyChangeGate` take one as well, and `SessionRevoker` is
-  handed the application. Starting, resending and cancelling an enrolment need
-  `mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`. A helper that names no action
-  (generating recovery codes, renaming, preferring or removing a factor and `proofs()`) serves active sessions only;
-  `recoveryCodeStatus()` needs `mfa.list_factors`, as `factors()` and `factor()` do. A bound factor route parameter
-  serves a pending session allowing any action that names an existing factor (see
-  [Factor Route Binding](factor-route-binding.md)).
+  helper needs, as its own identity, and otherwise the identity it names; only a person either way. Under the identity's
+  lock, `CallerContextResolver::still()` asks `PendingSessionResolver::revalidate()` for a pending session, or the proof
+  store for an active one's sign-in, and compares the binding; a pending session that no longer stands is refused. A
+  resolver that must read the credential again keeps it on the `PendingContext`, as `credential()`, which is held as a
+  `\SensitiveParameterValue` so no dump shows it. The seams handed the caller are `ChallengeGateway`, `StepUp` and
+  `FreshnessGate`; `ChallengeCounters` and `PasskeyChangeGate` take one as well, and `SessionRevoker` is handed the
+  application. Starting, resending and cancelling an enrolment need `mfa.start_bootstrap_enrollment`, and confirming one
+  `mfa.confirm_bootstrap_enrollment`. A helper that names no action (generating recovery codes, renaming, preferring or
+  removing a factor and `proofs()`) serves active sessions only; `recoveryCodeStatus()` needs `mfa.list_factors`, as
+  `factors()` and `factor()` do. A bound factor route parameter serves a pending session allowing any action that names
+  an existing factor (see [Factor Route Binding](factor-route-binding.md)).
 - A seam may throw an `OperationRefusedException`. It stays an exception on the two helpers that answer refusals as
   values, `generateRecoveryCodes()` and `requestAssertion()`: only a refusal the package marks becomes the reason, so a
   seam's is never read as the package deciding.

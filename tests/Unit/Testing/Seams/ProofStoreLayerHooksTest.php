@@ -16,9 +16,8 @@ use Tests\Fixtures\Seams\LayerWrittenProofStore;
 use Tests\TestCase;
 
 /**
- * The `ProofStore` kit over a store whose proofs and sign-ins an authentication
- * layer alone writes: the test records each proof, ends each sign-in and enrols
- * the factor through that layer, through the kit's hooks.
+ * The `ProofStore` kit over a store whose proofs and sign-ins only an
+ * authentication layer writes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,8 +36,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     private array $asked = [];
 
     /**
-     * Set up the store.
-     *
      * @return void
      */
     #[\Override]
@@ -50,9 +47,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * The kit records the sign-in's proof and ends the sign-in through the
-     * layer.
-     *
      * @return void
      */
     public function testTheKitWritesAndSignsOutThroughTheLayer(): void
@@ -63,8 +57,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * The kit names the factor the test enrolled, once.
-     *
      * @return void
      */
     public function testTheKitNamesTheFactorTheTestEnrolled(): void
@@ -75,9 +67,8 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * Without the hooks, the factor check fails on such a store: the proofs it
-     * records through the store never count, and the kit says so before it
-     * forgets the factor.
+     * Without the hooks the proofs recorded through the store never count, and
+     * the kit says so before forgetting the factor.
      *
      * @return void
      */
@@ -92,7 +83,7 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * Without the hooks, voiding is not checked on proofs that never counted.
+     * Without the hooks, voiding is not checked.
      *
      * @return void
      */
@@ -107,8 +98,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * The store under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
      */
     #[\Override]
@@ -118,8 +107,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -130,8 +117,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * Another person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -142,8 +127,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * The application.
-     *
      * @return string
      */
     #[\Override]
@@ -153,8 +136,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * Sign the identity in through the layer.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return string
@@ -165,9 +146,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * Sign the identity in again through the layer, and make that sign-in
-     * current.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -184,7 +162,7 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * Void the proofs as the layer does on a reset: by signing out.
+     * The layer voids proofs on a reset by signing out.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
@@ -195,8 +173,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * Record the proof through the layer.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -212,8 +188,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * Sign the identity out through the layer.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -227,8 +201,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     }
 
     /**
-     * Enrol a factor through the layer.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return string
      */

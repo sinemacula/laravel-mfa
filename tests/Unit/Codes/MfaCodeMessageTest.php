@@ -11,8 +11,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 
 /**
- * Unit tests for the default `MfaCodeMessage` mailable.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,8 +20,6 @@ use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 final class MfaCodeMessageTest extends TestCase
 {
     /**
-     * Test envelope has default subject.
-     *
      * @return void
      */
     public function testEnvelopeHasDefaultSubject(): void
@@ -37,8 +33,6 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test content returns content instance.
-     *
      * @return void
      */
     public function testContentReturnsContentInstance(): void
@@ -49,8 +43,6 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test html body mentions code and expiry.
-     *
      * @return void
      */
     public function testHtmlBodyMentionsCodeAndExpiry(): void
@@ -65,8 +57,6 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test html body escapes code.
-     *
      * @return void
      */
     public function testHtmlBodyEscapesCode(): void
@@ -81,8 +71,6 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test html body mentions ignore wording.
-     *
      * @return void
      */
     public function testHtmlBodyMentionsIgnoreWording(): void
@@ -97,8 +85,6 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test html body wraps content in paragraph tags.
-     *
      * @return void
      */
     public function testHtmlBodyWrapsContentInParagraphTags(): void
@@ -111,8 +97,8 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * The body is the three lines in the shipped English, with only the
-     * package's tags as markup, and the singular for one minute.
+     * The three shipped English lines, only the package's tags as markup, and
+     * the singular for one minute.
      *
      * @return void
      */
@@ -132,8 +118,8 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Quotes are escaped as HTML5 writes them, and what is not valid UTF-8 is
-     * replaced rather than emptying the line.
+     * Quotes are escaped as HTML5 writes them, and invalid UTF-8 is replaced
+     * rather than emptying the line.
      *
      * @return void
      */
@@ -145,16 +131,12 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * A subclass can replace the body by overriding `renderHtml()`.
-     *
      * @return void
      */
     public function testASubclassCanOverrideTheBody(): void
     {
         $message = new class ('ABC123', 3) extends MfaCodeMessage {
             /**
-             * A body of the subclass's own.
-             *
              * @return string
              */
             #[\Override]
@@ -168,8 +150,6 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test code parameter is marked sensitive.
-     *
      * @return void
      */
     public function testCodeParameterIsMarkedSensitive(): void
@@ -190,8 +170,6 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test code property exposes constructor argument.
-     *
      * @return void
      */
     public function testCodePropertyExposesConstructorArgument(): void
@@ -202,8 +180,6 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test expiry property exposes constructor argument.
-     *
      * @return void
      */
     public function testExpiryPropertyExposesConstructorArgument(): void
@@ -214,8 +190,6 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test code property is declared public readonly.
-     *
      * @return void
      */
     public function testCodePropertyIsDeclaredPublicReadonly(): void
@@ -228,8 +202,6 @@ final class MfaCodeMessageTest extends TestCase
     }
 
     /**
-     * Test expiry property is declared public readonly.
-     *
      * @return void
      */
     public function testExpiryPropertyIsDeclaredPublicReadonly(): void

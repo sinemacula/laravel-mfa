@@ -14,10 +14,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
  * Faulty seams whose fault only shows over more than one call, or against a
- * person, for proving the contract kit rejects them: a resolver that names a
- * new, never blank, application each time it is asked; a requirement that
- * answers a question the same each time it is asked in a row, but by the one
- * asked before it; and a resolver that finds nobody a person.
+ * person, for proving the contract kit rejects them.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,15 +23,13 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  */
 final class DriftingSeams implements ApplicationResolver, IdentityRequirement, SubjectTypeResolver
 {
-    /** @var int How often an application has been named. */
+    /** @var int */
     private int $named = 0;
 
-    /** @var ?string The application the requirement was last asked about. */
+    /** @var ?string */
     private ?string $lastAsked = null;
 
     /**
-     * A new application each time.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return string
      */
@@ -45,8 +40,7 @@ final class DriftingSeams implements ApplicationResolver, IdentityRequirement, S
     }
 
     /**
-     * Multifactor when the question asked before was about another application,
-     * nothing otherwise.
+     * Multifactor only when the previous call named another application.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -63,8 +57,6 @@ final class DriftingSeams implements ApplicationResolver, IdentityRequirement, S
     }
 
     /**
-     * Nobody is a person.
-     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return bool
      */

@@ -29,13 +29,6 @@ use Tests\TestCase;
 use Tests\Unit\Concerns\InteractsWithRecoveryCodes;
 
 /**
- * Tests for where a recovery code set stands, how it is removed with the last
- * factor, and how used and replaced codes are pruned: the remaining count and
- * the set's time are read without a code, in one statement, of the current set
- * only; removal runs inside the identity's factor state transaction and reports
- * a set that existed; pruning deletes only codes that can no longer be
- * redeemed.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -47,8 +40,7 @@ final class RecoveryCodeServiceTest extends TestCase
     use InteractsWithRecoveryCodes;
 
     /**
-     * An identity that never had a set has none: nothing remaining, no
-     * generation and no time.
+     * Nothing remaining, no generation and no time.
      *
      * @return void
      *
@@ -65,9 +57,8 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * The status follows the set: its size and time once generated, one less
-     * per redemption, which passes and says so, the next generation's size and
-     * time once replaced, and only the identity's own codes.
+     * Size and time once generated, one less per redemption, the next
+     * generation's once replaced, and only the identity's own codes.
      *
      * @return void
      *
@@ -112,8 +103,7 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * The status is read in one statement, so the count and the generation are
-     * always of the same set.
+     * So the count and the generation are always of the same set.
      *
      * @return void
      *
@@ -137,8 +127,6 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * A used-up set still exists, with nothing remaining.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -162,8 +150,8 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * Deleting the set reports nothing and says it existed; reporting it is its
-     * own call, once the set's removal is ready to be told.
+     * It says the set existed; reporting is a separate call made once the
+     * removal is ready to be told.
      *
      * @return void
      *
@@ -194,8 +182,8 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * Removing the set deletes every code row, clears the set's time, keeps its
-     * generation, and reports the removal with the actor once it commits.
+     * Every code row is deleted, the set's time cleared and its generation
+     * kept; the removal is reported with the actor once it commits.
      *
      * @return void
      *
@@ -222,8 +210,8 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * A used-up set whose codes were all pruned is still a set, and its removal
-     * is reported; so are code rows left without a set's time.
+     * A used-up set whose codes were all pruned is still a set; so are code
+     * rows left without a set's time.
      *
      * @return void
      *
@@ -255,8 +243,6 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * Without a set there is nothing to remove, and nothing is reported.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -273,9 +259,7 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * A removal whose state row save a model event cancels throws, so the whole
-     * removal rolls back: every code row stays, the set's time is kept and
-     * nothing is reported.
+     * Every code row stays, the set's time is kept and nothing is reported.
      *
      * @return void
      *
@@ -308,8 +292,7 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * Removing a set outside the identity's factor state transaction is
-     * refused, as it would not be atomic with the factor's removal.
+     * It would not be atomic with the factor's removal.
      *
      * @return void
      *
@@ -332,9 +315,8 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * Pruning deletes the codes used or replaced before the cutoff and keeps
-     * every usable code, every code used or replaced since, and the identity's
-     * state row; it returns how many it deleted.
+     * Usable codes, codes ended since and the state row are kept; it returns
+     * how many it deleted.
      *
      * @return void
      *
@@ -374,9 +356,6 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * Rows of the codes left after a redemption, the low count, and whether the
-     * set is reported low.
-     *
      * @return iterable<string, array{int, int, bool}>
      */
     public static function lowCounts(): iterable
@@ -389,8 +368,7 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * A redemption is always reported used, and low only when it leaves the set
-     * at or below a low count that is set.
+     * Always reported used, and low only when a low count is set.
      *
      * @param  int  $remaining
      * @param  int  $lowCount
@@ -415,9 +393,8 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * A gate runs before the codes are drawn, given no factors, and again first
-     * under the lock, given the identity's factors as stored there; a refusal
-     * before the lock replaces nothing.
+     * Before the lock it is given no factors, under it the stored ones; a
+     * refusal before the lock replaces nothing.
      *
      * @return void
      *
@@ -451,8 +428,7 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * Replacing the set stores the next generation and returns its codes with
-     * it, and reports nothing, which is left to the caller.
+     * Reporting is left to the caller.
      *
      * @return void
      *
@@ -472,8 +448,8 @@ final class RecoveryCodeServiceTest extends TestCase
     }
 
     /**
-     * Remove the identity's set as the removal of its last factor does: inside
-     * its factor state transaction.
+     * Inside the factor state transaction, as the removal of the last factor
+     * does.
      *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor

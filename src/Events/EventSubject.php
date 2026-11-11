@@ -8,16 +8,8 @@ use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 
 /**
- * What an event is about, as `EventContextResolver` is handed it: the identity,
- * the application the operation ran through, the sign-in the operation was
- * bound to, and the client it was served to. Each may be unknown: an operator's
- * action and an attempt's lockout name no sign-in, and nothing outside a
- * request knows the client.
- *
- * The sign-in is this package's own id for it, the session id a proof binding
- * and a pending session carry, which an authentication layer maps to its own
- * session, principal and tenant. It is given only where the operation captured
- * it, never looked up to decorate an event.
+ * What an event is about, as `EventContextResolver` is handed it. Any part may
+ * be unknown: an operator's action names no sign-in.
  *
  * @api
  *
@@ -26,21 +18,19 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
  */
 final readonly class EventSubject
 {
-    /** @var ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable The identity the event is about, when there is one. */
+    /** @var ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable The identity, when there is one. */
     public ?MultiFactorAuthenticatable $identity;
 
-    /** @var ?string The application the operation ran through, when it ran through one. */
+    /** @var ?string The application the operation ran through, if any. */
     public ?string $application;
 
-    /** @var ?string The sign-in the operation was bound to, when it captured one. */
+    /** @var ?string The package's session id, which an authentication layer maps to its own session. */
     public ?string $signInId;
 
-    /** @var \SineMacula\Laravel\Mfa\Context\ClientContext The client the operation was served to, or one of which nothing is known. */
+    /** @var \SineMacula\Laravel\Mfa\Context\ClientContext Unknown outside a request. */
     public ClientContext $client;
 
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?string  $application
      * @param  ?string  $signInId

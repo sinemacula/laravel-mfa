@@ -9,9 +9,8 @@ use SineMacula\Laravel\Mfa\Lifecycle\RecordPruner;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
- * `mfa:prune`: deletes the records `Lifecycle\RecordPruner` deletes and prints
- * how many of each kind went. It prints no secret and schedules nothing;
- * schedule this or the pruner itself.
+ * `mfa:prune`: runs `Lifecycle\RecordPruner` and prints the counts. It
+ * schedules nothing; schedule this or the pruner.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,18 +18,16 @@ use Symfony\Component\Console\Attribute\AsCommand;
 #[AsCommand(name: self::NAME)]
 final class PruneCommand extends Command
 {
-    /** @var string The command's name. */
+    /** @var string */
     public const string NAME = 'mfa:prune';
 
-    /** @var string The name and signature of the console command. */
+    /** @var string */
     protected $signature = self::NAME;
 
-    /** @var string The console command description. */
+    /** @var string */
     protected $description = 'Delete abandoned enrolments, expired codes, used or replaced recovery codes and ended throttle windows';
 
     /**
-     * Prune, and report how many records of each kind went.
-     *
      * @param  \SineMacula\Laravel\Mfa\Lifecycle\RecordPruner  $pruner
      * @return int
      *

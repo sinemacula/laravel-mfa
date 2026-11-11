@@ -7,11 +7,8 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * Identity requirement contract.
- *
- * What the identity itself requires whatever the application's setting, for
- * example a further factor for platform staff. An empty requirement adds
- * nothing to the others.
+ * What the identity itself requires whatever the application's setting; an
+ * empty requirement adds nothing.
  *
  * @api
  *
@@ -21,8 +18,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 interface IdentityRequirement
 {
     /**
-     * The identity's own requirement on the application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement

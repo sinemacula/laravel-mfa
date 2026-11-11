@@ -22,13 +22,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 
 /**
- * The window comparison of the TOTP driver: every time step of the window is
- * computed and compared whether or not one matches, so a code in the window and
- * one outside it should cost the same.
- *
- * The factor is not an Eloquent one and has nowhere to record a step, so both
- * subjects answer `INVALID`: this measures the comparison, and `ACCEPTED`, with
- * the database's compare-and-set, is timed only by `VerificationBench`.
+ * Every step of the window is compared, so a code in it and one outside should
+ * cost the same; both answer `INVALID`, as `ACCEPTED` needs the database.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -37,7 +32,7 @@ use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 #[BeforeMethods('setUp')]
 final class TotpDriverBench
 {
-    /** @var string The application the binding names. */
+    /** @var string */
     private const string APPLICATION = 'web';
 
     /** @var \SineMacula\Laravel\Mfa\Drivers\TotpSettings */
@@ -52,16 +47,13 @@ final class TotpDriverBench
     /** @var \SineMacula\Laravel\Mfa\Proofs\ProofBinding */
     private readonly ProofBinding $binding;
 
-    /** @var string A code of the window. */
+    /** @var string */
     private string $matching = '';
 
-    /** @var string A code outside the window. */
+    /** @var string */
     private string $mismatched = '';
 
     /**
-     * Build the driver with the default settings, its factor and the binding
-     * the codes are checked under.
-     *
      * @return void
      */
     public function __construct()
@@ -73,8 +65,7 @@ final class TotpDriverBench
     }
 
     /**
-     * Freeze the clock at a fixed time, so no step boundary is crossed, and
-     * prove each code is on its side of the window and answers `INVALID`.
+     * Freeze the clock so no step boundary is crossed, and prove both codes.
      *
      * @return void
      *
@@ -98,8 +89,6 @@ final class TotpDriverBench
     }
 
     /**
-     * Release the clock.
-     *
      * @return void
      */
     public function releaseClock(): void
@@ -108,8 +97,6 @@ final class TotpDriverBench
     }
 
     /**
-     * Measure comparing a code that matches a step of the window.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -122,8 +109,6 @@ final class TotpDriverBench
     }
 
     /**
-     * Measure comparing a code that matches no step of the window.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -136,8 +121,6 @@ final class TotpDriverBench
     }
 
     /**
-     * The first six-digit code that is none of those given.
-     *
      * @param  list<string>  $codes
      * @return string
      */
@@ -153,8 +136,6 @@ final class TotpDriverBench
     }
 
     /**
-     * Every code of the window around now, from the factor's parameters.
-     *
      * @param  int  $window
      * @return list<string>
      */

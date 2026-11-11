@@ -14,8 +14,6 @@ namespace SineMacula\Laravel\Mfa\Events;
 final readonly class RecoveryCodesRemoved extends ContextEvent
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, int|string|null>  $context
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
      */

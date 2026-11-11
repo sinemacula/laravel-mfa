@@ -20,8 +20,7 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * `Mfa::stepUpRefusal()`: the refusal the route gate raises, built for a caller
- * and a requirement given, without a request.
+ * `Mfa::stepUpRefusal()` builds the route gate's refusal without a request.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,8 +37,6 @@ final class StepUpRefusalTest extends TestCase
     private const string CLOSE_BOOKS = 'billing.close_books';
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -72,8 +69,6 @@ final class StepUpRefusalTest extends TestCase
     }
 
     /**
-     * A person whose only factor is not confirmed is reported as holding none.
-     *
      * @return void
      */
     public function testAPersonWithoutAConfirmedFactor(): void
@@ -89,8 +84,8 @@ final class StepUpRefusalTest extends TestCase
     }
 
     /**
-     * The requirement is taken as given: the application's own requirement is
-     * not folded in, and the operation adds no freshness.
+     * Neither the application's requirement nor the operation's freshness is
+     * folded in.
      *
      * @return void
      */
@@ -130,8 +125,7 @@ final class StepUpRefusalTest extends TestCase
     }
 
     /**
-     * A caller serving nobody, or an identity that is not a person, is offered
-     * nothing and reported as holding no confirmed factor, even one it holds.
+     * Reported as holding no confirmed factor, even one it holds.
      *
      * @return void
      */
@@ -152,9 +146,8 @@ final class StepUpRefusalTest extends TestCase
     }
 
     /**
-     * A pending caller is reported by its pending identity whatever it is, as
-     * the gate reports it, though it is offered nothing when it is not a person
-     * or its credential may not list factors.
+     * Reported as the gate reports it, though offered nothing when not a person
+     * or not allowed to list factors.
      *
      * @return void
      */
@@ -181,16 +174,12 @@ final class StepUpRefusalTest extends TestCase
     }
 
     /**
-     * Bind a subject type resolver that finds no identity a person.
-     *
      * @return void
      */
     private function noPersons(): void
     {
         $this->container()->instance(SubjectTypeResolver::class, new class implements SubjectTypeResolver {
             /**
-             * Whether the identity is a person: never.
-             *
              * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
              * @return bool
              */

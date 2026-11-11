@@ -48,9 +48,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * Every way a verification fails has its machine-readable reason, one report,
- * and is counted or not as it should be; what a caller may be told stays within
- * the disclosure boundary.
+ * Every way a verification fails has its reason, one report and the right
+ * counting, within the disclosure boundary.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -74,8 +73,6 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     use ArrangesVerification;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -87,8 +84,6 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -100,7 +95,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * Without an MFA-capable person, nothing is served and nothing reported.
+     * Without an MFA-capable person nothing is served or reported.
      *
      * @return void
      */
@@ -113,8 +108,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A factor that does not exist and one that belongs to someone else get the
-     * same answer and the same report.
+     * Same answer and same report.
      *
      * @return void
      */
@@ -142,7 +136,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * An id that is neither a string nor an integer finds nothing.
+     * Neither a string nor an integer.
      *
      * @return void
      */
@@ -154,8 +148,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A factor removed while the lock was awaited is reported as one that never
-     * existed.
+     * Reported as one that never existed.
      *
      * @return void
      */
@@ -178,7 +171,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * An inactive identity is refused, reported and counted nowhere.
+     * Reported and counted nowhere.
      *
      * @return void
      */
@@ -200,8 +193,6 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A factor still being enrolled is not confirmed.
-     *
      * @return void
      */
     public function testAPendingFactorIsNotConfirmed(): void
@@ -215,8 +206,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A type the application does not enable is refused on every route, with
-     * nothing sent, checked or counted.
+     * Nothing is sent, checked or counted.
      *
      * @return void
      */
@@ -245,8 +235,8 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A type turned off after the first check is refused under the lock, on the
-     * factor as stored.
+     * A type turned off after the first check is refused on the factor as
+     * stored.
      *
      * @return void
      */
@@ -265,8 +255,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A factor the combination policy does not accept after the first factor is
-     * refused, and with no first factor known nothing is accepted.
+     * With no first factor known nothing is accepted.
      *
      * @return void
      */
@@ -284,8 +273,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A recovery code with no first factor known is refused before any hash is
-     * checked.
+     * Before any hash is checked.
      *
      * @return void
      */
@@ -317,8 +305,6 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * The purposes refused, and whether on a pending session.
-     *
      * @return iterable<string, array{0: \SineMacula\Laravel\Mfa\Enums\Purpose, 1: bool}>
      */
     public static function refusedPurposes(): iterable
@@ -333,7 +319,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * Purposes a verification is not made for are refused, spending nothing.
+     * Nothing is spent.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  bool  $pending
@@ -358,8 +344,6 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A recovery code never confirms an enrolment.
-     *
      * @return void
      */
     public function testARecoveryCodeForAnEnrollmentIsNotAccepted(): void
@@ -376,7 +360,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A factor's lockout refuses it with the time it lifts, counting nothing.
+     * With the time it lifts, counting nothing.
      *
      * @return void
      */
@@ -395,9 +379,8 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A factor disabled at the failure ceiling is locked with no time, since it
-     * does not lift by itself, and a failure that reaches the ceiling is a
-     * plain failure.
+     * It does not lift by itself; a failure that reaches the ceiling is a plain
+     * failure.
      *
      * @return void
      */
@@ -414,8 +397,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * An identity's run at the ceiling blocks recovery codes with no time,
-     * while a usable factor can still recover the identity.
+     * A usable factor can still recover the identity.
      *
      * @return void
      */
@@ -440,8 +422,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A recovery code refused by the identity's lockout says why in the
-     * lockout's own words, timed or at the ceiling, not in a generic refusal.
+     * In the lockout's own words, timed or at the ceiling.
      *
      * @return void
      */
@@ -472,8 +453,8 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * An address at its limit is refused with the time its window ends, before
-     * anything else runs, and is reported with what was tried.
+     * With the time its window ends, before anything else runs, reported with
+     * what was tried.
      *
      * @return void
      */
@@ -502,8 +483,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A recovery code for an identity with no confirmed factor is refused, and
-     * counted nowhere.
+     * Counted nowhere.
      *
      * @return void
      */
@@ -517,7 +497,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A wrong code is an invalid code on every route, and counted once.
+     * On every route, counted once.
      *
      * @return void
      */
@@ -550,8 +530,6 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A used or expired challenge is expired, and counted.
-     *
      * @return void
      */
     public function testAnExpiredOrSpentChallengeIsExpiredAndCounted(): void
@@ -575,8 +553,6 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A challenge whose attempts are used up is expired, and counted.
-     *
      * @return void
      */
     public function testAChallengeOutOfAttemptsIsExpiredAndCounted(): void
@@ -594,8 +570,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A used code, a used TOTP step and a replayed assertion are all replayed,
-     * and counted; a wrong TOTP code stays invalid.
+     * A used code, TOTP step or assertion; a wrong TOTP code stays invalid.
      *
      * @return void
      */
@@ -629,9 +604,6 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A TOTP code whose step comes before one already accepted is replayed, not
-     * wrong.
-     *
      * @return void
      */
     public function testAMatchedStepAfterALaterOneIsReplayed(): void
@@ -644,8 +616,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A challenge that is not the factor's is not found, and counted, so it
-     * cannot be used to guess without paying for it.
+     * Counted so it cannot be used to guess for free.
      *
      * @return void
      */
@@ -669,8 +640,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A submission of the wrong kind for its factor is not found, with nothing
-     * checked or counted.
+     * Nothing is checked or counted.
      *
      * @return void
      */
@@ -706,8 +676,8 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A passkey's credential the gateway no longer lists is not found, and one
-     * of the wrong credential is an invalid code; neither reaches a proof.
+     * An unlisted credential is not found and a wrong one is an invalid code;
+     * neither reaches a proof.
      *
      * @return void
      */
@@ -731,8 +701,6 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * A gateway that cannot verify at all refuses, counting nothing.
-     *
      * @return void
      */
     public function testAnUnavailableGatewayCountsNothing(): void
@@ -758,8 +726,8 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * What an adapter's gateway says of a challenge is what is answered, and
-     * one it refuses is counted nowhere and gives back the address's slot.
+     * The gateway's answer is the one given; a refused challenge counts nowhere
+     * and frees the address's slot.
      *
      * @return void
      */
@@ -791,9 +759,8 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
-     * Run the change once, when the identity's state row is first locked: the
-     * first statement under the lock, after every check made before it, as a
-     * concurrent change made while the lock was awaited would land.
+     * Runs the change at the first statement under the identity's lock, as a
+     * change made while the lock was awaited would land.
      *
      * @param  \Closure(): void  $change
      * @return void

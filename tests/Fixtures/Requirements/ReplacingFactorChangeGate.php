@@ -9,10 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\FactorChangeGate;
 use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
 
 /**
- * A factor change gate that allows every change, and the first time it is asked
- * replaces the identity's sign-in, as another request signing the identity in
- * again would between the operation's check of its sign-in and its read of that
- * sign-in's proofs.
+ * Allows every change and, on the first call, replaces the sign-in as a
+ * concurrent sign-in would between the check and the read of its proofs.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,12 +19,10 @@ use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
  */
 final class ReplacingFactorChangeGate implements FactorChangeGate
 {
-    /** @var bool Whether the sign-in has been replaced yet. */
+    /** @var bool */
     private bool $replaced = false;
 
     /**
-     * Constructor.
-     *
      * @param  \Closure(\SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest): void  $replace
      */
     public function __construct(
@@ -36,8 +32,6 @@ final class ReplacingFactorChangeGate implements FactorChangeGate
     ) {}
 
     /**
-     * Replace the sign-in the first time, then allow the change.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @return ?\Carbon\CarbonImmutable
      */

@@ -19,9 +19,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 
 /**
- * The statements the `mfa` middleware makes for a request it lets on, on an
- * application in `always` mode: the path every gated request takes, which only
- * reads. It is called directly, so the route and the kernel are not measured.
+ * The `mfa` middleware passing a request in `always` mode, called directly so
+ * the route and kernel are not measured.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,8 +37,6 @@ final class RequirementGateQueryBudgetTest extends PerformanceContractTestCase
     use ArrangesVerification;
 
     /**
-     * Arrange the application in `always` mode.
-     *
      * @return void
      */
     #[\Override]
@@ -52,22 +49,18 @@ final class RequirementGateQueryBudgetTest extends PerformanceContractTestCase
     }
 
     /**
-     * A session whose first factor comes from the application's declaration.
-     *
      * @return void
      */
     public function testAPassingRequestOnADeclaredFirstFactor(): void
     {
         $this->verified($this->signedInPerson());
 
-        // Reads (4): the re-enrolment obligation (1); and the session's proofs,
-        // declaration and trust, each reading the generation (3).
+        // Re-enrolment obligation (1); proofs, declaration and trust each read
+        // the generation (3).
         self::assertSame(Response::HTTP_OK, $this->assertQueryBudget(4, 0, $this->gate(...))->getStatusCode());
     }
 
     /**
-     * A session whose first factor was recorded when it signed in.
-     *
      * @return void
      */
     public function testAPassingRequestOnARecordedFirstFactor(): void
@@ -77,14 +70,11 @@ final class RequirementGateQueryBudgetTest extends PerformanceContractTestCase
         $this->recordFirstFactor($user);
         $this->verified($user);
 
-        // Reads (2): the re-enrolment obligation (1); and the session's proofs,
-        // reading the generation (1).
+        // Re-enrolment obligation (1); proofs read the generation (1).
         self::assertSame(Response::HTTP_OK, $this->assertQueryBudget(2, 0, $this->gate(...))->getStatusCode());
     }
 
     /**
-     * Verify the person with a new TOTP factor.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return void
      */
@@ -96,8 +86,6 @@ final class RequirementGateQueryBudgetTest extends PerformanceContractTestCase
     }
 
     /**
-     * A request through the middleware alone.
-     *
      * @return \Symfony\Component\HttpFoundation\Response
      */
     private function gate(): Response

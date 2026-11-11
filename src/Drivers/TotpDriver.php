@@ -15,28 +15,11 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * TOTP factor driver: time-based one-time passwords (RFC 6238) from an
- * authenticator app, computed by the package itself over `hash_hmac`.
+ * TOTP (RFC 6238). The window comes from the binding's application, not the
+ * request, and every step is compared so timing does not reveal a match.
  *
- * A new enrolment gets a secret of random bytes as long as its algorithm's
- * output (20 for SHA-1, 32 for SHA-256, 64 for SHA-512, never under 160 bits)
- * and the algorithm, digits and period `mfa.totp` sets for new enrolments,
- * which the factor keeps. A code is checked against every time step of the
- * window, each compared with `hash_equals()` and none skipped when an earlier
- * one matches, so the work does not depend on which step matches or whether one
- * does. The window is the `totp_window` of the application the binding names,
- * at confirmation as at verification, so it comes from the application the
- * enrolment was granted through and not from the request. It is read from the
- * configuration on every call and never widens.
- *
- * A time step is single-use per factor (RFC 6238 §5.2): a code is accepted only
- * when its step is later than the factor's last accepted one, recorded in the
- * same compare-and-set (see `EloquentFactor::storeAcceptedStep()`), at
- * confirmation as at verification. Of two requests with the same code, only one
- * records the step, and a code that matches a step already passed is reported
- * as replayed, never as wrong. A factor that cannot record a step, one
- * implementing only the `Factor` read surface, cannot be held to single use, so
- * it verifies nothing.
+ * A step is single-use per factor (RFC 6238 section 5.2) through a
+ * compare-and-set, so a factor that cannot record one verifies nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -44,22 +27,17 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 final readonly class TotpDriver implements ProvisioningDriver
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Drivers\TotpSettings  $settings
      */
     public function __construct(
 
-        /** The parameters of new enrolments and the window, read per call. */
+        /** Read per call. */
         private TotpSettings $settings,
     ) {}
 
     /**
-     * Verify the code against the factor's secret and parameters within the
-     * window of the binding's application, recording the matched time step so
-     * it is never accepted again: `ACCEPTED`, `INVALID` for a code that matches
-     * no step of the window, or `REPLAYED` for one that matches a step already
-     * passed.
+     * Records the matched step so it is never accepted again; a step already
+     * passed is `REPLAYED`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
@@ -81,8 +59,6 @@ final readonly class TotpDriver implements ProvisioningDriver
     }
 
     /**
-     * An authenticator app holds the shared secret.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
      */
     #[\Override]
@@ -92,8 +68,6 @@ final readonly class TotpDriver implements ProvisioningDriver
     }
 
     /**
-     * The `amr` value of a TOTP code: `otp`.
-     *
      * @return list<string>
      */
     #[\Override]
@@ -103,12 +77,8 @@ final readonly class TotpDriver implements ProvisioningDriver
     }
 
     /**
-     * Start an enrolment with a new shared secret, which the enrolment stores
-     * encrypted on the pending factor and shows the person once.
-     *
-     * The parameters new enrolments use are stamped on an Eloquent factor, with
-     * no step accepted yet; a factor of another kind is given them by its
-     * caller, from `parameters()`.
+     * A new shared secret. A non-Eloquent factor gets its parameters from its
+     * caller, through `parameters()`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return \SineMacula\Laravel\Mfa\Secrets\RevealedSecret
@@ -132,10 +102,6 @@ final readonly class TotpDriver implements ProvisioningDriver
     }
 
     /**
-     * Confirm the pending factor with the first code its authenticator app
-     * shows, checked as any other under the binding of the enrolment, so its
-     * step is recorded and the confirming code cannot be used again.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -150,9 +116,6 @@ final readonly class TotpDriver implements ProvisioningDriver
     }
 
     /**
-     * The algorithm, digits and period a new enrolment is made with, as
-     * `mfa.totp` sets them now.
-     *
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpParameters
      *
      * @throws \InvalidArgumentException
@@ -163,11 +126,8 @@ final readonly class TotpDriver implements ProvisioningDriver
     }
 
     /**
-     * Build the factor's provisioning URI in the `otpauth://` key URI format,
-     * for an authenticator app to read from a QR code: the label
-     * `issuer:account` and the secret, issuer, algorithm, digits and period.
-     * Pass the issuer and account name as they are, not encoded; neither may be
-     * empty or hold a colon, which separates them in the label.
+     * An `otpauth://` URI. Pass the issuer and account name unencoded; neither
+     * may be empty or hold a colon.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $issuer
@@ -204,9 +164,7 @@ final readonly class TotpDriver implements ProvisioningDriver
     }
 
     /**
-     * The latest time step of the window whose code is the one given, or `null`
-     * when none is, or the factor has no usable secret or parameters. Every
-     * step of the window is computed and compared.
+     * The latest matching step of the window. Every step is compared.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code

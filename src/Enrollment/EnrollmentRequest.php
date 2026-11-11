@@ -7,11 +7,8 @@ namespace SineMacula\Laravel\Mfa\Enrollment;
 use SineMacula\Laravel\Mfa\Factors\FactorLabel;
 
 /**
- * What a person asks to enrol: an authenticator app, or an application's own
- * type provisioned the same way, under an account name; a delivered type with
- * its destination; or any other type; with the label they chose. The
- * destination is hidden from dumps, as it stays until the driver has normalised
- * it.
+ * What a person asks to enrol. The destination is hidden from dumps until the
+ * driver normalises it.
  *
  * @api
  *
@@ -20,12 +17,10 @@ use SineMacula\Laravel\Mfa\Factors\FactorLabel;
  */
 final readonly class EnrollmentRequest
 {
-    /** @var \SensitiveParameterValue The destination given, hidden from dumps. */
+    /** @var \SensitiveParameterValue */
     private \SensitiveParameterValue $destination;
 
     /**
-     * Constructor.
-     *
      * @param  string  $type
      * @param  ?string  $label
      * @param  ?string  $destination
@@ -34,28 +29,26 @@ final readonly class EnrollmentRequest
      */
     private function __construct(
 
-        /** The type to enrol. */
+        /** Factor type. */
         public string $type,
 
-        /** The label the person chose, trimmed, with a blank one as none. */
+        /** Trimmed; blank is null. */
         public ?string $label,
 
-        // The destination given, for a delivered type.
+        // For a delivered type.
         #[\SensitiveParameter]
         ?string $destination = null,
 
-        /** The account name an authenticator app shows, for a type that provisions one. */
+        /** Account name an authenticator app shows. */
         public ?string $accountName = null,
 
-        /** The issuer an authenticator app shows, in place of the configured one. */
+        /** Overrides the configured issuer. */
         public ?string $issuer = null,
     ) {
         $this->destination = new \SensitiveParameterValue($destination);
     }
 
     /**
-     * An authenticator app, under the account name and issuer it shows.
-     *
      * @param  string  $accountName
      * @param  ?string  $label
      * @param  ?string  $issuer
@@ -69,9 +62,7 @@ final readonly class EnrollmentRequest
     }
 
     /**
-     * A type whose driver provisions an authenticator app (see
-     * `Contracts\ProvisioningDriver`), under the account name and issuer it
-     * shows.
+     * A type whose driver implements `Contracts\ProvisioningDriver`.
      *
      * @param  string  $type
      * @param  string  $accountName
@@ -87,8 +78,6 @@ final readonly class EnrollmentRequest
     }
 
     /**
-     * A delivered type, with the destination its first code goes to.
-     *
      * @param  string  $type
      * @param  string  $destination
      * @param  ?string  $label
@@ -102,8 +91,6 @@ final readonly class EnrollmentRequest
     }
 
     /**
-     * Any other type.
-     *
      * @param  string  $type
      * @param  ?string  $label
      * @return self
@@ -116,7 +103,7 @@ final readonly class EnrollmentRequest
     }
 
     /**
-     * The destination given, as given.
+     * Not yet normalised.
      *
      * @return ?string
      */

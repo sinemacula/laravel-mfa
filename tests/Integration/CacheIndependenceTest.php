@@ -16,9 +16,8 @@ use Tests\Fixtures\Hardening\Concerns\FlowCatalog;
 use Tests\TestCase;
 
 /**
- * Nothing the package does asks the cache anything: every flow reaches its
- * branch with a cache store that throws on every call, and none is counted.
- * That also shows a cache that lies is irrelevant, as nothing reads it.
+ * Every flow reaches its branch with a cache store that throws on every call,
+ * so a lying cache is irrelevant too.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,8 +33,6 @@ final class CacheIndependenceTest extends TestCase
     private int $cacheCalls = 0;
 
     /**
-     * Arrange the flows.
-     *
      * @return void
      */
     #[\Override]
@@ -48,8 +45,6 @@ final class CacheIndependenceTest extends TestCase
     }
 
     /**
-     * The flow reaches its branch without asking the cache anything.
-     *
      * @param  string  $flow
      * @return void
      */
@@ -81,8 +76,6 @@ final class CacheIndependenceTest extends TestCase
     }
 
     /**
-     * The catalogue's names are the flows it holds.
-     *
      * @return void
      */
     public function testTheCatalogNamesEveryFlow(): void

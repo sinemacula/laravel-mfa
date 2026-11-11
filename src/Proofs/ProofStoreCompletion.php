@@ -19,24 +19,8 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 
 /**
- * The default `PendingCompletion` and `StepUp`, for a package with no
- * authentication layer: a verified proof is recorded in the bound `ProofStore`.
- *
- * It refuses a failed result, and a binding whose owner, application or session
- * is not the store's current sign-in, and for a pending session not the pending
- * context's either, or whose purpose the session cannot take, with an
- * `OperationRefusedException` as `not_accepted`, so everything the verification
- * did rolls back. It never begins a sign-in: an application that binds its own
- * `PendingSessionResolver` alone begins the store's sign-in under the pending
- * id through `GuardHooks::signedIn()`.
- *
- * The proof is handed to the store once the storage connection's transaction
- * commits, and never when it rolls back, because a write to the Laravel session
- * cannot roll back. A store that refuses it then throws `ProofRefusedException`
- * from the commit, with the code spent; that is not an ordinary refusal, and is
- * not turned into one.
- *
- * Stateless: the store is resolved on every call.
+ * The default `PendingCompletion` and `StepUp`: records the proof in the bound
+ * `ProofStore` after commit, as a session write cannot roll back.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -44,21 +28,17 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the store and the request's caller are resolved from. */
+        /** Seams are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * Record a successful verification on the caller's pending session, whose
-     * sign-in the store must hold under the pending session's public id: a
-     * proof made for the sign-in, or an additional factor confirmed by its
-     * enrolment. A caller with no pending session is refused.
+     * A sign-in proof, or an additional factor confirmed by enrolment, bound to
+     * the pending session's sign-in in the store.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
@@ -91,7 +71,7 @@ final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
     }
 
     /**
-     * Record a successful verification on the active session of the person the
+     * A step-up or sign-in proof bound to the active sign-in of the person the
      * request serves.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
@@ -124,8 +104,8 @@ final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
     }
 
     /**
-     * Record the proof once the storage connection commits, refusing one bound
-     * anywhere but the identity's current sign-in in the store.
+     * A store that refuses after commit throws `ProofRefusedException` with the
+     * code spent, which is not turned into a refusal.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
@@ -151,8 +131,6 @@ final readonly class ProofStoreCompletion implements PendingCompletion, StepUp
     }
 
     /**
-     * The proof of a successful result, refusing a failed one.
-     *
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      *

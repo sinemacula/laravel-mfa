@@ -27,18 +27,8 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * The factors a session is offered, as summaries: the identity's confirmed
- * factors, of a type the application enables, that the combination policy
- * accepts after the session's first factor, the preferred one first, then the
- * oldest, then by id; none while that first factor is not known.
- *
- * Left out, because they cannot succeed: a factor disabled at the failure
- * ceiling, and a passkey when the gateway is unavailable or its association or
- * credential is missing. A factor under a temporary lockout stays. A pending
- * session must allow listing factors; a request that serves nobody, and an
- * inactive identity, are offered nothing. Recovery codes are never offered.
- *
- * Offers are advisory: sending and verifying repeat every check.
+ * The factors a session is offered, leaving out any that cannot succeed. Offers
+ * are advisory: sending and verifying repeat every check.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -48,8 +38,6 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 final readonly class FactorOffers
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      * @param  \SineMacula\Laravel\Mfa\Context\SessionFirstFactor  $firstFactors
@@ -57,21 +45,22 @@ final readonly class FactorOffers
      */
     public function __construct(
 
-        /** The container the configuration and the seams are resolved from. */
+        /** Seams and configuration are resolved on every call. */
         private Container $container,
 
-        /** The resolver of who the request serves. */
+        /** Resolves who the request serves. */
         private CallerContextResolver $callers,
 
-        /** The reader of the session's first factor. */
+        /** Reads the session's first factor. */
         private SessionFirstFactor $firstFactors,
 
-        /** The ceremony checks of a passkey. */
+        /** Passkey ceremony checks. */
         private PasskeyAssertions $passkeys,
     ) {}
 
     /**
-     * The factors offered to the session the request serves.
+     * None for a request that serves nobody, an inactive identity or an unknown
+     * first factor; a locked-out factor stays.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
@@ -110,8 +99,7 @@ final readonly class FactorOffers
     }
 
     /**
-     * The first factor of the session the request serves, or `null` when it is
-     * not known.
+     * `null` when it is not known.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $application
@@ -128,9 +116,8 @@ final readonly class FactorOffers
     }
 
     /**
-     * Whether the factor could succeed on the session: confirmed, not disabled
-     * at the failure ceiling, able to take part if it is a passkey, and
-     * accepted after the first factor.
+     * Confirmed, not disabled, able to take part if a passkey, and accepted
+     * after the first factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -156,8 +143,7 @@ final readonly class FactorOffers
     }
 
     /**
-     * Where the factor falls in the list: the preferred one first, then the
-     * oldest, then by id.
+     * Preferred first, then oldest, then by id.
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return array{0: bool, 1: int, 2: ?string}

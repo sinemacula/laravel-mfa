@@ -7,31 +7,11 @@ namespace SineMacula\Laravel\Mfa\Secrets;
 use Illuminate\Contracts\Support\Arrayable;
 
 /**
- * Replaces the secrets, codes and full destinations in a set of values, such as
- * a log record's context or a trace frame's arguments, with `[redacted]`.
+ * Replaces secrets, codes, full destinations and values under keys naming one
+ * with `[redacted]` in log values or trace arguments.
  *
- * A value is redacted when it is a `RevealedSecret`, a
- * `\SensitiveParameterValue` or a code message (a `CodeMessage`, an
- * `MfaCodeMessage`, or a queued job sending one), or when its key names a
- * secret, a code or a destination (`secret`, `totp_secret`, `code`, `codes`,
- * `otp`, `one_time_code`, `recovery_code`, `recovery_codes`, `destination`,
- * `address`, `email`, `phone`, `phone_number`, `to`, `recipient`,
- * `provisioning_uri`, `otpauth_uri`, `grant`, `enrollment_grant`, compared
- * without case, underscores, hyphens or spaces, so `recoveryCodes` and
- * `phoneNumber` count). An `otpauth://` provisioning URI is redacted wherever
- * it appears in a string.
- *
- * In a log's values, an exception is scrubbed in place by `ExceptionScrubber`,
- * of the sensitive values the record holds too, a date or an enum is kept, and
- * any other object is first turned into what Monolog would log for it, keyed by
- * its class (see `normalize()`), so a secret held in an object cannot slip
- * past. In a trace's arguments, other objects are kept as they are, and a
- * string that is, or contains, a sensitive value collected for the scrub is
- * redacted too (see `SensitiveValues`).
- *
- * The walk is bounded: an array or object deeper than ten levels is replaced
- * with `[truncated]`, as is everything after an array's first thousand entries,
- * so a recursive or very large value cannot exhaust memory.
+ * The walk is bounded in depth and width so a recursive or very large value
+ * cannot exhaust memory.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -40,19 +20,19 @@ use Illuminate\Contracts\Support\Arrayable;
  */
 final class Redactor
 {
-    /** @var string The marker that replaces what the walk does not reach. */
+    /** @var string Replaces what the walk does not reach. */
     public const string TRUNCATED = '[truncated]';
 
-    /** @var string The marker that replaces the form of an object that refuses to give one. */
+    /** @var string Replaces the form of an object that throws when asked for one. */
     public const string UNSERIALIZABLE = '[unserializable]';
 
-    /** @var int The deepest level the walk reaches; deeper arrays and objects are truncated. */
+    /** @var int */
     public const int MAX_DEPTH = 10;
 
-    /** @var int The most entries of one array the walk keeps. */
+    /** @var int */
     private const int MAX_ITEMS = 1000;
 
-    /** @var list<string> The keys whose values are redacted, without case, underscores, hyphens or spaces. */
+    /** @var list<string> Compared without case, underscores, hyphens or spaces. */
     private const array KEYS = [
         'address',
         'code',
@@ -75,7 +55,7 @@ final class Redactor
         'totpsecret',
     ];
 
-    /** @var string An `otpauth://` provisioning URI, which carries the TOTP secret. */
+    /** @var string An `otpauth://` URI carries the TOTP secret. */
     private const string PROVISIONING_URI = '~otpauth(?:-migration)?://\S*~i';
 
     /**
@@ -84,9 +64,7 @@ final class Redactor
     private function __construct() {}
 
     /**
-     * A log's values already normalised (see `normalize()`), with every secret,
-     * code and full destination in them redacted, each exception in them
-     * scrubbed of the sensitive values given too.
+     * Expects values already passed through `normalize()`.
      *
      * @param  array<array-key, mixed>  $values
      * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $sensitive
@@ -98,14 +76,8 @@ final class Redactor
     }
 
     /**
-     * A log's values with every object in them turned into what Monolog would
-     * log for it, keyed by its class: an `Arrayable`'s array form, a
-     * `JsonSerializable`'s JSON form, a `Stringable`'s string form or any other
-     * object's public properties, themselves normalised. Secret values, code
-     * messages, exceptions, dates and enums, and every value under a key naming
-     * a secret, a code or a destination, are kept as they are. The walk is
-     * bounded as the redaction is, so the values collected from the result (see
-     * `SensitiveValues`) are those the redaction then reaches.
+     * Turns each object into what Monolog would log for it, so a secret held in
+     * an object cannot slip past the redaction.
      *
      * @param  array<array-key, mixed>  $values
      * @return array<array-key, mixed>
@@ -116,9 +88,7 @@ final class Redactor
     }
 
     /**
-     * A trace frame's arguments with every secret in them redacted, and every
-     * string the sensitive values collected for the scrub match. Objects other
-     * than code messages are kept as they are.
+     * Objects other than code messages are kept as they are.
      *
      * @param  array<array-key, mixed>  $arguments
      * @param  ?\SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $values
@@ -130,9 +100,6 @@ final class Redactor
     }
 
     /**
-     * A message, an exception's or a log record's, with every occurrence of the
-     * sensitive values in it redacted, and every provisioning URI.
-     *
      * @param  string  $message
      * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $values
      * @return string
@@ -143,8 +110,6 @@ final class Redactor
     }
 
     /**
-     * The string with every provisioning URI in it redacted.
-     *
      * @param  string  $value
      * @return string
      */
@@ -154,8 +119,6 @@ final class Redactor
     }
 
     /**
-     * Whether the key names a secret, a code or a destination.
-     *
      * @param  string  $key
      * @return bool
      */
@@ -165,9 +128,6 @@ final class Redactor
     }
 
     /**
-     * The array with every secret in it redacted, keeping its first thousand
-     * entries.
-     *
      * @param  array<array-key, mixed>  $values
      * @param  int  $depth
      * @param  bool  $trace
@@ -195,10 +155,7 @@ final class Redactor
     }
 
     /**
-     * The value with every secret in it redacted. In a trace's arguments, a
-     * string the sensitive values match is redacted whole and other objects are
-     * kept; in a log's normalised values, an exception is scrubbed in place, of
-     * the sensitive values too, and other objects are kept.
+     * In a log's values, an exception is scrubbed in place.
      *
      * @param  mixed  $value
      * @param  int  $depth
@@ -220,8 +177,6 @@ final class Redactor
     }
 
     /**
-     * The exception, scrubbed in place, of the sensitive values given too.
-     *
      * @param  \Throwable  $throwable
      * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $sensitive
      * @return \Throwable
@@ -234,11 +189,8 @@ final class Redactor
     }
 
     /**
-     * The array with every object in it normalised, keeping its first thousand
-     * entries. A value under a key naming a secret, a code or a destination is
-     * kept as it is, since the redaction replaces it whole: no method of an
-     * object in it is called, so one that throws when it is turned into its
-     * logged form cannot fail the log.
+     * Secret-keyed values are left untouched, as redaction replaces them whole
+     * and an object there that throws must not fail the log.
      *
      * @param  array<array-key, mixed>  $values
      * @param  int  $depth
@@ -265,10 +217,8 @@ final class Redactor
     }
 
     /**
-     * The value with every object in it normalised, bounded as the redaction
-     * is. An exception or an enum that gives its own JSON form is normalised as
-     * any other object is, since Monolog logs that form rather than the
-     * exception or the case.
+     * A `JsonSerializable` exception or enum is normalised, as Monolog logs its
+     * JSON form.
      *
      * @param  mixed  $value
      * @param  int  $depth
@@ -291,9 +241,6 @@ final class Redactor
     }
 
     /**
-     * Whether the value is an exception or an enum that gives its own JSON
-     * form, which Monolog logs in its place.
-     *
      * @param  mixed  $value
      * @return bool
      *
@@ -305,12 +252,8 @@ final class Redactor
     }
 
     /**
-     * A logged object as what Monolog would log for it, keyed by its class: its
-     * array form, its JSON form, its string form or its public properties,
-     * themselves normalised. An object that throws rather than give its form,
-     * as a value that refuses to be logged does on purpose, is logged as its
-     * class alone, so the log line is written and nothing it holds is read
-     * another way.
+     * Keyed by class. An object that throws is logged as its class alone, so
+     * the line is still written and nothing it holds is read another way.
      *
      * @param  object  $value
      * @param  int  $depth
@@ -322,8 +265,7 @@ final class Redactor
             return self::TRUNCATED;
         }
 
-        // Any of the forms may throw, an error included, and static analysis
-        // traces none of them through the object, so the catch is marked.
+        // Any form may throw; PHPStan cannot see it
         try {
             $form = match (true) {
                 $value instanceof Arrayable         => $value->toArray(),

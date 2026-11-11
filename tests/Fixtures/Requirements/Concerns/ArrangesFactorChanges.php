@@ -15,9 +15,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
 
 /**
- * Arranges a person's sign-in and the requests a factor change gate is asked:
- * the person signs in afresh with the proofs given, and holds a confirmed
- * factor their TOTP step-ups are made with and, by default, another.
+ * Arranges a person's fresh sign-in and the requests a factor change gate is
+ * asked.
  *
  * @phpstan-require-extends \Tests\TestCase
  *
@@ -28,15 +27,14 @@ use Tests\Fixtures\Requirements\SignInProofs;
  */
 trait ArrangesFactorChanges
 {
-    /** @var string The id of the factor the person's TOTP step-ups are made with. */
+    /** @var string The factor the person's TOTP step-ups are made with. */
     protected const string STEPPED_UP_WITH = 'factor-totp';
 
-    /** @var string The id of the person's other factor. */
+    /** @var string */
     protected const string OTHER_FACTOR = 'factor-other';
 
     /**
-     * The request for the person's change, from their sign-in, on the factors
-     * given, or on their two confirmed factors.
+     * Defaults to the person's two confirmed factors.
      *
      * @formatter:off
      *
@@ -57,7 +55,7 @@ trait ArrangesFactorChanges
     }
 
     /**
-     * A factor with the id and status, unsaved.
+     * An unsaved factor.
      *
      * @param  string  $id
      * @param  string  $status
@@ -69,8 +67,6 @@ trait ArrangesFactorChanges
     }
 
     /**
-     * Sign the person in afresh, recording the proofs given.
-     *
      * @param  \Closure(\Tests\Fixtures\Requirements\SignInProofs): list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @return \Tests\Fixtures\Identities\TestUser
      */

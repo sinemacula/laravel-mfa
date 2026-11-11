@@ -39,8 +39,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * The keys the package contributes to the authentication context under `mfa`,
- * pinned exactly for each kind of session, read from its recorded proofs.
+ * The `mfa` authentication context keys, pinned exactly for each kind of
+ * session.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -52,7 +52,7 @@ final class AuthenticationContextContributorTest extends TestCase
 {
     use ArrangesVerification;
 
-    /** @var array<string, mixed> The whole context of a caller the package does not serve. */
+    /** @var array<string, mixed> Whole context of a caller the package does not serve. */
     private const array NEUTRAL = [
         'accepted'                      => false,
         'multifactor'                   => false,
@@ -65,8 +65,6 @@ final class AuthenticationContextContributorTest extends TestCase
     ];
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -78,8 +76,6 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * The contributor fills the `mfa` namespace.
-     *
      * @return void
      */
     public function testItFillsTheMfaNamespace(): void
@@ -113,9 +109,8 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * `has_confirmed_factor` is a fact: an identity whose only factor's stored
-     * status is none the package knows reports no confirmed factor, while the
-     * requirement, which is conservative, still holds it to MFA.
+     * An unknown stored status reports no confirmed factor, while the
+     * conservative requirement still holds the identity to MFA.
      *
      * @return void
      *
@@ -400,8 +395,6 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * A guest has the neutral context.
-     *
      * @return void
      */
     public function testAGuestIsNeutral(): void
@@ -422,8 +415,6 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * An identity that is not MFA-capable has the neutral context.
-     *
      * @return void
      */
     public function testAnIdentityThatIsNotMfaCapableIsNeutral(): void
@@ -446,9 +437,8 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * The bound active state resolver, not the identity, decides who is
-     * inactive: a person it finds inactive has the neutral context, whatever
-     * they have met, and an identity it finds active is read from its proofs.
+     * The bound active state resolver decides who is inactive, not the
+     * identity.
      *
      * @return void
      */
@@ -473,9 +463,8 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * A pending session has the neutral context, also with an active one beside
-     * it that has met everything: its enrolment information comes through the
-     * pending flow.
+     * Neutral even beside a fully met active session; its enrolment details
+     * come through the pending flow.
      *
      * @return void
      */
@@ -495,9 +484,6 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * One instance answers for whoever each request serves, so nothing is
-     * shared between consecutive requests.
-     *
      * @return void
      */
     public function testConsecutiveRequestsThroughOneInstanceShareNothing(): void
@@ -531,9 +517,7 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * A sign-in replaced between reading which one is current and reading its
-     * proofs gives the neutral evidence: neither its own proofs, now gone, nor
-     * its successor's count for it.
+     * Neither the replaced sign-in's proofs nor its successor's count.
      *
      * @return void
      */
@@ -608,9 +592,8 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * A named sign-in reads only the proofs that count for it: none of another
-     * sign-in, another application or an older verification generation, and
-     * none dated in the future.
+     * Proofs of another sign-in, application or older generation, or dated in
+     * the future, do not count.
      *
      * @return void
      */
@@ -646,8 +629,7 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * A named sign-in of a machine, or of an inactive identity, has the neutral
-     * context, whatever proofs that count for it are given.
+     * Neutral whatever proofs are given.
      *
      * @return void
      */
@@ -668,8 +650,6 @@ final class AuthenticationContextContributorTest extends TestCase
 
         $this->container()->instance(SubjectTypeResolver::class, new class implements SubjectTypeResolver {
             /**
-             * Nobody is a person.
-             *
              * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
              * @return bool
              */
@@ -684,8 +664,6 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * The contributor under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor
      */
     private function contributor(): AuthenticationContextContributor
@@ -694,8 +672,6 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * The context the caller of the request is given now.
-     *
      * @return array<string, mixed>
      */
     private function context(): array
@@ -723,8 +699,7 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * A first factor of the person's on the channel, having observed the
-     * properties, an hour ago.
+     * A first factor proved an hour ago.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $channel
@@ -737,8 +712,6 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * A recovery code the person redeemed.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
@@ -767,8 +740,6 @@ final class AuthenticationContextContributorTest extends TestCase
     }
 
     /**
-     * What a proof of the person's on the sign-in is bound to.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding

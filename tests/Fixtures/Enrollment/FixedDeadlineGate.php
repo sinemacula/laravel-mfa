@@ -20,19 +20,15 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 final readonly class FixedDeadlineGate implements FreshnessGate
 {
     /**
-     * Constructor.
-     *
      * @param  ?\Carbon\CarbonImmutable  $deadline
      */
     public function __construct(
 
-        /** The deadline answered, or `null` for none. */
+        /** `null` for none. */
         private ?CarbonImmutable $deadline,
     ) {}
 
     /**
-     * Fresh while there is a deadline.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -45,8 +41,6 @@ final readonly class FixedDeadlineGate implements FreshnessGate
     }
 
     /**
-     * The fixed deadline.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -59,8 +53,6 @@ final readonly class FixedDeadlineGate implements FreshnessGate
     }
 
     /**
-     * The caller's requirement, unchanged.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement

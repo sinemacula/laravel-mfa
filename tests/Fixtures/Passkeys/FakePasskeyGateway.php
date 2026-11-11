@@ -12,10 +12,8 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * A passkey gateway for tests: lists the credential ids it is given, answers
- * every assertion with the one it is given (against a non-empty allowlist and
- * response only, unless told to ignore either, as a faulty gateway would), and
- * keeps what it was asked.
+ * Answers every assertion with the one it is given, for a non-empty allowlist
+ * and response unless told to skip either check, and keeps what it was asked.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,15 +22,13 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  */
 final class FakePasskeyGateway implements PasskeyGateway
 {
-    /** @var list<list<string>> The allowlists of the assertions requested, oldest first. */
+    /** @var list<list<string>> Allowlists requested, oldest first. */
     public array $requested = [];
 
-    /** @var list<list<string>> The allowlists of the assertions verified, oldest first. */
+    /** @var list<list<string>> Allowlists verified, oldest first. */
     public array $verified = [];
 
     /**
-     * Constructor.
-     *
      * @param  list<string>  $registered
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion  $assertion
      * @param  bool  $available
@@ -43,13 +39,13 @@ final class FakePasskeyGateway implements PasskeyGateway
      */
     public function __construct(
 
-        /** The credential ids of the identity's registered passkeys. */
+        /** Credential ids of the identity's passkeys. */
         public array $registered = [],
 
-        /** What every verified assertion observed, or why it did not verify. */
+        /** Every verification's answer. */
         public FailureReason|PasskeyAssertion $assertion = FailureReason::INVALID_CODE,
 
-        /** Whether passkeys can be used. */
+        /** @var bool */
         public bool $available = true,
 
         /** Whether an empty allowlist verifies nothing, as it must. */
@@ -58,16 +54,14 @@ final class FakePasskeyGateway implements PasskeyGateway
         /** Whether an empty response verifies nothing, as it must. */
         public bool $checksResponse = true,
 
-        /** What a verification is refused with, when it cannot verify at all. */
+        /** Thrown by every verification. */
         public ?OperationRefusedException $refusal = null,
 
-        /** What a request for an assertion fails with, when it cannot start one. */
+        /** Thrown by every assertion request. */
         public ?\Throwable $requestRefusal = null,
     ) {}
 
     /**
-     * Whether passkeys can be used.
-     *
      * @return bool
      */
     #[\Override]
@@ -77,8 +71,6 @@ final class FakePasskeyGateway implements PasskeyGateway
     }
 
     /**
-     * The registered credential ids.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return list<string>
      */
@@ -89,8 +81,6 @@ final class FakePasskeyGateway implements PasskeyGateway
     }
 
     /**
-     * Keep the allowlist, and return options naming it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  list<string>  $credentialIds
@@ -111,9 +101,6 @@ final class FakePasskeyGateway implements PasskeyGateway
     }
 
     /**
-     * Keep the allowlist, and answer the fixed assertion for a non-empty
-     * allowlist and response; otherwise an invalid code.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  list<string>  $credentialIds

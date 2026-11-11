@@ -8,10 +8,8 @@ use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 
 /**
- * Registers the default `CombinationPolicy`, which classifies combinations of
- * proofs from what they observed. An application that is stricter, or that
- * trusts an external provider's reported methods, rebinds the contract in its
- * own service provider.
+ * Binds the default `CombinationPolicy` only if the application has not bound
+ * its own.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,8 +24,6 @@ final class AssuranceBindings
     private function __construct() {}
 
     /**
-     * Register the default combination policy.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

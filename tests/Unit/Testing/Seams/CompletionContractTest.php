@@ -29,10 +29,8 @@ use Tests\Fixtures\Seams\RefusingCompletion;
 use Tests\TestCase;
 
 /**
- * The `PendingCompletion` and `StepUp` contract kits prove a completion that
- * checks each result's binding, and reject one that accepts every result, or
- * refuses with anything but an `OperationRefusedException`. The package's own
- * default, which records in the proof store, passes both.
+ * The package's own default, which records in the proof store, passes both
+ * kits.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,9 +44,6 @@ final class CompletionContractTest extends TestCase
     use PendingCompletionTests, StepUpTests;
 
     /**
-     * The kit rejects a pending completion that accepts a result of another
-     * binding.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -61,10 +56,6 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a pending completion that takes a result from a caller
-     * with no pending session, and one that refuses a result of its own pending
-     * session.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -85,8 +76,6 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a step-up that accepts a failed result.
-     *
      * @return void
      */
     public function testRejectsAStepUpThatAcceptsAFailedResult(): void
@@ -97,7 +86,7 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a seam that refuses with anything but a reason.
+     * Anything but an `OperationRefusedException`.
      *
      * @return void
      *
@@ -111,8 +100,6 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * A completion that checks each result.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\PendingCompletion
      */
     #[\Override]
@@ -122,8 +109,6 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * A pending session.
-     *
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
      */
     #[\Override]
@@ -143,8 +128,6 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * A result bound to the pending session.
-     *
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -158,8 +141,6 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * A result bound to another session.
-     *
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -173,8 +154,6 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * A step-up that checks each result.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\StepUp
      */
     #[\Override]
@@ -184,8 +163,6 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * A result bound to another session.
-     *
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -197,8 +174,6 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * The caller of the request.
-     *
      * @return \SineMacula\Laravel\Mfa\Context\CallerContext
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -210,8 +185,7 @@ final class CompletionContractTest extends TestCase
     }
 
     /**
-     * The failure a check that must reject what it is given fails with, or
-     * `null` when it accepts it.
+     * `null` when the check accepts what it is given.
      *
      * @param  \Closure(): void  $check
      * @return ?\PHPUnit\Framework\AssertionFailedError

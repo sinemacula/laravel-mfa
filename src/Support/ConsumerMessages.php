@@ -9,22 +9,12 @@ use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Translation\MessageSelector;
 
 /**
- * The wording of everything the package can put in front of a consumer: the
- * translation for the current locale, or the English the package ships when the
- * translator has nothing usable.
+ * Consumer-facing wording: the current translation, or the shipped English when
+ * the fallback chain has nothing usable, since `Translator::get` ends at the
+ * key.
  *
- * Laravel's fallback chain runs first, so a valid translation in a non-English
- * fallback locale is honoured. The English is needed because `Translator::get`
- * ends at the key, and shipping `en` does not add English to every chain.
- *
- * The translator is resolved on every call, so under Octane it is the sandbox's
- * and neither it nor its locale is kept. No code ever reaches it: a code line
- * is returned as a template for the caller to fill, keeping the code out of the
- * translator's arguments, its replacements and any missing-key handler.
- *
- * The promise is limited to a missing or unusable result. A missing-key handler
- * may return any non-empty string, which cannot be told from a translation, and
- * a translator that throws is left to propagate.
+ * Resolved per call for Octane. A code line is returned as a template, so the
+ * code never reaches the translator or a missing-key handler.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,34 +23,34 @@ use Illuminate\Translation\MessageSelector;
  */
 final class ConsumerMessages
 {
-    /** @var string The route gate's refusal. */
+    /** @var string */
     public const string FURTHER_AUTHENTICATION_REQUIRED = self::NAMESPACE . 'further_authentication_required';
 
-    /** @var string The SMS a code is sent in. */
+    /** @var string */
     public const string SMS_CODE = self::NAMESPACE . 'sms_code';
 
-    /** @var string The subject of the email a code is sent in. */
+    /** @var string */
     public const string EMAIL_SUBJECT = self::NAMESPACE . 'email_subject';
 
-    /** @var string The email's line carrying the code. */
+    /** @var string */
     public const string EMAIL_CODE = self::NAMESPACE . 'email_code';
 
-    /** @var string The email's line saying when the code expires, by the minutes left. */
+    /** @var string */
     public const string EMAIL_EXPIRY = self::NAMESPACE . 'email_expiry';
 
-    /** @var string The email's line for someone who did not ask for a code. */
+    /** @var string */
     public const string EMAIL_IGNORE = self::NAMESPACE . 'email_ignore';
 
-    /** @var string The placeholder a code line must carry, exactly; the code replaces it. */
+    /** @var string A code line must carry it exactly. */
     public const string CODE_PLACEHOLDER = ':code';
 
-    /** @var string What every key starts with: the package's namespace and its file. */
+    /** @var string */
     private const string NAMESPACE = 'mfa::messages.';
 
-    /** @var string The placeholder of a line that says how many minutes. */
+    /** @var string */
     private const string MINUTES_PLACEHOLDER = ':minutes';
 
-    /** @var string The file holding the English the package ships. */
+    /** @var string */
     private const string SHIPPED = __DIR__ . '/../../lang/en/messages.php';
 
     /**
@@ -69,9 +59,6 @@ final class ConsumerMessages
     private function __construct() {}
 
     /**
-     * The line in the current locale with no replacements, or the shipped
-     * English when there is no usable translation.
-     *
      * @param  string  $key
      * @return string
      */
@@ -83,9 +70,8 @@ final class ConsumerMessages
     }
 
     /**
-     * The line as a template for the caller to put the code in, or the shipped
-     * English when the line lacks the exact placeholder, so a message is never
-     * sent without its code.
+     * Falls back to English when the line lacks the exact placeholder, so a
+     * message is never sent without its code.
      *
      * @param  string  $key
      * @return string
@@ -98,12 +84,8 @@ final class ConsumerMessages
     }
 
     /**
-     * The plural line for the minutes, or the shipped English, by English
-     * plural rules whatever the locale, when there is no usable translation.
-     *
-     * The line is looked at before it is selected from, because an array would
-     * otherwise reach the selector, and after, because `One minute|` passes the
-     * first look and selects nothing for two.
+     * Checked before selection, so an array never reaches the selector, and
+     * after, as `One minute|` selects nothing for two.
      *
      * @param  string  $key
      * @param  int  $minutes
@@ -127,15 +109,14 @@ final class ConsumerMessages
     }
 
     /**
-     * The line the package ships, read from its file, never an application's
-     * override.
+     * Read from the file, never an application's override.
      *
      * @param  string  $key
      * @return string
      */
     public static function english(string $key): string
     {
-        // Not require_once: it answers true from the second read on
+        // Not require_once, which returns true on later reads
         /** @var array<string, string> $lines */
         $lines = require self::SHIPPED; // NOSONAR
 
@@ -143,8 +124,6 @@ final class ConsumerMessages
     }
 
     /**
-     * The translator's current locale, or `null` when none is bound.
-     *
      * @return ?string
      */
     public static function locale(): ?string
@@ -153,8 +132,7 @@ final class ConsumerMessages
     }
 
     /**
-     * The translator bound now, if there is one: raising a refusal must never
-     * raise something else because the application is not fully booted.
+     * Null before boot, so raising a refusal never raises something else.
      *
      * @return ?\Illuminate\Contracts\Translation\Translator
      */
@@ -170,9 +148,6 @@ final class ConsumerMessages
     }
 
     /**
-     * Whether the translator's answer can be said: a string, not the key it
-     * ends at when it has nothing, and not empty or only whitespace.
-     *
      * @param  mixed  $line
      * @param  string  $key
      * @return bool

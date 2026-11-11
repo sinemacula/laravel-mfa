@@ -12,9 +12,7 @@ use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * An owner's row in the identity states table, matched on the owner columns, so
- * every reader of the identity's durable state names the row the same way, and
- * the one way that row is locked.
+ * The one way to query and lock an owner's identity state row.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +27,7 @@ final class IdentityStateRow
     private function __construct() {}
 
     /**
-     * A query for the owner's row, on the given connection or, without one, on
-     * the storage connection.
+     * Defaults to the storage connection.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @param  ?\Illuminate\Database\ConnectionInterface  $connection
@@ -48,12 +45,8 @@ final class IdentityStateRow
     }
 
     /**
-     * Lock the owner's row until the connection's transaction ends, creating it
-     * when the owner has none yet.
-     *
-     * An insert that updates the existing row on a conflict takes the row's
-     * exclusive lock in one statement on MySQL and PostgreSQL, also when two
-     * first changes race to create it; SQLite serialises its writers anyway.
+     * Lock the owner's row until the transaction ends, creating it if missing.
+     * The upsert locks in one statement even when two first changes race.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @param  \Illuminate\Database\ConnectionInterface  $connection

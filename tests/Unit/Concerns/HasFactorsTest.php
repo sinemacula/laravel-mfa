@@ -23,10 +23,6 @@ use Tests\Fixtures\Identities\SoftDeletingFactorHolder;
 use Tests\TestCase;
 
 /**
- * Unit tests for the `HasFactors` trait: an identity model's factors, whether
- * it has a confirmed one, and the defaults of the questions every operation
- * asks first.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -38,9 +34,6 @@ final class HasFactorsTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * By default the identity is a person, active, and requires nothing of its
-     * own.
-     *
      * @return void
      */
     public function testTheDefaultsAreAnActivePersonRequiringNothing(): void
@@ -53,7 +46,7 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * The identity's factors are its own, of the shipped model.
+     * Of the shipped model.
      *
      * @return void
      */
@@ -72,9 +65,6 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * A model holding factors that is not an authenticatable finds them by its
-     * own key.
-     *
      * @return void
      */
     public function testAModelThatIsNotAnAuthenticatableFindsItsFactorsByItsKey(): void
@@ -92,8 +82,6 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * The factors are of the configured factor model.
-     *
      * @return void
      */
     public function testTheFactorsAreOfTheConfiguredModel(): void
@@ -104,8 +92,6 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * Only a confirmed factor enables MFA: a pending one does not.
-     *
      * @return void
      */
     public function testOnlyAConfirmedFactorEnablesMfa(): void
@@ -124,8 +110,7 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * Stored statuses that are none the package knows, which only a reset
-     * clears.
+     * Only a reset clears them.
      *
      * @return iterable<string, array{string}>
      */
@@ -139,10 +124,8 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * A factor whose stored status is none the package knows holds the identity
-     * to MFA as a confirmed one does: only exactly `pending` does not, so a
-     * corrupt status is never read as having no factor, on a database whose
-     * collation ignores case and padding as on any other.
+     * Only exactly `pending` does not, so a corrupt status never reads as no
+     * factor, whatever the collation.
      *
      * @param  string  $status
      * @return void
@@ -159,8 +142,7 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * A stored factor with no status at all, where a column allows that, holds
-     * the identity to MFA too.
+     * Where a column allows that.
      *
      * @return void
      */
@@ -184,9 +166,8 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * On a model that casts its status to the enum, the stored values are read
-     * as stored: a pending one does not count, a confirmed one does, and so
-     * does one the enum does not know, which the model itself cannot read.
+     * Pending does not count; confirmed does, and so does a value the enum does
+     * not know.
      *
      * @return void
      */
@@ -217,7 +198,7 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * Deleting the identity deletes its factors, and only its own.
+     * And only its own.
      *
      * @return void
      */
@@ -235,8 +216,7 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * A delete another `deleting` listener cancels keeps the identity's
-     * factors: the identity is never left without them.
+     * The identity is never left without them.
      *
      * @return void
      */
@@ -253,11 +233,8 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * A delete the database refuses keeps the identity's factors.
-     *
-     * The delete is aimed at a table that does not exist, which every driver
-     * refuses without a schema change, and runs in a transaction of its own so
-     * the refusal leaves the test's transaction usable on PostgreSQL.
+     * The delete targets a missing table in its own transaction, so every
+     * driver refuses it and PostgreSQL's test transaction stays usable.
      *
      * @return void
      */
@@ -280,8 +257,7 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * A soft delete keeps the identity's factors, so a restored identity still
-     * has them; a force delete deletes them.
+     * A restored identity still has them.
      *
      * @return void
      */
@@ -311,8 +287,7 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * The factors are found by the owner columns the configured model's
-     * relation names, not by the shipped ones.
+     * Not by the shipped ones.
      *
      * @return void
      */
@@ -336,9 +311,6 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * Create a confirmed factor of the identity through the remapped owner
-     * columns.
-     *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $identity
      * @return \Tests\Fixtures\Factors\RemappedOwnerFactor
      */
@@ -357,8 +329,6 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * Create an identity.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\FactorHolder
      */
@@ -368,8 +338,6 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * Create a factor of the identity with the given status.
-     *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $identity
      * @param  string  $status
      * @return \SineMacula\Laravel\Mfa\Models\Factor

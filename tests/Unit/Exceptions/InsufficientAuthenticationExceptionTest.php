@@ -15,9 +15,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * Unit tests for `InsufficientAuthenticationException`: what it carries, what
- * it adds no header for, and the data an RFC 9470 answer is built from.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -30,9 +27,8 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     private const string MESSAGE = 'Further authentication is required.';
 
     /**
-     * It is a 401 with the shipped message in the default locale, and no
-     * challenge header of its own: the package also serves cookie guards, so
-     * the application chooses.
+     * No challenge header of its own: cookie guards are served too, so the
+     * application chooses.
      *
      * @return void
      */
@@ -47,9 +43,6 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     }
 
     /**
-     * By default it offers nothing, names no operation and reports no confirmed
-     * factor.
-     *
      * @return void
      */
     public function testItsDefaultsReportNothing(): void
@@ -62,8 +55,6 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     }
 
     /**
-     * The requirements and the bound each gives.
-     *
      * @return iterable<string, array{0: \SineMacula\Laravel\Mfa\Requirements\Requirement, 1: ?int}>
      */
     public static function maximumAges(): iterable
@@ -77,8 +68,7 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     }
 
     /**
-     * The maximum age is the shortest bound of any part; a part with no bound
-     * sets none.
+     * A part with no bound sets none.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  ?int  $expected
@@ -91,8 +81,6 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     }
 
     /**
-     * The `acr` values are the minimum level's, or none.
-     *
      * @return void
      */
     public function testTheAcrValuesAreTheMinimumLevels(): void
@@ -102,8 +90,6 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     }
 
     /**
-     * The requirements and the header each gives.
-     *
      * @return iterable<string, array{0: \SineMacula\Laravel\Mfa\Requirements\Requirement, 1: string}>
      */
     public static function headers(): iterable
@@ -117,8 +103,6 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     }
 
     /**
-     * The header states what is present and omits what is absent.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  string  $expected
      * @return void
@@ -130,8 +114,6 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     }
 
     /**
-     * The scheme may be chosen by the application.
-     *
      * @return void
      */
     public function testTheSchemeIsTheCallers(): void
@@ -142,8 +124,6 @@ final class InsufficientAuthenticationExceptionTest extends TestCase
     }
 
     /**
-     * The array form is pinned exactly, its factors masked.
-     *
      * @return void
      */
     public function testTheArrayIsPinnedAndItsDestinationsMasked(): void

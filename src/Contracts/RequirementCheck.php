@@ -9,13 +9,8 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * Requirement check contract.
- *
- * Whether a session's proofs meet a requirement, the same answer wherever it is
- * asked: at sign-in, in a tenant's policy and on step-up. Each part is judged
- * on the newest proof that meets it within its maximum age, so a fresh weaker
- * proof never refreshes an old stronger one, and a fresh first factor never
- * stands in for an additional factor.
+ * Whether a session's proofs meet a requirement, judging each part on the
+ * newest proof that meets it within its maximum age.
  *
  * @api
  *
@@ -25,8 +20,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 interface RequirementCheck
 {
     /**
-     * Evaluate the session's proofs against the requirement.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation

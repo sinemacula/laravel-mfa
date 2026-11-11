@@ -29,30 +29,8 @@ use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\TestCase;
 
 /**
- * Removals and resets overlapping with one another, on MySQL and PostgreSQL.
- *
- * The package's tables live on the default connection, which a second
- * connection to the same database, `observer`, stands in for a concurrent
- * request on, with a lock timeout of a second. While one change holds the
- * identity's factor state lock, a parallel one cannot read what it would decide
- * on: it waits for the lock and times out, and once the first has committed it
- * finds what the first left.
- *
- * - Of two removals on the last two factors of an identity a factor is required
- *   of, the second waits and is then refused as the last factor: both cannot
- *   pass. One test runs the second on the observer until it times out; another
- *   runs it in a forked worker on a connection of its own, and commits the
- *   first only once the database reports the worker waiting on the lock.
- * - A verification that overlaps a reset waits, then fails, its factor gone.
- *   One test runs it on the observer until it times out and retries; another
- *   runs it in a forked worker and lets that same verification resume when the
- *   reset commits.
- * - A verification that committed first keeps its success, which nothing can
- *   undo, but the reset invalidates its proof.
- *
- * SQLite serialises every writer on the whole file, so these tests run on the
- * server databases only; the feature tests prove the same checks on one
- * connection, with the other change interleaved before the lock.
+ * Overlapping removals and resets, with `observer` or a forked worker as the
+ * concurrent request. SQLite serialises all writers, so this needs a server.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -65,15 +43,13 @@ final class LifecycleRaceTest extends TestCase
 {
     use ArrangesPasskeys;
 
-    /** @var int How long to wait for the worker, in microseconds, between looks. */
+    /** @var int Wait between polls, in microseconds. */
     private const int POLL_INTERVAL = 150000;
 
-    /** @var int How many times to look for the worker waiting on the lock. */
+    /** @var int Polls for the worker waiting on the lock. */
     private const int POLLS = 400;
 
     /**
-     * Skip on SQLite, and give the observer a lock timeout of a second.
-     *
      * @return void
      */
     #[\Override]
@@ -91,9 +67,6 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * Of two removals on the last two factors, the second waits for the first
-     * to commit, then is refused: exactly one passes, and one factor is left.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -140,11 +113,8 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * Of two removals truly overlapping, the first holding the lock uncommitted
-     * while a worker's removal waits on it, the worker is refused once the
-     * first commits. A revoker that advances nothing stands in for an
-     * authentication layer's, so the worker's copy of the session's proofs
-     * keeps counting and only the last factor check can refuse it.
+     * The revoker advances nothing, so only the last factor check can refuse
+     * the worker.
      *
      * @return void
      *
@@ -160,8 +130,7 @@ final class LifecycleRaceTest extends TestCase
         $first  = $this->confirmedFactor($user);
         $second = $this->confirmedFactor($user);
 
-        // Of a type no application enables, so it never counts as covering the
-        // identity, but its proof is made without either of the other two.
+        // A type no application enables: a proof that covers neither factor.
         $this->stepUpWith($user, $this->confirmedFactor($user, 'sms'));
 
         $outcome = $this->holdingTheLock(
@@ -175,10 +144,6 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * A verification that read the factor before a reset commits waits on the
-     * lock the reset holds, and when it commits the same verification resumes
-     * and fails: the factor it read is gone.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -205,9 +170,6 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * A verification overlapping a reset waits for it to commit, then fails:
-     * the factor it read is gone, and no proof is recorded.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -254,9 +216,6 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * A verification that committed before the reset took the lock keeps its
-     * success, and its proof stops counting with the reset.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -279,9 +238,6 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * Add the observer and the racer, two more connections to the test
-     * database, and hash cheaply.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -304,8 +260,6 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * Skip a test on a process that cannot fork.
-     *
      * @return void
      */
     private function needsAFork(): void
@@ -318,10 +272,8 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * Make the first change in a transaction left open, run the second in a
-     * forked worker, commit once the database reports the worker waiting on the
-     * lock, and return what the worker reported once it resumed: `made`, or the
-     * reason it was refused.
+     * Commits the first change once the worker waits on its lock, and returns
+     * `made` or the worker's refusal reason.
      *
      * @param  \Closure(): void  $first
      * @param  \Closure(): ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $second
@@ -387,11 +339,8 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * Run the change as the second request, in the forked worker, on the
-     * racer's connection, which the test never opened, so the worker shares no
-     * connection with the test. The worker reports its connection's id before
-     * it starts and the outcome after, then kills itself, so nothing the test
-     * process set up is torn down twice.
+     * Uses the racer connection the test never opened, and kills itself so
+     * nothing the test set up is torn down twice.
      *
      * @param  \Closure(): ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $change
      * @param  \Closure(string): void  $send
@@ -418,12 +367,7 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * Wait until the database reports the worker's connection waiting for a row
-     * lock, failing when it never does.
-     *
-     * InnoDB refreshes what `innodb_trx` reports only once nothing has read it
-     * for 100 milliseconds, so looking any more often than that would keep
-     * returning the first answer, and never see the worker start waiting.
+     * InnoDB refreshes `innodb_trx` only after 100ms unread, so poll no faster.
      *
      * @param  string  $backend
      * @return void
@@ -450,8 +394,6 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * Run the callback with the package's tables reached through the observer.
-     *
      * @template TReturn
      *
      * @param  \Closure(): TReturn  $callback
@@ -471,8 +413,6 @@ final class LifecycleRaceTest extends TestCase
     }
 
     /**
-     * The proofs of additional factors the user's session still holds.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return array<int, \SineMacula\Laravel\Mfa\Proofs\Proof>
      *

@@ -20,23 +20,14 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 
 /**
- * What every `ProofStore` must guarantee, as assertions: a proof of another
- * sign-in, identity or application is refused and changes nothing, the proofs
- * read for a sign-in are that current sign-in's only, a sign-in's proofs go
- * with it, a proof made before the identity's proofs are voided stops counting,
- * and forgetting a factor stops its proofs counting.
+ * What every `ProofStore` must guarantee: a proof of another sign-in, identity
+ * or application throws `ProofRefusedException` and changes nothing; a sign-in
+ * reads only its own proofs, which go with it; and voiding the identity's
+ * proofs or forgetting a factor stops them counting.
  *
- * Each assertion is given the sign-in it begins, so a store backed by real
- * sessions is tested on one the test has arranged, and the default store on
- * `SESSION`. A sign-in may already hold proofs when it is begun, such as the
- * first factor an authentication layer records on signing in, so each count is
- * taken against those. The other checks put their proofs in through a closure
- * and end the sign-in through another, so a store whose proofs and sign-ins an
- * authentication layer keeps is tested on what that layer wrote; the refusals
- * always go through `record()`. A proof of any other sign-in, identity or
- * application is refused by throwing a `ProofRefusedException`, as
- * `ProofStore::record()` declares; a store that cannot find that sign-in at all
- * refuses it the same way.
+ * Each check takes the sign-in it begins, and counts against proofs it already
+ * held. The closures let a store whose sign-ins an authentication layer keeps
+ * be tested on what that layer wrote; refusals always go through `record()`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -45,7 +36,7 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
  */
 final class ProofStoreContract
 {
-    /** @var string The sign-in a store that keeps its own begins. */
+    /** @var string The sign-in a store that keeps its own sessions begins. */
     public const string SESSION = 'contract-sign-in';
 
     /** @var string A sign-in id no check begins, so never the identity's current one. */
@@ -63,9 +54,7 @@ final class ProofStoreContract
     private function __construct() {}
 
     /**
-     * A proof bound to another sign-in than the identity's current one is
-     * refused by throwing, and changes nothing: the current sign-in and the
-     * proof `$arrange` put in it stay as they were.
+     * The current sign-in and the proof `$arrange` put in it stay as they were.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -87,9 +76,7 @@ final class ProofStoreContract
     }
 
     /**
-     * A proof of another identity's current sign-in, recorded for the identity,
-     * is refused by throwing, and changes neither identity's sign-in or proofs:
-     * a store must judge the identity it is handed, not the one the proof
+     * The store must judge the identity it is handed, not the one the proof
      * names.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
@@ -123,10 +110,6 @@ final class ProofStoreContract
     }
 
     /**
-     * A proof bound to another application, where the identity has no sign-in
-     * of that id, is refused by throwing, and changes nothing on the sign-in
-     * begun.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -147,15 +130,9 @@ final class ProofStoreContract
     }
 
     /**
-     * The proofs read for a sign-in are that sign-in's only: once the sign-in
-     * is replaced, reading it yields none though it held a proof, the sign-in
-     * that replaced it is read on its own, and a session never begun yields
-     * none.
-     *
-     * The proofs are put in by `$arrange`, and the sign-in replaced by
-     * `$replace`, which returns the new sign-in's id: by default the store's
-     * own `record()` and `begin()`, and for a store whose proofs and sign-ins
-     * another layer keeps, that layer's.
+     * A replaced sign-in yields none. `$arrange` and `$replace` default to the
+     * store's `record()` and `begin()`; `$replace` returns the new sign-in's
+     * id.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -203,12 +180,7 @@ final class ProofStoreContract
     }
 
     /**
-     * A proof of the current sign-in is kept, and goes when the sign-in is
-     * ended.
-     *
-     * The proof is put in by `$arrange`, and the sign-in ended by `$end`: by
-     * default the store's own `record()` and `forget()`, and for a store whose
-     * proofs and sign-ins another layer keeps, that layer's.
+     * `$arrange` and `$end` default to the store's `record()` and `forget()`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -245,12 +217,8 @@ final class ProofStoreContract
     }
 
     /**
-     * Voiding the identity's proofs stops every proof made before counting.
-     *
-     * The void is the store's own: advancing the identity's verification
-     * generation for a store that keeps it, as `voidByGeneration()` does, or
-     * what the bound `SessionRevoker` does on a reset for a store backed by an
-     * authentication layer's sessions.
+     * `$void` is the store's own: `voidByGeneration()` for a store that keeps
+     * the generation, or the bound `SessionRevoker`'s reset otherwise.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -284,8 +252,7 @@ final class ProofStoreContract
     }
 
     /**
-     * Void the identity's proofs by advancing its verification generation, as a
-     * store that keeps the generation honours.
+     * Advance the identity's verification generation.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
@@ -298,12 +265,8 @@ final class ProofStoreContract
     }
 
     /**
-     * Forgetting a factor stops the proofs made with it counting, and leaves
-     * the others.
-     *
-     * The further proof names `$factor`: by default `FACTOR`, and for a store
-     * that counts a proof only while the identity holds its factor, one the
-     * test enrolled.
+     * Other proofs keep counting. Pass an enrolled `$factor` for a store that
+     * counts a proof only while the identity holds its factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -342,9 +305,7 @@ final class ProofStoreContract
     }
 
     /**
-     * The proof is refused by throwing a `ProofRefusedException`, and the
-     * sign-in begun, holding a proof `$arrange` put in it, stays current and
-     * holds what it did.
+     * The sign-in begun stays current and holds what `$arrange` put in it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -389,8 +350,6 @@ final class ProofStoreContract
     }
 
     /**
-     * The kind of each proof, in order.
-     *
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @return list<\SineMacula\Laravel\Mfa\Enums\ProofKind>
      */
@@ -400,8 +359,6 @@ final class ProofStoreContract
     }
 
     /**
-     * A password first factor of the identity, bound to the sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $session
@@ -413,9 +370,6 @@ final class ProofStoreContract
     }
 
     /**
-     * An authenticator app proof of the identity's factor, bound to the
-     * sign-in.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $session
@@ -428,8 +382,7 @@ final class ProofStoreContract
     }
 
     /**
-     * A proof of the identity made now, under its current verification
-     * generation.
+     * Made now, under the identity's current verification generation.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Enums\ProofKind  $kind

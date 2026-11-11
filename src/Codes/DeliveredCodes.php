@@ -15,38 +15,10 @@ use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * The delivered code engine: issues the codes of a challenge and checks codes
- * against it, on the codes table's connection and always on its write PDO.
- *
- * A challenge is one row, bound to a factor and to a binding (the identity, the
- * application, the session and the purpose), and holds one live code at a time.
- * A code is `length` digits drawn uniformly with `random_int()`, stored only as
- * a keyed hash of the code, its challenge, its issue, its factor and its
- * binding (see `CodeKeys`), so it matches nothing else; the session is stored
- * as a keyed digest too. Issuing for a binding with an open challenge (a code
- * not yet used, sent less than `challenge_ttl_minutes` ago) is a resend: a new
- * code replaces the previous one, which stops working at once, the attempt
- * count is kept, and the new code expires at the code lifetime or the end of
- * the challenge, whichever is sooner; its digits are never the previous code's.
- * A resend waits out the cooldown since the last code, and a challenge that has
- * used up its attempts sends no more until it ends. Every issue is refused
- * while the factor's destination or the identity has been sent its cap of codes
- * within the send window, across every session; each send is counted for the
- * window from its own time, which the challenge records. The destination is
- * counted by a keyed digest that outlives its factor, and a new enrolment
- * challenge waits out the cooldown since the last enrolment code to it, so
- * discarding a pending factor and starting again resets neither.
- *
- * A check counts an attempt against the issue it read before it compares
- * anything, so concurrent checks never exceed `max_attempts`, and uses the code
- * up only with a second conditional statement, so of two correct submissions
- * exactly one is accepted. Every change is one statement the database applies
- * atomically, and a database error propagates. Issuing reads the counts it caps
- * on and then writes, so its caller serialises the issues of one identity (see
- * `CodeService`).
- *
- * The engine keeps no state between calls: the settings and the key are read
- * from the configuration each time.
+ * Issues and checks delivered codes, one row per challenge, on the write
+ * connection. Every change is a single conditional statement, so concurrent
+ * checks never exceed `max_attempts` and only one correct submission wins.
+ * Issuing reads then writes, so the caller must serialise per identity.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -55,27 +27,25 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  */
 final readonly class DeliveredCodes
 {
-    /** @var \SineMacula\Laravel\Mfa\Codes\CodeSettings The code settings. */
+    /** @var \SineMacula\Laravel\Mfa\Codes\CodeSettings */
     private CodeSettings $settings;
 
-    /** @var \SineMacula\Laravel\Mfa\Codes\CodeKeys The keyed digests of codes and sessions. */
+    /** @var \SineMacula\Laravel\Mfa\Codes\CodeKeys */
     private CodeKeys $keys;
 
-    /** @var \SineMacula\Laravel\Mfa\Codes\SendWaits The waits the caps on sends impose. */
+    /** @var \SineMacula\Laravel\Mfa\Codes\SendWaits */
     private SendWaits $waits;
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  (\Closure(int): string)|null  $generator
      */
     public function __construct(
 
-        // Configuration the settings and the key are read from on every call.
+        // Read on every call.
         Repository $config,
 
-        /** Draws a code of the given number of digits instead of `random_int()`; for tests that need a known code. */
+        /** Replaces `random_int()` so tests can know the code. */
         private ?\Closure $generator = null,
     ) {
         $this->settings = new CodeSettings($config);
@@ -84,9 +54,7 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Issue a code for the factor's challenge under the binding: a new
-     * challenge, or a resend of the open one. Returns the code issued, or the
-     * seconds, at least 1, until another may be.
+     * Start a challenge or resend the open one; an int is the seconds to wait.
      *
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -120,16 +88,8 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Check the code against the factor's challenge named under the binding,
-     * and use it up when it matches.
-     *
-     * A challenge that is unknown, or is not the binding's, is `missing`; a used challenge is `replayed` for its last code
-     * and `spent` for any other; an expired code or a challenge that has used
-     * up its attempts says so, without counting. A check that can count an
-     * attempt against the issue it read compares the code, and accepts it only
-     * when it also uses that issue up; one that cannot (a concurrent resend,
-     * check or expiry got there first) never compares, and answers from a fresh
-     * read.
+     * Consume the challenge's code when it matches. A used challenge answers
+     * `replayed` for its last code and `spent` for any other.
      *
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -158,10 +118,8 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Check the code against the challenge's live issue: count the attempt,
-     * then compare, accepting the code only when this check also uses the issue
-     * up. An issue that has expired or used up its attempts counts nothing, and
-     * the fresh read that follows says which.
+     * Count the attempt before comparing; a check that cannot count never
+     * compares and answers from a fresh read.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
      * @param  string  $factorId
@@ -188,9 +146,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * The binding's open challenge: not used, and started less than the
-     * challenge lifetime ago.
-     *
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $session
@@ -207,9 +162,8 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * The seconds until the open challenge may be sent another code: until it
-     * ends once it has used up its attempts, otherwise until the cooldown since
-     * its last code has passed. Zero or less means now.
+     * Seconds until a resend; an exhausted challenge waits until it ends. Zero
+     * or less means now.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $open
      * @param  \Carbon\CarbonImmutable  $now
@@ -227,8 +181,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Start a new challenge for the binding with its first code.
-     *
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $session
@@ -272,11 +224,9 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Send the open challenge a new code, which replaces its last, keeping its
-     * attempts and never working past the end of the challenge. The new code is
-     * drawn again until its digits differ from the last code's, which would
-     * otherwise still match under the new issue. Returns the code, or 1 second
-     * when a concurrent change got to the challenge first.
+     * Replace the code, keeping the attempt count. Digits are redrawn until
+     * they differ from the last code's, which would otherwise still match.
+     * Returns 1 second when a concurrent change got there first.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $open
      * @param  string  $factorId
@@ -318,8 +268,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * When the challenge ends: the challenge lifetime after its first code.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
      * @return \Carbon\CarbonImmutable
      *
@@ -331,9 +279,7 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * The answer for a check that could not count its attempt against the issue
-     * it read: why that issue refuses checks when it is still the challenge's
-     * code and does; otherwise `invalid`.
+     * Answer for a check that could not count its attempt.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
      * @param  int  $max
@@ -352,9 +298,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Whether the code is the one last issued for the challenge, compared in
-     * constant time.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -369,10 +312,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Count one attempt against the issue, in one statement, while it is still
-     * the challenge's code, unused, unexpired and under its maximum. Returns
-     * whether it did.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
      * @param  int  $max
      * @param  \Carbon\CarbonImmutable  $now
@@ -396,9 +335,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Use the issue up, in one statement, while it is still the challenge's
-     * code and unused. Returns whether this call used it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
      * @param  \Carbon\CarbonImmutable  $now
      * @return bool
@@ -419,8 +355,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * The factor's challenges under the binding, read from the write PDO.
-     *
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $session
@@ -438,8 +372,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Draw a code of the configured number of digits, each drawn uniformly.
-     *
      * @return string
      *
      * @throws \InvalidArgumentException
@@ -463,8 +395,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * A query on the codes' table, on its own connection, for the writes.
-     *
      * @return \Illuminate\Database\Query\Builder
      */
     private function table(): QueryBuilder
@@ -475,8 +405,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * The newest challenge the query finds, or `null`.
-     *
      * @param  \Illuminate\Database\Eloquent\Builder<\SineMacula\Laravel\Mfa\Models\Code>  $query
      * @return ?\SineMacula\Laravel\Mfa\Models\Code
      */
@@ -488,9 +416,6 @@ final readonly class DeliveredCodes
     }
 
     /**
-     * Why the challenge refuses checks: used (`spent`), expired, or out of
-     * attempts; `null` when it takes one.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Code  $row
      * @param  int  $max
      * @param  \Carbon\CarbonImmutable  $now

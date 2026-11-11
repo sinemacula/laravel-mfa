@@ -12,9 +12,6 @@ use SineMacula\Laravel\Mfa\Attempts\Lockout;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 
 /**
- * Unit tests for `AttemptOutcome`: an attempt passed, failed or refused, each
- * told apart from the others.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +21,6 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 final class AttemptOutcomeTest extends TestCase
 {
     /**
-     * A passed attempt is neither failed nor refused.
-     *
      * @return void
      */
     public function testAPassedAttempt(): void
@@ -40,8 +35,6 @@ final class AttemptOutcomeTest extends TestCase
     }
 
     /**
-     * A failed attempt is counted, and was not refused.
-     *
      * @return void
      */
     public function testAFailedAttempt(): void
@@ -58,8 +51,8 @@ final class AttemptOutcomeTest extends TestCase
     }
 
     /**
-     * A failure that locked what it was made against names the lockout it
-     * caused, and is still a counted failure that no lockout refused.
+     * It names the lockout it caused, and is still a counted failure that no
+     * lockout refused.
      *
      * @return void
      */
@@ -76,8 +69,6 @@ final class AttemptOutcomeTest extends TestCase
     }
 
     /**
-     * A refused attempt carries its lockout, and is not a counted failure.
-     *
      * @return void
      */
     public function testARefusedAttempt(): void
@@ -93,8 +84,7 @@ final class AttemptOutcomeTest extends TestCase
     }
 
     /**
-     * An attempt on a factor that was not found neither passed nor counted, and
-     * was not refused by a lockout.
+     * It neither passed nor counted, and was not refused by a lockout.
      *
      * @return void
      */
@@ -110,8 +100,8 @@ final class AttemptOutcomeTest extends TestCase
     }
 
     /**
-     * An attempt refused for any other reason neither passed nor counted, and
-     * is neither a lockout nor a factor not found.
+     * Refused for any other reason, it neither passed nor counted, and is
+     * neither a lockout nor a factor not found.
      *
      * @return void
      */

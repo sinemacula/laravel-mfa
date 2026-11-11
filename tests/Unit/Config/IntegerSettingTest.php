@@ -11,10 +11,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Config\IntegerSetting;
 
 /**
- * Unit tests for the numeric setting reader every settings class shares: the
- * default, the forms and range it accepts, the message it fails with, and the
- * parse the readers with a message of their own share.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -27,9 +23,6 @@ final class IntegerSettingTest extends TestCase
     private const string KEY = 'mfa.example.ttl_seconds';
 
     /**
-     * A setting that is not configured takes the default, which the caller
-     * chooses.
-     *
      * @return void
      */
     public function testTheDefaultAppliesWhenTheKeyIsNotSet(): void
@@ -38,8 +31,8 @@ final class IntegerSettingTest extends TestCase
     }
 
     /**
-     * Rows of `[value, least, greatest, what the reader returns]`: integers and
-     * the digit strings `env()` returns, at each end of the range and between.
+     * Integers and the digit strings `env()` returns, at each end of the range
+     * and between.
      *
      * @return iterable<string, array{0: int|string, 1: int, 2: int, 3: int}>
      */
@@ -59,8 +52,6 @@ final class IntegerSettingTest extends TestCase
     }
 
     /**
-     * Each accepted value is read as the integer it names.
-     *
      * @param  int|string  $value
      * @param  int  $least
      * @param  int  $most
@@ -78,8 +69,6 @@ final class IntegerSettingTest extends TestCase
     }
 
     /**
-     * Rows of malformed or out-of-range values.
-     *
      * @return iterable<string, array{0: mixed}>
      */
     public static function provideRefusedValues(): iterable
@@ -106,8 +95,6 @@ final class IntegerSettingTest extends TestCase
     }
 
     /**
-     * Anything else fails closed, naming the key and the range.
-     *
      * @param  mixed  $value
      * @return void
      */
@@ -125,9 +112,6 @@ final class IntegerSettingTest extends TestCase
     }
 
     /**
-     * A value already read is judged as a configured one is: within its range
-     * it is returned, and one past either end fails naming the key.
-     *
      * @return void
      */
     public function testFromJudgesAValueAlreadyRead(): void
@@ -147,9 +131,6 @@ final class IntegerSettingTest extends TestCase
     }
 
     /**
-     * Rows of `[value, the integer it names or null]`: the one form every
-     * numeric setting accepts.
-     *
      * @return iterable<string, array{0: mixed, 1: ?int}>
      */
     public static function provideParsedValues(): iterable
@@ -182,8 +163,6 @@ final class IntegerSettingTest extends TestCase
             'a list'                   => [[42], null],
             'a stringable'             => [new class implements \Stringable {
                 /**
-                 * The digits.
-                 *
                  * @return string
                  */
                 #[\Override]
@@ -196,9 +175,7 @@ final class IntegerSettingTest extends TestCase
     }
 
     /**
-     * An integer, or the exact decimal form of one, names that integer; any
-     * other value, including a string past the integer range that a cast would
-     * saturate, names none.
+     * A string past the integer range, which a cast would saturate, names none.
      *
      * @param  mixed  $value
      * @param  ?int  $expected
@@ -211,9 +188,7 @@ final class IntegerSettingTest extends TestCase
     }
 
     /**
-     * `IntegerSetting` is a utility container, not to be instantiated: its
-     * constructor is private. Reflection invokes it so the line is covered
-     * while still documenting the access modifier.
+     * Reflection invokes it so the line is covered.
      *
      * @return void
      *

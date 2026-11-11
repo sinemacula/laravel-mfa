@@ -10,9 +10,8 @@ use Illuminate\Support\Facades\Event;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * One log of a flow's statements on the storage connection and its calls to the
- * session seams, in the order they happened, each statement with the outermost
- * transaction it ran in, read against the lock order every change shares:
+ * Logs a flow's storage statements and session seam calls in order, each with
+ * its outermost transaction, and checks them against the lock order:
  *
  * 1. the first package statement that locks or writes in a transaction is the
  *    owner's identity lock;
@@ -20,8 +19,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * 3. once a session seam has been called, the transaction locks and writes no
  *    package table.
  *
- * This is evidence of the order of statements, not of their contention, which
- * stays with the tests that run on MySQL and PostgreSQL.
+ * Contention itself is left to the tests that run on MySQL and PostgreSQL.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,20 +28,18 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  */
 final class LockOrderRecorder
 {
-    /** @var list<array{seam: string, transaction: int}|array{statement: string, bindings: array<int|string, mixed>, transaction: int}> The log, oldest first. */
+    /** @var list<array{seam: string, transaction: int}|array{statement: string, bindings: array<int|string, mixed>, transaction: int}> Oldest first. */
     public array $log = [];
 
-    /** @var int The outermost transactions begun so far. */
+    /** @var int Outermost transactions begun so far. */
     private int $transactions = 0;
 
     /**
-     * Start recording the connection.
-     *
      * @param  \Illuminate\Database\Connection  $connection
      */
     public function __construct(
 
-        /** The storage connection. */
+        /** @var \Illuminate\Database\Connection */
         private readonly Connection $connection,
     ) {
         if ($connection->getDriverName() === 'sqlite') {
@@ -65,8 +61,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * Forget everything logged so far.
-     *
      * @return void
      */
     public function start(): void
@@ -75,8 +69,8 @@ final class LockOrderRecorder
     }
 
     /**
-     * Note that a session seam was called, or that a default seam of the
-     * package's own has finished its own same-owner work.
+     * Also marks where one of the package's default seams finished its
+     * same-owner work.
      *
      * @param  string  $seam
      * @return void
@@ -87,8 +81,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * How the log breaks the lock order, in words.
-     *
      * @return list<string>
      */
     public function violations(): array
@@ -103,8 +95,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * The seams called, oldest first.
-     *
      * @return list<string>
      */
     public function seams(): array
@@ -124,8 +114,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * The statements logged that lock or write the table's rows.
-     *
      * @param  string  $table
      * @return list<array{statement: string, bindings: array<int|string, mixed>, transaction: int}>
      */
@@ -146,7 +134,7 @@ final class LockOrderRecorder
     }
 
     /**
-     * The transaction a statement run now belongs to, or zero for none.
+     * Zero outside a transaction.
      *
      * @return int
      */
@@ -156,8 +144,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * The log's entries of each outermost transaction.
-     *
      * @return array<int, list<array{seam: string, transaction: int}|array{statement: string, bindings: array<int|string, mixed>, transaction: int}>>
      */
     private function byTransaction(): array
@@ -177,8 +163,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * How one transaction's entries break the lock order.
-     *
      * @param  list<array{seam: string, transaction: int}|array{statement: string, bindings: array<int|string, mixed>, transaction: int}>  $entries
      * @return list<string>
      */
@@ -217,9 +201,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * How the statement breaks the lock order, given whether it is the first to
-     * lock or write and the seam called before it, if any.
-     *
      * @param  string  $statement
      * @param  bool  $first
      * @param  ?string  $seamed
@@ -241,8 +222,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * Whether the statement locks or writes one of the package's tables.
-     *
      * @param  string  $statement
      * @return bool
      */
@@ -252,8 +231,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * Whether the statement locks or writes rows.
-     *
      * @param  string  $statement
      * @return bool
      */
@@ -263,8 +240,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * Whether the statement is the upsert that locks an identity's row.
-     *
      * @param  string  $statement
      * @return bool
      */
@@ -276,8 +251,6 @@ final class LockOrderRecorder
     }
 
     /**
-     * Whether the statement names one of the package's tables.
-     *
      * @param  string  $statement
      * @return bool
      */
