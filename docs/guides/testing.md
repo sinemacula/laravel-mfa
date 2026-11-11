@@ -121,6 +121,10 @@ Requested aal3 with additional verification; reached aal2; unmet: minimum_level.
 To use `AAL3`, bind a combination policy that rates such evidence AAL3. `AssuranceLevel::UNCLASSIFIED` and a future time
 are refused with an `InvalidArgumentException` before anything changes.
 
+The table and the check are public in `Testing\LevelEvidence`, for a helper of your own: `furtherProof()` builds a
+level's further proof, naming the factor you give or the synthetic one; `evaluate()` reads a sign-in as the route gate
+does; and `assertReached()` throws the `LogicException` above.
+
 ### What it does not do
 
 - It is a fixture for gating routes, not a statement that your sign-in can reach that level.
@@ -142,7 +146,8 @@ are refused with an `InvalidArgumentException` before anything changes.
   that holds a sign-in pending until it is verified may complete it with the further proof, but the sign-in begun must
   be the store's current one once the proofs are recorded, and never another. The proofs are still read back through the
   store, so what the recorder writes must count there: a store counting a proof only while the identity holds its factor
-  needs that factor arranged too.
+  needs that factor arranged too. The recorder's `factorReference()` names the factor the further proof is made with,
+  by default a synthetic one; return the id of a factor you enrolled where the store refuses a proof of any other.
 - A store whose `begin()` does nothing needs its session arranged first, otherwise a `LogicException` says so. If it
   retains a first factor, that first factor is kept, and one later than `$at` fails, since the further proof would not
   count. If it retains anything further, a `LogicException` says the time cannot be honoured.

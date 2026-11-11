@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
 
@@ -68,5 +69,17 @@ final readonly class ProofStoreRecorder implements VerifiedSignInRecorder
     public function record(MultiFactorAuthenticatable $identity, Proof $proof): void
     {
         $this->store->record($identity, $proof);
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
+     * @return string
+     */
+    #[\Override]
+    public function factorReference(MultiFactorAuthenticatable $identity, string $application, AssuranceLevel $level): string // NOSONAR: for another recorder
+    {
+        return LevelEvidence::syntheticReference($level);
     }
 }

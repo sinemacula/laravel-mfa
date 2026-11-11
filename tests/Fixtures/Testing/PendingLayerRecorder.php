@@ -6,9 +6,11 @@ namespace Tests\Fixtures\Testing;
 
 use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
+use SineMacula\Laravel\Mfa\Testing\LevelEvidence;
 use Tests\Fixtures\Seams\LayerWrittenProofStore;
 
 /**
@@ -72,5 +74,17 @@ final class PendingLayerRecorder implements VerifiedSignInRecorder
         }
 
         $this->layer->begin($identity, $proof->binding->application, $proof->binding->sessionId);
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
+     * @return string
+     */
+    #[\Override]
+    public function factorReference(MultiFactorAuthenticatable $identity, string $application, AssuranceLevel $level): string // NOSONAR: for another recorder
+    {
+        return LevelEvidence::syntheticReference($level);
     }
 }
