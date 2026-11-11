@@ -10,18 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 
 /**
- * The lifecycle hooks a guard calls when it fires neither of Laravel's `Login`
- * and `Logout` events, as a custom or stateless guard may not: `signedIn()`
- * once it has signed an identity in, with the proof of the first factor it
- * signed them in with, and `signedOut()` once it has signed them out of an
- * application. Both act on the bound proof store.
- *
- * Signing in begins a new sign-in on the application the first factor's proof
- * is bound to, named by the session id it is bound to, forgetting every proof
- * the identity's previous sign-in there left, and records the first factor. A
- * guard that calls neither hook and fires neither event leaves no sign-in, so
- * nothing is recorded for it and no proof counts: it never inherits a
- * verification.
+ * Sign-in and sign-out hooks for a guard that fires neither `Login` nor
+ * `Logout`; a guard that does neither leaves no sign-in, so no proof counts.
  *
  * @api
  *
@@ -36,13 +26,8 @@ final class GuardHooks
     private function __construct() {}
 
     /**
-     * Begin the identity's sign-in and record the first factor it was signed in
-     * with.
-     *
-     * The proof must be of the first factor at sign-in, bound to the identity,
-     * and made under the identity's current verification generation (see
-     * `VerificationGeneration::current()`); anything else is refused, as it
-     * would never count.
+     * Begin a sign-in on the first factor's application and session, forgetting
+     * the previous one there, and record the first factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
@@ -63,9 +48,8 @@ final class GuardHooks
     }
 
     /**
-     * End the identity's sign-in on the application, forgetting every proof of
-     * it. The application is the one its first factor's proof was bound to: the
-     * guard's name, unless a bound `ApplicationResolver` names another.
+     * End the sign-in on the application the first factor's proof was bound to,
+     * forgetting every proof of it.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -80,9 +64,8 @@ final class GuardHooks
     }
 
     /**
-     * Refuse a proof that is not of the first factor at sign-in, is bound to
-     * another identity, or was not made under the identity's current
-     * verification generation.
+     * Refuse a proof that could never count: not a first factor, another
+     * identity's, or of an older generation.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
@@ -108,8 +91,6 @@ final class GuardHooks
     }
 
     /**
-     * The bound proof store.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

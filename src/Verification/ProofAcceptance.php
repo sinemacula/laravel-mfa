@@ -21,14 +21,8 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 
 /**
- * What every new proof goes through, under the identity's lock, wherever it was
- * made: refused unless it is itself accepted after the session's first factor,
- * whatever an older proof shows; the whole requirement evaluated again with it;
- * whether it supplies or completes the multifactor evidence of that first
- * factor with it, when the evidence is its own and not the first factor's
- * alone; and the result handed to `PendingCompletion` or `StepUp`.
- *
- * Stateless: the seams are resolved on every call.
+ * Under the identity's lock: accept a new proof after the first factor,
+ * evaluate the whole requirement again and hand it to its seam.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,19 +32,17 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 final readonly class ProofAcceptance
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the seams are resolved from. */
+        /** Seams are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * Refuse a proof not accepted after the session's first factor, and
-     * evaluate the session's whole requirement with it.
+     * Refuse a proof not itself accepted after the first factor, whatever an
+     * older proof shows.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
@@ -84,18 +76,15 @@ final readonly class ProofAcceptance
 
         $amr = array_values(array_unique(array_diff([...Authenticator::of($proof)->amr, ...$driverAmr], ['mfa'])));
 
-        // Judged on the first factor with this proof alone, so another proof
-        // the session holds cannot make it look fresh, nor the first factor
-        // alone
+        // On the first factor and this proof alone, so no other proof can count
         $refreshes = $pair->multifactorAt?->equalTo($proof->provedAt) ?? false;
 
         return VerificationResult::verified($proof, $evaluation, $amr, $type, $refreshes);
     }
 
     /**
-     * Hand the result to the seam of the caller's session, as the last write of
-     * the transaction, so its refusal rolls back all the change did. What the
-     * seam returns is opaque to this package.
+     * As the last write of the transaction, so the seam's refusal rolls back
+     * the whole change.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $result
@@ -112,8 +101,7 @@ final readonly class ProofAcceptance
     }
 
     /**
-     * The pending session's further proofs that still count: those of the
-     * current verification generation, made by now.
+     * Proofs of the current generation, made by now.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  int  $generation
@@ -127,8 +115,6 @@ final readonly class ProofAcceptance
     }
 
     /**
-     * The session's first factor among its proofs, if it has one.
-     *
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
      */

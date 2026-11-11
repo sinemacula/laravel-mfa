@@ -12,10 +12,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 
 /**
- * Reads a caller's proofs through the bound `ProofStore`, on the caller's
- * application, and begins and ends an identity's sign-in on the application
- * named. No request is read. Proofs are recorded by the seams a verification
- * hands its result to (see `ProofStoreCompletion`).
+ * Reads a caller's proofs through the bound `ProofStore`, and begins and ends
+ * sign-ins; proofs are recorded by the completion seams.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,21 +23,17 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 final readonly class ProofService
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the store and the seams are read from. */
+        /** Seams are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * The proofs of the signed-in person's sign-in on the current application
-     * that still count, oldest first: none without an MFA-capable person or a
-     * sign-in, and none on a pending session, whose proofs are the
-     * authentication layer's (see `Context\CallerContextResolver`).
+     * None without a person or a sign-in, and none on a pending session, whose
+     * proofs are the authentication layer's.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
@@ -61,9 +55,7 @@ final readonly class ProofService
     }
 
     /**
-     * Begin a new sign-in for the identity on the application, as the guard
-     * signed it in to, named by a fresh random id, so nothing the identity
-     * proved before there carries over.
+     * Named by a fresh random id, so nothing proved there before carries over.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -78,9 +70,6 @@ final readonly class ProofService
     }
 
     /**
-     * Forget the identity's sign-in on the application, as the guard signed it
-     * out of, and every proof of it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void
@@ -94,8 +83,6 @@ final readonly class ProofService
     }
 
     /**
-     * Stop counting every proof the identity made with the factor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
      * @return void
@@ -108,8 +95,6 @@ final readonly class ProofService
     }
 
     /**
-     * Resolve the bound proof store.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

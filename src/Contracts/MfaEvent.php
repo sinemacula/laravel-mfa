@@ -8,8 +8,7 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 
 /**
  * Implemented by every event the package dispatches, so one listener can take
- * them all (`Event::listen(MfaEvent::class, ...)`) and attribute each through
- * the same context.
+ * them all.
  *
  * @api
  *
@@ -19,19 +18,16 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 interface MfaEvent
 {
     /**
-     * Who and what the event is about, as scalar values under the keys of
-     * `Events\EventContext::KEYS`: the identity, principal, active tenant,
-     * application, session and request; `null` for one not known.
+     * Scalar context under the keys of `Events\EventContext::KEYS`, `null`
+     * where unknown.
      *
      * @return array<string, int|string|null>
      */
     public function context(): array;
 
     /**
-     * What the action the event reports was for: the purpose of the attempt,
-     * code or proof behind it, `enrollment` for an enrolment's events, and
-     * `null` for a change made outside any verification, such as a rename, a
-     * removal or a reset.
+     * The purpose behind the action, `enrollment` for an enrolment's events, or
+     * `null` for a change made outside any verification.
      *
      * @return ?\SineMacula\Laravel\Mfa\Enums\Purpose
      */

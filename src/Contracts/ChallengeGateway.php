@@ -10,25 +10,8 @@ use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * Challenge gateway contract.
- *
- * Sends and checks the codes of a delivered factor (SMS or email) as challenges
- * bound to the identity, the application, the session, the factor and the
- * purpose, stored as a keyed hash and consumed atomically by whoever owns them.
- * This package supplies a confirmed factor of the identity, of an enabled type,
- * that the combination policy accepts, and counts the outcome against the
- * factor and the identity; or, under a binding whose purpose is `enrollment`, a
- * pending factor holding a live enrolment, whose outcome counts against that
- * enrolment alone. Neither kind of challenge answers for the other.
- *
- * The gateway asks `Attempts\ChallengeCounters::isUsable()` before it sends or
- * checks a code, and reports every outcome through `report()` in the same
- * transaction that consumes the challenge, never later: a deferred report would
- * let parallel guesses overrun the per-identity cap. A delivery is never
- * reported, and `CodeSent` and the verification events are not the gateway's to
- * dispatch: `Verification\VerificationService` reports whichever gateway is
- * bound. Without an authentication layer, the package's own codes
- * (`Codes\PackageChallengeGateway`) are bound.
+ * Sends and checks delivered codes as bound challenges, reporting each checked
+ * outcome in the transaction that consumes it.
  *
  * @api
  *
@@ -38,9 +21,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 interface ChallengeGateway
 {
     /**
-     * Send a code for the factor, bound as the binding says: the challenge's id
-     * and when the code stops working, or why none was sent and, when waiting
-     * will help, how long to wait.
+     * Check `Attempts\ChallengeCounters::isUsable()` first; the result is the
+     * challenge, or why none was sent.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -50,12 +32,8 @@ interface ChallengeGateway
     public function send(CallerContext $caller, Factor $factor, ProofBinding $binding): SendResult;
 
     /**
-     * Whether the code answers the challenge, consuming it when it does. A code
-     * matches only the challenge, factor, session and purpose it was issued
-     * for. A challenge that is absent, or another binding's, fails as
-     * `not_found`, whatever the code; a used challenge fails as `replayed` for
-     * the code that used it and `expired` for any other. Every outcome of a
-     * code that was checked has been reported; one refused before that has not.
+     * Consume a matching challenge; absent or foreign fails as `not_found`,
+     * used as `replayed` for its own code, else `expired`.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor

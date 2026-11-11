@@ -25,19 +25,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 
 /**
  * Checks a submission along its one route and counts it exactly once, under the
- * identity's factor state lock, which the caller holds.
- *
- * A code for a factor that makes its own goes to the factor's driver and a
- * passkey's response to the bound gateway, each as an attempt through
- * `Attempts\AttemptService`; a recovery code is redeemed, which is such an
- * attempt too. A code answering a challenge goes to the bound
- * `ChallengeGateway`, which reports its outcome through
- * `Attempts\ChallengeCounters` itself, so it is not counted again here.
- *
- * What a route writes (a TOTP step, a code's use, the count) stays in the
- * transaction, so a refusal that follows rolls it back.
- *
- * Stateless: the seams are resolved on every call.
+ * identity's lock the caller holds; a challenge's gateway counts its own.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -47,8 +35,6 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 final readonly class SubmissionRoutes
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptService  $attempts
      * @param  \SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions  $passkeys
@@ -56,23 +42,22 @@ final readonly class SubmissionRoutes
      */
     public function __construct(
 
-        /** The container the challenge gateway is resolved from. */
+        /** Resolves the challenge gateway on every call. */
         private Container $container,
 
-        /** The counts a route is made through. */
+        /** Counts each route's attempt. */
         private AttemptService $attempts,
 
-        /** The ceremony checks of a passkey. */
+        /** Passkey ceremony checks. */
         private PasskeyAssertions $passkeys,
 
-        /** The recovery code set. */
+        /** Redeems recovery codes. */
         private RecoveryCodeService $recoveryCodes,
     ) {}
 
     /**
-     * Whether the submission is the kind the factor's route takes: a delivered
-     * factor must name a challenge, a passkey takes an assertion, and any other
-     * factor takes a code.
+     * A delivered factor takes a challenge, a passkey an assertion, and any
+     * other factor a code.
      *
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
@@ -89,8 +74,6 @@ final readonly class SubmissionRoutes
     }
 
     /**
-     * Redeem the submitted recovery code.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -111,8 +94,7 @@ final readonly class SubmissionRoutes
     }
 
     /**
-     * Check the submission against the factor as stored under the lock, along
-     * the route its kind takes.
+     * Check against the factor as stored under the lock.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
@@ -133,8 +115,6 @@ final readonly class SubmissionRoutes
     }
 
     /**
-     * Check the code through the factor's driver, as an attempt.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -163,8 +143,6 @@ final readonly class SubmissionRoutes
     }
 
     /**
-     * Check the passkey's response through the gateway, as an attempt.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -194,8 +172,7 @@ final readonly class SubmissionRoutes
     }
 
     /**
-     * Check the code through the bound gateway, which owns the challenge and
-     * reports its outcome.
+     * The gateway owns the challenge and reports its outcome.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
@@ -219,8 +196,8 @@ final readonly class SubmissionRoutes
     }
 
     /**
-     * The refusal an attempt that never reached its check ended in: a lockout,
-     * or a factor no longer stored.
+     * The refusal of an attempt that never reached its check: a lockout or a
+     * factor no longer stored.
      *
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome  $outcome
      * @return ?\SineMacula\Laravel\Mfa\Verification\CheckOutcome

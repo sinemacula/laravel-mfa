@@ -7,12 +7,8 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use SineMacula\Laravel\Mfa\Events\EventSubject;
 
 /**
- * Event context resolver contract.
- *
- * The context every event carries, as an allowlist of scalar values: the
- * identity, its principal, the tenant, the session and the client (IP and user
- * agent), by id and type, never a model, a secret or a full destination, so a
- * queued listener can serialise it safely. A value it does not know is `null`.
+ * The scalar context every event carries, by id and type, never a model, secret
+ * or full destination, so a queued listener can serialise it.
  *
  * @api
  *
@@ -22,13 +18,8 @@ use SineMacula\Laravel\Mfa\Events\EventSubject;
 interface EventContextResolver
 {
     /**
-     * The context of an event about the subject: its identity, the sign-in the
-     * operation was bound to when it captured one, and the client the action
-     * was served to. The application is the package's own: whatever this
-     * answers for it is replaced by the subject's application. A sign-in the
-     * resolver cannot map to its own session leaves the session, principal and
-     * tenant unknown, never filled from whichever session the process happens
-     * to serve.
+     * Context of an event about the subject; a sign-in it cannot map to its own
+     * session leaves the session, principal and tenant `null`.
      *
      * @param  \SineMacula\Laravel\Mfa\Events\EventSubject  $subject
      * @return array<string, int|string|null>

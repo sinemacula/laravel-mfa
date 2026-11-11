@@ -24,52 +24,27 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 
 /**
- * The package's own judgement of a factor change, on the session's recorded
- * proofs, through the bound `FreshnessGate` and `Reauthenticator`:
- *
- * - a first additional factor needs the first factor proved again through the
- *   bound `Reauthenticator`, which the default refuses: a first factor
- *   reauthentication of the identity on the application, bound to the sign-in
- *   the change is made from, under its current verification generation, made
- *   within the last five minutes, which the grant lasts until the end of;
- * - a further factor needs the session fresh for `mfa.add_factor`, which the
- *   grant lasts as long as;
- * - removing a factor needs the session fresh for `mfa.remove_factor`, and,
- *   while the identity has another confirmed factor, whatever the freshness
- *   gate holds the session to met by proofs made without this one, so a
- *   step-up with the factor never authorises its own removal;
- * - generating recovery codes needs the session fresh for
- *   `mfa.generate_recovery_codes`.
- *
- * Each step-up is judged with the requirement the application configures for
- * the change's operation. A refusal is the package's own
- * `OperationRefusedException` carrying `not_fresh`; one a seam it asks throws
- * propagates as that seam's.
- *
- * Stateless: the seams are resolved on every call.
+ * The package's own judgement of a factor change on the session's recorded
+ * proofs; a seam's refusal propagates as that seam's.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
 {
-    /** @var int How old, in seconds, a reauthentication may be and still authorise a first additional factor. */
+    /** @var int Oldest reauthentication that authorises a first additional factor, in seconds. */
     public const int REAUTHENTICATION_MAX_AGE = 300;
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the seams are resolved from on every call. */
+        /** Seams are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * Authorise the change on the session's proofs, and say until when.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @return ?\Carbon\CarbonImmutable
      *
@@ -90,9 +65,8 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
     }
 
     /**
-     * Refuse unless the bound reauthenticator proves the first factor again,
-     * now, on the sign-in the change is made from; the grant lasts until that
-     * proof is too old to authorise one.
+     * Require the first factor proved again on this sign-in; the grant lasts
+     * until that proof is too old.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @return \Carbon\CarbonImmutable
@@ -115,8 +89,8 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
     }
 
     /**
-     * Refuse unless the session is fresh for the change's operation, and say
-     * until when it is.
+     * Require the session fresh for the operation; the grant lasts as long as
+     * it stays fresh.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @param  string  $detail
@@ -136,8 +110,6 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
     }
 
     /**
-     * Refuse unless the session is fresh for the change's operation.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @param  string  $detail
      * @return null
@@ -156,9 +128,8 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
     }
 
     /**
-     * Refuse removing the factor unless the session is fresh for it, and, while
-     * the identity has another confirmed factor, fresh on proofs made without
-     * this one.
+     * While another factor is confirmed, the freshness requirement must also be
+     * met without this factor's proofs, so it never authorises its own removal.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @return null
@@ -197,8 +168,6 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
     }
 
     /**
-     * The requirement service the freshness gate is asked through.
-     *
      * @return \SineMacula\Laravel\Mfa\Requirements\RequirementService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -209,9 +178,8 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
     }
 
     /**
-     * Whether the proof is a reauthentication with the identity's first factor
-     * on the sign-in, under its current verification generation, made within
-     * the last five minutes and not after now.
+     * A first-factor reauthentication of this sign-in and generation, made
+     * within the last five minutes and not after now.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -238,8 +206,7 @@ final readonly class ConfiguredFactorChangeGate implements FactorChangeGate
     }
 
     /**
-     * The caller the change is for: the request's identity, on an active
-     * session of its application, since the gate is asked only for those.
+     * The gate is asked only for an active session of the request's identity.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest  $request
      * @return \SineMacula\Laravel\Mfa\Context\CallerContext

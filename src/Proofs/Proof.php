@@ -13,24 +13,8 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Support\SerializedFields;
 
 /**
- * One verified authentication event: a first factor, a reauthentication with
- * it, an additional factor or a recovery code, with its method, channel, factor
- * or credential reference, the properties it actually observed, when it was
- * made, what it is bound to, the identity's verification generation at the time
- * and, when one was used, the challenge.
- *
- * Freshness, levels and requirements are evaluated against a session's proofs,
- * never against one `auth_time` and a list of `amr` values. A proof made under
- * an older verification generation, or with a factor since removed or reset,
- * stops counting.
- *
- * The rules between the parts are checked on construction: a recovery code has
- * no channel and every other kind has one; an additional factor names the
- * factor it was made with and travels on a factor's channel, never a password
- * or an unknown one; a first factor is proved at sign-in and a reauthentication
- * with it carries the reauthenticate purpose; a recovery code never confirms an
- * enrolment. The serialised form holds the channel's full destination, so it is
- * for storing the proof, never for an event, a log or a response.
+ * One verified authentication event. The serialised form holds the full
+ * destination, so it is for storage, never events, logs or responses.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, mixed>
  *
@@ -39,12 +23,10 @@ use SineMacula\Laravel\Mfa\Support\SerializedFields;
  */
 final readonly class Proof implements \JsonSerializable, Arrayable
 {
-    /** @var string The serialised form of the time: ISO-8601 to the microsecond, with its offset. */
+    /** @var string ISO-8601 to the microsecond, with offset. */
     private const string TIME_FORMAT = 'Y-m-d\TH:i:s.uP';
 
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\ProofKind  $kind
      * @param  string  $method
      * @param  ?\SineMacula\Laravel\Mfa\Assurance\Channel  $channel
@@ -59,7 +41,7 @@ final readonly class Proof implements \JsonSerializable, Arrayable
      */
     public function __construct(
 
-        /** What the proof is. */
+        /** The kind of proof. */
         public ProofKind $kind,
 
         /** The method proved, such as `password`, `totp`, `sms` or `passkey`. */
@@ -71,13 +53,13 @@ final readonly class Proof implements \JsonSerializable, Arrayable
         /** The factor or credential the proof was made with, when it names one. */
         public ?string $reference,
 
-        /** The properties the proof actually observed. */
+        /** What the proof actually observed. */
         public ObservedProperties $properties,
 
         /** When the proof was made. */
         public CarbonImmutable $provedAt,
 
-        /** The identity, application, session and purpose the proof is bound to. */
+        /** What the proof is bound to. */
         public ProofBinding $binding,
 
         /** The identity's verification generation when the proof was made. */
@@ -104,8 +86,6 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Read a proof back from its serialised form.
-     *
      * @param  array<array-key, mixed>  $data
      * @return self
      *
@@ -133,9 +113,6 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The same proof stamped with another verification generation: what it
-     * proved, when and for what are unchanged.
-     *
      * @param  int  $generation
      * @return self
      *
@@ -147,9 +124,6 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The proof with snake_case keys, its parts nested and its time in ISO-8601
-     * to the microsecond.
-     *
      * @return array<string, mixed>
      */
     #[\Override]
@@ -169,8 +143,6 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The proof as JSON serialises it: the same as `toArray()`.
-     *
      * @return array<string, mixed>
      */
     #[\Override]
@@ -180,8 +152,7 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Read the serialised time, refusing one that is not exactly in the
-     * serialised format, including one that only parses by overflowing.
+     * Refuse a time that only parses by overflowing.
      *
      * @param  string  $value
      * @return \Carbon\CarbonImmutable
@@ -200,8 +171,7 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Refuse a channel the proof's kind does not travel on, or a missing one,
-     * and an additional factor on a password or unknown channel.
+     * An additional factor never travels on a password or unknown channel.
      *
      * @return void
      *
@@ -225,9 +195,6 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Refuse a blank reference, and an additional factor proof that does not
-     * name its factor.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -244,8 +211,7 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Refuse a purpose the proof's kind does not carry, and a recovery code
-     * bound to an enrolment, which a recovery code cannot confirm.
+     * A recovery code cannot confirm an enrolment.
      *
      * @return void
      *

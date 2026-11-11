@@ -16,17 +16,8 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
 
 /**
- * Registers the proof service, the default `ProofStore`, which keeps each
- * sign-in's proofs in the Laravel session, the default `SessionRevoker`, which
- * advances the identity's verification generation, the default
- * `PendingCompletion` and `StepUp`, which record a verified proof in the store
- * (`ProofStoreCompletion`), and the listeners that begin a sign-in on Laravel's
- * `Login` event and forget it on `Logout` and `CurrentDeviceLogout`.
- *
- * Like every package service, each is built when it is asked for, the store
- * from the session of the request at hand, so nothing the container keeps holds
- * one request's session into the next. An application on a stateless guard
- * rebinds the `ProofStore` contract in its own service provider.
+ * Registers the proof service, the default proof seams and the sign-in
+ * listeners, each built when asked for so no request's session outlives it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -41,9 +32,6 @@ final class ProofBindings
     private function __construct() {}
 
     /**
-     * Register the proof service, the default proof store, session revoker,
-     * pending completion and step-up, and the sign-in listeners.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      *

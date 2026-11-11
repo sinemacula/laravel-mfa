@@ -16,22 +16,8 @@ use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 
 /**
- * Registers the requirement service and the defaults of the requirement seams:
- * the sign-in requirement from the application's configured mode
- * (`ConfiguredRequirementPolicy`), the identity's own from its model
- * (`IdentityContractRequirement`), no active tenant (`NoActiveTenant`) and no
- * tenant requirement (`NoTenantRequirement`), the check of a session's proofs
- * through the combination policy (`ProofRequirementCheck`), the freshness of a
- * named operation from the proof store (`ConfiguredFreshnessGate`), the
- * authorisation of a factor change on that freshness and the bound
- * reauthenticator (`ConfiguredFactorChangeGate`), and the first factor the
- * application declares (`Applications\DeclaredFirstFactorResolver`), which the
- * freshness gate reads. An adapter, or the application, rebinds any of the
- * contracts in its own service provider.
- *
- * Every default keeps no state between calls and resolves what it reads on each
- * one, and is built when it is asked for, on the application serving at the
- * time.
+ * Registers the requirement service and the default requirement seams, each
+ * stateless and resolved when asked for.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,8 +32,6 @@ final class RequirementBindings
     private function __construct() {}
 
     /**
-     * Register the requirement service and the default requirement seams.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

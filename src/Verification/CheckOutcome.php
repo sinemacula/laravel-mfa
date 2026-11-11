@@ -10,9 +10,8 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * How one route's check of a submission ended, under the identity's lock:
- * passed, with what it observed, the challenge it answered and, for a recovery
- * code, how many remain; failed and counted; or refused and counted nowhere.
+ * How one route's check of a submission ended under the identity's lock:
+ * passed, failed and counted, or refused and counted nowhere.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,8 +21,6 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final readonly class CheckOutcome
 {
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @param  bool  $counted
@@ -34,31 +31,29 @@ final readonly class CheckOutcome
      */
     private function __construct(
 
-        /** Why the check did not pass, or `null` when it did. */
+        /** `null` when the check passed. */
         public ?FailureReason $reason,
 
-        /** What happened in detail, for events and logs only. */
+        /** For events and logs only. */
         public string $detail,
 
-        /** Whether the check was counted as an attempt. */
+        /** Whether the check counted as an attempt. */
         public bool $counted,
 
-        /** When the lockout refusing the check lifts, if it lifts by itself. */
+        /** When the refusing lockout lifts, if it lifts by itself. */
         public ?CarbonImmutable $lockedUntil = null,
 
-        /** What the check observed, when it passed. */
+        /** Set when the check passed. */
         public ?ObservedProperties $properties = null,
 
-        /** The challenge the check answered, when it passed or a seam then refused and one was reported. */
+        /** The challenge answered, when it passed or a seam refused after one was reported. */
         public ?string $challengeId = null,
 
-        /** How many recovery codes a passed redemption left unused. */
+        /** Recovery codes left unused by a passed redemption. */
         public ?int $remaining = null,
     ) {}
 
     /**
-     * A check that passed.
-     *
      * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
      * @param  ?string  $challengeId
      * @param  ?int  $remaining
@@ -70,8 +65,6 @@ final readonly class CheckOutcome
     }
 
     /**
-     * A check that failed, and was counted.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @return self
@@ -82,8 +75,6 @@ final readonly class CheckOutcome
     }
 
     /**
-     * A check refused before anything was counted.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @param  ?\Carbon\CarbonImmutable  $lockedUntil
@@ -96,8 +87,6 @@ final readonly class CheckOutcome
     }
 
     /**
-     * A check an admission refused.
-     *
      * @param  \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission  $admission
      * @return self
      */
@@ -107,8 +96,6 @@ final readonly class CheckOutcome
     }
 
     /**
-     * Whether the check passed.
-     *
      * @return bool
      */
     public function hasPassed(): bool

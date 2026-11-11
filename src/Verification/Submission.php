@@ -7,15 +7,8 @@ namespace SineMacula\Laravel\Mfa\Verification;
 use SineMacula\Laravel\Mfa\Enums\SubmissionKind;
 
 /**
- * What a person submits to verify: a code for one of their factors, a code
- * answering a challenge sent to a delivered factor, a recovery code, or a
- * passkey's response to an assertion request.
- *
- * It holds a secret, as a `\SensitiveParameterValue` read through `code()` and
- * `response()`: no dump of it (`print_r`, `var_dump`, `var_export`, an array
- * cast, or Symfony's VarDumper behind Laravel's dump helpers) shows the code or
- * the response, encoding it as JSON leaves them out, and serialising it is
- * refused.
+ * What a person submits to verify. The secret is never dumped or JSON-encoded,
+ * and serialising it is refused.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,15 +17,13 @@ use SineMacula\Laravel\Mfa\Enums\SubmissionKind;
  */
 final readonly class Submission implements \JsonSerializable
 {
-    /** @var \SensitiveParameterValue The code, in clear, for anything but an assertion; hidden from dumps. */
+    /** @var \SensitiveParameterValue The code in clear, for anything but an assertion. */
     private \SensitiveParameterValue $code;
 
-    /** @var \SensitiveParameterValue The client's response to an assertion request, hidden from dumps. */
+    /** @var \SensitiveParameterValue The client's response to an assertion request. */
     private \SensitiveParameterValue $response;
 
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\SubmissionKind  $kind
      * @param  mixed  $factorId
      * @param  ?string  $challengeId
@@ -41,7 +32,7 @@ final readonly class Submission implements \JsonSerializable
      */
     private function __construct(
 
-        /** What is submitted. */
+        /** The kind of submission. */
         public SubmissionKind $kind,
 
         /** The factor named, or `null` for a recovery code. */
@@ -50,7 +41,7 @@ final readonly class Submission implements \JsonSerializable
         /** The challenge answered, for a delivered factor. */
         public ?string $challengeId = null,
 
-        // The code, in clear, for anything but an assertion.
+        // The code in clear, for anything but an assertion.
         #[\SensitiveParameter]
         ?string $code = null,
 
@@ -63,7 +54,7 @@ final readonly class Submission implements \JsonSerializable
     }
 
     /**
-     * What a dump shows: never the code or the response.
+     * Never the code or the response.
      *
      * @return array<string, mixed>
      */
@@ -73,8 +64,6 @@ final readonly class Submission implements \JsonSerializable
     }
 
     /**
-     * Refuse to serialise the secret.
-     *
      * @return array<string, mixed>
      *
      * @throws \LogicException
@@ -85,8 +74,6 @@ final readonly class Submission implements \JsonSerializable
     }
 
     /**
-     * Refuse to read a submission back.
-     *
      * @param  array<string, mixed>  $data
      * @return void
      *
@@ -110,7 +97,7 @@ final readonly class Submission implements \JsonSerializable
     }
 
     /**
-     * A code answering the challenge sent to a delivered factor.
+     * A code answering a challenge sent to a delivered factor.
      *
      * @param  mixed  $factorId
      * @param  string  $challengeId
@@ -123,8 +110,6 @@ final readonly class Submission implements \JsonSerializable
     }
 
     /**
-     * A recovery code.
-     *
      * @param  string  $code
      * @return self
      */
@@ -134,8 +119,6 @@ final readonly class Submission implements \JsonSerializable
     }
 
     /**
-     * A passkey's response to an assertion request.
-     *
      * @param  mixed  $factorId
      * @param  array<string, mixed>  $response
      * @return self
@@ -146,7 +129,7 @@ final readonly class Submission implements \JsonSerializable
     }
 
     /**
-     * The code, in clear, or `null` for an assertion.
+     * `null` for an assertion.
      *
      * @return ?string
      */
@@ -157,7 +140,7 @@ final readonly class Submission implements \JsonSerializable
     }
 
     /**
-     * The client's response to an assertion request; empty for anything else.
+     * Empty for anything but an assertion.
      *
      * @return array<string, mixed>
      */
@@ -168,7 +151,7 @@ final readonly class Submission implements \JsonSerializable
     }
 
     /**
-     * What JSON shows: never the code or the response.
+     * Never the code or the response.
      *
      * @return array<string, mixed>
      */

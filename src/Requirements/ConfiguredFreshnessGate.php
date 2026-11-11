@@ -16,25 +16,8 @@ use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 
 /**
- * The default `FreshnessGate`, which works from the proof store alone: the
- * current identity's sign-in on the current application is fresh for an
- * operation when the bound `RequirementCheck` finds its recorded proofs meet
- * the operation's requirement (see `OperationRequirements::effective()`), the
- * stricter of the application's configured one and the caller's.
- *
- * It is not fresh without a requirement, without a person it serves (a pending
- * session, a guest, a machine and an inactive identity are not fresh for any
- * operation), without a sign-in the store knows of, or without a first factor
- * on it: proofs are judged only after the sign-in's first factor. The first
- * factor is the one the store recorded; only when it holds none is the bound
- * `FirstFactorResolver` asked, and its answer counts only when it is a first
- * factor of the identity on the application, bound to the current sign-in, made
- * under the identity's current verification generation and not after now (see
- * `Context\SessionFirstFactor`). Only a proof's own time counts, so refreshing
- * or regenerating the session never renews freshness.
- *
- * Stateless: the configuration, the store and every collaborator are resolved
- * on every call.
+ * The default `FreshnessGate`, judged on the sign-in's recorded proofs. Only a
+ * proof's own time counts, so refreshing the session never renews freshness.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -42,19 +25,15 @@ use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 final readonly class ConfiguredFreshnessGate implements FreshnessGate
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the configuration, the store and the check are resolved from. */
+        /** Collaborators are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * Whether the current session is fresh for the operation.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -71,9 +50,7 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
     }
 
     /**
-     * When the current session stops being fresh for the operation, on the
-     * proofs it holds now: `null` when it is not fresh, and when the bound
-     * policy reports no such time for a requirement bounded by a maximum age.
+     * `null` when not fresh, or when the policy reports no end.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
@@ -91,8 +68,8 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
     }
 
     /**
-     * The requirement the application configures for the operation, with the
-     * caller's: the stricter of the two, either alone when the other is absent.
+     * The stricter of the configured and the caller's requirement, either alone
+     * when the other is absent.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
@@ -109,9 +86,7 @@ final readonly class ConfiguredFreshnessGate implements FreshnessGate
     }
 
     /**
-     * What the session's recorded proofs add up to against the operation's
-     * requirement, or `null` without a requirement or an active person it
-     * serves.
+     * `null` without a requirement or an active person to serve.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation

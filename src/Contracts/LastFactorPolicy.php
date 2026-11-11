@@ -7,19 +7,8 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
- * Last factor policy contract.
- *
- * Whether the identity's last confirmed factor, or the last one an application
- * or requirement accepts, may be removed by the identity acting on the
- * application. It is asked before the removal and again when it commits, so
+ * Whether an identity may remove its last confirmed or last accepted factor, so
  * required MFA cannot be turned off by the person it applies to.
- *
- * The caller supplies the identity's factor state each time: a snapshot read
- * without a lock the first time, and the factors as stored under the identity's
- * lock the second. A policy decides on what it is given and takes no factor
- * lock of its own, since the first ask may run inside a caller's transaction
- * before the identity's lock is held, and taking a factor's lock there would
- * break the lock order.
  *
  * @api
  *
@@ -29,8 +18,8 @@ use Illuminate\Database\Eloquent\Collection;
 interface LastFactorPolicy
 {
     /**
-     * Whether the factor, the last of its kind for the identity, may be
-     * removed, on the identity's factor state as given.
+     * Decide on the factors given and take no factor lock; the first ask may
+     * run before the identity's lock is held.
      *
      * @formatter:off
      *

@@ -7,12 +7,8 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use Illuminate\Http\Request;
 
 /**
- * Application resolver contract.
- *
- * Names the application a request is for, the key factor types, requirements,
- * limits and freshness are configured under. Without an authentication layer
- * that knows the application, it is the name of the guard that authenticated
- * the request.
+ * Names the application a request is for, the key its factor types,
+ * requirements, limits and freshness are configured under.
  *
  * @api
  *
@@ -22,8 +18,6 @@ use Illuminate\Http\Request;
 interface ApplicationResolver
 {
     /**
-     * The application the request is for.
-     *
      * @param  \Illuminate\Http\Request  $request
      * @return string
      */

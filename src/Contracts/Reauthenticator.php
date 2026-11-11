@@ -7,13 +7,8 @@ namespace SineMacula\Laravel\Mfa\Contracts;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * Reauthenticator contract.
- *
- * Proves the first factor again on an active session, for an identity enrolling
- * its first additional factor and for operations that require it, and returns
- * the proof: its method, channel, observed properties, time and session. It
- * fails closed: `null` means the first factor was not proved again, and the
- * change that asked is refused.
+ * Proves the first factor again on an active session, for a first additional
+ * factor and for operations that require it.
  *
  * @api
  *
@@ -23,8 +18,7 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 interface Reauthenticator
 {
     /**
-     * The proof of the first factor made again on the identity's current
-     * session, or `null` when none was made.
+     * The fresh first-factor proof, or `null` to refuse the change that asked.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

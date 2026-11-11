@@ -12,21 +12,8 @@ use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * The default `RequirementCheck`: the session's proofs judged by the bound
- * `CombinationPolicy`, so the answer is the same at sign-in, in a tenant's
- * policy and on step-up.
- *
- * Only the proofs of one sign-in count: those bound to the same session as the
- * session's one first factor. With no first factor, or more than one, none
- * counts, so nothing but an empty requirement is met. The combination policy
- * judges each part on a combination that provides it on evidence within the
- * part's maximum age, which for a boolean answer is the newest proof meeting
- * the part: a fresh weaker proof never refreshes an old stronger one, and a
- * fresh first factor, or a reauthentication with it, never stands in for an
- * additional factor unless it is a multi-factor authenticator itself.
- *
- * The policy is resolved on every call, so one bound after this check was
- * resolved is the one used.
+ * The default `RequirementCheck`, judged by the bound `CombinationPolicy` on
+ * the proofs of one sign-in only.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,19 +21,15 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 final readonly class ProofRequirementCheck implements RequirementCheck
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the combination policy is resolved from. */
+        /** Resolves the policy on every call, so a later binding applies. */
         private Container $container,
     ) {}
 
     /**
-     * Evaluate the session's proofs against the requirement.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation
@@ -60,9 +43,8 @@ final readonly class ProofRequirementCheck implements RequirementCheck
     }
 
     /**
-     * The proofs of the sign-in the session's one first factor began: those
-     * bound to the same session as it, none when there is no first factor or
-     * more than one.
+     * Proofs bound to the session of the one first factor, or none when there
+     * is not exactly one.
      *
      * @param  array<array-key, \SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>

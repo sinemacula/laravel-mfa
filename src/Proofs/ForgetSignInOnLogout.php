@@ -11,18 +11,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 
 /**
- * Forgets the identity's sign-in, and every proof of it, on the application the
- * event's guard acts for whenever Laravel's `Logout` or `CurrentDeviceLogout`
- * event fires for an identity that can hold factors, so whoever signs in next
- * on the same session inherits nothing. Its sign-ins on other applications are
- * left alone.
- *
- * An identity whose key cannot name a record holds no proofs, so it is left
- * alone rather than failing the sign-out.
- *
- * The event dispatcher builds a class listener on the application it was booted
- * with and keeps no copy of a request's, so the proof service is resolved from
- * the application serving when the event fires, and acts on its session.
+ * Forgets the sign-in and its proofs on the guard's application at sign-out, so
+ * whoever signs in next on the session inherits nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -32,7 +22,8 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 final class ForgetSignInOnLogout
 {
     /**
-     * Handle the `Logout` or `CurrentDeviceLogout` event.
+     * Resolved from the serving application, since the dispatcher keeps the
+     * listener it was booted with; an unsupported key holds no proofs.
      *
      * @param  \Illuminate\Auth\Events\CurrentDeviceLogout|\Illuminate\Auth\Events\Logout  $event
      * @return void

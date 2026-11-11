@@ -18,28 +18,8 @@ use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Enums\RequirementMode;
 
 /**
- * Composes what an identity's sign-in must prove, and asks whether the current
- * session is fresh enough for a named operation.
- *
- * A sign-in's requirement is the strictest of its parts, so the same inputs
- * always give the same answer in any order:
- *
- * - the application's configured mode: nothing for `never` (and for an
- *   application nobody configured), an additional verification for `always`,
- *   and for `enrolled` an additional verification once the identity has a
- *   confirmed factor;
- * - the identity's own requirement, from the bound `IdentityRequirement`;
- * - an additional verification while the identity's re-enrolment obligation is
- *   set, in every application (see `ReenrollmentObligation`);
- * - where the bound `ActiveTenantResolver` names a tenant, the tenant's
- *   requirement, from the bound `TenantRequirement`. A sign-in has no tenant
- *   before any principal is chosen, so it adds nothing there.
- *
- * A step-up adds the operation's requirement, which the bound `FreshnessGate`
- * judges. This package's own setting for the operation is passed to the gate as
- * part of the caller's requirement, so a gate an adapter binds over an
- * authentication layer always receives it and applies the stricter of it and
- * its own, and `freshUntil()` asks it the same way how long that answer lasts.
+ * Composes a sign-in's requirement, the strictest of its parts so order never
+ * matters, and asks the bound `FreshnessGate` about freshness.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -49,19 +29,16 @@ use SineMacula\Laravel\Mfa\Enums\RequirementMode;
 final readonly class RequirementService
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the configuration and the seams are read from. */
+        /** Seams and configuration are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * The requirement the current identity's sign-in on the current application
-     * must meet: none without an MFA-capable identity.
+     * None without an identity, and none for a pending session.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
@@ -82,10 +59,8 @@ final readonly class RequirementService
     }
 
     /**
-     * The requirement the identity's sign-in on the application must meet: the
-     * strictest of the application's, the identity's and the re-enrolment
-     * obligation's, and the active tenant's when the bound
-     * `ActiveTenantResolver` names one.
+     * The strictest of the application's mode, the identity's own, the
+     * re-enrolment obligation's and the active tenant's.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -113,12 +88,7 @@ final readonly class RequirementService
     }
 
     /**
-     * Whether the current session is fresh enough for the operation, asked of
-     * the bound `FreshnessGate` with the strictest of this package's setting
-     * for the operation and the caller's requirement. A name that is not an
-     * operation's is never fresh, whatever the caller asks, and never throws; a
-     * caller's requirement that asks for nothing adds nothing, and one with a
-     * part that carries no maximum age, or one longer than a day, is refused.
+     * A name that is not an operation's is never fresh and never throws.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
@@ -138,9 +108,7 @@ final readonly class RequirementService
     }
 
     /**
-     * When the current session stops being fresh for the operation on the
-     * proofs it holds now, asked of the bound `FreshnessGate` as `isFresh()`
-     * asks it; `null` when it is not fresh or the gate cannot say.
+     * `null` when not fresh or the gate cannot say.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
@@ -160,10 +128,8 @@ final readonly class RequirementService
     }
 
     /**
-     * The requirement the bound `FreshnessGate` holds the current session to
-     * for the operation, with this package's setting and the caller's
-     * requirement passed to it; `null` when it has none, or for a name that is
-     * not an operation's.
+     * The requirement the bound gate holds the session to, or `null` with none
+     * or for a name that is not an operation's.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
@@ -183,8 +149,8 @@ final readonly class RequirementService
     }
 
     /**
-     * The strictest of this package's setting for the operation on the current
-     * application and the caller's requirement.
+     * The package's setting is passed within the caller's requirement, so a
+     * bound gate always applies it.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
@@ -200,8 +166,7 @@ final readonly class RequirementService
     }
 
     /**
-     * What the application's configured mode requires of the identity's
-     * sign-in.
+     * What the application's configured mode requires of the sign-in.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -220,8 +185,7 @@ final readonly class RequirementService
     }
 
     /**
-     * An additional verification of any age when the condition holds, nothing
-     * otherwise.
+     * An additional verification of any age, or nothing.
      *
      * @param  bool  $condition
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
@@ -234,8 +198,6 @@ final readonly class RequirementService
     }
 
     /**
-     * The configuration the settings are read from.
-     *
      * @return \Illuminate\Contracts\Config\Repository
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
