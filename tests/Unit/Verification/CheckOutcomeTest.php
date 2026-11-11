@@ -15,8 +15,6 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Verification\CheckOutcome;
 
 /**
- * Unit tests for `CheckOutcome`: what a route's check says of a submission.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -26,7 +24,7 @@ use SineMacula\Laravel\Mfa\Verification\CheckOutcome;
 final class CheckOutcomeTest extends TestCase
 {
     /**
-     * A pass holds what it observed, the challenge and how many codes remain.
+     * Holds what it observed, the challenge and the codes remaining.
      *
      * @return void
      */
@@ -66,8 +64,7 @@ final class CheckOutcomeTest extends TestCase
     }
 
     /**
-     * An admission's refusal carries over, with the time of a lockout that has
-     * one.
+     * With the time of a lockout that has one.
      *
      * @return void
      */

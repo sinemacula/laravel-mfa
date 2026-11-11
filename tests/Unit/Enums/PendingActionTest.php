@@ -9,9 +9,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 
 /**
- * Unit tests for the `PendingAction` enum: the actions a pending session may
- * allow, with the values authentication adopts, pinned so a rename fails.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -21,7 +18,7 @@ use SineMacula\Laravel\Mfa\Enums\PendingAction;
 final class PendingActionTest extends TestCase
 {
     /**
-     * The pending actions, in order, each case name with its stable value.
+     * Pinned so a rename fails.
      *
      * @return void
      */

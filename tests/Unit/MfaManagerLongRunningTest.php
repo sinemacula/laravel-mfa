@@ -36,15 +36,8 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * The manager keeps nothing a request gave it. A manager resolved on the booted
- * application is shared with a copy of that application made current, as a
- * long-running server hands one to each request: every call answers from the
- * application current at the time, and the manager's own fields hold nothing
- * that copy gave them.
- *
- * What these show is the manager's own fields, the cheap layer beneath the
- * requests and jobs served for real in `Integration\Octane` and
- * `Integration\Process`.
+ * The manager keeps nothing a request gave it, checked on a copy of the
+ * application made current per request as a long-running server does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -56,8 +49,6 @@ use Tests\TestCase;
 final class MfaManagerLongRunningTest extends TestCase
 {
     /**
-     * Put the booted application back as the current one.
-     *
      * @return void
      */
     #[\Override]
@@ -69,8 +60,6 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * The manager declares no property of its own.
-     *
      * @return void
      */
     public function testTheManagerDeclaresNoProperty(): void
@@ -84,9 +73,8 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * A delegation answers from a service built in the application current at
-     * the time, which reads that application's request and seams; back on the
-     * booted application, it answers from there.
+     * A service built in the current application, reading its request and
+     * seams; back on the booted one, it answers from there.
      *
      * @return void
      */
@@ -115,8 +103,7 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * Each shipped driver is built with the configuration and sender of the
-     * application current at the time.
+     * With the configuration and sender of the current application.
      *
      * @return void
      */
@@ -173,8 +160,8 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * A driver registered at boot is handed the application current at the time
-     * it is built.
+     * A driver registered at boot is handed the application current when it is
+     * built.
      *
      * @return void
      */
@@ -201,9 +188,8 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * After a request on a copy of the application, the manager's own fields
-     * hold what they held before: no driver, the booted container and the
-     * configuration its constructor read.
+     * No driver, the booted container, and the configuration its constructor
+     * read.
      *
      * @return void
      */
@@ -227,8 +213,7 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * The inherited setter would store a request's application, so it is
-     * refused.
+     * The inherited setter would store a request's application.
      *
      * @return void
      */
@@ -241,8 +226,8 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * A driver is built on every call, two resolutions are two objects, and the
-     * most recent registration is the one built, however late.
+     * Two resolutions are two objects, and the latest registration wins however
+     * late.
      *
      * @return void
      */
@@ -260,8 +245,8 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * A driver's name is normalised as Laravel's manager normalises it: nothing
-     * is the default, and an enum is its value.
+     * As Laravel's manager normalises it: nothing is the default, and an enum
+     * is its value.
      *
      * @return void
      */
@@ -280,8 +265,7 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * A copy of the booted application made current, as a long-running server
-     * makes one for each request.
+     * As a long-running server makes one for each request.
      *
      * @return \Illuminate\Foundation\Application
      */
@@ -295,8 +279,6 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * Make the application the current one.
-     *
      * @param  \Illuminate\Foundation\Application  $app
      * @return void
      */
@@ -312,7 +294,7 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * A pending session of the user's that allows listing factors.
+     * Allowing factors to be listed.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
@@ -331,8 +313,6 @@ final class MfaManagerLongRunningTest extends TestCase
     }
 
     /**
-     * A factor of the user's.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */

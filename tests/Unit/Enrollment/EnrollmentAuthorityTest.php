@@ -31,9 +31,6 @@ use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
 /**
- * Tests for `EnrollmentAuthority`: when a caller may add a factor of a type, on
- * an active session and on a pending one, and the application's limits.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -46,8 +43,8 @@ final class EnrollmentAuthorityTest extends TestCase
     use ArrangesPasskeys;
 
     /**
-     * A first factor on an active session needs a reauthentication of the
-     * current sign-in, made in the last five minutes.
+     * The reauthentication must be of the current sign-in and under five
+     * minutes old.
      *
      * @return void
      *
@@ -72,8 +69,7 @@ final class EnrollmentAuthorityTest extends TestCase
 
         self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user, null, 'web'), 'passkey'));
 
-        // A reauthentication exactly five minutes old would grant nothing that
-        // lasts, so it is refused with the grant's end.
+        // Exactly five minutes old would grant nothing that lasts.
         $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($store, ConfiguredFactorChangeGate::REAUTHENTICATION_MAX_AGE));
 
         self::assertSame(FailureReason::NOT_FRESH, $this->refusal(new Caller($user, null, 'web'), 'passkey'));
@@ -86,8 +82,6 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * Without a sign-in the reauthenticator is not asked.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -107,9 +101,8 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * A pending session may add a factor only on the bootstrap path: its
-     * credential allows it, the application allows bootstrap for the type, and
-     * the identity has no confirmed factor.
+     * Its credential must allow it, the application allow bootstrap for the
+     * type, and the identity hold no confirmed factor.
      *
      * @return void
      *
@@ -135,9 +128,8 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * A pending session whose identity has a confirmed factor is told to verify
-     * it, even where the application does not allow bootstrap, since it has
-     * nothing to enrol to get through.
+     * Even where bootstrap is off, since it has nothing to enrol to get
+     * through.
      *
      * @return void
      *
@@ -155,8 +147,7 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * An active session may add only a type the application enables, and each
-     * path says what authorised it and until when.
+     * An active session may add only a type the application enables.
      *
      * @return void
      *
@@ -193,11 +184,8 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * An active session's enrolment is authorised by the bound factor change
-     * gate: a first additional factor while the identity has no confirmed
-     * factor, a further one beside one, from the session's sign-in, the grant
-     * lasting as long as the gate's authorisation; a bootstrap enrolment never
-     * asks it.
+     * A first or a further factor from the session's sign-in, lasting as long
+     * as the gate's authorisation; a bootstrap enrolment never asks it.
      *
      * @return void
      *
@@ -233,8 +221,7 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * An active session with no sign-in to authorise a change from is refused
-     * without the gate being asked.
+     * Refused without the gate being asked.
      *
      * @return void
      *
@@ -255,8 +242,7 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * What a grant rested on is asked again with `reconfirm()`: the limits, and
-     * no confirmed factor for what having none authorised.
+     * The limits, and no confirmed factor for what having none authorised.
      *
      * @return void
      *
@@ -284,8 +270,7 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * The limits on confirmed factors enrolled through the application, of the
-     * type and in all, apply; factors enrolled elsewhere do not count.
+     * Factors enrolled elsewhere do not count.
      *
      * @return void
      *
@@ -313,8 +298,6 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * The authority under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentAuthority
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -325,8 +308,7 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * The reason a grant of the kind is refused with on the factors stored now,
-     * or `null` when it is not.
+     * Why a grant of the kind is refused on the factors stored now, or `null`.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization  $kind
      * @return ?\SineMacula\Laravel\Mfa\Enums\FailureReason
@@ -345,8 +327,7 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * A pending context of the person's, allowing the actions given or the
-     * bootstrap confirmation.
+     * Allowing the actions given, or the bootstrap confirmation by default.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
@@ -362,8 +343,7 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * Authorise the caller a factor of the type inside a transaction, as the
-     * identity's factor state lock holds one.
+     * Runs inside a transaction, as the factor state lock does.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $type
@@ -377,8 +357,7 @@ final class EnrollmentAuthorityTest extends TestCase
     }
 
     /**
-     * The reason the caller is refused a factor of the type, or `null` when it
-     * is not.
+     * Why the caller is refused a factor of the type, or `null`.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  string  $type

@@ -18,9 +18,6 @@ use Tests\Fixtures\Verification\Dumps;
 use Tests\Unit\Concerns\BuildsProofs;
 
 /**
- * Unit tests for the `VerificationResult` value: a verified result carries the
- * proof and its evaluation, a failed one its reason and internal detail.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -32,8 +29,6 @@ final class VerificationResultTest extends TestCase
     use BuildsProofs;
 
     /**
-     * A verified result carries the proof and its evaluation, and no reason.
-     *
      * @return void
      */
     public function testAVerifiedResultCarriesTheProofAndItsEvaluation(): void
@@ -56,8 +51,6 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * A failed result carries its reason and internal detail, and no proof.
-     *
      * @return void
      */
     public function testAFailedResultCarriesItsReasonAndDetail(): void
@@ -74,8 +67,6 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * A lockout carries the time it lifts.
-     *
      * @return void
      */
     public function testALockoutCarriesTheTimeItLifts(): void
@@ -89,8 +80,6 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * Blank details.
-     *
      * @return iterable<string, array{string}>
      */
     public static function provideBlankDetails(): iterable
@@ -115,8 +104,7 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * A lockout at the failure ceiling carries no time, since it does not lift
-     * by itself.
+     * A lockout at the failure ceiling does not lift by itself.
      *
      * @return void
      */
@@ -142,8 +130,7 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * The same result with a completion is otherwise unchanged, and the one it
-     * came from keeps none.
+     * The original keeps none.
      *
      * @return void
      */
@@ -172,8 +159,7 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * A dump shows neither the channel's destination nor the completion, and
-     * the failure's detail stays for it alone.
+     * The failure's detail stays in the debug info.
      *
      * @return void
      */
@@ -197,7 +183,6 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * No way of dumping one shows the channel's destination or the completion,
      * Laravel's dump helpers and an array cast included.
      *
      * @return void
@@ -211,8 +196,6 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * JSON shows what a caller may be told, and nothing else.
-     *
      * @return void
      */
     public function testJsonShowsOnlyWhatACallerMayBeTold(): void
@@ -253,8 +236,6 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * A result is never serialised.
-     *
      * @return void
      */
     public function testSerializingIsRefused(): void
@@ -266,8 +247,6 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * A result is never read back.
-     *
      * @return void
      */
     public function testUnserializingIsRefused(): void
@@ -279,8 +258,6 @@ final class VerificationResultTest extends TestCase
     }
 
     /**
-     * A verified result with a proof on an email channel.
-     *
      * @return \SineMacula\Laravel\Mfa\Verification\VerificationResult
      */
     private static function verified(): VerificationResult

@@ -10,9 +10,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 
 /**
- * Unit tests for the `AssuranceLevel` enum: its stable values, and which level
- * meets which minimum.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,7 +19,7 @@ use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 final class AssuranceLevelTest extends TestCase
 {
     /**
-     * The levels, in order, each case name with its stable value.
+     * Pinned so a rename fails.
      *
      * @return void
      */
@@ -37,8 +34,6 @@ final class AssuranceLevelTest extends TestCase
     }
 
     /**
-     * Each level against each minimum.
-     *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Enums\AssuranceLevel, \SineMacula\Laravel\Mfa\Enums\AssuranceLevel, bool}>
      */
     public static function provideLevelsAgainstMinimums(): iterable
@@ -61,8 +56,7 @@ final class AssuranceLevelTest extends TestCase
     }
 
     /**
-     * A level meets every minimum at or below it, an unclassified minimum
-     * included, and an unclassified level meets none.
+     * Unclassified minimums included; an unclassified level meets none.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $minimum

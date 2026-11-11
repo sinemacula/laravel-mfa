@@ -12,9 +12,6 @@ use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use Tests\TestCase;
 
 /**
- * Unit tests for `EventBindings`: the default event context resolver and the
- * dispatcher, each one instance per container.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +21,6 @@ use Tests\TestCase;
 final class EventBindingsTest extends TestCase
 {
     /**
-     * The default resolver and the dispatcher are built afresh.
-     *
      * @return void
      */
     public function testBuildsTheResolverAndTheDispatcherOnEveryResolution(): void

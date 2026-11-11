@@ -20,9 +20,6 @@ use SineMacula\Laravel\Mfa\Http\MiddlewareSessionTransition;
 use Tests\TestCase;
 
 /**
- * Tests for `HttpBindings`: the middleware are registered under their short
- * aliases, and the gate runs straight after authentication.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -32,8 +29,7 @@ use Tests\TestCase;
 final class HttpBindingsTest extends TestCase
 {
     /**
-     * The middleware are aliased as `mfa` and `mfa.exempt`, and nothing else is
-     * registered.
+     * Nothing else is registered.
      *
      * @return void
      *
@@ -51,8 +47,7 @@ final class HttpBindingsTest extends TestCase
     }
 
     /**
-     * The session transition defaults to leaving the session to the `mfa`
-     * middleware, built afresh.
+     * Leaves the session to the `mfa` middleware, built afresh.
      *
      * @return void
      *
@@ -65,8 +60,7 @@ final class HttpBindingsTest extends TestCase
     }
 
     /**
-     * A kernel resolved after the package boots places the gate straight after
-     * authentication, once.
+     * Straight after authentication, once.
      *
      * @return void
      *
@@ -84,8 +78,7 @@ final class HttpBindingsTest extends TestCase
     }
 
     /**
-     * A kernel resolved before the package boots, as an application's is, has
-     * the gate placed at once.
+     * As an application's kernel is.
      *
      * @return void
      *
@@ -102,8 +95,7 @@ final class HttpBindingsTest extends TestCase
     }
 
     /**
-     * A kernel that is not the framework's has no priority to place it in, and
-     * is left alone.
+     * It has no priority to place the gate in.
      *
      * @return void
      *
@@ -122,8 +114,7 @@ final class HttpBindingsTest extends TestCase
     }
 
     /**
-     * Assert the gate is in the kernel's priority once, straight after
-     * authentication.
+     * Once, straight after authentication.
      *
      * @param  mixed  $kernel
      * @return void
@@ -141,8 +132,7 @@ final class HttpBindingsTest extends TestCase
     }
 
     /**
-     * An application of its own whose kernel has not been resolved, leaving the
-     * container the rest of the test case uses in place.
+     * Leaves the shared container in place, its kernel unresolved.
      *
      * @return \Illuminate\Foundation\Application
      */

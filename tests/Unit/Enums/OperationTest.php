@@ -10,10 +10,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enums\Operation;
 
 /**
- * Unit tests for the `Operation` enum: the names the package's own step-up
- * operations are configured and checked by, pinned so a rename fails, and the
- * form every operation's name takes.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,7 +19,7 @@ use SineMacula\Laravel\Mfa\Enums\Operation;
 final class OperationTest extends TestCase
 {
     /**
-     * The operations, in order, each case name with its stable value.
+     * Pinned so a rename fails.
      *
      * @return void
      */
@@ -38,8 +34,6 @@ final class OperationTest extends TestCase
     }
 
     /**
-     * Rows of a name and whether it is in the form an operation's name takes.
-     *
      * @return iterable<string, array{string, bool}>
      */
     public static function names(): iterable
@@ -61,9 +55,8 @@ final class OperationTest extends TestCase
     }
 
     /**
-     * An operation's name is lower-case segments of letters, digits and
-     * underscores, each starting with a letter, separated by dots, and nothing
-     * else.
+     * Lower-case dot-separated segments of letters, digits and underscores,
+     * each starting with a letter.
      *
      * @param  string  $name
      * @param  bool  $isName
@@ -76,8 +69,6 @@ final class OperationTest extends TestCase
     }
 
     /**
-     * Every one of the package's own operations is named in that form.
-     *
      * @return void
      */
     public function testEveryOperationIsNamedInThatForm(): void

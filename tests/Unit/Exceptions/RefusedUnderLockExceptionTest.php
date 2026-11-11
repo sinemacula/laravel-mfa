@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
 
 /**
- * Unit tests for `RefusedUnderLockException`: it carries a refusal, and the
- * challenge reported before it, out of the transaction.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,7 @@ use SineMacula\Laravel\Mfa\Exceptions\RefusedUnderLockException;
 final class RefusedUnderLockExceptionTest extends TestCase
 {
     /**
-     * A refusal thrown by the work is carried out with the challenge named, and
-     * stays the exception's previous one.
+     * With the challenge named, and kept as the previous exception.
      *
      * @return void
      */
@@ -51,8 +47,8 @@ final class RefusedUnderLockExceptionTest extends TestCase
     }
 
     /**
-     * Work that is not refused answers as it did, and anything else it throws
-     * is left alone.
+     * Work that is not refused answers as it did; anything else it throws
+     * passes through.
      *
      * @return void
      */

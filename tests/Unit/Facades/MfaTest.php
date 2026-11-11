@@ -10,8 +10,8 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use Tests\TestCase;
 
 /**
- * The facade's annotations state the manager's surface exactly, so what an
- * application's editor and static analysis read is what the manager declares.
+ * Pins the facade's annotations to the manager's surface, which editors and
+ * static analysis read.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +29,6 @@ final class MfaTest extends TestCase
     ];
 
     /**
-     * The facade reaches the manager the container holds.
-     *
      * @return void
      */
     public function testTheFacadeResolvesTheManager(): void
@@ -40,9 +38,8 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * Every public method the manager declares, and `extend()`, is annotated on
-     * the facade, once, with the return its docblock states and the parameters
-     * it declares, and nothing else is.
+     * Once each, with the return its docblock states and the parameters it
+     * declares, and nothing else is.
      *
      * @return void
      */
@@ -60,8 +57,7 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * The forms the comparison treats as one type are one type, and what
-     * differs in substance still differs.
+     * What differs in substance still differs.
      *
      * @return void
      */
@@ -75,8 +71,7 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * The facade's annotations, by method: the return and the parameters as
-     * written, failing on a duplicate.
+     * Failing on a duplicate.
      *
      * @return array<string, array{0: string, 1: string}>
      */
@@ -98,8 +93,7 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * What the facade must say of each method of the manager's surface: its
-     * return and its parameters.
+     * Each method's return and parameters, as the facade must state them.
      *
      * @return array<string, array{0: string, 1: string}>
      */
@@ -121,8 +115,6 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * The return a method's docblock states.
-     *
      * @param  \ReflectionMethod  $method
      * @return string
      */
@@ -136,8 +128,8 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * The parameter list a method declares, the type of an untyped parameter
-     * read from its docblock, as Laravel's `Manager` leaves its own untyped.
+     * An untyped parameter's type is read from its docblock, as Laravel's
+     * `Manager` leaves its own untyped.
      *
      * @param  \ReflectionMethod  $method
      * @return string
@@ -153,8 +145,6 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * One parameter as an annotation writes it.
-     *
      * @param  \ReflectionMethod  $method
      * @param  \ReflectionParameter  $parameter
      * @return string
@@ -177,7 +167,7 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * A type as an annotation writes it: every class named from the root.
+     * Every class named from the root.
      *
      * @param  string  $type
      * @return string
@@ -192,8 +182,6 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * A parameter's default as an annotation writes it.
-     *
      * @param  \ReflectionParameter  $parameter
      * @return string
      */
@@ -203,9 +191,8 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * The form two ways of writing one type share: no whitespace, no trailing
-     * comma in a shape, `?T` as `T|null`, and a top-level union's members in
-     * order. Parameter lists are compared parameter by parameter.
+     * No whitespace, no trailing comma in a shape, `?T` as `T|null` and union
+     * members sorted; parameter lists compare one by one.
      *
      * @param  string  $signature
      * @return string
@@ -220,8 +207,6 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * A parameter, or a bare type, in its normal form.
-     *
      * @param  string  $parameter
      * @return string
      */
@@ -237,8 +222,7 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * A type in its normal form: `?T` as `T|null`, and a union's members in
-     * order.
+     * `?T` as `T|null`, and a union's members sorted.
      *
      * @param  string  $type
      * @return string
@@ -259,7 +243,7 @@ final class MfaTest extends TestCase
     }
 
     /**
-     * Split on the separator, outside brackets of any kind.
+     * Outside brackets of any kind.
      *
      * @param  string  $value
      * @param  string  $separator

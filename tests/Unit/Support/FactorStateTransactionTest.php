@@ -22,9 +22,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Unit tests for `FactorStateTransaction`: the identity's state row it locks,
- * the factors it hands the callback, and what it refuses.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -36,8 +33,6 @@ final class FactorStateTransactionTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Clear the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -49,9 +44,6 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * The callback runs inside a transaction and its return value is passed
-     * back.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -68,8 +60,7 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * The callback is handed the identity's factors as stored, and no one
-     * else's.
+     * Another identity's factors are not included.
      *
      * @return void
      *
@@ -95,8 +86,8 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * The identity's state row is created on its first change and reused by the
-     * next: one row per identity, created once and touched by each change.
+     * One row per identity, created on its first change and touched by each
+     * one.
      *
      * @return void
      *
@@ -129,8 +120,6 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * A non-Eloquent identity is locked by its class name and its key.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -147,7 +136,7 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * A factor's owner, read from its owner columns, is the identity locked.
+     * The owner is read from the factor's owner columns.
      *
      * @return void
      *
@@ -172,8 +161,7 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * A stored factor whose owner is not an Eloquent model locks that owner,
-     * named by the factor's owner columns, without building it.
+     * The owner is named by the factor's owner columns and never built.
      *
      * @return void
      *
@@ -199,8 +187,6 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * An empty setting names the default identity states table.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -219,8 +205,7 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * A factor model on another connection than the storage one is refused
-     * before the transaction opens, so nothing is written.
+     * Refused before the transaction opens, so nothing is written.
      *
      * @return void
      *
@@ -241,8 +226,7 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * Identities whose key cannot name one lock are refused rather than
-     * collapsed onto a shared one.
+     * Refused rather than collapsed onto a shared lock.
      *
      * @return void
      *
@@ -257,8 +241,6 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * An empty key is refused too.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -272,8 +254,6 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * An integer key is locked as its string form.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -286,8 +266,6 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * A factor that names no owner type has no owner to lock.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -303,8 +281,6 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * An empty owner type is refused the same way.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -319,8 +295,6 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * Create a test user.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -330,8 +304,6 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
-     * Create a factor owned by the user.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $driver
      * @return \SineMacula\Laravel\Mfa\Models\Factor

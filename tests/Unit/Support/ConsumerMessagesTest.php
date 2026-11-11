@@ -11,8 +11,8 @@ use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
 use Tests\TestCase;
 
 /**
- * The wording a consumer can see: the translation of the current locale, or the
- * shipped English whenever the translator has nothing usable.
+ * The translation of the current locale, or the shipped English whenever the
+ * translator has nothing usable.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +29,7 @@ final class ConsumerMessagesTest extends TestCase
     private const string SMS = 'Your verification code is: :code';
 
     /**
-     * Every shipped key has its constant, and every constant its shipped key,
-     * so the file is the one source of the wording.
+     * Keeps the shipped file the one source of the wording.
      *
      * @return void
      */
@@ -55,8 +54,6 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * The English is what the shipped file says, however many times it is read.
-     *
      * @return void
      */
     public function testTheEnglishIsWhatTheShippedFileSays(): void
@@ -70,8 +67,8 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * An application's override of `en` is honoured by the translator and never
-     * reaches the shipped English.
+     * An `en` override is honoured by the translator but never reaches the
+     * shipped English.
      *
      * @return void
      */
@@ -84,8 +81,6 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * The shipped translations are loaded for the package's namespace.
-     *
      * @return void
      */
     public function testTheShippedLinesAreLoaded(): void
@@ -94,8 +89,7 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * A line of the current locale is what is said, and it follows the locale
-     * from one call to the next: neither the translator nor its locale is kept.
+     * Neither the translator nor its locale is kept between calls.
      *
      * @return void
      */
@@ -119,8 +113,7 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * An untranslated locale whose fallback is not English gets the shipped
-     * English, where the translator alone would end at the key.
+     * The translator alone would answer with the key.
      *
      * @return void
      */
@@ -135,9 +128,6 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * A valid translation in a non-English fallback locale is honoured before
-     * the shipped English.
-     *
      * @return void
      */
     public function testATranslationInTheFallbackLocaleIsHonoredFirst(): void
@@ -153,8 +143,6 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * The answers that cannot be said.
-     *
      * @return iterable<string, array{mixed}>
      */
     public static function unusableAnswers(): iterable
@@ -165,8 +153,7 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * An unusable answer is replaced by the shipped English, on the plain, the
-     * code and the plural path.
+     * Covers the plain, the code and the plural path.
      *
      * @param  mixed  $answer
      * @return void
@@ -185,8 +172,7 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * Without a translator the line is the shipped English, the locale is
-     * unknown, and raising a refusal never raises something else.
+     * The locale is unknown, and raising a refusal never raises something else.
      *
      * @return void
      */
@@ -208,9 +194,8 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * A code line must carry the exact placeholder: one without it, or with it
-     * in another case, is replaced by the shipped English, and it is returned
-     * as the template, with no code in it.
+     * A line without the placeholder, or with it in another case, gives the
+     * English; the template holds no code.
      *
      * @return void
      */
@@ -230,7 +215,7 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * A plural line selects by the locale's rules, with the minutes replaced.
+     * The minutes are replaced too.
      *
      * @return void
      */
@@ -248,8 +233,8 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * The English fallback uses English plural rules whatever the locale, whose
-     * own would call 0 and 1 singular or have more forms.
+     * Whatever the locale, whose own rules could call 0 and 1 singular or have
+     * more forms.
      *
      * @return void
      */
@@ -263,8 +248,7 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * A line that passes the first look and selects an empty branch falls back:
-     * the selected answer is checked too.
+     * The selected branch is checked as well as the whole line.
      *
      * @return void
      */
@@ -279,8 +263,6 @@ final class ConsumerMessagesTest extends TestCase
     }
 
     /**
-     * A plural line without the minutes is still a usable answer.
-     *
      * @return void
      */
     public function testAPluralLineWithoutTheMinutesIsUsable(): void

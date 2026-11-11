@@ -10,9 +10,6 @@ use SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactor;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 
 /**
- * Unit tests for `DeclaredFirstFactor`: it holds a method and a known channel
- * kind, and refuses a blank method or an unknown channel.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,8 +19,6 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 final class DeclaredFirstFactorTest extends TestCase
 {
     /**
-     * The declaration holds what it is given.
-     *
      * @return void
      */
     public function testHoldsTheMethodAndChannel(): void
@@ -35,8 +30,6 @@ final class DeclaredFirstFactorTest extends TestCase
     }
 
     /**
-     * A blank method is refused.
-     *
      * @return void
      */
     public function testRefusesABlankMethod(): void
@@ -49,8 +42,6 @@ final class DeclaredFirstFactorTest extends TestCase
     }
 
     /**
-     * An unknown channel is no declaration at all, and is refused.
-     *
      * @return void
      */
     public function testRefusesAnUnknownChannel(): void

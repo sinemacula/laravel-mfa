@@ -11,8 +11,6 @@ use SineMacula\Laravel\Mfa\Http\Middleware\ExemptFromMfa;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Unit tests for `ExemptFromMfa`: a marker that only passes the request on.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,8 +20,6 @@ use Symfony\Component\HttpFoundation\Response;
 final class ExemptFromMfaTest extends TestCase
 {
     /**
-     * The request goes on unchanged, and the next answer comes back.
-     *
      * @return void
      */
     public function testItOnlyPassesTheRequestOn(): void

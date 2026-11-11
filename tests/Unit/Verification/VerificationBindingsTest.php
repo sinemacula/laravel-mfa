@@ -10,8 +10,6 @@ use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\TestCase;
 
 /**
- * Tests for `VerificationBindings`: the verification service is built afresh.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -21,8 +19,6 @@ use Tests\TestCase;
 final class VerificationBindingsTest extends TestCase
 {
     /**
-     * The verification service is built on every resolution.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

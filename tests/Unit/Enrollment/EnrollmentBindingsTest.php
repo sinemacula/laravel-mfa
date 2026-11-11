@@ -10,8 +10,6 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentService;
 use Tests\TestCase;
 
 /**
- * Tests for `EnrollmentBindings`: the enrolment service is built afresh.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -21,8 +19,6 @@ use Tests\TestCase;
 final class EnrollmentBindingsTest extends TestCase
 {
     /**
-     * The enrolment service is built on every resolution.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

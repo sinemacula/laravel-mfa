@@ -10,9 +10,6 @@ use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException;
 
 /**
- * Unit tests for `SenderNotConfiguredException`: a runtime failure naming the
- * contract to bind.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,8 +19,6 @@ use SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException;
 final class SenderNotConfiguredExceptionTest extends TestCase
 {
     /**
-     * The exception is a runtime failure naming the contract.
-     *
      * @return void
      */
     public function testTheExceptionNamesTheContractToBind(): void

@@ -11,9 +11,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentSettings;
 
 /**
- * Unit tests for `EnrollmentSettings`: each setting's default, the bounds it
- * accepts, and the message a value past them fails with.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,6 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentSettings;
 final class EnrollmentSettingsTest extends TestCase
 {
     /**
-     * Rows of `[key, reader, default, least, greatest]`.
-     *
      * @return iterable<string, array{string, \Closure(\SineMacula\Laravel\Mfa\Enrollment\EnrollmentSettings): int, int, int, int}>
      */
     public static function settings(): iterable
@@ -34,11 +29,9 @@ final class EnrollmentSettingsTest extends TestCase
     }
 
     /**
-     * Each setting takes its default (within its bounds) when unset, reads
-     * either bound as an integer or the digit string `env()` returns, and
-     * refuses a value past either bound, or one that is not an integer, naming
-     * the key and its bounds, both as it is read and when every setting is
-     * validated.
+     * Either bound reads as an integer or as the digit string `env()` returns;
+     * anything past them fails naming the key and its bounds, when read and
+     * when validated.
      *
      * @param  string  $key
      * @param  \Closure(\SineMacula\Laravel\Mfa\Enrollment\EnrollmentSettings): int  $read
@@ -75,8 +68,6 @@ final class EnrollmentSettingsTest extends TestCase
     }
 
     /**
-     * The defaults validate.
-     *
      * @return void
      */
     public function testTheDefaultsValidate(): void
@@ -87,8 +78,6 @@ final class EnrollmentSettingsTest extends TestCase
     }
 
     /**
-     * Build the settings over an `mfa.enrollment` block.
-     *
      * @param  array<string, mixed>  $block
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentSettings
      */

@@ -43,11 +43,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * The event catalogue: every event a listener can take, each carrying its
- * context and payload, and none carrying a secret, a code, a provisioning URI
- * or a full destination, whether it is serialised for a queue or encoded as
- * JSON.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -107,8 +102,8 @@ final class EventCatalogTest extends TestCase
     ];
 
     /**
-     * Every event, built from a factor that holds a secret, a delivered code, a
-     * credential reference and a full destination, with what it is for.
+     * Built from a factor that holds a secret, a delivered code, a credential
+     * reference and a full destination.
      *
      * @return iterable<string, array{\Closure(\SineMacula\Laravel\Mfa\Factors\FactorSummary): \SineMacula\Laravel\Mfa\Contracts\MfaEvent, ?\SineMacula\Laravel\Mfa\Enums\Purpose}>
      */
@@ -150,9 +145,8 @@ final class EventCatalogTest extends TestCase
     }
 
     /**
-     * No event carries the factor's secret, its delivered code, a provisioning
-     * URI, its credential reference or its full destination, serialised for a
-     * queue or encoded as JSON; each still carries its context.
+     * Serialised for a queue or encoded as JSON; each still carries its
+     * context.
      *
      * @param  \Closure(\SineMacula\Laravel\Mfa\Factors\FactorSummary): \SineMacula\Laravel\Mfa\Contracts\MfaEvent  $build
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -181,8 +175,7 @@ final class EventCatalogTest extends TestCase
     }
 
     /**
-     * Every event is one a single listener on the contract takes, with the
-     * context it was built with.
+     * Every event is taken by a single listener on the contract.
      *
      * @param  \Closure(\SineMacula\Laravel\Mfa\Factors\FactorSummary): \SineMacula\Laravel\Mfa\Contracts\MfaEvent  $build
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -198,9 +191,8 @@ final class EventCatalogTest extends TestCase
     }
 
     /**
-     * Every event says what it was for: the purpose of the attempt, code or
-     * proof behind it where that varies, enrolment for an enrolment's events,
-     * and nothing for a change made outside any verification.
+     * The purpose behind it where that varies, enrolment for an enrolment's
+     * events, and nothing outside a verification.
      *
      * @param  \Closure(\SineMacula\Laravel\Mfa\Factors\FactorSummary): \SineMacula\Laravel\Mfa\Contracts\MfaEvent  $build
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
@@ -215,7 +207,7 @@ final class EventCatalogTest extends TestCase
     }
 
     /**
-     * The events' payloads, by name, so a renamed field fails.
+     * Pinned by name, so a renamed field fails.
      *
      * @return void
      */
@@ -268,8 +260,6 @@ final class EventCatalogTest extends TestCase
     }
 
     /**
-     * A factor holding everything an event must not carry.
-     *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
     private function sensitiveFactor(): Factor

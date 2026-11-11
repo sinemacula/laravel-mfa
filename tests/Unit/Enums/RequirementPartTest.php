@@ -9,9 +9,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 
 /**
- * Unit tests for the `RequirementPart` enum: the codes that name what a
- * requirement asks for, pinned so a rename fails.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -21,7 +18,7 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 final class RequirementPartTest extends TestCase
 {
     /**
-     * The parts, in order, each case name with its stable value.
+     * Pinned so a rename fails.
      *
      * @return void
      */

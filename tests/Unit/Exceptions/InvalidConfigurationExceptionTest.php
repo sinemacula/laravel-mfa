@@ -9,9 +9,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 
 /**
- * Unit tests for `InvalidConfigurationException`: it carries every problem and
- * lists them in its message, one per line.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -21,8 +18,6 @@ use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 final class InvalidConfigurationExceptionTest extends TestCase
 {
     /**
-     * The exception keeps the problems and lists each on its own line.
-     *
      * @return void
      */
     public function testListsEveryProblem(): void

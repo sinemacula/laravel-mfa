@@ -9,9 +9,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Enums\RequirementMode;
 
 /**
- * Unit tests for the `RequirementMode` enum: the values an application's
- * `requirement` setting takes, pinned so a rename fails.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -21,7 +18,7 @@ use SineMacula\Laravel\Mfa\Enums\RequirementMode;
 final class RequirementModeTest extends TestCase
 {
     /**
-     * The modes, in order, each case name with its stable value.
+     * Pinned so a rename fails.
      *
      * @return void
      */

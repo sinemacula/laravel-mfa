@@ -22,9 +22,8 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `DeclaredFirstFactorResolver`, the first factor without an
- * authentication layer: the application's declaration, for an identity with a
- * sign-in, dated at the epoch so it supplies no freshness of its own.
+ * The first factor without an authentication layer, dated at the epoch so it
+ * supplies no freshness.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,8 +34,6 @@ use Tests\TestCase;
 final class DeclaredFirstFactorResolverTest extends TestCase
 {
     /**
-     * An application that declares no first factor has none.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -49,8 +46,6 @@ final class DeclaredFirstFactorResolverTest extends TestCase
     }
 
     /**
-     * An identity with no sign-in on the application has none.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -66,9 +61,8 @@ final class DeclaredFirstFactorResolverTest extends TestCase
     }
 
     /**
-     * The declared first factor is a sign-in proof of the declared method and
-     * channel kind, naming nothing and observing nothing, bound to the current
-     * sign-in under the current generation and dated at the epoch.
+     * A sign-in proof of the declared method and channel, naming and observing
+     * nothing, bound to the current sign-in and generation, dated at the epoch.
      *
      * @return void
      *
@@ -99,8 +93,8 @@ final class DeclaredFirstFactorResolverTest extends TestCase
     }
 
     /**
-     * The freshness gate trusts the declared first factor, so a fresh further
-     * factor after it is fresh; the first factor alone never is.
+     * A fresh further factor after it is fresh; the first factor alone never
+     * is.
      *
      * @return void
      *
@@ -129,9 +123,8 @@ final class DeclaredFirstFactorResolverTest extends TestCase
     }
 
     /**
-     * A declared passkey first factor names no credential, so the combination
-     * policy accepts no passkey after it: the credential that signed the person
-     * in cannot be shown to differ.
+     * It names no credential, so the one that signed the person in cannot be
+     * shown to differ.
      *
      * @return void
      *
@@ -150,8 +143,6 @@ final class DeclaredFirstFactorResolverTest extends TestCase
     }
 
     /**
-     * Declare the application's first factor.
-     *
      * @param  string  $method
      * @param  string  $channel
      * @return void
@@ -162,7 +153,7 @@ final class DeclaredFirstFactorResolverTest extends TestCase
     }
 
     /**
-     * Sign a person in, with a sign-in the proof store knows.
+     * With a sign-in the proof store knows.
      *
      * @return \Tests\Fixtures\Identities\TestUser
      *
@@ -180,8 +171,6 @@ final class DeclaredFirstFactorResolverTest extends TestCase
     }
 
     /**
-     * The resolver under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactorResolver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

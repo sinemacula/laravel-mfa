@@ -24,8 +24,6 @@ use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
- * Unit tests for the `MfaManager` driver factories exposed via `driver($name)`.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -35,9 +33,6 @@ use Tests\Fixtures\Identities\TestUser;
 final class MfaManagerDriversTest extends MfaManagerTestCase
 {
     /**
-     * Resolving the TOTP driver should give a driver that reads the configured
-     * settings in `config('mfa.totp')`.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -57,8 +52,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the TOTP driver with no settings configured should fall back to
-     * the defaults authenticator apps expect: SHA-1, 6 digits, 30 seconds.
+     * SHA-1, 6 digits, 30 seconds: what authenticator apps expect.
      *
      * @return void
      *
@@ -79,9 +73,6 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the email driver builds one that hands each code message to the
-     * bound email sender.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -100,9 +91,6 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolving the SMS driver with an empty config slice should surface the
-     * shipped defaults verbatim.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -119,8 +107,8 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Recovery codes are not a factor, so no driver is registered for them:
-     * asking the manager for one fails as for any unknown driver.
+     * Recovery codes are not a factor, so asking for their driver fails as for
+     * any unknown one.
      *
      * @return void
      *
@@ -135,8 +123,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * An integer-backed enum names the driver registered under its value, as
-     * Laravel's manager names it.
+     * As Laravel's manager names it.
      *
      * @return void
      *
@@ -153,9 +140,7 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Verifying through an extension whose factory returns a non-`FactorDriver`
-     * instance should surface a clear `LogicException` instead of a fatal type
-     * error inside the verification pipeline.
+     * A `LogicException` rather than a fatal type error inside verification.
      *
      * @return void
      *
@@ -163,10 +148,6 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
      */
     public function testVerifyThrowsWhenExtendedDriverIsNotAFactorDriver(): void
     {
-        // The base Manager's extend() accepts any callable returning mixed;
-        // the resolver guards the FactorDriver contract at the boundary so a
-        // misconfigured extension surfaces a LogicException rather than a fatal
-        // type error deep inside verify().
         $manager = $this->manager();
         $manager->extend('not-a-driver', fn (): \stdClass => new \stdClass);
 
@@ -194,8 +175,6 @@ final class MfaManagerDriversTest extends MfaManagerTestCase
     }
 
     /**
-     * Resolve the package's MFA manager from the container.
-     *
      * @return \SineMacula\Laravel\Mfa\MfaManager
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

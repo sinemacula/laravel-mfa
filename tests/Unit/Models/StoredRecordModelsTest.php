@@ -17,10 +17,8 @@ use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use Tests\TestCase;
 
 /**
- * Unit tests for the models of the package's other records (enrolments,
- * delivered codes, identity states, passkey associations and recovery codes):
- * each on its configured table and the storage connection, keyed by a ULID,
- * with what it must never serialise hidden and its columns cast.
+ * Enrolments, delivered codes, identity states, passkey associations and
+ * recovery codes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,8 +33,6 @@ use Tests\TestCase;
 final class StoredRecordModelsTest extends TestCase
 {
     /**
-     * Rows of a model, its table setting and its default table.
-     *
      * @return iterable<string, array{class-string<\Illuminate\Database\Eloquent\Model>, string, string}>
      */
     public static function tables(): iterable
@@ -47,8 +43,6 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * The model takes its default table, or the configured one.
-     *
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
      * @param  string  $setting
      * @param  string  $default
@@ -69,8 +63,6 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * Rows of a model.
-     *
      * @return iterable<string, array{class-string<\Illuminate\Database\Eloquent\Model>}>
      */
     public static function models(): iterable
@@ -81,8 +73,7 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * The model lives on the storage connection, named even when it is the
-     * default one.
+     * Named even when it is the default one.
      *
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
      * @return void
@@ -102,8 +93,6 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * The model is keyed by a ULID it generates.
-     *
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
      * @return void
      */
@@ -117,8 +106,6 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * Rows of a model and what it hides.
-     *
      * @return iterable<string, array{class-string<\Illuminate\Database\Eloquent\Model>, list<string>}>
      */
     public static function hidden(): iterable
@@ -129,8 +116,6 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * What the model must never serialise is hidden.
-     *
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
      * @param  list<string>  $hidden
      * @return void
@@ -142,8 +127,6 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * Rows of a model and its casts.
-     *
      * @return iterable<string, array{class-string<\Illuminate\Database\Eloquent\Model>, array<string, string>}>
      */
     public static function casts(): iterable
@@ -154,8 +137,6 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * The model casts its columns.
-     *
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
      * @param  array<string, string>  $casts
      * @return void
@@ -171,8 +152,6 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * Every column but the key and the timestamps is mass assignable.
-     *
      * @return void
      */
     public function testEveryColumnButTheKeyAndTimestampsIsFillable(): void
@@ -210,9 +189,8 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * A subclass of the recovery code model that names a connection of its own
-     * keeps it, so a model off the storage connection is refused rather than
-     * silently moved.
+     * So a model off the storage connection is refused rather than silently
+     * moved.
      *
      * @return void
      */
@@ -228,9 +206,6 @@ final class StoredRecordModelsTest extends TestCase
     }
 
     /**
-     * Each model, its table setting, its default table, what it hides and its
-     * casts.
-     *
      * @return iterable<string, array{class-string<\Illuminate\Database\Eloquent\Model>, string, string, list<string>, array<string, string>}>
      */
     private static function records(): iterable

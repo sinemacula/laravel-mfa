@@ -12,11 +12,8 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 
 /**
- * Shared base test case for the package's test suites.
- *
- * Boots a Testbench application with the MFA service provider registered, the
- * database `DB_CONNECTION` names (in-memory SQLite when unset), and the shipped
- * migration plus the test user migrations applied.
+ * Boots Testbench with the package provider, the `DB_CONNECTION` database
+ * (in-memory SQLite when unset) and the migrations applied.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -32,8 +29,8 @@ abstract class TestCase extends BaseTestCase
     private array $migratedSettings = [];
 
     /**
-     * Boot the application and run its migrations, noting the storage
-     * connection and table names they created the package's tables with.
+     * Notes the storage connection and table names the package's tables were
+     * created with.
      *
      * @return void
      */
@@ -50,18 +47,9 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Destroy the application, then close its database connections.
-     *
-     * The storage connection and table name settings are put back first, so a
-     * test that changed them has the migrations roll back the tables they
-     * created: on a database that outlives the test, a rollback of other names
-     * or elsewhere would forget the package's tables while leaving them in
-     * place, and the next test could not create them.
-     *
-     * The application's objects reference each other, so a destroyed
-     * application's PDO is only closed once the cycles are collected. Without
-     * this, a long run against a persistent database holds dozens of
-     * connections at once, and parallel workers exhaust the server's limit.
+     * Restores the table settings first so the rollback drops what the
+     * migrations created, then collects cycles so the PDO closes before
+     * parallel runs exhaust connections.
      *
      * @return void
      */
@@ -83,8 +71,6 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Register the package's service provider with the test application.
-     *
      * @param  mixed  $app
      * @return list<class-string<\Illuminate\Support\ServiceProvider>>
      */
@@ -97,12 +83,6 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Configure the application environment for the test suite.
-     *
-     * Reads `DB_CONNECTION` from the environment to select the driver. Defaults
-     * to in-memory SQLite when unset, so local development needs no extra
-     * configuration.
-     *
      * @param  mixed  $app
      * @return void
      *
@@ -131,9 +111,6 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Load the package's migration and the test user migrations for the test
-     * application database.
-     *
      * @return void
      */
     #[\Override]
@@ -144,8 +121,7 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Return the bootstrapped application container as a non-null value,
-     * narrowing the parent's nullable property for static analysis.
+     * Narrows the parent's nullable property for static analysis.
      *
      * @return \Illuminate\Foundation\Application
      */
@@ -157,8 +133,8 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Return the settings the package's migrations read: the storage connection
-     * and every table's name.
+     * The storage connection and every table's name, as the migrations read
+     * them.
      *
      * @return list<string>
      */
@@ -171,8 +147,6 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Build the database connection config from environment variables.
-     *
      * @return array<string, mixed>
      */
     private function databaseConnection(): array
@@ -205,13 +179,8 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Return the database this process tests against.
-     *
-     * Tests create, empty and drop the same tables, so paratest workers sharing
-     * one database would collide. Each process gets its own database, named
-     * after its paratest `TEST_TOKEN` (`0` outside paratest) and created afresh
-     * on first use from a connection to the configured one, so nothing a
-     * previous or interrupted run left behind reaches the next.
+     * One per paratest worker (`TEST_TOKEN`, `0` outside paratest), created
+     * afresh on first use so workers and earlier runs never collide.
      *
      * @param  array{driver: string, host: string, port: string, database: string, username: string, password: string}  $connection
      * @return string
@@ -239,8 +208,6 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Return the default database port for the given driver.
-     *
      * @param  string  $driver
      * @return string
      */
@@ -250,8 +217,6 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Return the default database username for the given driver.
-     *
      * @param  string  $driver
      * @return string
      */

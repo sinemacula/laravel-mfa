@@ -72,8 +72,6 @@ use Tests\Fixtures\Factors\SecondaryConnectionFactor;
 use Tests\TestCase;
 
 /**
- * Unit tests for the `MfaServiceProvider` container wiring.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -83,8 +81,6 @@ use Tests\TestCase;
 final class MfaServiceProviderTest extends TestCase
 {
     /**
-     * Test binds mfa manager as singleton under mfa alias.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -99,8 +95,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test binds each requirement seam to its default.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -115,8 +109,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test binds the proof store to the session store.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -130,8 +122,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test binds the SMS and email senders to the null senders.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -143,8 +133,7 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test registers each capability's services and defaults, built on every
-     * resolution.
+     * Each built on every resolution.
      *
      * @return void
      */
@@ -190,8 +179,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test registers the shipped drivers with the manager.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -207,9 +194,7 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Booting checks that the configured factor model lives on the storage
-     * connection, refusing one on another connection before anything is served,
-     * as one of the configuration's problems.
+     * Before anything is served, as one of the configuration's problems.
      *
      * @return void
      *
@@ -226,8 +211,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test registers middleware aliases.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -246,8 +229,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test merges default mfa config.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -256,15 +237,11 @@ final class MfaServiceProviderTest extends TestCase
     {
         $config = $this->container()->make('config');
 
-        // Sanity check: the config file shipped with the package has been
-        // merged into the runtime configuration.
         self::assertIsArray($config->get('mfa'));
         self::assertSame('mfa_factors', $config->get('mfa.factor.table'));
     }
 
     /**
-     * Test registers config publishing tag.
-     *
      * @return void
      */
     public function testRegistersConfigPublishingTag(): void
@@ -279,8 +256,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test registers migration publishing tag.
-     *
      * @return void
      */
     public function testRegistersMigrationPublishingTag(): void
@@ -294,9 +269,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * The package's translations are loaded under its namespace, from the file
-     * that ships.
-     *
      * @return void
      */
     public function testLoadsTheTranslations(): void
@@ -305,8 +277,7 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * The translations publish under their own tag, to where Laravel looks for
-     * a package's overrides.
+     * To where Laravel looks for a package's overrides.
      *
      * @return void
      */
@@ -320,10 +291,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * The configuration publishes from the package's own file to the
-     * application's, and the migrations from the package's own directory to the
-     * application's.
-     *
      * @return void
      */
     public function testPublishesThePackagesOwnConfigurationAndMigrations(): void
@@ -343,9 +310,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * The seams and policies the capabilities register are bound to the
-     * package's defaults, which an application rebinds to replace.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -366,9 +330,7 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * A binding made before the provider registers is kept: the provider binds
-     * `mfa` and every default only when nothing is bound yet, so a package or
-     * an application registered earlier is not overwritten.
+     * `mfa` and every default are bound only when nothing is bound yet.
      *
      * @return void
      */
@@ -405,9 +367,8 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Booting registers the secrets' protections: the middleware that stops a
-     * response holding a secret being stored, and the redaction of the log
-     * channels.
+     * The middleware that stops a response holding a secret being stored, and
+     * the log channels' redaction.
      *
      * @return void
      *
@@ -436,8 +397,7 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * The SMS wording is only a translation: no configuration can defeat every
-     * locale.
+     * No configuration could cover every locale.
      *
      * @return void
      */
@@ -448,20 +408,16 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Test offer publishing is skipped when not running in console.
-     *
      * @return void
      *
      * @throws \ReflectionException
      */
     public function testOfferPublishingIsSkippedWhenNotRunningInConsole(): void
     {
-        // Build a throwaway testbench kernel whose `runningInConsole()` returns
-        // false so we exercise the early-return in `offerPublishing()`.
+        // A kernel whose `runningInConsole()` is false reaches the early return
+        // in `offerPublishing()`.
         $app = new class extends Application {
             /**
-             * Running in console.
-             *
              * @imperative
              *
              * @return bool
@@ -473,21 +429,14 @@ final class MfaServiceProviderTest extends TestCase
             }
         };
 
-        // The booted provider only consults the config to decide what to
-        // publish, and `runningInConsole()` short-circuits that path for this
-        // test — so an empty repository is sufficient and avoids loading the
-        // real config file via `require` / `include` (both forbidden by the
-        // project's lint rules outside namespace imports).
+        // `runningInConsole()` short-circuits before the config is read, so an
+        // empty repository is enough.
         $app->bind('config', static fn () => new Repository(['mfa' => []]));
         $app->bind(Router::class, static fn ($app) => new Router(
             new Dispatcher($app),
         ));
 
-        // Snapshot the pre-boot publishable paths so we can assert the
-        // short-circuit leaves them untouched. Using the shared static registry
-        // means other tests may have pre-registered paths under the real
-        // provider class; diffing before/after isolates this boot's
-        // contribution.
+        // Other tests share the static registry, so compare before and after.
         $providerClass = MfaServiceProvider::class;
 
         /** @var array<string, mixed> $before */
@@ -513,8 +462,6 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * The `mfa:check` command is registered in the console.
-     *
      * @return void
      */
     public function testRegistersTheCheckCommand(): void
@@ -523,8 +470,7 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Booting checks the configuration, refusing one out of range before
-     * anything is served.
+     * Refusing one out of range before anything is served.
      *
      * @return void
      *
@@ -541,8 +487,7 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Resolving the manager checks the configuration first, so a setting
-     * changed after boot fails there rather than at a person's first
+     * So a setting changed after boot fails there rather than at a first
      * verification.
      *
      * @return void

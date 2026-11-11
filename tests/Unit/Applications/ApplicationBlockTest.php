@@ -10,10 +10,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Applications\ApplicationBlock;
 
 /**
- * Unit tests for `ApplicationBlock`: the raw block it reads for one
- * application, the keys it refuses, its flags and type lists, and the keys it
- * names in its messages.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +19,8 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationBlock;
 final class ApplicationBlockTest extends TestCase
 {
     /**
-     * The block is read as configured, and is empty for an application with
-     * none or when no applications are configured.
+     * Empty for an application with none, or when no applications are
+     * configured.
      *
      * @return void
      */
@@ -37,8 +33,7 @@ final class ApplicationBlockTest extends TestCase
     }
 
     /**
-     * An applications block that is not an array is refused, rather than
-     * leaving the application with every default.
+     * Rather than leaving the application with every default.
      *
      * @return void
      */
@@ -51,8 +46,7 @@ final class ApplicationBlockTest extends TestCase
     }
 
     /**
-     * A key the block does not know is refused, an integer key included, each
-     * listed in the message.
+     * An integer key included, each listed in the message.
      *
      * @return void
      */
@@ -65,8 +59,6 @@ final class ApplicationBlockTest extends TestCase
     }
 
     /**
-     * A block that is not an array is refused.
-     *
      * @return void
      */
     public function testRefusesABlockThatIsNotAnArray(): void
@@ -78,8 +70,7 @@ final class ApplicationBlockTest extends TestCase
     }
 
     /**
-     * A nested block is read as configured, empty when it is not set, and
-     * refuses a key it does not know, an integer key included.
+     * Empty when unset; an unknown key, integer keys included, is refused.
      *
      * @return void
      */
@@ -95,8 +86,6 @@ final class ApplicationBlockTest extends TestCase
     }
 
     /**
-     * A nested block that is not an array is refused.
-     *
      * @return void
      */
     public function testRefusesANestedBlockThatIsNotAnArray(): void
@@ -108,7 +97,7 @@ final class ApplicationBlockTest extends TestCase
     }
 
     /**
-     * A flag is off when not set, reads a boolean, and refuses anything else.
+     * Off when unset, reads a boolean, and refuses anything else.
      *
      * @return void
      */
@@ -125,8 +114,8 @@ final class ApplicationBlockTest extends TestCase
     }
 
     /**
-     * A list of distinct type names is read as it is, and anything else is
-     * refused under the setting's key.
+     * A list of distinct type names; anything else is refused under the
+     * setting's key.
      *
      * @return void
      */
@@ -149,8 +138,6 @@ final class ApplicationBlockTest extends TestCase
     }
 
     /**
-     * The key of the block, and of a setting in it, names the application.
-     *
      * @return void
      */
     public function testNamesKeys(): void
@@ -160,8 +147,6 @@ final class ApplicationBlockTest extends TestCase
     }
 
     /**
-     * Build the reader over the `web` application's block.
-     *
      * @param  mixed  $block
      * @return \SineMacula\Laravel\Mfa\Applications\ApplicationBlock
      */

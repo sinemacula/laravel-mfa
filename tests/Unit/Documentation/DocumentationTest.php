@@ -16,15 +16,9 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use Tests\TestCase;
 
 /**
- * A drift guard for the README and the guides in docs/guides: every value of
- * the package's enums (the failure reasons and requirement parts among them),
- * every package event, every key of the event context and of the authentication
- * context, every configuration key and every key of an application's block, and
- * every method of the manager is documented, and every `Mfa::` call they show
- * exists.
- *
- * It catches an omission or a rename, not wrong prose: what the documentation
- * says about each of them is held to the code by review.
+ * Drift guard: every enum value, event, context key, configuration key,
+ * application key and manager method is documented, and every `Mfa::` call
+ * shown exists. It catches omissions and renames, not wrong prose.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -41,9 +35,6 @@ final class DocumentationTest extends TestCase
     private static ?string $documentation = null;
 
     /**
-     * Rows of `[enum value, enum]`: every case of every backed enum the package
-     * ships.
-     *
      * @return iterable<string, array{0: string, 1: string}>
      */
     public static function provideEnumValues(): iterable
@@ -61,8 +52,7 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Every value of the package's enums is named in the documentation, in code
-     * type.
+     * Each is named in code type.
      *
      * @param  string  $value
      * @param  string  $enum
@@ -75,8 +65,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Rows of `[event class]`: every event the package dispatches.
-     *
      * @return iterable<string, array{0: class-string}>
      */
     public static function provideEvents(): iterable
@@ -92,8 +80,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Every event the package dispatches has a row in the events guide's table.
-     *
      * @param  class-string  $class
      * @return void
      */
@@ -106,8 +92,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Rows of `[key]`: every key of an event's context.
-     *
      * @return iterable<string, array{0: string}>
      */
     public static function provideEventContextKeys(): iterable
@@ -118,8 +102,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Every key of an event's context is named in the documentation.
-     *
      * @param  string  $key
      * @return void
      */
@@ -130,9 +112,8 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Every key the package contributes to the authentication context is named
-     * in the documentation. The keys are read from the contributor's neutral
-     * answer, which has the keys of a full one.
+     * The keys are read from the contributor's neutral answer, which has a full
+     * one's keys.
      *
      * @return void
      */
@@ -148,8 +129,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Rows of `[key]`: every configuration key the package config ships.
-     *
      * @return iterable<string, array{0: string}>
      */
     public static function provideConfigurationKeys(): iterable
@@ -163,8 +142,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Every configuration key is named by its full path in the documentation.
-     *
      * @param  string  $key
      * @return void
      */
@@ -175,9 +152,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Rows of `[key]`: every key an application's block holds, by its path
-     * within the block.
-     *
      * @return iterable<string, array{0: string}>
      */
     public static function provideApplicationKeys(): iterable
@@ -193,9 +167,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Every key of an application's block is named by its path within the block
-     * in the documentation.
-     *
      * @param  string  $key
      * @return void
      */
@@ -206,8 +177,8 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Rows of `[method]`: every public method the manager declares, but those
-     * it declares only to refuse.
+     * Every public method the manager declares, but those it declares only to
+     * refuse.
      *
      * @return iterable<string, array{0: string}>
      */
@@ -224,8 +195,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Every method the manager declares is shown being called.
-     *
      * @param  string  $method
      * @return void
      */
@@ -236,8 +205,7 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Every `Mfa::name(` the documentation calls is a method of the manager,
-     * its own or inherited, or of the facade.
+     * Its own, inherited, or the facade's.
      *
      * @return void
      */
@@ -256,9 +224,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * Every `Mfa::name(` the documentation shows with arguments, for a method
-     * that takes the caller first, passes the caller first.
-     *
      * @return void
      */
     public function testEveryCallerFirstCallTheDocumentationShowsPassesTheCaller(): void
@@ -284,8 +249,8 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * The dotted paths of the configuration's settings: every key whose value
-     * is not a map of further settings, a list and an empty array included.
+     * Dotted paths of every key whose value is not a map of further settings;
+     * lists and empty arrays count as settings.
      *
      * @param  array<array-key, mixed>  $config
      * @param  string  $prefix
@@ -312,8 +277,7 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * The classes of a top-level namespace of the package, by the files in its
-     * directory.
+     * Read from the files in its directory.
      *
      * @param  string  $namespace
      * @return list<class-string>
@@ -334,8 +298,6 @@ final class DocumentationTest extends TestCase
     }
 
     /**
-     * The text of the README and every guide.
-     *
      * @return string
      */
     private static function documentation(): string

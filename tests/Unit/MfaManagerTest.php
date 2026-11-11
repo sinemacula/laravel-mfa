@@ -50,8 +50,7 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Pins the manager as a thin entry point: every method hands its arguments to
- * the service of its capability, resolved from the container, and returns that
+ * The manager is a thin entry point: each method returns its capability
  * service's answer unchanged.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -63,8 +62,6 @@ use Tests\TestCase;
 final class MfaManagerTest extends TestCase
 {
     /**
-     * Tear down Mockery expectations between test cases.
-     *
      * @return void
      */
     #[\Override]
@@ -76,8 +73,6 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * The default driver is TOTP.
-     *
      * @return void
      */
     public function testDefaultDriverIsTotp(): void
@@ -86,9 +81,6 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * The delegation matrix: manager method, service, service method, arguments
-     * and the service's result.
-     *
      * @return iterable<string, array{0: string, 1: class-string, 2: string, 3: list<mixed>, 4: mixed}>
      */
     public static function delegations(): iterable
@@ -150,9 +142,6 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * Each manager method calls the same method on its capability's service
-     * with the arguments it was given, and returns the service's result.
-     *
      * @param  string  $method
      * @param  class-string  $service
      * @param  string  $serviceMethod
@@ -184,8 +173,6 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * A reset obliges the identity to enrol again unless it says otherwise.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -205,8 +192,7 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * A manager method called without its optional argument passes the
-     * argument's default to the service: no purpose, which each caller decides.
+     * No purpose, which each caller decides.
      *
      * @return void
      *
@@ -241,8 +227,6 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * The recovery code status is that of the identity the request serves.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -259,8 +243,7 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * Without an MFA-capable identity the recovery code methods change and read
-     * nothing: generating is refused, and there is no status.
+     * Generating is refused, and there is no status.
      *
      * @return void
      *
@@ -277,10 +260,8 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * A method neither the manager nor Laravel's declares is refused, not
-     * forwarded to the default driver, whose raw check runs outside attempts,
-     * proofs and events. Neither the method's arguments nor the driver are
-     * reached.
+     * Not forwarded to the default driver, whose raw check runs outside
+     * attempts, proofs and events.
      *
      * @return void
      *
@@ -315,8 +296,6 @@ final class MfaManagerTest extends TestCase
     }
 
     /**
-     * Resolve the package's MFA manager from the container.
-     *
      * @return \SineMacula\Laravel\Mfa\MfaManager
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

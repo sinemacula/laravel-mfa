@@ -17,8 +17,8 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\SignInProofs;
 
 /**
- * Unit tests for `PurposeRule`: a pending session is always completing its
- * sign-in, and an active one steps up unless it asks for a sign-in.
+ * A pending session always completes its sign-in; an active one steps up unless
+ * it asks for a sign-in.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +29,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 final class PurposeRuleTest extends TestCase
 {
     /**
-     * What each caller asks for, and what it gets.
-     *
      * @return iterable<string, array{0: bool, 1: ?\SineMacula\Laravel\Mfa\Enums\Purpose, 2: ?\SineMacula\Laravel\Mfa\Enums\Purpose}>
      */
     public static function purposes(): iterable
@@ -48,8 +46,6 @@ final class PurposeRuleTest extends TestCase
     }
 
     /**
-     * Each caller gets the purpose it may make the request for, or none.
-     *
      * @param  bool  $pending
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $requested
      * @param  ?\SineMacula\Laravel\Mfa\Enums\Purpose  $expected
