@@ -53,6 +53,38 @@ final class ProofTest extends TestCase
     }
 
     /**
+     * Proofs and the `amr` each adds.
+     *
+     * @return iterable<string, array{\SineMacula\Laravel\Mfa\Assurance\Channel, \SineMacula\Laravel\Mfa\Assurance\ObservedProperties, list<string>}>
+     */
+    public static function amrCases(): iterable
+    {
+        yield 'a password' => [new Channel(ChannelKind::PASSWORD), ObservedProperties::none(), ['pwd']];
+        yield 'an email code' => [new Channel(ChannelKind::EMAIL, 'person@example.test'), ObservedProperties::none(), ['otp']];
+        yield 'a TOTP code' => [new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-1'), ObservedProperties::none(), ['otp']];
+        yield 'a hardware passkey' => [
+            new Channel(ChannelKind::PASSKEY, 'credential-1'),
+            new ObservedProperties(userPresence: true, keyProtection: KeyProtection::HARDWARE),
+            ['pop', 'user', 'hwk'],
+        ];
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $channel
+     * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
+     * @param  list<string>  $amr
+     * @return void
+     */
+    #[DataProvider('amrCases')]
+    public function testAProofsAmrComesFromItsChannelAndProperties(Channel $channel, ObservedProperties $properties, array $amr): void
+    {
+        $binding = new ProofBinding('user', '42', 'admin', 'session-1', Purpose::SIGN_IN);
+        $proof   = new Proof(ProofKind::FIRST_FACTOR, 'method', $channel, null, $properties, CarbonImmutable::now(), $binding, 0);
+
+        self::assertSame($amr, $proof->amr());
+    }
+
+    /**
      * Everything else is kept and the original is unchanged.
      *
      * @return void

@@ -215,7 +215,8 @@ The evaluation's `amr` values (RFC 8176) state only what happened. Each proof th
 first factor first: `pwd` for a password, `sms` for an SMS code, `otp` for a TOTP, email or recovery code, and `pop`
 for a passkey; then `user` when it observed user presence, and `hwk` or `swk` when it observed how its key was
 protected. `mfa` is added when the combination is multifactor, and `mca` when it is an accepted additional verification
-that is not. An external provider's own methods are not repeated: an application that trusts them rebinds the policy.
+that is not. An external provider's own methods are not repeated: an application that trusts them rebinds the policy. A
+single proof's own values are `$proof->amr()`.
 
 ### Requirements and maximum ages
 
