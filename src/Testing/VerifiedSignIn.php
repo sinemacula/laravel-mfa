@@ -10,24 +10,18 @@ use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
-use SineMacula\Laravel\Mfa\Assurance\Evaluation;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
-use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
-use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
-use SineMacula\Laravel\Mfa\Enums\KeyProtection;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
-use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\SignInApplication;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
-use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
 
 /**
@@ -46,18 +40,6 @@ use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
  */
 final readonly class VerifiedSignIn
 {
-    /** @var string The synthetic factor an AAL1 proof names. */
-    public const string EMAIL_REFERENCE = 'verified-email-factor';
-
-    /** @var string The synthetic address an AAL1 proof travels to. */
-    private const string EMAIL_ADDRESS = 'verified@example.test';
-
-    /** @var string The synthetic factor an AAL2 proof names. */
-    private const string TOTP_REFERENCE = 'verified-totp-factor';
-
-    /** @var string The synthetic factor an AAL3 proof names. */
-    private const string PASSKEY_REFERENCE = 'verified-passkey-factor';
-
     /**
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
@@ -89,9 +71,14 @@ final readonly class VerifiedSignIn
 
         $application ??= SignInApplication::of($this->container, $guardName);
 
-        $store    = $this->container->make(ProofStore::class);
-        $recorder = $this->recorder($store);
-        $session  = $recorder->begin($identity, $application, $provedAt);
+        $store     = $this->container->make(ProofStore::class);
+        $recorder  = $this->recorder($store);
+        $session   = $recorder->begin($identity, $application, $provedAt);
+        $reference = $recorder->factorReference($identity, $application, $level);
+
+        if (trim($reference) === '') {
+            throw new \LogicException('The recorder named no factor for the further proof.');
+        }
 
         $generation = VerificationGeneration::current($identity);
 
@@ -108,11 +95,11 @@ final readonly class VerifiedSignIn
             ));
         }
 
-        $recorder->record($identity, self::furtherProof($level, $provedAt, self::binding($identity, $application, $session), $generation));
+        $recorder->record($identity, LevelEvidence::furtherProof($level, $provedAt, self::binding($identity, $application, $session), $generation, $reference));
 
         self::assertCurrent($store, $identity, $application, $session);
 
-        $this->assertReached($level, $this->evaluate($identity, $application, $session, $level));
+        LevelEvidence::assertReached($level, LevelEvidence::evaluate($this->container, $identity, $application, $session, $level));
     }
 
     /**
@@ -193,38 +180,6 @@ final readonly class VerifiedSignIn
     }
 
     /**
-     * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
-     * @param  \Carbon\CarbonImmutable  $provedAt
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @param  int  $generation
-     * @return \SineMacula\Laravel\Mfa\Proofs\Proof
-     */
-    private static function furtherProof(AssuranceLevel $level, CarbonImmutable $provedAt, ProofBinding $binding, int $generation): Proof
-    {
-        [$method, $channel, $reference, $properties] = match ($level) {
-            AssuranceLevel::AAL1 => ['email', new Channel(ChannelKind::EMAIL, self::EMAIL_ADDRESS), self::EMAIL_REFERENCE, ObservedProperties::none()],
-            AssuranceLevel::AAL3 => [
-                'passkey',
-                new Channel(ChannelKind::PASSKEY, self::PASSKEY_REFERENCE),
-                self::PASSKEY_REFERENCE,
-                new ObservedProperties(userPresence: true, userVerification: true, phishingResistance: true, keyProtection: KeyProtection::HARDWARE),
-            ],
-            default => ['totp', new Channel(ChannelKind::AUTHENTICATOR_APP, self::TOTP_REFERENCE), self::TOTP_REFERENCE, ObservedProperties::none()],
-        };
-
-        return new Proof(
-            kind: ProofKind::ADDITIONAL_FACTOR,
-            method: $method,
-            channel: $channel,
-            reference: $reference,
-            properties: $properties,
-            provedAt: $provedAt,
-            binding: $binding,
-            generation: $generation,
-        );
-    }
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  string  $session
@@ -298,47 +253,5 @@ final readonly class VerifiedSignIn
         $auth->shouldUse($name);
 
         return $name;
-    }
-
-    /**
-     * Reads the proofs as the route gate does.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  string  $application
-     * @param  string  $session
-     * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
-     * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
-     */
-    private function evaluate(MultiFactorAuthenticatable $identity, string $application, string $session, AssuranceLevel $level): Evaluation
-    {
-        $proofs = $this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $session);
-
-        $requirement = Requirement::none()->withAdditionalVerification()->withMinimumLevel($level);
-
-        return $this->container->make(RequirementCheck::class)->check($requirement, ...$proofs);
-    }
-
-    /**
-     * Refuses a level short of or past the one asked for.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
-     * @param  \SineMacula\Laravel\Mfa\Assurance\Evaluation  $evaluation
-     * @return void
-     *
-     * @throws \LogicException
-     */
-    private function assertReached(AssuranceLevel $level, Evaluation $evaluation): void
-    {
-        if ($evaluation->meetsRequirement() && $evaluation->level === $level) {
-            return;
-        }
-
-        $unmet  = array_map(static fn (RequirementPart $part): string => $part->value, $evaluation->unmet);
-        $listed = $unmet === [] ? 'none' : implode(', ', $unmet);
-
-        throw new \LogicException(sprintf('Requested %s with additional verification; reached %s; unmet: %s.', $level->value, $evaluation->level->value, $listed));
     }
 }

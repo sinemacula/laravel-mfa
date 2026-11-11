@@ -40,9 +40,10 @@ is built the way it is, and which test helpers deliberately stay private to the 
    pending until the further proof completes it.
 5. A password first factor is recorded at `$at` through the recorder, unless the store already holds one, which is
    kept.
-6. The further proof is recorded at `$at` through the recorder, an additional factor for sign-in, under the identity's
-   current verification generation, with synthetic references: nothing judges a reference against factor rows at read
-   time.
+6. The further proof, from `Testing\LevelEvidence`, is recorded at `$at` through the recorder, an additional factor for
+   sign-in, under the identity's current verification generation, naming the factor the recorder's `factorReference()`
+   gives, by default a synthetic one: nothing in the package judges a reference against factor rows at read time. A
+   blank reference is a `LogicException` before anything is recorded.
 7. The store must name the sign-in begun as current, or a `LogicException` says so.
 8. The proofs are read back and evaluated. Any shortfall or excess is a `LogicException` in one format, naming what was
    requested, what was reached and what is unmet.

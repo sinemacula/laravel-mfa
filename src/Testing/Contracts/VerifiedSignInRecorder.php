@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Testing\Contracts;
 
 use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
@@ -48,4 +49,15 @@ interface VerifiedSignInRecorder
      * @throws \SineMacula\Laravel\Mfa\Exceptions\ProofRefusedException
      */
     public function record(MultiFactorAuthenticatable $identity, Proof $proof): void;
+
+    /**
+     * The factor the further proof for the level names: one the identity holds
+     * where the store refuses a proof of any other.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
+     * @return string
+     */
+    public function factorReference(MultiFactorAuthenticatable $identity, string $application, AssuranceLevel $level): string;
 }
