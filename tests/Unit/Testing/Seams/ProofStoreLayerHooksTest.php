@@ -63,7 +63,7 @@ final class ProofStoreLayerHooksTest extends TestCase
     {
         $this->testProofStoreStopsCountingAForgottenFactor();
 
-        self::assertSame(['enrol', 'write FIRST_FACTOR', 'write ADDITIONAL_FACTOR'], $this->asked);
+        self::assertSame(['enrol', 'write FIRST_FACTOR', 'write ADDITIONAL_FACTOR', 'forget factor-1'], $this->asked);
     }
 
     /**
@@ -185,6 +185,21 @@ final class ProofStoreLayerHooksTest extends TestCase
         $this->asked[] = 'write ' . $proof->kind->name;
 
         $this->store->write($proof);
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @param  string  $factor
+     * @return void
+     */
+    protected function forgetProofStoreFactor(ProofStore $store, MultiFactorAuthenticatable $identity, string $application, string $session, string $factor): void
+    {
+        $this->asked[] = 'forget ' . $factor;
+
+        $store->forgetFactor($identity, $factor);
     }
 
     /**

@@ -41,12 +41,13 @@ in [Factor lifecycle](../guides/lifecycle.md).
   one propagates and rolls back: it failed, it was not refused. An exception a listener throws after the commit is not
   one of these either, so what committed is never reported as refused.
 - A removal's order is the lock order: the factor and its association, with the last confirmed factor the recovery code
-  set (`deleteSet()`), then what the session keeps is read and `SessionRevoker::factorRemoved()` runs with the factor
-  and the sign-in the removal is made from, the requirement is evaluated again, and the removal goes to the transition
-  with any shortfall unless the revoker judged the session itself. Every package row has changed before a session seam
-  runs, so a package row is never locked after a session row. `FactorRemoved` is queued after that synchronous security
-  work, then `reportSetRemoved()` queues `RecoveryCodesRemoved`. Moving them ahead of `factorRemoved()` would put their
-  listeners ahead of the default revoker's after-commit restoration of the proofs the current session keeps.
+  set (`deleteSet()`), then what the session keeps is read, leaving out the removed factor's proofs a store may still
+  list until the revoker voids them, and `SessionRevoker::factorRemoved()` runs with the factor and the sign-in the
+  removal is made from, the requirement is evaluated again, and the removal goes to the transition with any shortfall
+  unless the revoker judged the session itself. Every package row has changed before a session seam runs, so a package
+  row is never locked after a session row. `FactorRemoved` is queued after that synchronous security work, then
+  `reportSetRemoved()` queues `RecoveryCodesRemoved`. Moving them ahead of `factorRemoved()` would put their listeners
+  ahead of the default revoker's after-commit restoration of the proofs the current session keeps.
 - A revoker that judges the current session itself, as an authentication layer's does, says so with
   `RemovalRevocation::judged()`, and what it returns reaches the caller as `FactorRemovalResult::completion()`: a
   layer's result carrying the pending session's new credential, say. Otherwise what the transition returns does. The

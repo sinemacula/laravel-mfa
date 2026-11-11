@@ -5,11 +5,15 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Testing\Seams;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Container\Container;
+use Illuminate\Contracts\Config\Repository;
 use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
+use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -274,6 +278,7 @@ final class ProofStoreContract
      * @param  string  $session
      * @param  string  $factor
      * @param  ?\Closure(\SineMacula\Laravel\Mfa\Proofs\Proof): void  $arrange
+     * @param  ?\Closure(): void  $forget
      * @return void
      */
     public static function assertForgettingAFactorStopsItsProofsCounting(
@@ -283,8 +288,10 @@ final class ProofStoreContract
         string $session,
         string $factor = self::FACTOR,
         ?\Closure $arrange = null,
+        ?\Closure $forget = null,
     ): void {
         $arrange ??= static fn (Proof $proof) => $store->record($identity, $proof);
+        $forget  ??= static fn () => $store->forgetFactor($identity, $factor);
 
         $store->begin($identity, $application, $session);
 
@@ -297,7 +304,9 @@ final class ProofStoreContract
 
         Assert::assertSame([...$held, ProofKind::FIRST_FACTOR, ProofKind::ADDITIONAL_FACTOR], $arranged, 'Both proofs must count before the factor is forgotten.');
 
-        $store->forgetFactor($identity, $factor);
+        self::deleteFactor($factor);
+
+        $forget();
 
         $kinds = self::kinds($store->proofs($identity, $application, $session));
 
@@ -347,6 +356,26 @@ final class ProofStoreContract
         }
 
         Assert::fail($what . ' must be refused by throwing a ProofRefusedException.');
+    }
+
+    /**
+     * The package deletes a factor through its model before it asks the store
+     * to forget it; the synthetic default names no stored factor.
+     *
+     * @param  string  $factor
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     */
+    private static function deleteFactor(string $factor): void
+    {
+        if ($factor === self::FACTOR) {
+            return;
+        }
+
+        $model = ConfiguredModels::factor(Container::getInstance()->make(Repository::class));
+
+        WriteConnection::query((new $model)->newQuery())->find($factor)?->delete();
     }
 
     /**
